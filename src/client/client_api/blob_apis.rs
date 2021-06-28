@@ -44,14 +44,13 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::ChunkAddress;
     /// use xor_name::XorName;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// let head_chunk = ChunkAddress::Public(XorName::random());
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// # let query_timeout: u64 = 20; // 20 seconds
-    /// let client = Client::new(None, None, bootstrap_contacts, query_timeout).await?;
+    /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     ///
     /// // grab the random head of the blob from the network
     /// let _data = client.read_blob(head_chunk, None, None).await?;

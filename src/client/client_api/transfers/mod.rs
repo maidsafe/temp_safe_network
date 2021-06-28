@@ -34,7 +34,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, Token};
     /// use rand::rngs::OsRng;
     /// use std::str::FromStr;
@@ -44,7 +44,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// let initial_balance = Token::from_str("0")?;
     /// let balance = client.get_balance().await?;
     /// assert_eq!(balance, initial_balance);
@@ -67,7 +67,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, Token};
     /// use std::str::FromStr;
     /// use rand::rngs::OsRng;
@@ -79,7 +79,7 @@ impl Client {
     ///
     /// // And we use a random client to do this
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(None, None, bootstrap_contacts).await?;
+    /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// let initial_balance = Token::from_str("0")?;
     /// let balance = client.get_balance_for(pk).await?;
     /// assert_eq!(balance, initial_balance);
@@ -101,7 +101,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::Keypair;
     /// use rand::rngs::OsRng;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
@@ -110,7 +110,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// // Upon calling, history is retrieved and applied to the local AT2 actor.
     /// let _ = client.get_history().await?;
     /// # Ok(()) } ); }

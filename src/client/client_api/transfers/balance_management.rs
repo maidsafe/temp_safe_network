@@ -29,7 +29,6 @@ impl Client {
     /// use safe_network::types::Token;
     /// # #[tokio::main]async fn main() {let _: Result<()> = futures::executor::block_on( async {
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// # let query_timeout: u64 = 20; // 20 seconds
     /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// // now we check the local balance
     /// let some_balance = client.get_local_balance().await;
@@ -111,7 +110,6 @@ impl Client {
     /// let pk = PublicKey::from(sk.public_key());
     /// // Next we create a random client.
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// # let query_timeout: u64 = 20; // 20 seconds
     /// let mut client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// let target_balance = Token::from_str("100")?;
     /// // And trigger a simulated payout to our client's PublicKey, so we have token to send.
