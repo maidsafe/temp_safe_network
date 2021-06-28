@@ -10,9 +10,6 @@ readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
 version = "0.2.21"
 
-[profile.release]
-incremental = true
-
 [[bin]]
 name = "sn_node"
 doc = false
