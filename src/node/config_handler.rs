@@ -415,7 +415,7 @@ where
     T: Serialize,
 {
     let project_dirs = project_dirs()?;
-    fs::create_dir_all(project_dirs.clone())?;
+    fs::create_dir_all(project_dirs.as_path())?;
 
     let path = project_dirs.join(file);
     let mut file = File::create(&path)?;
