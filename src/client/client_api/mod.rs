@@ -43,8 +43,7 @@ pub struct Client {
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
     query_timeout: Duration,
-    #[cfg(test)]
-    pub override_timeout: Option<Duration>,
+    pub(crate) override_timeout: Option<Duration>,
 }
 
 /// Easily manage connections to/from The Safe Network with the client and its APIs.
@@ -69,7 +68,6 @@ impl Client {
     /// let _: Result<()> = futures::executor::block_on( async {
     ///
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// # let query_timeout: u64 = 20; // 20 seconds
     /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// // Now for example you can perform read operations:
     /// let _some_balance = client.get_balance().await?;
@@ -151,7 +149,6 @@ impl Client {
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: Duration::from_secs(query_timeout),
-            #[cfg(test)]
             override_timeout: None,
         };
 

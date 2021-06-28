@@ -25,11 +25,10 @@
 //! # // The Safe Client is an sync library so will need some kind of runtime. Here we use tokio.
 //! # extern crate tokio; use anyhow::Result;
 //! # use safe_network::client::utils::test_utils::read_network_conn_info;
-//! use safe_network::client::Client;
+//! use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
 //! # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
 //! # let bootstrap_contacts = Some(read_network_conn_info()?);
-//! # let query_timeout: u64 = 20; // 20 seconds
-//! let client = Client::new(None, None, bootstrap_contacts, query_timeout).await?;
+//! let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
 //! // Now for example you can perform read operations:
 //! let _some_balance = client.get_balance().await?;
 //! # Ok(()) } ); }
@@ -47,7 +46,6 @@
 //! # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
 //! let id = Keypair::new_ed25519(&mut OsRng);
 //! # let bootstrap_contacts = Some(read_network_conn_info()?);
-//! # let query_timeout: u64 = 20; // 20 seconds
 //! let client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
 //! // Now for example you can perform read operations:
 //! let _some_balance = client.get_balance().await?;
