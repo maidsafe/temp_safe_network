@@ -35,15 +35,11 @@ impl Client {
         let client_pk = self.public_key();
         let signature = self.keypair.sign(b"TODO");
 
-        #[cfg(test)]
         let timeout = if let Some(overriden) = self.override_timeout {
             overriden
         } else {
             self.query_timeout
         };
-
-        #[cfg(not(test))]
-        let timeout = self.query_timeout;
 
         tokio::time::timeout(timeout, self.send_signed_query(query, client_pk, signature))
             .await

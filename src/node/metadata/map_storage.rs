@@ -273,6 +273,7 @@ impl MapStorage {
             .map(|data| data.shell())
         {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
