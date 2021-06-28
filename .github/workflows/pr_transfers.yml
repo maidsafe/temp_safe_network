@@ -57,7 +57,7 @@ jobs:
       # Run tests.
       - shell: bash
         if: steps.changes.outputs.src == 'true'
-        run: cargo test --release transfers -- --skip client::
+        run: cargo test --release transfers -- --skip client
 
       # Print CI machine disk space stats if the tests fail
       - name: Print CI Machine df Stats on Failure

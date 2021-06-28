@@ -86,7 +86,7 @@ jobs:
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: any remaining tests client...
         shell: bash
-        run: timeout 15m cargo test --release client_api:: -- --skip client_api::seq --skip client_api::map --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
+        run: timeout 15m cargo test --release client_api -- --skip client_api::seq --skip client_api::map --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
       
 
 
