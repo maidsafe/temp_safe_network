@@ -150,7 +150,7 @@ impl Comm {
             .await
             .map_err(|err| Error::CannotConnectEndpoint { err })?;
 
-        connectivity_endpoint
+        let result = connectivity_endpoint
             .is_reachable(peer)
             .await
             .map_err(|err| {
@@ -159,7 +159,9 @@ impl Comm {
             })
             .map(|()| {
                 info!("Peer {} is externally reachable.", peer);
-            })
+            });
+        connectivity_endpoint.close();
+        result
     }
 
     /// Sends a message to multiple recipients. Attempts to send to `delivery_group_size`
