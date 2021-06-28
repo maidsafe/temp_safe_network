@@ -40,7 +40,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, Token};
     /// use std::str::FromStr;
     /// use rand::rngs::OsRng;
@@ -49,7 +49,7 @@ impl Client {
 
     /// // Start our client
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// let target_balance = Token::from_str("100")?;
     /// let _ = client.trigger_simulated_farming_payout(target_balance).await?;
     ///
