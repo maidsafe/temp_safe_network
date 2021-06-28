@@ -38,7 +38,7 @@ const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 use safe_network::routing;
 
 /// Runs a Safe Network node.
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     run_node().await
 }
