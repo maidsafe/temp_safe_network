@@ -52,21 +52,21 @@ pub(crate) fn delivery_targets(
     }
 
     let (best_section, dg_size) = match dst {
-        DstLocation::Section(target_name) => {
-            section_candidates(target_name, our_name, section, network)?
+        DstLocation::Section { name, section_pk } => {
+            section_candidates(name, our_name, section, network)?
         }
         DstLocation::EndUser(user) => {
             section_candidates(&user.xorname, our_name, section, network)?
         }
-        DstLocation::Node(target_name) => {
-            if target_name == our_name {
+        DstLocation::Node { name, section_pk } => {
+            if name == our_name {
                 return Ok((Vec::new(), 0));
             }
-            if let Some(node) = get_peer(target_name, section, network) {
+            if let Some(node) = get_peer(name, section, network) {
                 return Ok((vec![node], 1));
             }
 
-            candidates(target_name, our_name, section, network)?
+            candidates(name, our_name, section, network)?
         }
         DstLocation::DirectAndUnrouted(_) => return Err(Error::CannotRoute),
     };

@@ -150,7 +150,9 @@ impl Core {
     }
 
     // Send message over the network.
-    pub async fn relay_message(&self, msg: &NodeMsg) -> Result<Option<Command>> {
+    pub async fn relay_message(&self, wire_msg: &WireMsg) -> Result<Option<Command>> {
+        unimplemented!();
+        /*
         let (presumed_targets, dg_size) = delivery_group::delivery_targets(
             &msg.dst,
             &self.node.name(),
@@ -197,13 +199,12 @@ impl Core {
         );
 
         Ok(Some(command))
+        */
     }
 
-    pub async fn send_user_message(
-        &self,
-        itinerary: Itinerary,
-        content: MessageType,
-    ) -> Result<Vec<Command>> {
+    pub async fn send_user_message(&self, wire_msg: WireMsg) -> Result<Vec<Command>> {
+        unimplemented!();
+        /*
         let are_we_src = itinerary.src.equals(&self.node.name())
             || itinerary.src.equals(&self.section().prefix().name());
         if !are_we_src {
@@ -272,6 +273,7 @@ impl Core {
         commands.extend(self.relay_message(&msg).await?);
 
         Ok(commands)
+        */
     }
 
     // Setting the JoinsAllowed triggers a round Proposal::SetJoinsAllowed to update the flag.

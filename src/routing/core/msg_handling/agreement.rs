@@ -165,9 +165,9 @@ impl Core {
         node_state: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
         unimplemented!();
         /*
+        let mut commands = vec![];
         let peer = node_state.peer;
         let age = peer.age();
         let signature = sig.signature.clone();

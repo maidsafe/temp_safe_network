@@ -33,7 +33,9 @@ pub use section::{ElderCandidates, MembershipState, NodeState, Peer, Section, Se
 pub use signature_aggregator::{Error, SignatureAggregator};
 pub use signed::{KeyedSig, SigShare};
 
-use crate::messaging::{client::ClientMsg, EndUser, MessageId, SectionAuthorityProvider};
+use crate::messaging::{
+    client::ClientMsg, ClientSigned, EndUser, MessageId, SectionAuthorityProvider,
+};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use hex_fmt::HexFmt;
@@ -67,6 +69,8 @@ pub enum NodeMsg {
         msg: ClientMsg,
         /// The origin
         user: EndUser,
+        /// Signature provided by the client
+        client_signed: ClientSigned,
     },
     /// Inform other sections about our section or vice-versa.
     SectionKnowledge {

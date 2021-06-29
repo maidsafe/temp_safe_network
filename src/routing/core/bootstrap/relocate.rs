@@ -112,7 +112,7 @@ impl JoiningAsRelocated {
                     return Err(Error::InvalidMessage);
                 }
 
-                if !section_chain.check_trust(self.dst_section_key) {
+                if !section_chain.check_trust(Some(&self.dst_section_key)) {
                     error!("Verification failed - untrusted Join approval message",);
                     return Ok(None);
                 }
@@ -229,8 +229,8 @@ impl JoiningAsRelocated {
         let new_keypair = ed25519::gen_keypair(&name_prefix.range_inclusive(), age);
         let new_name = XorName::from(PublicKey::from(new_keypair.public));
         self.relocate_payload = Some(RelocatePayload::new(
-            self.node_msg,
-            self.node_msg_sig,
+            self.node_msg.clone(),
+            self.node_msg_sig.clone(),
             &new_name,
             &self.node.keypair,
         ));

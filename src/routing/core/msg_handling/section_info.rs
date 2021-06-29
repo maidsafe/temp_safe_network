@@ -33,10 +33,10 @@ impl Core {
     ) -> Vec<Command> {
         // Provide our PK as the dst PK, only redundant as the message
         // itself contains details regarding relocation/registration.
-        let dst_info = DstInfo {
+        /*let dst_info = DstInfo {
             dst: dst_info.dst,
             dst_section_pk: *self.section().chain().last_key(),
-        };
+        };*/
 
         match message {
             SectionInfoMsg::GetSectionQuery(public_key) => {
@@ -70,14 +70,17 @@ impl Core {
                 let response = SectionInfoMsg::GetSectionResponse(response);
                 debug!("Sending {:?} to {}", response, sender);
 
-                vec![Command::SendMessage {
-                    recipients: vec![(name, sender)],
-                    delivery_group_size: 1,
-                    message: MessageType::SectionInfo {
-                        msg: response,
-                        dst_info,
-                    },
-                }]
+                match WireMsg::new_section_info_msg(&response, dst_location) {
+                    Ok(wire_msg) => vec![Command::SendMessage {
+                        recipients: vec![(name, sender)],
+                        delivery_group_size: 1,
+                        wire_msg,
+                    }],
+                    Err(err) => {
+                        error!("Failed to build section info response msg: {:?}", err);
+                        vec![]
+                    }
+                }
             }
             SectionInfoMsg::GetSectionResponse(response) => {
                 error!("GetSectionResponse unexpectedly received: {:?}", response);
@@ -114,6 +117,9 @@ impl Core {
             self.section.authority_provider().section_key(),
         )?;
         let key = self.section_key_by_name(&src_name);
+
+        unimplemented!();
+        /*
         Ok(Command::send_message_to_node(
             (src_name, sender),
             msg,
@@ -121,6 +127,6 @@ impl Core {
                 dst: src_name,
                 dst_section_pk: key,
             },
-        ))
+        ))*/
     }
 }

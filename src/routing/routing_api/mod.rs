@@ -495,13 +495,13 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
         return;
     }
 
+    let msg_id = wire_msg.msg_id();
     let message_type = match wire_msg.to_message() {
         Ok(message_type) => message_type,
         Err(err) => {
             error!(
                 "Failed to deserialize message payload ({:?}): {}",
-                wire_msg.msg_id(),
-                err
+                msg_id, err
             );
             return;
         }
@@ -537,7 +537,10 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
             let _ = task::spawn(dispatcher.handle_commands(command));
         }
         MessageType::Client {
-            client_signed, msg, ..
+            client_signed,
+            msg,
+            dst_location,
+            ..
         } => {
             let end_user = dispatcher
                 .core
@@ -573,14 +576,18 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
                 }
             };
 
-            if dispatcher
-                .core
-                .read()
-                .await
-                .section()
-                .prefix()
-                .matches(msg.dst_location().name())
-            {
+            let is_in_destination = match dst_location.name() {
+                Some(dst_name) => dispatcher
+                    .core
+                    .read()
+                    .await
+                    .section()
+                    .prefix()
+                    .matches(&dst_name),
+                None => true, // it's a DirectAndUnrouted dst
+            };
+
+            if is_in_destination {
                 let event = Event::ClientMsgReceived {
                     msg: Box::new(msg),
                     client_signed,
@@ -592,11 +599,11 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
                     let core = dispatcher.core.read().await;
                     let node = core.node();
                     let section = core.section();
-                    let dst_location = msg.dst_location().clone();
 
                     let node_msg = NodeMsg::ForwardClientMsg {
                         msg,
                         user: end_user,
+                        client_signed,
                     };
                     let to_relay = match WireMsg::single_src(
                         node,

@@ -73,6 +73,8 @@ impl Core {
             content: proposal,
             sig_share,
         };
+        unimplemented!();
+        /*
         let message = WireMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
@@ -81,6 +83,7 @@ impl Core {
         )?;
 
         Ok(self.send_or_handle(message, recipients))
+        */
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -400,7 +403,7 @@ impl Core {
 
     // Send the message to all `recipients`. If one of the recipients is us, don't send it over the
     // network but handle it directly.
-    pub(crate) fn send_or_handle(&self, message: NodeMsg, recipients: &[Peer]) -> Vec<Command> {
+    pub(crate) fn send_or_handle(&self, wire_msg: WireMsg, recipients: &[Peer]) -> Vec<Command> {
         unimplemented!();
         /*
         let mut commands = vec![];

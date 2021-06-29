@@ -20,7 +20,7 @@ mod user_msg;
 
 use super::Core;
 use crate::messaging::{
-    node::{DstInfo, Error as AggregatorError, JoinResponse, NodeMsg, Proposal},
+    node::{DstInfo, Error as AggregatorError, NodeMsg, Proposal},
     DstLocation, MessageId, NodeMsgAuthority,
 };
 use crate::routing::{
@@ -52,12 +52,15 @@ impl Core {
         // all the elders in our section and the msg needs to be propagated.
         if !in_dst_location {
             // RoutingMsg not for us.
-            info!("Relay message {} closer to the destination", routing_msg.id);
-            if let Some(cmd) = self.relay_message(&routing_msg).await? {
+            info!("Relay message {:?} closer to the destination", msg);
+            unimplemented!();
+            /*
+            if let Some(cmd) = self.relay_message(&msg).await? {
                 return Ok(vec![cmd]);
             } else {
                 return Ok(vec![]);
             }
+            */
         }
 
         // Let's first verify the section chain in the src authority is trusted
@@ -83,7 +86,7 @@ impl Core {
             msg
         );
         let (ae_command, shall_be_handled) = self
-            .check_for_entropy(&msg, &msg_authority, &dst_location.section_pk())
+            .check_for_entropy(&msg, &msg_authority, &dst_location, sender)
             .await?;
 
         let mut commands = vec![];
@@ -93,10 +96,7 @@ impl Core {
         }
 
         if shall_be_handled {
-            trace!(
-                "Entropy check passed. Handling useful msg {}!",
-                routing_msg.id
-            );
+            trace!("Entropy check passed. Handling useful msg {:?}!", msg);
             commands.extend(
                 self.handle_useful_message(sender, msg, dst_location, msg_authority, &known_keys)
                     .await?,
@@ -122,13 +122,18 @@ impl Core {
         let src_name = msg_authority.name();
 
         match node_msg {
-            NodeMsg::ForwardClientMsg { msg, user } => {
+            NodeMsg::ForwardClientMsg {
+                msg,
+                user,
+                client_signed,
+            } => {
                 // If elder, always handle Forward
                 if self.is_not_elder() {
                     return Ok(vec![]);
                 }
 
-                self.handle_forwarded_message(msg, user).await
+                self.handle_forwarded_message(msg, user, client_signed)
+                    .await
             }
             NodeMsg::SectionKnowledge {
                 src_info: (src_signed_sap, src_chain),
@@ -143,6 +148,8 @@ impl Core {
                 }
 
                 self.update_section_knowledge(src_signed_sap, src_chain);
+                unimplemented!()
+                /*
                 if let Some(message) = msg {
                     // This included message shall be sent from us originally.
                     // Now send it back with the latest knowledge of the destination section.
@@ -167,7 +174,7 @@ impl Core {
                     Ok(vec![cmd])
                 } else {
                     Ok(vec![])
-                }
+                }*/
             }
             NodeMsg::Sync {
                 ref section,
@@ -185,14 +192,14 @@ impl Core {
                         "Untrusted Sync message from {:?} and section: {:?} ",
                         sender, section
                     );
-                    let cmd = self.handle_untrusted_message(sender, &node_msg, dst_info)?;
+                    let cmd = self.handle_untrusted_message(sender, &node_msg, &msg_authority)?;
                     Ok(vec![cmd])
                 }
             }
-            NodeMsg::Relocate(details) => {
+            NodeMsg::Relocate(ref details) => {
                 if let NodeMsgAuthority::Section(section_signed) = msg_authority {
                     Ok(self
-                        .handle_relocate(details, node_msg, section_signed)
+                        .handle_relocate(details.clone(), node_msg, section_signed)
                         .await?
                         .into_iter()
                         .collect())
@@ -212,7 +219,7 @@ impl Core {
             }
             NodeMsg::JoinRequest(join_request) => {
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
-                self.handle_join_request(node_msg.src.peer(sender)?, *join_request)
+                self.handle_join_request(msg_authority.peer(sender)?, *join_request)
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 if self.is_not_elder()
@@ -223,7 +230,7 @@ impl Core {
 
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
                 self.handle_join_as_relocated_request(
-                    node_msg.src.peer(sender)?,
+                    msg_authority.peer(sender)?,
                     *join_request,
                     &known_keys,
                 )
@@ -231,18 +238,24 @@ impl Core {
             NodeMsg::UserMessage(ref content) => {
                 // If elder, always handle UserMessage, otherwise
                 // handle it only if addressed directly to us as a node.
-                if self.is_not_elder() && node_msg.dst != DstLocation::Node(self.node.name()) {
+                unimplemented!();
+                /*
+                let our_dst = DstLocation::Node {
+                    name: self.node.name(),
+                    section_pk: *self.section.chain().last_key(),
+                };
+                if self.is_not_elder() && node_msg.dst != our_dst {
                     return Ok(vec![]);
                 }
 
                 self.handle_user_message(
                     Bytes::from(content.clone()),
-                    node_msg.src.src_location(),
-                    node_msg.dst,
+                    msg_authority.src_location(),
+                    dst_location,
                     node_msg.section_pk,
                     node_msg.keyed_sig(),
                 )
-                .await
+                .await*/
             }
             NodeMsg::BouncedUntrustedMessage {
                 msg: bounced_msg,
@@ -250,7 +263,7 @@ impl Core {
             } => {
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
                 Ok(vec![self.handle_bounced_untrusted_message(
-                    node_msg.src.peer(sender)?,
+                    msg_authority.peer(sender)?,
                     dst_info.dst_section_pk,
                     *bounced_msg,
                 )?])
@@ -265,7 +278,7 @@ impl Core {
                     returned_msg,
                     sender,
                     src_name,
-                    node_msg.src.src_location().to_dst(),
+                    msg_authority.src_location().to_dst(),
                 )?])
             }
             NodeMsg::DkgStart {
@@ -313,7 +326,8 @@ impl Core {
                             .chain()
                             .has_key(&sig_share.public_key_set.public_key())
                         {
-                            let cmd = self.handle_untrusted_message(sender, &node_msg, dst_info)?;
+                            let cmd =
+                                self.handle_untrusted_message(sender, &node_msg, &msg_authority)?;
                             return Ok(vec![cmd]);
                         }
                     }
@@ -352,6 +366,10 @@ impl Core {
                 }
 
                 Ok(vec![])
+            }
+            _node_msg_types => {
+                // TODO: send them to sn_node layer as an event
+                unimplemented!();
             }
         }
     }

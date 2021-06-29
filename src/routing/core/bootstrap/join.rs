@@ -65,7 +65,7 @@ pub(crate) async fn join_network(
 
 struct Join<'a> {
     // Sender for outgoing messages.
-    send_tx: mpsc::Sender<(MessageType, Vec<(XorName, SocketAddr)>)>,
+    send_tx: mpsc::Sender<(WireMsg, Vec<(XorName, SocketAddr)>)>,
     // Receiver for incoming messages.
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
@@ -76,7 +76,7 @@ struct Join<'a> {
 impl<'a> Join<'a> {
     fn new(
         node: Node,
-        send_tx: mpsc::Sender<(MessageType, Vec<(XorName, SocketAddr)>)>,
+        send_tx: mpsc::Sender<(WireMsg, Vec<(XorName, SocketAddr)>)>,
         recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     ) -> Self {
         Self {
@@ -291,27 +291,15 @@ impl<'a> Join<'a> {
     ) -> Result<()> {
         info!("Sending {:?} to {:?}", join_request, recipients);
 
-        let variant = NodeMsg::JoinRequest(Box::new(join_request));
-        let message = NodeMsg::single_src(
+        let node_msg = NodeMsg::JoinRequest(Box::new(join_request));
+        let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted,
-            variant,
+            DstLocation::DirectAndUnrouted(section_key),
+            node_msg,
             section_key,
         )?;
 
-        let _ = self
-            .send_tx
-            .send((
-                MessageType::Routing {
-                    msg: message,
-                    dst_info: DstInfo {
-                        dst: recipients[0].0,
-                        dst_section_pk: section_key,
-                    },
-                },
-                recipients.to_vec(),
-            ))
-            .await;
+        let _ = self.send_tx.send((wire_msg, recipients.to_vec())).await;
 
         Ok(())
     }
@@ -326,11 +314,10 @@ impl<'a> Join<'a> {
                     }
                     Ok(MessageType::Node {
                         msg_id,
-                        msg_authority:
-                            NodeMsgAuthority::NodeSignedMsg(NodeSigned { public_key, .. }),
+                        msg_authority: NodeMsgAuthority::Node(NodeSigned { public_key, .. }),
                         dst_location,
                         msg: NodeMsg::JoinResponse(resp),
-                    }) => (*resp, sender, ed25519::name(public_key)),
+                    }) => (*resp, sender, ed25519::name(&public_key)),
                     Ok(MessageType::Node {
                         msg_id,
                         msg_authority,
@@ -423,22 +410,22 @@ impl<'a> Join<'a> {
 
 // Keep reading messages from `rx` and send them using `comm`.
 async fn send_messages(
-    mut rx: mpsc::Receiver<(MessageType, Vec<(XorName, SocketAddr)>)>,
+    mut rx: mpsc::Receiver<(WireMsg, Vec<(XorName, SocketAddr)>)>,
     comm: &Comm,
 ) -> Result<()> {
-    while let Some((message, recipients)) = rx.recv().await {
+    while let Some((wire_msg, recipients)) = rx.recv().await {
         match comm
-            .send(&recipients, recipients.len(), message.clone())
+            .send(&recipients, recipients.len(), wire_msg.clone())
             .await
         {
             Ok(SendStatus::AllRecipients) | Ok(SendStatus::MinDeliveryGroupSizeReached(_)) => {}
             Ok(SendStatus::MinDeliveryGroupSizeFailed(recipients)) => {
-                error!("Failed to send message {:?} to {:?}", message, recipients)
+                error!("Failed to send message {:?} to {:?}", wire_msg, recipients)
             }
             Err(err) => {
                 error!(
                     "Failed to send message {:?} to {:?}: {:?}",
-                    message, recipients, err
+                    wire_msg, recipients, err
                 )
             }
         }
