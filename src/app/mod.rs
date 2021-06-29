@@ -19,10 +19,10 @@ mod test_helpers;
 use super::{common, constants, Result};
 use rand::rngs::OsRng;
 use safe_client::SafeAppClient;
+use safe_network::client::DEFAULT_QUERY_TIMEOUT;
 use safe_network::types::Keypair;
-use std::time::Duration;
 
-static DEFAULT_TIMEOUT_SECS: u64 = 20;
+use std::time::Duration;
 
 // The following is what's meant to be the public API
 
@@ -41,15 +41,13 @@ pub use xor_name::{XorName, XOR_NAME_LEN};
 pub struct Safe {
     safe_client: SafeAppClient,
     pub xorurl_base: XorUrlBase,
-    #[allow(dead_code)]
-    timeout: Duration,
 }
 
 impl Default for Safe {
     fn default() -> Self {
         Self::new(
             Some(DEFAULT_XORURL_BASE),
-            Duration::from_secs(DEFAULT_TIMEOUT_SECS),
+            Duration::from_secs(DEFAULT_QUERY_TIMEOUT),
         )
     }
 }
@@ -57,9 +55,8 @@ impl Default for Safe {
 impl Safe {
     pub fn new(xorurl_base: Option<XorUrlBase>, timeout: Duration) -> Self {
         Self {
-            safe_client: SafeAppClient::new(),
+            safe_client: SafeAppClient::new(timeout),
             xorurl_base: xorurl_base.unwrap_or(DEFAULT_XORURL_BASE),
-            timeout,
         }
     }
 

@@ -19,7 +19,9 @@ use hmac::Hmac;
 use log::{debug, info, trace};
 use rand::rngs::{OsRng, StdRng};
 use rand_core::SeedableRng;
-use safe_network::client::{client_api::Client, Error as ClientError, ErrorMessage::NoSuchEntry};
+use safe_network::client::{
+    client_api::Client, Error as ClientError, ErrorMessage::NoSuchEntry, DEFAULT_QUERY_TIMEOUT,
+};
 use safe_network::types::{
     Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions,
     MapValue, Token,
@@ -189,6 +191,7 @@ impl SafeAuthenticator {
             Some(keypair),
             self.config_path.as_deref(),
             self.bootstrap_contacts.clone(),
+            DEFAULT_QUERY_TIMEOUT,
         )
         .await?;
         trace!("Client instantiated properly!");
@@ -293,6 +296,7 @@ impl SafeAuthenticator {
             Some(keypair),
             self.config_path.as_deref(),
             self.bootstrap_contacts.clone(),
+            DEFAULT_QUERY_TIMEOUT,
         )
         .await?;
         trace!("Client instantiated properly!");
@@ -455,6 +459,7 @@ impl SafeAuthenticator {
                         Some(keypair.clone()),
                         self.config_path.as_deref(),
                         self.bootstrap_contacts.clone(),
+                        DEFAULT_QUERY_TIMEOUT,
                     )
                     .await?;
                     tmp_client

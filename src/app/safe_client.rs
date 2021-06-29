@@ -22,6 +22,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     net::SocketAddr,
     path::{Path, PathBuf},
+    time::Duration,
 };
 use xor_name::XorName;
 
@@ -32,6 +33,7 @@ pub struct SafeAppClient {
     safe_client: Option<Client>,
     pub(crate) bootstrap_config: Option<HashSet<SocketAddr>>,
     config_path: Option<PathBuf>,
+    timeout: Duration,
 }
 
 impl SafeAppClient {
@@ -43,11 +45,12 @@ impl SafeAppClient {
         }
     }
 
-    pub fn new() -> Self {
+    pub fn new(timeout: Duration) -> Self {
         Self {
             safe_client: None,
             bootstrap_config: None,
             config_path: None,
+            timeout,
         }
     }
 
@@ -78,6 +81,7 @@ impl SafeAppClient {
             app_keypair,
             self.config_path.as_deref(),
             self.bootstrap_config.clone(),
+            self.timeout.as_secs(),
         )
         .await
         .map_err(|err| {
@@ -101,6 +105,7 @@ impl SafeAppClient {
             Some(id),
             self.config_path.as_deref(),
             self.bootstrap_config.clone(),
+            self.timeout.as_secs(),
         )
         .await?;
 
@@ -121,6 +126,7 @@ impl SafeAppClient {
                 id,
                 self.config_path.as_deref(),
                 self.bootstrap_config.clone(),
+                self.timeout.as_secs(),
             )
             .await?
         } else {
@@ -164,6 +170,7 @@ impl SafeAppClient {
                     Some(id),
                     self.config_path.as_deref(),
                     self.bootstrap_config.clone(),
+                    self.timeout.as_secs(),
                 )
                 .await?
             }
