@@ -83,18 +83,11 @@ impl Client {
     /// You're only able to delete a PrivateRegister. Public data can no be removed from the network.
     pub async fn delete_register(&self, address: Address) -> Result<(), Error> {
         let cmd = DataCmd::Register(RegisterWrite::Delete(address));
-        // Payment for PUT
-        let payment_proof = self.create_write_payment_proof(&cmd).await?;
 
         // The _actual_ message
-        let cmd = Cmd::Data {
-            cmd,
-            payment: payment_proof.clone(),
-        };
+        let cmd = Cmd::Data { cmd };
 
-        self.send_cmd(cmd, None).await?;
-
-        self.apply_write_payment_to_local_actor(payment_proof).await
+        self.send_cmd(cmd, None).await
     }
 
     /// Write to Register
@@ -245,14 +238,11 @@ mod tests {
     use crate::messaging::client::Error as ErrorMessage;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
-        Error as DtError, PublicKey, Token,
+        Error as DtError, PublicKey,
     };
     use crate::{retry_loop, retry_loop_for_pattern};
     use anyhow::{anyhow, bail, Result};
-    use std::{
-        collections::{BTreeMap, BTreeSet},
-        str::FromStr,
-    };
+    use std::collections::{BTreeMap, BTreeSet};
     use tokio::time::Duration;
     use xor_name::XorName;
 
@@ -521,29 +511,6 @@ mod tests {
         // Check that our data still exists.
         let register = client.get_register(address).await?;
         assert!(register.is_public());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    pub async fn register_deletions_should_cost_put_price() -> Result<()> {
-        let name = XorName(rand::random());
-        let tag = 10;
-        let client = create_test_client(None).await?;
-        let owner = client.public_key();
-        let perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
-        let address = client
-            .store_private_register(name, tag, owner, perms)
-            .await?;
-
-        let balance_before_delete = retry_loop_for_pattern!(client.get_balance(),
-            Ok(balance) if *balance != Token::from_str("0")? && *balance != Token::from_str("10")?)?;
-
-        client.delete_register(address).await?;
-
-        // now let's ensure we've paid _something_
-        let _ = retry_loop_for_pattern!(client.get_balance(),
-            Ok(balance) if *balance != balance_before_delete)?;
 
         Ok(())
     }

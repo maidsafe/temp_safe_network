@@ -413,8 +413,13 @@ mod tests {
         let src_section_pk = SecretKey::random().public_key();
         let dst_section_pk = SecretKey::random().public_key();
 
+        let pk = crate::types::PublicKey::Bls(dst_section_pk);
+
         let node_cmd = NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(dst_section_pk.into())),
+            cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
+                node_id: pk,
+                section: pk.into(),
+            }),
             id: MessageId::new(),
         };
 

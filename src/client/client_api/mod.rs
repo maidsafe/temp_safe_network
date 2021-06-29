@@ -13,24 +13,20 @@ mod map_apis;
 mod queries;
 mod register_apis;
 mod sequence_apis;
-mod transfers;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
-use crate::messaging::client::{Cmd, CmdError, DataCmd, Error as ErrorMessage, TransferCmd};
-use crate::transfers::TransferActor;
-use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey, SectionElders, Token};
-use crdts::Dot;
+use crate::messaging::client::{Cmd, CmdError, DataCmd};
+use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
 use lru::LruCache;
 use rand::rngs::OsRng;
 use std::{
     path::Path,
-    str::FromStr,
     {collections::HashSet, net::SocketAddr, sync::Arc},
 };
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::Duration;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, trace};
 
 // Number of attempts to make when trying to bootstrap to the network
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 1;
@@ -40,8 +36,6 @@ const BLOB_CACHE_CAP: usize = 150;
 #[derive(Clone, Debug)]
 pub struct Client {
     keypair: Keypair,
-    transfer_actor: Arc<RwLock<TransferActor<Keypair>>>,
-    simulated_farming_payout_dot: Dot<PublicKey>,
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
     blob_cache: Arc<Mutex<LruCache<ChunkAddress, Chunk>>>,
@@ -83,7 +77,7 @@ impl Client {
     ) -> Result<Self, Error> {
         let mut rng = OsRng;
 
-        let (keypair, is_random_client) = match optional_keypair {
+        let (keypair, _is_random_client) = match optional_keypair {
             Some(id) => {
                 info!("Client started for specific pk: {:?}", id.public_key());
                 (id, false)
@@ -104,12 +98,9 @@ impl Client {
 
         // Incoming error notifiers
         let (err_sender, err_receiver) = tokio::sync::mpsc::channel::<CmdError>(10);
-        // Listener for transfer errors
-        let (trasfer_err_sender, transfer_err_receiver) =
-            tokio::sync::mpsc::channel::<(SocketAddr, ErrorMessage)>(10);
 
         // Create the session with the network
-        let mut session = Session::new(qp2p_config, err_sender, trasfer_err_sender)?;
+        let mut session = Session::new(qp2p_config, err_sender)?;
 
         let client_pk = keypair.public_key();
 
@@ -118,99 +109,15 @@ impl Client {
         debug!("Bootstrapping to the network...");
         attempt_bootstrap(&mut session, client_pk).await?;
 
-        // Random PK used for from payment
-        let random_payment_id = Keypair::new_ed25519(&mut rng);
-        let random_payment_pk = random_payment_id.public_key();
-
-        let simulated_farming_payout_dot = Dot::new(random_payment_pk, 0);
-
-        let key_set = session
-            .section_key_set
-            .read()
-            .await
-            .clone()
-            .ok_or(Error::NotBootstrapped)?;
-        let names = session.get_elder_names().await;
-        let prefix = session
-            .section_prefix()
-            .await
-            .ok_or(Error::NoSectionPrefixKnown)?;
-
-        let elders = SectionElders {
-            prefix,
-            names,
-            key_set,
-        };
-
-        let transfer_actor = Arc::new(RwLock::new(TransferActor::new(keypair.clone(), elders)));
-
-        let mut client = Self {
+        let client = Self {
             keypair,
-            transfer_actor,
-            simulated_farming_payout_dot,
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: Duration::from_secs(query_timeout),
             blob_cache: Arc::new(Mutex::new(LruCache::new(BLOB_CACHE_CAP))),
         };
 
-        Self::handle_anti_entropy_errors(client.clone(), transfer_err_receiver);
-
-        if cfg!(feature = "simulated-payouts") {
-            // only trigger simulated payouts on new _random_ clients
-            if is_random_client {
-                debug!("Attempting to trigger simulated payout");
-                // we're testing, and currently a lot of tests expect 10 token to start
-                let _ = client
-                    .trigger_simulated_farming_payout(Token::from_str("10")?)
-                    .await?;
-            } else {
-                warn!("No automatic simulated payout occurs for clients created for pre-existing SecretKeys")
-            }
-        }
-
-        if !is_random_client {
-            // update our local state
-            client.get_history().await?;
-        }
-
         Ok(client)
-    }
-
-    /// Sets up a listener for Cmd Errors that may need transfer debits to be resent to elders
-    pub fn handle_anti_entropy_errors(
-        client: Self,
-        mut transfer_err_receiver: Receiver<(SocketAddr, ErrorMessage)>,
-    ) {
-        let _ = tokio::spawn(async move {
-            let transfer_actor = client.clone().transfer_actor;
-            while let Some((src, ErrorMessage::MissingTransferHistory(received, expected))) =
-                transfer_err_receiver.recv().await
-            {
-                trace!("An elder received a transfer out of order");
-
-                if expected < received {
-                    info!("An Elder is missing transfer history, updating if we have newer");
-                    // TODO: target specific elder by src
-                    // refactor send_cmd to allow optional src
-                    let our_history = transfer_actor.read().await.history();
-                    for (i, debit) in our_history.debits.iter().enumerate() {
-                        if i >= expected as usize {
-                            trace!("Sending transfer #${:?} to elder@{:?}", i, src);
-                            if let Err(error) = client
-                                .send_cmd(
-                                    Cmd::Transfer(TransferCmd::RegisterTransfer(debit.clone())),
-                                    Some(src),
-                                )
-                                .await
-                            {
-                                error!("Error sending command to update elder with missing debits. {:?}", error)
-                            }
-                        }
-                    }
-                }
-            }
-        });
     }
 
     /// Return the client's FullId.
@@ -255,18 +162,10 @@ impl Client {
     // Private helper to obtain payment proof for a data command, send it to the network,
     // and also apply the payment to local replica actor.
     async fn pay_and_send_data_command(&self, cmd: DataCmd) -> Result<(), Error> {
-        // Payment for PUT
-        let payment_proof = self.create_write_payment_proof(&cmd).await?;
-
         // The _actual_ message
-        let cmd = Cmd::Data {
-            cmd,
-            payment: payment_proof.clone(),
-        };
+        let cmd = Cmd::Data { cmd };
 
-        self.send_cmd(cmd, None).await?;
-
-        self.apply_write_payment_to_local_actor(payment_proof).await
+        self.send_cmd(cmd, None).await
     }
 
     #[cfg(test)]
@@ -339,10 +238,10 @@ mod tests {
 
     #[tokio::test]
     pub async fn long_lived_connection_survives() -> Result<()> {
-        let client = create_test_client(None).await?;
+        let _client = create_test_client(None).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
-        let balance = client.get_balance().await?;
-        assert_ne!(balance, Token::from_nano(0));
+
+        // TODO: make a network call
 
         Ok(())
     }

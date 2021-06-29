@@ -8,7 +8,6 @@
 
 use crate::messaging::{client::Error as ErrorMessage, MessageId, MessageType};
 use crate::routing::Prefix;
-use crate::transfers::Error as TransferError;
 use crate::types::{DataAddress, Error as DtError, PublicKey};
 use std::io;
 use thiserror::Error;
@@ -139,21 +138,9 @@ pub enum Error {
     /// NetworkData error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] crate::types::Error),
-    /// transfers error.
-    #[error("Transfer data error:: {0}")]
-    Transfer(#[from] crate::transfers::Error),
     /// Routing error.
     #[error("Routing error:: {0}")]
     Routing(#[from] crate::routing::Error),
-    /// Transfer has already been registered
-    #[error("Transfer has already been registered")]
-    TransferAlreadyRegistered,
-    /// Transfer message is invalid.
-    #[error("Signed transfer for Dot: '{0:?}' is not valid. Debit or credit are missing")]
-    InvalidSignedTransfer(crdts::Dot<PublicKey>),
-    /// Transfer message is invalid.
-    #[error("Propagated Credit Agreement proof is not valid. Proof received: {0:?}")]
-    InvalidPropagatedTransfer(crate::types::CreditAgreementProof),
     /// Message is invalid.
     #[error("Message with id: '{0:?}' is invalid. {1}")]
     InvalidMessage(MessageId, String),
@@ -185,11 +172,6 @@ pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
         Error::InvalidOperation(msg) => ErrorMessage::InvalidOperation(msg),
         Error::InvalidMessage(_, msg) => ErrorMessage::InvalidOperation(msg),
         Error::InvalidOwner(key) => ErrorMessage::InvalidOwners(key),
-        Error::InvalidSignedTransfer(_) => ErrorMessage::InvalidSignature,
-        Error::TransferAlreadyRegistered => ErrorMessage::TransactionIdExists,
-        Error::Transfer(TransferError::OperationOutOfOrder(received, expected)) => {
-            ErrorMessage::MissingTransferHistory(received, expected)
-        }
         Error::NoSuchChunk(address) => ErrorMessage::DataNotFound(address),
         Error::NotEnoughSpace => ErrorMessage::NotEnoughSpace,
         Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,

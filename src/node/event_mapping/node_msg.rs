@@ -10,8 +10,8 @@ use super::{Mapping, MsgContext};
 use crate::messaging::{
     client::QueryResponse,
     node::{
-        NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeRewardQuery,
-        NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
+        NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeSystemCmd,
+        NodeSystemQuery,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -74,57 +74,11 @@ pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping
 
 fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
     match msg {
-        // ------ wallet register ------
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet_id)),
-            ..
-        } => NodeDuty::SetNodeWallet {
-            wallet_id,
-            node_id: origin.name(),
-        },
         // Churn synch
         NodeMsg::NodeCmd {
-            cmd:
-                NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
-                    node_rewards,
-                    user_wallets,
-                    metadata,
-                }),
+            cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData { metadata }),
             ..
-        } => NodeDuty::SynchState {
-            node_rewards,
-            user_wallets,
-            metadata,
-        },
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
-            ..
-        } => NodeDuty::ReceiveRewardProposal(proposal),
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
-            ..
-        } => NodeDuty::ReceiveRewardAccumulation(accumulation),
-        // ------ section funds -----
-        NodeMsg::NodeQuery {
-            query: NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletKey(node_name)),
-            id,
-            ..
-        } => NodeDuty::GetNodeWalletKey {
-            node_name,
-            msg_id: id,
-            origin,
-        },
-        //
-        // ------ transfers --------
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::Transfers(NodeTransferCmd::PropagateTransfer(proof)),
-            id,
-            ..
-        } => NodeDuty::PropagateTransfer {
-            proof,
-            msg_id: id,
-            origin,
-        },
+        } => NodeDuty::SynchState { metadata },
         // ------ metadata ------
         NodeMsg::NodeQuery {
             query:
@@ -137,7 +91,6 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             ..
         } => {
             // FIXME: ******** validate client signature!!!! *********
-
             NodeDuty::ProcessRead {
                 query,
                 msg_id: id,
@@ -156,7 +109,6 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             ..
         } => {
             // FIXME: ******** validate client signature!!!! *********
-
             NodeDuty::ProcessWrite {
                 cmd,
                 msg_id: id,
@@ -206,13 +158,6 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             cmd: NodeCmd::System(NodeSystemCmd::StorageFull { node_id, .. }),
             ..
         } => NodeDuty::IncrementFullNodeCount { node_id },
-        //
-        // ------ transfers ------
-        NodeMsg::NodeQuery {
-            query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
-            id,
-            ..
-        } => NodeDuty::GetTransferReplicaEvents { msg_id: id, origin },
         // --- Adult Operation response ---
         NodeMsg::NodeQueryResponse {
             response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(res)),

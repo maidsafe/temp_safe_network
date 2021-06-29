@@ -20,9 +20,7 @@ mod metadata;
 mod network;
 mod node_api;
 mod node_ops;
-mod section_funds;
 mod to_db_key;
-mod transfers;
 
 /// Docs
 pub mod state_db;

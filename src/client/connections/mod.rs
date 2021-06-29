@@ -11,13 +11,13 @@ mod messaging;
 
 use crate::client::Error;
 use crate::messaging::client::CmdError;
-use crate::messaging::{client::Error as ErrorMessage, client::QueryResponse, MessageId};
-use crate::types::{PublicKey, TransferValidated};
+use crate::messaging::{client::QueryResponse, MessageId};
+use crate::types::PublicKey;
 use bls::PublicKeySet;
 use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
 use std::{
     borrow::Borrow,
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, HashMap},
     net::SocketAddr,
     sync::Arc,
 };
@@ -26,11 +26,8 @@ use tokio::sync::RwLock;
 use tracing::{debug, trace};
 use xor_name::{Prefix, XorName};
 
-// Channel for sending result of transfer validation
-type TransferValidationSender = Sender<Result<TransferValidated, Error>>;
 type QueryResponseSender = Sender<QueryResponse>;
 
-type PendingTransferValidations = Arc<RwLock<HashMap<MessageId, TransferValidationSender>>>;
 type PendingQueryResponses = Arc<RwLock<HashMap<MessageId, QueryResponseSender>>>;
 
 pub(crate) struct QueryResult {
@@ -40,37 +37,28 @@ pub(crate) struct QueryResult {
 
 #[derive(Clone, Debug)]
 pub struct Session {
+    pub section_key_set: Arc<RwLock<Option<PublicKeySet>>>,
     qp2p: QuicP2p,
     pending_queries: PendingQueryResponses,
-    pending_transfers: PendingTransferValidations,
     incoming_err_sender: Arc<Sender<CmdError>>,
-    /// Internal client err listener to handle tx/data issues and AE flows
-    transfer_err_sender: Arc<Sender<(SocketAddr, ErrorMessage)>>,
     endpoint: Option<Endpoint>,
     /// elders we've managed to connect to
     connected_elders: Arc<RwLock<BTreeMap<SocketAddr, XorName>>>,
     /// all elders we know about from SectionInfo messages
     all_known_elders: Arc<RwLock<BTreeMap<SocketAddr, XorName>>>,
-    pub section_key_set: Arc<RwLock<Option<PublicKeySet>>>,
     section_prefix: Arc<RwLock<Option<Prefix>>>,
     is_connecting_to_new_elders: bool,
 }
 
 impl Session {
-    pub fn new(
-        qp2p_config: QuicP2pConfig,
-        err_sender: Sender<CmdError>,
-        transfer_err_sender: Sender<(SocketAddr, ErrorMessage)>,
-    ) -> Result<Self, Error> {
+    pub fn new(qp2p_config: QuicP2pConfig, err_sender: Sender<CmdError>) -> Result<Self, Error> {
         debug!("QP2p config: {:?}", qp2p_config);
 
         let qp2p = qp2p::QuicP2p::with_config(Some(qp2p_config), Default::default(), true)?;
         Ok(Self {
             qp2p,
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
-            pending_transfers: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
-            transfer_err_sender: Arc::new(transfer_err_sender),
             endpoint: None,
             section_key_set: Arc::new(RwLock::new(None)),
             connected_elders: Arc::new(RwLock::new(Default::default())),
@@ -81,13 +69,9 @@ impl Session {
     }
 
     /// Get the SuperMajority count based on number of known elders
+    #[allow(unused)]
     pub async fn super_majority(&self) -> usize {
         1 + self.known_elders_count().await * 2 / 3
-    }
-
-    pub async fn get_elder_names(&self) -> BTreeSet<XorName> {
-        let elders = self.connected_elders.read().await;
-        elders.values().cloned().collect()
     }
 
     /// Get the elders count of our section elders as provided by SectionInfo
@@ -115,10 +99,5 @@ impl Session {
                 Err(Error::NotBootstrapped)
             }
         }
-    }
-
-    /// Get section's prefix
-    pub async fn section_prefix(&self) -> Option<Prefix> {
-        *self.section_prefix.read().await
     }
 }

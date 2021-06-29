@@ -31,7 +31,6 @@ jobs:
               - 'src/client/**'
               - 'src/messaging/**'
               - 'src/types/**'
-              - 'src/transfers/**'
 
       # Install Rust
       - uses: actions-rs/toolchain@v1

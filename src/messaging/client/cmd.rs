@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{data::DataCmd, transfer::TransferCmd};
-use crate::types::TransferAgreementProof;
+use super::data::DataCmd;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -19,11 +18,7 @@ pub enum Cmd {
     Data {
         /// The data command struct itself
         cmd: DataCmd,
-        /// Proof of payment for the data command
-        payment: TransferAgreementProof,
     },
-    /// Command for transfering safe network tokens
-    Transfer(TransferCmd),
 }
 
 impl Cmd {
@@ -32,7 +27,6 @@ impl Cmd {
         use Cmd::*;
         match self {
             Data { cmd, .. } => cmd.dst_address(),
-            Transfer(c) => c.dst_address(),
         }
     }
 }

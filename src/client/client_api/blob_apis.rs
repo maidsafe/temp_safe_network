@@ -425,12 +425,11 @@ mod tests {
     use super::{Chunk, ChunkAddress, Client, DataMap, DataMapLevel, Error};
     use crate::client::client_api::blob_storage::BlobStorage;
     use crate::client::utils::{generate_random_vector, test_utils::create_test_client};
-    use crate::types::{PrivateChunk, PublicChunk, Token};
+    use crate::types::{PrivateChunk, PublicChunk};
     use crate::{retry_err_loop, retry_loop};
     use anyhow::{anyhow, bail, Result};
     use bincode::deserialize;
     use self_encryption::Storage;
-    use std::str::FromStr;
     use tokio::time::Duration;
 
     // Test storing and getting public Blob.
@@ -573,27 +572,6 @@ mod tests {
                 root_data_map
             ))
         }
-    }
-
-    #[tokio::test]
-    pub async fn blob_deletions_should_cost_put_price() -> Result<()> {
-        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-
-        let address = client
-            .store_private_blob(&generate_random_vector::<u8>(10))
-            .await?;
-
-        let _ = retry_loop!(client.read_blob(address, None, None));
-
-        let balance_before_delete = client.get_balance().await?;
-        client.delete_blob(address).await?;
-        let new_balance = client.get_balance().await?;
-
-        // make sure we have _some_ balance
-        assert_ne!(balance_before_delete, Token::from_str("0")?);
-        assert_ne!(balance_before_delete, new_balance);
-
-        Ok(())
     }
 
     // Test creating and retrieving a 1kb blob.

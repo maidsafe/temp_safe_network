@@ -8,10 +8,8 @@
 
 use super::read_network_conn_info;
 use crate::client::{Client, DEFAULT_QUERY_TIMEOUT};
-use crate::types::{Keypair, Token};
-use crate::{retry_loop, retry_loop_for_pattern};
+use crate::types::Keypair;
 use anyhow::Result;
-use std::str::FromStr;
 use std::sync::Once;
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -45,14 +43,6 @@ pub async fn create_test_client_with(
     let timeout = timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
     let contact_info = read_network_conn_info()?;
     let client = Client::new(optional_keypair.clone(), None, Some(contact_info), timeout).await?;
-
-    if optional_keypair.is_none() {
-        // get history, will only be Ok when we have _some_ history, aka test tokens
-        retry_loop!(client.get_history());
-        // check we have some balance, 10 test coins
-        let _ = retry_loop_for_pattern!(client.get_balance(),
-            Ok(balance) if *balance == Token::from_str("10")?)?;
-    }
 
     Ok(client)
 }

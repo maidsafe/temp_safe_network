@@ -11,8 +11,7 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{peer::PeerUtils, Prefix, XorName};
-use crate::types::ReplicaPublicKeySet;
-use bls::PublicKey;
+use bls::{PublicKey, PublicKeySet};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -69,16 +68,12 @@ impl ElderCandidatesUtils for ElderCandidates {
 /// due to an elder being added or removed, or the section splitting or merging.
 pub trait SectionAuthorityProviderUtils {
     /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.
-    fn new<I: IntoIterator<Item = Peer>>(
-        elders: I,
-        prefix: Prefix,
-        pk_set: ReplicaPublicKeySet,
-    ) -> Self;
+    fn new<I: IntoIterator<Item = Peer>>(elders: I, prefix: Prefix, pk_set: PublicKeySet) -> Self;
 
     /// Creates a new `SectionAuthorityProvider` from ElderCandidates and public keyset.
     fn from_elder_candidates(
         elder_candidates: ElderCandidates,
-        pk_set: ReplicaPublicKeySet,
+        pk_set: PublicKeySet,
     ) -> SectionAuthorityProvider;
 
     /// Returns `ElderCandidates`, which doesn't have key related infos.
@@ -114,7 +109,7 @@ pub trait SectionAuthorityProviderUtils {
 
 impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.
-    fn new<I>(elders: I, prefix: Prefix, pk_set: ReplicaPublicKeySet) -> Self
+    fn new<I>(elders: I, prefix: Prefix, pk_set: PublicKeySet) -> Self
     where
         I: IntoIterator<Item = Peer>,
     {
@@ -133,7 +128,7 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     /// Creates a new `SectionAuthorityProvider` from ElderCandidates and public keyset.
     fn from_elder_candidates(
         elder_candidates: ElderCandidates,
-        pk_set: ReplicaPublicKeySet,
+        pk_set: PublicKeySet,
     ) -> SectionAuthorityProvider {
         let elders = elder_candidates
             .elders

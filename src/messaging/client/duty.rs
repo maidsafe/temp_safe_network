@@ -14,7 +14,7 @@ pub enum Duty {
     ///
     Adult(AdultDuties),
     ///
-    Elder(ElderDuties),
+    Elder,
     ///
     Node(NodeDuties),
 }
@@ -33,17 +33,4 @@ pub enum AdultDuties {
     ChunkStorage,
     /// Replicating chunks.
     ChunkReplication,
-}
-
-/// Duties of an Elder.
-#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub enum ElderDuties {
-    /// Interfacing with clients.
-    Gateway,
-    /// Metadata management.
-    Metadata,
-    /// Transfers of tokens.
-    Transfer,
-    /// Rewards for data storage etc.
-    Rewards,
 }

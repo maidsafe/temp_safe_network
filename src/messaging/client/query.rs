@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{data::DataQuery, transfer::TransferQuery, Error, QueryResponse};
+use super::{data::DataQuery, Error, QueryResponse};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -16,8 +16,6 @@ use xor_name::XorName;
 pub enum Query {
     ///
     Data(DataQuery),
-    ///
-    Transfer(TransferQuery),
 }
 
 impl Query {
@@ -27,7 +25,6 @@ impl Query {
         use Query::*;
         match self {
             Data(q) => q.error(error),
-            Transfer(q) => q.error(error),
         }
     }
 
@@ -36,7 +33,6 @@ impl Query {
         use Query::*;
         match self {
             Data(q) => q.dst_address(),
-            Transfer(q) => q.dst_address(),
         }
     }
 }

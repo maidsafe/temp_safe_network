@@ -9,9 +9,9 @@
 use super::Session;
 use crate::client::Error;
 use crate::messaging::{
-    client::{ClientMsg, CmdError, Event, ProcessMsg, TransferError},
+    client::{ClientMsg, CmdError, ProcessMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
-    MessageId, MessageType, SectionAuthorityProvider, WireMsg,
+    MessageType, SectionAuthorityProvider, WireMsg,
 };
 use crate::types::PublicKey;
 use qp2p::IncomingMessages;
@@ -22,18 +22,6 @@ use std::{
 use tracing::{debug, error, info, trace, warn};
 
 impl Session {
-    /// Remove a pending transfer sender from the listener map
-    pub async fn remove_pending_transfer_sender(&self, msg_id: &MessageId) -> Result<(), Error> {
-        let pending_transfers = self.pending_transfers.clone();
-        let mut listeners = pending_transfers.write().await;
-        debug!("Pending transfers at this point: {:?}", listeners);
-        let _ = listeners
-            .remove(msg_id)
-            .ok_or(Error::NoTransferValidationListener)?;
-
-        Ok(())
-    }
-
     // Listen for incoming messages on a connection
     pub(crate) async fn spawn_message_listener_thread(
         &self,
@@ -202,9 +190,7 @@ impl Session {
     async fn handle_client_msg(&self, msg: ProcessMsg, src: SocketAddr) {
         debug!("ClientMsg with id {:?} received from {:?}", msg.id(), src);
         let queries = self.pending_queries.clone();
-        let transfers = self.pending_transfers.clone();
         let error_sender = self.incoming_err_sender.clone();
-        let transfer_err_sender = self.transfer_err_sender.clone();
 
         let _ = tokio::spawn(async move {
             debug!("Thread spawned to handle this client message");
@@ -239,21 +225,6 @@ impl Session {
                 } => {
                     debug!("Event received to be processed: {:?}", correlation_id);
                     trace!("Event received is: {:?}", event);
-
-                    if let Event::TransferValidated { event, .. } = event {
-                        let transfers = transfers.read().await;
-                        let sender = transfers.get(&correlation_id);
-                        if let Some(sender) = sender {
-                            let _ = sender.send(Ok(event)).await;
-                        } else {
-                            warn!(
-                            "No transfer validation listener found for elder {:?} and message {:?}",
-                            src, correlation_id
-                        );
-                            warn!("It may be that this transfer is complete and the listener cleaned up already.");
-                            trace!("Event received was {:?}", event);
-                        }
-                    }
                 }
                 ProcessMsg::CmdError {
                     error,
@@ -268,18 +239,6 @@ impl Session {
                     let _ = error_sender.send(error.clone()).await;
 
                     match error {
-                        CmdError::Transfer(transfer_error) => {
-                            if let TransferError::TransferRegistration(the_transfer_error) =
-                                transfer_error
-                            {
-                                match transfer_err_sender.send((src, the_transfer_error)).await {
-                                    Ok(_) => {}
-                                    Err(error) => {
-                                        error!("Error handling transfer error. ErrorMessage could not be sent to handler: {:?}", error);
-                                    }
-                                }
-                            }
-                        }
                         CmdError::Data(_data_error) => {
                             // do nothing just yet
                         }

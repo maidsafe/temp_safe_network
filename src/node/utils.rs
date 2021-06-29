@@ -52,6 +52,7 @@ macro_rules! btree_map {
     };
 }
 
+#[allow(unused)]
 pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
     db_name: N,

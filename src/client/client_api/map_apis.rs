@@ -668,10 +668,9 @@ mod tests {
     use super::*;
     use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair};
     use crate::messaging::client::{CmdError, Error as ErrorMessage};
-    use crate::types::{MapAction, MapKind, Token};
-    use crate::{retry_loop, retry_loop_for_pattern};
+    use crate::retry_loop;
+    use crate::types::MapAction;
     use anyhow::{anyhow, bail, Result};
-    use std::str::FromStr;
     use std::time::Duration;
     use xor_name::XorName;
 
@@ -1153,27 +1152,5 @@ mod tests {
             }) => Ok(()),
             Err(err) => bail!("Unexpected error: {:?}", err),
         }
-    }
-
-    #[tokio::test]
-    pub async fn map_deletions_should_cost_put_price() -> Result<()> {
-        let name = XorName(rand::random());
-        let tag = 10;
-        let client = create_test_client(None).await?;
-        let owner = client.public_key();
-
-        let _ = client.store_unseq_map(name, tag, owner, None, None).await?;
-
-        let map_address = MapAddress::from_kind(MapKind::Unseq, name, tag);
-
-        let balance_before_delete = client.get_balance().await?;
-        client.delete_map(map_address).await?;
-
-        // make sure we have _some_ balance
-        let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal != Token::from_str("0")?);
-        // and its not the same as before
-        let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal != balance_before_delete);
-
-        Ok(())
     }
 }

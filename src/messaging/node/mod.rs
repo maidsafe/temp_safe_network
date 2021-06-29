@@ -26,8 +26,7 @@ pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use network::{Network, OtherSection};
 pub use node_msg::{
     NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery,
-    NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
-    NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
+    NodeQueryResponse, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
 };
 pub use plain_message::PlainMessage;
 pub use prefix_map::PrefixMap;
