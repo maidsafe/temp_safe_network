@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.3.0](https://github.com/maidsafe/safe_network/compare/v0.2.21...v0.3.0) (2021-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **client:** changes client API to add a query timeout
+
+### Features
+
+* **client:** adapt client tests to dropped errors change ([cb90f98](https://github.com/maidsafe/safe_network/commit/cb90f9828a4822a88881bb5263cf28e51c0e0ee4))
+* **responses:** drop data error responses if NoSuchChunk is encountered ([dfa6be1](https://github.com/maidsafe/safe_network/commit/dfa6be1ee3e112a23c9b93bc6856d0e0342426bc))
+
+
+### Bug Fixes
+
+* **misc:** fixup docs ([00c6822](https://github.com/maidsafe/safe_network/commit/00c68228f179b270fc624fa1b611a22a86873798))
+* **response:** drop error-ed blob responses at Elders instead of Adults ([ee763d9](https://github.com/maidsafe/safe_network/commit/ee763d950307b8e6d7d0dea9c80bc30bb0a48d22))
+* **tests:** override timeouts on deletion tests ([c882fb6](https://github.com/maidsafe/safe_network/commit/c882fb60e35ac98d2bf1c614cdb54caff68a7267))
+
 ### [0.2.21](https://github.com/maidsafe/safe_network/compare/v0.2.20...v0.2.21) (2021-06-29)
 
 
