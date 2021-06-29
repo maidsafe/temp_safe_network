@@ -39,38 +39,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// Store data
+    /// TODO: update once data types are crdt compliant
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
-    ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
-    ///
-    /// // The returned address can then be used to `append` data to.
-    /// let _address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn store_private_sequence(
         &self,
         sequence: Option<SequenceEntries>,
@@ -110,38 +80,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// Store data
+    /// TODO: update once data types are crdt compliant
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, SequenceUser, Token, SequencePublicPermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<SequenceUser, SequencePublicPermissions>::new();
-    ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    SequenceUser::Key(owner),
-    ///    SequencePublicPermissions::new(true),
-    /// );
-    ///
-    /// // The returned address can then be used to `append` data to.
-    /// let _address = client.store_public_sequence(None, name, tag, owner, perms).await?;
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn store_public_sequence(
         &self,
         sequence: Option<SequenceEntries>,
@@ -177,40 +117,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// Delete data
+    /// TODO: update once data types are crdt compliant
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
-    ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
-    ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    ///
-    /// client.delete_sequence(address).await?;
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn delete_sequence(&self, address: SequenceAddress) -> Result<(), Error> {
         let cmd = DataCmd::Sequence(SequenceWrite::Delete(address));
 
@@ -225,38 +133,9 @@ impl Client {
     /// Public or private isn't important for append. You can append to either (though the data you append will be Public or Private).
     ///
     /// # Examples
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
     ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
+    /// TODO: update once data types are crdt compliant
     ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    ///
-    /// client.append_to_sequence(address, b"New Entry Value".to_vec()).await?;
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn append_to_sequence(
         &self,
         address: SequenceAddress,
@@ -298,39 +177,9 @@ impl Client {
     /// Get Sequence Data from the Network
     ///
     /// # Examples
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
     ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
+    /// TODO: update once data types are crdt compliant
     ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    ///
-    /// let _data = client.get_sequence(address).await?;
-    ///
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn get_sequence(&self, address: SequenceAddress) -> Result<Sequence, Error> {
         trace!("Get Sequence Data at {:?}", address.name());
         // Let's fetch the Sequence from the network
@@ -347,44 +196,9 @@ impl Client {
     /// Get the last data entry from a Sequence Data.
     ///
     /// # Examples
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
     ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
+    /// TODO: update once data types are crdt compliant
     ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    /// client.append_to_sequence(address, b"New Entry Value".to_vec()).await?;
-    /// client.append_to_sequence(address, b"Another New Entry Value".to_vec()).await?;
-    ///
-    /// // Now we can retrieve the alst entry in the sequence:
-    /// let (_position, last_entry) = client.get_sequence_last_entry(address).await?;
-    ///
-    /// assert_eq!(last_entry, b"Another New Entry Value".to_vec());
-    ///
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn get_sequence_last_entry(
         &self,
         address: SequenceAddress,
@@ -405,43 +219,9 @@ impl Client {
     /// Get Sequence Data from the Network at a specific version
     ///
     /// # Examples
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
     ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
+    /// TODO: update once data types are crdt compliant
     ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    /// client.append_to_sequence(address, b"New Entry Value".to_vec()).await?;
-    /// client.append_to_sequence(address, b"Another New Entry Value".to_vec()).await?;
-    ///
-    /// // Now we can retrieve the alst entry in the sequence:
-    /// let entry_v1 = client.get_sequence_entry(address, 1).await?;
-    ///
-    /// assert_eq!(entry_v1, b"Another New Entry Value".to_vec());
-    /// # Ok(()) } ); }
-    /// ```
     pub async fn get_sequence_entry(
         &self,
         address: SequenceAddress,
@@ -464,46 +244,9 @@ impl Client {
     /// Get a set of Entries for the requested range from a Sequence.
     ///
     /// # Examples
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions, SequenceIndex};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
     ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
+    /// TODO: update once data types are crdt compliant
     ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    /// client.append_to_sequence(address, b"New Entry Value".to_vec()).await?;
-    /// client.append_to_sequence(address, b"Another New Entry Value".to_vec()).await?;
-    /// client.append_to_sequence(address, b"Third Entry Value".to_vec()).await?;
-    ///
-    /// // Now we can retrieve the alst entry in the sequence:
-    /// let entries = client.get_sequence_range(address, (SequenceIndex::FromStart(1), SequenceIndex::FromEnd(0) )).await?;
-    ///
-    /// assert_eq!(entries[0], b"Another New Entry Value".to_vec());
-    /// assert_eq!(entries[1], b"Third Entry Value".to_vec());
-    ///
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn get_sequence_range(
         &self,
         address: SequenceAddress,
@@ -528,39 +271,9 @@ impl Client {
     /// Get the owner of a Sequence.
     ///
     /// # Examples
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
     ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
+    /// TODO: update once data types are crdt compliant
     ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    ///
-    /// let seq_owner = client.get_sequence_owner(address).await?;
-    /// assert_eq!(seq_owner, owner);
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn get_sequence_owner(&self, address: SequenceAddress) -> Result<PublicKey, Error> {
         trace!("Get owner of the Sequence Data at {:?}", address.name());
 
@@ -585,38 +298,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, Token, SequenceUser,SequencePublicPermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<SequenceUser, SequencePublicPermissions>::new();
+    /// TODO: update once data types are crdt compliant
     ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    SequenceUser::Key(owner),
-    ///    SequencePublicPermissions::new(true),
-    /// );
-    ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_public_sequence(None, name, tag, owner, perms).await?;
-    ///
-    /// let _permissions = client.get_sequence_public_permissions_for_user(address, owner).await?;
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn get_sequence_public_permissions_for_user(
         &self,
         address: SequenceAddress,
@@ -646,38 +329,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
+    /// TODO: update once data types are crdt compliant
     ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
-    ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    ///
-    /// let _permissions = client.get_sequence_private_permissions_for_user(address, owner).await?;
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn get_sequence_private_permissions_for_user(
         &self,
         address: SequenceAddress,
@@ -705,38 +358,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 10;
-    /// let owner = client.public_key();
-    /// let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
+    /// TODO: update once data types are crdt compliant
     ///
-    /// // Set the access permissions
-    /// let _ = perms.insert(
-    ///    owner,
-    ///    SequencePrivatePermissions::new(true, true),
-    /// );
-    ///
-    /// // The returned address can then be used to `append` data to.
-    /// let address = client.store_private_sequence(None, name, tag, owner, perms).await?;
-    ///
-    /// let _permissions = client.get_sequence_public_permissions_for_user(address, owner).await?;
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn get_sequence_permissions(
         &self,
         address: SequenceAddress,

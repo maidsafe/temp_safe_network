@@ -35,33 +35,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{ Keypair, Token, MapAction, MapPermissionSet, MapSeqValue, MapSeqEntries};
-    /// use rand::rngs::OsRng;
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 15001;
-    /// let mut entries = MapSeqEntries::default();
-    /// let mut permissions = BTreeMap::default();
-    /// let permission_set = MapPermissionSet::new().allow(MapAction::Read);
-    /// let _ = permissions.insert(client.public_key(), permission_set);
-    /// let _ = entries.insert(b"key".to_vec(), MapSeqValue { data: b"value".to_vec(), version: 0 });
-    /// let owner = client.public_key();
-    /// let _ = client.store_seq_map(name, tag, owner, Some(entries), Some(permissions)).await?;
+    /// TODO: update once data types are crdt compliant
     ///
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn store_seq_map(
         &self,
         name: XorName,
@@ -89,33 +64,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{ Keypair, Token, MapAction, MapPermissionSet, MapUnseqEntries};
-    /// use rand::rngs::OsRng;
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 15001;
-    /// let mut entries = MapUnseqEntries::default();
-    /// let mut permissions = BTreeMap::default();
-    /// let permission_set = MapPermissionSet::new().allow(MapAction::Read);
-    /// let _ = permissions.insert(client.public_key(), permission_set);
-    /// let _ = entries.insert(b"key".to_vec(), b"value".to_vec());
-    /// let owner = client.public_key();
-    /// let _ = client.store_unseq_map(name, tag, owner, Some(entries), Some(permissions)).await?;
+    /// TODO: update once data types are crdt compliant
     ///
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn store_unseq_map(
         &self,
         name: XorName,
@@ -144,35 +94,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{ Keypair, Token, MapAction, MapPermissionSet, MapUnseqEntries};
-    /// use rand::rngs::OsRng;
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 15001;
-    /// let mut entries = MapUnseqEntries::default();
-    /// let mut permissions = BTreeMap::default();
-    /// let permission_set = MapPermissionSet::new().allow(MapAction::Read);
-    /// let _ = permissions.insert(client.public_key(), permission_set);
-    /// let _ = entries.insert(b"key".to_vec(), b"value".to_vec());
-    /// let owner = client.public_key();
-    /// let address = client.store_unseq_map(name, tag, owner, Some(entries.clone()), Some(permissions)).await?;
-    /// # let balance_after_first_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_first_write);
-    /// let _ = client.delete_map(address).await?;
-    /// # let balance_after_second_write = client.get_local_balance().await; assert_ne!(balance_after_second_write, balance_after_first_write);
-    /// # Ok(()) } ); }
-    /// ```
+    /// TODO: update once data types are crdt compliant
+    ///
     pub async fn delete_map(&self, address: MapAddress) -> Result<(), Error> {
         let cmd = DataCmd::Map(MapWrite::Delete(address));
 
@@ -232,34 +155,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{ Keypair, Token, MapAction, MapPermissionSet, MapUnseqEntries};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 15001;
-    /// let mut entries = MapUnseqEntries::default();
-    /// let mut permissions = BTreeMap::default();
-    /// let permission_set = MapPermissionSet::new().allow(MapAction::Read);
-    /// let _ = permissions.insert(client.public_key(), permission_set);
-    /// let _ = entries.insert(b"key".to_vec(), b"value".to_vec());
-    /// let owner = client.public_key();
-    /// let address = client.store_unseq_map(name, tag, owner, Some(entries.clone()), Some(permissions)).await?;
-    /// # let balance_after_first_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_first_write);
-    /// let _ = client.get_map(address).await?;
-    /// # Ok(()) } ); }
-    /// ```
+    /// TODO: update once data types are crdt compliant
+    ///
     pub async fn get_map(&self, address: MapAddress) -> Result<Map, Error>
     where
         Self: Sized,
@@ -280,39 +177,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{ Keypair, Token, MapAction, MapValue, MapPermissionSet, MapUnseqEntries};
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// use rand::rngs::OsRng;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 15001;
-    /// let mut entries = MapUnseqEntries::default();
-    /// let _ = entries.insert(b"beep".to_vec(), b"boop".to_vec() );
-    /// let mut permissions = BTreeMap::default();
-    /// let permission_set = MapPermissionSet::new().allow(MapAction::Read);
-    /// let _ = permissions.insert(client.public_key(), permission_set);
-    /// let _ = entries.insert(b"key".to_vec(), b"value".to_vec());
-    /// let owner = client.public_key();
-    /// let address = client.store_unseq_map(name, tag, owner, Some(entries.clone()), Some(permissions)).await?;
-    /// # let balance_after_first_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_first_write);
-    /// let received_value = match client.get_map_value(address, b"beep".to_vec()).await? {
-    ///     MapValue::Unseq(value) => value,
-    ///     _ => panic!("Exptected an unsequenced map")
-    /// };
-    /// assert_eq!(received_value, b"boop".to_vec());
-    /// # Ok(()) } ); }
-    /// ```
+    /// TODO: update once data types are crdt compliant
+    ///
     pub async fn get_map_value(&self, address: MapAddress, key: Vec<u8>) -> Result<MapValue, Error>
     where
         Self: Sized,
@@ -350,36 +216,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::{ Keypair, Token, MapAction, MapPermissionSet, MapUnseqEntries};
-    /// use rand::rngs::OsRng;
-    /// use std::collections::BTreeMap;
-    /// use xor_name::XorName;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// let id = Keypair::new_ed25519(&mut OsRng);
-
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let name = XorName::random();
-    /// let tag = 15001;
-    /// let mut entries = MapUnseqEntries::default();
-    /// let _ = entries.insert(b"beep".to_vec(), b"boop".to_vec() );
-    /// let mut permissions = BTreeMap::default();
-    /// let permission_set = MapPermissionSet::new().allow(MapAction::Read);
-    /// let _ = permissions.insert(client.public_key(), permission_set);
-    /// let _ = entries.insert(b"key".to_vec(), b"value".to_vec());
-    /// let owner = client.public_key();
-    /// let address = client.store_unseq_map(name, tag, owner, Some(entries.clone()), Some(permissions)).await?;
-    /// # let balance_after_first_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_first_write);
-    /// let version = client.get_map_version(address).await?;
-    /// assert_eq!(version, 0);
-    /// # Ok(()) } ); }
-    /// ```
+    /// TODO: update once data types are crdt compliant
+    ///
     pub async fn get_map_version(&self, address: MapAddress) -> Result<u64, Error>
     where
         Self: Sized,
