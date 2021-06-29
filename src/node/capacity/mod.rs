@@ -13,10 +13,8 @@ use crate::routing::{Prefix, XorName};
 pub use adult_storage_info::AdultsStorageInfo;
 use std::collections::BTreeSet;
 
-// pub const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
 // The number of separate copies of a blob chunk which should be maintained.
 pub(crate) const CHUNK_COPY_COUNT: usize = 4;
-//pub(crate) const MAX_CHUNK_SIZE: u64 = 1_000_000;
 
 /// A util for sharing the
 /// info on data capacity among the

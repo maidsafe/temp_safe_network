@@ -10,11 +10,8 @@
 
 use crate::node::{Error, Result};
 use bytes::Bytes;
-
-use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fs, path::Path};
 
 /// Easily create a `BTreeSet`.
 #[macro_export]
@@ -50,26 +47,6 @@ macro_rules! btree_map {
     ($($key:expr => $value:expr),*,) => {
         btree_map![$($key => $value),*]
     };
-}
-
-#[allow(unused)]
-pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
-    db_dir: D,
-    db_name: N,
-) -> Result<PickleDb> {
-    let db_path = db_dir.as_ref().join(db_name);
-    match PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump) {
-        Ok(db) => Ok(db),
-        Err(_) => {
-            fs::create_dir_all(db_dir)?;
-            let mut db = PickleDb::new_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
-
-            // dump is needed to actually write the db to disk.
-            db.dump()?;
-
-            PickleDb::load_bin(db_path, PickleDbDumpPolicy::AutoDump).map_err(Error::PickleDb)
-        }
-    }
 }
 
 #[allow(dead_code)]

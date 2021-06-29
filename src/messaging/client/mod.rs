@@ -512,7 +512,6 @@ mod tests {
             let lazy_error =
                 msg.create_processing_error(Some(Error::DataNotFound(random_addr.clone())));
 
-            println!("{:?}", lazy_error);
             assert!(format!("{:?}", lazy_error).contains("Data(Blob(Get(Private"));
             assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
             assert!(
@@ -546,7 +545,6 @@ mod tests {
                 id: MessageId::new(),
             };
 
-            println!("{:?}", errored_response);
             assert!(format!("{:?}", errored_response).contains("Data(Blob(Get(Public"));
             assert!(format!("{:?}", errored_response).contains("ProcessingError"));
             assert!(format!("{:?}", errored_response)
