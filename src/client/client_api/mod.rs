@@ -54,21 +54,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// Create a random client
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
+    /// TODO: update once data types are crdt compliant
     ///
-    /// # #[tokio::main] async fn main() {
-    /// let _: Result<()> = futures::executor::block_on( async {
-    ///
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// // Now for example you can perform read operations:
-    /// let _some_balance = client.get_balance().await?;
-    /// # Ok(()) } ); }
-    /// ```
     pub async fn new(
         optional_keypair: Option<Keypair>,
         config_file_path: Option<&Path>,
@@ -126,17 +113,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// let _keypair = client.keypair();
+    /// TODO: update once data types are crdt compliant
     ///
-    /// # Ok(()) } ); }
-    /// ```
     pub fn keypair(&self) -> Keypair {
         self.keypair.clone()
     }
@@ -145,16 +123,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// let _pk = client.public_key();
-    /// # Ok(()) } ); }
-    /// ```
+    /// TODO: update once data types are crdt compliant
+    ///
     pub fn public_key(&self) -> PublicKey {
         self.keypair().public_key()
     }

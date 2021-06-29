@@ -39,23 +39,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// Get data
+    /// TODO: update once data types are crdt compliant
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::ChunkAddress;
-    /// use xor_name::XorName;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// let head_chunk = ChunkAddress::Public(XorName::random());
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    ///
-    /// // grab the random head of the blob from the network
-    /// let _data = client.read_blob(head_chunk, None, None).await?;
-    /// # Ok(())} );}
-    /// ```
     pub async fn read_blob(
         &mut self,
         head_address: ChunkAddress,
@@ -91,25 +76,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// Store data
+    /// TODO: update once data types are crdt compliant
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::Token;
-    /// use std::str::FromStr;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let data = b"some data".to_vec();
-    /// // grab the random head of the blob from the network
-    /// let _address = client.store_public_blob(&data).await?;
-    ///
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn store_public_blob(&self, data: &[u8]) -> Result<ChunkAddress, Error> {
         self.create_new_blob(data, true).await
     }
@@ -122,26 +90,8 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// Store data
+    /// TODO: update once data types are crdt compliant
     ///
-    /// ```no_run
-    /// # extern crate tokio; use anyhow::Result;
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::Token;
-    /// use std::str::FromStr;
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let data = b"some data".to_vec();
-    /// // grab the random head of the blob from the network
-    /// let fetched_data = client.store_private_blob(&data).await?;
-    ///
-    /// println!( "{:?}", fetched_data ); // prints "some data"
-    /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
-    /// ```
     pub async fn store_private_blob(&self, data: &[u8]) -> Result<ChunkAddress, Error> {
         self.create_new_blob(data, false).await
     }
@@ -159,7 +109,7 @@ impl Client {
     }
 
     pub(crate) async fn fetch_blob_from_network(
-        &mut self,
+        &self,
         head_address: ChunkAddress,
         allow_cache: bool,
     ) -> Result<Chunk, Error> {
@@ -223,33 +173,9 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// Remove data
+    /// TODO: update once data types are crdt compliant
     ///
-    /// ```no_run
-    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
-    /// use safe_network::types::Token;
-    /// use std::str::FromStr;
-    /// # #[tokio::main] async fn main() { let _: anyhow::Result<()> = futures::executor::block_on( async {
-    ///
-    /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
-    /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
-    /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
-    /// let data = b"some private data".to_vec();
-    /// let address = client.store_private_blob(&data).await?;
-    ///
-    /// let _ = client.delete_blob(address).await?;
-    ///
-    /// // Now when we attempt to retrieve the blob, we should get an error
-    ///
-    /// match client.read_blob(address, None, None).await {
-    ///     Err(error) => eprintln!("Expected error getting blob {:?}", error),
-    ///     _ => return Err(anyhow::anyhow!("Should not have been able to retrieve this blob"))
-    /// };
-    /// #  Ok(())} );}
-    /// ```
-    pub async fn delete_blob(&mut self, head_chunk: ChunkAddress) -> Result<(), Error> {
+    pub async fn delete_blob(&self, head_chunk: ChunkAddress) -> Result<(), Error> {
         info!("Deleting blob at given address: {:?}", head_chunk);
 
         let mut chunk = self.fetch_blob_from_network(head_chunk, false).await?;
