@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.2](https://github.com/maidsafe/sn_cli/compare/v0.30.1...v0.30.2) (2021-06-29)
+
+
+### Features
+
+* add 10 min default timeout ([111f64b](https://github.com/maidsafe/sn_cli/commit/111f64b7d93aae839c95d8143dc665e89995d487))
+* override timeout w/ env var ([b904587](https://github.com/maidsafe/sn_cli/commit/b904587ef2965b4ff07ba0e3f3f47f4d3c81b846))
+* updates sn_api dep ([1fa58d5](https://github.com/maidsafe/sn_cli/commit/1fa58d5458678f67e4bd61fcfeb5dcef41a1d78d))
+
 ### [0.30.1](https://github.com/maidsafe/sn_cli/compare/v0.30.0...v0.30.1) (2021-06-24)
 
 ## [0.30.0](https://github.com/maidsafe/sn_cli/compare/v0.29.2...v0.30.0) (2021-06-23)
