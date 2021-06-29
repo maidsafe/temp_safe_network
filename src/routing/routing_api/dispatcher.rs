@@ -6,15 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Comm, Command};
+use super::{comm::SendStatus, Comm, Command, Event};
 use crate::messaging::{
     node::{JoinAsRelocatedResponse, JoinRejectionReason, JoinResponse, NodeMsg, Section},
     DstLocation, MsgKind, NodeMsgAuthority, NodeSigned, WireMsg,
 };
 use crate::routing::{
-    core::Core, error::Result, event::Event, messages::WireMsgUtils, node::Node, peer::PeerUtils,
-    routing_api::comm::SendStatus, section::SectionPeersUtils, section::SectionUtils, Error,
-    XorName,
+    core::Core, error::Result, messages::WireMsgUtils, node::Node, peer::PeerUtils,
+    section::SectionPeersUtils, section::SectionUtils, Error, XorName,
 };
 use crate::types::PublicKey;
 use itertools::Itertools;

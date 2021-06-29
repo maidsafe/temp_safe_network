@@ -14,9 +14,9 @@ use crate::messaging::{
 };
 use crate::routing::{
     error::{Error, Result},
-    event::Event,
     routing_api::command::Command,
     section::SectionUtils,
+    Event,
 };
 use bls::PublicKey;
 use bytes::Bytes;
