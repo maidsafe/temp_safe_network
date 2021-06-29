@@ -21,7 +21,10 @@ use crate::{
 use anyhow::{anyhow, Result};
 use log::debug;
 use sn_api::{Safe, XorUrlBase};
+use std::time::Duration;
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
+
+const DEFAULT_TIMEOUT_SECS: u64 = 60 * 10; //10 mins
 
 #[derive(StructOpt, Debug)]
 /// Interact with the Safe Network
@@ -51,7 +54,8 @@ pub struct CmdArgs {
 }
 
 pub async fn run() -> Result<()> {
-    let mut safe = Safe::default();
+    let cli_timeout = Duration::from_secs(DEFAULT_TIMEOUT_SECS);
+    let mut safe = Safe::new(None, cli_timeout);
     run_with(None, &mut safe).await
 }
 
