@@ -22,6 +22,7 @@ const COIN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
 // The maximum amount of safecoin that can be represented by a single `Token`
 const MAX_COINS_VALUE: u64 = (u32::max_value() as u64 + 1) * COIN_TO_RAW_CONVERSION - 1;
 
+#[allow(dead_code)]
 pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
     PublicKey::ed25519_from_hex(&hex_str)
         .or_else(|_| PublicKey::bls_from_hex(&hex_str))

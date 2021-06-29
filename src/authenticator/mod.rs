@@ -23,8 +23,7 @@ use safe_network::client::{
     client_api::Client, Error as ClientError, ErrorMessage::NoSuchEntry, DEFAULT_QUERY_TIMEOUT,
 };
 use safe_network::types::{
-    Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions,
-    MapValue, Token,
+    Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions, MapValue,
 };
 use sha3::Sha3_256;
 use std::{
@@ -39,9 +38,6 @@ const SHA3_512_HASH_LEN: usize = 64;
 
 // Type tag value used for the Map which holds the Safe's content on the network.
 const SAFE_TYPE_TAG: u64 = 1_300;
-
-// Number of testcoins (in nano) for any new keypair when simulated-payouts is enabled.
-const DEFAULT_TEST_COINS_AMOUNT: u64 = 777_000_000_000;
 
 /// Derive Passphrase, Password and Salt (in order).
 pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
@@ -187,7 +183,7 @@ impl SafeAuthenticator {
 
         debug!("Creating Safe to be owned by PublicKey: {:?}", data_owner);
 
-        let mut client = Client::new(
+        let client = Client::new(
             Some(keypair),
             self.config_path.as_deref(),
             self.bootstrap_contacts.clone(),
@@ -195,20 +191,6 @@ impl SafeAuthenticator {
         )
         .await?;
         trace!("Client instantiated properly!");
-
-        // check if client data already exists
-        // TODO: Use a more reliable test for existing data...
-        let existing_balance = client.get_balance().await?;
-
-        if existing_balance != Token::from_nano(0) {
-            return Err(Error::AuthenticatorError(
-                "Client data already exists".to_string(),
-            ));
-        }
-
-        client
-            .trigger_simulated_farming_payout(Token::from_nano(DEFAULT_TEST_COINS_AMOUNT))
-            .await?;
 
         // Create Map data to store the list of keypairs generated for
         // each of the user's applications.
@@ -450,23 +432,6 @@ impl SafeAuthenticator {
                         auth_req.app_id,
                         keypair.public_key()
                     );
-
-                    // Allocate some test coins
-                    // TODO: we may want to allow different options here, either accept
-                    // a proof of payment from the requester, transfer from the Safe's balance,
-                    // or simply allocate testcoins as it's now.
-                    let mut tmp_client = Client::new(
-                        Some(keypair.clone()),
-                        self.config_path.as_deref(),
-                        self.bootstrap_contacts.clone(),
-                        DEFAULT_QUERY_TIMEOUT,
-                    )
-                    .await?;
-                    tmp_client
-                        .trigger_simulated_farming_payout(Token::from_nano(
-                            DEFAULT_TEST_COINS_AMOUNT,
-                        ))
-                        .await?;
 
                     // Store the keypair in the Safe, mapped to the app id
                     let map_actions =

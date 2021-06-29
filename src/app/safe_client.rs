@@ -11,12 +11,12 @@ use super::fetch::Range;
 use crate::{ipc::BootstrapConfig, Error, Result};
 use hex::encode;
 use log::{debug, info};
-use safe_network::client::{Client, Error as ClientError, ErrorMessage, TransfersError};
+use safe_network::client::{Client, Error as ClientError, ErrorMessage};
 use safe_network::types::{
     register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
     ChunkAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
-    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,
-    SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, Token,
+    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, SequenceAddress,
+    SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
 };
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -99,111 +99,6 @@ impl SafeAppClient {
         Ok(client.keypair())
     }
 
-    // === Token operations ===
-    pub async fn read_balance_from_keypair(&self, id: Keypair) -> Result<Token> {
-        let temp_client = Client::new(
-            Some(id),
-            self.config_path.as_deref(),
-            self.bootstrap_config.clone(),
-            self.timeout.as_secs(),
-        )
-        .await?;
-
-        temp_client
-            .get_balance()
-            .await
-            .map_err(|err| Error::NetDataError(format!("Failed to retrieve balance: {:?}", err)))
-    }
-
-    #[cfg(feature = "simulated-payouts")]
-    pub async fn trigger_simulated_farming_payout(
-        &self,
-        amount: Token,
-        id: Option<Keypair>,
-    ) -> Result<()> {
-        let mut client = if id.is_some() {
-            Client::new(
-                id,
-                self.config_path.as_deref(),
-                self.bootstrap_config.clone(),
-                self.timeout.as_secs(),
-            )
-            .await?
-        } else {
-            self.get_safe_client()?
-        };
-
-        client.trigger_simulated_farming_payout(amount).await?;
-
-        Ok(())
-    }
-
-    pub async fn safecoin_transfer_to_xorname(
-        &self,
-        from_id: Option<Keypair>,
-        to_xorname: XorName,
-        amount: Token,
-    ) -> Result<u64> {
-        // Get pk from xorname. We assume Ed25519 key for now, which is
-        // 32 bytes long, just like a xorname.
-        // TODO: support for BLS keys which are longer.
-        let to_pk = ed25519_dalek::PublicKey::from_bytes(to_xorname.as_ref()).map_err(|err| {
-            Error::NetDataError(format!(
-                "Failed to derive Ed25519 PublicKey from Xorname '{}': {:?}",
-                to_xorname, err
-            ))
-        })?;
-
-        self.safecoin_transfer_to_pk(from_id, to_pk.into(), amount)
-            .await
-    }
-
-    pub async fn safecoin_transfer_to_pk(
-        &self,
-        from_id: Option<Keypair>,
-        to_pk: PublicKey,
-        amount: Token,
-    ) -> Result<u64> {
-        let client = match from_id {
-            Some(id) => {
-                Client::new(
-                    Some(id),
-                    self.config_path.as_deref(),
-                    self.bootstrap_config.clone(),
-                    self.timeout.as_secs(),
-                )
-                .await?
-            }
-            None => self.get_safe_client()?,
-        };
-
-        let (dot_counter, _dot_actor) =
-            client
-                .send_tokens(to_pk, amount)
-                .await
-                .map_err(|err| match err {
-                    ClientError::Transfer(TransfersError::ZeroValueTransfer) => {
-                        Error::InvalidAmount("Cannot send zero-value transfers".to_string())
-                    }
-                    ClientError::Transfer(TransfersError::InsufficientBalance) => {
-                        Error::NotEnoughBalance(format!(
-                            "Not enough balance at 'source' for the operation: {}",
-                            amount
-                        ))
-                    }
-                    ClientError::NetworkDataError(SafeNdError::ExcessiveValue) => {
-                        Error::InvalidAmount(format!(
-                            "The amount '{}' specified for the transfer is invalid",
-                            amount
-                        ))
-                    }
-                    other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
-                })?;
-
-        // TODO: perhaps include the actor as part of the TX ID
-        Ok(dot_counter)
-    }
-
     // // === Blob operations ===
     pub async fn store_public_blob(&self, data: &[u8], dry_run: bool) -> Result<XorName> {
         let address = if dry_run {
@@ -248,6 +143,7 @@ impl SafeAppClient {
     }
 
     // === Map operations ===
+    #[allow(dead_code)]
     pub async fn store_map(
         &self,
         name: Option<XorName>,
@@ -297,6 +193,7 @@ impl SafeAppClient {
             .map_err(|e| Error::NetDataError(format!("Failed to get SeqMap: {:?}", e)))
     }
 
+    #[allow(dead_code)]
     pub async fn map_insert(
         &self,
         name: XorName,
@@ -310,6 +207,7 @@ impl SafeAppClient {
             .await
     }
 
+    #[allow(dead_code)]
     pub async fn map_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MapValue> {
         let client = self.get_safe_client()?;
         let key_vec = key.to_vec();
@@ -344,6 +242,7 @@ impl SafeAppClient {
             })
     }
 
+    #[allow(dead_code)]
     pub async fn list_map_entries(
         &self,
         name: XorName,
@@ -402,6 +301,7 @@ impl SafeAppClient {
             })
     }
 
+    #[allow(dead_code)]
     pub async fn update_map(
         &self,
         name: XorName,

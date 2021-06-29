@@ -32,7 +32,7 @@ rmp-serde = "~0.15"
 serde = "1.0.123"
 serde_json = "1.0.62"
 sha3 = "~0.9"
-safe_network = "0.4.0"
+safe_network = { git = "https://github.com/oetyng/safe_network", branch = "remove-transfers" }
 thiserror = "1.0.23"
 uhttp_uri = "~0.5"
 url = "2.2.0"
@@ -60,8 +60,8 @@ xor_name = "1"
 authenticator = [ ]
 authd_client = [ ]
 app = [ ]
-simulated-payouts = [ "safe_network/simulated-payouts" ]
-default = [ "simulated-payouts", "authenticator", "authd_client", "app" ]
+testing = [ "safe_network/testing" ]
+default = [ "testing", "authenticator", "authd_client", "app" ]
 
 [dev-dependencies]
 anyhow = "1.0.38"

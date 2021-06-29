@@ -14,9 +14,7 @@ use super::{
     register::{Entry, EntryHash},
     Safe, XorName,
 };
-pub use super::{
-    wallet::WalletSpendableBalances, SafeContentType, SafeDataType, SafeUrl, XorUrlBase,
-};
+pub use super::{SafeContentType, SafeDataType, SafeUrl, XorUrlBase};
 use crate::{Error, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -32,14 +30,6 @@ pub enum SafeData {
     SafeKey {
         xorurl: String,
         xorname: XorName,
-        resolved_from: String,
-    },
-    Wallet {
-        xorurl: String,
-        xorname: XorName,
-        type_tag: u64,
-        balances: WalletSpendableBalances,
-        data_type: SafeDataType,
         resolved_from: String,
     },
     FilesContainer {
@@ -113,7 +103,6 @@ impl SafeData {
         use SafeData::*;
         match self {
             SafeKey { xorurl, .. }
-            | Wallet { xorurl, .. }
             | FilesContainer { xorurl, .. }
             | PublicBlob { xorurl, .. }
             | NrsMapContainer { xorurl, .. }
@@ -129,7 +118,6 @@ impl SafeData {
         use SafeData::*;
         match self {
             SafeKey { resolved_from, .. }
-            | Wallet { resolved_from, .. }
             | FilesContainer { resolved_from, .. }
             | PublicBlob { resolved_from, .. }
             | NrsMapContainer { resolved_from, .. }
@@ -556,35 +544,6 @@ impl Safe {
                     ))),
                 }
             }
-            SafeContentType::Wallet => {
-                if !the_xor.sub_names_vec().is_empty() {
-                    let msg = format!(
-                        "Cannot resolve Wallet URL as it contains subnames: {}",
-                        xorurl
-                    );
-                    debug!("{}", msg);
-                    return Err(Error::InvalidXorUrl(msg));
-                }
-
-                // TODO: do the _actual_fetch
-                // let balances = WalletSpendableBalances::new();
-                let balances = if retrieve_data {
-                    self.fetch_wallet(&the_xor).await?
-                } else {
-                    WalletSpendableBalances::new()
-                };
-
-                let safe_data = SafeData::Wallet {
-                    xorurl,
-                    xorname: the_xor.xorname(),
-                    type_tag: the_xor.type_tag(),
-                    balances,
-                    data_type: the_xor.data_type(),
-                    resolved_from: url,
-                };
-
-                Ok((safe_data, None))
-            }
         }
     }
 
@@ -659,56 +618,6 @@ mod tests {
     use anyhow::{anyhow, bail, Context, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use std::io::Read;
-
-    #[tokio::test]
-    async fn test_fetch_key() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let preload_amount = "1324.12";
-        let (xorurl, _key_pair) = safe.keys_create_preload_test_coins(preload_amount).await?;
-
-        let safe_url = SafeUrl::from_url(&xorurl)?;
-        let content = retry_loop!(safe.fetch(&xorurl, None));
-        assert!(
-            content
-                == SafeData::SafeKey {
-                    xorurl: xorurl.clone(),
-                    xorname: safe_url.xorname(),
-                    resolved_from: xorurl.clone(),
-                }
-        );
-
-        // let's also compare it with the result from inspecting the URL
-        let inspected_content = safe.inspect(&xorurl).await?;
-        assert_eq!(inspected_content.len(), 1);
-        assert_eq!(content, inspected_content[0]);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_fetch_wallet() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let xorurl = safe.wallet_create().await?;
-
-        let safe_url = SafeUrl::from_url(&xorurl)?;
-        let content = retry_loop!(safe.fetch(&xorurl, None));
-        assert!(
-            content
-                == SafeData::Wallet {
-                    xorurl: xorurl.clone(),
-                    xorname: safe_url.xorname(),
-                    type_tag: 1_000,
-                    balances: WalletSpendableBalances::default(),
-                    data_type: SafeDataType::SeqMap,
-                    resolved_from: xorurl.clone(),
-                }
-        );
-
-        // let's also compare it with the result from inspecting the URL
-        let inspected_content = safe.inspect(&xorurl).await?;
-        assert_eq!(inspected_content.len(), 1);
-        assert_eq!(content, inspected_content[0]);
-        Ok(())
-    }
 
     #[tokio::test]
     async fn test_fetch_files_container() -> Result<()> {
