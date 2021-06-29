@@ -9,23 +9,11 @@
 
 //! Map
 //!
-//! All Map is unpublished. Map can be either sequenced or unsequenced.
+//! Map can be either private or public.
 //!
-//! ## Private data
-//!
-//! Please see `append_only_data.rs` for more about unpublished versus published data.
-//!
-//! ## Sequenced and unsequenced data.
-//!
-//! Explicitly sequencing all mutations is an option provided for clients to allow them to avoid
-//! dealing with conflicting mutations. However, we don't need the version for preventing replay
-//! attacks.
-//!
-//! For sequenced Map the client must specify the next version number of a value while
+//! The client must specify the next version number of a value while
 //! modifying/deleting keys. Similarly, while modifying the Map shell (permissions,
-//! ownership, etc.), the next version number must be passed. For unsequenced Map the client
-//! does not have to pass version numbers for keys, but it still must pass the next version number
-//! while modifying the Map shell.
+//! ownership, etc.), the next version number must be passed.
 
 use super::{utils, Error, PublicKey, Result};
 use serde::{Deserialize, Serialize};
@@ -39,11 +27,11 @@ use xor_name::XorName;
 /// Map that is unpublished on the network. This data can only be fetched by the owner or
 /// those in the permissions fields with `Permission::Read` access.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
-pub struct SeqData {
+pub struct Map {
     /// Network address.
     address: Address,
     /// Key-Value semantics.
-    data: SeqEntries,
+    data: Entries,
     /// Maps an application key to a list of allowed or forbidden actions.
     permissions: BTreeMap<PublicKey, PermissionSet>,
     /// Version should be increased for any changes to Map fields except for data.
@@ -54,92 +42,32 @@ pub struct SeqData {
     owner: PublicKey,
 }
 
-impl Debug for SeqData {
+impl Debug for Map {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "SeqMap {:?}", self.name())
+        write!(formatter, "Map {:?}", self.name())
     }
 }
 
-/// Map that is unpublished on the network. This data can only be fetched by the owner or
-/// those in the permissions fields with `Permission::Read` access.
+/// A value in a Map.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
-pub struct UnseqData {
-    /// Network address.
-    address: Address,
-    /// Key-Value semantics.
-    data: UnseqEntries,
-    /// Maps an application key to a list of allowed or forbidden actions.
-    permissions: BTreeMap<PublicKey, PermissionSet>,
-    /// Version should be increased for any changes to Map fields except for data.
-    version: u64,
-    /// Contains the public key of an owner or owners of this data.
-    ///
-    /// Data Handlers in nodes enforce that a mutation request has a valid signature of the owner.
-    owner: PublicKey,
-}
-
-impl Debug for UnseqData {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "UnseqMap {:?}", self.name())
-    }
-}
-
-/// A value in sequenced Map.
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
-pub struct SeqValue {
-    /// Actual data.
-    pub data: Vec<u8>,
+pub struct Value {
+    /// Pointer.
+    pub pointer: XorName,
     /// Version, incremented sequentially for any change to `data`.
     pub version: u64,
 }
 
-impl Debug for SeqValue {
+impl Debug for Value {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:<8} :: {}", hex::encode(&self.data), self.version)
+        write!(f, "{:<8} :: {}", hex::encode(&self.pointer), self.version)
     }
 }
 
-/// Wrapper type for values, which can be sequenced or unsequenced.
-#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
-pub enum Value {
-    /// Sequenced value.
-    Seq(SeqValue),
-    /// Unsequenced value.
-    Unseq(Vec<u8>),
-}
+/// Wrapper type for lists of values.
+pub type Values = Vec<Value>;
 
-impl From<SeqValue> for Value {
-    fn from(value: SeqValue) -> Self {
-        Value::Seq(value)
-    }
-}
-
-impl From<Vec<u8>> for Value {
-    fn from(value: Vec<u8>) -> Self {
-        Value::Unseq(value)
-    }
-}
-
-/// Wrapper type for lists of sequenced or unsequenced values.
-#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
-pub enum Values {
-    /// List of sequenced values.
-    Seq(Vec<SeqValue>),
-    /// List of unsequenced values.
-    Unseq(Vec<Vec<u8>>),
-}
-
-impl From<Vec<SeqValue>> for Values {
-    fn from(values: Vec<SeqValue>) -> Self {
-        Values::Seq(values)
-    }
-}
-
-impl From<Vec<Vec<u8>>> for Values {
-    fn from(values: Vec<Vec<u8>>) -> Self {
-        Values::Unseq(values)
-    }
-}
+/// Entries (key-value pairs, with versioned values).
+pub type Entries = BTreeMap<Vec<u8>, Value>;
 
 /// Set of user permissions.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize, Deserialize, Default)]
@@ -379,14 +307,14 @@ macro_rules! impl_map {
     };
 }
 
-impl_map!(SeqData);
-impl_map!(UnseqData);
+impl_map!(Map);
 
-impl UnseqData {
-    /// Creates a new unsequenced Map.
-    pub fn new(name: XorName, tag: u64, owner: PublicKey) -> Self {
+/// Implements functions for Map.
+impl Map {
+    /// Creates a new Map.
+    pub fn new(name: XorName, tag: u64, owner: PublicKey, kind: Kind) -> Self {
         Self {
-            address: Address::Unseq { name, tag },
+            address: Address::from_kind(kind, name, tag),
             data: Default::default(),
             permissions: Default::default(),
             version: 0,
@@ -394,150 +322,17 @@ impl UnseqData {
         }
     }
 
-    /// Creates a new unsequenced Map with entries and permissions.
+    /// Creates a new Map with entries and permissions.
     pub fn new_with_data(
         name: XorName,
         tag: u64,
-        data: UnseqEntries,
+        data: Entries,
         permissions: BTreeMap<PublicKey, PermissionSet>,
         owner: PublicKey,
+        kind: Kind,
     ) -> Self {
         Self {
-            address: Address::Unseq { name, tag },
-            data,
-            permissions,
-            version: 0,
-            owner,
-        }
-    }
-
-    /// Returns a value for the given key.
-    pub fn get(&self, key: &[u8]) -> Option<&Vec<u8>> {
-        self.data.get(key)
-    }
-
-    /// Returns values of all entries.
-    pub fn values(&self) -> Vec<Vec<u8>> {
-        self.data.values().cloned().collect()
-    }
-
-    /// Returns all entries.
-    pub fn entries(&self) -> &UnseqEntries {
-        &self.data
-    }
-
-    /// Removes and returns all entries.
-    pub fn take_entries(&mut self) -> UnseqEntries {
-        mem::take(&mut self.data)
-    }
-
-    /// Mutates entries based on `actions` for the provided user.
-    ///
-    /// Returns `Err(InvalidEntryActions)` if the mutation parameters are invalid.
-    pub fn mutate_entries(
-        &mut self,
-        actions: UnseqEntryActions,
-        requester: &PublicKey,
-    ) -> Result<()> {
-        let (insert, update, delete) = actions.actions.into_iter().fold(
-            (
-                BTreeMap::<Vec<u8>, Vec<u8>>::new(),
-                BTreeMap::<Vec<u8>, Vec<u8>>::new(),
-                BTreeSet::<Vec<u8>>::new(),
-            ),
-            |(mut insert, mut update, mut delete), (key, item)| {
-                match item {
-                    UnseqEntryAction::Ins(value) => {
-                        let _ = insert.insert(key, value);
-                    }
-                    UnseqEntryAction::Update(value) => {
-                        let _ = update.insert(key, value);
-                    }
-                    UnseqEntryAction::Del => {
-                        let _ = delete.insert(key);
-                    }
-                };
-                (insert, update, delete)
-            },
-        );
-
-        if self.owner() != requester
-            && ((!insert.is_empty() && !self.is_action_allowed(requester, Action::Insert))
-                || (!update.is_empty() && !self.is_action_allowed(requester, Action::Update))
-                || (!delete.is_empty() && !self.is_action_allowed(requester, Action::Delete)))
-        {
-            return Err(Error::AccessDenied(*requester));
-        }
-
-        let mut new_data = self.data.clone();
-        let mut errors = BTreeMap::new();
-
-        for (key, val) in insert {
-            match new_data.entry(key) {
-                Entry::Occupied(entry) => {
-                    let _ = errors.insert(entry.key().clone(), Error::EntryExists(0));
-                }
-                Entry::Vacant(entry) => {
-                    let _ = entry.insert(val);
-                }
-            }
-        }
-
-        for (key, val) in update {
-            match new_data.entry(key) {
-                Entry::Occupied(mut entry) => {
-                    let _ = entry.insert(val);
-                }
-                Entry::Vacant(entry) => {
-                    let _ = errors.insert(entry.key().clone(), Error::NoSuchEntry);
-                }
-            }
-        }
-
-        for key in delete {
-            match new_data.entry(key.clone()) {
-                Entry::Occupied(_) => {
-                    let _ = new_data.remove(&key);
-                }
-                Entry::Vacant(entry) => {
-                    let _ = errors.insert(entry.key().clone(), Error::NoSuchEntry);
-                }
-            }
-        }
-
-        if !errors.is_empty() {
-            return Err(Error::InvalidEntryActions(errors));
-        }
-
-        let _old_data = mem::replace(&mut self.data, new_data);
-
-        Ok(())
-    }
-}
-
-/// Implements functions for sequenced Map.
-impl SeqData {
-    /// Creates a new sequenced Map.
-    pub fn new(name: XorName, tag: u64, owner: PublicKey) -> Self {
-        Self {
-            address: Address::Seq { name, tag },
-            data: Default::default(),
-            permissions: Default::default(),
-            version: 0,
-            owner,
-        }
-    }
-
-    /// Creates a new sequenced Map with entries and permissions.
-    pub fn new_with_data(
-        name: XorName,
-        tag: u64,
-        data: SeqEntries,
-        permissions: BTreeMap<PublicKey, PermissionSet>,
-        owner: PublicKey,
-    ) -> Self {
-        Self {
-            address: Address::Seq { name, tag },
+            address: Address::from_kind(kind, name, tag),
             data,
             permissions,
             version: 0,
@@ -546,45 +341,41 @@ impl SeqData {
     }
 
     /// Returns a value by the given key
-    pub fn get(&self, key: &[u8]) -> Option<&SeqValue> {
+    pub fn get(&self, key: &[u8]) -> Option<&Value> {
         self.data.get(key)
     }
 
     /// Returns values of all entries
-    pub fn values(&self) -> Vec<SeqValue> {
+    pub fn values(&self) -> Vec<Value> {
         self.data.values().cloned().collect()
     }
 
     /// Returns all entries
-    pub fn entries(&self) -> &SeqEntries {
+    pub fn entries(&self) -> &Entries {
         &self.data
     }
 
     /// Removes and returns all entries
-    pub fn take_entries(&mut self) -> SeqEntries {
+    pub fn take_entries(&mut self) -> Entries {
         mem::take(&mut self.data)
     }
 
     /// Mutates entries (key + value pairs) in bulk.
     ///
     /// Returns `Err(InvalidEntryActions)` if the mutation parameters are invalid.
-    pub fn mutate_entries(
-        &mut self,
-        actions: SeqEntryActions,
-        requester: &PublicKey,
-    ) -> Result<()> {
+    pub fn mutate_entries(&mut self, actions: EntryActions, requester: &PublicKey) -> Result<()> {
         // Deconstruct actions into inserts, updates, and deletes
         let (insert, update, delete) = actions.actions.into_iter().fold(
             (BTreeMap::new(), BTreeMap::new(), BTreeMap::new()),
             |(mut insert, mut update, mut delete), (key, item)| {
                 match item {
-                    SeqEntryAction::Ins(value) => {
+                    EntryAction::Insert(value) => {
                         let _ = insert.insert(key, value);
                     }
-                    SeqEntryAction::Update(value) => {
+                    EntryAction::Update(value) => {
                         let _ = update.insert(key, value);
                     }
-                    SeqEntryAction::Del(version) => {
+                    EntryAction::Delete(version) => {
                         let _ = delete.insert(key, version);
                     }
                 };
@@ -664,49 +455,39 @@ impl SeqData {
         Ok(())
     }
 }
-
 /// Kind of a Map.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub enum Kind {
-    /// Unsequenced.
-    Unseq,
-    /// Sequenced.
-    Seq,
+    /// Public map.
+    Public,
+    /// Private map.
+    Private,
 }
 
 impl Kind {
-    /// Creates `Kind` from a `sequenced` flag.
-    pub fn from_flag(sequenced: bool) -> Self {
-        if sequenced {
-            Kind::Seq
-        } else {
-            Kind::Unseq
-        }
+    /// Returns true if public.
+    pub fn is_public(self) -> bool {
+        self == Kind::Public
     }
 
-    /// Returns `true` if sequenced.
-    pub fn is_seq(self) -> bool {
-        self == Kind::Seq
-    }
-
-    /// Returns `true` if unsequenced.
-    pub fn is_unseq(self) -> bool {
-        !self.is_seq()
+    /// Returns true if private.
+    pub fn is_private(self) -> bool {
+        !self.is_public()
     }
 }
 
 /// Address of an Map.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub enum Address {
-    /// Unsequenced namespace.
-    Unseq {
+    ///
+    Public {
         /// Name.
         name: XorName,
         /// Tag.
         tag: u64,
     },
-    /// Sequenced namespace.
-    Seq {
+    ///
+    Private {
         /// Name.
         name: XorName,
         /// Tag.
@@ -718,41 +499,41 @@ impl Address {
     /// Constructs an `Address` given `kind`, `name`, and `tag`.
     pub fn from_kind(kind: Kind, name: XorName, tag: u64) -> Self {
         match kind {
-            Kind::Seq => Address::Seq { name, tag },
-            Kind::Unseq => Address::Unseq { name, tag },
+            Kind::Public => Address::Public { name, tag },
+            Kind::Private => Address::Private { name, tag },
         }
     }
 
     /// Returns the kind.
     pub fn kind(&self) -> Kind {
         match self {
-            Address::Seq { .. } => Kind::Seq,
-            Address::Unseq { .. } => Kind::Unseq,
+            Address::Public { .. } => Kind::Public,
+            Address::Private { .. } => Kind::Private,
         }
     }
 
     /// Returns the name.
     pub fn name(&self) -> &XorName {
         match self {
-            Address::Unseq { ref name, .. } | Address::Seq { ref name, .. } => name,
+            Address::Private { ref name, .. } | Address::Public { ref name, .. } => name,
         }
     }
 
     /// Returns the tag.
     pub fn tag(&self) -> u64 {
         match self {
-            Address::Unseq { tag, .. } | Address::Seq { tag, .. } => *tag,
+            Address::Private { tag, .. } | Address::Public { tag, .. } => *tag,
         }
     }
 
-    /// Returns `true` if sequenced.
-    pub fn is_seq(&self) -> bool {
-        self.kind().is_seq()
+    /// Return `true` if public.
+    pub fn is_public(&self) -> bool {
+        self.kind().is_public()
     }
 
-    /// Returns `true` if unsequenced.
-    pub fn is_unseq(&self) -> bool {
-        self.kind().is_unseq()
+    /// Return `true` if private.
+    pub fn is_private(&self) -> bool {
+        self.kind().is_private()
     }
 
     /// Returns the Address serialised and encoded in z-base-32.
@@ -766,401 +547,106 @@ impl Address {
     }
 }
 
-/// Object storing a Map variant.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub enum Data {
-    /// Sequenced Map.
-    Seq(SeqData),
-    /// Unsequenced Map.
-    Unseq(UnseqData),
-}
-
-impl Data {
-    /// Returns the address of the data.
-    pub fn address(&self) -> &Address {
-        match self {
-            Data::Seq(data) => data.address(),
-            Data::Unseq(data) => data.address(),
-        }
-    }
-
-    /// Returns the kind of the data.
-    pub fn kind(&self) -> Kind {
-        self.address().kind()
-    }
-
-    /// Returns the name of the data.
-    pub fn name(&self) -> &XorName {
-        self.address().name()
-    }
-
-    /// Returns the tag of the data.
-    pub fn tag(&self) -> u64 {
-        self.address().tag()
-    }
-
-    /// Returns true if the data is sequenced.
-    pub fn is_seq(&self) -> bool {
-        self.kind().is_seq()
-    }
-
-    /// Returns true if the data is unsequenced.
-    pub fn is_unseq(&self) -> bool {
-        self.kind().is_unseq()
-    }
-
-    /// Returns the version of this data.
-    pub fn version(&self) -> u64 {
-        match self {
-            Data::Seq(data) => data.version(),
-            Data::Unseq(data) => data.version(),
-        }
-    }
-
-    /// Returns all the keys in the data.
-    pub fn keys(&self) -> BTreeSet<Vec<u8>> {
-        match self {
-            Data::Seq(data) => data.keys(),
-            Data::Unseq(data) => data.keys(),
-        }
-    }
-
-    /// Returns the shell of the data.
-    pub fn shell(&self) -> Self {
-        match self {
-            Data::Seq(data) => Data::Seq(data.shell()),
-            Data::Unseq(data) => Data::Unseq(data.shell()),
-        }
-    }
-
-    /// Gets a complete list of permissions.
-    pub fn permissions(&self) -> BTreeMap<PublicKey, PermissionSet> {
-        match self {
-            Data::Seq(data) => data.permissions(),
-            Data::Unseq(data) => data.permissions(),
-        }
-    }
-
-    /// Gets the permissions for the provided user.
-    pub fn user_permissions(&self, user: &PublicKey) -> Result<&PermissionSet> {
-        match self {
-            Data::Seq(data) => data.user_permissions(user),
-            Data::Unseq(data) => data.user_permissions(user),
-        }
-    }
-
-    /// Inserts or update permissions for the provided user.
-    pub fn set_user_permissions(
-        &mut self,
-        user: PublicKey,
-        permissions: PermissionSet,
-        version: u64,
-    ) -> Result<()> {
-        match self {
-            Data::Seq(data) => data.set_user_permissions(user, permissions, version),
-            Data::Unseq(data) => data.set_user_permissions(user, permissions, version),
-        }
-    }
-
-    /// Deletes permissions for the provided user.
-    pub fn del_user_permissions(&mut self, user: PublicKey, version: u64) -> Result<()> {
-        match self {
-            Data::Seq(data) => data.del_user_permissions(user, version),
-            Data::Unseq(data) => data.del_user_permissions(user, version),
-        }
-    }
-
-    /// Checks permissions for given `action` for the provided user.
-    pub fn check_permissions(&self, action: Action, requester: &PublicKey) -> Result<()> {
-        match self {
-            Data::Seq(data) => data.check_permissions(action, requester),
-            Data::Unseq(data) => data.check_permissions(action, requester),
-        }
-    }
-
-    /// Checks if the provided user is an owner.
-    pub fn check_is_owner(&self, requester: &PublicKey) -> Result<()> {
-        match self {
-            Data::Seq(data) => data.check_is_owner(requester),
-            Data::Unseq(data) => data.check_is_owner(requester),
-        }
-    }
-
-    /// Returns the owner key.
-    pub fn owner(&self) -> PublicKey {
-        match self {
-            Data::Seq(data) => data.owner,
-            Data::Unseq(data) => data.owner,
-        }
-    }
-
-    /// Mutates entries (key + value pairs) in bulk.
-    pub fn mutate_entries(&mut self, actions: EntryActions, requester: &PublicKey) -> Result<()> {
-        match self {
-            Data::Seq(data) => {
-                if let EntryActions::Seq(actions) = actions {
-                    return data.mutate_entries(actions, requester);
-                }
-            }
-            Data::Unseq(data) => {
-                if let EntryActions::Unseq(actions) = actions {
-                    return data.mutate_entries(actions, requester);
-                }
-            }
-        }
-
-        Err(Error::InvalidOperation)
-    }
-}
-
-impl From<SeqData> for Data {
-    fn from(data: SeqData) -> Self {
-        Data::Seq(data)
-    }
-}
-
-impl From<UnseqData> for Data {
-    fn from(data: UnseqData) -> Self {
-        Data::Unseq(data)
-    }
-}
-
-/// Action for a sequenced Entry.
+/// Action for a Entry.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
-pub enum SeqEntryAction {
-    /// Inserts a new sequenced entry.
-    Ins(SeqValue),
+pub enum EntryAction {
+    /// Inserts a new entry.
+    Insert(Value),
     /// Updates an entry with a new value and version.
-    Update(SeqValue),
+    Update(Value),
     /// Deletes an entry.
-    Del(u64),
+    Delete(u64),
 }
 
-impl SeqEntryAction {
+impl EntryAction {
     /// Returns the version for this action.
     pub fn version(&self) -> u64 {
         match *self {
-            Self::Ins(ref value) => value.version,
+            Self::Insert(ref value) => value.version,
             Self::Update(ref value) => value.version,
-            Self::Del(v) => v,
+            Self::Delete(v) => v,
         }
     }
 
     /// Sets the version for this action.
     pub fn set_version(&mut self, version: u64) {
         match *self {
-            Self::Ins(ref mut value) => value.version = version,
+            Self::Insert(ref mut value) => value.version = version,
             Self::Update(ref mut value) => value.version = version,
-            Self::Del(ref mut v) => *v = version,
+            Self::Delete(ref mut v) => *v = version,
         }
     }
 }
 
-/// Action for an unsequenced Entry.
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
-pub enum UnseqEntryAction {
-    /// Inserts a new unsequenced entry.
-    Ins(Vec<u8>),
-    /// Updates an entry with a new value.
-    Update(Vec<u8>),
-    /// Deletes an entry.
-    Del,
-}
-
-/// Sequenced Entry Actions for given entry keys.
+/// Entry Actions for given entry keys.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug, Default)]
-pub struct SeqEntryActions {
-    // A map containing keys and corresponding sequenced entry actions to perform.
-    actions: BTreeMap<Vec<u8>, SeqEntryAction>,
+pub struct EntryActions {
+    // A map containing keys and corresponding entry actions to perform.
+    actions: BTreeMap<Vec<u8>, EntryAction>,
 }
 
-impl SeqEntryActions {
-    /// Creates a new sequenced Entry Actions list.
+impl EntryActions {
+    /// Creates a new Entry Actions list.
     pub fn new() -> Self {
         Default::default()
     }
 
     /// Gets the actions.
-    pub fn actions(&self) -> &BTreeMap<Vec<u8>, SeqEntryAction> {
+    pub fn actions(&self) -> &BTreeMap<Vec<u8>, EntryAction> {
         &self.actions
     }
 
     /// Converts `self` to a map of the keys with their corresponding action.
-    pub fn into_actions(self) -> BTreeMap<Vec<u8>, SeqEntryAction> {
+    pub fn into_actions(self) -> BTreeMap<Vec<u8>, EntryAction> {
         self.actions
     }
 
     /// Inserts a new key-value pair.
     ///
-    /// Requires the new `version` of the sequenced entry content. If it does not match the current
+    /// Requires the new `version` of the entry content. If it does not match the current
     /// version + 1, an error will be returned.
-    pub fn ins(mut self, key: Vec<u8>, content: Vec<u8>, version: u64) -> Self {
-        let _ = self.actions.insert(
-            key,
-            SeqEntryAction::Ins(SeqValue {
-                data: content,
-                version,
-            }),
-        );
+    pub fn insert(mut self, key: Vec<u8>, pointer: XorName, version: u64) -> Self {
+        let _ = self
+            .actions
+            .insert(key, EntryAction::Insert(Value { pointer, version }));
         self
     }
 
     /// Updates an existing key-value pair.
     ///
-    /// Requires the new `version` of the sequenced entry content. If it does not match the current
+    /// Requires the new `version` of the entry content. If it does not match the current
     /// version + 1, an error will be returned.
-    pub fn update(mut self, key: Vec<u8>, content: Vec<u8>, version: u64) -> Self {
-        let _ = self.actions.insert(
-            key,
-            SeqEntryAction::Update(SeqValue {
-                data: content,
-                version,
-            }),
-        );
+    pub fn update(mut self, key: Vec<u8>, pointer: XorName, version: u64) -> Self {
+        let _ = self
+            .actions
+            .insert(key, EntryAction::Update(Value { pointer, version }));
         self
     }
 
     /// Deletes an entry.
     ///
-    /// Requires the new `version` of the sequenced entry content. If it does not match the current
+    /// Requires the new `version` of the entry content. If it does not match the current
     /// version + 1, an error will be returned.
-    pub fn del(mut self, key: Vec<u8>, version: u64) -> Self {
-        let _ = self.actions.insert(key, SeqEntryAction::Del(version));
+    pub fn delete(mut self, key: Vec<u8>, version: u64) -> Self {
+        let _ = self.actions.insert(key, EntryAction::Delete(version));
         self
     }
 
     /// Adds an action to the list of actions, replacing it if it is already present.
-    pub fn add_action(&mut self, key: Vec<u8>, action: SeqEntryAction) {
+    pub fn add_action(&mut self, key: Vec<u8>, action: EntryAction) {
         let _ = self.actions.insert(key, action);
     }
 }
 
-impl From<SeqEntryActions> for BTreeMap<Vec<u8>, SeqEntryAction> {
-    fn from(actions: SeqEntryActions) -> Self {
+impl From<EntryActions> for BTreeMap<Vec<u8>, EntryAction> {
+    fn from(actions: EntryActions) -> Self {
         actions.actions
     }
 }
 
-impl From<BTreeMap<Vec<u8>, SeqEntryAction>> for SeqEntryActions {
-    fn from(actions: BTreeMap<Vec<u8>, SeqEntryAction>) -> Self {
-        SeqEntryActions { actions }
-    }
-}
-
-/// Unsequenced Entry Actions for given entry keys.
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug, Default)]
-pub struct UnseqEntryActions {
-    // A BTreeMap containing keys to which the corresponding unsequenced entry action is to be
-    // performed.
-    actions: BTreeMap<Vec<u8>, UnseqEntryAction>,
-}
-
-impl UnseqEntryActions {
-    /// Creates a new unsequenced Entry Actions list.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Gets the actions.
-    pub fn actions(&self) -> &BTreeMap<Vec<u8>, UnseqEntryAction> {
-        &self.actions
-    }
-
-    /// Converts UnseqEntryActions struct to a BTreeMap of the keys with their corresponding action.
-    pub fn into_actions(self) -> BTreeMap<Vec<u8>, UnseqEntryAction> {
-        self.actions
-    }
-
-    /// Insert a new key-value pair
-    pub fn ins(mut self, key: Vec<u8>, content: Vec<u8>) -> Self {
-        let _ = self.actions.insert(key, UnseqEntryAction::Ins(content));
-        self
-    }
-
-    /// Update existing key-value pair
-    pub fn update(mut self, key: Vec<u8>, content: Vec<u8>) -> Self {
-        let _ = self.actions.insert(key, UnseqEntryAction::Update(content));
-        self
-    }
-
-    /// Delete existing key
-    pub fn del(mut self, key: Vec<u8>) -> Self {
-        let _ = self.actions.insert(key, UnseqEntryAction::Del);
-        self
-    }
-
-    /// Adds a UnseqEntryAction to the list of actions, replacing it if it is already present
-    pub fn add_action(&mut self, key: Vec<u8>, action: UnseqEntryAction) {
-        let _ = self.actions.insert(key, action);
-    }
-}
-
-impl From<UnseqEntryActions> for BTreeMap<Vec<u8>, UnseqEntryAction> {
-    fn from(actions: UnseqEntryActions) -> Self {
-        actions.actions
-    }
-}
-
-impl From<BTreeMap<Vec<u8>, UnseqEntryAction>> for UnseqEntryActions {
-    fn from(actions: BTreeMap<Vec<u8>, UnseqEntryAction>) -> Self {
-        UnseqEntryActions { actions }
-    }
-}
-
-/// Wrapper type for entry actions, which can be sequenced or unsequenced.
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
-pub enum EntryActions {
-    /// Sequenced entry actions.
-    Seq(SeqEntryActions),
-    /// Unsequenced entry actions.
-    Unseq(UnseqEntryActions),
-}
-
-impl EntryActions {
-    /// Gets the kind.
-    pub fn kind(&self) -> Kind {
-        match self {
-            EntryActions::Seq(_) => Kind::Seq,
-            EntryActions::Unseq(_) => Kind::Unseq,
-        }
-    }
-}
-
-impl From<SeqEntryActions> for EntryActions {
-    fn from(entry_actions: SeqEntryActions) -> Self {
-        EntryActions::Seq(entry_actions)
-    }
-}
-
-impl From<UnseqEntryActions> for EntryActions {
-    fn from(entry_actions: UnseqEntryActions) -> Self {
-        EntryActions::Unseq(entry_actions)
-    }
-}
-
-/// Sequenced entries (key-value pairs, with versioned values).
-pub type SeqEntries = BTreeMap<Vec<u8>, SeqValue>;
-/// Unsequenced entries (key-value pairs, without versioned values).
-pub type UnseqEntries = BTreeMap<Vec<u8>, Vec<u8>>;
-
-/// Wrapper type for entries, which can be sequenced or unsequenced.
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
-pub enum Entries {
-    /// Sequenced entries.
-    Seq(SeqEntries),
-    /// Unsequenced entries.
-    Unseq(UnseqEntries),
-}
-
-impl From<SeqEntries> for Entries {
-    fn from(entries: SeqEntries) -> Self {
-        Entries::Seq(entries)
-    }
-}
-
-impl From<UnseqEntries> for Entries {
-    fn from(entries: UnseqEntries) -> Self {
-        Entries::Unseq(entries)
+impl From<BTreeMap<Vec<u8>, EntryAction>> for EntryActions {
+    fn from(actions: BTreeMap<Vec<u8>, EntryAction>) -> Self {
+        EntryActions { actions }
     }
 }
 
@@ -1172,7 +658,7 @@ mod tests {
     #[test]
     fn zbase32_encode_decode_map_address() -> Result<()> {
         let name = XorName(rand::random());
-        let address = Address::Seq { name, tag: 15000 };
+        let address = Address::Public { name, tag: 15000 };
         let encoded = address.encode_to_zbase32()?;
         let decoded = self::Address::decode_from_zbase32(&encoded)?;
         assert_eq!(address, decoded);

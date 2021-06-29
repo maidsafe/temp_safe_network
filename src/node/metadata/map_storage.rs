@@ -319,17 +319,11 @@ impl MapStorage {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let res = self.get_chunk(&address, requester, MapAction::Read).await;
-        let result = match res.and_then(|data| match data {
-            Map::Seq(map) => map
-                .get(key)
+        let result = match res.and_then(|map| {
+            map.get(key)
                 .cloned()
                 .map(MapValue::from)
-                .ok_or(Error::NetworkData(DtError::NoSuchEntry)),
-            Map::Unseq(map) => map
-                .get(key)
-                .cloned()
-                .map(MapValue::from)
-                .ok_or(Error::NetworkData(DtError::NoSuchEntry)),
+                .ok_or(Error::NetworkData(DtError::NoSuchEntry))
         }) {
             Ok(res) => Ok(res),
             Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
@@ -377,10 +371,7 @@ impl MapStorage {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let res = self.get_chunk(&address, requester, MapAction::Read).await;
-        let result = match res.map(|data| match data {
-            Map::Seq(map) => map.values().into(),
-            Map::Unseq(map) => map.values().into(),
-        }) {
+        let result = match res.map(|map| map.values()) {
             Ok(res) => Ok(res),
             Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
@@ -402,10 +393,7 @@ impl MapStorage {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let res = self.get_chunk(&address, requester, MapAction::Read).await;
-        let result = match res.map(|data| match data {
-            Map::Seq(map) => map.entries().clone().into(),
-            Map::Unseq(map) => map.entries().clone().into(),
-        }) {
+        let result = match res.map(|map| map.entries().clone()) {
             Ok(res) => Ok(res),
             Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),

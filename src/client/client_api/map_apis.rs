@@ -11,9 +11,7 @@ use crate::client::Error;
 use tracing::trace;
 
 use crate::types::{
-    Map, MapAddress, MapEntries, MapEntryActions, MapPermissionSet, MapSeqEntries,
-    MapSeqEntryActions, MapSeqValue, MapUnseqEntries, MapUnseqEntryActions, MapValue, MapValues,
-    PublicKey, SeqMap, UnseqMap,
+    Map, MapAddress, MapEntries, MapEntryActions, MapKind, MapPermissionSet, MapValue, PublicKey,
 };
 
 use crate::messaging::client::{DataCmd, DataQuery, MapRead, MapWrite, Query, QueryResponse};
@@ -31,58 +29,30 @@ impl Client {
     // Store
     // ------------------
 
-    /// Store a new sequenced Map
+    /// Store a new Map
     ///
     /// # Examples
     ///
     /// TODO: update once data types are crdt compliant
     ///
-    pub async fn store_seq_map(
+    pub async fn store_map(
         &self,
         name: XorName,
         tag: u64,
         owner: PublicKey,
-        entries: Option<MapSeqEntries>,
+        kind: MapKind,
+        entries: Option<MapEntries>,
         permissions: Option<BTreeMap<PublicKey, MapPermissionSet>>,
     ) -> Result<MapAddress, Error> {
-        let data = Map::Seq(SeqMap::new_with_data(
+        let data = Map::new_with_data(
             name,
             tag,
-            entries.unwrap_or_else(MapSeqEntries::default),
+            entries.unwrap_or_else(MapEntries::default),
             permissions.unwrap_or_else(BTreeMap::default),
             owner,
-        ));
+            kind,
+        );
         let address = *data.address();
-        let cmd = DataCmd::Map(MapWrite::New(data));
-
-        self.pay_and_send_data_command(cmd).await?;
-
-        Ok(address)
-    }
-
-    /// Store a new unsequenced Map
-    ///
-    /// # Examples
-    ///
-    /// TODO: update once data types are crdt compliant
-    ///
-    pub async fn store_unseq_map(
-        &self,
-        name: XorName,
-        tag: u64,
-        owner: PublicKey,
-        entries: Option<MapUnseqEntries>,
-        permissions: Option<BTreeMap<PublicKey, MapPermissionSet>>,
-    ) -> Result<MapAddress, Error> {
-        let data = Map::Unseq(UnseqMap::new_with_data(
-            name,
-            tag,
-            entries.unwrap_or_else(MapUnseqEntries::default),
-            permissions.unwrap_or_else(BTreeMap::default),
-            owner,
-        ));
-        let address = *data.address();
-
         let cmd = DataCmd::Map(MapWrite::New(data));
 
         self.pay_and_send_data_command(cmd).await?;
@@ -238,96 +208,34 @@ impl Client {
     // Entries
     //----------
 
-    /// Mutates sequenced `Map` entries in bulk
-    pub async fn mutate_seq_map_entries(
+    /// Mutates public `Map` entries in bulk
+    pub async fn mutate_map_entries(
         &self,
-        name: XorName,
-        tag: u64,
-        actions: MapSeqEntryActions,
+        address: MapAddress,
+        actions: MapEntryActions,
     ) -> Result<(), Error>
     where
         Self: Sized,
     {
-        trace!("Mutate Map for {:?}", name);
-
-        let map_actions = MapEntryActions::Seq(actions);
-        let address = MapAddress::Seq { name, tag };
-
-        self.edit_map_entries(address, map_actions).await
-    }
-
-    /// Mutates unsequenced `Map` entries in bulk
-    pub async fn mutate_unseq_map_entries(
-        &self,
-        name: XorName,
-        tag: u64,
-        actions: MapUnseqEntryActions,
-    ) -> Result<(), Error>
-    where
-        Self: Sized,
-    {
-        trace!("Mutate Map for {:?}", name);
-
-        let map_actions = MapEntryActions::Unseq(actions);
-        let address = MapAddress::Unseq { name, tag };
-
-        self.edit_map_entries(address, map_actions).await
+        trace!("Mutate Map for {:?}", address.name());
+        self.edit_map_entries(address, actions).await
     }
 
     /// Return a complete list of entries in `Map`.
-    pub async fn list_unseq_map_entries(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, Vec<u8>>, Error>
+    pub async fn list_map_entries(&self, address: MapAddress) -> Result<MapEntries, Error>
     where
         Self: Sized,
     {
-        trace!("ListMapEntries for {:?}", name);
+        trace!("ListMapEntries for {:?}", address.name());
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::ListEntries(MapAddress::Unseq {
-                name,
-                tag,
-            })))
+            .send_query(wrap_map_read(MapRead::ListEntries(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {
-            QueryResponse::ListMapEntries(res) => res
-                .map_err(|err| Error::from((err, msg_id)))
-                .and_then(|entries| match entries {
-                    MapEntries::Unseq(data) => Ok(data),
-                    MapEntries::Seq(_) => Err(Error::ReceivedUnexpectedData),
-                }),
-            _ => Err(Error::ReceivedUnexpectedEvent),
-        }
-    }
-
-    /// Return a complete list of entries in `Map`.
-    pub async fn list_seq_map_entries(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<MapSeqEntries, Error>
-    where
-        Self: Sized,
-    {
-        trace!("ListSeqMapEntries for {:?}", name);
-
-        let query_result = self
-            .send_query(wrap_map_read(MapRead::ListEntries(MapAddress::Seq {
-                name,
-                tag,
-            })))
-            .await?;
-        let msg_id = query_result.msg_id;
-        match query_result.response {
-            QueryResponse::ListMapEntries(res) => res
-                .map_err(|err| Error::from((err, msg_id)))
-                .and_then(|entries| match entries {
-                    MapEntries::Seq(data) => Ok(data),
-                    MapEntries::Unseq(_) => Err(Error::ReceivedUnexpectedData),
-                }),
+            QueryResponse::ListMapEntries(res) => {
+                Ok(res.map_err(|err| Error::from((err, msg_id)))?)
+            }
             _ => Err(Error::ReceivedUnexpectedEvent),
         }
     }
@@ -349,60 +257,19 @@ impl Client {
         }
     }
 
-    /// Return a list of values in a Sequenced Mutable Data
-    pub async fn list_seq_map_values(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<Vec<MapSeqValue>, Error>
+    /// Return a list of values in a Map
+    pub async fn list_map_values(&self, address: MapAddress) -> Result<Vec<MapValue>, Error>
     where
         Self: Sized,
     {
-        trace!("List MapValues for {:?}", name);
+        trace!("List MapValues for {:?}", address.name());
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::ListValues(MapAddress::Seq {
-                name,
-                tag,
-            })))
+            .send_query(wrap_map_read(MapRead::ListValues(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {
-            QueryResponse::ListMapValues(res) => res
-                .map_err(|err| Error::from((err, msg_id)))
-                .and_then(|values| match values {
-                    MapValues::Seq(data) => Ok(data),
-                    MapValues::Unseq(_) => Err(Error::ReceivedUnexpectedData),
-                }),
-            _ => Err(Error::ReceivedUnexpectedEvent),
-        }
-    }
-
-    /// Returns a list of values in an Unsequenced Mutable Data
-    pub async fn list_unseq_map_values(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<Vec<Vec<u8>>, Error>
-    where
-        Self: Sized,
-    {
-        trace!("List MapValues for {:?}", name);
-
-        let query_result = self
-            .send_query(wrap_map_read(MapRead::ListValues(MapAddress::Unseq {
-                name,
-                tag,
-            })))
-            .await?;
-        let msg_id = query_result.msg_id;
-        match query_result.response {
-            QueryResponse::ListMapValues(res) => res
-                .map_err(|err| Error::from((err, msg_id)))
-                .and_then(|values| match values {
-                    MapValues::Unseq(data) => Ok(data),
-                    MapValues::Seq(_) => Err(Error::ReceivedUnexpectedData),
-                }),
+            QueryResponse::ListMapValues(res) => Ok(res.map_err(|err| Error::from((err, msg_id)))?),
             _ => Err(Error::ReceivedUnexpectedEvent),
         }
     }
@@ -507,7 +374,7 @@ mod tests {
     use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair};
     use crate::messaging::client::{CmdError, Error as ErrorMessage};
     use crate::retry_loop;
-    use crate::types::MapAction;
+    use crate::types::{MapAction, MapKind, MapValues};
     use anyhow::{anyhow, bail, Result};
     use std::time::Duration;
     use xor_name::XorName;
@@ -516,30 +383,40 @@ mod tests {
     // 2. Fetch the shell version, entries, keys, values anv verify them
     // 3. Fetch the entire. data object and verify
     #[tokio::test]
-    pub async fn unseq_map_test() -> Result<()> {
+    pub async fn public_map_test() -> Result<()> {
         let client = create_test_client(None).await?;
 
-        let name = XorName(rand::random());
+        let name = XorName::random();
         let tag = 15001;
-        let mut entries: BTreeMap<Vec<u8>, Vec<u8>> = Default::default();
+        let mut entries: MapEntries = Default::default();
         let mut permissions: BTreeMap<_, _> = Default::default();
         let permission_set = MapPermissionSet::new().allow(MapAction::Read);
         let _ = permissions.insert(client.public_key(), permission_set);
-        let _ = entries.insert(b"key".to_vec(), b"value".to_vec());
+        let _ = entries.insert(
+            b"key".to_vec(),
+            MapValue {
+                pointer: name,
+                version: 0,
+            },
+        );
         let entries_keys = entries.keys().cloned().collect();
-        let entries_values: Vec<Vec<u8>> = entries.values().cloned().collect();
+        let entries_values: MapValues = entries.values().cloned().collect();
         let owner = client.public_key();
         let address = client
-            .store_unseq_map(name, tag, owner, Some(entries.clone()), Some(permissions))
+            .store_map(
+                name,
+                tag,
+                owner,
+                MapKind::Public,
+                Some(entries.clone()),
+                Some(permissions),
+            )
             .await?;
 
         let mut res: Result<u64> = Err(anyhow!("Timeout!".to_string()));
         while res.is_err() {
             tokio::time::sleep(Duration::from_millis(200)).await;
-            res = match client
-                .get_map_version(MapAddress::Unseq { name, tag })
-                .await
-            {
+            res = match client.get_map_version(address).await {
                 Ok(res) => Ok(res),
                 Err(error) => Err(error.into()), // into anyhow error
             };
@@ -548,13 +425,11 @@ mod tests {
         let version = res?;
 
         assert_eq!(version, 0);
-        let fetched_entries = client.list_unseq_map_entries(name, tag).await?;
+        let fetched_entries = client.list_map_entries(address).await?;
         assert_eq!(fetched_entries, entries);
-        let keys = client
-            .list_map_keys(MapAddress::Unseq { name, tag })
-            .await?;
+        let keys = client.list_map_keys(address).await?;
         assert_eq!(keys, entries_keys);
-        let values = client.list_unseq_map_values(name, tag).await?;
+        let values = client.list_map_values(address).await?;
         assert_eq!(values, entries_values);
         let fetched_data = client.get_map(address).await?;
         assert_eq!(*fetched_data.name(), name);
@@ -562,38 +437,45 @@ mod tests {
         Ok(())
     }
 
-    // 1. Create an put seq. map on the network with some entries and permissions.
+    // 1. Store a private map on the network with some entries and permissions.
     // 2. Fetch the shell version, entries, keys, values anv verify them
     // 3. Fetch the entire. data object and verify
     #[tokio::test]
-    pub async fn seq_map_test() -> Result<()> {
+    pub async fn private_map_test() -> Result<()> {
         let client = create_test_client(None).await?;
 
-        let name = XorName(rand::random());
+        let name = XorName::random();
         let tag = 15001;
-        let mut entries: MapSeqEntries = Default::default();
+        let mut entries: MapEntries = Default::default();
         let _ = entries.insert(
             b"key".to_vec(),
-            MapSeqValue {
-                data: b"value".to_vec(),
+            MapValue {
+                pointer: name,
                 version: 0,
             },
         );
         let entries_keys = entries.keys().cloned().collect();
-        let entries_values: Vec<MapSeqValue> = entries.values().cloned().collect();
+        let entries_values: Vec<MapValue> = entries.values().cloned().collect();
         let mut permissions: BTreeMap<_, _> = Default::default();
         let permission_set = MapPermissionSet::new().allow(MapAction::Read);
         let _ = permissions.insert(client.public_key(), permission_set);
         let owner = client.public_key();
 
         let address = client
-            .store_seq_map(name, tag, owner, Some(entries.clone()), Some(permissions))
+            .store_map(
+                name,
+                tag,
+                owner,
+                MapKind::Private,
+                Some(entries.clone()),
+                Some(permissions),
+            )
             .await?;
 
-        let mut res: Result<MapSeqEntries> = Err(anyhow!("Timeout!".to_string()));
+        let mut res: Result<MapEntries> = Err(anyhow!("Timeout!".to_string()));
         while res.is_err() {
             tokio::time::sleep(Duration::from_millis(200)).await;
-            res = match client.list_seq_map_entries(name, tag).await {
+            res = match client.list_map_entries(address).await {
                 Ok(res) => Ok(res),
                 Err(error) => Err(error.into()), // into anyhow error
             };
@@ -601,21 +483,15 @@ mod tests {
         let fetched_entries = res?;
 
         assert_eq!(fetched_entries, entries);
-        let map_shell = match client.get_map_shell(address).await? {
-            Map::Seq(data) => data,
-            _ => bail!("expected sequence map"),
-        };
+        let map_shell = client.get_map_shell(address).await?;
         assert_eq!(*map_shell.name(), name);
         assert_eq!(map_shell.tag(), tag);
         assert_eq!(map_shell.entries().len(), 0);
-        let keys = client.list_map_keys(MapAddress::Seq { name, tag }).await?;
+        let keys = client.list_map_keys(address).await?;
         assert_eq!(keys, entries_keys);
-        let values = client.list_seq_map_values(name, tag).await?;
+        let values = client.list_map_values(address).await?;
         assert_eq!(values, entries_values);
-        let fetched_data = match client.get_map(address).await? {
-            Map::Seq(data) => data,
-            _ => bail!("Expected seq map"),
-        };
+        let fetched_data = client.get_map(address).await?;
         assert_eq!(*fetched_data.name(), name);
         assert_eq!(fetched_data.tag(), tag);
         assert_eq!(fetched_data.entries().len(), 1);
@@ -625,14 +501,16 @@ mod tests {
     // 1. Put seq. map on the network and then delete it
     // 2. Try getting the data object. It should bail
     #[tokio::test]
-    pub async fn del_seq_map_test() -> Result<()> {
+    pub async fn del_private_map_test() -> Result<()> {
         let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
-        let mapref = MapAddress::Seq { name, tag };
+        let mapref = MapAddress::Private { name, tag };
         let owner = client.public_key();
 
-        let address = client.store_seq_map(name, tag, owner, None, None).await?;
+        let address = client
+            .store_map(name, tag, owner, MapKind::Private, None, None)
+            .await?;
 
         client.delete_map(mapref).await?;
 
@@ -654,14 +532,16 @@ mod tests {
     // 1. Put unseq. map on the network and then delete it
     // 2. Try getting the data object. It should bail
     #[tokio::test]
-    pub async fn del_unseq_map_test() -> Result<()> {
+    pub async fn del_public_map_test() -> Result<()> {
         let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
-        let mapref = MapAddress::Unseq { name, tag };
+        let mapref = MapAddress::Public { name, tag };
         let owner = client.public_key();
 
-        let address = client.store_unseq_map(name, tag, owner, None, None).await?;
+        let address = client
+            .store_map(name, tag, owner, MapKind::Public, None, None)
+            .await?;
 
         client.delete_map(mapref).await?;
 
@@ -683,15 +563,15 @@ mod tests {
     // 1. Create a client that PUTs some map on the network
     // 2. Create a different client that tries to delete the data. It should bail.
     #[tokio::test]
-    pub async fn del_unseq_map_permission_test() -> Result<()> {
+    pub async fn del_public_map_permission_test() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 15001;
-        let mapref = MapAddress::Unseq { name, tag };
+        let mapref = MapAddress::Public { name, tag };
 
         let some_client = create_test_client(None).await?;
         let owner = some_client.public_key();
 
-        let _ = retry_loop!(some_client.store_unseq_map(name, tag, owner, None, None));
+        let _ = retry_loop!(some_client.store_map(name, tag, owner, MapKind::Public, None, None));
 
         let mut client = create_test_client(None).await?;
 
@@ -721,10 +601,11 @@ mod tests {
         let _ = permissions.insert(random_user, permission_set);
 
         let test_data_name = XorName(rand::random());
-        let address = retry_loop!(client.store_seq_map(
+        let address = retry_loop!(client.store_map(
             test_data_name,
             15000u64,
             random_pk,
+            MapKind::Private,
             None,
             Some(permissions.clone())
         ));
@@ -773,7 +654,7 @@ mod tests {
 
         // Store the data
         let address = client
-            .store_seq_map(name, tag, owner, None, Some(permissions))
+            .store_map(name, tag, owner, MapKind::Private, None, Some(permissions))
             .await?;
 
         // Assert that the data is stored.
@@ -789,17 +670,17 @@ mod tests {
 
         // Set new perms to the data
         client
-            .set_map_user_permissions(MapAddress::Seq { name, tag }, user, new_perm_set, 1)
+            .set_map_user_permissions(MapAddress::Private { name, tag }, user, new_perm_set, 1)
             .await?;
 
         // Assert that the new perms are set.
         let mut permissions = client
-            .list_map_user_permissions(MapAddress::Seq { name, tag }, user)
+            .list_map_user_permissions(MapAddress::Private { name, tag }, user)
             .await?;
         while permissions.is_allowed(MapAction::Insert) {
             tokio::time::sleep(Duration::from_millis(200)).await;
             permissions = client
-                .list_map_user_permissions(MapAddress::Seq { name, tag }, user)
+                .list_map_user_permissions(MapAddress::Private { name, tag }, user)
                 .await?;
         }
         assert!(!permissions.is_allowed(MapAction::Insert));
@@ -808,17 +689,17 @@ mod tests {
 
         // Delete user perms
         client
-            .del_map_user_permissions(MapAddress::Seq { name, tag }, random_user, 2)
+            .del_map_user_permissions(MapAddress::Private { name, tag }, random_user, 2)
             .await?;
 
         // Assert perms deletion.
         let mut permissions = client
-            .list_map_permissions(MapAddress::Seq { name, tag })
+            .list_map_permissions(MapAddress::Private { name, tag })
             .await?;
         while permissions.len() != 1 {
             tokio::time::sleep(Duration::from_millis(200)).await;
             permissions = client
-                .list_map_permissions(MapAddress::Seq { name, tag })
+                .list_map_permissions(MapAddress::Private { name, tag })
                 .await?;
         }
 
@@ -832,7 +713,8 @@ mod tests {
     #[tokio::test]
     pub async fn map_mutations_test() -> Result<()> {
         let client = create_test_client(None).await?;
-        let name = XorName(rand::random());
+        let name = XorName::random();
+        let val_1 = XorName::random();
         let tag = 15001;
         let mut permissions: BTreeMap<_, _> = Default::default();
         let permission_set = MapPermissionSet::new()
@@ -842,25 +724,32 @@ mod tests {
             .allow(MapAction::Delete);
         let user = client.public_key();
         let _ = permissions.insert(user, permission_set);
-        let mut entries: MapSeqEntries = Default::default();
+        let mut entries: MapEntries = Default::default();
         let _ = entries.insert(
             b"key1".to_vec(),
-            MapSeqValue {
-                data: b"value".to_vec(),
+            MapValue {
+                pointer: val_1,
                 version: 0,
             },
         );
         let _ = entries.insert(
             b"key2".to_vec(),
-            MapSeqValue {
-                data: b"value".to_vec(),
+            MapValue {
+                pointer: val_1,
                 version: 0,
             },
         );
         let owner = client.public_key();
 
         let address = client
-            .store_seq_map(name, tag, owner, Some(entries.clone()), Some(permissions))
+            .store_map(
+                name,
+                tag,
+                owner,
+                MapKind::Private,
+                Some(entries.clone()),
+                Some(permissions),
+            )
             .await?;
 
         // Assert that the data is stored.
@@ -870,50 +759,48 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(200)).await;
             res = client.get_map(address).await;
         }
-        let fetched_entries = client.list_seq_map_entries(name, tag).await?;
+        let fetched_entries = client.list_map_entries(address).await?;
 
         assert_eq!(fetched_entries, entries);
-        let entry_actions: MapSeqEntryActions = MapSeqEntryActions::new()
-            .update(b"key1".to_vec(), b"newValue".to_vec(), 1)
-            .del(b"key2".to_vec(), 1)
-            .ins(b"key3".to_vec(), b"value".to_vec(), 0);
 
-        client
-            .mutate_seq_map_entries(name, tag, entry_actions)
-            .await?;
+        let new_value = XorName::random();
+        let value = XorName::random();
+        let entry_actions: MapEntryActions = MapEntryActions::new()
+            .update(b"key1".to_vec(), new_value, 1)
+            .delete(b"key2".to_vec(), 1)
+            .insert(b"key3".to_vec(), value, 0);
 
-        let mut fetched_entries = client.list_seq_map_entries(name, tag).await?;
+        client.mutate_map_entries(address, entry_actions).await?;
+
+        let mut fetched_entries = client.list_map_entries(address).await?;
         while fetched_entries.contains_key(&b"key2".to_vec()) {
-            fetched_entries = client.list_seq_map_entries(name, tag).await?;
+            fetched_entries = client.list_map_entries(address).await?;
         }
 
         let mut expected_entries: BTreeMap<_, _> = Default::default();
         let _ = expected_entries.insert(
             b"key1".to_vec(),
-            MapSeqValue {
-                data: b"newValue".to_vec(),
+            MapValue {
+                pointer: new_value,
                 version: 1,
             },
         );
         let _ = expected_entries.insert(
             b"key3".to_vec(),
-            MapSeqValue {
-                data: b"value".to_vec(),
+            MapValue {
+                pointer: value,
                 version: 0,
             },
         );
 
         assert_eq!(fetched_entries, expected_entries);
 
-        let fetched_value = match client.get_map_value(address, b"key3".to_vec()).await? {
-            MapValue::Seq(value) => value,
-            _ => bail!("Unexpected seq mutable data"),
-        };
+        let fetched_value = client.get_map_value(address, b"key3".to_vec()).await?;
 
         assert_eq!(
             fetched_value,
-            MapSeqValue {
-                data: b"value".to_vec(),
+            MapValue {
+                pointer: value,
                 version: 0
             }
         );
@@ -939,13 +826,32 @@ mod tests {
             .allow(MapAction::Delete);
         let user = client.public_key();
         let _ = permissions.insert(user, permission_set);
-        let mut entries: BTreeMap<Vec<u8>, Vec<u8>> = Default::default();
-        let _ = entries.insert(b"key1".to_vec(), b"value".to_vec());
-        let _ = entries.insert(b"key2".to_vec(), b"value".to_vec());
+        let mut entries: BTreeMap<Vec<u8>, MapValue> = Default::default();
+        let _ = entries.insert(
+            b"key1".to_vec(),
+            MapValue {
+                pointer: val_1,
+                version: 0,
+            },
+        );
+        let _ = entries.insert(
+            b"key2".to_vec(),
+            MapValue {
+                pointer: val_1,
+                version: 0,
+            },
+        );
 
         let owner = client.public_key();
         let address = client
-            .store_unseq_map(name, tag, owner, Some(entries.clone()), Some(permissions))
+            .store_map(
+                name,
+                tag,
+                owner,
+                MapKind::Public,
+                Some(entries.clone()),
+                Some(permissions),
+            )
             .await?;
 
         // Assert that the data is stored.
@@ -955,32 +861,45 @@ mod tests {
             res = client.get_map(address).await;
         }
 
-        let fetched_entries = client.list_unseq_map_entries(name, tag).await?;
+        let fetched_entries = client.list_map_entries(address).await?;
         assert_eq!(fetched_entries, entries);
-        let entry_actions: MapUnseqEntryActions = MapUnseqEntryActions::new()
-            .update(b"key1".to_vec(), b"newValue".to_vec())
-            .del(b"key2".to_vec())
-            .ins(b"key3".to_vec(), b"value".to_vec());
+        let entry_actions = MapEntryActions::new()
+            .update(b"key1".to_vec(), new_value, 1)
+            .delete(b"key2".to_vec(), 1)
+            .insert(b"key3".to_vec(), value, 0);
 
-        client
-            .mutate_unseq_map_entries(name, tag, entry_actions)
-            .await?;
+        client.mutate_map_entries(address, entry_actions).await?;
 
-        let mut fetched_entries = client.list_unseq_map_entries(name, tag).await?;
+        let mut fetched_entries = client.list_map_entries(address).await?;
         while fetched_entries.contains_key(&b"key2".to_vec()) {
-            fetched_entries = client.list_unseq_map_entries(name, tag).await?;
+            fetched_entries = client.list_map_entries(address).await?;
         }
 
         let mut expected_entries: BTreeMap<_, _> = Default::default();
-        let _ = expected_entries.insert(b"key1".to_vec(), b"newValue".to_vec());
-        let _ = expected_entries.insert(b"key3".to_vec(), b"value".to_vec());
+        let _ = expected_entries.insert(
+            b"key1".to_vec(),
+            MapValue {
+                pointer: new_value,
+                version: 1,
+            },
+        );
+        let _ = expected_entries.insert(
+            b"key3".to_vec(),
+            MapValue {
+                pointer: value,
+                version: 0,
+            },
+        );
         assert_eq!(fetched_entries, expected_entries);
-        let fetched_value = match client.get_map_value(address, b"key1".to_vec()).await? {
-            MapValue::Unseq(value) => value,
-            _ => bail!("unexpeced seq mutable data"),
-        };
+        let fetched_value = client.get_map_value(address, b"key1".to_vec()).await?;
 
-        assert_eq!(fetched_value, b"newValue".to_vec());
+        assert_eq!(
+            fetched_value,
+            MapValue {
+                pointer: new_value,
+                version: 1,
+            }
+        );
         let res = client.get_map_value(address, b"wrongKey".to_vec()).await;
         match res {
             Ok(_) => bail!("Unexpected: Entry should not exist"),

@@ -12,10 +12,7 @@ use crate::types::{DataAddress, Map, MapAddress};
 impl Data for Map {
     type Id = MapAddress;
     fn id(&self) -> &Self::Id {
-        match self {
-            Map::Seq(ref chunk) => chunk.address(),
-            Map::Unseq(ref chunk) => chunk.address(),
-        }
+        self.address()
     }
 }
 
