@@ -42,7 +42,7 @@ impl Core {
         self.end_users.get_socket_addr(id)
     }
 
-    pub fn try_add(&mut self, sender: SocketAddr) -> Result<EndUser> {
+    pub fn try_add_enduser(&mut self, sender: SocketAddr) -> Result<EndUser> {
         let section_prefix = self.section.prefix();
         self.end_users.try_add(sender, section_prefix)
     }
@@ -151,16 +151,15 @@ impl Core {
 
     // Send message over the network.
     pub async fn relay_message(&self, wire_msg: &WireMsg) -> Result<Option<Command>> {
-        unimplemented!();
-        /*
+        let dst_location = wire_msg.dst_location();
         let (presumed_targets, dg_size) = delivery_group::delivery_targets(
-            &msg.dst,
+            dst_location,
             &self.node.name(),
             &self.section,
             &self.network,
         )?;
 
-        let target_name = msg.dst.name().ok_or(Error::CannotRoute)?;
+        let target_name = dst_location.name().ok_or(Error::CannotRoute)?;
         let dst_pk = self.section_key_by_name(&target_name);
 
         let mut targets = vec![];
@@ -168,7 +167,7 @@ impl Core {
         for peer in presumed_targets {
             if self
                 .msg_filter
-                .filter_outgoing(msg, peer.name())
+                .filter_outgoing(wire_msg, peer.name())
                 .await
                 .is_new()
             {
@@ -182,11 +181,13 @@ impl Core {
 
         trace!(
             "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
-            msg,
+            wire_msg,
             dg_size,
             targets,
-            msg.section_pk,
+            dst_location.section_pk(),
         );
+        unimplemented!();
+        /*
 
         let command = Command::send_message_to_nodes(
             targets,
