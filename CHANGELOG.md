@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.30.0](https://github.com/maidsafe/sn_api/compare/v0.29.2...v0.30.0) (2021-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* uses updated SN which needs a user definable query timeout
+
+### Features
+
+* update sn, add timeout ([c27fd11](https://github.com/maidsafe/sn_api/commit/c27fd11d023b94f07c98fc207fcab3e25eee5469))
+
 ### [0.29.2](https://github.com/maidsafe/sn_api/compare/v0.29.1...v0.29.2) (2021-06-23)
 
 
