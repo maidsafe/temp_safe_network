@@ -66,6 +66,7 @@ impl Network {
     }
 
     /// Sign with our BLS PK Share
+    #[allow(unused)]
     pub async fn sign_as_elder<T: Serialize>(&self, data: &T) -> Result<SignatureShare> {
         let bls_pk = self
             .routing
@@ -223,6 +224,7 @@ impl Network {
     }
 
     /// get our PKshare
+    #[allow(unused)]
     pub async fn our_public_key_share(&self) -> Result<PublicKey> {
         let index = self.our_index().await?;
         Ok(PublicKey::from(
@@ -231,6 +233,7 @@ impl Network {
     }
 
     /// BLS key index in routing for key shares
+    #[allow(unused)]
     pub async fn our_index(&self) -> Result<usize> {
         self.routing.our_index().await.map_err(Error::Routing)
     }
@@ -282,6 +285,7 @@ impl Network {
             .collect::<Vec<_>>()
     }
 
+    #[allow(unused)]
     pub async fn our_members(&self) -> BTreeMap<XorName, u8> {
         let elders: Vec<_> = self
             .routing

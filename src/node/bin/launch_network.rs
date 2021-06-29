@@ -54,7 +54,7 @@ async fn main() -> Result<(), String> {
     remove_dir_all(&path).unwrap_or(()); // Delete nodes directory if it exists;
     create_dir_all(&path).expect("Cannot create nodes directory");
 
-    let args: Vec<&str> = vec!["build", "--features=simulated-payouts", "--release"];
+    let args: Vec<&str> = vec!["build", "--release"];
     println!("Building current sn_node");
     let _child = Command::new("cargo")
         .args(args.clone())

@@ -16,14 +16,10 @@ use crate::messaging::{
     },
     EndUser, MessageId, MessageType, WireMsg,
 };
-use crate::types::{
-    ActorHistory, Chunk, ChunkAddress, CreditAgreementProof, NodeAge, PublicKey, ReplicaEvent,
-    SectionElders, Signature,
-};
+use crate::types::{Chunk, ChunkAddress, PublicKey, SectionElders, Signature};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use xor_name::XorName;
 
 // -------------- Node Cmd Messages --------------
@@ -147,8 +143,6 @@ pub enum NodeCmd {
         /// Message source
         origin: EndUser,
     },
-    /// Transfers are handled by Elders
-    Transfers(NodeTransferCmd),
     /// Cmds related to the running of a node.
     System(NodeSystemCmd),
 }
@@ -157,8 +151,6 @@ pub enum NodeCmd {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeSystemCmd {
-    /// Register a wallet for reward payouts.
-    RegisterWallet(PublicKey),
     /// Notify Elders on nearing max capacity
     StorageFull {
         /// Node Id
@@ -170,28 +162,12 @@ pub enum NodeSystemCmd {
     ReplicateChunk(Chunk),
     /// Tells the Elders to re-publish a chunk in the data section
     RepublishChunk(Chunk),
-    /// When new section key, all propose a reward payout.
-    ProposeRewardPayout(crate::types::RewardProposal),
-    /// When proposal has been agreed, they all accumulate the reward payout.
-    AccumulateRewardPayout(crate::types::RewardAccumulation),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveExistingData {
-        /// Age and reward wallets of registered nodes, keyed by node name.
-        node_rewards: BTreeMap<XorName, (NodeAge, PublicKey)>,
-        /// Transfer histories
-        user_wallets: BTreeMap<PublicKey, ActorHistory>,
         /// Metadata
         metadata: DataExchange,
     },
-}
-
-///
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeTransferCmd {
-    ///
-    PropagateTransfer(CreditAgreementProof),
 }
 
 // -------------- Node Events --------------
@@ -233,33 +209,8 @@ pub enum NodeQuery {
         /// The user that has initiated this query
         origin: EndUser,
     },
-    /// Rewards handled by Elders
-    Rewards(NodeRewardQuery),
-    /// Transfers handled by Elders
-    Transfers(NodeTransferQuery),
     /// Related to the running of a node
     System(NodeSystemQuery),
-}
-
-/// Reward query that is sent between sections.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeRewardQuery {
-    /// Get the wallet key of a given node for receiving rewards
-    GetNodeWalletKey(XorName),
-    /// A new Section Actor share (i.e. a new Elder) needs to query
-    /// its peer Elders for the replicas' public key set
-    /// and the history of events of the section wallet.
-    GetSectionWalletHistory,
-}
-
-///
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeTransferQuery {
-    /// Replicas starting up
-    /// need to query for events of
-    /// the existing Replicas. (Sent to the other Elders).
-    GetReplicaEvents,
 }
 
 ///
@@ -290,19 +241,7 @@ pub enum NodeQueryResponse {
     ///
     Data(NodeDataQueryResponse),
     ///
-    Transfers(NodeTransferQueryResponse),
-    ///
     System(NodeSystemQueryResponse),
-}
-
-///
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeTransferQueryResponse {
-    /// Replicas starting up
-    /// need to query for events of
-    /// the existing Replicas.
-    GetReplicaEvents(Result<Vec<ReplicaEvent>>),
 }
 
 ///
@@ -319,8 +258,6 @@ pub enum NodeDataQueryResponse {
 pub enum NodeCmdError {
     ///
     Data(NodeDataError),
-    ///
-    Transfers(NodeTransferError),
 }
 
 ///
@@ -333,11 +270,4 @@ pub enum NodeDataError {
         ///
         error: Error,
     },
-}
-
-///
-#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeTransferError {
-    /// The error of propagation of TransferRegistered event.
-    TransferPropagation(Error),
 }

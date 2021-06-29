@@ -12,7 +12,6 @@ use super::{
     role::{AdultRole, Role},
 };
 use crate::messaging::{
-    client::{Cmd, ProcessMsg},
     node::{NodeMsg, NodeQuery},
     Aggregation, MessageId,
 };
@@ -20,8 +19,7 @@ use crate::node::{
     chunks::Chunks,
     event_mapping::MsgContext,
     node_ops::{NodeDuties, NodeDuty},
-    section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
-    Error, Node, Result,
+    Node, Result,
 };
 use crate::routing::ELDER_SIZE;
 use std::sync::Arc;
@@ -75,11 +73,10 @@ impl Node {
                     }
                     Ok(NodeTask::None)
                 } else {
-                    info!("Updating our replicas on Churn");
+                    info!("Updating on elder churn");
                     let elder = self.role.as_elder_mut()?.clone();
                     let network = self.network_api.clone();
                     let handle = tokio::spawn(async move {
-                        Self::update_replicas(&elder, &network).await?;
                         let msg_id =
                             MessageId::combine(&[our_prefix.name().0, XorName::from(our_key).0]);
                         let ops = vec![push_state(&elder, our_prefix, msg_id, new_elders).await?];
@@ -130,7 +127,7 @@ impl Node {
                 );
                 if newbie {
                     info!("Beginning split as Newbie");
-                    self.begin_split_as_newbie(our_key, our_prefix).await?;
+                    self.begin_split_as_newbie(our_key).await?;
                     Ok(NodeTask::None)
                 } else {
                     info!("Beginning split as Oldie");
@@ -169,103 +166,11 @@ impl Node {
                 });
                 Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::ReceiveRewardProposal(proposal) => {
-                info!("Handling Churn proposal as an Elder");
-                let elder = self.role.as_elder_mut()?;
-                let mut churn_process = elder
-                    .section_funds
-                    .write()
-                    .await
-                    .as_churning_mut()?
-                    .0
-                    .clone();
-                let duties = vec![churn_process.receive_churn_proposal(proposal).await?];
-                Ok(NodeTask::Result(Box::new((duties, None))))
-            }
-            NodeDuty::ReceiveRewardAccumulation(accumulation) => {
-                let elder = self.role.as_elder_mut()?.clone();
-                let network_api = self.network_api.clone();
-                let handle = tokio::spawn(async move {
-                    let mut section_funds = elder.section_funds.write().await;
-                    let (churn_process, reward_wallets) = section_funds.as_churning_mut()?;
-
-                    let mut ops = vec![
-                        churn_process
-                            .clone()
-                            .receive_wallet_accumulation(accumulation)
-                            .await?,
-                    ];
-
-                    if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
-                        let reward_sum = credit_proofs.sum();
-                        ops.extend(Self::propagate_credits(credit_proofs)?);
-                        // update state
-                        *section_funds = SectionFunds::KeepingNodeWallets(reward_wallets.clone());
-                        let section_key = network_api.section_public_key().await?;
-                        info!(
-                            "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
-                            section_key, reward_sum
-                        );
-                        ops.push(NodeDuty::SetNodeJoinsAllowed(true));
-                    }
-
-                    Ok(NodeTask::from(ops))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            //
-            // ------- reward reg -------
-            NodeDuty::SetNodeWallet { wallet_id, node_id } => {
-                let elder = self.role.as_elder_mut()?.clone();
-                let network_api = self.network_api.clone();
-                let handle = tokio::spawn(async move {
-                    let members = network_api.our_members().await;
-                    let result = if let Some(age) = members.get(&node_id) {
-                        elder
-                            .section_funds
-                            .write()
-                            .await
-                            .set_node_wallet(node_id, wallet_id, *age);
-                        Ok(vec![])
-                    } else {
-                        let our_prefix = network_api.our_prefix().await;
-
-                        debug!(
-                            "{:?}: Couldn't find node id {} when adding wallet {}",
-                            our_prefix, node_id, wallet_id
-                        );
-                        Err(Error::NodeNotFoundForReward)
-                    }?;
-                    Ok(NodeTask::from(result))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::GetNodeWalletKey { node_name, .. } => {
-                let elder = self.role.as_elder_mut()?.clone();
-                let network_api = self.network_api.clone();
-                let handle = tokio::spawn(async move {
-                    let members = network_api.our_members().await;
-                    let result = if members.get(&node_name).is_some() {
-                        let _wallet = elder.section_funds.read().await.get_node_wallet(&node_name);
-                        Ok(vec![]) // not yet implemented
-                    } else {
-                        let our_prefix = network_api.our_prefix().await;
-                        debug!(
-                            "{:?}: Couldn't find node {} when getting wallet.",
-                            our_prefix, node_name,
-                        );
-                        Err(Error::NodeNotFoundForReward)
-                    }?;
-                    Ok(NodeTask::from(result))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
             NodeDuty::ProcessLostMember { name, .. } => {
                 info!("Member Lost: {:?}", name);
                 let elder = self.role.as_elder_mut()?.clone();
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
-                    elder.section_funds.write().await.remove_node_wallet(name);
                     let our_adults = network_api.our_adults().await;
                     elder
                         .meta_data
@@ -279,25 +184,11 @@ impl Node {
             }
             //
             // ---------- Levelling --------------
-            NodeDuty::SynchState {
-                node_rewards,
-                user_wallets,
-                metadata,
-            } => {
+            NodeDuty::SynchState { metadata } => {
                 let elder = self.role.as_elder()?.clone();
-                let network_api = self.network_api.clone();
-                let reward_key = self.node_info.reward_key;
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(vec![
-                        Self::synch_state(
-                            &elder,
-                            reward_key,
-                            &network_api,
-                            node_rewards,
-                            user_wallets,
-                            metadata,
-                        )
-                        .await?,
+                        Self::synch_state(&elder, metadata).await?,
                     ]))
                 });
                 Ok(NodeTask::Thread(handle))
@@ -311,140 +202,6 @@ impl Node {
                     )),
                 });
                 Ok(NodeTask::None)
-            }
-            //
-            // ----------- Transfers -----------
-            NodeDuty::GetTransferReplicaEvents { msg_id, origin } => {
-                let elder = self.role.as_elder_mut()?.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        elder
-                            .transfers
-                            .read()
-                            .await
-                            .all_events(msg_id, origin)
-                            .await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::PropagateTransfer {
-                proof,
-                msg_id,
-                origin,
-            } => {
-                let elder = self.role.as_elder_mut()?.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        elder
-                            .transfers
-                            .read()
-                            .await
-                            .receive_propagated(&proof, msg_id, origin)
-                            .await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::ValidateClientTransfer {
-                signed_transfer,
-                msg_id,
-                origin,
-            } => {
-                let elder = self.role.as_elder()?.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        elder
-                            .transfers
-                            .read()
-                            .await
-                            .validate(signed_transfer, msg_id, origin)
-                            .await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::SimulatePayout { transfer, .. } => {
-                let elder = self.role.as_elder_mut()?.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        elder
-                            .transfers
-                            .write()
-                            .await
-                            .credit_without_proof(transfer)
-                            .await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::GetTransfersHistory {
-                at, msg_id, origin, ..
-            } => {
-                // TODO: add limit with since_version
-                let elder = self.role.as_elder()?.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        elder
-                            .transfers
-                            .read()
-                            .await
-                            .history(&at, msg_id, origin)
-                            .await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::GetBalance { at, msg_id, origin } => {
-                let elder = self.role.as_elder()?.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        elder
-                            .transfers
-                            .read()
-                            .await
-                            .balance(at, msg_id, origin)
-                            .await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::GetStoreCost {
-                bytes,
-                msg_id,
-                origin,
-                ..
-            } => {
-                let elder = self.role.as_elder_mut()?.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(
-                        elder
-                            .transfers
-                            .read()
-                            .await
-                            .get_store_cost(bytes, msg_id, origin)
-                            .await,
-                    ))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::RegisterTransfer {
-                proof,
-                msg_id,
-                origin,
-            } => {
-                let elder = self.role.as_elder_mut()?.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        elder
-                            .transfers
-                            .read()
-                            .await
-                            .register(&proof, msg_id, origin)
-                            .await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
             }
             //
             // -------- Immutable chunks --------
@@ -645,30 +402,6 @@ impl Node {
                 });
                 Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::ProcessDataPayment {
-                msg:
-                    ProcessMsg::Cmd {
-                        id,
-                        cmd: Cmd::Data { payment, cmd },
-                        client_sig,
-                    },
-                origin,
-                ..
-            } => {
-                let elder = self.role.as_elder_mut()?.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(
-                        elder
-                            .transfers
-                            .write()
-                            .await
-                            .process_payment(id, payment, cmd, client_sig, origin)
-                            .await?,
-                    ))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::ProcessDataPayment { .. } => Ok(NodeTask::None),
             NodeDuty::ReplicateChunk { chunk, .. } => {
                 let adult = self.role.as_adult_mut()?.clone();
                 let handle = tokio::spawn(async move {

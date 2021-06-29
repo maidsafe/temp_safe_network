@@ -18,7 +18,6 @@ mod map;
 mod query;
 mod register;
 mod sequence;
-mod transfer;
 
 pub use self::{
     chunk::{ChunkRead, ChunkWrite},
@@ -28,21 +27,20 @@ pub use self::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
         SequenceDataExchange,
     },
-    duty::{AdultDuties, Duty, ElderDuties, NodeDuties},
+    duty::{AdultDuties, Duty, NodeDuties},
     errors::{Error, Result},
     map::{MapRead, MapWrite},
     query::Query,
     register::{RegisterRead, RegisterWrite},
     sequence::{SequenceRead, SequenceWrite},
-    transfer::{TransferCmd, TransferQuery},
 };
 
 use crate::messaging::{MessageId, MessageType, WireMsg};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
-    ActorHistory, Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
-    Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
-    SequencePublicPolicy, Signature, Token, TransferAgreementProof, TransferValidated,
+    Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey, Sequence,
+    SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
+    SequencePublicPolicy, Signature,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -312,40 +310,12 @@ impl ProcessMsg {
 pub enum CmdError {
     ///
     Data(Error), // DataError enum for better differentiation?
-    ///
-    Transfer(TransferError),
-}
-
-///
-#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum TransferError {
-    /// The error of a ValidateTransfer cmd.
-    TransferValidation(Error),
-    /// The error of a RegisterTransfer cmd.
-    TransferRegistration(Error),
 }
 
 /// Events from the network that
 /// are pushed to the client.
-#[allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum Event {
-    /// The transfer was validated by a Replica instance.
-    TransferValidated {
-        /// This is the validation of the transfer
-        /// requested by the client for an account.
-        event: TransferValidated,
-    },
-    /// An aggregate event created client side
-    /// (for upper Client layers) out of a quorum of TransferValidated events.
-    /// This is a temporary variant, until
-    /// SignatureAccumulation has been broken out
-    /// to its own crate, and can be used at client.
-    TransferAgreementReached {
-        /// The accumulated proof.
-        proof: TransferAgreementProof,
-    },
-}
+pub enum Event {}
 
 /// Query responses from the network.
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
@@ -405,15 +375,6 @@ pub enum QueryResponse {
     GetRegisterPolicy(Result<Policy>),
     /// Get Register permissions for a user.
     GetRegisterUserPermissions(Result<Permissions>),
-    //
-    // ===== Tokens =====
-    //
-    /// Get key balance.
-    GetBalance(Result<Token>),
-    /// Get key transfer history.
-    GetHistory(Result<ActorHistory>),
-    /// Get Store Cost.
-    GetStoreCost(Result<(u64, Token, PublicKey)>),
 }
 
 impl QueryResponse {
@@ -442,9 +403,6 @@ impl QueryResponse {
             ReadRegister(result) => result.is_ok(),
             GetRegisterPolicy(result) => result.is_ok(),
             GetRegisterUserPermissions(result) => result.is_ok(),
-            GetBalance(result) => result.is_ok(),
-            GetHistory(result) => result.is_ok(),
-            GetStoreCost(result) => result.is_ok(),
         }
     }
 }
@@ -497,8 +455,6 @@ try_from!(PublicKey, GetRegisterOwner);
 try_from!(BTreeSet<(EntryHash, Entry)>, ReadRegister);
 try_from!(Policy, GetRegisterPolicy);
 try_from!(Permissions, GetRegisterUserPermissions);
-try_from!(Token, GetBalance);
-try_from!(ActorHistory, GetHistory);
 
 #[cfg(test)]
 mod tests {
@@ -544,7 +500,9 @@ mod tests {
 
             let msg = ProcessMsg::Query {
                 id: MessageId::new(),
-                query: Query::Transfer(TransferQuery::GetBalance(public_key)),
+                query: Query::Data(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
+                    XorName::random(),
+                )))),
                 client_sig: ClientSig {
                     public_key,
                     signature,
@@ -554,7 +512,7 @@ mod tests {
             let lazy_error =
                 msg.create_processing_error(Some(Error::DataNotFound(random_addr.clone())));
 
-            assert!(format!("{:?}", lazy_error).contains("TransferQuery::GetBalance"));
+            assert!(format!("{:?}", lazy_error).contains("ChunkRead::Get"));
             assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
             assert!(
                 format!("{:?}", lazy_error).contains(&format!("DataNotFound({:?})", random_addr))
@@ -572,12 +530,13 @@ mod tests {
             let public_key = keypair.public_key();
             let signature = keypair.sign(b"the query");
 
-            let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
+            let chunk_addr = ChunkAddress::Public(XorName::random());
+            let random_addr = DataAddress::Chunk(chunk_addr);
             let errored_response = ProcessingError {
                 reason: Some(Error::DataNotFound(random_addr.clone())),
                 source_message: Some(ProcessMsg::Query {
                     id: MessageId::new(),
-                    query: Query::Transfer(TransferQuery::GetBalance(public_key)),
+                    query: Query::Data(DataQuery::Blob(ChunkRead::Get(chunk_addr))),
                     client_sig: ClientSig {
                         public_key,
                         signature,
@@ -586,7 +545,7 @@ mod tests {
                 id: MessageId::new(),
             };
 
-            assert!(format!("{:?}", errored_response).contains("TransferQuery::GetBalance"));
+            assert!(format!("{:?}", errored_response).contains("ChunkRead::Get"));
             assert!(format!("{:?}", errored_response).contains("ProcessingError"));
             assert!(format!("{:?}", errored_response)
                 .contains(&format!("DataNotFound({:?})", random_addr)));
@@ -649,7 +608,9 @@ mod tests {
         let id = MessageId::new();
         let message = ClientMsg::Process(ProcessMsg::Query {
             id,
-            query: Query::Transfer(TransferQuery::GetBalance(public_key)),
+            query: Query::Data(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
+                XorName::random(),
+            )))),
             client_sig: ClientSig {
                 public_key,
                 signature,

@@ -8,8 +8,7 @@
 
 use crate::node::{utils, Error, Result};
 use crate::types::{
-    register::Address, ChunkAddress, CreditId, DebitId, Keypair, MapAddress, PublicKey,
-    SequenceAddress,
+    register::Address, ChunkAddress, Keypair, MapAddress, PublicKey, SequenceAddress,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use xor_name::XorName;
@@ -36,8 +35,6 @@ impl ToDbKey for ChunkAddress {}
 impl ToDbKey for MapAddress {}
 impl ToDbKey for PublicKey {}
 impl ToDbKey for XorName {}
-impl ToDbKey for CreditId {}
-impl ToDbKey for DebitId {}
 
 #[cfg(test)]
 mod test {

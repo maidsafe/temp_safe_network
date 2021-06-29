@@ -13,15 +13,11 @@ use crate::messaging::{
     section_info::SectionInfoMsg,
     MessageId,
 };
-use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey, TransferValidated};
+use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
 use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
 use itertools::Itertools;
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
-use tokio::{
-    sync::mpsc::{channel, Sender},
-    task::JoinHandle,
-    time::timeout,
-};
+use tokio::{sync::mpsc::channel, task::JoinHandle, time::timeout};
 use tracing::{debug, error, info, trace, warn};
 use xor_name::XorName;
 
@@ -150,7 +146,7 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dst_section_name = XorName::from(client_sig.public_key);
+        let dst_section_name = cmd.dst_address();
 
         let msg = ClientMsg::Process(ProcessMsg::Cmd {
             id: msg_id,
@@ -193,63 +189,6 @@ impl Session {
         }
 
         Ok(())
-    }
-
-    /// Send a transfer validation message to all Elder without awaiting for a response.
-    pub async fn send_transfer_validation(
-        &self,
-        cmd: Cmd,
-        client_sig: ClientSig,
-        sender: Sender<Result<TransferValidated, Error>>,
-    ) -> Result<MessageId, Error> {
-        let msg_id = MessageId::new();
-        info!(
-            "Sending transfer validation command {:?} w/ id: {:?}",
-            cmd, msg_id
-        );
-        let endpoint = self.endpoint()?.clone();
-        let elders: Vec<SocketAddr> = self.connected_elders.read().await.keys().cloned().collect();
-        let pending_transfers = self.pending_transfers.clone();
-
-        let section_pk = self
-            .section_key()
-            .await?
-            .bls()
-            .ok_or(Error::NoBlsSectionKey)?;
-        let dst_section_name = XorName::from(client_sig.public_key);
-
-        let msg = ClientMsg::Process(ProcessMsg::Cmd {
-            id: msg_id,
-            cmd,
-            client_sig,
-        });
-        let msg_bytes = msg.serialize(dst_section_name, section_pk)?;
-
-        let _ = pending_transfers.write().await.insert(msg_id, sender);
-
-        // Send message to all Elders concurrently
-        let mut tasks = Vec::default();
-        for socket in elders.iter() {
-            let msg_bytes_clone = msg_bytes.clone();
-            let socket = *socket;
-            let endpoint = endpoint.clone();
-
-            let task_handle = tokio::spawn(async move {
-                endpoint.connect_to(&socket).await?;
-                trace!("Sending transfer validation to Elder {}", &socket);
-                endpoint.send_message(msg_bytes_clone, &socket).await?;
-                Ok::<_, Error>(())
-            });
-            tasks.push(task_handle);
-        }
-
-        // Let's await for all messages to be sent
-        let _results = join_all(tasks).await;
-
-        // TODO: return an error if we didn't successfully
-        // send it to at least a majority of Elders??
-
-        Ok(msg_id)
     }
 
     /// Send a Query `ClientMsg` to the network awaiting for the response.
@@ -417,11 +356,9 @@ impl Session {
                 // Saving error, but not returning until we have more responses in
                 // (note, this will overwrite prior errors, so we'll just return whicever was last received)
                 (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
-                | (response @ Some(QueryResponse::GetBalance(Err(_))), None)
                 | (response @ Some(QueryResponse::GetMap(Err(_))), None)
                 | (response @ Some(QueryResponse::GetRegister(Err(_))), None)
                 | (response @ Some(QueryResponse::GetSequence(Err(_))), None)
-                | (response @ Some(QueryResponse::GetStoreCost(Err(_))), None)
                 | (response @ Some(QueryResponse::GetMapShell(Err(_))), None)
                 | (response @ Some(QueryResponse::GetMapValue(Err(_))), None)
                 | (response @ Some(QueryResponse::GetMapVersion(Err(_))), None)

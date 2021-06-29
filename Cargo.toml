@@ -24,8 +24,8 @@ doc = false
 path = "src/node/bin/launch_network.rs"
 
 [features]
-default = [ "simulated-payouts" ]
-simulated-payouts = [ ]
+default = [ "testing" ]
+testing = [ ]
 chaos = [ ]
 always-joinable = [ ]
 

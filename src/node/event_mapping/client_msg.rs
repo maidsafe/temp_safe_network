@@ -8,7 +8,7 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    client::{ClientMsg, Cmd, ProcessMsg, ProcessingError, Query, TransferCmd, TransferQuery},
+    client::{ClientMsg, Cmd, ProcessMsg, ProcessingError, Query},
     Aggregation, EndUser, MessageId, SrcLocation,
 };
 use crate::node::{
@@ -71,63 +71,20 @@ fn map_client_process_msg(process_msg: ProcessMsg, origin: EndUser) -> NodeDuty 
             origin,
         },
         ProcessMsg::Cmd {
-            cmd: Cmd::Data { .. },
+            cmd: Cmd::Data { cmd, .. },
+            id,
+            client_sig,
             ..
-        } => NodeDuty::ProcessDataPayment {
-            msg: process_msg.clone(),
-            origin,
-        },
-        ProcessMsg::Cmd {
-            cmd: Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer)),
-            ..
-        } => NodeDuty::ValidateClientTransfer {
-            signed_transfer,
-            origin: SrcLocation::EndUser(origin),
-            msg_id,
-        },
-        // TODO: Map more transfer cmds
-        ProcessMsg::Cmd {
-            cmd: Cmd::Transfer(TransferCmd::SimulatePayout(transfer)),
-            ..
-        } => NodeDuty::SimulatePayout {
-            transfer,
-            origin: SrcLocation::EndUser(origin),
-            msg_id,
-        },
-        ProcessMsg::Cmd {
-            cmd: Cmd::Transfer(TransferCmd::RegisterTransfer(proof)),
-            ..
-        } => NodeDuty::RegisterTransfer {
-            proof,
-            origin: SrcLocation::EndUser(origin),
-            msg_id,
-        },
-        // TODO: Map more transfer queries
-        ProcessMsg::Query {
-            query: Query::Transfer(TransferQuery::GetHistory { at, since_version }),
-            ..
-        } => NodeDuty::GetTransfersHistory {
-            at,
-            since_version,
-            origin: SrcLocation::EndUser(origin),
-            msg_id,
-        },
-        ProcessMsg::Query {
-            query: Query::Transfer(TransferQuery::GetBalance(at)),
-            ..
-        } => NodeDuty::GetBalance {
-            at,
-            origin: SrcLocation::EndUser(origin),
-            msg_id,
-        },
-        ProcessMsg::Query {
-            query: Query::Transfer(TransferQuery::GetStoreCost { bytes, .. }),
-            ..
-        } => NodeDuty::GetStoreCost {
-            bytes,
-            origin: SrcLocation::EndUser(origin),
-            msg_id,
-        },
+        } =>
+        // FIXME: ******** validate client signature!!!! *********
+        {
+            NodeDuty::ProcessWrite {
+                cmd,
+                msg_id: id,
+                client_sig,
+                origin,
+            }
+        }
         _ => {
             let error_data = convert_to_error_message(Error::InvalidMessage(
                 msg_id,

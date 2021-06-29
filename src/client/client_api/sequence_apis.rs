@@ -213,18 +213,11 @@ impl Client {
     /// ```
     pub async fn delete_sequence(&self, address: SequenceAddress) -> Result<(), Error> {
         let cmd = DataCmd::Sequence(SequenceWrite::Delete(address));
-        // Payment for PUT
-        let payment_proof = self.create_write_payment_proof(&cmd).await?;
 
         // The _actual_ message
-        let cmd = Cmd::Data {
-            cmd,
-            payment: payment_proof.clone(),
-        };
+        let cmd = Cmd::Data { cmd };
 
-        self.send_cmd(cmd, None).await?;
-
-        self.apply_write_payment_to_local_actor(payment_proof).await
+        self.send_cmd(cmd, None).await
     }
 
     /// Append to Sequence
@@ -770,33 +763,11 @@ mod tests {
     use super::*;
     use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair};
     use crate::messaging::client::Error as ErrorMessage;
-    use crate::types::{Error as DtError, SequenceAction, SequencePrivatePermissions, Token};
-    use crate::{retry_loop, retry_loop_for_pattern};
+    use crate::retry_loop;
+    use crate::types::{Error as DtError, SequenceAction, SequencePrivatePermissions};
     use anyhow::{anyhow, bail, Result};
-    use std::str::FromStr;
     use tokio::time::Duration;
     use xor_name::XorName;
-
-    #[tokio::test]
-    pub async fn sequence_deletions_should_cost_put_price() -> Result<()> {
-        let name = XorName(rand::random());
-        let tag = 10;
-        let client = create_test_client(None).await?;
-        let owner = client.public_key();
-        let perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
-        let sequence_address =
-            retry_loop!(client.store_private_sequence(None, name, tag, owner, perms.clone()));
-
-        let balance_before_delete = retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != Token::from_str("10")? && *bal != Token::from_str("0")?)?;
-
-        client.delete_sequence(sequence_address).await?;
-
-        // now let's ensure we've paid _something_
-        let _ =
-            retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != balance_before_delete);
-
-        Ok(())
-    }
 
     /// Sequence data tests ///
 

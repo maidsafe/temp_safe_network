@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 /// Common utility functions for writing test cases.
-#[cfg(any(test, feature = "testing", feature = "simulated-payouts"))]
+#[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
 use crate::client::Error;

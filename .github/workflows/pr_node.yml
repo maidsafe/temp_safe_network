@@ -37,7 +37,6 @@ jobs:
               - 'src/node/**'
               - 'src/routing/**'
               - 'src/messaging/**'
-              - 'src/transfers/**'
               - 'src/types/**'
 
       # Install Rust

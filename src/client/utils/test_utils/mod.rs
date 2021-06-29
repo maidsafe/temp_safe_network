@@ -8,20 +8,23 @@
 
 #[cfg(test)]
 mod test_client;
-#[cfg(feature = "simulated-payouts")]
-mod tokens;
 
+use crate::types::Keypair;
 use anyhow::{anyhow, Context, Result};
 use dirs_next::home_dir;
 use std::path::Path;
 use std::{collections::HashSet, fs::File, io::BufReader, net::SocketAddr};
 #[cfg(test)]
 pub use test_client::{create_test_client, create_test_client_with, init_logger};
-#[cfg(feature = "simulated-payouts")]
-pub use tokens::{calculate_new_balance, gen_ed_keypair};
 
 // Relative path from $HOME where to read the genesis node connection information from
 const GENESIS_CONN_INFO_FILEPATH: &str = ".safe/node/node_connection_info.config";
+
+/// Generates a random BLS secret and public keypair.
+pub fn gen_ed_keypair() -> Keypair {
+    let mut rng = rand::thread_rng();
+    Keypair::new_ed25519(&mut rng)
+}
 
 /// Read local network bootstrapping/connection information
 pub fn read_network_conn_info() -> Result<HashSet<SocketAddr>> {

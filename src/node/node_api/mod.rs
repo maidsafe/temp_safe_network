@@ -110,12 +110,6 @@ impl Node {
             network_api: network_api.clone(),
         };
 
-        messaging::send(
-            Self::register_wallet(&network_api, reward_key).await,
-            &node.network_api,
-        )
-        .await?;
-
         let our_pid = std::process::id();
         let node_prefix = node.our_prefix().await;
         let node_name = node.our_name().await;
