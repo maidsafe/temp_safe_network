@@ -3146,6 +3146,61 @@ dependencies = [
 ]
 
 [[package]]
+name = "safe_network"
+version = "0.2.21"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.10.1",
+ "bincode",
+ "bls_dkg",
+ "bytes 1.0.1",
+ "cookie-factory",
+ "crdts",
+ "dashmap",
+ "dirs-next 2.0.0",
+ "ed25519",
+ "ed25519-dalek",
+ "env_logger 0.8.4",
+ "flexi_logger",
+ "futures",
+ "futures-util",
+ "hex 0.3.2",
+ "hex_fmt",
+ "itertools 0.10.1",
+ "lazy_static",
+ "log",
+ "miscreant",
+ "multibase 0.8.0",
+ "pickledb",
+ "qp2p",
+ "rand 0.7.3",
+ "rand_chacha 0.2.2",
+ "rand_core 0.5.1",
+ "regex",
+ "resource_proof",
+ "rmp-serde",
+ "secured_linked_list",
+ "self_encryption",
+ "self_update 0.16.0",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "signature",
+ "sn_launch_tool",
+ "structopt",
+ "thiserror",
+ "threshold_crypto",
+ "tiny-keccak 2.0.2",
+ "tokio 1.6.2",
+ "tracing",
+ "uhttp_uri",
+ "url",
+ "urlencoding",
+ "xor_name",
+]
+
+[[package]]
 name = "safemem"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3416,6 +3471,43 @@ checksum = "f173ac3d1a7e3b28003f40de0b5ce7fe2710f9b9dc3fc38664cebee46b3b6527"
 [[package]]
 name = "sn_api"
 version = "0.29.2"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "chrono",
+ "dirs-next 2.0.0",
+ "ed25519-dalek",
+ "env_logger 0.8.4",
+ "futures",
+ "hex 0.4.3",
+ "hmac",
+ "lazy_static",
+ "log",
+ "mime_guess",
+ "multibase 0.9.1",
+ "pbkdf2",
+ "qjsonrpc",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "relative-path",
+ "rmp-serde",
+ "safe_network 0.2.21",
+ "serde",
+ "serde_json",
+ "sha3",
+ "thiserror",
+ "tiny-keccak 2.0.2",
+ "tokio 1.6.2",
+ "uhttp_uri",
+ "url",
+ "urlencoding",
+ "walkdir",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_api"
+version = "0.29.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "222a7ba189bb6a406820ab06d904bec93f71d039b4a0a0544b693451e7287f06"
 dependencies = [
@@ -3438,7 +3530,7 @@ dependencies = [
  "rand_core 0.5.1",
  "relative-path",
  "rmp-serde",
- "safe_network",
+ "safe_network 0.2.17",
  "serde",
  "serde_json",
  "sha3",
@@ -3454,7 +3546,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.30.0"
+version = "0.30.1"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -3488,7 +3580,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shrust",
- "sn_api",
+ "sn_api 0.29.2",
  "sn_cmd_test_utilities",
  "sn_data_types",
  "sn_launch_tool",
@@ -3508,7 +3600,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_json",
- "sn_api",
+ "sn_api 0.29.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "sn_data_types",
  "tiny-keccak 2.0.2",
  "walkdir",
