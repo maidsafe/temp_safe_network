@@ -303,7 +303,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn client_creation() -> Result<()> {
-        let _client = create_test_client().await?;
+        let _client = create_test_client(None).await?;
 
         Ok(())
     }
@@ -327,7 +327,7 @@ mod tests {
         let full_id = Keypair::new_ed25519(&mut rng);
         let pk = full_id.public_key();
 
-        let client = create_test_client_with(Some(full_id)).await?;
+        let client = create_test_client_with(Some(full_id), None).await?;
         assert_eq!(pk, client.public_key());
 
         Ok(())
@@ -335,7 +335,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn long_lived_connection_survives() -> Result<()> {
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
         let balance = client.get_balance().await?;
         assert_ne!(balance, Token::from_nano(0));

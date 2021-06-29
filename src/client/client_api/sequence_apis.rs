@@ -781,7 +781,7 @@ mod tests {
     pub async fn sequence_deletions_should_cost_put_price() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
         let owner = client.public_key();
         let perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
         let sequence_address =
@@ -802,7 +802,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn sequence_basics() -> Result<()> {
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
         let tag = 15000;
@@ -841,7 +841,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn sequence_private_permissions() -> Result<()> {
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key();
@@ -907,7 +907,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn sequence_public_permissions() -> Result<()> {
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
         let tag = 15000;
@@ -977,7 +977,7 @@ mod tests {
     pub async fn append_to_sequence() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         let owner = client.public_key();
         let mut perms = BTreeMap::<SequenceUser, SequencePublicPermissions>::new();
@@ -1045,7 +1045,7 @@ mod tests {
     pub async fn sequence_owner() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         let owner = client.public_key();
         let mut perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
@@ -1064,7 +1064,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn sequence_can_delete_private() -> Result<()> {
-        let mut client = create_test_client().await?;
+        let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key();
@@ -1105,7 +1105,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn sequence_cannot_delete_public() -> Result<()> {
-        let mut client = create_test_client().await?;
+        let mut client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
         let tag = 15000;

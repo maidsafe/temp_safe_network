@@ -99,7 +99,7 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "simulated-payouts")]
     async fn transfer_actor_can_receive_simulated_farming_payout() -> Result<()> {
-        let mut client = create_test_client().await?;
+        let mut client = create_test_client(None).await?;
 
         let _ = client
             .trigger_simulated_farming_payout(Token::from_str("100")?)

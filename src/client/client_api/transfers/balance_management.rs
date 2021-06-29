@@ -206,7 +206,7 @@ mod tests {
     pub async fn transfer_actor_can_send_tokens_and_thats_reflected_locally() -> Result<()> {
         let keypair = Keypair::new_ed25519(&mut OsRng);
 
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         let _ = client
             .send_tokens(keypair.public_key(), Token::from_str("1")?)
@@ -226,7 +226,7 @@ mod tests {
     ) -> Result<()> {
         let keypair2 = Keypair::new_ed25519(&mut OsRng);
 
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         let _ = client
             .send_tokens(keypair2.public_key(), Token::from_str("1")?)
@@ -252,7 +252,7 @@ mod tests {
     pub async fn transfer_actor_can_send_many_many_transfers() -> Result<()> {
         let keypair2 = Keypair::new_ed25519(&mut OsRng);
 
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         let mut count = 0u32;
 
@@ -292,7 +292,7 @@ mod tests {
     pub async fn transfer_actor_cannot_send_0_token_req() -> Result<()> {
         let keypair2 = Keypair::new_ed25519(&mut OsRng);
 
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         // Send 0 token to a random PK.
         match client
@@ -317,8 +317,8 @@ mod tests {
     // 4. Transfer 11 token from client A to client B and verify the new balances.
     #[tokio::test]
     pub async fn balance_transfers_between_clients() -> Result<()> {
-        let mut client = create_test_client().await?;
-        let receiving_client = create_test_client().await?;
+        let mut client = create_test_client(None).await?;
+        let receiving_client = create_test_client(None).await?;
 
         let wallet1 = receiving_client.public_key();
 
@@ -371,8 +371,8 @@ mod tests {
     // 5. Assert Client B's balance is unchanged.
     #[tokio::test]
     pub async fn insufficient_balance_transfers() -> Result<()> {
-        let client = create_test_client().await?;
-        let receiving_client = create_test_client().await?;
+        let client = create_test_client(None).await?;
+        let receiving_client = create_test_client(None).await?;
 
         let wallet1 = receiving_client.public_key();
 
@@ -393,8 +393,8 @@ mod tests {
 
     #[tokio::test]
     pub async fn cannot_write_with_insufficient_balance() -> Result<()> {
-        let client = create_test_client().await?;
-        let receiving_client = create_test_client().await?;
+        let client = create_test_client(None).await?;
+        let receiving_client = create_test_client(None).await?;
 
         let wallet1 = receiving_client.public_key();
 
