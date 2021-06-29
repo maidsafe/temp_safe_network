@@ -485,7 +485,8 @@ mod tests {
 
         // Make sure Blob was deleted
         let mut attempts = 10u8;
-        client.override_timeout = Some(Duration::from_secs(5)); // override with a short timeout
+        let orignal_timeout = client.query_timeout;
+        client.query_timeout = Duration::from_secs(5); // override with a short timeout
         while client.read_blob(priv_address, None, None).await.is_ok() {
             tokio::time::sleep(tokio::time::Duration::from_millis(4000)).await;
             if attempts == 0 {
@@ -495,7 +496,7 @@ mod tests {
             }
         }
 
-        client.override_timeout = None; // reset override
+        client.query_timeout = orignal_timeout; // reset override
 
         // Test storing private chunk with the same value again. Should not conflict.
         let new_addr = client.store_private_blob(&value).await?;
@@ -530,7 +531,7 @@ mod tests {
 
         client.delete_blob(address).await?;
 
-        client.override_timeout = Some(Duration::from_secs(5)); // override timeout
+        client.query_timeout = Duration::from_secs(5); // override with a short timeout
         let mut blob_storage = BlobStorage::new(client, false);
 
         if let DataMap::Chunks(chunks) = root_data_map {
