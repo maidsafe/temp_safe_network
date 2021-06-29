@@ -9,8 +9,8 @@
 use super::Core;
 use crate::messaging::node::{Network, Section};
 use crate::routing::{
-    error::Result, event::Event, network::NetworkUtils, peer::PeerUtils,
-    routing_api::command::Command, section::SectionUtils,
+    error::Result, network::NetworkUtils, peer::PeerUtils, routing_api::command::Command,
+    section::SectionUtils, Event,
 };
 use std::collections::BTreeSet;
 

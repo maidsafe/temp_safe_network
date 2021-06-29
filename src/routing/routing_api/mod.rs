@@ -13,9 +13,14 @@ pub(crate) mod comm;
 pub(crate) mod command;
 
 mod dispatcher;
+mod event;
 mod event_stream;
 
-pub use self::event_stream::EventStream;
+pub use self::{
+    event::{Elders, Event, NodeElderChange, SendStream},
+    event_stream::EventStream,
+};
+
 use self::{
     comm::{Comm, ConnectionEvent},
     command::Command,
@@ -29,7 +34,6 @@ use crate::routing::{
     core::{join_network, Core},
     ed25519,
     error::Result,
-    event::{Elders, Event, NodeElderChange},
     messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,

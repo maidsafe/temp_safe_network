@@ -27,13 +27,13 @@ use crate::routing::routing_api::command::Command;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
-    event::{Elders, Event, NodeElderChange},
     messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
     relocation::RelocateState,
     section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionKeysProvider, SectionUtils},
+    Elders, Event, NodeElderChange,
 };
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 use itertools::Itertools;

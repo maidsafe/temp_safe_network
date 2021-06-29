@@ -26,9 +26,8 @@
 pub use self::{
     cache::Cache,
     error::{Error, Result},
-    event::{Event, NodeElderChange, SendStream},
     peer::PeerUtils,
-    routing_api::{Config, EventStream, Routing},
+    routing_api::{Config, Elders, Event, EventStream, NodeElderChange, Routing, SendStream},
     section::{
         SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
         MIN_AGE,
@@ -47,7 +46,6 @@ mod core;
 mod dkg;
 mod ed25519;
 mod error;
-mod event;
 mod messages;
 mod network;
 mod node;
