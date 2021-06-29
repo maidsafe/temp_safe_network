@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSigSet, KeyedSig, NodeMsg, Proposal, Section},
+    node::{DkgFailureSigSet, DstInfo, KeyedSig, NodeMsg, Proposal, Section},
     section_info::SectionInfoMsg,
-    DstInfo, Itinerary, MessageType, MsgEnvelope, SectionAuthorityProvider,
+    DstLocation, Itinerary, MessageId, MessageType, NodeMsgAuthority, SectionAuthorityProvider,
+    WireMsg,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
 use std::{
@@ -27,14 +28,17 @@ pub(crate) enum Command {
     /// and `None` if it is an aggregated message.
     HandleMessage {
         sender: Option<SocketAddr>,
-        message: NodeMsg,
-        msg_envelope: MsgEnvelope,
+        msg_id: MessageId,
+        msg_authority: NodeMsgAuthority,
+        dst_location: DstLocation,
+        msg: NodeMsg,
     },
     /// Handle network info message.
     HandleSectionInfoMsg {
         sender: SocketAddr,
-        message: SectionInfoMsg,
-        msg_envelope: MsgEnvelope,
+        msg_id: MessageId,
+        dst_location: DstLocation,
+        msg: SectionInfoMsg,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
@@ -56,12 +60,11 @@ pub(crate) enum Command {
     SendMessage {
         recipients: Vec<(XorName, SocketAddr)>,
         delivery_group_size: usize,
-        message: MessageType,
+        wire_msg: WireMsg,
     },
     /// Send `UserMessage` with the given source and destination.
     SendUserMessage {
-        itinerary: Itinerary,
-        content: MessageType,
+        wire_msg: WireMsg,
         additional_proof_chain_key: Option<bls::PublicKey>,
     },
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
@@ -98,9 +101,9 @@ impl Command {
     pub fn send_message_to_node(
         recipient: (XorName, SocketAddr),
         node_msg: NodeMsg,
-        msg_envelope: MsgEnvelope,
+        dst_location: DstLocation,
     ) -> Self {
-        Self::send_message_to_nodes(vec![recipient], 1, node_msg, msg_envelope)
+        Self::send_message_to_nodes(vec![recipient], 1, node_msg, dst_location)
     }
 
     /// Convenience method to create `Command::SendMessage` with multiple recipients.
@@ -108,13 +111,14 @@ impl Command {
         recipients: Vec<(XorName, SocketAddr)>,
         delivery_group_size: usize,
         msg: NodeMsg,
-        msg_envelope: MsgEnvelope,
+        dst_location: DstLocation,
     ) -> Self {
-        Self::SendMessage {
+        unimplemented!();
+        /*Self::SendMessage {
             recipients,
             delivery_group_size,
-            message: MessageType::Node { msg_envelope, msg },
-        }
+            message: MessageType::Node { envelope, msg },
+        }*/
     }
 }
 
@@ -123,23 +127,29 @@ impl Debug for Command {
         match self {
             Self::HandleMessage {
                 sender,
-                message,
-                msg_envelope,
+                msg_id,
+                msg_authority,
+                dst_location,
+                msg,
             } => f
                 .debug_struct("HandleMessage")
                 .field("sender", sender)
-                .field("message", message)
-                .field("msg_envelope", msg_envelope)
+                .field("msg_id", msg_id)
+                .field("msg_authority", msg_authority)
+                .field("dst_location", dst_location)
+                .field("msg", msg)
                 .finish(),
             Self::HandleSectionInfoMsg {
                 sender,
-                message,
-                msg_envelope,
+                msg_id,
+                dst_location,
+                msg,
             } => f
                 .debug_struct("HandleSectionInfoMsg")
                 .field("sender", sender)
-                .field("message", message)
-                .field("msg_envelope", msg_envelope)
+                .field("msg_id", msg_id)
+                .field("dst_location", dst_location)
+                .field("msg", msg)
                 .finish(),
             Self::HandleTimeout(token) => f.debug_tuple("HandleTimeout").field(token).finish(),
             Self::HandleConnectionLost(addr) => {
@@ -165,21 +175,19 @@ impl Debug for Command {
             Self::SendMessage {
                 recipients,
                 delivery_group_size,
-                message,
+                wire_msg,
             } => f
                 .debug_struct("SendMessage")
                 .field("recipients", recipients)
                 .field("delivery_group_size", delivery_group_size)
-                .field("message", message)
+                .field("wire_msg", wire_msg)
                 .finish(),
             Self::SendUserMessage {
-                itinerary,
-                content,
+                wire_msg,
                 additional_proof_chain_key,
             } => f
                 .debug_struct("SendUserMessage")
-                .field("itinerary", itinerary)
-                .field("content", &format_args!("{:?}", content))
+                .field("wire_msg", wire_msg)
                 .field("additional_proof_chain_key", additional_proof_chain_key)
                 .finish(),
             Self::ScheduleTimeout { duration, token } => f

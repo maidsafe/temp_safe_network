@@ -19,10 +19,9 @@ mod split_barrier;
 use self::{
     enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
 };
-use crate::messaging::node::SignatureAggregator;
 use crate::messaging::{
-    node::{Network, NodeMsg, Proposal, Section, SectionSigned, Variant},
-    DstInfo, DstLocation, MessageId, SectionAuthorityProvider,
+    node::{DstInfo, Network, NodeMsg, Proposal, Section, SectionSigned, SignatureAggregator},
+    DstLocation, MessageId, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::routing_api::command::Command;
 use crate::routing::{
@@ -165,15 +164,15 @@ impl Core {
 
                 // Sending SectionKnowledge to other sections for new SAP.
                 let section_auth = self.section.section_signed_authority_provider();
-                let variant = Variant::SectionKnowledge {
+                let node_msg = NodeMsg::SectionKnowledge {
                     src_info: (section_auth.clone(), self.section.chain().clone()),
                     msg: None,
                 };
                 for sap in self.network.all() {
-                    let msg = NodeMsg::single_src(
+                    let msg = WireMsg::single_src(
                         &self.node,
                         DstLocation::DirectAndUnrouted,
-                        variant.clone(),
+                        node_msg.clone(),
                         section_auth.value.section_key(),
                     )?;
                     let targets: Vec<_> = sap
@@ -182,12 +181,15 @@ impl Core {
                         .map(|(name, addr)| (*name, *addr))
                         .collect();
                     let len = targets.len();
+                    unimplemented!();
+                    /*
                     let dst_info = DstInfo {
                         dst: XorName::random(),
                         dst_section_pk: sap.section_key(),
                     };
                     trace!("Sending updated SectionInfo to all known sections");
                     commands.push(Command::send_message_to_nodes(targets, len, msg, dst_info));
+                    */
                 }
             }
 

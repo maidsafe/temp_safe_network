@@ -8,11 +8,11 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{NodeMsg, Peer, Variant},
-    DstInfo, DstLocation,
+    node::{DstInfo, NodeMsg, Peer},
+    DstLocation, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
-    messages::{MsgAuthorityUtils, WireMsgUtils},
+    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     peer::PeerUtils,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
@@ -28,33 +28,33 @@ impl Core {
     pub(crate) fn handle_untrusted_message(
         &self,
         sender: Option<SocketAddr>,
-        routing_msg: &NodeMsg,
-        received_dst_info: DstInfo,
+        node_msg: &NodeMsg,
+        msg_authority: &NodeMsgAuthority,
     ) -> Result<Command> {
-        unimplemented!();
-        /*        let src_name = routing_msg.src.name();
+        let src_name = msg_authority.name();
+
         let bounce_dst_key = self.section_key_by_name(&src_name);
         let dst_info = DstInfo {
             dst: src_name,
             dst_section_pk: bounce_dst_key,
         };
-        let bounce_msg = NodeMsg::single_src(
+        let bounce_msg = WireMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted(bounce_dst_key),
-            Variant::BouncedUntrustedMessage {
-                msg: Box::new(routing_msg.clone()),
-                dst_info: received_dst_info,
+            NodeMsg::BouncedUntrustedMessage {
+                msg: Box::new(node_msg.clone()),
+                dst_info,
             },
             self.section.authority_provider().section_key(),
         )?;
 
         let cmd = if let Some(sender) = sender {
-            Command::send_message_to_node((src_name, sender), bounce_msg, dst_info)
+            Command::send_message_to_node((src_name, sender), bounce_msg, msg_envelope)
         } else {
             self.send_message_to_our_elders(bounce_msg)
         };
 
-        Ok(cmd)*/
+        Ok(cmd)
     }
 
     pub(crate) fn handle_bounced_untrusted_message(
@@ -66,8 +66,8 @@ impl Core {
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();
 
-        let resend_msg = match bounced_msg.variant {
-            Variant::Sync { section, network } => {
+        let resend_msg = match bounced_msg {
+            NodeMsg::Sync { section, network } => {
                 // `Sync` messages are handled specially, because they don't carry a signed chain.
                 // Instead we use the section chain that's part of the included `Section` struct.
                 // Problem is we can't extend that chain as it would invalidate the signature. We
@@ -79,10 +79,10 @@ impl Core {
                         Error::InvalidMessage // TODO: more specific error
                     })?;
 
-                NodeMsg::single_src(
+                WireMsg::single_src(
                     &self.node,
                     DstLocation::DirectAndUnrouted(dst_key),
-                    Variant::Sync { section, network },
+                    NodeMsg::Sync { section, network },
                     self.section.authority_provider().section_key(),
                 )?
             }
@@ -93,15 +93,18 @@ impl Core {
             }
         };
 
+        unimplemented!();
+        /*
         let dst_info = DstInfo {
             dst: *sender.name(),
             dst_section_pk: dst_key,
         };
+
         trace!("resending with extended signed");
         Ok(Command::send_message_to_node(
             (*sender.name(), *sender.addr()),
             resend_msg,
             dst_info,
-        ))
+        ))*/
     }
 }

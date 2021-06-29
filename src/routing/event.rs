@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{client::ClientMsg, node::KeyedSig, DstLocation, EndUser, SrcLocation};
+use crate::messaging::{
+    client::ClientMsg, node::KeyedSig, ClientSigned, DstLocation, EndUser, SrcLocation,
+};
 use bytes::Bytes;
 use ed25519_dalek::Keypair;
 use hex_fmt::HexFmt;
@@ -119,6 +121,8 @@ pub enum Event {
     ClientMsgReceived {
         /// The content of the message.
         msg: Box<ClientMsg>,
+        /// Client authority
+        client_signed: ClientSigned,
         /// The SocketAddr and PublicKey that sent the message.
         /// (Note: socket_id will be a random hash, to map against the actual socketaddr)
         user: EndUser,

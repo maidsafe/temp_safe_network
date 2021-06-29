@@ -57,7 +57,7 @@ pub struct DstInfo {
     pub dst_section_pk: BlsPublicKey,
 }
 
-#[derive(Clone, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
 pub enum NodeMsg {
@@ -184,17 +184,6 @@ pub enum NodeMsg {
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
-}
-
-impl PartialEq for NodeMsg {
-    fn eq(&self, other: &NodeMsg) -> bool {
-        unimplemented!();
-        /*self.src == other.src
-        && self.dst == other.dst
-        && self.id == other.id
-        && self.variant == other.variant
-        && self.section_pk == other.section_pk*/
-    }
 }
 
 impl Debug for NodeMsg {

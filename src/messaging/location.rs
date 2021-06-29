@@ -96,14 +96,15 @@ impl SrcLocation {
         }
     }
 
-    /* /// Returns this location as `DstLocation`
+    /// Returns this location as `DstLocation`
     pub fn to_dst(self) -> DstLocation {
-        match self {
+        unimplemented!();
+        /*match self {
             Self::EndUser(user) => DstLocation::EndUser(user),
             Self::Node(name) => DstLocation::Node(name),
             Self::Section(name) => DstLocation::Section(name),
-        }
-    }*/
+        }*/
+    }
 }
 
 /// Message destination location.

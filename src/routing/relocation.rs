@@ -8,9 +8,12 @@
 
 //! Relocation related types and utilities.
 
-use crate::messaging::node::{
-    Network, NodeMsg, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, Section,
-    SignedRelocateDetails, Variant,
+use crate::messaging::{
+    node::{
+        Network, NodeMsg, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise,
+        Section,
+    },
+    SectionSigned,
 };
 use crate::routing::{
     core::JoiningAsRelocated,
@@ -96,7 +99,8 @@ impl RelocateDetailsUtils for RelocateDetails {
     }
 }
 
-/// NodeMsg with Variant::Relocate in a convenient wrapper.
+/*
+/// NodeMsg with NodeMsg::Relocate in a convenient wrapper.
 pub trait SignedRelocateDetailsUtils {
     fn new(signed_msg: NodeMsg) -> Result<Self, Error>
     where
@@ -113,7 +117,7 @@ pub trait SignedRelocateDetailsUtils {
 
 impl SignedRelocateDetailsUtils for SignedRelocateDetails {
     fn new(signed_msg: NodeMsg) -> Result<Self, Error> {
-        if let Variant::Relocate(_) = signed_msg.variant {
+        if let NodeMsg::Relocate(_) = signed_msg.variant {
             Ok(Self { signed_msg })
         } else {
             Err(Error::InvalidMessage)
@@ -121,10 +125,10 @@ impl SignedRelocateDetailsUtils for SignedRelocateDetails {
     }
 
     fn relocate_details(&self) -> Result<&RelocateDetails, Error> {
-        if let Variant::Relocate(details) = &self.signed_msg.variant {
+        if let NodeMsg::Relocate(details) = &self.signed_msg.variant {
             Ok(details)
         } else {
-            error!("SignedRelocateDetails does not contain Variant::Relocate");
+            error!("SignedRelocateDetails does not contain NodeMsg::Relocate");
             Err(Error::InvalidMessage)
         }
     }
@@ -141,9 +145,14 @@ impl SignedRelocateDetailsUtils for SignedRelocateDetails {
         Ok(self.relocate_details()?.dst_key)
     }
 }
-
+*/
 pub trait RelocatePayloadUtils {
-    fn new(details: SignedRelocateDetails, new_name: &XorName, old_keypair: &Keypair) -> Self;
+    fn new(
+        details: NodeMsg,
+        section_signed: SectionSigned,
+        new_name: &XorName,
+        old_keypair: &Keypair,
+    ) -> Self;
 
     fn verify_identity(&self, new_name: &XorName) -> bool;
 
@@ -151,17 +160,23 @@ pub trait RelocatePayloadUtils {
 }
 
 impl RelocatePayloadUtils for RelocatePayload {
-    fn new(details: SignedRelocateDetails, new_name: &XorName, old_keypair: &Keypair) -> Self {
+    fn new(
+        details: NodeMsg,
+        section_signed: SectionSigned,
+        new_name: &XorName,
+        old_keypair: &Keypair,
+    ) -> Self {
         let signature_of_new_name_with_old_key = ed25519::sign(&new_name.0, old_keypair);
 
         Self {
             details,
+            section_signed,
             signature_of_new_name_with_old_key,
         }
     }
 
     fn verify_identity(&self, new_name: &XorName) -> bool {
-        let details = if let Ok(details) = self.details.relocate_details() {
+        let details = if let Ok(details) = self.relocate_details() {
             details
         } else {
             return false;
@@ -179,7 +194,12 @@ impl RelocatePayloadUtils for RelocatePayload {
     }
 
     fn relocate_details(&self) -> Result<&RelocateDetails, Error> {
-        self.details.relocate_details()
+        if let NodeMsg::Relocate(relocate_details) = &self.details {
+            Ok(relocate_details)
+        } else {
+            error!("RelocateDetails does not contain a NodeMsg::Relocate");
+            Err(Error::InvalidMessage)
+        }
     }
 }
 

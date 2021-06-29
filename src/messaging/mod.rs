@@ -21,50 +21,16 @@ mod errors;
 mod location;
 // Message ID definition
 mod msg_id;
-// Types of source authorities for message
-mod msg_authority;
+// Types of messages and corresponding source authorities
+mod msg_kind;
 // SectionAuthorityProvider
 mod sap;
 
 pub use self::{
     errors::{Error, Result},
     location::{DstLocation, EndUser, Itinerary, SrcLocation},
-    msg_authority::{BlsShareSigned, ClientSigned, MsgAuthority, NodeSigned, SectionSigned},
     msg_id::{MessageId, MESSAGE_ID_LEN},
+    msg_kind::{BlsShareSigned, ClientSigned, MsgKind, NodeSigned, SectionSigned},
     sap::SectionAuthorityProvider,
-    serialisation::{MsgEnvelope, WireMsg},
+    serialisation::{MessageType, NodeMsgAuthority, WireMsg},
 };
-
-use bls::PublicKey;
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use xor_name::XorName;
-
-/// Type of message.
-/// Note this is part of this crate's public API but this enum is
-/// never serialised or even part of the message that is sent over the wire.
-#[derive(PartialEq, Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
-pub enum MessageType {
-    /// Message about infrastructure
-    SectionInfo {
-        /// message envelope
-        msg_envelope: MsgEnvelope,
-        /// the message
-        msg: section_info::SectionInfoMsg,
-    },
-    /// Client message
-    Client {
-        /// message envelope
-        msg_envelope: MsgEnvelope,
-        /// the message
-        msg: client::ClientMsg,
-    },
-    /// Node to node message
-    Node {
-        /// message envelope
-        msg_envelope: MsgEnvelope,
-        /// the message
-        msg: node::NodeMsg,
-    },
-}

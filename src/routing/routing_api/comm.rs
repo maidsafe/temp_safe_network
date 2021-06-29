@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::MessageType;
+use crate::messaging::{MessageType, WireMsg};
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -117,21 +117,28 @@ impl Comm {
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
     pub async fn send_on_existing_connection(
         &self,
-        recipient: (XorName, SocketAddr),
-        mut msg: MessageType,
+        recipient_name: XorName,
+        recipient_addr: SocketAddr,
+        mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
-        msg.update_dst_info(None, Some(recipient.0));
+        unimplemented!();
+        /*
+        wire_msg.update_dst_location(dst_location);
+        let bytes = wire_msg.serialize()?;
 
-        let bytes = msg.serialize()?;
         self.endpoint
-            .try_send_message(bytes, &recipient.1)
+            .try_send_message(bytes, &recipient.addr)
             .await
             .map_err(|err| {
-                error!("Sending to {:?} failed with {}", recipient, err);
-                Error::FailedSend(recipient.1, recipient.0)
+                error!(
+                    "Sending to {:?} (name {:?}) failed with {}",
+                    recipient_addr, recipient_name, err
+                );
+                Error::FailedSend(recipient.addr, recipient_name)
             })?;
 
         Ok(())
+        */
     }
 
     /// Tests whether the peer is reachable.
@@ -177,7 +184,7 @@ impl Comm {
         &self,
         recipients: &[(XorName, SocketAddr)],
         delivery_group_size: usize,
-        mut msg: MessageType,
+        mut wire_msg: WireMsg,
     ) -> Result<SendStatus> {
         trace!(
             "Sending message to {} of {:?}",
@@ -200,19 +207,19 @@ impl Comm {
         }
         // Use the first Xor address recipient to represent the destination section.
         // So that only one copy of MessageType need to be constructed.
-        msg.update_dst_info(None, Some(recipients[0].0));
+        wire_msg.update_dst_info(None, Some(recipients[0].0));
 
-        let msg_bytes = msg.serialize().map_err(Error::Messaging)?;
+        let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
 
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
         // succeeds or if there are no more recipients to pick.
         let send = |recipient: (XorName, SocketAddr), msg_bytes: Bytes| async move {
             trace!(
-                "Sending message ({} bytes) to {} of {:?}",
+                "Sending message ({} bytes) to {} of delivery group size {}",
                 msg_bytes.len(),
+                recipient.1,
                 delivery_group_size,
-                recipient.1
             );
 
             let result = self
@@ -261,7 +268,7 @@ impl Comm {
 
         trace!(
             "Sending message {:?} finished to {}/{} recipients (failed: {:?})",
-            msg,
+            wire_msg,
             successes,
             delivery_group_size,
             failed_recipients

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{DstLocation, Error, MessageId, MsgAuthority, Result};
+use crate::messaging::{DstLocation, Error, MessageId, MsgKind, Result};
 use bytes::Bytes;
 use cookie_factory::{bytes::be_u16, combinator::slice, gen, gen_simple};
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ pub(crate) struct WireMsgHeader {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MsgEnvelope {
     pub msg_id: MessageId,
-    pub msg_authority: MsgAuthority,
+    pub msg_kind: MsgKind,
     pub dst_location: DstLocation,
 }
 
@@ -48,21 +48,16 @@ const HDR_VERSION_BYTES_END: usize = HDR_VERSION_BYTES_START + HDR_VERSION_BYTES
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
-    pub fn new(msg_id: MessageId, msg_authority: MsgAuthority, dst_location: DstLocation) -> Self {
+    pub fn new(msg_id: MessageId, msg_kind: MsgKind, dst_location: DstLocation) -> Self {
         Self {
             //header_size: Self::max_size(),
             version: MESSAGING_PROTO_VERSION,
             msg_envelope: MsgEnvelope {
                 msg_id,
-                msg_authority,
+                msg_kind,
                 dst_location,
             },
         }
-    }
-
-    // Return the message envelope
-    pub fn msg_envelope(&self) -> &MsgEnvelope {
-        &self.msg_envelope
     }
 
     // Set a new dst_location in the message envelope

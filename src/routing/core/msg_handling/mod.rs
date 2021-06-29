@@ -20,17 +20,14 @@ mod user_msg;
 
 use super::Core;
 use crate::messaging::{
-    node::{
-        Error as AggregatorError, Proposal, RoutingMsg, SignedRelocateDetails, SrcAuthority,
-        Variant,NodeMsg
-    },
-    DstInfo, DstLocation,
+    node::{DstInfo, Error as AggregatorError, JoinResponse, NodeMsg, Proposal},
+    DstLocation, MessageId, NodeMsgAuthority,
 };
 use crate::routing::{
     error::{Error, Result},
-    messages::{MsgAuthorityUtils, WireMsgUtils},
+    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network::NetworkUtils,
-    relocation::{RelocateState, SignedRelocateDetailsUtils},
+    relocation::RelocateState,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
@@ -43,13 +40,14 @@ impl Core {
     pub(crate) async fn handle_message(
         &mut self,
         sender: Option<SocketAddr>,
-        routing_msg: NodeMsg,
-        dst_info: DstInfo,
+        msg_id: MessageId,
+        msg_authority: NodeMsgAuthority,
+        dst_location: DstLocation,
+        msg: NodeMsg,
     ) -> Result<Vec<Command>> {
         // Check if the message is for us.
-        let in_dst_location = routing_msg
-            .dst
-            .contains(&self.node.name(), self.section.prefix());
+        let in_dst_location = dst_location.contains(&self.node.name(), self.section.prefix());
+
         // TODO: Broadcast message to our section when src is a Node as nodes might not know
         // all the elders in our section and the msg needs to be propagated.
         if !in_dst_location {
@@ -73,19 +71,19 @@ impl Core {
             .chain(iter::once(*self.section.genesis_key()))
             .collect();
 
-        if !routing_msg.verify_src_section_chain(&known_keys) {
-            debug!("Untrusted message from {:?}: {:?} ", sender, routing_msg);
-            let cmd = self.handle_untrusted_message(sender, &routing_msg, dst_info)?;
+        if !msg_authority.verify_src_section_chain(&known_keys) {
+            debug!("Untrusted message from {:?}: {:?} ", sender, msg);
+            let cmd = self.handle_untrusted_message(sender, &msg, &msg_authority)?;
             return Ok(vec![cmd]);
         }
 
         trace!(
             "Trusted source authority in message from {:?}: {:?}",
             sender,
-            routing_msg
+            msg
         );
         let (ae_command, shall_be_handled) = self
-            .check_for_entropy(&routing_msg, dst_info.clone(), sender)
+            .check_for_entropy(&msg, &msg_authority, &dst_location.section_pk())
             .await?;
 
         let mut commands = vec![];
@@ -100,7 +98,7 @@ impl Core {
                 routing_msg.id
             );
             commands.extend(
-                self.handle_useful_message(sender, routing_msg, dst_info, &known_keys)
+                self.handle_useful_message(sender, msg, dst_location, msg_authority, &known_keys)
                     .await?,
             );
         }
@@ -111,19 +109,20 @@ impl Core {
     pub(crate) async fn handle_useful_message(
         &mut self,
         sender: Option<SocketAddr>,
-        routing_msg: NodeMsg,
-        dst_info: DstInfo,
+        node_msg: NodeMsg,
+        dst_location: DstLocation,
+        msg_authority: NodeMsgAuthority,
         known_keys: &[BlsPublicKey],
     ) -> Result<Vec<Command>> {
-        let routing_msg = if let Some(msg) = self.aggregate_message(routing_msg)? {
+        let node_msg = if let Some(msg) = self.aggregate_message(node_msg)? {
             msg
         } else {
             return Ok(vec![]);
         };
-        let src_name = routing_msg.src.name();
+        let src_name = msg_authority.name();
 
-        match routing_msg.variant {
-            Variant::ForwardClientMsg { msg, user } => {
+        match node_msg {
+            NodeMsg::ForwardClientMsg { msg, user } => {
                 // If elder, always handle Forward
                 if self.is_not_elder() {
                     return Ok(vec![]);
@@ -131,7 +130,7 @@ impl Core {
 
                 self.handle_forwarded_message(msg, user).await
             }
-            Variant::SectionKnowledge {
+            NodeMsg::SectionKnowledge {
                 src_info: (src_signed_sap, src_chain),
                 msg,
             } => {
@@ -170,7 +169,7 @@ impl Core {
                     Ok(vec![])
                 }
             }
-            Variant::Sync {
+            NodeMsg::Sync {
                 ref section,
                 ref network,
             } => {
@@ -186,15 +185,14 @@ impl Core {
                         "Untrusted Sync message from {:?} and section: {:?} ",
                         sender, section
                     );
-                    let cmd = self.handle_untrusted_message(sender, &routing_msg, dst_info)?;
+                    let cmd = self.handle_untrusted_message(sender, &node_msg, dst_info)?;
                     Ok(vec![cmd])
                 }
             }
-            Variant::Relocate(_) => {
-                if routing_msg.src.is_section() {
-                    let signed_relocate = SignedRelocateDetails::new(routing_msg)?;
+            NodeMsg::Relocate(details) => {
+                if let NodeMsgAuthority::Section(section_signed) = msg_authority {
                     Ok(self
-                        .handle_relocate(signed_relocate)
+                        .handle_relocate(details, node_msg, section_signed)
                         .await?
                         .into_iter()
                         .collect())
@@ -202,21 +200,21 @@ impl Core {
                     Err(Error::InvalidSrcLocation)
                 }
             }
-            Variant::RelocatePromise(promise) => {
-                self.handle_relocate_promise(promise, routing_msg).await
+            NodeMsg::RelocatePromise(promise) => {
+                self.handle_relocate_promise(promise, node_msg).await
             }
-            Variant::StartConnectivityTest(name) => {
+            NodeMsg::StartConnectivityTest(name) => {
                 if self.is_not_elder() {
                     return Ok(vec![]);
                 }
 
                 Ok(vec![Command::TestConnectivity(name)])
             }
-            Variant::JoinRequest(join_request) => {
+            NodeMsg::JoinRequest(join_request) => {
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
-                self.handle_join_request(routing_msg.src.peer(sender)?, *join_request)
+                self.handle_join_request(node_msg.src.peer(sender)?, *join_request)
             }
-            Variant::JoinAsRelocatedRequest(join_request) => {
+            NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 if self.is_not_elder()
                     && join_request.section_key == *self.section.chain().last_key()
                 {
@@ -225,39 +223,39 @@ impl Core {
 
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
                 self.handle_join_as_relocated_request(
-                    routing_msg.src.peer(sender)?,
+                    node_msg.src.peer(sender)?,
                     *join_request,
                     &known_keys,
                 )
             }
-            Variant::UserMessage(ref content) => {
+            NodeMsg::UserMessage(ref content) => {
                 // If elder, always handle UserMessage, otherwise
                 // handle it only if addressed directly to us as a node.
-                if self.is_not_elder() && routing_msg.dst != DstLocation::Node(self.node.name()) {
+                if self.is_not_elder() && node_msg.dst != DstLocation::Node(self.node.name()) {
                     return Ok(vec![]);
                 }
 
                 self.handle_user_message(
                     Bytes::from(content.clone()),
-                    routing_msg.src.src_location(),
-                    routing_msg.dst,
-                    routing_msg.section_pk,
-                    routing_msg.keyed_sig(),
+                    node_msg.src.src_location(),
+                    node_msg.dst,
+                    node_msg.section_pk,
+                    node_msg.keyed_sig(),
                 )
                 .await
             }
-            Variant::BouncedUntrustedMessage {
+            NodeMsg::BouncedUntrustedMessage {
                 msg: bounced_msg,
                 dst_info,
             } => {
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
                 Ok(vec![self.handle_bounced_untrusted_message(
-                    routing_msg.src.peer(sender)?,
+                    node_msg.src.peer(sender)?,
                     dst_info.dst_section_pk,
                     *bounced_msg,
                 )?])
             }
-            Variant::SectionKnowledgeQuery {
+            NodeMsg::SectionKnowledgeQuery {
                 last_known_key,
                 msg: returned_msg,
             } => {
@@ -267,10 +265,10 @@ impl Core {
                     returned_msg,
                     sender,
                     src_name,
-                    routing_msg.src.src_location().to_dst(),
+                    node_msg.src.src_location().to_dst(),
                 )?])
             }
-            Variant::DkgStart {
+            NodeMsg::DkgStart {
                 dkg_key,
                 elder_candidates,
             } => {
@@ -280,18 +278,18 @@ impl Core {
 
                 self.handle_dkg_start(dkg_key, elder_candidates)
             }
-            Variant::DkgMessage { dkg_key, message } => {
+            NodeMsg::DkgMessage { dkg_key, message } => {
                 self.handle_dkg_message(dkg_key, message, src_name)
             }
-            Variant::DkgFailureObservation {
+            NodeMsg::DkgFailureObservation {
                 dkg_key,
                 sig,
                 failed_participants,
             } => self.handle_dkg_failure_observation(dkg_key, &failed_participants, sig),
-            Variant::DkgFailureAgreement(sig_set) => {
+            NodeMsg::DkgFailureAgreement(sig_set) => {
                 self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
-            Variant::Propose {
+            NodeMsg::Propose {
                 ref content,
                 ref sig_share,
             } => {
@@ -315,8 +313,7 @@ impl Core {
                             .chain()
                             .has_key(&sig_share.public_key_set.public_key())
                         {
-                            let cmd =
-                                self.handle_untrusted_message(sender, &routing_msg, dst_info)?;
+                            let cmd = self.handle_untrusted_message(sender, &node_msg, dst_info)?;
                             return Ok(vec![cmd]);
                         }
                     }
@@ -333,11 +330,11 @@ impl Core {
 
                 Ok(commands)
             }
-            Variant::JoinResponse(join_response) => {
+            NodeMsg::JoinResponse(join_response) => {
                 debug!("Ignoring unexpected message: {:?}", join_response);
                 Ok(vec![])
             }
-            Variant::JoinAsRelocatedResponse(join_response) => {
+            NodeMsg::JoinAsRelocatedResponse(join_response) => {
                 match (sender, self.relocate_state.as_mut()) {
                     (
                         Some(sender),
@@ -360,7 +357,9 @@ impl Core {
     }
 
     fn aggregate_message(&mut self, msg: NodeMsg) -> Result<Option<NodeMsg>> {
-        let sig_share = if let SrcAuthority::BlsShare { sig_share, .. } = &msg.src {
+        unimplemented!();
+        /*
+        let sig_share = if let NodeMsgAuthority::BlsShare { sig_share, .. } = &msg.src {
             sig_share
         } else {
             // Not an aggregating message, return unchanged.
@@ -383,5 +382,6 @@ impl Core {
                 Err(Error::InvalidSignatureShare)
             }
         }
+        */
     }
 }

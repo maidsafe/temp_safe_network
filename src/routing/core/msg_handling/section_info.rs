@@ -8,9 +8,9 @@
 
 use super::super::Core;
 use crate::messaging::{
-    node::{Variant, WireMsg},
+    node::{DstInfo, NodeMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DstInfo, DstLocation, MessageType, SectionAuthorityProvider,
+    DstLocation, MessageType, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     error::Result,
@@ -28,8 +28,8 @@ impl Core {
     pub(crate) async fn handle_section_info_msg(
         &mut self,
         sender: SocketAddr,
+        dst_location: DstLocation,
         message: SectionInfoMsg,
-        dst_info: DstInfo, // The DstInfo contains the XorName of the sender and a random PK during the initial SectionQuery,
     ) -> Vec<Command> {
         // Provide our PK as the dst PK, only redundant as the message
         // itself contains details regarding relocation/registration.
@@ -102,7 +102,7 @@ impl Core {
         };
         let truncated_chain = chain.get_proof_chain_to_current(&given_key)?;
         let section_auth = self.section.section_signed_authority_provider();
-        let variant = Variant::SectionKnowledge {
+        let variant = NodeMsg::SectionKnowledge {
             src_info: (section_auth.clone(), truncated_chain),
             msg: Some(msg),
         };

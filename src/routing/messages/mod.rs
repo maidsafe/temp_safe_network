@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod msg_authority;
-mod plain_message;
+// mod plain_message;
 
-pub use self::{msg_authority::MsgAuthorityUtils, plain_message::PlainMessageUtils};
+pub use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
-    node::{KeyedSig, MsgAuthority, NodeMsg, PlainMessage, SigShare, Variant},
-    Aggregation, BlsShareSigned, DstLocation, MessageId, MsgAuthority, NodeSigned, SectionSigned,
-    WireMsg,
+    node::{KeyedSig, NodeMsg, PlainMessage, SigShare},
+    BlsShareSigned, ClientSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority, NodeSigned,
+    SectionSigned, WireMsg,
 };
 use crate::routing::{
     ed25519::{self, Verifier},
@@ -22,33 +22,22 @@ use crate::routing::{
     section::SectionKeyShare,
 };
 use bls::PublicKey as BlsPublicKey;
+use bytes::Bytes;
 use secured_linked_list::{error::Error as SecuredLinkedListError, SecuredLinkedList};
 use serde::Serialize;
 use std::fmt::Debug;
 use thiserror::Error;
 use xor_name::XorName;
 
-// View of a message that can be serialized for the purpose of signing.
-#[derive(Serialize)]
-pub struct SignableView<'a> {
-    // TODO: why don't we include also `src`?
-    pub dst: &'a DstLocation,
-    pub variant: &'a Variant,
-}
-
 // Utilities for WireMsg.
 pub(crate) trait WireMsgUtils {
     /// Verify this message is properly signed.
     fn check_signature(&self) -> Result<()>;
 
-    // Verify if the section chain of the MsgAuthority can be trusted
-    // based on a set of known keys.
-    fn verify_src_section_chain(&self, known_keys: &[BlsPublicKey]) -> bool;
-
     /// Creates a signed message where signature is assumed valid.
     fn new_signed(
         payload: Bytes,
-        msg_authority: MsgAuthority,
+        node_msg_authority: NodeMsgAuthority,
         dst: DstLocation,
     ) -> Result<WireMsg, Error>;
 
@@ -57,23 +46,21 @@ pub(crate) trait WireMsgUtils {
         key_share: &SectionKeyShare,
         src_name: XorName,
         dst: DstLocation,
-        variant: Variant,
+        node_msg: NodeMsg,
         proof_chain: SecuredLinkedList,
-    ) -> Result<NodeMsg, Error>;
+    ) -> Result<WireMsg, Error>;
 
     /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
     /// Returns errors if src is not `BlsShare` or if the signed is invalid.
-    fn into_dst_accumulated(self, sig: KeyedSig) -> Result<NodeMsg>;
-
-    fn signable_view(&self) -> SignableView;
+    fn into_dst_accumulated(self, sig: KeyedSig) -> Result<WireMsg>;
 
     /// Creates a signed message from single node.
     fn single_src(
         node: &Node,
         dst: DstLocation,
-        variant: Variant,
+        node_msg: NodeMsg,
         section_key: BlsPublicKey,
-    ) -> Result<NodeMsg>;
+    ) -> Result<WireMsg>;
 
     /// Creates a signed message from a section.
     /// Note: `signed` isn't verified and is assumed valid.
@@ -81,7 +68,7 @@ pub(crate) trait WireMsgUtils {
         plain: PlainMessage,
         sig: KeyedSig,
         section_chain: SecuredLinkedList,
-    ) -> Result<NodeMsg>;
+    ) -> Result<WireMsg>;
 
     /// Getter
     fn keyed_sig(&self) -> Option<KeyedSig>;
@@ -93,8 +80,18 @@ pub(crate) trait WireMsgUtils {
 impl WireMsgUtils for WireMsg {
     /// Verify this message is properly signed.
     fn check_signature(&self) -> Result<()> {
-        match self.msg_authority() {
-            MsgAuthority::Node(NodeSigned {
+        match self.msg_kind() {
+            MsgKind::SectionInfoMsg => {}
+            MsgKind::ClientMsg(ClientSigned {
+                public_key,
+                signature,
+            }) => {
+                if public_key.verify(signature, &self.payload).is_err() {
+                    error!("Failed signature: {:?}", self);
+                    return Err(Error::FailedSignature);
+                }
+            }
+            MsgKind::NodeSignedMsg(NodeSigned {
                 public_key,
                 signature,
                 ..
@@ -104,7 +101,7 @@ impl WireMsgUtils for WireMsg {
                     return Err(Error::FailedSignature);
                 }
             }
-            MsgAuthority::BlsShare(BlsShareSigned {
+            MsgKind::NodeBlsShareSignedMsg(BlsShareSigned {
                 sig_share,
                 section_pk,
                 ..
@@ -123,7 +120,7 @@ impl WireMsgUtils for WireMsg {
                     return Err(Error::FailedSignature);
                 }
             }
-            MsgAuthority::Section(SectionSigned {
+            MsgKind::SectionSignedMsg(SectionSigned {
                 sig, section_pk, ..
             }) => {
                 // Signed chain is required for section-src messages.
@@ -140,42 +137,29 @@ impl WireMsgUtils for WireMsg {
         Ok(())
     }
 
-    // Verify if the section chain of the MsgAuthority can be trusted
-    // based on a set of known keys.
-    fn verify_src_section_chain(&self, known_keys: &[BlsPublicKey]) -> bool {
-        unimplemented!();
-        /*match &self.src {
-            MsgAuthority::Node { .. } => true,
-            MsgAuthority::BlsShare { section_chain, .. }
-            | MsgAuthority::Section { section_chain, .. } => {
-                section_chain.check_trust(known_keys.iter())
-            }
-        }*/
-    }
-
     /// Creates a signed message where signature is assumed valid.
     fn new_signed(
         payload: Bytes,
-        msg_authority: MsgAuthority,
+        node_msg_authority: NodeMsgAuthority,
         dst: DstLocation,
     ) -> Result<WireMsg, Error> {
         // Create message id from msg authority signature
-        let id = match &msg_authority {
-            MsgAuthority::None => MessageId::new(),
-            MsgAuthority::Client(ClientSigned { signature, .. }) => {
-                MessageId::from_content(signature)
-            }
-            MsgAuthority::Node(NodeSigned { signature, .. }) => MessageId::from_content(signature),
-            MsgAuthority::BlsShare(BlsShareSigned { sig_share, .. }) => {
-                MessageId::from_content(&sig_share.signature_share.0)
-            }
-            MsgAuthority::Section(SectionSigned { sig, .. }) => {
-                MessageId::from_content(&sig.signature)
-            }
-        }
-        .unwrap_or_default();
+        let (id, msg_kind) = match &node_msg_authority {
+            NodeMsgAuthority::Node(node_signed) => (
+                MessageId::from_content(&node_signed.signature),
+                MsgKind::NodeSignedMsg(*node_signed),
+            ),
+            NodeMsgAuthority::BlsShare(bls_share_signed) => (
+                MessageId::from_content(&bls_share_signed.sig_share.signature_share.0),
+                MsgKind::NodeBlsShareSignedMsg(*bls_share_signed),
+            ),
+            NodeMsgAuthority::Section(section_signed) => (
+                MessageId::from_content(&section_signed.sig.signature),
+                MsgKind::SectionSignedMsg(*section_signed),
+            ),
+        };
 
-        let msg = WireMsg::new_msg(id, payload, msg_authority, dst)?;
+        let msg = WireMsg::new_msg(id.unwrap_or_default(), payload, msg_kind, dst)?;
 
         Ok(msg)
     }
@@ -185,9 +169,9 @@ impl WireMsgUtils for WireMsg {
         key_share: &SectionKeyShare,
         src_name: XorName,
         dst: DstLocation,
-        variant: Variant,
+        node_msg: NodeMsg,
         section_chain: SecuredLinkedList,
-    ) -> Result<Self, Error> {
+    ) -> Result<WireMsg, Error> {
         unimplemented!();
         /*
         let serialized = bincode::serialize(&SignableView {
@@ -215,7 +199,7 @@ impl WireMsgUtils for WireMsg {
 
     /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
     /// Returns errors if src is not `BlsShare` or if the signed is invalid.
-    fn into_dst_accumulated(mut self, sig: KeyedSig) -> Result<Self> {
+    fn into_dst_accumulated(mut self, sig: KeyedSig) -> Result<WireMsg> {
         unimplemented!();
         /*let (sig_share, src_name, section_chain) = if let MsgAuthority::BlsShare {
             sig_share,
@@ -254,36 +238,24 @@ impl WireMsgUtils for WireMsg {
         Ok(self)*/
     }
 
-    fn signable_view(&self) -> SignableView {
-        unimplemented!();
-        /*SignableView {
-            dst: &self.dst,
-            variant: &self.variant,
-        }*/
-    }
-
     /// Creates a signed message from single node.
     fn single_src(
         node: &Node,
         dst: DstLocation,
-        variant: Variant,
+        node_msg: NodeMsg,
         section_pk: BlsPublicKey,
-    ) -> Result<Self> {
-        // TODO: ideally we should get rid of SignableView and sign just the message
-        let msg_payload = WireMsg::serialize_msg_payload(&SignableView {
-            dst: &dst,
-            variant: &variant,
-        })
-        .map_err(|_| Error::InvalidMessage)?;
+    ) -> Result<WireMsg> {
+        let msg_payload =
+            WireMsg::serialize_msg_payload(&NodeMsg).map_err(|_| Error::InvalidMessage)?;
 
         let signature = ed25519::sign(&msg_payload, &node.keypair);
-        let msg_authority = MsgAuthority::Node(NodeSigned {
+        let msg_authority = NodeMsgAuthority::Node(NodeSigned {
             public_key: node.keypair.public,
             section_pk,
             signature,
         });
 
-        Self::new_signed(msg_payload, msg_authority, dst)
+        WireMsg::new_signed(msg_payload, msg_authority, dst)
     }
 
     /// Creates a signed message from a section.
@@ -292,7 +264,7 @@ impl WireMsgUtils for WireMsg {
         plain: PlainMessage,
         sig: KeyedSig,
         section_chain: SecuredLinkedList,
-    ) -> Result<Self> {
+    ) -> Result<WireMsg> {
         unimplemented!();
         /*
                 // TODO: ideally we should get rid of SignableView and sign just the message
@@ -308,7 +280,7 @@ impl WireMsgUtils for WireMsg {
                     section_pk: section_chain.last_key(),
                 };
 
-                Self::new_signed(msg_payload, msg_authority, plain.dst)
+                WireMsg::new_signed(msg_payload, msg_authority, plain.dst)
         */
     }
 
