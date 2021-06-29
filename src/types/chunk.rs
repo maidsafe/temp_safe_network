@@ -179,25 +179,25 @@ pub enum Kind {
     /// Private.
     Private,
     /// Public.
-    Pub,
+    Public,
 }
 
 impl Kind {
-    /// Creates `Kind` from a `published` flag.
-    pub fn from_flag(published: bool) -> Self {
-        if published {
-            Kind::Pub
+    /// Creates `Kind` from a `public` flag.
+    pub fn from_flag(public: bool) -> Self {
+        if public {
+            Kind::Public
         } else {
             Kind::Private
         }
     }
 
-    /// Returns true if published.
+    /// Returns true if public.
     pub fn is_public(self) -> bool {
-        self == Kind::Pub
+        self == Kind::Public
     }
 
-    /// Returns true if unpublished.
+    /// Returns true if private.
     pub fn is_private(self) -> bool {
         !self.is_public()
     }
@@ -216,7 +216,7 @@ impl Address {
     /// Constructs an `Address` given `kind` and `name`.
     pub fn from_kind(kind: Kind, name: XorName) -> Self {
         match kind {
-            Kind::Pub => Address::Public(name),
+            Kind::Public => Address::Public(name),
             Kind::Private => Address::Private(name),
         }
     }
@@ -225,7 +225,7 @@ impl Address {
     pub fn kind(&self) -> Kind {
         match self {
             Address::Private(_) => Kind::Private,
-            Address::Public(_) => Kind::Pub,
+            Address::Public(_) => Kind::Public,
         }
     }
 

@@ -16,6 +16,7 @@ pub mod config_handler;
 mod data_store;
 mod error;
 mod event_mapping;
+mod event_store;
 mod metadata;
 mod network;
 mod node_api;
