@@ -8,7 +8,7 @@
 
 use super::Client;
 use crate::client::Error;
-use crate::messaging::client::{ClientSig, Cmd};
+use crate::messaging::{client::Cmd, ClientSigned};
 use crate::types::{PublicKey, Signature};
 use std::net::SocketAddr;
 use tracing::debug;
@@ -23,7 +23,7 @@ impl Client {
         target: Option<SocketAddr>,
     ) -> Result<(), Error> {
         debug!("Sending Cmd: {:?}", cmd);
-        let client_sig = ClientSig {
+        let client_sig = ClientSigned {
             public_key: client_pk,
             signature,
         };

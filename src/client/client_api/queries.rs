@@ -8,7 +8,7 @@
 
 use super::Client;
 use crate::client::{connections::QueryResult, errors::Error};
-use crate::messaging::client::{ClientSig, Query};
+use crate::messaging::{client::Query, ClientSigned};
 use crate::types::{PublicKey, Signature};
 use tracing::debug;
 
@@ -21,7 +21,7 @@ impl Client {
         signature: Signature,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
-        let client_sig = ClientSig {
+        let client_sig = ClientSigned {
             public_key: client_pk,
             signature,
         };
