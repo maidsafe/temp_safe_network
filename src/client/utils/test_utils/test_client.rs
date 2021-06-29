@@ -31,16 +31,17 @@ pub fn init_logger() {
 }
 
 /// Create a test client without providing any specific keypair or bootstrap_config
-pub async fn create_test_client() -> Result<Client> {
-    create_test_client_with(None).await
+pub async fn create_test_client( timeout: Option<u64> ) -> Result<Client> {
+    create_test_client_with(None, timeout).await
 }
 
 /// Create a test client optionally providing keypair and/or bootstrap_config
 /// If no keypair is provided, a check is run that a balance has been generated for the client
-pub async fn create_test_client_with(optional_keypair: Option<Keypair>) -> Result<Client> {
+pub async fn create_test_client_with(optional_keypair: Option<Keypair>, timeout: Option<u64>) -> Result<Client> {
     init_logger();
+    let timeout = timeout.unwrap_or(5);
     let contact_info = read_network_conn_info()?;
-    let client = Client::new(optional_keypair.clone(), None, Some(contact_info), 60).await?;
+    let client = Client::new(optional_keypair.clone(), None, Some(contact_info), timeout).await?;
 
     if optional_keypair.is_none() {
         // get history, will only be Ok when we have _some_ history, aka test tokens

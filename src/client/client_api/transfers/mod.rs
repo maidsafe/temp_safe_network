@@ -339,7 +339,7 @@ mod tests {
     pub async fn transfer_actor_creation_hydration_for_nonexistant_balance() -> Result<()> {
         let keypair = crate::types::Keypair::new_ed25519(&mut OsRng);
 
-        match create_test_client_with(Some(keypair)).await {
+        match create_test_client_with(Some(keypair), None).await {
             Ok(actor) => {
                 assert_eq!(actor.get_local_balance().await, Token::from_str("0")? );
                 Ok(())
@@ -350,7 +350,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn transfer_actor_client_random_creation_gets_initial_balance() -> Result<()> {
-        let actor = create_test_client().await
+        let actor = create_test_client(None).await
             .map_err(|err| anyhow!("Should not error for random client, only create a new instance with 10 token, we got: {:?}" , err))?;
 
         let mut bal = actor.get_balance().await;
@@ -376,13 +376,13 @@ mod tests {
         let keypair = crate::types::Keypair::new_ed25519(&mut OsRng);
 
         {
-            let mut initial_actor = create_test_client_with(Some(keypair.clone())).await?;
+            let mut initial_actor = create_test_client_with(Some(keypair.clone()), None).await?;
             let _ = initial_actor
                 .trigger_simulated_farming_payout(Token::from_str("100")?)
                 .await?;
         }
 
-        let client_res = create_test_client_with(Some(keypair.clone())).await;
+        let client_res = create_test_client_with(Some(keypair.clone()), None).await;
 
         let client = client_res?;
 

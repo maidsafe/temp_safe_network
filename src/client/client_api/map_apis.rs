@@ -680,7 +680,7 @@ mod tests {
     // 3. Fetch the entire. data object and verify
     #[tokio::test]
     pub async fn unseq_map_test() -> Result<()> {
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
         let tag = 15001;
@@ -730,7 +730,7 @@ mod tests {
     // 3. Fetch the entire. data object and verify
     #[tokio::test]
     pub async fn seq_map_test() -> Result<()> {
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
         let tag = 15001;
@@ -789,7 +789,7 @@ mod tests {
     // 2. Try getting the data object. It should bail
     #[tokio::test]
     pub async fn del_seq_map_test() -> Result<()> {
-        let mut client = create_test_client().await?;
+        let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
         let mapref = MapAddress::Seq { name, tag };
@@ -818,7 +818,7 @@ mod tests {
     // 2. Try getting the data object. It should bail
     #[tokio::test]
     pub async fn del_unseq_map_test() -> Result<()> {
-        let mut client = create_test_client().await?;
+        let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
         let mapref = MapAddress::Unseq { name, tag };
@@ -851,12 +851,12 @@ mod tests {
         let tag = 15001;
         let mapref = MapAddress::Unseq { name, tag };
 
-        let some_client = create_test_client().await?;
+        let some_client = create_test_client(None).await?;
         let owner = some_client.public_key();
 
         let _ = retry_loop!(some_client.store_unseq_map(name, tag, owner, None, None));
 
-        let mut client = create_test_client().await?;
+        let mut client = create_test_client(None).await?;
 
         client.delete_map(mapref).await?;
 
@@ -869,7 +869,7 @@ mod tests {
     #[tokio::test]
     pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client() -> Result<()>
     {
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
         let mut permissions: BTreeMap<_, _> = Default::default();
         let permission_set = MapPermissionSet::new()
             .allow(MapAction::Read)
@@ -917,7 +917,7 @@ mod tests {
     // 4. Delete a user's permissions from the permission set and verify the deletion.
     #[tokio::test]
     pub async fn map_can_modify_permissions_test() -> Result<()> {
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
         let mut permissions: BTreeMap<_, _> = Default::default();
@@ -993,7 +993,7 @@ mod tests {
     // 4. Fetch a value for a particular key and verify
     #[tokio::test]
     pub async fn map_mutations_test() -> Result<()> {
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
         let mut permissions: BTreeMap<_, _> = Default::default();
@@ -1090,7 +1090,7 @@ mod tests {
             Err(err) => bail!("Unexpected error: {:?}", err),
         };
 
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
         let mut permissions: BTreeMap<_, _> = Default::default();
@@ -1158,7 +1158,7 @@ mod tests {
     pub async fn map_deletions_should_cost_put_price() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
-        let client = create_test_client().await?;
+        let client = create_test_client(None).await?;
         let owner = client.public_key();
 
         let _ = client.store_unseq_map(name, tag, owner, None, None).await?;
