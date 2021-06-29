@@ -21,6 +21,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use log::debug;
 use sn_api::{Safe, XorUrlBase};
+use std::env;
 use std::time::Duration;
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 
@@ -54,8 +55,14 @@ pub struct CmdArgs {
 }
 
 pub async fn run() -> Result<()> {
-    let cli_timeout = Duration::from_secs(DEFAULT_TIMEOUT_SECS);
-    let mut safe = Safe::new(None, cli_timeout);
+    let cli_timeout: u64 = match env::var("SN_CLI_QUERY_TIMEOUT") {
+        Ok(timeout) => timeout
+            .parse::<u64>()
+            .map_err(|_| anyhow!("Could not parse \'SN_CLI_QUERY_TIMEOUT\' env var"))?,
+        Err(_) => DEFAULT_TIMEOUT_SECS,
+    };
+
+    let mut safe = Safe::new(None, Duration::from_secs(cli_timeout));
     run_with(None, &mut safe).await
 }
 
