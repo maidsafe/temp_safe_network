@@ -68,12 +68,6 @@ impl Session {
         })
     }
 
-    /// Get the SuperMajority count based on number of known elders
-    #[allow(unused)]
-    pub async fn super_majority(&self) -> usize {
-        1 + self.known_elders_count().await * 2 / 3
-    }
-
     /// Get the elders count of our section elders as provided by SectionInfo
     pub async fn known_elders_count(&self) -> usize {
         self.all_known_elders.read().await.len()

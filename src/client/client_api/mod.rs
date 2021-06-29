@@ -64,10 +64,10 @@ impl Client {
     ) -> Result<Self, Error> {
         let mut rng = OsRng;
 
-        let (keypair, _is_random_client) = match optional_keypair {
+        let keypair = match optional_keypair {
             Some(id) => {
                 info!("Client started for specific pk: {:?}", id.public_key());
-                (id, false)
+                id
             }
             None => {
                 let keypair = Keypair::new_ed25519(&mut rng);
@@ -75,7 +75,7 @@ impl Client {
                     "Client started for new randomly created pk: {:?}",
                     keypair.public_key()
                 );
-                (keypair, true)
+                keypair
             }
         };
 
@@ -208,10 +208,10 @@ mod tests {
 
     #[tokio::test]
     pub async fn long_lived_connection_survives() -> Result<()> {
-        let _client = create_test_client(None).await?;
+        let client = create_test_client(None).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
 
-        // TODO: make a network call
+        let _ = client.store_private_blob(&[0, 1, 2, 3, 4]).await?;
 
         Ok(())
     }
