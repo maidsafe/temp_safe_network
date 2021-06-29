@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.31.0](https://github.com/maidsafe/sn_api/compare/v0.30.0...v0.31.0) (2021-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* updates to use blsttc
+
+### Features
+
+* upgrade to safe_network with blsttc ([d4217d0](https://github.com/maidsafe/sn_api/commit/d4217d0cef7070faf45b1fd2903f15b4bbdf144e))
+
 ## [0.30.0](https://github.com/maidsafe/sn_api/compare/v0.29.2...v0.30.0) (2021-06-29)
 
 
