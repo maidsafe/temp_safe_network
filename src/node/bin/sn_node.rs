@@ -39,14 +39,23 @@ const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 use safe_network::routing;
 
 /// Runs a Safe Network node.
-fn main() -> Result<()> {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .thread_name("sn_node")
-        .thread_stack_size(8 * 1024 * 1024)
-        .enable_all()
-        .build()?;
-    rt.block_on(run_node());
-    Ok(())
+fn main() {
+    let sn_node_thread = std::thread::Builder::new()
+        .name("sn_node".to_string())
+        .stack_size(8 * 1024 * 1024)
+        .spawn(move || {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(run_node());
+            Ok::<(), std::io::Error>(())
+        });
+
+    match sn_node_thread {
+        Ok(thread) => match thread.join() {
+            Ok(_) => {}
+            Err(err) => println!("Failed to run node: {:?}", err),
+        },
+        Err(err) => println!("Failed to run node: {:?}", err),
+    }
 }
 
 async fn run_node() {
