@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.21](https://github.com/maidsafe/safe_network/compare/v0.2.20...v0.2.21) (2021-06-29)
+
+
+### Bug Fixes
+
+* **bin:** use multi-threaded runtime for node bin ([2ccb751](https://github.com/maidsafe/safe_network/commit/2ccb75181495a53867bae3bff1259bc788d51de8))
+
 ### [0.2.20](https://github.com/maidsafe/safe_network/compare/v0.2.19...v0.2.20) (2021-06-28)
 
 ### [0.2.19](https://github.com/maidsafe/safe_network/compare/v0.2.18...v0.2.19) (2021-06-28)
