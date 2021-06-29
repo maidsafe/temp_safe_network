@@ -55,6 +55,8 @@ impl DkgCommand {
                 let message =
                     WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
 
+                unimplemented!();
+                /*
                 Ok(Command::send_message_to_nodes(
                     recipients.clone(),
                     recipients.len(),
@@ -64,6 +66,7 @@ impl DkgCommand {
                         dst_section_pk: key,
                     },
                 ))
+                */
             }
             Self::ScheduleTimeout { duration, token } => {
                 Ok(Command::ScheduleTimeout { duration, token })
@@ -89,6 +92,8 @@ impl DkgCommand {
                 let message =
                     WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
 
+                unimplemented!();
+                /*
                 Ok(Command::send_message_to_nodes(
                     recipients.clone(),
                     recipients.len(),
@@ -97,7 +102,7 @@ impl DkgCommand {
                         dst: XorName::random(),
                         dst_section_pk: key,
                     },
-                ))
+                ))*/
             }
             Self::HandleFailureAgreement(signeds) => Ok(Command::HandleDkgFailure(signeds)),
         }

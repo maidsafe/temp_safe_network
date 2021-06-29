@@ -221,11 +221,11 @@ impl Core {
         }
 
         // Check for signatures and trust of the relocate_payload msg
+        /* FIXME: check section pk is known to us
         let payload_sig = relocate_payload.section_signed;
-        if payload_sig
+        if !payload_sig
             .section_pk
-            .verify(&relocate_payload.details, payload_sig.sig)
-            .is_err()
+            .verify(&relocate_payload.details, &payload_sig.sig)
             || known_keys
                 .iter()
                 .find(|key| **key == payload_sig.section_pk)
@@ -237,6 +237,7 @@ impl Core {
             );
             return Ok(vec![]);
         }
+        */
 
         // Requires the node name matches the age.
         let age = details.age;

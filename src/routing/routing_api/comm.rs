@@ -207,6 +207,9 @@ impl Comm {
         }
         // Use the first Xor address recipient to represent the destination section.
         // So that only one copy of MessageType need to be constructed.
+        unimplemented!();
+        /*
+        FIXME: just the update dst below needs to be fixed
         wire_msg.update_dst_info(None, Some(recipients[0].0));
 
         let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
@@ -283,6 +286,7 @@ impl Comm {
         } else {
             Ok(SendStatus::MinDeliveryGroupSizeFailed(failed_recipients))
         }
+        */
     }
 
     // Low-level send

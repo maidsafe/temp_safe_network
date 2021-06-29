@@ -10,7 +10,7 @@ use super::Core;
 use crate::messaging::{
     client::ClientMsg,
     node::{DstInfo, KeyedSig},
-    DstLocation, EndUser, MessageType, SrcLocation,
+    ClientSigned, DstLocation, EndUser, MessageType, SrcLocation,
 };
 use crate::routing::{
     error::{Error, Result},
@@ -26,10 +26,12 @@ impl Core {
         &mut self,
         msg: ClientMsg,
         user: EndUser,
+        client_signed: ClientSigned,
     ) -> Result<Vec<Command>> {
         self.send_event(Event::ClientMsgReceived {
             msg: Box::new(msg),
             user,
+            client_signed,
         })
         .await;
 
@@ -51,6 +53,8 @@ impl Core {
         {
             if let Some(socket_addr) = self.get_socket_addr(socket_id).copied() {
                 trace!("sending user message to client {:?}", socket_addr);
+                unimplemented!();
+                /*
                 return Ok(vec![Command::SendMessage {
                     recipients: vec![(xor_name, socket_addr)],
                     delivery_group_size: 1,
@@ -61,7 +65,7 @@ impl Core {
                             dst_section_pk: *self.section.chain().last_key(),
                         },
                     },
-                }]);
+                }]);*/
             } else {
                 trace!(
                     "Cannot route user message, socket id not found {:?}",

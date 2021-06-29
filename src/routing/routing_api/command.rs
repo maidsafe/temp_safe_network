@@ -98,20 +98,15 @@ pub(crate) enum Command {
 
 impl Command {
     /// Convenience method to create `Command::SendMessage` with a single recipient.
-    pub fn send_message_to_node(
-        recipient: (XorName, SocketAddr),
-        node_msg: NodeMsg,
-        dst_location: DstLocation,
-    ) -> Self {
-        Self::send_message_to_nodes(vec![recipient], 1, node_msg, dst_location)
+    pub fn send_message_to_node(recipient: (XorName, SocketAddr), wire_msg: WireMsg) -> Self {
+        Self::send_message_to_nodes(vec![recipient], 1, wire_msg)
     }
 
     /// Convenience method to create `Command::SendMessage` with multiple recipients.
     pub fn send_message_to_nodes(
         recipients: Vec<(XorName, SocketAddr)>,
         delivery_group_size: usize,
-        msg: NodeMsg,
-        dst_location: DstLocation,
+        wire_msg: WireMsg,
     ) -> Self {
         unimplemented!();
         /*Self::SendMessage {

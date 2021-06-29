@@ -234,12 +234,15 @@ impl Dispatcher {
                 let msg = {
                     let core = self.core.read().await;
                     let node = core.node();
-                    let section_key = *core.section().chain.last_key();
+                    let section_pk = *core.section().chain.last_key();
                     WireMsg::single_src(
                         node,
-                        DstLocation::Section(core.node().name()),
+                        DstLocation::Section {
+                            name: core.node().name(),
+                            section_pk,
+                        },
                         NodeMsg::StartConnectivityTest(name),
-                        section_key,
+                        section_pk,
                     )?
                 };
                 let our_name = self.core.read().await.node().name();

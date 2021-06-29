@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{node::NodeMsg, DstLocation, MessageId};
+use crate::messaging::{node::NodeMsg, DstLocation, MessageId, WireMsg};
 use crate::routing::cache::Cache;
 use std::time::Duration;
 use xor_name::XorName;
@@ -56,19 +56,19 @@ impl MessageFilter {
     // Filter outgoing `SNRoutingMessage`. Return whether this specific message has been seen recently
     // (and thus should not be sent, due to deduplication).
     //
-    pub async fn filter_outgoing(&self, msg: &NodeMsg, pub_id: &XorName) -> FilteringResult {
+    pub async fn filter_outgoing(&self, wire_msg: &WireMsg, pub_id: &XorName) -> FilteringResult {
         // Not filtering direct messages.
-        if let DstLocation::DirectAndUnrouted(_) = msg.dst {
+        if let DstLocation::DirectAndUnrouted(_) = wire_msg.dst_location() {
             return FilteringResult::NewMessage;
         }
 
         if self
             .outgoing
-            .set((msg.id, *pub_id), (), None)
+            .set((wire_msg.msg_id(), *pub_id), (), None)
             .await
             .is_some()
         {
-            trace!("Outgoing message filtered: {:?}", msg.id);
+            trace!("Outgoing message filtered: {:?}", wire_msg.msg_id());
             FilteringResult::KnownMessage
         } else {
             FilteringResult::NewMessage

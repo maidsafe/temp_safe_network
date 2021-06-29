@@ -8,18 +8,19 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{DstInfo, NodeMsg, Section},
+    node::{DstInfo, JoinResponse, NodeMsg, Section},
     DstLocation, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
     error::Result,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    network::NetworkUtils,
     node::Node,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
 use bls::PublicKey as BlsPublicKey;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, net::SocketAddr};
 
 impl Core {
     pub async fn check_for_entropy(
@@ -27,6 +28,7 @@ impl Core {
         msg: &NodeMsg,
         msg_authority: &NodeMsgAuthority,
         dst_location: &DstLocation,
+        sender: Option<SocketAddr>,
     ) -> Result<(Option<Command>, bool)> {
         if self.is_not_elder() {
             // Adult nodes do need to carry out entropy checking, however the message shall always
@@ -34,20 +36,24 @@ impl Core {
             return Ok((None, true));
         }
 
-        let (command, shall_be_handled) =
-            match process(&self.node, &self.section, msg, dst_location.section_pk())? {
-                (Some(msg_to_send), shall_be_handled) => {
-                    let command = self.relay_message(&msg_to_send).await?;
-                    (command, shall_be_handled)
+        let (command, shall_be_handled) = match dst_location.section_pk() {
+            None => return Ok((None, true)),
+            Some(section_pk) => {
+                match process(&self.node, &self.section, msg, msg_authority, section_pk)? {
+                    (Some(msg_to_send), shall_be_handled) => {
+                        let command = self.relay_message(&msg_to_send).await?;
+                        (command, shall_be_handled)
+                    }
+                    (None, shall_be_handled) => (None, shall_be_handled),
                 }
-                (None, shall_be_handled) => (None, shall_be_handled),
-            };
+            }
+        };
 
         if shall_be_handled || command.is_some() {
             Ok((command, shall_be_handled))
         } else {
             // For the case of receiving a JoinRequest not matching our prefix.
-            let sender_name = msg.src.name();
+            let sender_name = msg_authority.name();
             let sender_addr = if let Some(addr) = sender {
                 addr
             } else {
@@ -85,7 +91,7 @@ fn process(
     msg: &NodeMsg,
     msg_authority: &NodeMsgAuthority,
     dst_section_pk: BlsPublicKey,
-) -> Result<(Option<NodeMsg>, bool)> {
+) -> Result<(Option<WireMsg>, bool)> {
     let src_name = msg_authority.name();
 
     if section.prefix().matches(&src_name) {

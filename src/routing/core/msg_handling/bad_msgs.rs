@@ -48,13 +48,16 @@ impl Core {
             self.section.authority_provider().section_key(),
         )?;
 
+        unimplemented!();
+        /*
+
         let cmd = if let Some(sender) = sender {
-            Command::send_message_to_node((src_name, sender), bounce_msg, msg_envelope)
+            Command::send_message_to_node((src_name, sender), bounce_msg)
         } else {
             self.send_message_to_our_elders(bounce_msg)
         };
 
-        Ok(cmd)
+        Ok(cmd)*/
     }
 
     pub(crate) fn handle_bounced_untrusted_message(
@@ -63,6 +66,8 @@ impl Core {
         dst_key: BlsPublicKey,
         mut bounced_msg: NodeMsg,
     ) -> Result<Command> {
+        unimplemented!();
+        /*
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();
 
@@ -93,8 +98,6 @@ impl Core {
             }
         };
 
-        unimplemented!();
-        /*
         let dst_info = DstInfo {
             dst: *sender.name(),
             dst_section_pk: dst_key,

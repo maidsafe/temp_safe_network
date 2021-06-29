@@ -144,18 +144,18 @@ impl WireMsgUtils for WireMsg {
         dst: DstLocation,
     ) -> Result<WireMsg, Error> {
         // Create message id from msg authority signature
-        let (id, msg_kind) = match &node_msg_authority {
+        let (id, msg_kind) = match node_msg_authority {
             NodeMsgAuthority::Node(node_signed) => (
                 MessageId::from_content(&node_signed.signature),
-                MsgKind::NodeSignedMsg(*node_signed),
+                MsgKind::NodeSignedMsg(node_signed),
             ),
             NodeMsgAuthority::BlsShare(bls_share_signed) => (
                 MessageId::from_content(&bls_share_signed.sig_share.signature_share.0),
-                MsgKind::NodeBlsShareSignedMsg(*bls_share_signed),
+                MsgKind::NodeBlsShareSignedMsg(bls_share_signed),
             ),
             NodeMsgAuthority::Section(section_signed) => (
                 MessageId::from_content(&section_signed.sig.signature),
-                MsgKind::SectionSignedMsg(*section_signed),
+                MsgKind::SectionSignedMsg(section_signed),
             ),
         };
 
@@ -246,7 +246,7 @@ impl WireMsgUtils for WireMsg {
         section_pk: BlsPublicKey,
     ) -> Result<WireMsg> {
         let msg_payload =
-            WireMsg::serialize_msg_payload(&NodeMsg).map_err(|_| Error::InvalidMessage)?;
+            WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
         let signature = ed25519::sign(&msg_payload, &node.keypair);
         let msg_authority = NodeMsgAuthority::Node(NodeSigned {

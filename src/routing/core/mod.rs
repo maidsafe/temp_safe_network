@@ -171,7 +171,7 @@ impl Core {
                 for sap in self.network.all() {
                     let msg = WireMsg::single_src(
                         &self.node,
-                        DstLocation::DirectAndUnrouted,
+                        DstLocation::DirectAndUnrouted(section_auth.value.section_key()),
                         node_msg.clone(),
                         section_auth.value.section_key(),
                     )?;
