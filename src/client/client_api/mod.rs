@@ -42,8 +42,7 @@ pub struct Client {
     simulated_farming_payout_dot: Dot<PublicKey>,
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
-    query_timeout: Duration,
-    pub(crate) override_timeout: Option<Duration>,
+    pub(crate) query_timeout: Duration,
 }
 
 /// Easily manage connections to/from The Safe Network with the client and its APIs.
@@ -149,7 +148,6 @@ impl Client {
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: Duration::from_secs(query_timeout),
-            override_timeout: None,
         };
 
         Self::handle_anti_entropy_errors(client.clone(), transfer_err_receiver);

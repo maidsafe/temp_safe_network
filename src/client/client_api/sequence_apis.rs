@@ -1082,7 +1082,7 @@ mod tests {
 
         client.delete_sequence(address).await?;
 
-        client.override_timeout = Some(Duration::from_secs(5)); // override with a short timeout
+        client.query_timeout = Duration::from_secs(5); // override with a short timeout
 
         let mut res = client.get_sequence(address).await;
 
@@ -1128,7 +1128,7 @@ mod tests {
 
         client.delete_sequence(address).await?;
 
-        client.override_timeout = Some(Duration::from_secs(5)); // override with a short timeout
+        client.query_timeout = Duration::from_secs(5); // override with a short timeout
 
         // Check that our data still exists.
         match client.get_sequence(address).await {

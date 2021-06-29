@@ -799,7 +799,7 @@ mod tests {
 
         client.delete_map(mapref).await?;
 
-        client.override_timeout = Some(Duration::from_secs(5)); // override with a short timeout
+        client.query_timeout = Duration::from_secs(5); // override with a short timeout
         let mut res = client.get_map(address).await;
         while res.is_ok() {
             tokio::time::sleep(Duration::from_millis(200)).await;
@@ -828,7 +828,7 @@ mod tests {
 
         client.delete_map(mapref).await?;
 
-        client.override_timeout = Some(Duration::from_secs(5)); // override with a short timeout
+        client.query_timeout = Duration::from_secs(5); // override with a short timeout
         let mut res = client.get_map(address).await;
         while res.is_ok() {
             // Keep trying until it fails
