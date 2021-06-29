@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.4.0](https://github.com/maidsafe/safe_network/compare/v0.3.0...v0.4.0) (2021-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* updates to use blsstc
+
+### Features
+
+* replace threshold_crytpo with blsstc ([a37947f](https://github.com/maidsafe/safe_network/commit/a37947f2b9d0f8c5151bea47473a34d8ef00f0b8))
+
 ## [0.3.0](https://github.com/maidsafe/safe_network/compare/v0.2.21...v0.3.0) (2021-06-29)
 
 
