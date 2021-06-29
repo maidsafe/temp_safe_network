@@ -58,7 +58,7 @@ impl MessageFilter {
     //
     pub async fn filter_outgoing(&self, msg: &NodeMsg, pub_id: &XorName) -> FilteringResult {
         // Not filtering direct messages.
-        if let DstLocation::DirectAndUnrouted = msg.dst {
+        if let DstLocation::DirectAndUnrouted(_) = msg.dst {
             return FilteringResult::NewMessage;
         }
 

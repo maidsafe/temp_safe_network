@@ -6,64 +6,75 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{node::Peer, MsgAuthority, NodeSigned, SrcLocation};
+use crate::messaging::{
+    node::Peer, BlsShareSigned, NodeMsgAuthority, NodeSigned, SectionSigned, SrcLocation,
+};
 use crate::routing::{
     ed25519::{self},
     error::{Error, Result},
     peer::PeerUtils,
 };
+use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;
 use xor_name::XorName;
 
-/// Source authority of a message.
-/// Src of message and authority to send it. Authority is validated by the signature.
-/// Messages do not need to sign this field as it is all verifiable (i.e. if the sig validates
-/// agains the pub key and we know th epub key then we are good. If the signed is not recognised we
-/// ask for a longer chain that can be recognised). Therefore we don't need to sign this field.
-pub trait MsgAuthorityUtils {
+pub trait NodeMsgAuthorityUtils {
     fn src_location(&self) -> SrcLocation;
-
-    fn is_section(&self) -> bool;
 
     fn name(&self) -> XorName;
 
     // If this location is `Node`, returns the corresponding `Peer` with `addr`. Otherwise error.
     fn peer(&self, addr: SocketAddr) -> Result<Peer>;
+
+    // Verify if the section key of the NodeMsgAuthority can be trusted
+    // based on a set of known keys.
+    fn verify_src_section_chain(&self, known_keys: &[BlsPublicKey]) -> bool;
 }
 
-impl MsgAuthorityUtils for MsgAuthority {
+impl NodeMsgAuthorityUtils for NodeMsgAuthority {
     fn src_location(&self) -> SrcLocation {
-        unimplemented!();
-        /*match self {
-            MsgAuthority::Node { public_key, .. } => SrcLocation::Node(ed25519::name(public_key)),
-            MsgAuthority::BlsShare { src_name, .. } => SrcLocation::Section(*src_name),
-            MsgAuthority::Section { src_name, .. } => SrcLocation::Section(*src_name),
-        }*/
-    }
-
-    fn is_section(&self) -> bool {
-        matches!(self, MsgAuthority::Section(_))
+        match self {
+            NodeMsgAuthority::Node(NodeSigned { public_key, .. }) => {
+                SrcLocation::Node(ed25519::name(public_key))
+            }
+            NodeMsgAuthority::BlsShare(BlsShareSigned { src_name, .. }) => {
+                SrcLocation::Section(*src_name)
+            }
+            NodeMsgAuthority::Section(SectionSigned { src_name, .. }) => {
+                SrcLocation::Section(*src_name)
+            }
+        }
     }
 
     fn name(&self) -> XorName {
-        unimplemented!();
-        /*match self {
-            MsgAuthority::Node { public_key, .. } => ed25519::name(public_key),
-            MsgAuthority::BlsShare { src_name, .. } => *src_name,
-            MsgAuthority::Section { src_name, .. } => *src_name,
-        }*/
+        match self {
+            NodeMsgAuthority::Node(NodeSigned { public_key, .. }) => ed25519::name(public_key),
+            NodeMsgAuthority::BlsShare(BlsShareSigned { src_name, .. }) => *src_name,
+            NodeMsgAuthority::Section(SectionSigned { src_name, .. }) => *src_name,
+        }
     }
 
     // If this location is `Node`, returns the corresponding `Peer` with `addr`. Otherwise error.
     fn peer(&self, addr: SocketAddr) -> Result<Peer> {
         match self {
-            MsgAuthority::Node(NodeSigned { public_key, .. }) => {
+            NodeMsgAuthority::Node(NodeSigned { public_key, .. }) => {
                 Ok(Peer::new(ed25519::name(public_key), addr))
             }
-            MsgAuthority::None
-            | MsgAuthority::Client(_)
-            | MsgAuthority::Section(_)
-            | MsgAuthority::BlsShare(_) => Err(Error::InvalidSrcLocation),
+            NodeMsgAuthority::Section(_) | NodeMsgAuthority::BlsShare(_) => {
+                Err(Error::InvalidSrcLocation)
+            }
+        }
+    }
+
+    // Verify if the section key of the NodeMsgAuthority can be trusted
+    // based on a set of known keys.
+    fn verify_src_section_chain(&self, known_keys: &[BlsPublicKey]) -> bool {
+        match &self {
+            NodeMsgAuthority::Node(_) => true,
+            NodeMsgAuthority::BlsShare(BlsShareSigned { section_pk, .. })
+            | NodeMsgAuthority::Section(SectionSigned { section_pk, .. }) => {
+                known_keys.iter().find(|key| *key == section_pk).is_some()
+            }
         }
     }
 }

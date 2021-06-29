@@ -8,7 +8,7 @@
 
 use super::{KeyedSig, SigShare, SignatureAggregator};
 use crate::messaging::node::Proposal;
-use crate::routing::{error::Result, messages::PlainMessageUtils};
+use crate::routing::error::Result;
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 
@@ -57,7 +57,8 @@ impl<'a> Serialize for SignableView<'a> {
             // Proposal::TheirKey { prefix, key } => (prefix, key).serialize(serializer),
             // Proposal::TheirKnowledge { prefix, key } => (prefix, key).serialize(serializer),
             Proposal::AccumulateAtSrc { message, .. } => {
-                message.as_signable().serialize(serializer)
+                unimplemented!();
+                //message.as_signable().serialize(serializer)
             }
             Proposal::JoinsAllowed(joins_allowed) => joins_allowed.serialize(serializer),
         }

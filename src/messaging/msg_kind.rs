@@ -20,17 +20,17 @@ use xor_name::XorName;
 /// ask for a longer chain that can be recognised).
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum MsgAuthority {
-    /// No source authority provided with the message
-    None,
-    /// Authority of a client
-    Client(ClientSigned),
-    /// Authority of a single peer.
-    Node(NodeSigned),
-    /// Authority of a single peer that uses it's BLS Keyshare to sign the message.
-    BlsShare(BlsShareSigned),
-    /// Authority of a whole section.
-    Section(SectionSigned),
+pub enum MsgKind {
+    /// SectionInfoMsg wich doesn't contain any msg authority
+    SectionInfoMsg,
+    /// ClietnMsg with authority provided by a client
+    ClientMsg(ClientSigned),
+    /// NodeMsg with authority of a single peer.
+    NodeSignedMsg(NodeSigned),
+    /// NodeMsg with authority of a single peer that uses it's BLS Keyshare to sign the message.
+    NodeBlsShareSignedMsg(BlsShareSigned),
+    /// NodeMsg with authority of a whole section.
+    SectionSignedMsg(SectionSigned),
 }
 
 /// Authority of a client

@@ -9,13 +9,13 @@
 use super::super::Core;
 use crate::messaging::node::{
     JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-    JoinResponse, Peer, Variant,
+    JoinResponse, NodeMsg, Peer,
 };
 use crate::routing::{
     core::WireMsgUtils,
     error::Result,
     peer::PeerUtils,
-    relocation::{RelocatePayloadUtils, SignedRelocateDetailsUtils},
+    relocation::RelocatePayloadUtils,
     routing_api::command::Command,
     section::{
         SectionPeersUtils, SectionUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
@@ -56,7 +56,7 @@ impl Core {
 
             let redirect_sap = self.matching_section(peer.name())?;
 
-            let variant = Variant::JoinResponse(Box::new(JoinResponse::Retry(redirect_sap)));
+            let variant = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(redirect_sap)));
             trace!("Sending {:?} to {}", variant, peer);
             return Ok(vec![self.send_direct_message(
                 (*peer.name(), *peer.addr()),
@@ -78,7 +78,7 @@ impl Core {
                 "Rejecting JoinRequest from {} - joins currently not allowed.",
                 peer,
             );
-            let variant = Variant::JoinResponse(Box::new(JoinResponse::Rejected(
+            let variant = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                 JoinRejectionReason::JoinsDisallowed,
             )));
 
@@ -109,7 +109,7 @@ impl Core {
             }
         } else if peer.age() != MIN_ADULT_AGE {
             // After section split, new node has to join with age of MIN_ADULT_AGE.
-            let variant = Variant::JoinResponse(Box::new(JoinResponse::Retry(
+            let variant = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(
                 self.section.authority_provider().clone(),
             )));
             trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", variant, peer);
@@ -156,10 +156,10 @@ impl Core {
         known_keys: &[BlsPublicKey],
     ) -> Result<Vec<Command>> {
         debug!("Received {:?} from {}", join_request, peer);
-        let payload = if let Some(payload) = join_request.relocate_payload {
-            payload
+        let relocate_payload = if let Some(relocate_payload) = join_request.relocate_payload {
+            relocate_payload
         } else {
-            let variant = Variant::JoinAsRelocatedResponse(Box::new(
+            let variant = NodeMsg::JoinAsRelocatedResponse(Box::new(
                 JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
             ));
 
@@ -180,7 +180,7 @@ impl Core {
                 self.section.prefix()
             );
 
-            let variant = Variant::JoinAsRelocatedResponse(Box::new(
+            let variant = NodeMsg::JoinAsRelocatedResponse(Box::new(
                 JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
             ));
             trace!("Sending {:?} to {}", variant, peer);
@@ -199,7 +199,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if !payload.verify_identity(peer.name()) {
+        if !relocate_payload.verify_identity(peer.name()) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - invalid signature.",
                 peer
@@ -207,7 +207,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        let details = payload.relocate_details()?;
+        let details = relocate_payload.relocate_details()?;
 
         if !self.section.prefix().matches(&details.dst) {
             debug!(
@@ -220,10 +220,16 @@ impl Core {
             return Ok(vec![]);
         }
 
-        // Check for signatures and trust of the payload msg
-        let payload_msg = payload.details.signed_msg();
-        if payload_msg.check_signature().is_err()
-            || !payload_msg.verify_src_section_chain(&known_keys)
+        // Check for signatures and trust of the relocate_payload msg
+        let payload_sig = relocate_payload.section_signed;
+        if payload_sig
+            .section_pk
+            .verify(&relocate_payload.details, payload_sig.sig)
+            .is_err()
+            || known_keys
+                .iter()
+                .find(|key| **key == payload_sig.section_pk)
+                .is_none()
         {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - invalid signature or untrusted src.",

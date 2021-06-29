@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, Variant, WireMsg},
-    DstInfo, DstLocation, SectionAuthorityProvider,
+    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, DstInfo, NodeMsg},
+    DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     error::Result, messages::WireMsgUtils, node::Node, routing_api::command::Command,
@@ -51,9 +51,9 @@ impl DkgCommand {
                 dkg_key,
                 message,
             } => {
-                let variant = Variant::DkgMessage { dkg_key, message };
+                let node_msg = NodeMsg::DkgMessage { dkg_key, message };
                 let message =
-                    WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), variant, key)?;
+                    WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
 
                 Ok(Command::send_message_to_nodes(
                     recipients.clone(),
@@ -81,13 +81,13 @@ impl DkgCommand {
                 sig,
                 failed_participants,
             } => {
-                let variant = Variant::DkgFailureObservation {
+                let node_msg = NodeMsg::DkgFailureObservation {
                     dkg_key,
                     sig,
                     failed_participants,
                 };
                 let message =
-                    WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), variant, key)?;
+                    WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
 
                 Ok(Command::send_message_to_nodes(
                     recipients.clone(),

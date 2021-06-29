@@ -9,10 +9,10 @@
 use super::Core;
 use crate::messaging::{
     node::{
-        DkgKey, ElderCandidates, JoinResponse, Network, NodeMsg, NodeState, Peer, PlainMessage,
-        Proposal, RelocateDetails, RelocatePromise, Section, SectionSigned, Variant,
+        DkgKey, DstInfo, ElderCandidates, JoinResponse, Network, NodeMsg, NodeState, Peer,
+        PlainMessage, Proposal, RelocateDetails, RelocatePromise, Section, SectionSigned,
     },
-    DstInfo, DstLocation,
+    DstLocation, WireMsg,
 };
 use crate::routing::{
     dkg::{DkgKeyUtils, ProposalUtils, SigShare},
@@ -24,6 +24,7 @@ use crate::routing::{
     routing_api::command::Command,
     section::{ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionKeyShare, SectionUtils},
 };
+use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use std::{cmp::Ordering, iter, net::SocketAddr, slice};
 use xor_name::XorName;
@@ -68,14 +69,14 @@ impl Core {
         )?;
 
         // Broadcast the proposal to the rest of the section elders.
-        let variant = Variant::Propose {
+        let node_msg = NodeMsg::Propose {
             content: proposal,
             sig_share,
         };
-        let message = NodeMsg::single_src(
+        let message = WireMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
-            variant,
+            node_msg,
             self.section.authority_provider().section_key(),
         )?;
 
@@ -90,6 +91,8 @@ impl Core {
         peer: (XorName, SocketAddr),
         sig_share: &SigShare,
     ) -> Result<Option<Command>> {
+        unimplemented!();
+        /*
         let public_key = sig_share.public_key_set.public_key();
 
         if self.section.chain().has_key(&public_key)
@@ -100,7 +103,7 @@ impl Core {
                 peer,
                 // TODO: consider sending only those parts of section that are new
                 // since `public_key` was the latest key.
-                Variant::Sync {
+                NodeMsg::Sync {
                     section: self.section.clone(),
                     network: self.network.clone(),
                 },
@@ -109,6 +112,7 @@ impl Core {
         } else {
             Ok(None)
         }
+        */
     }
 
     // Send NodeApproval to a joining node which makes them a section member
@@ -116,6 +120,8 @@ impl Core {
         &self,
         node_state: SectionSigned<NodeState>,
     ) -> Result<Command> {
+        unimplemented!();
+        /*
         info!(
             "Our section with {:?} has approved peer {:?}.",
             self.section.prefix(),
@@ -125,7 +131,7 @@ impl Core {
         let addr = *node_state.value.peer.addr();
         let name = *node_state.value.peer.name();
 
-        let variant = Variant::JoinResponse(Box::new(JoinResponse::Approval {
+        let node_msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Approval {
             genesis_key: *self.section.genesis_key(),
             section_auth: self.section.section_signed_authority_provider().clone(),
             node_state,
@@ -135,7 +141,7 @@ impl Core {
         let message = NodeMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
-            variant,
+            node_msg,
             self.section.authority_provider().section_key(),
         )?;
 
@@ -147,16 +153,19 @@ impl Core {
                 dst_section_pk: *self.section.chain().last_key(),
             },
         ))
+        */
     }
 
     pub(crate) fn send_sync(&mut self, section: Section, network: Network) -> Result<Vec<Command>> {
-        let send = |variant, recipients: Vec<(XorName, SocketAddr)>| -> Result<_> {
-            trace!("Send {:?} to {:?}", variant, recipients);
+        unimplemented!();
+        /*
+        let send = |node_msg, recipients: Vec<(XorName, SocketAddr)>| -> Result<_> {
+            trace!("Send {:?} to {:?}", node_msg, recipients);
 
             let message = NodeMsg::single_src(
                 &self.node,
                 DstLocation::DirectAndUnrouted,
-                variant,
+                node_msg,
                 self.section.authority_provider().section_key(),
             )?;
             let dst_info = DstInfo {
@@ -181,28 +190,31 @@ impl Core {
 
         // Send the trimmed state to non-elders. The trimmed state contains only the knowledge of
         // own section.
-        let variant = Variant::Sync {
+        let node_msg = NodeMsg::Sync {
             section: section.clone(),
             network: Network::new(),
         };
-        commands.push(send(variant, non_elders)?);
+        commands.push(send(node_msg, non_elders)?);
 
         // Send the full state to elders.
         // The full state contains the whole section chain.
-        let variant = Variant::Sync { section, network };
-        commands.push(send(variant, elders)?);
+        let node_msg = NodeMsg::Sync { section, network };
+        commands.push(send(node_msg, elders)?);
 
         Ok(commands)
+        */
     }
 
     pub(crate) fn send_sync_to_adults(&mut self) -> Result<Vec<Command>> {
-        let send = |variant, recipients: Vec<_>| -> Result<_> {
-            trace!("Send {:?} to {:?}", variant, recipients);
+        unimplemented!();
+        /*
+        let send = |node_msg, recipients: Vec<_>| -> Result<_> {
+            trace!("Send {:?} to {:?}", node_msg, recipients);
 
             let message = NodeMsg::single_src(
                 &self.node,
                 DstLocation::DirectAndUnrouted,
-                variant,
+                node_msg,
                 self.section.authority_provider().section_key(),
             )?;
 
@@ -225,14 +237,15 @@ impl Core {
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
 
-        let variant = Variant::Sync {
+        let node_msg = NodeMsg::Sync {
             section: self.section.clone(),
             network: Network::new(),
         };
 
-        commands.push(send(variant, adults)?);
+        commands.push(send(node_msg, adults)?);
 
         Ok(commands)
+        */
     }
 
     pub(crate) fn send_relocate(
@@ -240,11 +253,14 @@ impl Core {
         recipient: &Peer,
         details: RelocateDetails,
     ) -> Result<Vec<Command>> {
+        unimplemented!();
+        /*
         let src = details.pub_id;
         let dst = DstLocation::Node(details.pub_id);
-        let variant = Variant::Relocate(details);
+        let node_msg = NodeMsg::Relocate(details);
 
-        self.send_message_for_dst_accumulation(src, dst, variant, slice::from_ref(recipient))
+        self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
+        */
     }
 
     pub(crate) fn send_relocate_promise(
@@ -255,11 +271,14 @@ impl Core {
         // Note: this message is first sent to a single node who then sends it back to the section
         // where it needs to be handled by all the elders. This is why the destination is
         // `Section`, not `Node`.
+        unimplemented!();
+        /*
         let src = promise.name;
         let dst = DstLocation::Section(promise.name);
-        let variant = Variant::RelocatePromise(promise);
+        let node_msg = NodeMsg::RelocatePromise(promise);
 
-        self.send_message_for_dst_accumulation(src, dst, variant, slice::from_ref(recipient))
+        self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
+        */
     }
 
     pub(crate) fn return_relocate_promise(&self) -> Option<Command> {
@@ -282,6 +301,8 @@ impl Core {
         elder_candidates: ElderCandidates,
         recipients: &[Peer],
     ) -> Result<Vec<Command>> {
+        unimplemented!();
+        /*
         let src_prefix = elder_candidates.prefix;
         let generation = self.section.chain().main_branch_len() as u64;
         let dkg_key = DkgKey::new(&elder_candidates, generation);
@@ -293,7 +314,7 @@ impl Core {
             recipients
         );
 
-        let variant = Variant::DkgStart {
+        let node_msg = NodeMsg::DkgStart {
             dkg_key,
             elder_candidates,
         };
@@ -301,17 +322,20 @@ impl Core {
         self.send_message_for_dst_accumulation(
             src_prefix.name(),
             DstLocation::DirectAndUnrouted,
-            variant,
+            node_msg,
             recipients,
         )
+        */
     }
 
     pub(crate) fn create_aggregate_at_src_proposal(
         &self,
         dst: DstLocation,
-        variant: Variant,
-        proof_chain_first_key: Option<&bls::PublicKey>,
+        node_msg: NodeMsg,
+        proof_chain_first_key: Option<&BlsPublicKey>,
     ) -> Result<Proposal> {
+        unimplemented!();
+        /*
         let proof_chain = self.create_proof_chain(proof_chain_first_key)?;
         let dst_key = if let Some(name) = dst.name() {
             self.section_key_by_name(&name)
@@ -326,7 +350,7 @@ impl Core {
             src: self.section.prefix().name(),
             dst,
             dst_key,
-            variant,
+            node_msg,
         };
 
         let proposal = Proposal::AccumulateAtSrc {
@@ -335,19 +359,22 @@ impl Core {
         };
         trace!("Created aggregate at source proposal {:?}", proposal);
         Ok(proposal)
+        */
     }
 
     pub(crate) fn send_message_for_dst_accumulation(
         &self,
         src: XorName,
         dst: DstLocation,
-        variant: Variant,
+        node_msg: NodeMsg,
         recipients: &[Peer],
     ) -> Result<Vec<Command>> {
+        unimplemented!();
+        /*
         let key_share = self.section_keys_provider.key_share().map_err(|err| {
             trace!(
                 "Can't create message {:?} for accumulation at dst {:?}: {}",
-                variant,
+                node_msg,
                 dst,
                 err
             );
@@ -357,7 +384,7 @@ impl Core {
             key_share,
             src,
             dst,
-            variant,
+            node_msg,
             self.section.chain().clone(),
         )?;
 
@@ -368,11 +395,14 @@ impl Core {
         );
 
         Ok(self.send_or_handle(message, recipients))
+        */
     }
 
     // Send the message to all `recipients`. If one of the recipients is us, don't send it over the
     // network but handle it directly.
     pub(crate) fn send_or_handle(&self, message: NodeMsg, recipients: &[Peer]) -> Vec<Command> {
+        unimplemented!();
+        /*
         let mut commands = vec![];
         let mut others = Vec::new();
         let mut handle = false;
@@ -413,12 +443,16 @@ impl Core {
         }
 
         commands
+        */
     }
 
     pub(crate) fn create_proof_chain(
         &self,
-        additional_key: Option<&bls::PublicKey>,
+        additional_key: Option<&BlsPublicKey>,
     ) -> Result<SecuredLinkedList> {
+        unimplemented!();
+
+        /*
         // The last key of the signed chain is the last section key for which we also have the
         // secret key share. Ideally this is our current section key unless we haven't observed the
         // DKG completion yet.
@@ -438,20 +472,23 @@ impl Core {
             .section
             .chain()
             .minimize(iter::once(&last_key).chain(additional_key))?)
+            */
     }
 
     pub(crate) fn send_direct_message(
         &self,
         recipient: (XorName, SocketAddr),
-        variant: Variant,
-        dst_pk: bls::PublicKey,
+        node_msg: NodeMsg,
+        dst_pk: BlsPublicKey,
     ) -> Result<Command> {
-        let message = NodeMsg::single_src(
+        unimplemented!();
+        /*let message = WireMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
-            variant,
+            node_msg,
             self.section.authority_provider().section_key(),
         )?;
+
         Ok(Command::send_message_to_node(
             recipient,
             message,
@@ -459,12 +496,14 @@ impl Core {
                 dst: recipient.0,
                 dst_section_pk: dst_pk,
             },
-        ))
+        ))*/
     }
 
     // TODO: consider changing this so it sends only to a subset of the elders
     // (say 1/3 of the ones closest to our name or so)
     pub(crate) fn send_message_to_our_elders(&self, msg: NodeMsg) -> Command {
+        unimplemented!();
+        /*
         let targets: Vec<_> = self
             .section
             .authority_provider()
@@ -481,5 +520,6 @@ impl Core {
         };
 
         Command::send_message_to_nodes(targets.clone(), targets.len(), msg, dst_info)
+        */
     }
 }

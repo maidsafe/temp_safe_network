@@ -40,16 +40,14 @@ use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey, Sequence,
     SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
-    SequencePublicPolicy, Signature,
+    SequencePublicPolicy,
 };
-use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
 };
-use xor_name::XorName;
 
 /// Message envelope containing a Safe message payload,
 /// This struct also provides utilities to obtain the serialized bytes
@@ -176,16 +174,6 @@ impl ClientMsg {
                 "bytes as a client message".to_string(),
             ))
         }
-    }
-
-    /// Serialize this Message into bytes ready to be sent over the wire.
-    pub fn serialize(
-        &self,
-        dst: XorName,
-        dst_section_pk: BlsPublicKey,
-    ) -> crate::messaging::Result<Bytes> {
-        unimplemented!();
-        //WireMsg::serialize_client_msg(self, dst, dst_section_pk)
     }
 
     /// Gets the message ID.
@@ -450,6 +438,7 @@ mod tests {
     use crate::types::{ChunkAddress, DataAddress, Keypair, MapKind, MapValue, PrivateChunk};
     use anyhow::{anyhow, Result};
     use std::convert::{TryFrom, TryInto};
+    use xor_name::XorName;
 
     fn gen_keypairs() -> Vec<Keypair> {
         let mut rng = rand::thread_rng();
@@ -583,29 +572,6 @@ mod tests {
             Err(TryFromError::Response(e.clone())),
             Map::try_from(GetMap(Err(e)))
         );
-        Ok(())
-    }
-
-    #[test]
-    fn serialization() -> Result<()> {
-        let keypair = &gen_keypairs()[0];
-        let public_key = keypair.public_key();
-
-        let id = MessageId::new();
-        let message = ClientMsg::Process(ProcessMsg::Query {
-            id,
-            query: Query::Data(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
-                XorName::random(),
-            )))),
-        });
-
-        // test msgpack serialization
-        let dst = XorName::random();
-        let dst_section_pk = bls::SecretKey::random().public_key();
-        let serialized = message.serialize(dst, dst_section_pk)?;
-        let deserialized = ClientMsg::from(serialized)?;
-        assert_eq!(deserialized, message);
-
         Ok(())
     }
 }

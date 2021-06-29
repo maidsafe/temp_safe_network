@@ -8,11 +8,8 @@
 
 use super::{Comm, Command};
 use crate::messaging::{
-    node::{
-        JoinAsRelocatedResponse, JoinRejectionReason, JoinResponse, NodeMsg, Section, SrcAuthority,
-        Variant,
-    },
-    DstLocation, MessageType,
+    node::{JoinAsRelocatedResponse, JoinRejectionReason, JoinResponse, NodeMsg, Section},
+    DstLocation, MsgKind, NodeMsgAuthority, NodeSigned, WireMsg,
 };
 use crate::routing::{
     core::Core, error::Result, event::Event, messages::WireMsgUtils, node::Node, peer::PeerUtils,
@@ -103,30 +100,32 @@ impl Dispatcher {
         match command {
             Command::HandleMessage {
                 sender,
-                message,
-                dst_info,
+                msg_id,
+                msg_authority,
+                dst_location,
+                msg,
             } => {
                 if let Some(sender) = &sender {
                     // let's then see if we need to do a reachability test
-                    let failure = match &message.variant {
-                        Variant::JoinRequest(join_request) => {
+                    let failure = match &msg {
+                        NodeMsg::JoinRequest(join_request) => {
                             // Do this check only for the initial join request
                             if join_request.resource_proof_response.is_none()
                                 && self.comm.is_reachable(sender).await.is_err()
                             {
-                                Some(Variant::JoinResponse(Box::new(JoinResponse::Rejected(
+                                Some(NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                                     JoinRejectionReason::NodeNotReachable(*sender),
                                 ))))
                             } else {
                                 None
                             }
                         }
-                        Variant::JoinAsRelocatedRequest(join_request) => {
+                        NodeMsg::JoinAsRelocatedRequest(join_request) => {
                             // Do this check only for the initial join request
                             if join_request.relocate_payload.is_none()
                                 && self.comm.is_reachable(sender).await.is_err()
                             {
-                                Some(Variant::JoinAsRelocatedResponse(Box::new(
+                                Some(NodeMsg::JoinAsRelocatedResponse(Box::new(
                                     JoinAsRelocatedResponse::NodeNotReachable(*sender),
                                 )))
                             } else {
@@ -136,13 +135,14 @@ impl Dispatcher {
                         _ => None,
                     };
 
-                    if let Some(variant) = failure {
+                    if let Some(node_msg) = failure {
                         let section_key = *self.core.read().await.section().chain.last_key();
-                        if let SrcAuthority::Node { public_key, .. } = message.src {
-                            trace!("Sending {:?} to {}", variant, sender);
+                        if let NodeMsgAuthority::Node(NodeSigned { public_key, .. }) = msg_authority
+                        {
+                            trace!("Sending {:?} to {}", node_msg, sender);
                             return Ok(vec![self.core.read().await.send_direct_message(
                                 (XorName::from(PublicKey::from(public_key)), *sender),
-                                variant,
+                                node_msg,
                                 section_key,
                             )?]);
                         }
@@ -152,18 +152,19 @@ impl Dispatcher {
                 self.core
                     .write()
                     .await
-                    .handle_message(sender, message, dst_info)
+                    .handle_message(sender, msg_id, msg_authority, dst_location, msg)
                     .await
             }
             Command::HandleSectionInfoMsg {
                 sender,
-                message,
-                dst_info,
+                msg_id,
+                dst_location,
+                msg,
             } => Ok(self
                 .core
                 .write()
                 .await
-                .handle_section_info_msg(sender, message, dst_info)
+                .handle_section_info_msg(sender, dst_location, msg)
                 .await),
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
             Command::HandleAgreement { proposal, sig } => {
@@ -195,23 +196,15 @@ impl Dispatcher {
                 // send to network from routing layer
                 recipients,
                 delivery_group_size,
-                message,
+                wire_msg,
             } => {
-                self.send_message(&recipients, delivery_group_size, message)
+                self.send_message(&recipients, delivery_group_size, wire_msg)
                     .await
             }
             Command::SendUserMessage {
-                // send to network from node layer
-                itinerary,
-                content,
+                wire_msg,
                 additional_proof_chain_key: _,
-            } => {
-                self.core
-                    .write()
-                    .await
-                    .send_user_message(itinerary, content)
-                    .await
-            }
+            } => self.core.write().await.send_user_message(wire_msg).await,
             Command::ScheduleTimeout { duration, token } => Ok(self
                 .handle_schedule_timeout(duration, token)
                 .await
@@ -242,10 +235,10 @@ impl Dispatcher {
                     let core = self.core.read().await;
                     let node = core.node();
                     let section_key = *core.section().chain.last_key();
-                    NodeMsg::single_src(
+                    WireMsg::single_src(
                         node,
                         DstLocation::Section(core.node().name()),
-                        Variant::StartConnectivityTest(name),
+                        NodeMsg::StartConnectivityTest(name),
                         section_key,
                     )?
                 };
@@ -291,14 +284,17 @@ impl Dispatcher {
         &self,
         recipients: &[(XorName, SocketAddr)],
         delivery_group_size: usize,
-        message: MessageType,
+        wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
-        let cmds = match message {
-            MessageType::Node { .. } | MessageType::Routing { .. } => {
+        let cmds = match wire_msg.msg_kind() {
+            MsgKind::NodeSignedMsg(_)
+            | MsgKind::NodeBlsShareSignedMsg(_)
+            | MsgKind::SectionSignedMsg(_) => {
                 let status = self
                     .comm
-                    .send(recipients, delivery_group_size, message)
+                    .send(recipients, delivery_group_size, wire_msg)
                     .await?;
+
                 match status {
                     SendStatus::MinDeliveryGroupSizeReached(failed_recipients)
                     | SendStatus::MinDeliveryGroupSizeFailed(failed_recipients) => {
@@ -311,29 +307,29 @@ impl Dispatcher {
                 }
                 .map_err(|e: Error| e)?
             }
-            MessageType::Client { .. } => {
-                for recipient in recipients {
+            MsgKind::ClientMsg(_) => {
+                for (name, addr) in recipients {
                     if self
                         .comm
-                        .send_on_existing_connection(*recipient, message.clone())
+                        .send_on_existing_connection(*name, *addr, wire_msg.clone())
                         .await
                         .is_err()
                     {
                         trace!(
                             "Lost connection to client {:?} when sending message {:?}",
-                            recipient,
-                            message
+                            addr,
+                            wire_msg
                         );
-                        self.send_event(Event::ClientLost(recipient.1)).await;
+                        self.send_event(Event::ClientLost(*addr)).await;
                     }
                 }
                 vec![]
             }
-            MessageType::SectionInfo { .. } => {
-                for recipient in recipients {
+            MsgKind::SectionInfoMsg => {
+                for (name, addr) in recipients {
                     let _ = self
                         .comm
-                        .send_on_existing_connection(*recipient, message.clone())
+                        .send_on_existing_connection(*name, *addr, wire_msg.clone())
                         .await;
                 }
                 vec![]

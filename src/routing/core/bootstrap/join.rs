@@ -8,10 +8,10 @@
 
 use crate::messaging::{
     node::{
-        JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, ResourceProofResponse, Section,
-        Variant,
+        DstInfo, JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, ResourceProofResponse,
+        Section,
     },
-    DstInfo, DstLocation, MessageType, WireMsg,
+    DstLocation, MessageType, NodeMsgAuthority, NodeSigned, WireMsg,
 };
 use crate::routing::{
     dkg::SectionSignedUtils,
@@ -20,7 +20,10 @@ use crate::routing::{
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
-    routing_api::comm::{Comm, ConnectionEvent, SendStatus},
+    routing_api::{
+        comm::{Comm, ConnectionEvent, SendStatus},
+        command::Command,
+    },
     section::{SectionAuthorityProviderUtils, SectionUtils},
     FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
@@ -47,7 +50,7 @@ pub(crate) async fn join_network(
     comm: &Comm,
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
     bootstrap_addr: SocketAddr,
-) -> Result<(Node, Section, Vec<(NodeMsg, SocketAddr, DstInfo)>)> {
+) -> Result<(Node, Section, Vec<Command>)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap", name = %node.name());
@@ -67,7 +70,7 @@ struct Join<'a> {
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
     // Backlog for unknown messages
-    backlog: VecDeque<(NodeMsg, SocketAddr, DstInfo)>,
+    backlog: VecDeque<Command>,
 }
 
 impl<'a> Join<'a> {
@@ -90,10 +93,7 @@ impl<'a> Join<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn run(
-        self,
-        bootstrap_addr: SocketAddr,
-    ) -> Result<(Node, Section, Vec<(NodeMsg, SocketAddr, DstInfo)>)> {
+    async fn run(self, bootstrap_addr: SocketAddr) -> Result<(Node, Section, Vec<Command>)> {
         // Use our XorName as we do not know their name or section key yet.
         let section_key = bls::SecretKey::random().public_key();
         let dst_xorname = self.node.name();
@@ -107,7 +107,7 @@ impl<'a> Join<'a> {
         mut self,
         mut section_key: bls::PublicKey,
         mut recipients: Vec<(XorName, SocketAddr)>,
-    ) -> Result<(Node, Section, Vec<(NodeMsg, SocketAddr, DstInfo)>)> {
+    ) -> Result<(Node, Section, Vec<Command>)> {
         // We send a first join request to obtain the resource challenge, which
         // we will then use to generate the challenge proof and send the
         // `JoinRequest` again with it.
@@ -125,7 +125,7 @@ impl<'a> Join<'a> {
         loop {
             used_recipient.extend(recipients.iter().map(|(_, addr)| addr));
 
-            let (response, sender, dst_info) = self.receive_join_response().await?;
+            let (response, sender, src_name) = self.receive_join_response().await?;
 
             match response {
                 JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
@@ -275,7 +275,7 @@ impl<'a> Join<'a> {
                             nonce_signature,
                         }),
                     };
-                    let recipients = &[(dst_info.dst, sender)];
+                    let recipients = &[(src_name, sender)];
                     self.send_join_requests(join_request, recipients, section_key)
                         .await?;
                 }
@@ -291,7 +291,7 @@ impl<'a> Join<'a> {
     ) -> Result<()> {
         info!("Sending {:?} to {:?}", join_request, recipients);
 
-        let variant = Variant::JoinRequest(Box::new(join_request));
+        let variant = NodeMsg::JoinRequest(Box::new(join_request));
         let message = NodeMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
@@ -316,21 +316,35 @@ impl<'a> Join<'a> {
         Ok(())
     }
 
-    async fn receive_join_response(&mut self) -> Result<(JoinResponse, SocketAddr, DstInfo)> {
+    async fn receive_join_response(&mut self) -> Result<(JoinResponse, SocketAddr, XorName)> {
         while let Some(event) = self.recv_rx.recv().await {
             // we are interested only in `JoinResponse` type of messages
-            let (dst_info, join_response, sender) = match event {
+            let (join_response, sender, src_name) = match event {
                 ConnectionEvent::Received((sender, bytes)) => match WireMsg::deserialize(bytes) {
-                    Ok(MessageType::Node { .. })
-                    | Ok(MessageType::Client { .. })
-                    | Ok(MessageType::SectionInfo { .. }) => continue,
-                    Ok(MessageType::Routing { msg, dst_info }) => {
-                        if let Variant::JoinResponse(resp) = msg.variant {
-                            (dst_info, *resp, sender)
-                        } else {
-                            self.backlog_message(msg, sender, dst_info);
-                            continue;
-                        }
+                    Ok(MessageType::Client { .. }) | Ok(MessageType::SectionInfo { .. }) => {
+                        continue
+                    }
+                    Ok(MessageType::Node {
+                        msg_id,
+                        msg_authority:
+                            NodeMsgAuthority::NodeSignedMsg(NodeSigned { public_key, .. }),
+                        dst_location,
+                        msg: NodeMsg::JoinResponse(resp),
+                    }) => (*resp, sender, ed25519::name(public_key)),
+                    Ok(MessageType::Node {
+                        msg_id,
+                        msg_authority,
+                        dst_location,
+                        msg,
+                    }) => {
+                        self.backlog_message(Command::HandleMessage {
+                            sender: Some(sender),
+                            msg_id,
+                            msg_authority,
+                            dst_location,
+                            msg,
+                        });
+                        continue;
                     }
                     Err(error) => {
                         debug!("Failed to deserialize message: {}", error);
@@ -344,7 +358,7 @@ impl<'a> Join<'a> {
                 JoinResponse::ResourceChallenge { .. }
                 | JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(_))
                 | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
-                    return Ok((join_response, sender, dst_info));
+                    return Ok((join_response, sender, src_name));
                 }
                 JoinResponse::Retry(ref section_auth)
                 | JoinResponse::Redirect(ref section_auth) => {
@@ -357,7 +371,7 @@ impl<'a> Join<'a> {
                     }
                     trace!("Received a redirect/retry JoinResponse. Sending request to the latest contacts");
 
-                    return Ok((join_response, sender, dst_info));
+                    return Ok((join_response, sender, src_name));
                 }
                 JoinResponse::Approval {
                     ref section_auth,
@@ -388,7 +402,7 @@ impl<'a> Join<'a> {
                         section_auth.value.prefix,
                     );
 
-                    return Ok((join_response, sender, dst_info));
+                    return Ok((join_response, sender, src_name));
                 }
             }
         }
@@ -398,12 +412,12 @@ impl<'a> Join<'a> {
         Err(Error::InvalidState)
     }
 
-    fn backlog_message(&mut self, message: NodeMsg, sender: SocketAddr, dst_info: DstInfo) {
+    fn backlog_message(&mut self, cmd: Command) {
         while self.backlog.len() >= BACKLOG_CAPACITY {
             let _ = self.backlog.pop_front();
         }
 
-        self.backlog.push_back((message, sender, dst_info))
+        self.backlog.push_back(cmd)
     }
 }
 
@@ -496,14 +510,14 @@ mod tests {
                 (msg, dst_info));
 
             assert_eq!(dst_info.dst, *peer.name());
-            assert_matches!(message.variant, Variant::JoinRequest(request) => {
+            assert_matches!(message.variant, NodeMsg::JoinRequest(request) => {
                 assert!(request.resource_proof_response.is_none());
             });
 
             // Send JoinResponse::Retry with section auth provider info
             send_response(
                 &recv_tx,
-                Variant::JoinResponse(Box::new(JoinResponse::Retry(section_auth.clone()))),
+                NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(section_auth.clone()))),
                 &bootstrap_node,
                 section_auth.section_key(),
                 *peer.name(),
@@ -526,7 +540,7 @@ mod tests {
                     .map(|(name, addr)| (*name, *addr))
                     .collect::<Vec<_>>(),
             );
-            assert_matches!(message.variant, Variant::JoinRequest(request) => {
+            assert_matches!(message.variant, NodeMsg::JoinRequest(request) => {
                 assert_eq!(request.section_key, pk);
             });
 
@@ -536,7 +550,7 @@ mod tests {
             let proof_chain = SecuredLinkedList::new(pk);
             send_response(
                 &recv_tx,
-                Variant::JoinResponse(Box::new(JoinResponse::Approval {
+                NodeMsg::JoinResponse(Box::new(JoinResponse::Approval {
                     genesis_key: pk,
                     section_auth: section_auth.clone(),
                     node_state,
@@ -594,7 +608,7 @@ mod tests {
             );
 
             assert_matches!(message, MessageType::Routing { msg, .. } =>
-                assert_matches!(msg.variant, Variant::JoinRequest{..}));
+                assert_matches!(msg.variant, NodeMsg::JoinRequest{..}));
 
             // Send JoinResponse::Redirect
             let new_bootstrap_addrs: BTreeMap<_, _> = (0..ELDER_SIZE)
@@ -603,7 +617,7 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                Variant::JoinResponse(Box::new(JoinResponse::Redirect(SectionAuthorityProvider {
+                NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(SectionAuthorityProvider {
                     prefix: Prefix::default(),
                     public_key_set: pk_set.clone(),
                     elders: new_bootstrap_addrs.clone(),
@@ -635,7 +649,7 @@ mod tests {
                 (msg, dst_info));
 
             assert_eq!(dst_info.dst_section_pk, pk_set.public_key());
-            assert_matches!(message.variant, Variant::JoinRequest(req) => {
+            assert_matches!(message.variant, NodeMsg::JoinRequest(req) => {
                 assert_eq!(req.section_key, pk_set.public_key());
             });
 
@@ -676,11 +690,11 @@ mod tests {
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
 
             assert_matches!(message, MessageType::Routing { msg, .. } =>
-                    assert_matches!(msg.variant, Variant::JoinRequest{..}));
+                    assert_matches!(msg.variant, NodeMsg::JoinRequest{..}));
 
             send_response(
                 &recv_tx,
-                Variant::JoinResponse(Box::new(JoinResponse::Redirect(SectionAuthorityProvider {
+                NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(SectionAuthorityProvider {
                     prefix: Prefix::default(),
                     public_key_set: pk_set.clone(),
                     elders: BTreeMap::new(),
@@ -697,7 +711,7 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                Variant::JoinResponse(Box::new(JoinResponse::Redirect(SectionAuthorityProvider {
+                NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(SectionAuthorityProvider {
                     prefix: Prefix::default(),
                     public_key_set: pk_set.clone(),
                     elders: addrs,
@@ -714,7 +728,7 @@ mod tests {
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
 
             assert_matches!(message, MessageType::Routing { msg, .. } =>
-                        assert_matches!(msg.variant, Variant::JoinRequest{..}));
+                        assert_matches!(msg.variant, NodeMsg::JoinRequest{..}));
 
             Ok(())
         };
@@ -753,11 +767,11 @@ mod tests {
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
 
             assert_matches!(message, MessageType::Routing { msg, .. } =>
-                            assert_matches!(msg.variant, Variant::JoinRequest{..}));
+                            assert_matches!(msg.variant, NodeMsg::JoinRequest{..}));
 
             send_response(
                 &recv_tx,
-                Variant::JoinResponse(Box::new(JoinResponse::Rejected(
+                NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                     JoinRejectionReason::JoinsDisallowed,
                 ))),
                 &bootstrap_node,
@@ -820,12 +834,12 @@ mod tests {
                 .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
 
             let message = assert_matches!(message, MessageType::Routing{ msg, .. } => msg);
-            assert_matches!(message.variant, Variant::JoinRequest(_));
+            assert_matches!(message.variant, NodeMsg::JoinRequest(_));
 
             // Send `Retry` with bad prefix
             send_response(
                 &recv_tx,
-                Variant::JoinResponse(Box::new(JoinResponse::Retry(
+                NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(
                     gen_section_authority_provider(bad_prefix, ELDER_SIZE).0,
                 ))),
                 &bootstrap_node,
@@ -837,7 +851,7 @@ mod tests {
             // Send `Retry` with good prefix
             send_response(
                 &recv_tx,
-                Variant::JoinResponse(Box::new(JoinResponse::Retry(
+                NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(
                     gen_section_authority_provider(good_prefix, ELDER_SIZE).0,
                 ))),
                 &bootstrap_node,
@@ -851,7 +865,7 @@ mod tests {
                 .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
 
             let message = assert_matches!(message, MessageType::Routing{ msg, .. } => msg);
-            assert_matches!(message.variant, Variant::JoinRequest(_));
+            assert_matches!(message.variant, NodeMsg::JoinRequest(_));
 
             Ok(())
         };
@@ -868,7 +882,7 @@ mod tests {
     // test helper
     fn send_response(
         recv_tx: &mpsc::Sender<ConnectionEvent>,
-        variant: Variant,
+        variant: NodeMsg,
         bootstrap_node: &Node,
         section_key: bls::PublicKey,
         node_name: XorName,

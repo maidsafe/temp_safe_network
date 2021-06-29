@@ -8,9 +8,8 @@
 
 use super::{delivery_group, enduser_registry::SocketId, Core};
 use crate::messaging::{
-    node::{Network, NodeMsg, NodeState, Peer, Proposal, Section, Variant},
-    DstInfo, EndUser, Itinerary, MessageId, MessageType, SectionAuthorityProvider, SrcLocation,
-    WireMsg,
+    node::{DstInfo, Network, NodeMsg, NodeState, Peer, Proposal, Section},
+    EndUser, Itinerary, MessageId, MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
     dkg::commands::DkgCommands,
@@ -230,7 +229,7 @@ impl Core {
         let dst_section_pk = self.section_key_by_name(&dst_name);
 
         // TODO: don't require this serialize or perhaps even variant altogether?
-        let variant = Variant::UserMessage(content.serialize()?.to_vec());
+        let variant = NodeMsg::UserMessage(content.serialize()?.to_vec());
 
         // If the msg is to be aggregated at dst, we don't vote among our peers, we simply send the
         // msg as our vote to the dst.

@@ -8,7 +8,9 @@
 
 use super::Core;
 use crate::messaging::{
-    client::ClientMsg, node::KeyedSig, DstInfo, DstLocation, EndUser, MessageType, SrcLocation,
+    client::ClientMsg,
+    node::{DstInfo, KeyedSig},
+    DstLocation, EndUser, MessageType, SrcLocation,
 };
 use crate::routing::{
     error::{Error, Result},

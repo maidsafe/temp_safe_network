@@ -8,25 +8,25 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{NodeMsg, Section, Variant, JoinResponse},
-    DstInfo,
+    node::{DstInfo, NodeMsg, Section},
+    DstLocation, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
     error::Result,
-    messages::{RoutingMsgUtils, SrcAuthorityUtils},
-    network::NetworkUtils,
+    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
-use std::{cmp::Ordering, net::SocketAddr};
+use bls::PublicKey as BlsPublicKey;
+use std::cmp::Ordering;
 
 impl Core {
     pub async fn check_for_entropy(
         &self,
         msg: &NodeMsg,
-        dst_info: DstInfo,
-        sender: Option<SocketAddr>,
+        msg_authority: &NodeMsgAuthority,
+        dst_location: &DstLocation,
     ) -> Result<(Option<Command>, bool)> {
         if self.is_not_elder() {
             // Adult nodes do need to carry out entropy checking, however the message shall always
@@ -34,13 +34,14 @@ impl Core {
             return Ok((None, true));
         }
 
-        let (command, shall_be_handled) = match process(&self.node, &self.section, msg, dst_info)? {
-            (Some(msg_to_send), shall_be_handled) => {
-                let command = self.relay_message(&msg_to_send).await?;
-                (command, shall_be_handled)
-            }
-            (None, shall_be_handled) => (None, shall_be_handled),
-        };
+        let (command, shall_be_handled) =
+            match process(&self.node, &self.section, msg, dst_location.section_pk())? {
+                (Some(msg_to_send), shall_be_handled) => {
+                    let command = self.relay_message(&msg_to_send).await?;
+                    (command, shall_be_handled)
+                }
+                (None, shall_be_handled) => (None, shall_be_handled),
+            };
 
         if shall_be_handled || command.is_some() {
             Ok((command, shall_be_handled))
@@ -59,13 +60,13 @@ impl Core {
                 .closest(&sender_name)
                 .unwrap_or_else(|| self.section.authority_provider());
 
-            let variant =
-                Variant::JoinResponse(Box::new(JoinResponse::Redirect(section_auth.clone())));
+            let node_msg =
+                NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(section_auth.clone())));
 
-            trace!("Sending {:?} to {}", variant, sender_name);
+            trace!("Sending {:?} to {}", node_msg, sender_name);
             let cmd = self.send_direct_message(
                 (sender_name, sender_addr),
-                variant,
+                node_msg,
                 section_auth.section_key(),
             )?;
 
@@ -82,49 +83,48 @@ fn process(
     node: &Node,
     section: &Section,
     msg: &NodeMsg,
-    dst_info: DstInfo,
+    msg_authority: &NodeMsgAuthority,
+    dst_section_pk: BlsPublicKey,
 ) -> Result<(Option<NodeMsg>, bool)> {
-    let src_name = msg.src.name();
+    let src_name = msg_authority.name();
+
     if section.prefix().matches(&src_name) {
         // This message is from our section. We update our members via the `Sync` message which is
         // done elsewhere.
         return Ok((None, true));
     }
 
-    let dst = msg.src.src_location().to_dst();
+    let dst = msg_authority.src_location().to_dst();
 
     if let Ordering::Less = section
         .chain()
-        .cmp_by_position(&dst_info.dst_section_pk, section.chain().last_key())
+        .cmp_by_position(&dst_section_pk, section.chain().last_key())
     {
         info!("Anti-Entropy: Source's knowledge of our key is outdated, send them an update.");
-        let chain = if let Ok(chain) = section
-            .chain()
-            .get_proof_chain_to_current(&dst_info.dst_section_pk)
-        {
+        let chain = if let Ok(chain) = section.chain().get_proof_chain_to_current(&dst_section_pk) {
             chain
         } else {
             trace!(
                 "Cannot find section_key {:?} within the chain",
-                dst_info.dst_section_pk
+                dst_section_pk
             );
             // In case a new node is trying to bootstrap from us, not being its matching section.
             // Reply with no msg and with false flag to send back a JoinResponse::Redirect.
-            if let Variant::JoinRequest(_) = msg.variant {
+            if let NodeMsg::JoinRequest(_) = msg {
                 return Ok((None, false));
             }
             section.chain().clone()
         };
 
         let section_auth = section.section_signed_authority_provider();
-        let variant = Variant::SectionKnowledge {
+        let node_msg = NodeMsg::SectionKnowledge {
             src_info: (section_auth.clone(), chain),
             msg: Some(Box::new(msg.clone())),
         };
-        let msg = NodeMsg::single_src(
+        let msg = WireMsg::single_src(
             node,
             dst,
-            variant,
+            node_msg,
             section.authority_provider().section_key(),
         )?;
 

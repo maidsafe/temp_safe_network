@@ -11,11 +11,9 @@ use crate::messaging::{
         ChunkRead, ChunkWrite, CmdError, DataCmd as NodeDataCmd, DataExchange,
         DataQuery as NodeDataQuery, Error, Result,
     },
-    ClientSigned, EndUser, MessageId, MessageType, WireMsg,
+    ClientSigned, EndUser,
 };
 use crate::types::{Chunk, ChunkAddress, PublicKey, SectionElders, Signature};
-use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
