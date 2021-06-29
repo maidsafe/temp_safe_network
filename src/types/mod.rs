@@ -30,12 +30,9 @@ pub use keys::{
     SignatureShare, Signing,
 };
 pub use map::{
-    Action as MapAction, Address as MapAddress, Data as Map, Entries as MapEntries,
-    EntryActions as MapEntryActions, Kind as MapKind, PermissionSet as MapPermissionSet,
-    SeqData as SeqMap, SeqEntries as MapSeqEntries, SeqEntryAction as MapSeqEntryAction,
-    SeqEntryActions as MapSeqEntryActions, SeqValue as MapSeqValue, UnseqData as UnseqMap,
-    UnseqEntries as MapUnseqEntries, UnseqEntryAction as MapUnseqEntryAction,
-    UnseqEntryActions as MapUnseqEntryActions, Value as MapValue, Values as MapValues,
+    Action as MapAction, Address as MapAddress, Entries as MapEntries,
+    EntryAction as MapEntryAction, EntryActions as MapEntryActions, Kind as MapKind, Map,
+    PermissionSet as MapPermissionSet, Value as MapValue, Values as MapValues,
 };
 pub use register::Address as RegisterAddress;
 pub use section::SectionElders;

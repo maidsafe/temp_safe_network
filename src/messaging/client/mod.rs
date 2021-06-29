@@ -459,7 +459,7 @@ try_from!(Permissions, GetRegisterUserPermissions);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ChunkAddress, DataAddress, Keypair, PublicChunk, UnseqMap};
+    use crate::types::{ChunkAddress, DataAddress, Keypair, MapKind, MapValue, PrivateChunk};
     use anyhow::{anyhow, Result};
     use std::convert::{TryFrom, TryInto};
 
@@ -563,7 +563,9 @@ mod tests {
             None => return Err(anyhow!("Could not generate public key")),
         };
 
-        let i_data = Chunk::Public(PublicChunk::new(vec![1, 3, 1, 4]));
+        let owner = PublicKey::Bls(bls::SecretKey::random().public_key());
+
+        let i_data = Chunk::Private(PrivateChunk::new(vec![1, 3, 1, 4], owner));
         let e = Error::AccessDenied(key);
         assert_eq!(
             i_data,
@@ -577,15 +579,22 @@ mod tests {
         );
 
         let mut data = BTreeMap::new();
-        let _ = data.insert(vec![1], vec![10]);
-        let owners = PublicKey::Bls(bls::SecretKey::random().public_key());
-        let m_data = Map::Unseq(UnseqMap::new_with_data(
+        let _ = data.insert(
+            vec![1],
+            MapValue {
+                pointer: XorName::random(),
+                version: 0,
+            },
+        );
+
+        let m_data = Map::new_with_data(
             *i_data.name(),
             1,
             data,
             BTreeMap::new(),
-            owners,
-        ));
+            owner,
+            MapKind::Private,
+        );
         assert_eq!(
             m_data,
             GetMap(Ok(m_data.clone()))
