@@ -23,6 +23,12 @@ use std::{
 /// Command for node.
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Command {
+    /// TODO: this is to replace the HandleMessage command defined further bellow,
+    /// this holds the WireMsg that has been received from the network,
+    HandleWireMessage {
+        sender: SocketAddr,
+        wire_msg: WireMsg,
+    },
     /// Handle `message` from `sender`.
     /// Note: `sender` is `Some` if the message was received from someone else
     /// and `None` if it is an aggregated message.
@@ -32,13 +38,6 @@ pub(crate) enum Command {
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
         msg: NodeMsg,
-    },
-    /// Handle network info message.
-    HandleSectionInfoMsg {
-        sender: SocketAddr,
-        msg_id: MessageId,
-        dst_location: DstLocation,
-        msg: SectionInfoMsg,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
@@ -120,6 +119,11 @@ impl Command {
 impl Debug for Command {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
+            Self::HandleWireMessage { sender, wire_msg } => f
+                .debug_struct("HandleWireMessage")
+                .field("sender", sender)
+                .field("wire_msg", wire_msg)
+                .finish(),
             Self::HandleMessage {
                 sender,
                 msg_id,
@@ -131,18 +135,6 @@ impl Debug for Command {
                 .field("sender", sender)
                 .field("msg_id", msg_id)
                 .field("msg_authority", msg_authority)
-                .field("dst_location", dst_location)
-                .field("msg", msg)
-                .finish(),
-            Self::HandleSectionInfoMsg {
-                sender,
-                msg_id,
-                dst_location,
-                msg,
-            } => f
-                .debug_struct("HandleSectionInfoMsg")
-                .field("sender", sender)
-                .field("msg_id", msg_id)
                 .field("dst_location", dst_location)
                 .field("msg", msg)
                 .finish(),

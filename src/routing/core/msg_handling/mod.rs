@@ -20,8 +20,8 @@ mod user_msg;
 
 use super::Core;
 use crate::messaging::{
-    node::{DstInfo, Error as AggregatorError, NodeMsg, Proposal},
-    DstLocation, MessageId, NodeMsgAuthority,
+    node::{DstInfo, Error as AggregatorError, JoinResponse, NodeMsg, Proposal},
+    DstLocation, MessageId, MessageType, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
     error::{Error, Result},
@@ -30,6 +30,7 @@ use crate::routing::{
     relocation::RelocateState,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
+    Event,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -39,31 +40,151 @@ use std::{iter, net::SocketAddr};
 impl Core {
     pub(crate) async fn handle_message(
         &mut self,
-        sender: Option<SocketAddr>,
-        msg_id: MessageId,
-        msg_authority: NodeMsgAuthority,
-        dst_location: DstLocation,
-        msg: NodeMsg,
+        sender: SocketAddr,
+        wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
-        // Check if the message is for us.
-        let in_dst_location = dst_location.contains(&self.node.name(), self.section.prefix());
-
-        // TODO: Broadcast message to our section when src is a Node as nodes might not know
-        // all the elders in our section and the msg needs to be propagated.
-        if !in_dst_location {
-            // RoutingMsg not for us.
-            info!("Relay message {:?} closer to the destination", msg);
-            unimplemented!();
-            /*
-            if let Some(cmd) = self.relay_message(&msg).await? {
-                return Ok(vec![cmd]);
+        // Check if the message is for us
+        let dst_location = wire_msg.dst_location();
+        let msg_id = wire_msg.msg_id();
+        if !dst_location.contains(&self.node.name(), self.section.prefix()) {
+            // Message is not for us
+            info!("Relay message {} closer to the destination", msg_id);
+            if let Some(cmds) = self.relay_message(&wire_msg).await? {
+                return Ok(vec![cmds]);
             } else {
                 return Ok(vec![]);
             }
-            */
         }
 
-        // Let's first verify the section chain in the src authority is trusted
+        // Now check the signature of the msg authority is valid
+        if let Err(err) = wire_msg.check_signature() {
+            error!(
+                "Discarding message received ({:?}) due to invalid signature: {:?}",
+                msg_id, err
+            );
+            return Ok(vec![]);
+        }
+
+        // We can now deserialize the payload of the incoming message
+        let message_type = match wire_msg.to_message() {
+            Ok(message_type) => message_type,
+            Err(error) => {
+                error!(
+                    "Failed to deserialize message payload ({:?}): {}",
+                    msg_id, error
+                );
+                return Ok(vec![]);
+            }
+        };
+
+        match message_type {
+            MessageType::SectionInfo {
+                msg_id,
+                dst_location,
+                msg,
+            } => Ok(self
+                .handle_section_info_msg(sender, dst_location, msg)
+                .await),
+            MessageType::Node {
+                msg_id,
+                msg_authority,
+                dst_location,
+                msg,
+            } => {
+                self.handle_node_message(sender, msg_id, msg_authority, dst_location, msg)
+                    .await
+            }
+            MessageType::Client {
+                client_signed,
+                msg,
+                dst_location,
+                ..
+            } => {
+                let user = match self.get_enduser_by_addr(&sender) {
+                    Some(end_user) => {
+                        debug!(
+                            "Message from client {}, socket id already exists: {:?}",
+                            sender, end_user
+                        );
+                        *end_user
+                    }
+                    None => {
+                        // This is the first time we receive a message from this client
+                        debug!("First message from client {}, creating a socket id", sender);
+
+                        // TODO: remove the enduser registry and simply encrypt socket
+                        // addr with this node's keypair and use that as the socket id
+                        match self.try_add_enduser(sender) {
+                            Ok(end_user) => end_user,
+                            Err(err) => {
+                                error!(
+                                    "Failed to cache client socket address for message {:?}: {:?}",
+                                    msg, err
+                                );
+                                return Ok(vec![]);
+                            }
+                        }
+                    }
+                };
+
+                // We send this message to be handled by the upper Node layer
+                // through the public event stream API
+                let is_in_destination = match dst_location.name() {
+                    Some(dst_name) => self.section().prefix().matches(&dst_name),
+                    None => true, // it's a DirectAndUnrouted dst
+                };
+
+                if is_in_destination {
+                    let event = Event::ClientMsgReceived {
+                        msg: Box::new(msg),
+                        client_signed,
+                        user,
+                    };
+                    self.send_event(event).await;
+                } else {
+                    let node_msg = NodeMsg::ForwardClientMsg {
+                        msg,
+                        user,
+                        client_signed,
+                    };
+                    let to_relay = match WireMsg::single_src(
+                        &self.node,
+                        dst_location,
+                        node_msg,
+                        self.section.authority_provider().section_key(),
+                    ) {
+                        Ok(msg) => msg,
+                        Err(error) => {
+                            error!("Failed create routing msg {:?}", error);
+                            return Ok(vec![]);
+                        }
+                    };
+                    match self.relay_message(&to_relay).await {
+                        Ok(Some(cmd)) => return Ok(vec![cmd]),
+                        Ok(None) => {
+                            error!("Failed to relay msg, no cmd returned.");
+                        }
+                        Err(error) => {
+                            error!("Failed to relay msg {:?}", error);
+                        }
+                    }
+                }
+
+                Ok(vec![])
+            }
+        }
+    }
+
+    // Handler for all node messages
+    async fn handle_node_message(
+        &mut self,
+        sender: SocketAddr,
+        msg_id: MessageId,
+        msg_authority: NodeMsgAuthority,
+        dst_location: DstLocation,
+        node_msg: NodeMsg,
+    ) -> Result<Vec<Command>> {
+        // Let's now verify the section key in the msg authority is trusted
         // based on our current knowledge of the network and sections chains.
         let known_keys: Vec<BlsPublicKey> = self
             .section
@@ -75,18 +196,19 @@ impl Core {
             .collect();
 
         if !msg_authority.verify_src_section_chain(&known_keys) {
-            debug!("Untrusted message from {:?}: {:?} ", sender, msg);
-            let cmd = self.handle_untrusted_message(sender, &msg, &msg_authority)?;
+            debug!("Untrusted message from {:?}: {:?} ", sender, node_msg);
+            let cmd = self.handle_untrusted_message(sender, &node_msg, &msg_authority)?;
             return Ok(vec![cmd]);
         }
-
         trace!(
-            "Trusted source authority in message from {:?}: {:?}",
+            "Trusted msg authority in message from {:?}: {:?}",
             sender,
-            msg
+            node_msg
         );
+
+        // Let's check for entropy before we proceed to finally process the node message
         let (ae_command, shall_be_handled) = self
-            .check_for_entropy(&msg, &msg_authority, &dst_location, sender)
+            .check_for_entropy(&node_msg, &msg_authority, &dst_location, sender)
             .await?;
 
         let mut commands = vec![];
@@ -96,29 +218,43 @@ impl Core {
         }
 
         if shall_be_handled {
-            trace!("Entropy check passed. Handling useful msg {:?}!", msg);
+            trace!("Entropy check passed. Handling useful msg {:?}!", msg_id);
             commands.extend(
-                self.handle_useful_message(sender, msg, dst_location, msg_authority, &known_keys)
-                    .await?,
+                self.handle_valid_message(
+                    sender,
+                    msg_id,
+                    msg_authority,
+                    dst_location,
+                    node_msg,
+                    &known_keys,
+                )
+                .await?,
             );
         }
 
         Ok(commands)
     }
 
-    pub(crate) async fn handle_useful_message(
+    // Hanlder for node messages which have successfully
+    // passed all signature checks and msg verifications
+    async fn handle_valid_message(
         &mut self,
-        sender: Option<SocketAddr>,
-        node_msg: NodeMsg,
-        dst_location: DstLocation,
+        sender: SocketAddr,
+        msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
+        dst_location: DstLocation,
+        node_msg: NodeMsg,
         known_keys: &[BlsPublicKey],
     ) -> Result<Vec<Command>> {
+        /*
+        TODO: aggregation needs to be hanlded at each particular message
+        that needs aggregation. This logic shall be moved to those msg handlers
         let node_msg = if let Some(msg) = self.aggregate_message(node_msg)? {
             msg
         } else {
             return Ok(vec![]);
         };
+        */
         let src_name = msg_authority.name();
 
         match node_msg {
@@ -218,7 +354,6 @@ impl Core {
                 Ok(vec![Command::TestConnectivity(name)])
             }
             NodeMsg::JoinRequest(join_request) => {
-                let sender = sender.ok_or(Error::InvalidSrcLocation)?;
                 self.handle_join_request(msg_authority.peer(sender)?, *join_request)
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
@@ -228,7 +363,6 @@ impl Core {
                     return Ok(vec![]);
                 }
 
-                let sender = sender.ok_or(Error::InvalidSrcLocation)?;
                 self.handle_join_as_relocated_request(
                     msg_authority.peer(sender)?,
                     *join_request,
@@ -240,6 +374,9 @@ impl Core {
                 // handle it only if addressed directly to us as a node.
                 unimplemented!();
                 /*
+                TODO: remove the UserMessage type, users of routing now pass a WireMsg
+                to routing API.
+
                 let our_dst = DstLocation::Node {
                     name: self.node.name(),
                     section_pk: *self.section.chain().last_key(),
@@ -260,27 +397,21 @@ impl Core {
             NodeMsg::BouncedUntrustedMessage {
                 msg: bounced_msg,
                 dst_info,
-            } => {
-                let sender = sender.ok_or(Error::InvalidSrcLocation)?;
-                Ok(vec![self.handle_bounced_untrusted_message(
-                    msg_authority.peer(sender)?,
-                    dst_info.dst_section_pk,
-                    *bounced_msg,
-                )?])
-            }
+            } => Ok(vec![self.handle_bounced_untrusted_message(
+                msg_authority.peer(sender)?,
+                dst_info.dst_section_pk,
+                *bounced_msg,
+            )?]),
             NodeMsg::SectionKnowledgeQuery {
                 last_known_key,
                 msg: returned_msg,
-            } => {
-                let sender = sender.ok_or(Error::InvalidSrcLocation)?;
-                Ok(vec![self.handle_section_knowledge_query(
-                    last_known_key,
-                    returned_msg,
-                    sender,
-                    src_name,
-                    msg_authority.src_location().to_dst(),
-                )?])
-            }
+            } => Ok(vec![self.handle_section_knowledge_query(
+                last_known_key,
+                returned_msg,
+                sender,
+                src_name,
+                msg_authority.src_location().to_dst(),
+            )?]),
             NodeMsg::DkgStart {
                 dkg_key,
                 elder_candidates,
@@ -335,9 +466,7 @@ impl Core {
 
                 let mut commands = vec![];
 
-                if let Some(addr) = sender {
-                    commands.extend(self.check_lagging((src_name, addr), sig_share)?);
-                }
+                commands.extend(self.check_lagging((src_name, sender), sig_share)?);
 
                 let result = self.handle_proposal(content.clone(), sig_share.clone())?;
                 commands.extend(result);
@@ -349,20 +478,15 @@ impl Core {
                 Ok(vec![])
             }
             NodeMsg::JoinAsRelocatedResponse(join_response) => {
-                match (sender, self.relocate_state.as_mut()) {
-                    (
-                        Some(sender),
-                        Some(RelocateState::InProgress(ref mut joining_as_relocated)),
-                    ) => {
-                        if let Some(cmd) = joining_as_relocated
-                            .handle_join_response(*join_response, sender)
-                            .await?
-                        {
-                            return Ok(vec![cmd]);
-                        }
+                if let Some(RelocateState::InProgress(ref mut joining_as_relocated)) =
+                    self.relocate_state.as_mut()
+                {
+                    if let Some(cmd) = joining_as_relocated
+                        .handle_join_response(*join_response, sender)
+                        .await?
+                    {
+                        return Ok(vec![cmd]);
                     }
-                    (Some(_), _) => {}
-                    (None, _) => error!("Missing sender of {:?}", join_response),
                 }
 
                 Ok(vec![])

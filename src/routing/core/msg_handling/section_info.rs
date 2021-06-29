@@ -70,6 +70,10 @@ impl Core {
                 let response = SectionInfoMsg::GetSectionResponse(response);
                 debug!("Sending {:?} to {}", response, sender);
 
+                // FIXME: we need to build the dst_location for the response
+                unimplemented!()
+                /*
+                let dst_location = ....
                 match WireMsg::new_section_info_msg(&response, dst_location) {
                     Ok(wire_msg) => vec![Command::SendMessage {
                         recipients: vec![(name, sender)],
@@ -81,6 +85,7 @@ impl Core {
                         vec![]
                     }
                 }
+                */
             }
             SectionInfoMsg::GetSectionResponse(response) => {
                 error!("GetSectionResponse unexpectedly received: {:?}", response);

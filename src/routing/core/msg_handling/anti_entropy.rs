@@ -28,7 +28,7 @@ impl Core {
         msg: &NodeMsg,
         msg_authority: &NodeMsgAuthority,
         dst_location: &DstLocation,
-        sender: Option<SocketAddr>,
+        sender: SocketAddr,
     ) -> Result<(Option<Command>, bool)> {
         if self.is_not_elder() {
             // Adult nodes do need to carry out entropy checking, however the message shall always
@@ -54,13 +54,6 @@ impl Core {
         } else {
             // For the case of receiving a JoinRequest not matching our prefix.
             let sender_name = msg_authority.name();
-            let sender_addr = if let Some(addr) = sender {
-                addr
-            } else {
-                error!("JoinRequest from {:?} without address", sender_name);
-                return Ok((None, false));
-            };
-
             let section_auth = self
                 .network
                 .closest(&sender_name)
@@ -71,7 +64,7 @@ impl Core {
 
             trace!("Sending {:?} to {}", node_msg, sender_name);
             let cmd = self.send_direct_message(
-                (sender_name, sender_addr),
+                (sender_name, sender),
                 node_msg,
                 section_auth.section_key(),
             )?;

@@ -310,6 +310,10 @@ impl Core {
     ) -> Result<Command> {
         unimplemented!();
         /*
+        TODO: we should not use the same HandleMessage for this,
+        but a new command so we don't pass a sender as None making
+        msg handling codebase complex.
+
         let message = WireMsg::section_src(message, sig, section_chain)?;
         Ok(Command::HandleMessage {
             message,

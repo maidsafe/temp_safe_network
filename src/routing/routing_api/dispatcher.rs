@@ -98,6 +98,61 @@ impl Dispatcher {
 
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
+            Command::HandleWireMessage { sender, wire_msg } => {
+                // TODO: move this to the handlers
+                // Let's see if we need to do a reachability test
+                /*
+                TODO: we need to be able to know if this is a Join request up front,
+                or simply moving this to the Join handlers will be enough
+                let failure = match &msg {
+                    NodeMsg::JoinRequest(join_request) => {
+                        // Do this check only for the initial join request
+                        if join_request.resource_proof_response.is_none()
+                            && self.comm.is_reachable(sender).await.is_err()
+                        {
+                            Some(NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+                                JoinRejectionReason::NodeNotReachable(*sender),
+                            ))))
+                        } else {
+                            None
+                        }
+                    }
+                    NodeMsg::JoinAsRelocatedRequest(join_request) => {
+                        // Do this check only for the initial join request
+                        if join_request.relocate_payload.is_none()
+                            && self.comm.is_reachable(sender).await.is_err()
+                        {
+                            Some(NodeMsg::JoinAsRelocatedResponse(Box::new(
+                                JoinAsRelocatedResponse::NodeNotReachable(*sender),
+                            )))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+
+                if let Some(node_msg) = failure {
+                    let section_key = *self.core.read().await.section().chain.last_key();
+                    if let NodeMsgAuthority::Node(NodeSigned { public_key, .. }) =
+                        wire_msg.msg_authority()
+                    {
+                        trace!("Sending {:?} to {}", node_msg, sender);
+
+                        return Ok(vec![self.core.read().await.send_direct_message(
+                            (XorName::from(PublicKey::from(public_key)), *sender),
+                            node_msg,
+                            section_key,
+                        )?]);
+                    }
+                }*/
+
+                self.core
+                    .write()
+                    .await
+                    .handle_message(sender, wire_msg)
+                    .await
+            }
             Command::HandleMessage {
                 sender,
                 msg_id,
@@ -105,67 +160,11 @@ impl Dispatcher {
                 dst_location,
                 msg,
             } => {
-                if let Some(sender) = &sender {
-                    // let's then see if we need to do a reachability test
-                    let failure = match &msg {
-                        NodeMsg::JoinRequest(join_request) => {
-                            // Do this check only for the initial join request
-                            if join_request.resource_proof_response.is_none()
-                                && self.comm.is_reachable(sender).await.is_err()
-                            {
-                                Some(NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                                    JoinRejectionReason::NodeNotReachable(*sender),
-                                ))))
-                            } else {
-                                None
-                            }
-                        }
-                        NodeMsg::JoinAsRelocatedRequest(join_request) => {
-                            // Do this check only for the initial join request
-                            if join_request.relocate_payload.is_none()
-                                && self.comm.is_reachable(sender).await.is_err()
-                            {
-                                Some(NodeMsg::JoinAsRelocatedResponse(Box::new(
-                                    JoinAsRelocatedResponse::NodeNotReachable(*sender),
-                                )))
-                            } else {
-                                None
-                            }
-                        }
-                        _ => None,
-                    };
-
-                    if let Some(node_msg) = failure {
-                        let section_key = *self.core.read().await.section().chain.last_key();
-                        if let NodeMsgAuthority::Node(NodeSigned { public_key, .. }) = msg_authority
-                        {
-                            trace!("Sending {:?} to {}", node_msg, sender);
-                            return Ok(vec![self.core.read().await.send_direct_message(
-                                (XorName::from(PublicKey::from(public_key)), *sender),
-                                node_msg,
-                                section_key,
-                            )?]);
-                        }
-                    }
-                }
-
-                self.core
-                    .write()
-                    .await
-                    .handle_message(sender, msg_id, msg_authority, dst_location, msg)
-                    .await
+                unimplemented!();
+                /*
+                TODO: this command will go away anyways
+                */
             }
-            Command::HandleSectionInfoMsg {
-                sender,
-                msg_id,
-                dst_location,
-                msg,
-            } => Ok(self
-                .core
-                .write()
-                .await
-                .handle_section_info_msg(sender, dst_location, msg)
-                .await),
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
             Command::HandleAgreement { proposal, sig } => {
                 self.core

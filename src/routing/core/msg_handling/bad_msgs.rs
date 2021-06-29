@@ -27,7 +27,7 @@ impl Core {
     // contains only keys we don't know.
     pub(crate) fn handle_untrusted_message(
         &self,
-        sender: Option<SocketAddr>,
+        sender: SocketAddr,
         node_msg: &NodeMsg,
         msg_authority: &NodeMsgAuthority,
     ) -> Result<Command> {
@@ -50,10 +50,14 @@ impl Core {
 
         unimplemented!();
         /*
-
         let cmd = if let Some(sender) = sender {
             Command::send_message_to_node((src_name, sender), bounce_msg)
         } else {
+            FIXME: this used to be the case only when the message was
+            built internally at msg_handling/agreement.rs in handle_accumulate_at_src_agreement()
+            We should generate a different type of Command for such casse rather than setting
+            the serder to None in HandleMessage as we used to.
+
             self.send_message_to_our_elders(bounce_msg)
         };
 
