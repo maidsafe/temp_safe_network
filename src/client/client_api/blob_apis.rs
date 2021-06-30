@@ -191,6 +191,7 @@ impl Client {
         Ok(chunk)
     }
 
+    /// Clear the client's blob cache
     pub async fn clear_blob_cache(&mut self) {
         self.blob_cache.lock().await.clear()
     }
@@ -695,7 +696,6 @@ mod tests {
 
         Ok(())
     }
-
 
     const BLOB_TEST_QUERY_TIMEOUT: u64 = 60;
 
