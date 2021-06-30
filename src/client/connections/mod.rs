@@ -14,7 +14,6 @@ use crate::messaging::client::CmdError;
 use crate::messaging::{client::Error as ErrorMessage, client::QueryResponse, MessageId};
 use crate::types::{PublicKey, TransferValidated};
 use bls::PublicKeySet;
-use log::{debug, trace};
 use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
 use std::{
     borrow::Borrow,
@@ -24,6 +23,7 @@ use std::{
 };
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
+use tracing::{debug, trace};
 use xor_name::{Prefix, XorName};
 
 // Channel for sending result of transfer validation

@@ -22,9 +22,9 @@ use crate::routing::XorName;
 use crate::routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use crate::types::PublicKey;
 use client_msg::map_client_msg;
-use log::{debug, error, info, trace, warn};
 use node_msg::map_node_msg;
 use std::{thread::sleep, time::Duration};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug)]
 pub struct Mapping {
@@ -245,10 +245,8 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 }
 
 pub async fn log_network_stats(network_api: &Network) {
-    debug!(
-        "{:?}: {:?} Elders, {:?} Adults.",
-        network_api.our_prefix().await,
-        network_api.our_elder_names().await.len(),
-        network_api.our_adults().await.len()
-    );
+    let adults = network_api.our_adults().await.len();
+    let elders = network_api.our_elder_names().await.len();
+    let prefix = network_api.our_prefix().await;
+    debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
 }

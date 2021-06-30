@@ -19,9 +19,9 @@ use crate::types::{
 use bls::PublicKeySet;
 use crdts::Dot;
 use itertools::Itertools;
-use log::debug;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
+use tracing::debug;
 
 /// The Actor is the part of an AT2 system
 /// that initiates transfers, by requesting Replicas

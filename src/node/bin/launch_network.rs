@@ -28,7 +28,6 @@
 )]
 
 use dirs_next::home_dir;
-use log::{debug, info};
 use sn_launch_tool::run_with;
 use std::{
     fs::{create_dir_all, remove_dir_all},
@@ -36,6 +35,7 @@ use std::{
     process::{Command, Stdio},
 };
 use tokio::time::{sleep, Duration};
+use tracing::{debug, info};
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node";

@@ -18,11 +18,11 @@ use crate::node::{
 };
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use chunk_storage::ChunkStorage;
-use log::info;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
 };
+use tracing::info;
 
 /// At 50% full, the node will report that it's reaching full capacity.
 pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;

@@ -9,8 +9,8 @@
 use crate::routing::Prefix;
 use crate::types::{NodeAge, PublicKey};
 use dashmap::DashMap;
-use log::debug;
 use std::collections::BTreeMap;
+use tracing::debug;
 use xor_name::XorName;
 
 /// The accumulation and paying

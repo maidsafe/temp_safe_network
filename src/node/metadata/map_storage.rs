@@ -19,12 +19,12 @@ use crate::types::{
     Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapValue,
     PublicKey, Result as NdResult,
 };
-use log::{debug, info};
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::Path,
 };
+use tracing::{debug, info};
 
 /// Operations over the data type Map.
 pub(super) struct MapStorage {

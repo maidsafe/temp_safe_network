@@ -18,11 +18,11 @@ use crate::node::{
     Error, Result,
 };
 use crate::types::{Chunk, ChunkAddress, DataAddress, PublicKey};
-use log::{error, info};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
 };
+use tracing::{error, info};
 
 /// Storage of data chunks.
 pub(crate) struct ChunkStorage {

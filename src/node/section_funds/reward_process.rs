@@ -26,8 +26,8 @@ use crate::node::{
 use crate::types::{
     Credit, NodeAge, PublicKey, RewardAccumulation, RewardProposal, Signature, Signing, Token,
 };
-use log::{debug, info};
 use std::collections::BTreeMap;
+use tracing::{debug, info};
 use xor_name::{Prefix, XorName};
 
 ///

@@ -18,13 +18,13 @@ use crate::node::{
 };
 use crate::routing::{Prefix, XorName};
 use crate::types::{NodeAge, PublicKey, Token};
-use log::debug;
 use section_funds::{
     elder_signing::ElderSigning,
     reward_process::{OurSection, RewardProcess},
     reward_wallets::RewardWallets,
 };
 use std::collections::{BTreeMap, BTreeSet};
+use tracing::debug;
 
 impl Node {
     /// Called on split reported from routing layer.

@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::client::Error;
-use log::{debug, warn};
 use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -17,6 +16,7 @@ use std::{
     net::SocketAddr,
     path::Path,
 };
+use tracing::{debug, warn};
 
 /// Configuration for sn_client.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]

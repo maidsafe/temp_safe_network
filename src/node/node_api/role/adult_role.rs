@@ -19,10 +19,10 @@ use crate::node::{
 use crate::routing::XorName;
 use crate::types::{Chunk, ChunkAddress};
 use itertools::Itertools;
-use log::{info, trace, warn};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{info, trace, warn};
 
 #[derive(Clone)]
 pub(crate) struct AdultRole {

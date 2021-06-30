@@ -9,8 +9,8 @@
 use super::Client;
 use crate::types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
 use async_trait::async_trait;
-use log::trace;
 use self_encryption::{SelfEncryptionError, Storage};
+use tracing::trace;
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Network storage is the concrete type which self_encryption crate will use

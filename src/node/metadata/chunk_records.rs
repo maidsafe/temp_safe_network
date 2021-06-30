@@ -20,7 +20,7 @@ use crate::node::{
 };
 use crate::routing::Prefix;
 use crate::types::{Chunk, ChunkAddress, PublicKey};
-use log::{info, warn};
+use tracing::{info, warn};
 
 use std::{
     collections::BTreeSet,
@@ -85,10 +85,8 @@ impl ChunkRecords {
 
     /// Adds a given node to the list of full nodes.
     pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
-        info!(
-            "No. of full Adults: {:?}",
-            self.capacity.full_adults_count().await
-        );
+        let full_adults = self.capacity.full_adults_count().await;
+        info!("No. of full Adults: {:?}", full_adults);
         info!("Increasing full Adults count");
         self.capacity
             .insert_full_adults(btree_set!(XorName::from(node_id)))

@@ -30,7 +30,6 @@ use crate::routing::{
 use crate::types::PublicKey;
 use futures::{future::BoxFuture, lock::Mutex, stream::FuturesUnordered, FutureExt, StreamExt};
 use handle::NodeTask;
-use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use std::sync::Arc;
@@ -42,6 +41,7 @@ use std::{
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio::time::Duration;
+use tracing::{error, warn};
 
 const JOINING_TIMEOUT: u64 = 180; // 180 seconds
 

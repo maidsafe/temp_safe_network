@@ -8,7 +8,7 @@
 // Software.
 
 use super::{Error, Result};
-use log::debug;
+use tracing::debug;
 use uhttp_uri::HttpUri;
 use url::Url;
 

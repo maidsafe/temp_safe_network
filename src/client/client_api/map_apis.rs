@@ -8,7 +8,7 @@
 
 use super::Client;
 use crate::client::Error;
-use log::trace;
+use tracing::trace;
 
 use crate::types::{
     Map, MapAddress, MapEntries, MapEntryActions, MapPermissionSet, MapSeqEntries,

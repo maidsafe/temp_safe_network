@@ -20,7 +20,6 @@ use crate::messaging::client::{Cmd, CmdError, DataCmd, Error as ErrorMessage, Tr
 use crate::transfers::TransferActor;
 use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey, SectionElders, Token};
 use crdts::Dot;
-use log::{debug, info, trace, warn};
 use lru::LruCache;
 use rand::rngs::OsRng;
 use std::{
@@ -31,6 +30,7 @@ use std::{
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::Duration;
+use tracing::{debug, info, trace, warn};
 
 // Number of attempts to make when trying to bootstrap to the network
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 1;

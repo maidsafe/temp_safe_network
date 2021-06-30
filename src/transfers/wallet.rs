@@ -8,8 +8,8 @@
 
 use super::{Error, Result};
 use crate::types::{Credit, CreditId, Debit, OwnerType, Token};
-use log::debug;
 use std::collections::HashSet;
+use tracing::debug;
 
 #[derive(Debug, Clone)]
 pub struct WalletSnapshot {

@@ -18,8 +18,8 @@ use crate::types::{
     },
     PublicKey,
 };
-use log::{debug, trace};
 use std::collections::{BTreeMap, BTreeSet};
+use tracing::{debug, trace};
 use xor_name::XorName;
 
 impl Client {

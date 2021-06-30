@@ -16,8 +16,8 @@ use crate::types::{
     SequencePermissions, SequencePrivatePermissions, SequencePrivatePolicy,
     SequencePublicPermissions, SequencePublicPolicy, SequenceUser,
 };
-use log::{debug, trace};
 use std::collections::BTreeMap;
+use tracing::{debug, trace};
 use xor_name::XorName;
 
 fn wrap_seq_read(read: SequenceRead) -> Query {

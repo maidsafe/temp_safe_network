@@ -173,7 +173,7 @@ impl AdultLiveness {
                     && adult_pending_ops as f64 * PENDING_OP_TOLERANCE_RATIO
                         > *max_pending_by_neighbours as f64
                 {
-                    log::info!(
+                    tracing::info!(
                         "Pending ops for {}: {} Neighbour max: {}",
                         adult,
                         adult_pending_ops,
