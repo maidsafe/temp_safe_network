@@ -85,7 +85,6 @@ impl Wallet {
 
     /// Mutates state.
     pub fn apply_debit(&mut self, debit: Debit) -> Result<()> {
-        debug!("Wallet applying debit");
         if self.id.public_key() == debit.id.actor {
             match self.balance.checked_sub(debit.amount) {
                 Some(amount) => self.balance = amount,
