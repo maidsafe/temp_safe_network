@@ -276,7 +276,7 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
 
     let id = Id(new_rng().gen());
     match data_store.get(&id).await {
-        Err(Error::NoSuchChunk(_)) => (),
+        Err(Error::NoSuchData(_)) => (),
         x => return Err(crate::node::Error::Logic(format!("Unexpected {:?}", x))),
     }
 

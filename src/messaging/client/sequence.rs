@@ -51,6 +51,19 @@ pub enum SequenceRead {
     },
 }
 
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct SequenceCmd {
+    ///
+    pub write: SequenceWrite,
+    ///
+    pub msg_id: crate::messaging::MessageId,
+    ///
+    pub client_sig: super::ClientSig,
+    ///
+    pub origin: crate::messaging::EndUser,
+}
+
 /// TODO: docs
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -109,6 +122,15 @@ impl SequenceWrite {
             New(ref data) => *data.name(),
             Delete(ref address) => *address.name(),
             Edit(ref op) => *op.address.name(),
+        }
+    }
+
+    /// Returns the address of the sequence.
+    pub fn address(&self) -> &Address {
+        match self {
+            Self::New(map) => map.address(),
+            Self::Delete(address) => address,
+            Self::Edit(ref op) => &op.address,
         }
     }
 

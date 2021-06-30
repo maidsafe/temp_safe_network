@@ -9,18 +9,13 @@
 //! A simple, persistent, disk-based key-value store.
 
 mod data;
-mod immutable;
-mod mutable;
-mod register;
-mod sequence;
 #[cfg(test)]
 mod tests;
 mod used_space;
 
 use crate::node::utils;
 use crate::node::{Error, Result};
-use crate::types::{register::Register, Chunk, Map, Sequence};
-use data::{Data, DataId};
+pub use data::{Data, DataId};
 use std::{
     fs::Metadata,
     marker::PhantomData,
@@ -39,11 +34,6 @@ const CHUNK_STORE_DIR: &str = "chunks";
 
 /// The max name length for a chunk file.
 const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
-
-pub(crate) type ChunkDataStore = DataStore<Chunk>;
-pub(crate) type MapDataStore = DataStore<Map>;
-pub(crate) type SequenceDataStore = DataStore<Sequence>;
-pub(crate) type RegisterDataStore = DataStore<Register>;
 
 /// `DataStore` is a store of data held as serialised files on disk, implementing a maximum disk
 /// usage to restrict storage.
@@ -168,18 +158,18 @@ impl<T: Data> DataStore<T> {
 
     /// Returns a data chunk previously stored under `id`.
     ///
-    /// If the data file can't be accessed, it returns `Error::NoSuchChunk`.
+    /// If the data file can't be accessed, it returns `Error::NoSuchData`.
     pub async fn get(&self, id: &T::Id) -> Result<T> {
         let contents = fs::read(self.file_path(id)?)
             .await
-            .map_err(|_| Error::NoSuchChunk(id.to_data_address()))?;
+            .map_err(|_| Error::NoSuchData(id.to_data_address()))?;
 
         let chunk = bincode::deserialize::<T>(&contents)?;
         // Check it's the requested chunk variant.
         if chunk.id() == id {
             Ok(chunk)
         } else {
-            Err(Error::NoSuchChunk(id.to_data_address()))
+            Err(Error::NoSuchData(id.to_data_address()))
         }
     }
 
@@ -234,30 +224,6 @@ impl<T: Data> DataStore<T> {
 
 pub(crate) trait Subdir {
     fn subdir() -> &'static Path;
-}
-
-impl Subdir for ChunkDataStore {
-    fn subdir() -> &'static Path {
-        Path::new("immutable")
-    }
-}
-
-impl Subdir for MapDataStore {
-    fn subdir() -> &'static Path {
-        Path::new("mutable")
-    }
-}
-
-impl Subdir for SequenceDataStore {
-    fn subdir() -> &'static Path {
-        Path::new("sequence")
-    }
-}
-
-impl Subdir for RegisterDataStore {
-    fn subdir() -> &'static Path {
-        Path::new("register")
-    }
 }
 
 fn to_chunk_id<T: DataId>(entry: &DirEntry) -> Option<T> {

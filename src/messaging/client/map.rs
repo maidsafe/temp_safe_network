@@ -49,6 +49,19 @@ pub enum MapRead {
     },
 }
 
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct MapCmd {
+    ///
+    pub write: MapWrite,
+    ///
+    pub msg_id: crate::messaging::MessageId,
+    ///
+    pub client_sig: super::ClientSig,
+    ///
+    pub origin: crate::messaging::EndUser,
+}
+
 /// TODO: docs
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
@@ -140,7 +153,18 @@ impl MapWrite {
         }
     }
 
-    /// Returns the owner of the data on a New map write.
+    /// Returns the address of the map.
+    pub fn address(&self) -> &Address {
+        match self {
+            Self::New(map) => map.address(),
+            Self::Delete(address)
+            | Self::Edit { address, .. }
+            | Self::DelUserPermissions { address, .. }
+            | Self::SetUserPermissions { address, .. } => address,
+        }
+    }
+
+    /// Returns the owner of the data on a new map write.
     pub fn owner(&self) -> Option<PublicKey> {
         match self {
             Self::New(data) => Some(*data.owner()),

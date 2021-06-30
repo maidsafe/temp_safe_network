@@ -96,9 +96,9 @@ pub enum Error {
     /// Node not found for rewarding
     #[error("Node not found for rewards")]
     NodeNotFoundForReward,
-    /// Key, Value pair not found in `DataStore`.
-    #[error("No such chunk: {0:?}")]
-    NoSuchChunk(DataAddress),
+    /// Key, Value pair not found.
+    #[error("No such data: {0:?}")]
+    NoSuchData(DataAddress),
     /// Unable to process fund churn message.
     #[error("Cannot process fund churn message")]
     NotChurningFunds,
@@ -172,7 +172,7 @@ pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
         Error::InvalidOperation(msg) => ErrorMessage::InvalidOperation(msg),
         Error::InvalidMessage(_, msg) => ErrorMessage::InvalidOperation(msg),
         Error::InvalidOwner(key) => ErrorMessage::InvalidOwners(key),
-        Error::NoSuchChunk(address) => ErrorMessage::DataNotFound(address),
+        Error::NoSuchData(address) => ErrorMessage::DataNotFound(address),
         Error::NotEnoughSpace => ErrorMessage::NotEnoughSpace,
         Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
         Error::DataExists => ErrorMessage::DataExists,

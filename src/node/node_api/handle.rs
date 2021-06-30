@@ -16,7 +16,7 @@ use crate::messaging::{
     Aggregation, MessageId,
 };
 use crate::node::{
-    chunks::Chunks,
+    chunk_store::ChunkStore,
     event_mapping::MsgContext,
     node_ops::{NodeDuties, NodeDuty},
     Node, Result,
@@ -198,7 +198,7 @@ impl Node {
                 let capacity = self.used_space.max_capacity().await;
                 self.role = Role::Adult(AdultRole {
                     chunks: Arc::new(RwLock::new(
-                        Chunks::new(self.node_info.root_dir.as_path(), capacity).await?,
+                        ChunkStore::new(self.node_info.root_dir.as_path(), capacity).await?,
                     )),
                 });
                 Ok(NodeTask::None)

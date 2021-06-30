@@ -7,60 +7,165 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
-use crate::messaging::{
-    client::{CmdError, MapDataExchange, MapRead, MapWrite, QueryResponse},
-    EndUser, MessageId,
-};
 use crate::node::{
-    data_store::MapDataStore, error::convert_to_error_message, node_ops::NodeDuty, Error, Result,
+    error::convert_to_error_message, event_store::EventStore, node_ops::NodeDuty, Error, Result,
 };
 use crate::routing::Prefix;
 use crate::types::{
-    Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapValue,
-    PublicKey, Result as NdResult,
+    Error as DtError, Map, MapAction, MapAddress as Address, MapPermissionSet, MapValue, PublicKey,
+};
+use crate::{
+    messaging::{
+        client::{CmdError, MapCmd, MapDataExchange, MapRead, MapWrite, QueryResponse},
+        EndUser, MessageId,
+    },
+    types::DataAddress,
 };
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use tracing::{debug, info};
+use xor_name::XorName;
 
 /// Operations over the data type Map.
 pub(super) struct MapStorage {
-    chunks: MapDataStore,
+    path: PathBuf,
+    store: BTreeMap<XorName, (Map, EventStore<MapCmd>)>,
 }
 
 impl MapStorage {
-    pub(super) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
-        let chunks = MapDataStore::new(path, max_capacity).await?;
-        Ok(Self { chunks })
+    pub(super) fn new(path: &Path, _max_capacity: u64) -> Self {
+        Self {
+            path: path.to_path_buf(),
+            store: BTreeMap::new(),
+        }
     }
 
-    pub(super) async fn get_data_of(&self, prefix: Prefix) -> Result<MapDataExchange> {
-        let store = &self.chunks;
-        let keys = self.chunks.keys().await?;
+    /// --- Synching ---
 
+    /// Used for replication of data to new Elders.
+    pub(super) async fn get_data_of(&self, prefix: Prefix) -> Result<MapDataExchange> {
         let mut the_data = BTreeMap::default();
 
-        for data in keys.iter().filter(|address| prefix.matches(address.name())) {
-            let data = store.get(&data).await?;
-            let _ = the_data.insert(*data.address(), data);
+        for (key, (_, history)) in self
+            .store
+            .iter()
+            .filter(|(_, (map, _))| prefix.matches(map.name()))
+        {
+            let _ = the_data.insert(*key, history.get_all());
         }
 
         Ok(MapDataExchange(the_data))
     }
 
-    pub async fn update(&self, map_data: MapDataExchange) -> Result<()> {
+    /// On receiving data from Elders when promoted.
+    pub async fn update(&mut self, map_data: MapDataExchange) -> Result<()> {
         debug!("Updating Map DataStore");
-        let data_store = &self.chunks;
+
         let MapDataExchange(data) = map_data;
 
-        for (_key, value) in data {
-            data_store.put(&value).await?;
+        // todo: make outer loop parallel
+        for (_, history) in data {
+            for op in history {
+                let _ = self.apply(op).await?;
+            }
         }
         Ok(())
     }
+
+    /// --- Writing ---
+
+    pub(super) async fn write(&mut self, op: MapCmd) -> Result<NodeDuty> {
+        let msg_id = op.msg_id;
+        let origin = op.origin;
+        let write_result = self.apply(op).await;
+        self.ok_or_error(write_result, msg_id, origin).await
+    }
+
+    async fn apply(&mut self, op: MapCmd) -> Result<()> {
+        let MapCmd {
+            write, client_sig, ..
+        } = op.clone();
+
+        let address = *write.address();
+        let key = to_id(&address)?;
+
+        use MapWrite::*;
+        match write {
+            New(map) => {
+                if self.store.contains_key(&key) {
+                    return Err(Error::DataExists);
+                }
+                let mut store = new_store(key, self.path.as_path())?;
+                let _ = store.append(op)?;
+                let _ = self.store.insert(key, (map, store));
+                Ok(())
+            }
+            Delete(_) => {
+                let result = match self.store.get(&key) {
+                    Some((map, store)) => match map.check_is_owner(&client_sig.public_key) {
+                        Ok(()) => {
+                            info!("Deleting Map");
+                            store.as_deletable().delete()
+                        }
+                        Err(_e) => {
+                            info!("Error: Delete Map called by non-owner");
+                            return Err(Error::NetworkData(DtError::AccessDenied(
+                                client_sig.public_key,
+                            )));
+                        }
+                    },
+                    None => Ok(()),
+                };
+
+                if result.is_ok() {
+                    let _ = self.store.remove(&key);
+                }
+
+                result
+            }
+            SetUserPermissions {
+                user,
+                ref permissions,
+                version,
+                ..
+            } => {
+                let (map, store) = match self.store.get_mut(&key) {
+                    Some(entry) => entry,
+                    None => return Err(Error::NoSuchData(DataAddress::Map(address))),
+                };
+                map.check_permissions(MapAction::ManagePermissions, &client_sig.public_key)
+                    .map_err(Error::from)?;
+                map.set_user_permissions(user, permissions.clone(), version)
+                    .map_err(Error::from)?;
+                store.append(op)
+            }
+            DelUserPermissions { user, version, .. } => {
+                let (map, store) = match self.store.get_mut(&key) {
+                    Some(entry) => entry,
+                    None => return Err(Error::NoSuchData(DataAddress::Map(address))),
+                };
+                map.check_permissions(MapAction::ManagePermissions, &client_sig.public_key)
+                    .map_err(Error::from)?;
+                map.del_user_permissions(user, version)
+                    .map_err(Error::from)?;
+                store.append(op)
+            }
+            Edit { changes, .. } => {
+                let (map, store) = match self.store.get_mut(&key) {
+                    Some(entry) => entry,
+                    None => return Err(Error::NoSuchData(DataAddress::Map(address))),
+                };
+                map.mutate_entries(changes, &client_sig.public_key)
+                    .map_err(Error::from)?;
+                store.append(op)
+            }
+        }
+    }
+
+    /// --- Reading ---
 
     pub(super) async fn read(
         &self,
@@ -92,163 +197,38 @@ impl MapStorage {
         }
     }
 
-    pub(super) async fn write(
-        &self,
-        write: MapWrite,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        use MapWrite::*;
-        match write {
-            New(data) => self.create(&data, msg_id, origin).await,
-            Delete(address) => self.delete(address, msg_id, requester, origin).await,
-            SetUserPermissions {
-                address,
-                user,
-                ref permissions,
-                version,
-            } => {
-                self.edit_chunk(&address, origin, msg_id, move |mut data| {
-                    data.check_permissions(MapAction::ManagePermissions, &requester)?;
-                    data.set_user_permissions(user, permissions.clone(), version)?;
-                    Ok(data)
-                })
-                .await
-            }
-            DelUserPermissions {
-                address,
-                user,
-                version,
-            } => {
-                self.delete_user_permissions(address, user, version, msg_id, requester, origin)
-                    .await
-            }
-            Edit { address, changes } => {
-                self.edit_entries(address, changes, msg_id, requester, origin)
-                    .await
-            }
-        }
-    }
-
     /// Get `Map` from the chunk store and check permissions.
     /// Returns `Some(Result<..>)` if the flow should be continued, returns
     /// `None` if there was a logic error encountered and the flow should be
     /// terminated.
-    async fn get_chunk(
+    async fn get_map(
         &self,
-        address: &MapAddress,
+        address: &Address,
         requester: PublicKey,
         action: MapAction,
-    ) -> Result<Map> {
-        self.chunks.get(&address).await.and_then(move |map| {
-            map.check_permissions(action, &requester)
-                .map(move |_| map)
-                .map_err(|error| error.into())
-        })
-    }
-
-    /// Get Map from the chunk store, update it, and overwrite the stored chunk.
-    async fn edit_chunk<F>(
-        &self,
-        address: &MapAddress,
-        origin: EndUser,
-        msg_id: MessageId,
-        mutation_fn: F,
-    ) -> Result<NodeDuty>
-    where
-        F: FnOnce(Map) -> NdResult<Map>,
-    {
-        let result = match self.chunks.get(address).await {
-            Ok(data) => match mutation_fn(data) {
-                Ok(map) => self.chunks.put(&map).await,
-                Err(error) => Err(error.into()),
-            },
-            Err(error) => Err(error),
-        };
-
-        self.ok_or_error(result, msg_id, origin).await
-    }
-
-    /// Put Map.
-    async fn create(&self, data: &Map, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
-        let result = if self.chunks.has(data.address()).await {
-            Err(Error::DataExists)
-        } else {
-            self.chunks.put(&data).await
-        };
-        self.ok_or_error(result, msg_id, origin).await
-    }
-
-    async fn delete(
-        &self,
-        address: MapAddress,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        let result = match self.chunks.get(&address).await {
-            Ok(map) => match map.check_is_owner(&requester) {
-                Ok(()) => {
-                    info!("Deleting Map");
-                    self.chunks.delete(&address).await
-                }
-                Err(_e) => {
-                    info!("Error: Delete Map called by non-owner");
-                    Err(Error::NetworkData(DtError::AccessDenied(requester)))
-                }
-            },
-            Err(error) => Err(error),
-        };
-
-        self.ok_or_error(result, msg_id, origin).await
-    }
-
-    /// Delete Map user permissions.
-    async fn delete_user_permissions(
-        &self,
-        address: MapAddress,
-        user: PublicKey,
-        version: u64,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        self.edit_chunk(&address, origin, msg_id, move |mut data| {
-            data.check_permissions(MapAction::ManagePermissions, &requester)?;
-            data.del_user_permissions(user, version)?;
-            Ok(data)
-        })
-        .await
-    }
-
-    /// Edit Map.
-    async fn edit_entries(
-        &self,
-        address: MapAddress,
-        actions: MapEntryActions,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        self.edit_chunk(&address, origin, msg_id, move |mut data| {
-            data.mutate_entries(actions, &requester)?;
-            Ok(data)
-        })
-        .await
+    ) -> Result<&Map> {
+        match self.store.get(&to_id(address)?) {
+            Some((map, _)) => {
+                let _ = map
+                    .check_permissions(action, &requester)
+                    .map_err(Error::from)?;
+                Ok(map)
+            }
+            None => Err(Error::NoSuchData(DataAddress::Map(*address))),
+        }
     }
 
     /// Get entire Map.
     async fn get(
         &self,
-        address: MapAddress,
+        address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let result = match self.get_chunk(&address, requester, MapAction::Read).await {
-            Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+        let result = match self.get_map(&address, requester, MapAction::Read).await {
+            Ok(res) => Ok(res.clone()),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -262,18 +242,18 @@ impl MapStorage {
     /// Get Map shell.
     async fn get_shell(
         &self,
-        address: MapAddress,
+        address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(&address, requester, MapAction::Read)
+            .get_map(&address, requester, MapAction::Read)
             .await
             .map(|data| data.shell())
         {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -287,18 +267,18 @@ impl MapStorage {
     /// Get Map version.
     async fn get_version(
         &self,
-        address: MapAddress,
+        address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(&address, requester, MapAction::Read)
+            .get_map(&address, requester, MapAction::Read)
             .await
             .map(|data| data.version())
         {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -312,13 +292,13 @@ impl MapStorage {
     /// Get Map value.
     async fn get_value(
         &self,
-        address: MapAddress,
+        address: Address,
         key: &[u8],
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let res = self.get_chunk(&address, requester, MapAction::Read).await;
+        let res = self.get_map(&address, requester, MapAction::Read).await;
         let result = match res.and_then(|map| {
             map.get(key)
                 .cloned()
@@ -326,7 +306,7 @@ impl MapStorage {
                 .ok_or(Error::NetworkData(DtError::NoSuchEntry))
         }) {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -340,18 +320,18 @@ impl MapStorage {
     /// Get Map keys.
     async fn list_keys(
         &self,
-        address: MapAddress,
+        address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(&address, requester, MapAction::Read)
+            .get_map(&address, requester, MapAction::Read)
             .await
             .map(|data| data.keys())
         {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -365,15 +345,15 @@ impl MapStorage {
     /// Get Map values.
     async fn list_values(
         &self,
-        address: MapAddress,
+        address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let res = self.get_chunk(&address, requester, MapAction::Read).await;
+        let res = self.get_map(&address, requester, MapAction::Read).await;
         let result = match res.map(|map| map.values()) {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -387,15 +367,15 @@ impl MapStorage {
     /// Get Map entries.
     async fn list_entries(
         &self,
-        address: MapAddress,
+        address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let res = self.get_chunk(&address, requester, MapAction::Read).await;
+        let res = self.get_map(&address, requester, MapAction::Read).await;
         let result = match res.map(|map| map.entries().clone()) {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -409,18 +389,18 @@ impl MapStorage {
     /// Get Map permissions.
     async fn list_permissions(
         &self,
-        address: MapAddress,
+        address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(&address, requester, MapAction::Read)
+            .get_map(&address, requester, MapAction::Read)
             .await
             .map(|data| data.permissions())
         {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -434,14 +414,14 @@ impl MapStorage {
     /// Get Map user permissions.
     async fn list_user_permissions(
         &self,
-        address: MapAddress,
+        address: Address,
         user: PublicKey,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(&address, requester, MapAction::Read)
+            .get_map(&address, requester, MapAction::Read)
             .await
             .and_then(|data| {
                 data.user_permissions(&user)
@@ -449,7 +429,7 @@ impl MapStorage {
                     .map(MapPermissionSet::clone)
             }) {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -480,6 +460,17 @@ impl MapStorage {
             Ok(NodeDuty::NoOp)
         }
     }
+}
+
+fn to_id(address: &Address) -> Result<XorName> {
+    Ok(XorName::from_content(&[address
+        .encode_to_zbase32()?
+        .as_bytes()]))
+}
+
+fn new_store(id: XorName, path: &Path) -> Result<EventStore<MapCmd>> {
+    let db_dir = path.join("map".to_string());
+    EventStore::new(id, db_dir.as_path())
 }
 
 impl Display for MapStorage {

@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::{ChunkAddress, MapAddress, PublicKey, SequenceAddress};
+use super::{MapCmd, RegisterCmd, SequenceCmd};
+use crate::types::{ChunkAddress, PublicKey};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
@@ -36,6 +37,8 @@ pub struct DataExchange {
     ///
     pub map_data: MapDataExchange,
     ///
+    pub reg_data: RegisterDataExchange,
+    ///
     pub seq_data: SequenceDataExchange,
 }
 
@@ -48,8 +51,12 @@ pub struct ChunkDataExchange {
 
 /// Map data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MapDataExchange(pub BTreeMap<MapAddress, crate::types::Map>);
+pub struct MapDataExchange(pub BTreeMap<XorName, Vec<MapCmd>>);
+
+/// Map data exchange.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RegisterDataExchange(pub BTreeMap<XorName, Vec<RegisterCmd>>);
 
 /// Sequence data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SequenceDataExchange(pub BTreeMap<SequenceAddress, crate::types::Sequence>);
+pub struct SequenceDataExchange(pub BTreeMap<XorName, Vec<SequenceCmd>>);

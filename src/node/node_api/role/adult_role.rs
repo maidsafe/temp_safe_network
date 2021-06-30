@@ -12,7 +12,7 @@ use crate::messaging::{
 };
 use crate::node::{
     capacity::CHUNK_COPY_COUNT,
-    chunks::Chunks,
+    chunk_store::ChunkStore,
     node_ops::{NodeDuties, NodeDuty},
     Result,
 };
@@ -27,7 +27,7 @@ use tracing::{info, trace, warn};
 #[derive(Clone)]
 pub(crate) struct AdultRole {
     // immutable chunks
-    pub chunks: Arc<RwLock<Chunks>>,
+    pub chunks: Arc<RwLock<ChunkStore>>,
 }
 
 impl AdultRole {

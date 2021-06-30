@@ -15,8 +15,7 @@ mod split;
 
 use crate::messaging::client::ClientMsg;
 use crate::node::{
-    chunks::Chunks,
-    data_store::UsedSpace,
+    chunk_store::{ChunkStore, UsedSpace},
     error::convert_to_error_message,
     event_mapping::{map_routing_event, Mapping, MsgContext},
     network::Network,
@@ -102,7 +101,7 @@ impl Node {
         let node = Self {
             role: Role::Adult(AdultRole {
                 chunks: Arc::new(RwLock::new(
-                    Chunks::new(node_info.root_dir.as_path(), config.max_capacity()).await?,
+                    ChunkStore::new(node_info.root_dir.as_path(), config.max_capacity()).await?,
                 )),
             }),
             node_info,

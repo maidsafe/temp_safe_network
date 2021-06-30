@@ -10,10 +10,9 @@
 
 mod capacity;
 mod chaos;
-mod chunks;
+mod chunk_store;
 /// Configuration handling
 pub mod config_handler;
-mod data_store;
 mod error;
 mod event_mapping;
 mod event_store;
