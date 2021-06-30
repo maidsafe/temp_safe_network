@@ -8,23 +8,25 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{RoutingMsg, Section, Variant},
+    node::{JoinResponse, RoutingMsg, Section, Variant},
     DstInfo,
 };
 use crate::routing::{
     error::Result,
     messages::{RoutingMsgUtils, SrcAuthorityUtils},
+    network::NetworkUtils,
     node::Node,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
-use std::cmp::Ordering;
+use std::{cmp::Ordering, net::SocketAddr};
 
 impl Core {
     pub async fn check_for_entropy(
         &self,
         msg: &RoutingMsg,
         dst_info: DstInfo,
+        sender: Option<SocketAddr>,
     ) -> Result<(Option<Command>, bool)> {
         if self.is_not_elder() {
             // Adult nodes do need to carry out entropy checking, however the message shall always
@@ -32,12 +34,42 @@ impl Core {
             return Ok((None, true));
         }
 
-        match process(&self.node, &self.section, msg, dst_info)? {
+        let (command, shall_be_handled) = match process(&self.node, &self.section, msg, dst_info)? {
             (Some(msg_to_send), shall_be_handled) => {
                 let command = self.relay_message(&msg_to_send).await?;
-                Ok((command, shall_be_handled))
+                (command, shall_be_handled)
             }
-            (None, shall_be_handled) => Ok((None, shall_be_handled)),
+            (None, shall_be_handled) => (None, shall_be_handled),
+        };
+
+        if shall_be_handled || command.is_some() {
+            Ok((command, shall_be_handled))
+        } else {
+            // For the case of receiving a JoinRequest not matching our prefix.
+            let sender_name = msg.src.name();
+            let sender_addr = if let Some(addr) = sender {
+                addr
+            } else {
+                error!("JoinRequest from {:?} without address", sender_name);
+                return Ok((None, false));
+            };
+
+            let section_auth = self
+                .network
+                .closest(&sender_name)
+                .unwrap_or_else(|| self.section.authority_provider());
+
+            let variant =
+                Variant::JoinResponse(Box::new(JoinResponse::Redirect(section_auth.clone())));
+
+            trace!("Sending {:?} to {}", variant, sender_name);
+            let cmd = self.send_direct_message(
+                (sender_name, sender_addr),
+                variant,
+                section_auth.section_key(),
+            )?;
+
+            Ok((Some(cmd), false))
         }
     }
 }

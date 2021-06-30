@@ -21,8 +21,8 @@ mod user_msg;
 use super::Core;
 use crate::messaging::{
     node::{
-        Error as AggregatorError, JoinResponse, Proposal, RoutingMsg, SignedRelocateDetails,
-        SrcAuthority, Variant,
+        Error as AggregatorError, Proposal, RoutingMsg, SignedRelocateDetails, SrcAuthority,
+        Variant,
     },
     DstInfo, DstLocation,
 };
@@ -46,8 +46,6 @@ impl Core {
         routing_msg: RoutingMsg,
         dst_info: DstInfo,
     ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
-
         // Check if the message is for us.
         let in_dst_location = routing_msg
             .dst
@@ -55,13 +53,13 @@ impl Core {
         // TODO: Broadcast message to our section when src is a Node as nodes might not know
         // all the elders in our section and the msg needs to be propagated.
         if !in_dst_location {
-            info!("Relay closer to the destination");
-            if let Some(cmds) = self.relay_message(&routing_msg).await? {
-                commands.push(cmds);
-            }
-
             // RoutingMsg not for us.
-            return Ok(commands);
+            info!("Relay message {} closer to the destination", routing_msg.id);
+            if let Some(cmd) = self.relay_message(&routing_msg).await? {
+                return Ok(vec![cmd]);
+            } else {
+                return Ok(vec![]);
+            }
         }
 
         // Let's first verify the section chain in the src authority is trusted
@@ -87,46 +85,24 @@ impl Core {
             routing_msg
         );
         let (ae_command, shall_be_handled) = self
-            .check_for_entropy(&routing_msg, dst_info.clone())
+            .check_for_entropy(&routing_msg, dst_info.clone(), sender)
             .await?;
 
-        let no_ae_commands = if let Some(cmd) = ae_command {
+        let mut commands = vec![];
+
+        if let Some(cmd) = ae_command {
             commands.push(cmd);
-            false
-        } else {
-            true
-        };
+        }
 
         if shall_be_handled {
-            trace!("Entropy check passed. Handling useful msg!");
+            trace!(
+                "Entropy check passed. Handling useful msg {}!",
+                routing_msg.id
+            );
             commands.extend(
                 self.handle_useful_message(sender, routing_msg, dst_info, &known_keys)
                     .await?,
             );
-        } else if no_ae_commands {
-            // For the case of receiving a JoinRequest not matching our prefix.
-            let sender_name = routing_msg.src.name();
-            let sender_addr = if let Some(addr) = sender {
-                addr
-            } else {
-                error!("JoinRequest from {:?} without address", sender_name);
-                return Ok(commands);
-            };
-
-            let section_auth = self
-                .network
-                .closest(&sender_name)
-                .unwrap_or_else(|| self.section.authority_provider());
-
-            let variant =
-                Variant::JoinResponse(Box::new(JoinResponse::Redirect(section_auth.clone())));
-
-            trace!("Sending {:?} to {}", variant, sender_name);
-            commands.push(self.send_direct_message(
-                (sender_name, sender_addr),
-                variant,
-                section_auth.section_key(),
-            )?);
         }
 
         Ok(commands)
