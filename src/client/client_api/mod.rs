@@ -18,9 +18,10 @@ mod transfers;
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
 use crate::messaging::client::{Cmd, CmdError, DataCmd, Error as ErrorMessage, TransferCmd};
 use crate::transfers::TransferActor;
-use crate::types::{Keypair, PublicKey, SectionElders, Token};
+use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey, SectionElders, Token};
 use crdts::Dot;
 use log::{debug, info, trace, warn};
+use lru::LruCache;
 use rand::rngs::OsRng;
 use std::{
     path::Path,
@@ -28,7 +29,7 @@ use std::{
     {collections::HashSet, net::SocketAddr, sync::Arc},
 };
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::Duration;
 
 // Number of attempts to make when trying to bootstrap to the network
@@ -42,6 +43,7 @@ pub struct Client {
     simulated_farming_payout_dot: Dot<PublicKey>,
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
+    blob_cache: Arc<Mutex<LruCache<ChunkAddress, Chunk>>>,
     pub(crate) query_timeout: Duration,
 }
 
@@ -148,6 +150,7 @@ impl Client {
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: Duration::from_secs(query_timeout),
+            blob_cache: Arc::new(Mutex::new(LruCache::new(150))),
         };
 
         Self::handle_anti_entropy_errors(client.clone(), transfer_err_receiver);

@@ -57,7 +57,7 @@ impl Client {
     /// # Ok(())} );}
     /// ```
     pub async fn read_blob(
-        &self,
+        &mut self,
         head_address: ChunkAddress,
         position: Option<usize>,
         len: Option<usize>,
@@ -72,7 +72,7 @@ impl Client {
             &len
         );
 
-        let chunk = self.fetch_blob_from_network(head_address).await?;
+        let chunk = self.fetch_blob_from_network(head_address, false).await?;
         let public = head_address.is_public();
         let data_map = self.unpack(chunk).await?;
 
@@ -159,19 +159,40 @@ impl Client {
     }
 
     pub(crate) async fn fetch_blob_from_network(
-        &self,
+        &mut self,
         head_address: ChunkAddress,
+        allow_cache: bool,
     ) -> Result<Chunk, Error> {
+        if allow_cache {
+            if let Some(chunk) = self.blob_cache.lock().await.get_mut(&head_address) {
+                trace!("Blob chunk retrieved from cache: {:?}", head_address);
+                return Ok(chunk.clone());
+            }
+        }
+
         let res = self
             .send_query(Query::Data(DataQuery::Blob(ChunkRead::Get(head_address))))
             .await?;
+
         let msg_id = res.msg_id;
         let chunk: Chunk = match res.response {
             QueryResponse::GetChunk(result) => result.map_err(|err| Error::from((err, msg_id))),
             _ => return Err(Error::ReceivedUnexpectedEvent),
         }?;
 
+        if allow_cache {
+            let _ = self
+                .blob_cache
+                .lock()
+                .await
+                .put(head_address, chunk.clone());
+        }
+
         Ok(chunk)
+    }
+
+    pub async fn clear_blob_cache(&mut self) {
+        self.blob_cache.lock().await.clear()
     }
 
     pub(crate) async fn delete_chunk_from_network(
@@ -227,10 +248,10 @@ impl Client {
     /// };
     /// #  Ok(())} );}
     /// ```
-    pub async fn delete_blob(&self, head_chunk: ChunkAddress) -> Result<(), Error> {
+    pub async fn delete_blob(&mut self, head_chunk: ChunkAddress) -> Result<(), Error> {
         info!("Deleting blob at given address: {:?}", head_chunk);
 
-        let mut chunk = self.fetch_blob_from_network(head_chunk).await?;
+        let mut chunk = self.fetch_blob_from_network(head_chunk, false).await?;
         self.delete_chunk_from_network(head_chunk).await?;
 
         loop {
@@ -414,7 +435,7 @@ mod tests {
     // Test storing and getting public Blob.
     #[tokio::test]
     pub async fn public_blob_test() -> Result<()> {
-        let client = create_test_client(Some(120)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
         let value = generate_random_vector::<u8>(10);
         let (_, expected_address) = Client::blob_data_map(value.clone(), None).await?;
 
@@ -445,7 +466,7 @@ mod tests {
     // Test storing, getting, and deleting private chunk.
     #[tokio::test]
     pub async fn private_blob_test() -> Result<()> {
-        let mut client = create_test_client(Some(120)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let value = generate_random_vector::<u8>(10);
 
@@ -487,6 +508,9 @@ mod tests {
         let mut attempts = 10u8;
         let orignal_timeout = client.query_timeout;
         client.query_timeout = Duration::from_secs(5); // override with a short timeout
+                                                       // clear cache first
+        client.clear_blob_cache().await;
+
         while client.read_blob(priv_address, None, None).await.is_ok() {
             tokio::time::sleep(tokio::time::Duration::from_millis(4000)).await;
             if attempts == 0 {
@@ -511,7 +535,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn private_delete_large() -> Result<()> {
-        let mut client = create_test_client(Some(120)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let value = generate_random_vector::<u8>(1024 * 1024);
         let address = client.store_private_blob(&value).await?;
@@ -519,7 +543,7 @@ mod tests {
         // let's make sure we have all chunks stored on the network
         let _ = retry_loop!(client.read_blob(address, None, None));
 
-        let fetched_data = retry_loop!(client.fetch_blob_from_network(address));
+        let fetched_data = retry_loop!(client.fetch_blob_from_network(address, false));
 
         let root_data_map = match deserialize(fetched_data.value())? {
             DataMapLevel::Root(data_map) => data_map,
@@ -530,6 +554,8 @@ mod tests {
         };
 
         client.delete_blob(address).await?;
+
+        client.clear_blob_cache().await;
 
         client.query_timeout = Duration::from_secs(5); // override with a short timeout
         let mut blob_storage = BlobStorage::new(client, false);
@@ -550,7 +576,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn blob_deletions_should_cost_put_price() -> Result<()> {
-        let client = create_test_client(Some(120)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let address = client
             .store_private_blob(&generate_random_vector::<u8>(10))
@@ -592,7 +618,7 @@ mod tests {
         let size = 1024;
         let data = generate_random_vector(size);
 
-        let client = create_test_client(Some(120)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
         let address = client.store_public_blob(&data).await?;
 
         // let's make sure the public chunk is stored
@@ -613,7 +639,7 @@ mod tests {
 
         let value = generate_random_vector(size);
 
-        let client = create_test_client(Some(120)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let address = client.store_private_blob(&value).await?;
 
@@ -670,6 +696,9 @@ mod tests {
         Ok(())
     }
 
+
+    const BLOB_TEST_QUERY_TIMEOUT: u64 = 60;
+
     #[tokio::test]
     pub async fn create_and_retrieve_index_based() -> Result<()> {
         create_and_index_based_retrieve(1024).await
@@ -678,7 +707,7 @@ mod tests {
     async fn create_and_index_based_retrieve(size: usize) -> Result<()> {
         // Test read first half
         let data = generate_random_vector(size);
-        let client = create_test_client(Some(120)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let address = client.store_public_blob(&data).await?;
 
@@ -687,7 +716,7 @@ mod tests {
 
         // Test read second half
         let data = generate_random_vector(size);
-        let client = create_test_client(Some(120)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let address = client.store_public_blob(&data).await?;
 
@@ -701,7 +730,7 @@ mod tests {
     async fn gen_data_then_create_and_retrieve(size: usize, public: bool) -> Result<()> {
         let raw_data = generate_random_vector(size);
 
-        let client = create_test_client(Some(120)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         // generate address without storing to the network (public and unencrypted)
         let chunk = if public {
