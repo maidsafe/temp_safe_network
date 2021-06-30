@@ -42,7 +42,7 @@ pub async fn create_test_client_with(
     timeout: Option<u64>,
 ) -> Result<Client> {
     init_logger();
-    let timeout = timeout.unwrap_or(5);
+    let timeout = timeout.unwrap_or(20);
     let contact_info = read_network_conn_info()?;
     let client = Client::new(optional_keypair.clone(), None, Some(contact_info), timeout).await?;
 
