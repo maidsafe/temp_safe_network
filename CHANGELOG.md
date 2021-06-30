@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.5.0](https://github.com/maidsafe/safe_network/compare/v0.4.0...v0.5.0) (2021-06-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* This removes a type and an enum variant from the public
+API. Although they're not used by any maidsafe repos it's still a
+breaking change.
+* This removes types and enum variants from the public
+API. Although I couldn't find any uses of them, this still constitutes a
+breaking change.
+
+* Remove redundant `section_info::Error` ([d21cd8d](https://github.com/maidsafe/safe_network/commit/d21cd8d37d890072ea1684a92aa14a3ad1fad808))
+* Remove redundant SectionInfoUpdate variants ([38cf3de](https://github.com/maidsafe/safe_network/commit/38cf3de1199a196d71e583d03334ffb096699925))
+
 ## [0.4.0](https://github.com/maidsafe/safe_network/compare/v0.3.0...v0.4.0) (2021-06-29)
 
 
