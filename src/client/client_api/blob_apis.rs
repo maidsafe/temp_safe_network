@@ -414,7 +414,7 @@ mod tests {
     // Test storing and getting public Blob.
     #[tokio::test]
     pub async fn public_blob_test() -> Result<()> {
-        let client = create_test_client(Some(60)).await?;
+        let client = create_test_client(Some(120)).await?;
         let value = generate_random_vector::<u8>(10);
         let (_, expected_address) = Client::blob_data_map(value.clone(), None).await?;
 
@@ -445,7 +445,7 @@ mod tests {
     // Test storing, getting, and deleting private chunk.
     #[tokio::test]
     pub async fn private_blob_test() -> Result<()> {
-        let mut client = create_test_client(Some(60)).await?;
+        let mut client = create_test_client(Some(120)).await?;
 
         let value = generate_random_vector::<u8>(10);
 
@@ -511,7 +511,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn private_delete_large() -> Result<()> {
-        let mut client = create_test_client(Some(60)).await?;
+        let mut client = create_test_client(Some(120)).await?;
 
         let value = generate_random_vector::<u8>(1024 * 1024);
         let address = client.store_private_blob(&value).await?;
@@ -550,7 +550,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn blob_deletions_should_cost_put_price() -> Result<()> {
-        let client = create_test_client(Some(60)).await?;
+        let client = create_test_client(Some(120)).await?;
 
         let address = client
             .store_private_blob(&generate_random_vector::<u8>(10))
@@ -592,7 +592,7 @@ mod tests {
         let size = 1024;
         let data = generate_random_vector(size);
 
-        let client = create_test_client(Some(60)).await?;
+        let client = create_test_client(Some(120)).await?;
         let address = client.store_public_blob(&data).await?;
 
         // let's make sure the public chunk is stored
@@ -613,7 +613,7 @@ mod tests {
 
         let value = generate_random_vector(size);
 
-        let client = create_test_client(Some(60)).await?;
+        let client = create_test_client(Some(120)).await?;
 
         let address = client.store_private_blob(&value).await?;
 
@@ -678,7 +678,7 @@ mod tests {
     async fn create_and_index_based_retrieve(size: usize) -> Result<()> {
         // Test read first half
         let data = generate_random_vector(size);
-        let client = create_test_client(Some(60)).await?;
+        let client = create_test_client(Some(120)).await?;
 
         let address = client.store_public_blob(&data).await?;
 
@@ -687,7 +687,7 @@ mod tests {
 
         // Test read second half
         let data = generate_random_vector(size);
-        let client = create_test_client(Some(60)).await?;
+        let client = create_test_client(Some(120)).await?;
 
         let address = client.store_public_blob(&data).await?;
 
@@ -701,7 +701,7 @@ mod tests {
     async fn gen_data_then_create_and_retrieve(size: usize, public: bool) -> Result<()> {
         let raw_data = generate_random_vector(size);
 
-        let client = create_test_client(Some(60)).await?;
+        let client = create_test_client(Some(120)).await?;
 
         // generate address without storing to the network (public and unencrypted)
         let chunk = if public {
