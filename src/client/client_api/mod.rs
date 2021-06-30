@@ -34,6 +34,7 @@ use tokio::time::Duration;
 
 // Number of attempts to make when trying to bootstrap to the network
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 1;
+const BLOB_CACHE_CAP: usize = 150;
 
 /// Client object
 #[derive(Clone, Debug)]
@@ -150,7 +151,7 @@ impl Client {
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: Duration::from_secs(query_timeout),
-            blob_cache: Arc::new(Mutex::new(LruCache::new(150))),
+            blob_cache: Arc::new(Mutex::new(LruCache::new(BLOB_CACHE_CAP))),
         };
 
         Self::handle_anti_entropy_errors(client.clone(), transfer_err_receiver);

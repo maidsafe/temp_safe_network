@@ -300,15 +300,15 @@ checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
 name = "bls_dkg"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37819039c8f84cb319fe3bb4aedf3bfac4ddb1becc21c876175e5163051f429c"
+checksum = "9e2c19530d31f5bdf3892ea3647adcdebd72f752a446437aae95c9a2c9fe19fa"
 dependencies = [
  "aes 0.7.4",
  "anyhow",
  "bincode",
  "block-modes 0.8.1",
- "blsttc 1.0.1",
+ "blsttc",
  "itertools 0.9.0",
  "log",
  "rand 0.7.3",
@@ -328,27 +328,6 @@ dependencies = [
  "cc",
  "glob",
  "threadpool",
- "zeroize",
-]
-
-[[package]]
-name = "blsttc"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac565d887265714861790e736ec3c452cb56ca8b6ccc9a36b7118b4e621bc876"
-dependencies = [
- "blst",
- "byteorder",
- "ff",
- "group",
- "hex_fmt",
- "log",
- "pairing",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "serde",
- "thiserror",
- "tiny-keccak 2.0.2",
  "zeroize",
 ]
 
@@ -2386,7 +2365,7 @@ dependencies = [
  "base64 0.10.1",
  "bincode",
  "bls_dkg",
- "blsttc 2.0.1",
+ "blsttc",
  "bytes 1.0.1",
  "cookie-factory",
  "crdts",
@@ -2470,7 +2449,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1194adb1e3a2641b89cbc5a7e44ac3b64aa7a824fc822d46b0f6c626129cf2bc"
 dependencies = [
  "bincode",
- "blsttc 2.0.1",
+ "blsttc",
  "itertools 0.9.0",
  "serde",
  "thiserror",
