@@ -294,9 +294,9 @@ checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
 name = "bls_dkg"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37819039c8f84cb319fe3bb4aedf3bfac4ddb1becc21c876175e5163051f429c"
+checksum = "9e2c19530d31f5bdf3892ea3647adcdebd72f752a446437aae95c9a2c9fe19fa"
 dependencies = [
  "aes 0.7.4",
  "anyhow",
@@ -327,9 +327,9 @@ dependencies = [
 
 [[package]]
 name = "blsttc"
-version = "1.0.1"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac565d887265714861790e736ec3c452cb56ca8b6ccc9a36b7118b4e621bc876"
+checksum = "167ea60fc6fb789e18db41b3004a76fca7947d83a3484e75f24f482cec85cd24"
 dependencies = [
  "blst",
  "byteorder",
@@ -2419,9 +2419,9 @@ dependencies = [
 
 [[package]]
 name = "secured_linked_list"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "078d22573c2ca558ae6fb42e14411f968e6e7cc9cdf6ee0a9500bbdc806019e7"
+checksum = "1194adb1e3a2641b89cbc5a7e44ac3b64aa7a824fc822d46b0f6c626129cf2bc"
 dependencies = [
  "bincode",
  "blsttc",
