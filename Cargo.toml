@@ -45,7 +45,7 @@ sn_launch_tool = "~0.2.0"
 thiserror = "1.0.23"
 itertools = "0.10.0"
 async-trait = "0.1.42"
-secured_linked_list = "~0.2.0"
+secured_linked_list = "~0.3.0"
 bls_dkg = "~0.4.0"
 cookie-factory = "0.3.1"
 hex_fmt = "~0.3.0"
@@ -116,7 +116,7 @@ lru="0.6.5"
 
   [dependencies.bls]
   package = "blsttc"
-  version = "1.0.1"
+  version = "2.0.1"
 
   [dependencies.tokio]
   version = "1.6.0"
