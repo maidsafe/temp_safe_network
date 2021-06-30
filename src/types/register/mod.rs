@@ -132,7 +132,7 @@ impl Register {
     /// Return the number of items held in the register, optionally
     /// verifying read permissions if a pk is provided
     pub fn size(&self, requester: Option<PublicKey>) -> Result<u64> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         Ok(self.crdt.size())
     }
@@ -144,14 +144,14 @@ impl Register {
 
     /// Return a value corresponding to the provided 'hash', if present.
     pub fn get(&self, hash: EntryHash, requester: Option<PublicKey>) -> Result<Option<&Entry>> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         Ok(self.crdt.get(hash))
     }
 
     /// Read the last entry, or entries when there are branches, if the register is not empty.
     pub fn read(&self, requester: Option<PublicKey>) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         Ok(self.crdt.read())
     }
@@ -164,28 +164,28 @@ impl Register {
         entry: Entry,
         parents: BTreeSet<EntryHash>,
     ) -> Result<(EntryHash, RegisterOp<Entry>)> {
-        self.check_permission(Action::Write, None)?;
+        self.check_permissions(Action::Write, None)?;
 
         self.crdt.write(entry, parents, self.authority)
     }
 
     /// Apply a signed data CRDT operation.
     pub fn apply_op(&mut self, op: RegisterOp<Entry>) -> Result<()> {
-        self.check_permission(Action::Write, Some(op.source))?;
+        self.check_permissions(Action::Write, Some(op.source))?;
 
         self.crdt.apply_op(op)
     }
 
     /// Return user permissions, if applicable.
     pub fn permissions(&self, user: User, requester: Option<PublicKey>) -> Result<Permissions> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         self.policy.permissions(user).ok_or(Error::NoSuchEntry)
     }
 
     /// Return the policy.
     pub fn policy(&self, requester: Option<PublicKey>) -> Result<&Policy> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         Ok(&self.policy)
     }
@@ -196,7 +196,7 @@ impl Register {
     /// Returns:
     /// `Ok(())` if the permissions are valid,
     /// `Err::AccessDenied` if the action is not allowed.
-    pub fn check_permission(&self, action: Action, requester: Option<PublicKey>) -> Result<()> {
+    pub fn check_permissions(&self, action: Action, requester: Option<PublicKey>) -> Result<()> {
         let requester = requester.unwrap_or(self.authority);
         self.policy.is_action_allowed(requester, action)
     }

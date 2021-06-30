@@ -142,7 +142,7 @@ impl Data {
     /// Returns the length of the sequence, optionally
     /// verifying read permissions if a pk is provided
     pub fn len(&self, requester: Option<PublicKey>) -> Result<u64> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         Ok(match &self.data {
             SeqData::Public(data) => data.len(),
@@ -152,7 +152,7 @@ impl Data {
 
     /// Returns true if the sequence is empty.
     pub fn is_empty(&self, requester: Option<PublicKey>) -> Result<bool> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         Ok(self.len(None)? == 0)
     }
@@ -165,7 +165,7 @@ impl Data {
         end: Index,
         requester: Option<PublicKey>,
     ) -> Result<Option<Entries>> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         let entries = match &self.data {
             SeqData::Public(data) => data.in_range(start, end),
@@ -177,7 +177,7 @@ impl Data {
 
     /// Returns a value at 'index', if present.
     pub fn get(&self, index: Index, requester: Option<PublicKey>) -> Result<Option<&Vec<u8>>> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         Ok(match &self.data {
             SeqData::Public(data) => data.get(index),
@@ -187,7 +187,7 @@ impl Data {
 
     /// Returns the last entry, if it's not empty.
     pub fn last_entry(&self, requester: Option<PublicKey>) -> Result<Option<&Entry>> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         Ok(match &self.data {
             SeqData::Public(data) => data.last_entry(),
@@ -197,7 +197,7 @@ impl Data {
 
     /// Generate unsigned crdt op, adding the new entry.
     pub fn create_unsigned_append_op(&mut self, entry: Entry) -> Result<DataOp<Entry>> {
-        self.check_permission(Action::Append, None)?;
+        self.check_permissions(Action::Append, None)?;
 
         match &mut self.data {
             SeqData::Public(data) => data.create_append_op(entry, self.authority),
@@ -207,7 +207,7 @@ impl Data {
 
     /// Apply a signed data CRDT operation.
     pub fn apply_op(&mut self, op: DataOp<Entry>) -> Result<()> {
-        self.check_permission(Action::Append, Some(op.source))?;
+        self.check_permissions(Action::Append, Some(op.source))?;
 
         match &mut self.data {
             SeqData::Public(data) => data.apply_op(op),
@@ -217,7 +217,7 @@ impl Data {
 
     /// Returns user permissions, if applicable.
     pub fn permissions(&self, user: User, requester: Option<PublicKey>) -> Result<Permissions> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
 
         let user_perm = match &self.data {
             SeqData::Public(data) => data.policy().permissions(user).ok_or(Error::NoSuchEntry)?,
@@ -237,7 +237,7 @@ impl Data {
 
     /// Returns the private policy, if applicable.
     pub fn private_policy(&self, requester: Option<PublicKey>) -> Result<&PrivatePolicy> {
-        self.check_permission(Action::Read, requester)?;
+        self.check_permissions(Action::Read, requester)?;
         match &self.data {
             SeqData::Private(data) => Ok(data.policy()),
             SeqData::Public(_) => Err(Error::InvalidOperation),
@@ -250,7 +250,7 @@ impl Data {
     /// Returns:
     /// `Ok(())` if the permissions are valid,
     /// `Err::AccessDenied` if the action is not allowed.
-    pub fn check_permission(&self, action: Action, requester: Option<PublicKey>) -> Result<()> {
+    pub fn check_permissions(&self, action: Action, requester: Option<PublicKey>) -> Result<()> {
         let requester = requester.unwrap_or(self.authority);
         match &self.data {
             SeqData::Public(data) => data.policy().is_action_allowed(requester, action),

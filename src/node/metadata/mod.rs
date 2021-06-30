@@ -53,9 +53,9 @@ pub struct Metadata {
 impl Metadata {
     pub async fn new(path: &Path, max_capacity: u64, capacity: Capacity) -> Result<Self> {
         let chunk_records = ChunkRecords::new(capacity);
-        let map_storage = MapStorage::new(path, max_capacity).await?;
-        let sequence_storage = SequenceStorage::new(path, max_capacity).await?;
-        let register_storage = RegisterStorage::new(path, max_capacity).await?;
+        let map_storage = MapStorage::new(path, max_capacity);
+        let sequence_storage = SequenceStorage::new(path, max_capacity);
+        let register_storage = RegisterStorage::new(path, max_capacity);
         let elder_stores = ElderStores::new(
             chunk_records,
             map_storage,
@@ -73,7 +73,7 @@ impl Metadata {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         match self.elder_stores.read(query, id, requester, origin).await {
-            Err(Error::NoSuchChunk(_)) => Ok(NodeDuty::NoOp),
+            Err(Error::NoSuchData(_)) => Ok(NodeDuty::NoOp),
             res => res,
         }
     }

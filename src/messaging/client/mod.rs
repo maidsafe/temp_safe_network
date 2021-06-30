@@ -25,14 +25,14 @@ pub use self::{
     data::{DataCmd, DataQuery},
     data_exchange::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
-        SequenceDataExchange,
+        RegisterDataExchange, SequenceDataExchange,
     },
     duty::{AdultDuties, Duty, NodeDuties},
     errors::{Error, Result},
-    map::{MapRead, MapWrite},
+    map::{MapCmd, MapRead, MapWrite},
     query::Query,
-    register::{RegisterRead, RegisterWrite},
-    sequence::{SequenceRead, SequenceWrite},
+    register::{RegisterCmd, RegisterRead, RegisterWrite},
+    sequence::{SequenceCmd, SequenceRead, SequenceWrite},
 };
 
 use crate::messaging::{MessageId, MessageType, WireMsg};

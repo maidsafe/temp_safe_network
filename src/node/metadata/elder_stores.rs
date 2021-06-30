@@ -11,7 +11,7 @@ use super::{
     sequence_storage::SequenceStorage,
 };
 use crate::messaging::{
-    client::{ClientSig, DataCmd, DataExchange, DataQuery},
+    client::{ClientSig, DataCmd, DataExchange, DataQuery, MapCmd, RegisterCmd, SequenceCmd},
     EndUser, MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Error, Result};
@@ -67,7 +67,7 @@ impl ElderStores {
     }
 
     pub async fn write(
-        &self,
+        &mut self,
         cmd: DataCmd,
         msg_id: MessageId,
         client_sig: ClientSig,
@@ -84,19 +84,34 @@ impl ElderStores {
             DataCmd::Map(write) => {
                 info!("Writing Map");
                 self.map_storage
-                    .write(write, msg_id, client_sig.public_key, origin)
+                    .write(MapCmd {
+                        write,
+                        msg_id,
+                        client_sig,
+                        origin,
+                    })
                     .await
             }
             DataCmd::Sequence(write) => {
                 info!("Writing Sequence");
                 self.sequence_storage
-                    .write(write, msg_id, client_sig.public_key, origin)
+                    .write(SequenceCmd {
+                        write,
+                        msg_id,
+                        client_sig,
+                        origin,
+                    })
                     .await
             }
             DataCmd::Register(write) => {
                 info!("Writing Register");
                 self.register_storage
-                    .write(write, msg_id, client_sig.public_key, origin)
+                    .write(RegisterCmd {
+                        write,
+                        msg_id,
+                        client_sig,
+                        origin,
+                    })
                     .await
             }
         }
@@ -111,20 +126,23 @@ impl ElderStores {
         // Prepare chunk_records, map and sequence data
         let chunk_data = self.chunk_records.get_data_of(prefix).await;
         let map_data = self.map_storage.get_data_of(prefix).await?;
+        let reg_data = self.register_storage.get_data_of(prefix).await?;
         let seq_data = self.sequence_storage.get_data_of(prefix).await?;
 
         Ok(DataExchange {
             chunk_data,
             map_data,
+            reg_data,
             seq_data,
         })
     }
 
-    pub async fn update(&self, data: DataExchange) -> Result<(), Error> {
+    pub async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
+        // todo: all this can be done in parallel
         self.map_storage.update(data.map_data).await?;
+        self.register_storage.update(data.reg_data).await?;
         self.sequence_storage.update(data.seq_data).await?;
         self.chunk_records.update(data.chunk_data).await;
-
         Ok(())
     }
 }

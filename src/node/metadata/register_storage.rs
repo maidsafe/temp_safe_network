@@ -7,35 +7,159 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
-use crate::messaging::{
-    client::{CmdError, QueryResponse, RegisterRead, RegisterWrite},
-    EndUser, MessageId,
-};
 use crate::node::{
-    data_store::RegisterDataStore, error::convert_to_error_message, node_ops::NodeDuty, Error,
-    Result,
+    error::convert_to_error_message, event_store::EventStore, node_ops::NodeDuty, Error, Result,
 };
 use crate::types::{
-    register::{Action, Address, Entry, Register, RegisterOp, User},
+    register::{Action, Address, Register, User},
     PublicKey,
 };
+use crate::{
+    messaging::{
+        client::{
+            CmdError, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead, RegisterWrite,
+        },
+        EndUser, MessageId,
+    },
+    types::DataAddress,
+};
 use std::{
+    collections::BTreeMap,
     fmt::{self, Display, Formatter},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use tracing::info;
+use xor_name::{Prefix, XorName};
 
 /// Operations over the data type Register.
 pub(super) struct RegisterStorage {
-    chunks: RegisterDataStore,
+    path: PathBuf,
+    store: BTreeMap<XorName, (Register, EventStore<RegisterCmd>)>,
 }
 
 impl RegisterStorage {
-    pub(super) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
-        let chunks = RegisterDataStore::new(path, max_capacity).await?;
-
-        Ok(Self { chunks })
+    pub(super) fn new(path: &Path, _max_capacity: u64) -> Self {
+        Self {
+            path: path.to_path_buf(),
+            store: BTreeMap::new(),
+        }
     }
+
+    /// --- Synching ---
+
+    /// Used for replication of data to new Elders.
+    pub(super) async fn get_data_of(&self, prefix: Prefix) -> Result<RegisterDataExchange> {
+        let mut the_data = BTreeMap::default();
+
+        for (key, (_, history)) in self
+            .store
+            .iter()
+            .filter(|(_, (map, _))| prefix.matches(map.name()))
+        {
+            let _ = the_data.insert(*key, history.get_all());
+        }
+
+        Ok(RegisterDataExchange(the_data))
+    }
+
+    /// On receiving data from Elders when promoted.
+    pub async fn update(&mut self, reg_data: RegisterDataExchange) -> Result<()> {
+        debug!("Updating Register store");
+
+        let RegisterDataExchange(data) = reg_data;
+
+        // todo: make outer loop parallel
+        for (_, history) in data {
+            for op in history {
+                let _ = self.apply(op).await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// --- Writing ---
+
+    pub(super) async fn write(&mut self, op: RegisterCmd) -> Result<NodeDuty> {
+        let msg_id = op.msg_id;
+        let origin = op.origin;
+        let write_result = self.apply(op).await;
+        self.ok_or_error(write_result, msg_id, origin).await
+    }
+
+    async fn apply(&mut self, op: RegisterCmd) -> Result<()> {
+        let RegisterCmd {
+            write,
+            msg_id,
+            client_sig,
+            ..
+        } = op.clone();
+
+        let address = *write.address();
+        let key = to_id(&address)?;
+
+        use RegisterWrite::*;
+        match write {
+            New(map) => {
+                if self.store.contains_key(&key) {
+                    return Err(Error::DataExists);
+                }
+                let mut store = new_store(key, self.path.as_path())?;
+                let _ = store.append(op)?;
+                let _ = self.store.insert(key, (map, store));
+                Ok(())
+            }
+            Delete(_) => {
+                let result = match self.store.get(&key) {
+                    Some((register, store)) => {
+                        if register.address().is_public() {
+                            return Err(Error::InvalidMessage(
+                                msg_id,
+                                "Cannot delete public Register".to_string(),
+                            ));
+                        }
+
+                        // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
+                        // register.check_permission(action, Some(client_sig.public_key))?;
+
+                        if client_sig.public_key != register.owner() {
+                            Err(Error::InvalidOwner(client_sig.public_key))
+                        } else {
+                            info!("Deleting Register");
+                            store.as_deletable().delete()
+                        }
+                    }
+                    None => Ok(()),
+                };
+
+                if result.is_ok() {
+                    let _ = self.store.remove(&key);
+                }
+
+                result
+            }
+            Edit(reg_op) => {
+                let (register, store) = match self.store.get_mut(&key) {
+                    Some(entry) => entry,
+                    None => return Err(Error::NoSuchData(DataAddress::Register(address))),
+                };
+
+                info!("Editing Register");
+                register.check_permissions(Action::Write, Some(client_sig.public_key))?;
+                let result = register.apply_op(reg_op).map_err(Error::NetworkData);
+
+                if result.is_ok() {
+                    store.append(op)?;
+                    info!("Editing Register SUCCESSFUL!");
+                } else {
+                    info!("Editing Register FAILED!");
+                }
+
+                result
+            }
+        }
+    }
+
+    /// --- Reading ---
 
     pub(super) async fn read(
         &self,
@@ -60,34 +184,7 @@ impl RegisterStorage {
         }
     }
 
-    pub(super) async fn write(
-        &self,
-        write: RegisterWrite,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        use RegisterWrite::*;
-        info!("Matching Register Write");
-        match write {
-            New(data) => self.store(&data, msg_id, origin).await,
-            Edit(operation) => {
-                info!("Editing Register");
-                self.edit(operation, msg_id, requester, origin).await
-            }
-            Delete(address) => self.delete(address, msg_id, requester, origin).await,
-        }
-    }
-
-    async fn store(&self, data: &Register, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
-        let result = if self.chunks.has(data.address()).await {
-            Err(Error::DataExists)
-        } else {
-            self.chunks.put(&data).await
-        };
-        self.ok_or_error(result, msg_id, origin).await
-    }
-
+    /// Get entire Register.
     async fn get(
         &self,
         address: Address,
@@ -95,9 +192,9 @@ impl RegisterStorage {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let result = match self.get_chunk(address, Action::Read, requester).await {
-            Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+        let result = match self.get_register(&address, Action::Read, requester).await {
+            Ok(register) => Ok(register.clone()),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -108,44 +205,22 @@ impl RegisterStorage {
         )))
     }
 
-    async fn get_chunk(
+    /// Get `Register` from the store and check permissions.
+    async fn get_register(
         &self,
-        address: Address,
+        address: &Address,
         action: Action,
         requester: PublicKey,
-    ) -> Result<Register> {
-        let data = self.chunks.get(&address).await?;
-        data.check_permission(action, Some(requester))?;
-        Ok(data)
-    }
-
-    async fn delete(
-        &self,
-        address: Address,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        let result = match self.chunks.get(&address).await.and_then(|register| {
-            // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
-            if register.address().is_public() {
-                return Err(Error::InvalidMessage(
-                    msg_id,
-                    "Cannot delete public Register".to_string(),
-                ));
+    ) -> Result<&Register> {
+        match self.store.get(&to_id(address)?) {
+            Some((register, _)) => {
+                let _ = register
+                    .check_permissions(action, Some(requester))
+                    .map_err(Error::from)?;
+                Ok(register)
             }
-
-            if requester != register.owner() {
-                Err(Error::InvalidOwner(requester))
-            } else {
-                Ok(())
-            }
-        }) {
-            Ok(()) => self.chunks.delete(&address).await,
-            Err(error) => Err(error),
-        };
-
-        self.ok_or_error(result, msg_id, origin).await
+            None => Err(Error::NoSuchData(DataAddress::Register(*address))),
+        }
     }
 
     async fn read_register(
@@ -155,18 +230,14 @@ impl RegisterStorage {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let result = match self
-            .get_chunk(address, Action::Read, requester)
-            .await
-            .and_then(|register| register.read(Some(requester)).map_err(Error::from))
-        {
-            Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
-            Err(error) => Err(convert_to_error_message(error)),
+        let result = match self.get_register(&address, Action::Read, requester).await {
+            Ok(register) => register.read(Some(requester)).map_err(Error::from),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
+            Err(error) => Err(error),
         };
 
         Ok(NodeDuty::Send(build_client_query_response(
-            QueryResponse::ReadRegister(result),
+            QueryResponse::ReadRegister(result.map_err(convert_to_error_message)),
             msg_id,
             origin,
         )))
@@ -179,9 +250,9 @@ impl RegisterStorage {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let result = match self.get_chunk(address, Action::Read, requester).await {
+        let result = match self.get_register(&address, Action::Read, requester).await {
             Ok(res) => Ok(res.owner()),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -201,7 +272,7 @@ impl RegisterStorage {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(address, Action::Read, requester)
+            .get_register(&address, Action::Read, requester)
             .await
             .and_then(|register| {
                 register
@@ -209,7 +280,7 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -228,7 +299,7 @@ impl RegisterStorage {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(address, Action::Read, requester)
+            .get_register(&address, Action::Read, requester)
             .await
             .and_then(|register| {
                 register
@@ -237,7 +308,7 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
+            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -246,48 +317,6 @@ impl RegisterStorage {
             msg_id,
             origin,
         )))
-    }
-
-    async fn edit(
-        &self,
-        write_op: RegisterOp<Entry>,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        let address = write_op.address;
-        info!("Editing Register chunk");
-        let result = self
-            .edit_chunk(address, Action::Write, requester, move |mut register| {
-                register.apply_op(write_op)?;
-                Ok(register)
-            })
-            .await;
-
-        if result.is_ok() {
-            info!("Editing Register chunk SUCCESSFUL!");
-        } else {
-            info!("Editing Register chunk FAILED!");
-        }
-
-        self.ok_or_error(result, msg_id, origin).await
-    }
-
-    async fn edit_chunk<F>(
-        &self,
-        address: Address,
-        action: Action,
-        requester: PublicKey,
-        write_fn: F,
-    ) -> Result<()>
-    where
-        F: FnOnce(Register) -> Result<Register>,
-    {
-        info!("Getting Register chunk for Edit");
-        let result = self.get_chunk(address, action, requester).await?;
-        let sequence = write_fn(result)?;
-        info!("Edited Register chunk successfully");
-        self.chunks.put(&sequence).await
     }
 
     async fn ok_or_error<T>(
@@ -310,6 +339,17 @@ impl RegisterStorage {
             origin,
         )))
     }
+}
+
+fn to_id(address: &Address) -> Result<XorName> {
+    Ok(XorName::from_content(&[address
+        .encode_to_zbase32()?
+        .as_bytes()]))
+}
+
+fn new_store(id: XorName, path: &Path) -> Result<EventStore<RegisterCmd>> {
+    let db_dir = path.join("register".to_string());
+    EventStore::new(id, db_dir.as_path())
 }
 
 impl Display for RegisterStorage {

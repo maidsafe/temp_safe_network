@@ -6,18 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::data::{Data, DataId};
-use crate::types::{DataAddress, Sequence, SequenceAddress};
+use crate::node::to_db_key::ToDbKey;
+use crate::types::DataAddress;
+use serde::{de::DeserializeOwned, Serialize};
 
-impl Data for Sequence {
-    type Id = SequenceAddress;
-    fn id(&self) -> &Self::Id {
-        self.address()
-    }
+pub trait Data: Serialize + DeserializeOwned {
+    type Id: DataId;
+    fn id(&self) -> &Self::Id;
 }
 
-impl DataId for SequenceAddress {
-    fn to_data_address(&self) -> DataAddress {
-        DataAddress::Sequence(*self)
-    }
+pub trait DataId: ToDbKey + PartialEq + Eq + DeserializeOwned {
+    fn to_data_address(&self) -> DataAddress;
 }

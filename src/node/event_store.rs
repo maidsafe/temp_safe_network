@@ -40,12 +40,11 @@ impl<'a, TEvent: Debug + Serialize + DeserializeOwned> EventStore<TEvent>
 where
     TEvent: 'a,
 {
-    pub fn new(id: XorName, root_dir: &Path, type_name: String) -> Result<Self> {
-        let db_dir = root_dir.join(Path::new(&type_name));
+    pub fn new(id: XorName, db_dir: &Path) -> Result<Self> {
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         let db_path = db_dir.join(db_name.clone());
         Ok(Self {
-            db: utils::new_auto_dump_db(db_dir.as_path(), db_name)?,
+            db: utils::new_auto_dump_db(db_dir, db_name)?,
             db_path,
             _phantom: PhantomData::default(),
         })
@@ -98,17 +97,20 @@ where
 
 #[cfg(test)]
 mod test {
+
     use super::EventStore;
     use crate::node::Result;
     use crate::types::Token;
+    use std::path::Path;
     use tempdir::TempDir;
 
     #[test]
     fn history() -> Result<()> {
         let id = xor_name::XorName::random();
         let tmp_dir = TempDir::new("root")?;
-        let root_dir = tmp_dir.into_path();
-        let mut store = EventStore::new(id, &root_dir, "String".to_string())?;
+        let db_dir = tmp_dir.into_path().join(Path::new(&"Token".to_string()));
+
+        let mut store = EventStore::new(id, db_dir.as_path())?;
 
         store.append(Token::from_nano(10))?;
 
