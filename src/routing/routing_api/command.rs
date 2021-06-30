@@ -23,21 +23,11 @@ use std::{
 /// Command for node.
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Command {
-    /// TODO: this is to replace the HandleMessage command defined further bellow,
-    /// this holds the WireMsg that has been received from the network,
-    HandleWireMessage {
+    /// Handle `message` from `sender`.
+    /// holding the WireMsg that has been received from the network,
+    HandleMessage {
         sender: SocketAddr,
         wire_msg: WireMsg,
-    },
-    /// Handle `message` from `sender`.
-    /// Note: `sender` is `Some` if the message was received from someone else
-    /// and `None` if it is an aggregated message.
-    HandleMessage {
-        sender: Option<SocketAddr>,
-        msg_id: MessageId,
-        msg_authority: NodeMsgAuthority,
-        dst_location: DstLocation,
-        msg: NodeMsg,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
@@ -62,10 +52,7 @@ pub(crate) enum Command {
         wire_msg: WireMsg,
     },
     /// Send `UserMessage` with the given source and destination.
-    SendUserMessage {
-        wire_msg: WireMsg,
-        additional_proof_chain_key: Option<bls::PublicKey>,
-    },
+    SendUserMessage(WireMsg),
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
     /// command is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },
@@ -107,36 +94,21 @@ impl Command {
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Self {
-        unimplemented!();
-        /*Self::SendMessage {
+        Self::SendMessage {
             recipients,
             delivery_group_size,
-            message: MessageType::Node { envelope, msg },
-        }*/
+            wire_msg,
+        }
     }
 }
 
 impl Debug for Command {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Self::HandleWireMessage { sender, wire_msg } => f
-                .debug_struct("HandleWireMessage")
-                .field("sender", sender)
-                .field("wire_msg", wire_msg)
-                .finish(),
-            Self::HandleMessage {
-                sender,
-                msg_id,
-                msg_authority,
-                dst_location,
-                msg,
-            } => f
+            Self::HandleMessage { sender, wire_msg } => f
                 .debug_struct("HandleMessage")
                 .field("sender", sender)
-                .field("msg_id", msg_id)
-                .field("msg_authority", msg_authority)
-                .field("dst_location", dst_location)
-                .field("msg", msg)
+                .field("wire_msg", wire_msg)
                 .finish(),
             Self::HandleTimeout(token) => f.debug_tuple("HandleTimeout").field(token).finish(),
             Self::HandleConnectionLost(addr) => {
@@ -169,13 +141,9 @@ impl Debug for Command {
                 .field("delivery_group_size", delivery_group_size)
                 .field("wire_msg", wire_msg)
                 .finish(),
-            Self::SendUserMessage {
-                wire_msg,
-                additional_proof_chain_key,
-            } => f
+            Self::SendUserMessage(wire_msg) => f
                 .debug_struct("SendUserMessage")
                 .field("wire_msg", wire_msg)
-                .field("additional_proof_chain_key", additional_proof_chain_key)
                 .finish(),
             Self::ScheduleTimeout { duration, token } => f
                 .debug_struct("ScheduleTimeout")

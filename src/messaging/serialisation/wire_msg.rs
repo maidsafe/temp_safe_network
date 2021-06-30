@@ -16,6 +16,7 @@ use bytes::Bytes;
 use cookie_factory::{combinator::slice, gen_simple};
 use serde::Serialize;
 use std::fmt::Debug;
+use xor_name::XorName;
 
 /// In order to send a message over the wire, it needs to be serialized
 /// along with a header (WireMsgHeader) which contains the information needed
@@ -188,6 +189,16 @@ impl WireMsg {
         self.header.msg_envelope.dst_location.section_pk()
     }
 
+    /// Update the destination section PublicKey for this message
+    pub fn set_dst_section_pk(&mut self, pk: BlsPublicKey) {
+        self.header.msg_envelope.dst_location.set_section_pk(pk)
+    }
+
+    /// Update the destination XorName for this message
+    pub fn set_dst_xorname(&mut self, name: XorName) {
+        self.header.msg_envelope.dst_location.set_name(name)
+    }
+
     /// Return the destination for this message
     pub fn dst_location(&self) -> &DstLocation {
         &self.header.msg_envelope.dst_location
@@ -204,18 +215,10 @@ impl WireMsg {
         }
     }
 
-    // The following functions are just for convenience, which allow users to
-    // not need to create an instance of WireMsg beforehand.
-
     /// Convenience function which creates a temporary WireMsg from the provided
     /// bytes, returning the deserialized message.
     pub fn deserialize(bytes: Bytes) -> Result<MessageType> {
         Self::from(bytes)?.to_message()
-    }
-
-    /// Update dst_location in the WireMsg
-    pub fn update_dst_location(&mut self, dst_location: DstLocation) {
-        self.header.set_dst_location(dst_location)
     }
 }
 

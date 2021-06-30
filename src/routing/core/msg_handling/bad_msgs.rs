@@ -23,13 +23,13 @@ use std::net::SocketAddr;
 
 // Bad msgs
 impl Core {
-    // Handle message whose trust we can't establish because its signed
+    // Handle message whose trust we can't establish because its signature
     // contains only keys we don't know.
     pub(crate) fn handle_untrusted_message(
         &self,
         sender: SocketAddr,
-        node_msg: &NodeMsg,
-        msg_authority: &NodeMsgAuthority,
+        node_msg: NodeMsg,
+        msg_authority: NodeMsgAuthority,
     ) -> Result<Command> {
         let src_name = msg_authority.name();
 
@@ -42,26 +42,27 @@ impl Core {
             &self.node,
             DstLocation::DirectAndUnrouted(bounce_dst_key),
             NodeMsg::BouncedUntrustedMessage {
-                msg: Box::new(node_msg.clone()),
+                msg: Box::new(node_msg),
                 dst_info,
             },
             self.section.authority_provider().section_key(),
         )?;
 
+        let cmd = Command::send_message_to_node((src_name, sender), bounce_msg);
+
+        /*************************
         unimplemented!();
-        /*
-        let cmd = if let Some(sender) = sender {
-            Command::send_message_to_node((src_name, sender), bounce_msg)
-        } else {
-            FIXME: this used to be the case only when the message was
-            built internally at msg_handling/agreement.rs in handle_accumulate_at_src_agreement()
-            We should generate a different type of Command for such casse rather than setting
-            the serder to None in HandleMessage as we used to.
+        FIXME: this used to be the case only when the message was
+        built internally at msg_handling/agreement.rs
+        in handle_accumulate_at_src_agreement()
+        setting the sneder to None.
+        We should generate a different type of Command for such casse rather than setting
+        the serder to None in HandleMessage as we used to.
 
-            self.send_message_to_our_elders(bounce_msg)
-        };
+        self.send_message_to_our_elders(bounce_msg)
+        *************************/
 
-        Ok(cmd)*/
+        Ok(cmd)
     }
 
     pub(crate) fn handle_bounced_untrusted_message(
@@ -70,12 +71,10 @@ impl Core {
         dst_key: BlsPublicKey,
         mut bounced_msg: NodeMsg,
     ) -> Result<Command> {
-        unimplemented!();
-        /*
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();
 
-        let resend_msg = match bounced_msg {
+        let new_node_msg = match bounced_msg {
             NodeMsg::Sync { section, network } => {
                 // `Sync` messages are handled specially, because they don't carry a signed chain.
                 // Instead we use the section chain that's part of the included `Section` struct.
@@ -88,30 +87,22 @@ impl Core {
                         Error::InvalidMessage // TODO: more specific error
                     })?;
 
-                WireMsg::single_src(
-                    &self.node,
-                    DstLocation::DirectAndUnrouted(dst_key),
-                    NodeMsg::Sync { section, network },
-                    self.section.authority_provider().section_key(),
-                )?
+                NodeMsg::Sync { section, network }
             }
-            _ => {
-                bounced_msg
-                    .updated_with_latest_key(self.section.authority_provider().section_key());
-                bounced_msg
-            }
+            bounced_msg => bounced_msg,
         };
 
-        let dst_info = DstInfo {
-            dst: *sender.name(),
-            dst_section_pk: dst_key,
-        };
+        let wire_msg = WireMsg::single_src(
+            &self.node,
+            DstLocation::DirectAndUnrouted(dst_key),
+            new_node_msg,
+            self.section.authority_provider().section_key(),
+        )?;
 
         trace!("resending with extended signed");
         Ok(Command::send_message_to_node(
             (*sender.name(), *sender.addr()),
-            resend_msg,
-            dst_info,
-        ))*/
+            wire_msg,
+        ))
     }
 }

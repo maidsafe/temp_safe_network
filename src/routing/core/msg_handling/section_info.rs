@@ -28,16 +28,9 @@ impl Core {
     pub(crate) async fn handle_section_info_msg(
         &mut self,
         sender: SocketAddr,
-        dst_location: DstLocation,
+        mut dst_location: DstLocation,
         message: SectionInfoMsg,
     ) -> Vec<Command> {
-        // Provide our PK as the dst PK, only redundant as the message
-        // itself contains details regarding relocation/registration.
-        /*let dst_info = DstInfo {
-            dst: dst_info.dst,
-            dst_section_pk: *self.section().chain().last_key(),
-        };*/
-
         match message {
             SectionInfoMsg::GetSectionQuery(public_key) => {
                 let name = XorName::from(public_key);
@@ -70,10 +63,10 @@ impl Core {
                 let response = SectionInfoMsg::GetSectionResponse(response);
                 debug!("Sending {:?} to {}", response, sender);
 
-                // FIXME: we need to build the dst_location for the response
-                unimplemented!()
-                /*
-                let dst_location = ....
+                // Provide our PK as the dst PK, only redundant as the message
+                // itself contains details regarding relocation/registration.
+                dst_location.set_section_pk(*self.section().chain().last_key());
+
                 match WireMsg::new_section_info_msg(&response, dst_location) {
                     Ok(wire_msg) => vec![Command::SendMessage {
                         recipients: vec![(name, sender)],
@@ -85,7 +78,6 @@ impl Core {
                         vec![]
                     }
                 }
-                */
             }
             SectionInfoMsg::GetSectionResponse(response) => {
                 error!("GetSectionResponse unexpectedly received: {:?}", response);
@@ -97,7 +89,7 @@ impl Core {
     pub(crate) fn handle_section_knowledge_query(
         &self,
         given_key: Option<bls::PublicKey>,
-        msg: Box<NodeMsg>,
+        returned_msg: Box<NodeMsg>,
         sender: SocketAddr,
         src_name: XorName,
         dst_location: DstLocation,
@@ -110,28 +102,19 @@ impl Core {
         };
         let truncated_chain = chain.get_proof_chain_to_current(&given_key)?;
         let section_auth = self.section.section_signed_authority_provider();
-        let variant = NodeMsg::SectionKnowledge {
+        let node_msg = NodeMsg::SectionKnowledge {
             src_info: (section_auth.clone(), truncated_chain),
-            msg: Some(msg),
+            msg: Some(returned_msg),
         };
 
-        let msg = WireMsg::single_src(
+        let dst_section_key = self.section_key_by_name(&src_name);
+        let wire_msg = WireMsg::single_src(
             self.node(),
-            dst_location,
-            variant,
+            DstLocation::DirectAndUnrouted(dst_section_key),
+            node_msg,
             self.section.authority_provider().section_key(),
         )?;
-        let key = self.section_key_by_name(&src_name);
 
-        unimplemented!();
-        /*
-        Ok(Command::send_message_to_node(
-            (src_name, sender),
-            msg,
-            DstInfo {
-                dst: src_name,
-                dst_section_pk: key,
-            },
-        ))*/
+        Ok(Command::send_message_to_node((src_name, sender), wire_msg))
     }
 }

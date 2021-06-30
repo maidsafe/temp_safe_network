@@ -22,5 +22,5 @@ pub struct PlainMessage {
     /// The latest key of the destination section according to the sender's knowledge.
     pub dst_key: BlsPublicKey,
     /// Message body.
-    pub variant: NodeMsg,
+    pub node_msg: NodeMsg,
 }

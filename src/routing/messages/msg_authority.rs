@@ -28,7 +28,7 @@ pub trait NodeMsgAuthorityUtils {
 
     // Verify if the section key of the NodeMsgAuthority can be trusted
     // based on a set of known keys.
-    fn verify_src_section_chain(&self, known_keys: &[BlsPublicKey]) -> bool;
+    fn verify_src_section_key(&self, known_keys: &[BlsPublicKey]) -> bool;
 }
 
 impl NodeMsgAuthorityUtils for NodeMsgAuthority {
@@ -68,7 +68,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
 
     // Verify if the section key of the NodeMsgAuthority can be trusted
     // based on a set of known keys.
-    fn verify_src_section_chain(&self, known_keys: &[BlsPublicKey]) -> bool {
+    fn verify_src_section_key(&self, known_keys: &[BlsPublicKey]) -> bool {
         match &self {
             NodeMsgAuthority::Node(_) => true,
             NodeMsgAuthority::BlsShare(BlsShareSigned { section_pk, .. })

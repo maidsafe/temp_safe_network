@@ -60,11 +60,6 @@ impl WireMsgHeader {
         }
     }
 
-    // Set a new dst_location in the message envelope
-    pub fn set_dst_location(&mut self, dst_location: DstLocation) {
-        self.msg_envelope.dst_location = dst_location;
-    }
-
     // Parses the provided bytes to deserialize a WireMsgHeader,
     // returning the created WireMsgHeader, as well as the remaining bytes which
     // correspond to the message payload. The caller shall then take care of

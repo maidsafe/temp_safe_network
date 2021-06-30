@@ -49,7 +49,7 @@ impl Core {
         if !dst_location.contains(&self.node.name(), self.section.prefix()) {
             // Message is not for us
             info!("Relay message {} closer to the destination", msg_id);
-            if let Some(cmds) = self.relay_message(&wire_msg).await? {
+            if let Some(cmds) = self.relay_message(wire_msg).await? {
                 return Ok(vec![cmds]);
             } else {
                 return Ok(vec![]);
@@ -127,14 +127,14 @@ impl Core {
                     }
                 };
 
-                // We send this message to be handled by the upper Node layer
-                // through the public event stream API
                 let is_in_destination = match dst_location.name() {
                     Some(dst_name) => self.section().prefix().matches(&dst_name),
                     None => true, // it's a DirectAndUnrouted dst
                 };
 
                 if is_in_destination {
+                    // We send this message to be handled by the upper Node layer
+                    // through the public event stream API
                     let event = Event::ClientMsgReceived {
                         msg: Box::new(msg),
                         client_signed,
@@ -159,7 +159,7 @@ impl Core {
                             return Ok(vec![]);
                         }
                     };
-                    match self.relay_message(&to_relay).await {
+                    match self.relay_message(to_relay).await {
                         Ok(Some(cmd)) => return Ok(vec![cmd]),
                         Ok(None) => {
                             error!("Failed to relay msg, no cmd returned.");
@@ -195,9 +195,9 @@ impl Core {
             .chain(iter::once(*self.section.genesis_key()))
             .collect();
 
-        if !msg_authority.verify_src_section_chain(&known_keys) {
+        if !msg_authority.verify_src_section_key(&known_keys) {
             debug!("Untrusted message from {:?}: {:?} ", sender, node_msg);
-            let cmd = self.handle_untrusted_message(sender, &node_msg, &msg_authority)?;
+            let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
             return Ok(vec![cmd]);
         }
         trace!(
@@ -218,9 +218,13 @@ impl Core {
         }
 
         if shall_be_handled {
-            trace!("Entropy check passed. Handling useful msg {:?}!", msg_id);
+            trace!(
+                "Entropy check passed. Handling verified node msg {}",
+                msg_id
+            );
+
             commands.extend(
-                self.handle_valid_message(
+                self.handle_verified_node_message(
                     sender,
                     msg_id,
                     msg_authority,
@@ -237,7 +241,7 @@ impl Core {
 
     // Hanlder for node messages which have successfully
     // passed all signature checks and msg verifications
-    async fn handle_valid_message(
+    async fn handle_verified_node_message(
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,
@@ -255,6 +259,7 @@ impl Core {
             return Ok(vec![]);
         };
         */
+
         let src_name = msg_authority.name();
 
         match node_msg {
@@ -284,33 +289,22 @@ impl Core {
                 }
 
                 self.update_section_knowledge(src_signed_sap, src_chain);
-                unimplemented!()
-                /*
-                if let Some(message) = msg {
-                    // This included message shall be sent from us originally.
-                    // Now send it back with the latest knowledge of the destination section.
-                    let addr = if let Some(addr) = sender {
-                        addr
-                    } else {
-                        error!("SectionKnowledge bounced message {:?} doesn't have addr of sender {:?}", message, src_name);
-                        return Ok(vec![]);
-                    };
+                if let Some(node_msg) = msg {
+                    // This included message shall have been sent from us originally.
+                    // Now re-send it with the latest knowledge of the destination section.
                     let dst_section_pk = self
                         .network
                         .key_by_name(&src_name)
                         .map_err(|_| Error::NoMatchingSection)?;
-                    let cmd = Command::send_message_to_node(
-                        (src_name, addr),
-                        *message,
-                        DstInfo {
-                            dst: src_name,
-                            dst_section_pk,
-                        },
-                    );
-                    Ok(vec![cmd])
+
+                    Ok(vec![self.send_direct_message(
+                        (src_name, sender),
+                        *node_msg,
+                        dst_section_pk,
+                    )?])
                 } else {
                     Ok(vec![])
-                }*/
+                }
             }
             NodeMsg::Sync {
                 ref section,
@@ -328,7 +322,7 @@ impl Core {
                         "Untrusted Sync message from {:?} and section: {:?} ",
                         sender, section
                     );
-                    let cmd = self.handle_untrusted_message(sender, &node_msg, &msg_authority)?;
+                    let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
                     Ok(vec![cmd])
                 }
             }
@@ -366,33 +360,8 @@ impl Core {
                 self.handle_join_as_relocated_request(
                     msg_authority.peer(sender)?,
                     *join_request,
-                    &known_keys,
+                    known_keys,
                 )
-            }
-            NodeMsg::UserMessage(ref content) => {
-                // If elder, always handle UserMessage, otherwise
-                // handle it only if addressed directly to us as a node.
-                unimplemented!();
-                /*
-                TODO: remove the UserMessage type, users of routing now pass a WireMsg
-                to routing API.
-
-                let our_dst = DstLocation::Node {
-                    name: self.node.name(),
-                    section_pk: *self.section.chain().last_key(),
-                };
-                if self.is_not_elder() && node_msg.dst != our_dst {
-                    return Ok(vec![]);
-                }
-
-                self.handle_user_message(
-                    Bytes::from(content.clone()),
-                    msg_authority.src_location(),
-                    dst_location,
-                    node_msg.section_pk,
-                    node_msg.keyed_sig(),
-                )
-                .await*/
             }
             NodeMsg::BouncedUntrustedMessage {
                 msg: bounced_msg,
@@ -458,7 +427,7 @@ impl Core {
                             .has_key(&sig_share.public_key_set.public_key())
                         {
                             let cmd =
-                                self.handle_untrusted_message(sender, &node_msg, &msg_authority)?;
+                                self.handle_untrusted_message(sender, node_msg, msg_authority)?;
                             return Ok(vec![cmd]);
                         }
                     }
