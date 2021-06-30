@@ -19,11 +19,11 @@ use crate::types::{
     register::{Action, Address, Entry, Register, RegisterOp, User},
     PublicKey,
 };
-use log::info;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
 };
+use tracing::info;
 
 /// Operations over the data type Register.
 pub(super) struct RegisterStorage {

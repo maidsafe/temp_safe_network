@@ -22,9 +22,6 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[non_exhaustive]
 /// Node error variants.
 pub enum Error {
-    /// FlexiLogger error
-    #[error("Failed to start logging :: {0}")]
-    FlexiLoggerError(#[from] flexi_logger::FlexiLoggerError),
     /// Attempted to perform an operation meant only for Adults when we are not one.
     #[error("Attempted Adult operation when not an Adult")]
     NotAnAdult,

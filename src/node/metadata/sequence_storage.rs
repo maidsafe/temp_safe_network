@@ -20,12 +20,12 @@ use crate::types::{
     Error as DtError, PublicKey, Sequence, SequenceAction, SequenceAddress, SequenceEntry,
     SequenceIndex, SequenceOp, SequenceUser,
 };
-use log::{debug, info};
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::Path,
 };
+use tracing::{debug, info};
 
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {

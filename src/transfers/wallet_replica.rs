@@ -18,9 +18,9 @@ use crate::types::{
     TransferValidationProposed,
 };
 use bls::{PublicKeySet, PublicKeyShare};
-use log::{debug, error};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
+use tracing::{debug, error};
 
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{

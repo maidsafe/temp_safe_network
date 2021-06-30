@@ -24,9 +24,9 @@ use crate::node::{
     Error, Node, Result,
 };
 use crate::routing::ELDER_SIZE;
-use log::{debug, info};
 use std::sync::Arc;
 use tokio::{sync::RwLock, task::JoinHandle};
+use tracing::{debug, info};
 use xor_name::XorName;
 
 const DATA_SECTION_TARGET_COUNT: usize = 3;
@@ -228,11 +228,11 @@ impl Node {
                             .set_node_wallet(node_id, wallet_id, *age);
                         Ok(vec![])
                     } else {
+                        let our_prefix = network_api.our_prefix().await;
+
                         debug!(
                             "{:?}: Couldn't find node id {} when adding wallet {}",
-                            network_api.our_prefix().await,
-                            node_id,
-                            wallet_id
+                            our_prefix, node_id, wallet_id
                         );
                         Err(Error::NodeNotFoundForReward)
                     }?;
@@ -249,10 +249,10 @@ impl Node {
                         let _wallet = elder.section_funds.read().await.get_node_wallet(&node_name);
                         Ok(vec![]) // not yet implemented
                     } else {
+                        let our_prefix = network_api.our_prefix().await;
                         debug!(
                             "{:?}: Couldn't find node {} when getting wallet.",
-                            network_api.our_prefix().await,
-                            node_name,
+                            our_prefix, node_name,
                         );
                         Err(Error::NodeNotFoundForReward)
                     }?;

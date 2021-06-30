@@ -15,10 +15,10 @@ use crate::types::{
 };
 use bls::PublicKeySet;
 use dashmap::DashMap;
-use log::info;
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
+use tracing::info;
 use xor_name::Prefix;
 
 #[cfg(feature = "simulated-payouts")]
@@ -26,8 +26,8 @@ use {
     crate::node::node_ops::NodeDuty,
     crate::types::{Signature, SignedCredit, SignedDebit, Transfer},
     bls::{SecretKey, SecretKeySet},
-    log::debug,
     rand::thread_rng,
+    tracing::debug,
 };
 
 type Stores = DashMap<PublicKey, Arc<RwLock<TransferStore<ReplicaEvent>>>>;

@@ -14,12 +14,12 @@ use crate::messaging::{
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
 use crate::types::PublicKey;
-use log::{debug, error, info, trace, warn};
 use qp2p::IncomingMessages;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
 };
+use tracing::{debug, error, info, trace, warn};
 
 impl Session {
     /// Remove a pending transfer sender from the listener map

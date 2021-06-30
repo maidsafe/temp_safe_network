@@ -16,13 +16,13 @@ use crate::messaging::{
 use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey, TransferValidated};
 use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
 use itertools::Itertools;
-use log::{debug, error, info, trace, warn};
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},
     task::JoinHandle,
     time::timeout,
 };
+use tracing::{debug, error, info, trace, warn};
 use xor_name::XorName;
 
 // Number of attemps when retrying to send a message to a node

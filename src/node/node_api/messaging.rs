@@ -16,8 +16,8 @@ use crate::node::{
     Error, Result,
 };
 use crate::routing::XorName;
-use log::{error, trace};
 use std::collections::BTreeSet;
+use tracing::{error, trace};
 
 pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
     let our_prefix = network.our_prefix().await;

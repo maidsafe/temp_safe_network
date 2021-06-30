@@ -12,9 +12,9 @@ macro_rules! with_chaos {
     ( $x:expr) => {{
         #[cfg(feature = "chaos")]
         {
-            use log::{debug, warn};
             use rand::distributions::{Distribution, Uniform};
             use std::env;
+            use tracing::{debug, warn};
 
             let mut rng = rand::thread_rng();
             // 20% chance of happening

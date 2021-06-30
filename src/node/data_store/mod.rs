@@ -21,12 +21,12 @@ use crate::node::utils;
 use crate::node::{Error, Result};
 use crate::types::{register::Register, Chunk, Map, Sequence};
 use data::{Data, DataId};
-use log::{info, trace};
 use std::{
     fs::Metadata,
     marker::PhantomData,
     path::{Path, PathBuf},
 };
+use tracing::{info, trace};
 
 use tokio::fs::{self, DirEntry, File};
 use tokio::io::AsyncWriteExt; // for write_all()
@@ -108,18 +108,19 @@ impl<T: Data> DataStore<T> {
         let consumed_space = serialised_chunk.len() as u64;
 
         info!("consumed space: {:?}", consumed_space);
-        info!("max : {:?}", self.used_space.max_capacity().await);
-        info!("use space total : {:?}", self.used_space.total().await);
+        let max_capacity = self.used_space.max_capacity().await;
+        info!("max : {:?}", max_capacity);
+        let used_total_space = self.used_space.total().await;
+        info!("use space total : {:?}", used_total_space);
 
         let file_path = self.file_path(chunk.id())?;
         self.do_delete(&file_path).await?;
 
         // pre-reserve space
         self.used_space.increase(self.id, consumed_space).await?;
-        trace!(
-            "use space total after add: {:?}",
-            self.used_space.total().await
-        );
+
+        let used_total_space_after = self.used_space.total().await;
+        trace!("use space total after add: {:?}", used_total_space_after);
 
         let mut file = File::create(&file_path).await?;
         let res = file.write_all(&serialised_chunk).await;

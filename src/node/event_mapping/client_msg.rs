@@ -16,7 +16,7 @@ use crate::node::{
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error,
 };
-use log::warn;
+use tracing::warn;
 
 pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
     match msg {

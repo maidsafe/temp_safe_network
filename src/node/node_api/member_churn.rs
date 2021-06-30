@@ -22,8 +22,8 @@ use crate::node::{
 };
 use crate::routing::XorName;
 use crate::types::{ActorHistory, NodeAge, PublicKey};
-use log::info;
 use std::collections::BTreeMap;
+use tracing::info;
 
 impl Node {
     /// If we are an oldie we'll have a transfer instance,

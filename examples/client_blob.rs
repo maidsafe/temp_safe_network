@@ -16,10 +16,12 @@ use std::{
     time::Duration,
 };
 use tokio::time::sleep;
+use tracing::{debug, error, info, span, warn, Level};
+use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     println!("Reading network bootstrap information...");
     let bootstrap_contacts = read_network_conn_info()?;

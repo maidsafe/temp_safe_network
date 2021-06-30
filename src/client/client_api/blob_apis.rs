@@ -14,9 +14,9 @@ use crate::client::Error;
 use crate::messaging::client::{ChunkRead, ChunkWrite, DataCmd, DataQuery, Query, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
 use bincode::{deserialize, serialize};
-use log::{info, trace};
 use self_encryption::{DataMap, SelfEncryptor};
 use serde::{Deserialize, Serialize};
+use tracing::{info, trace};
 
 #[derive(Serialize, Deserialize)]
 enum DataMapLevel {

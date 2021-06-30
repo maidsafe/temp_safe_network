@@ -27,13 +27,16 @@
     unused_results
 )]
 
-use anyhow::Result;
-use log::{self, error, info};
-use safe_network::node::{add_connection_info, set_connection_info, utils, Config, Error, Node};
+use anyhow::{Error as AnyhowError, Result};
+use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
+use tracing::{self, error, info};
+use tracing_subscriber;
+use tracing_subscriber::filter::EnvFilter;
+const MODULE_NAME: &str = "safe_network";
 
 const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 use safe_network::routing;
@@ -45,8 +48,8 @@ fn main() {
         .stack_size(8 * 1024 * 1024)
         .spawn(move || {
             let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(run_node());
-            Ok::<(), std::io::Error>(())
+            rt.block_on(run_node())?;
+            Ok::<(), AnyhowError>(())
         });
 
     match sn_node_thread {
@@ -58,12 +61,12 @@ fn main() {
     }
 }
 
-async fn run_node() {
+async fn run_node() -> Result<()> {
     let config = match Config::new() {
         Ok(cfg) => cfg,
         Err(e) => {
             println!("Failed to create Config: {:?}", e);
-            return exit(1);
+            return Ok(exit(1));
         }
     };
 
@@ -80,16 +83,56 @@ async fn run_node() {
             Err(e) => println!("Unknown completions option. {}", e),
         }
         // we exit program on both success and error.
-        return;
+        return Ok(());
     }
 
-    //  Logger handle should be kept in scope
-    let _logger = match utils::init_logging(&config) {
-        Err(e) => {
-            println!("Error setting up logging {:?}", e);
-            return exit(1);
-        }
-        Ok(logger) => logger,
+    // ==============
+    // Set up logging
+    // ==============
+
+    // we manually determine level filter instead of using tracing EnvFilter.
+    let level_filter = config.verbose();
+    let module_log_filter = format!("{}={}", MODULE_NAME, level_filter.to_string());
+
+    let filter = EnvFilter::from_default_env().add_directive(module_log_filter.parse()?);
+
+    // Guard (if we're writing to a file) should be kept in scope until end of main and therefore should not be _optional_guard
+    // https://tracing.rs/tracing_appender/non_blocking/index.html1
+    #[allow(unused)]
+    let optional_guard = if let Some(log_dir) = config.log_dir() {
+        println!("Starting logging to file");
+        let file_appender = tracing_appender::rolling::hourly(log_dir, "sn_node.log");
+
+        // configure how tracing non-blocking works: https://tracing.rs/tracing_appender/non_blocking/struct.nonblockingbuilder#method.default
+        let non_blocking_builder = tracing_appender::non_blocking::NonBlockingBuilder::default();
+
+        let (non_blocking, guard) = non_blocking_builder
+            // lose lines and keep perf, or exert backpressure?
+            .lossy(false)
+            // optionally change buffered lines limit
+            // .buffered_lines_limit(buffered_lines_limit)
+            .finish(file_appender);
+
+        tracing_subscriber::fmt()
+            .with_writer(non_blocking)
+            .with_max_level(level_filter)
+            // eg : .with_env_filter("my_crate=info,my_crate::my_mod=debug,[my_span]=trace")
+            .with_env_filter(filter)
+            .with_thread_names(true)
+            // here we choose log style output... do we want json for prod + analysis?
+            // can be compact, pretty, json... there are more...
+            // .compact()
+            // .pretty()
+            // .json()
+            .init();
+
+        Some(guard)
+    } else {
+        println!("Starting logging to stdout");
+
+        tracing_subscriber::fmt().init();
+
+        None
     };
 
     if config.update() || config.update_only() {
@@ -169,17 +212,16 @@ async fn run_node() {
     }
 
     match node.run(event_stream).await {
-        Ok(()) => exit(0),
+        Ok(()) => Ok(exit(0)),
         Err(e) => {
             println!("Cannot start node due to error: {:?}", e);
             error!("Cannot start node due to error: {:?}", e);
-            exit(1);
+            Ok(exit(1))
         }
     }
 }
 
 fn exit(exit_code: i32) {
-    log::logger().flush();
     process::exit(exit_code);
 }
 
@@ -195,8 +237,8 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
         .fetch()?;
 
     if !releases.is_empty() {
-        log::debug!("Target for update is {}", target);
-        log::debug!("Found releases: {:#?}\n", releases);
+        tracing::debug!("Target for update is {}", target);
+        tracing::debug!("Found releases: {:#?}\n", releases);
         let bin_name = if target.contains("pc-windows") {
             "sn_node.exe"
         } else {

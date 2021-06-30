@@ -22,8 +22,8 @@ use crate::types::{
     DebitId, PublicKey, SignedTransfer, Token, TransferAgreementProof, TransferValidated,
 };
 use bincode::serialize;
-use log::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::channel;
+use tracing::{debug, error, info, trace, warn};
 
 impl Client {
     /// Get the client's current coin balance from the network

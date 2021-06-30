@@ -11,8 +11,8 @@ use crate::types::{
     Credit, CreditAgreementProof, CreditId, PublicKey, ReplicaPublicKeySet, SignatureShare,
     SignedCredit, SignedCreditShare,
 };
-use log::{debug, warn};
 use std::collections::BTreeMap;
+use tracing::{debug, warn};
 
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]

@@ -11,7 +11,8 @@
 mod capacity;
 mod chaos;
 mod chunks;
-mod config_handler;
+/// Configuration handling
+pub mod config_handler;
 mod data_store;
 mod error;
 mod event_mapping;

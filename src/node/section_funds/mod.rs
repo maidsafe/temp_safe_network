@@ -17,8 +17,8 @@ use crate::node::{Error, Result};
 use crate::routing::{Prefix, XorName};
 use crate::types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, Token};
 use dashmap::DashMap;
-use log::info;
 use std::collections::BTreeMap;
+use tracing::info;
 
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.

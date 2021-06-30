@@ -37,11 +37,11 @@ use crate::types::{
     TransferAgreementProof,
 };
 use futures::lock::Mutex;
-use log::{debug, error, info, trace, warn};
 use replica_signing::ReplicaSigningImpl;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
+use tracing::{debug, error, info, trace, warn};
 use xor_name::Prefix;
 
 /*
@@ -229,10 +229,8 @@ impl Transfers {
                     ),
                 };
                 info!("Payment: registration and propagation succeeded. (Store cost: {}, paid amount: {}.)", total_cost, payment.amount());
-                info!(
-                    "Section balance: {}",
-                    self.replicas.balance(payment.recipient()).await?
-                );
+                let section_balance = self.replicas.balance(payment.recipient()).await?;
+                info!("Section balance: {}", section_balance);
                 if let Some(e) = error {
                     let origin = SrcLocation::EndUser(origin);
                     return Ok(vec![NodeDuty::Send(OutgoingMsg {

@@ -10,7 +10,6 @@
                                  // beep
 use crate::node::{Error, Result};
 use crate::routing::TransportConfig as NetworkConfig;
-use log::{debug, Level};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -20,6 +19,7 @@ use std::{
     path::PathBuf,
 };
 use structopt::StructOpt;
+use tracing::{debug, Level};
 
 const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
@@ -149,7 +149,7 @@ impl Config {
         config.merge(command_line_args);
 
         config.clear_data_from_disk().unwrap_or_else(|_| {
-            log::error!("Error deleting data file from disk");
+            tracing::error!("Error deleting data file from disk");
         });
 
         Ok(config)
@@ -286,11 +286,11 @@ impl Config {
     /// Get the log level.
     pub fn verbose(&self) -> Level {
         match self.verbose {
-            0 => Level::Error,
-            1 => Level::Warn,
-            2 => Level::Info,
-            3 => Level::Debug,
-            _ => Level::Trace,
+            0 => Level::ERROR,
+            1 => Level::WARN,
+            2 => Level::INFO,
+            3 => Level::DEBUG,
+            _ => Level::TRACE,
         }
     }
 

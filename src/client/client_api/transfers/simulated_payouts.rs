@@ -13,7 +13,7 @@ use crate::types::Transfer;
 use crate::messaging::client::{Cmd, TransferCmd};
 
 #[cfg(feature = "simulated-payouts")]
-use log::info;
+use tracing::info;
 
 use crate::client::{Client, Error};
 use crate::types::Token;

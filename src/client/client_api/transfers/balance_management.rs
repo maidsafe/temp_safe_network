@@ -12,7 +12,7 @@ use crate::types::{PublicKey, SignedTransfer, Token, TransferAgreementProof};
 
 use crate::client::{Client, Error};
 
-use log::{debug, info, trace};
+use tracing::{debug, info, trace};
 
 /// Handle all token transfers and Write API requests for a given ClientId.
 impl Client {

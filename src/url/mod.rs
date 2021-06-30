@@ -15,10 +15,10 @@ mod xorurl_media_types;
 
 use crate::types::register;
 pub use errors::{Error, Result};
-use log::{info, trace, warn};
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use tracing::{info, trace, warn};
 use url::Url;
 use url_parts::SafeUrlParts;
 use xor_name::{XorName, XOR_NAME_LEN};

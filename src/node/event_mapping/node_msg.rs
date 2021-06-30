@@ -20,7 +20,7 @@ use crate::node::{
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error,
 };
-use log::debug;
+use tracing::debug;
 
 pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
     debug!(
@@ -45,7 +45,7 @@ pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping
             ));
 
             if let SrcLocation::EndUser(_) = src {
-                log::error!("Logic error! EndUser cannot send NodeMsgs. ({:?})", msg);
+                tracing::error!("Logic error! EndUser cannot send NodeMsgs. ({:?})", msg);
                 return Mapping {
                     op: NodeDuty::NoOp,
                     ctx: None,
