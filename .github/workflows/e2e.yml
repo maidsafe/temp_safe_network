@@ -65,7 +65,7 @@ jobs:
 
       - name: Client blob tests against local network
         shell: bash
-        run: timeout 25m cargo test --release -- client_api::blob && sleep 5
+        run: timeout 35m cargo test --release -- client_api::blob && sleep 5
       
       - name: Client transfer tests against local network
         shell: bash
