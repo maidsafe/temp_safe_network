@@ -83,10 +83,6 @@ impl Core {
                 error!("GetSectionResponse unexpectedly received: {:?}", response);
                 vec![]
             }
-            SectionInfoMsg::SectionInfoUpdate(error) => {
-                error!("SectionInfoUpdate received: {:?}", error);
-                vec![]
-            }
         }
     }
 

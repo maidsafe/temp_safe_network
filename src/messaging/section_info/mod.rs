@@ -8,7 +8,7 @@
 
 mod errors;
 
-use crate::messaging::{MessageId, MessageType, SectionAuthorityProvider, WireMsg};
+use crate::messaging::{MessageType, SectionAuthorityProvider, WireMsg};
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -24,17 +24,6 @@ pub enum SectionInfoMsg {
     GetSectionQuery(PublicKey),
     /// Response to `GetSectionQuery`.
     GetSectionResponse(GetSectionResponse),
-    /// Updated info related to section
-    SectionInfoUpdate(ErrorResponse),
-}
-
-/// Infrastructure error wrapper to add correltion info for triggering message
-#[derive(Debug, Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
-pub struct ErrorResponse {
-    /// Optional correlation id if this messge is in response to some non network info query/cmd
-    pub correlation_id: MessageId,
-    /// Section data error message
-    pub error: Error,
 }
 
 /// Information about a section.
@@ -46,8 +35,6 @@ pub enum GetSectionResponse {
     /// Response to `GetSectionQuery` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
     Redirect(SectionAuthorityProvider),
-    /// Request could not be fulfilled due to section constellation updates
-    SectionInfoUpdate(Error),
 }
 
 impl SectionInfoMsg {
