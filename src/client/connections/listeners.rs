@@ -10,7 +10,7 @@ use super::Session;
 use crate::client::Error;
 use crate::messaging::{
     client::{ClientMsg, CmdError, Event, ProcessMsg, TransferError},
-    section_info::{Error as SectionInfoError, GetSectionResponse, SectionInfoMsg},
+    section_info::{GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
 use crate::types::PublicKey;
@@ -111,23 +111,6 @@ impl Session {
                 debug!("GetSectionResponse::Success!");
                 self.update_session_info(info).await
             }
-            SectionInfoMsg::GetSectionResponse(GetSectionResponse::SectionInfoUpdate(
-                SectionInfoError::InvalidBootstrap(err),
-            )) => {
-                warn!(
-                    "Message was interrupted due to {:?}. Attempting to connect to elders again.",
-                    err
-                );
-                self.connect_to_elders().await?;
-                Ok(())
-            }
-            SectionInfoMsg::GetSectionResponse(GetSectionResponse::SectionInfoUpdate(
-                SectionInfoError::TargetSectionInfoOutdated(sap),
-            )) => {
-                debug!("Updated section info received: {:?}", sap);
-                self.update_session_info(sap).await?;
-                Ok(())
-            }
             SectionInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(sap)) => {
                 trace!("GetSectionResponse::Redirect, reboostrapping with provided peers");
                 // Disconnect from peer that sent us the redirect, connect to the new elders provided and
@@ -147,22 +130,10 @@ impl Session {
 
                 Ok(())
             }
-            SectionInfoMsg::SectionInfoUpdate(update) => {
-                let correlation_id = update.correlation_id;
-                error!("MessageId {:?} was interrupted due to infrastructure updates. This will most likely need to be sent again. Update was : {:?}", correlation_id, update);
-                if let SectionInfoError::TargetSectionInfoOutdated(sap) = update.clone().error {
-                    trace!("Updated network info: ({:?})", sap);
-                    self.update_session_info(&sap).await?;
-                }
-                Ok(())
-            }
-            SectionInfoMsg::GetSectionResponse(GetSectionResponse::SectionInfoUpdate(_))
-            | SectionInfoMsg::GetSectionQuery { .. } => {
-                Err(Error::UnexpectedMessageOnJoin(format!(
-                    "bootstrapping failed since an invalid response ({:?}) was received",
-                    msg
-                )))
-            }
+            SectionInfoMsg::GetSectionQuery { .. } => Err(Error::UnexpectedMessageOnJoin(format!(
+                "bootstrapping failed since an invalid response ({:?}) was received",
+                msg
+            ))),
         }
     }
 
