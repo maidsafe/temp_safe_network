@@ -13,7 +13,7 @@ use crate::messaging::{
         DstInfo, KeyedSig, MembershipState, NodeMsg, NodeState, PlainMessage, Proposal,
         SectionSigned,
     },
-    DstLocation, SectionAuthorityProvider,
+    DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     dkg::SectionSignedUtils,
@@ -40,8 +40,6 @@ impl Core {
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         debug!("handle agreement on {:?}", proposal);
-        unimplemented!();
-        /*
         match proposal {
             Proposal::Online {
                 node_state,
@@ -84,7 +82,6 @@ impl Core {
                 Ok(vec![])
             }
         }
-        */
     }
 
     async fn handle_online_agreement(
@@ -93,8 +90,6 @@ impl Core {
         previous_name: Option<XorName>,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        unimplemented!();
-        /*
         let mut commands = vec![];
         if let Some(old_info) = self
             .section
@@ -157,7 +152,6 @@ impl Core {
         self.print_network_stats();
 
         Ok(commands)
-        */
     }
 
     async fn handle_offline_agreement(
@@ -165,8 +159,6 @@ impl Core {
         node_state: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        unimplemented!();
-        /*
         let mut commands = vec![];
         let peer = node_state.peer;
         let age = peer.age();
@@ -198,7 +190,6 @@ impl Core {
         .await;
 
         Ok(commands)
-        */
     }
 
     fn handle_section_info_agreement(
@@ -206,8 +197,6 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        unimplemented!();
-        /*
         let mut commands = vec![];
         let equal_or_extension = section_auth.prefix() == *self.section.prefix()
             || section_auth.prefix().is_extension_of(self.section.prefix());
@@ -231,9 +220,9 @@ impl Core {
                 .map(|peer| (*peer.name(), *peer.addr()))
                 .collect();
             if !sync_recipients.is_empty() {
-                let sync_message = NodeMsg::single_src(
+                let wire_msg = WireMsg::single_src(
                     &self.node,
-                    DstLocation::DirectAndUnrouted,
+                    DstLocation::DirectAndUnrouted(sig.public_key),
                     NodeMsg::Sync {
                         section: self.section.clone(),
                         network: self.network.clone(),
@@ -244,11 +233,7 @@ impl Core {
                 commands.push(Command::send_message_to_nodes(
                     sync_recipients,
                     len,
-                    sync_message,
-                    DstInfo {
-                        dst: XorName::random(),
-                        dst_section_pk: sig.public_key,
-                    },
+                    wire_msg,
                 ));
             }
 
@@ -267,7 +252,6 @@ impl Core {
         }
 
         Ok(commands)
-        */
     }
 
     async fn handle_our_elders_agreement(
@@ -275,9 +259,6 @@ impl Core {
         section_auth: SectionSigned<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        unimplemented!();
-
-        /*
         let updates = self
             .split_barrier
             .process(self.section.prefix(), section_auth, key_sig);
@@ -298,7 +279,6 @@ impl Core {
         }
 
         self.update_state(snapshot).await
-        */
     }
 
     fn handle_accumulate_at_src_agreement(

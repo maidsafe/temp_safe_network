@@ -67,14 +67,11 @@ pub(crate) trait WireMsgUtils {
     fn section_src(
         plain: PlainMessage,
         sig: KeyedSig,
-        section_chain: SecuredLinkedList,
+        src_section_chain: SecuredLinkedList,
     ) -> Result<WireMsg>;
 
     /// Getter
     fn keyed_sig(&self) -> Option<KeyedSig>;
-
-    /// Returns an updated message with the provided Section key i.e. known to be latest.
-    fn updated_with_latest_key(&mut self, section_pk: BlsPublicKey);
 }
 
 impl WireMsgUtils for WireMsg {
@@ -243,7 +240,7 @@ impl WireMsgUtils for WireMsg {
         node: &Node,
         dst: DstLocation,
         node_msg: NodeMsg,
-        section_pk: BlsPublicKey,
+        src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg> {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
@@ -251,7 +248,7 @@ impl WireMsgUtils for WireMsg {
         let signature = ed25519::sign(&msg_payload, &node.keypair);
         let msg_authority = NodeMsgAuthority::Node(NodeSigned {
             public_key: node.keypair.public,
-            section_pk,
+            section_pk: src_section_pk,
             signature,
         });
 
@@ -293,11 +290,6 @@ impl WireMsgUtils for WireMsg {
             None
         }
         */
-    }
-
-    fn updated_with_latest_key(&mut self, section_pk: BlsPublicKey) {
-        unimplemented!();
-        //self.section_pk = section_pk
     }
 }
 

@@ -148,6 +148,16 @@ impl DstLocation {
         }
     }
 
+    /// Updates the section pk if it's not EndUser.
+    pub fn set_section_pk(&mut self, pk: BlsPublicKey) {
+        match self {
+            Self::EndUser(_) => {}
+            Self::Node { section_pk, .. } => *section_pk = pk,
+            Self::Section { section_pk, .. } => *section_pk = pk,
+            Self::DirectAndUnrouted(section_pk) => *section_pk = pk,
+        }
+    }
+
     /// Returns whether the given name of the given prefix is part of this location.
     ///
     /// Returns None if `prefix` does not match `name`.
@@ -175,6 +185,16 @@ impl DstLocation {
             Self::Node { name, .. } => Some(*name),
             Self::Section { name, .. } => Some(*name),
             Self::DirectAndUnrouted(_) => None,
+        }
+    }
+
+    /// Updates the name of this location if it's not `DirectAndUnrouted`.
+    pub fn set_name(&mut self, new_name: XorName) {
+        match self {
+            Self::EndUser(EndUser { xorname, .. }) => *xorname = new_name,
+            Self::Node { name, .. } => *name = new_name,
+            Self::Section { name, .. } => *name = new_name,
+            Self::DirectAndUnrouted(_) => {}
         }
     }
 }

@@ -250,29 +250,20 @@ impl JoiningAsRelocated {
         info!("Sending {:?} to {:?}", join_request, recipients);
 
         let node_msg = NodeMsg::JoinAsRelocatedRequest(Box::new(join_request));
-        let routing_msg = WireMsg::single_src(
+        let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted(self.dst_section_key),
             node_msg,
             self.dst_section_key,
         )?;
-        unimplemented!();
-        /*
-        let message = MessageType::Node {
-            msg: routing_msg,
-            dst_info: DstInfo {
-                dst: recipients[0].0,
-                dst_section_pk: self.dst_section_key,
-            },
-        };
 
         let cmd = Command::SendMessage {
             recipients: recipients.to_vec(),
             delivery_group_size: recipients.len(),
-            message,
+            wire_msg,
         };
 
-        Ok(cmd)*/
+        Ok(cmd)
     }
 
     fn check_autority_provider(

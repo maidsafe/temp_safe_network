@@ -56,11 +56,11 @@ impl Core {
 
             let redirect_sap = self.matching_section(peer.name())?;
 
-            let variant = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(redirect_sap)));
-            trace!("Sending {:?} to {}", variant, peer);
+            let node_msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(redirect_sap)));
+            trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![self.send_direct_message(
                 (*peer.name(), *peer.addr()),
-                variant,
+                node_msg,
                 *self.section.chain().last_key(),
             )?]);
         }
@@ -78,14 +78,14 @@ impl Core {
                 "Rejecting JoinRequest from {} - joins currently not allowed.",
                 peer,
             );
-            let variant = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+            let node_msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                 JoinRejectionReason::JoinsDisallowed,
             )));
 
-            trace!("Sending {:?} to {}", variant, peer);
+            trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![self.send_direct_message(
                 (*peer.name(), *peer.addr()),
-                variant,
+                node_msg,
                 *self.section.chain().last_key(),
             )?]);
         }
@@ -109,13 +109,13 @@ impl Core {
             }
         } else if peer.age() != MIN_ADULT_AGE {
             // After section split, new node has to join with age of MIN_ADULT_AGE.
-            let variant = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(
+            let node_msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(
                 self.section.authority_provider().clone(),
             )));
-            trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", variant, peer);
+            trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
             return Ok(vec![self.send_direct_message(
                 (*peer.name(), *peer.addr()),
-                variant,
+                node_msg,
                 *self.section.chain().last_key(),
             )?]);
         }
@@ -159,14 +159,14 @@ impl Core {
         let relocate_payload = if let Some(relocate_payload) = join_request.relocate_payload {
             relocate_payload
         } else {
-            let variant = NodeMsg::JoinAsRelocatedResponse(Box::new(
+            let node_msg = NodeMsg::JoinAsRelocatedResponse(Box::new(
                 JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
             ));
 
-            trace!("Sending {:?} to {}", variant, peer);
+            trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![self.send_direct_message(
                 (*peer.name(), *peer.addr()),
-                variant,
+                node_msg,
                 *self.section.chain().last_key(),
             )?]);
         };
@@ -180,13 +180,13 @@ impl Core {
                 self.section.prefix()
             );
 
-            let variant = NodeMsg::JoinAsRelocatedResponse(Box::new(
+            let node_msg = NodeMsg::JoinAsRelocatedResponse(Box::new(
                 JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
             ));
-            trace!("Sending {:?} to {}", variant, peer);
+            trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![self.send_direct_message(
                 (*peer.name(), *peer.addr()),
-                variant,
+                node_msg,
                 *self.section.chain().last_key(),
             )?]);
         }
@@ -221,16 +221,22 @@ impl Core {
         }
 
         // Check for signatures and trust of the relocate_payload msg
-        /* FIXME: check section pk is known to us
-        let payload_sig = relocate_payload.section_signed;
-        if !payload_sig
-            .section_pk
-            .verify(&relocate_payload.details, &payload_sig.sig)
-            || known_keys
-                .iter()
-                .find(|key| **key == payload_sig.section_pk)
-                .is_none()
-        {
+        let payload_section_signed = relocate_payload.section_signed;
+        unimplemented!();
+        /*
+        TODO: serialise relocation details
+        let serialised_relocate_details = bincode::serialize(relocate_payload.details);
+
+        let is_signautre_valid = payload_section_signed.section_pk.verify(
+            &payload_section_signed.sig.signature,
+            serialised_relocate_details,
+        );
+        let is_key_unknown = known_keys
+            .iter()
+            .find(|key| **key == payload_section_signed.section_pk)
+            .is_none();
+
+        if !is_signautre_valid || is_key_unknown {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - invalid signature or untrusted src.",
                 peer
@@ -238,7 +244,6 @@ impl Core {
             return Ok(vec![]);
         }
         */
-
         // Requires the node name matches the age.
         let age = details.age;
         if age != peer.age() {

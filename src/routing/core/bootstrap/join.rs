@@ -11,7 +11,7 @@ use crate::messaging::{
         DstInfo, JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, ResourceProofResponse,
         Section,
     },
-    DstLocation, MessageType, NodeMsgAuthority, NodeSigned, WireMsg,
+    DstLocation, MessageType, MsgKind, NodeMsgAuthority, NodeSigned, WireMsg,
 };
 use crate::routing::{
     dkg::SectionSignedUtils,
@@ -304,37 +304,56 @@ impl<'a> Join<'a> {
         Ok(())
     }
 
+    // TODO: receive JoinResponse from the JoinResponse handler directly,
+    // analogous to the JoinAsRelocated flow.
     async fn receive_join_response(&mut self) -> Result<(JoinResponse, SocketAddr, XorName)> {
         while let Some(event) = self.recv_rx.recv().await {
             // we are interested only in `JoinResponse` type of messages
             let (join_response, sender, src_name) = match event {
-                ConnectionEvent::Received((sender, bytes)) => match WireMsg::deserialize(bytes) {
-                    Ok(MessageType::Client { .. }) | Ok(MessageType::SectionInfo { .. }) => {
-                        continue
-                    }
-                    Ok(MessageType::Node {
-                        msg_id,
-                        msg_authority: NodeMsgAuthority::Node(NodeSigned { public_key, .. }),
-                        dst_location,
-                        msg: NodeMsg::JoinResponse(resp),
-                    }) => (*resp, sender, ed25519::name(&public_key)),
-                    Ok(MessageType::Node {
-                        msg_id,
-                        msg_authority,
-                        dst_location,
-                        msg,
-                    }) => {
-                        self.backlog_message(Command::HandleMessage {
-                            sender: Some(sender),
-                            msg_id,
-                            msg_authority,
-                            dst_location,
-                            msg,
-                        });
-                        continue;
-                    }
-                    Err(error) => {
-                        debug!("Failed to deserialize message: {}", error);
+                ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
+                    Ok(wire_msg) => match wire_msg.msg_kind() {
+                        MsgKind::ClientMsg(_) | MsgKind::SectionInfoMsg => continue,
+                        MsgKind::NodeBlsShareSignedMsg(_) | MsgKind::SectionSignedMsg(_) => {
+                            self.backlog_message(Command::HandleMessage { sender, wire_msg });
+                            continue;
+                        }
+                        MsgKind::NodeSignedMsg(NodeSigned { public_key, .. }) => {
+                            // TOOD: find a way we don't need to reconstruct the WireMsg
+                            let msg_id = wire_msg.msg_id();
+                            let payload = wire_msg.payload.clone();
+                            let msg_kind = wire_msg.msg_kind().clone();
+                            let dst_location = wire_msg.dst_location().clone();
+                            let pk = public_key.clone();
+                            match wire_msg.to_message() {
+                                Ok(MessageType::Node {
+                                    msg: NodeMsg::JoinResponse(resp),
+                                    ..
+                                }) => (*resp, sender, ed25519::name(&pk)),
+                                Ok(
+                                    MessageType::Client { .. }
+                                    | MessageType::SectionInfo { .. }
+                                    | MessageType::Node { .. },
+                                ) => {
+                                    // We just put the WireMsg in the backlog then
+                                    if let Ok(wire_msg) =
+                                        WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)
+                                    {
+                                        self.backlog_message(Command::HandleMessage {
+                                            sender,
+                                            wire_msg,
+                                        });
+                                    }
+                                    continue;
+                                }
+                                Err(err) => {
+                                    debug!("Failed to deserialize message payload: {}", err);
+                                    continue;
+                                }
+                            }
+                        }
+                    },
+                    Err(err) => {
+                        debug!("Failed to deserialize message: {}", err);
                         continue;
                     }
                 },

@@ -97,7 +97,7 @@ impl Dispatcher {
 
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
-            Command::HandleWireMessage { sender, wire_msg } => {
+            Command::HandleMessage { sender, wire_msg } => {
                 // TODO: move this to the handlers
                 // Let's see if we need to do a reachability test
                 /*
@@ -152,18 +152,6 @@ impl Dispatcher {
                     .handle_message(sender, wire_msg)
                     .await
             }
-            Command::HandleMessage {
-                sender,
-                msg_id,
-                msg_authority,
-                dst_location,
-                msg,
-            } => {
-                unimplemented!();
-                /*
-                TODO: this command will go away anyways
-                */
-            }
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
             Command::HandleAgreement { proposal, sig } => {
                 self.core
@@ -199,10 +187,9 @@ impl Dispatcher {
                 self.send_message(&recipients, delivery_group_size, wire_msg)
                     .await
             }
-            Command::SendUserMessage {
-                wire_msg,
-                additional_proof_chain_key: _,
-            } => self.core.write().await.send_user_message(wire_msg).await,
+            Command::SendUserMessage(wire_msg) => {
+                self.core.write().await.send_user_message(wire_msg).await
+            }
             Command::ScheduleTimeout { duration, token } => Ok(self
                 .handle_schedule_timeout(duration, token)
                 .await
@@ -309,10 +296,12 @@ impl Dispatcher {
                 .map_err(|e: Error| e)?
             }
             MsgKind::ClientMsg(_) => {
+                // TODO: send them all together without cloning WireMsg
+                // by having the send_on_existing_connection to return SendStatus
                 for (name, addr) in recipients {
                     if self
                         .comm
-                        .send_on_existing_connection(*name, *addr, wire_msg.clone())
+                        .send_on_existing_connection(&[(*name, *addr)], wire_msg.clone())
                         .await
                         .is_err()
                     {
@@ -327,12 +316,11 @@ impl Dispatcher {
                 vec![]
             }
             MsgKind::SectionInfoMsg => {
-                for (name, addr) in recipients {
-                    let _ = self
-                        .comm
-                        .send_on_existing_connection(*name, *addr, wire_msg.clone())
-                        .await;
-                }
+                let _ = self
+                    .comm
+                    .send_on_existing_connection(recipients, wire_msg)
+                    .await;
+
                 vec![]
             }
         };

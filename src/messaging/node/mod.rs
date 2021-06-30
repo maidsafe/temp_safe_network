@@ -79,9 +79,6 @@ pub enum NodeMsg {
         /// Message
         msg: Option<Box<NodeMsg>>,
     },
-    /// User-facing message
-    #[serde(with = "serde_bytes")]
-    UserMessage(Vec<u8>),
     /// Message sent to all members to update them about the state of our section.
     Sync {
         /// Information about our section.
@@ -195,7 +192,6 @@ impl Debug for NodeMsg {
         match self {
             Self::ForwardClientMsg { .. } => f.debug_struct("ForwardClientMsg").finish(),
             Self::SectionKnowledge { .. } => f.debug_struct("SectionKnowledge").finish(),
-            Self::UserMessage(payload) => write!(f, "UserMessage({:10})", HexFmt(payload)),
             Self::Sync { section, network } => f
                 .debug_struct("Sync")
                 .field("section_auth", &section.section_auth.value)

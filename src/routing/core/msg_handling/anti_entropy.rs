@@ -25,7 +25,7 @@ use std::{cmp::Ordering, net::SocketAddr};
 impl Core {
     pub async fn check_for_entropy(
         &self,
-        msg: &NodeMsg,
+        node_msg: &NodeMsg,
         msg_authority: &NodeMsgAuthority,
         dst_location: &DstLocation,
         sender: SocketAddr,
@@ -39,9 +39,15 @@ impl Core {
         let (command, shall_be_handled) = match dst_location.section_pk() {
             None => return Ok((None, true)),
             Some(section_pk) => {
-                match process(&self.node, &self.section, msg, msg_authority, section_pk)? {
+                match process(
+                    &self.node,
+                    &self.section,
+                    node_msg,
+                    msg_authority,
+                    section_pk,
+                )? {
                     (Some(msg_to_send), shall_be_handled) => {
-                        let command = self.relay_message(&msg_to_send).await?;
+                        let command = self.relay_message(msg_to_send).await?;
                         (command, shall_be_handled)
                     }
                     (None, shall_be_handled) => (None, shall_be_handled),
@@ -81,7 +87,7 @@ impl Core {
 fn process(
     node: &Node,
     section: &Section,
-    msg: &NodeMsg,
+    node_msg: &NodeMsg,
     msg_authority: &NodeMsgAuthority,
     dst_section_pk: BlsPublicKey,
 ) -> Result<(Option<WireMsg>, bool)> {
@@ -109,7 +115,7 @@ fn process(
             );
             // In case a new node is trying to bootstrap from us, not being its matching section.
             // Reply with no msg and with false flag to send back a JoinResponse::Redirect.
-            if let NodeMsg::JoinRequest(_) = msg {
+            if let NodeMsg::JoinRequest(_) = node_msg {
                 return Ok((None, false));
             }
             section.chain().clone()
@@ -118,7 +124,7 @@ fn process(
         let section_auth = section.section_signed_authority_provider();
         let node_msg = NodeMsg::SectionKnowledge {
             src_info: (section_auth.clone(), chain),
-            msg: Some(Box::new(msg.clone())),
+            msg: Some(Box::new(node_msg.clone())),
         };
         let msg = WireMsg::single_src(
             node,

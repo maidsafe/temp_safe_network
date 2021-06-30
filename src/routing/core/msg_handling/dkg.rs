@@ -9,7 +9,7 @@
 use super::super::Core;
 use crate::messaging::{
     node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, NodeMsg, Proposal},
-    DstLocation, SectionAuthorityProvider,
+    DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     dkg::{commands::DkgCommands, DkgFailureSigSetUtils},
@@ -124,15 +124,7 @@ impl Core {
     }
 
     pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Result<Command> {
-        unimplemented!();
-        /*
-                let variant = NodeMsg::DkgFailureAgreement(failure_set);
-        let message = NodeMsg::single_src(
-            &self.node,
-            DstLocation::DirectAndUnrouted,
-            variant,
-            self.section.authority_provider().section_key(),
-        )?;
-        Ok(self.send_message_to_our_elders(message))*/
+        let node_msg = NodeMsg::DkgFailureAgreement(failure_set);
+        self.send_message_to_our_elders(node_msg)
     }
 }

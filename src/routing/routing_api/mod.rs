@@ -346,15 +346,7 @@ impl Routing {
     /// Send a message.
     /// Messages sent here, either section to section or node to node are signed
     /// and validated upon receipt by routing itself.
-    ///
-    /// `additional_proof_chain_key` is a key to be included in the signed chain attached to the
-    /// message. This is useful when the message contains some data that is signed with a different
-    /// key than the whole message is so that the recipient can verify such key.
-    pub async fn send_message(
-        &self,
-        wire_msg: WireMsg,
-        additional_proof_chain_key: Option<bls::PublicKey>,
-    ) -> Result<()> {
+    pub async fn send_message(&self, wire_msg: WireMsg) -> Result<()> {
         if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
             if self.our_prefix().await.matches(&xorname) {
                 let addr = self
@@ -382,10 +374,7 @@ impl Routing {
             }
         }
 
-        let command = Command::SendUserMessage {
-            wire_msg,
-            additional_proof_chain_key,
-        };
+        let command = Command::SendUserMessage(wire_msg);
         self.dispatcher.clone().handle_commands(command).await
     }
 
@@ -398,12 +387,8 @@ impl Routing {
         user_xorname: XorName,
         mut wire_msg: WireMsg,
     ) -> Result<()> {
-        unimplemented!();
-        /*
-        message.update_dst_info(
-            Some(*self.section_chain().await.last_key()),
-            Some(user_xorname),
-        );
+        wire_msg.set_dst_section_pk(*self.section_chain().await.last_key());
+        wire_msg.set_dst_xorname(user_xorname);
 
         let command = Command::SendMessage {
             recipients: vec![(user_xorname, recipient_addr)],
@@ -411,7 +396,6 @@ impl Routing {
             wire_msg,
         };
         self.dispatcher.clone().handle_commands(command).await
-        */
     }
 
     /// Returns the current BLS public key set if this node has one, or
@@ -490,6 +474,6 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
     };
     let _span_guard = span.enter();
 
-    let command = Command::HandleWireMessage { sender, wire_msg };
+    let command = Command::HandleMessage { sender, wire_msg };
     let _ = task::spawn(dispatcher.handle_commands(command));
 }

@@ -150,7 +150,7 @@ impl Core {
     }
 
     // Send message over the network.
-    pub async fn relay_message(&self, wire_msg: &WireMsg) -> Result<Option<Command>> {
+    pub async fn relay_message(&self, mut wire_msg: WireMsg) -> Result<Option<Command>> {
         let dst_location = wire_msg.dst_location();
         let (presumed_targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
@@ -159,15 +159,12 @@ impl Core {
             &self.network,
         )?;
 
-        let target_name = dst_location.name().ok_or(Error::CannotRoute)?;
-        let dst_pk = self.section_key_by_name(&target_name);
-
         let mut targets = vec![];
 
         for peer in presumed_targets {
             if self
                 .msg_filter
-                .filter_outgoing(wire_msg, peer.name())
+                .filter_outgoing(&wire_msg, peer.name())
                 .await
                 .is_new()
             {
@@ -184,52 +181,32 @@ impl Core {
             wire_msg,
             dg_size,
             targets,
-            dst_location.section_pk(),
+            wire_msg.src_section_pk(),
         );
-        unimplemented!();
-        /*
 
-        let command = Command::send_message_to_nodes(
-            targets,
-            dg_size,
-            msg.clone(),
-            DstInfo {
-                dst: XorName::random(),
-                dst_section_pk: dst_pk,
-            },
-        );
+        let target_name = dst_location.name().ok_or(Error::CannotRoute)?;
+        let dst_pk = self.section_key_by_name(&target_name);
+        wire_msg.set_dst_section_pk(dst_pk);
+
+        let command = Command::send_message_to_nodes(targets, dg_size, wire_msg);
 
         Ok(Some(command))
-        */
     }
 
     pub async fn send_user_message(&self, wire_msg: WireMsg) -> Result<Vec<Command>> {
-        unimplemented!();
-        /*
-        let are_we_src = itinerary.src.equals(&self.node.name())
-            || itinerary.src.equals(&self.section().prefix().name());
-        if !are_we_src {
-            error!(
-                "Not sending user message {:?} -> {:?}: we are not the source location",
-                itinerary.src, itinerary.dst
-            );
-            return Err(Error::InvalidSrcLocation);
-        }
-        if matches!(itinerary.src, SrcLocation::EndUser(_)) {
-            return Err(Error::InvalidSrcLocation);
-        }
-        let dst_name = if let Some(name) = itinerary.dst_name() {
+        let dst_name = if let Some(name) = wire_msg.dst_location().name() {
             name
         } else {
             trace!(
                 "Not sending user message {:?} -> {:?}: direct dst not supported",
-                itinerary.src,
-                itinerary.dst
+                wire_msg.msg_kind(),
+                wire_msg.dst_location()
             );
             return Err(Error::InvalidDstLocation);
         };
         let dst_section_pk = self.section_key_by_name(&dst_name);
-
+        unimplemented!();
+        /*
         // TODO: don't require this serialize or perhaps even variant altogether?
         let variant = NodeMsg::UserMessage(content.serialize()?.to_vec());
 

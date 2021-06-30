@@ -185,7 +185,7 @@ impl Core {
 
             // We are no longer elder. Send the promise back already.
             if self.is_not_elder() {
-                commands.push(self.send_message_to_our_elders(msg));
+                commands.push(self.send_message_to_our_elders(msg)?);
             }
 
             return Ok(commands);

@@ -117,28 +117,26 @@ impl Comm {
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
     pub async fn send_on_existing_connection(
         &self,
-        recipient_name: XorName,
-        recipient_addr: SocketAddr,
+        recipients: &[(XorName, SocketAddr)],
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
-        unimplemented!();
-        /*
-        wire_msg.update_dst_location(dst_location);
-        let bytes = wire_msg.serialize()?;
+        for (name, addr) in recipients {
+            wire_msg.set_dst_xorname(*name);
+            let bytes = wire_msg.serialize()?;
 
-        self.endpoint
-            .try_send_message(bytes, &recipient.addr)
-            .await
-            .map_err(|err| {
-                error!(
-                    "Sending to {:?} (name {:?}) failed with {}",
-                    recipient_addr, recipient_name, err
-                );
-                Error::FailedSend(recipient.addr, recipient_name)
-            })?;
+            self.endpoint
+                .try_send_message(bytes, addr)
+                .await
+                .map_err(|err| {
+                    error!(
+                        "Sending to {:?} (name {:?}) failed with {}",
+                        addr, name, err
+                    );
+                    Error::FailedSend(*addr, *name)
+                })?;
+        }
 
         Ok(())
-        */
     }
 
     /// Tests whether the peer is reachable.
@@ -205,12 +203,10 @@ impl Comm {
         if recipients.is_empty() {
             return Err(Error::EmptyRecipientList);
         }
+
         // Use the first Xor address recipient to represent the destination section.
         // So that only one copy of MessageType need to be constructed.
-        unimplemented!();
-        /*
-        FIXME: just the update dst below needs to be fixed
-        wire_msg.update_dst_info(None, Some(recipients[0].0));
+        wire_msg.set_dst_xorname(recipients[0].0);
 
         let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
 
@@ -226,7 +222,8 @@ impl Comm {
             );
 
             let result = self
-                .send_to(&recipient.1, msg_bytes)
+                .endpoint
+                .send_message(msg_bytes, &recipient.1)
                 .await
                 .map_err(|err| match err {
                     qp2p::Error::Connection(qp2p::ConnectionError::LocallyClosed) => {
@@ -286,13 +283,6 @@ impl Comm {
         } else {
             Ok(SendStatus::MinDeliveryGroupSizeFailed(failed_recipients))
         }
-        */
-    }
-
-    // Low-level send
-    async fn send_to(&self, recipient: &SocketAddr, msg: Bytes) -> Result<(), qp2p::Error> {
-        trace!("Low level send for msg over qp2p");
-        self.endpoint.send_message(msg, recipient).await
     }
 }
 
