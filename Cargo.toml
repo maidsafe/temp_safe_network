@@ -69,6 +69,7 @@ uhttp_uri = "~0.5"
 urlencoding = "1.1.1"
 url = "2.2.0"
 dashmap = "~4.0.2"
+lru="0.6.5"
 
   [dependencies.flexi_logger]
   version = "0.18"

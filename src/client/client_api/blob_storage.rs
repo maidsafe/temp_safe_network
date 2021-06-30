@@ -51,7 +51,7 @@ impl Storage for BlobStorage {
 
         trace!("Self encrypt invoked GetChunk({:?})", &address);
 
-        match self.client.fetch_blob_from_network(address).await {
+        match self.client.fetch_blob_from_network(address, true).await {
             Ok(data) => Ok(data.value().clone()),
             Err(error) => Err(SelfEncryptionError::Generic(format!("{:?}", error))),
         }
