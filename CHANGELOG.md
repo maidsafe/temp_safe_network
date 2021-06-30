@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.3](https://github.com/maidsafe/safe_network/compare/v0.5.2...v0.5.3) (2021-06-30)
+
+
+### Features
+
+* **client:** add basic blob cache ([71918a8](https://github.com/maidsafe/safe_network/commit/71918a8a9fa558c702c42e2eb311c689cab4cefc))
+
 ### [0.5.2](https://github.com/maidsafe/safe_network/compare/v0.5.1...v0.5.2) (2021-06-30)
 
 
