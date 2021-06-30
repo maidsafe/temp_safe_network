@@ -6,13 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod errors;
-
 use crate::messaging::{MessageType, SectionAuthorityProvider, WireMsg};
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-pub use errors::Error;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
