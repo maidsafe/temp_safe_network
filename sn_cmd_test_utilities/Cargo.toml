@@ -13,7 +13,7 @@ anyhow = "1.0.38"
 rand = "~0.7.3"
 serde = "1.0.123"
 serde_json = "1.0.62"
-sn_api = { version = "~0.30", default-features=false, features = ["app", "authd_client"] }
+sn_api = { version = "~0.31", default-features=false, features = ["app", "authd_client"] }
 duct = "~0.12.0"
 walkdir = "2.3.1"
 multibase = "~0.6.0"
