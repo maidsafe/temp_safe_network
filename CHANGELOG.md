@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.31.0](https://github.com/maidsafe/sn_cli/compare/v0.30.2...v0.31.0) (2021-06-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* blsstc for bls
+
+### Features
+
+* update to use blsstc sn_api ([b30ed62](https://github.com/maidsafe/sn_cli/commit/b30ed62090c36f96c4e70a7f75dd373bda8b4d12))
+
 ### [0.30.2](https://github.com/maidsafe/sn_cli/compare/v0.30.1...v0.30.2) (2021-06-29)
 
 
