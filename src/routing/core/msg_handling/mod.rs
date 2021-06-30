@@ -137,11 +137,27 @@ impl Core {
 
                 self.update_section_knowledge(src_signed_sap, src_chain);
                 if let Some(message) = msg {
-                    Ok(vec![Command::HandleMessage {
-                        sender,
-                        message: *message,
-                        dst_info,
-                    }])
+                    // This included message shall be sent from us originally.
+                    // Now send it back with the latest knowledge of the destination section.
+                    let addr = if let Some(addr) = sender {
+                        addr
+                    } else {
+                        error!("SectionKnowledge bounced message {:?} doesn't have addr of sender {:?}", message, src_name);
+                        return Ok(vec![]);
+                    };
+                    let dst_section_pk = self
+                        .network
+                        .key_by_name(&src_name)
+                        .map_err(|_| Error::NoMatchingSection)?;
+                    let cmd = Command::send_message_to_node(
+                        (src_name, addr),
+                        *message,
+                        DstInfo {
+                            dst: src_name,
+                            dst_section_pk,
+                        },
+                    );
+                    Ok(vec![cmd])
                 } else {
                     Ok(vec![])
                 }

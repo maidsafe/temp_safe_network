@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.2](https://github.com/maidsafe/safe_network/compare/v0.5.1...v0.5.2) (2021-06-30)
+
+
+### Bug Fixes
+
+* send back bounced message within SectionKnowledge ([91132d3](https://github.com/maidsafe/safe_network/commit/91132d32e018a75548a63334aa02a08a682cb915))
+
 ### [0.5.1](https://github.com/maidsafe/safe_network/compare/v0.5.0...v0.5.1) (2021-06-30)
 
 ## [0.5.0](https://github.com/maidsafe/safe_network/compare/v0.4.0...v0.5.0) (2021-06-30)
