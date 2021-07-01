@@ -232,15 +232,15 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use crate::client::{
-        utils::test_utils::{create_test_client, gen_ed_keypair},
+        utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff},
         Error,
     };
     use crate::messaging::client::Error as ErrorMessage;
+    use crate::retry_loop_for_pattern;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         Error as DtError, PublicKey,
     };
-    use crate::{retry_loop, retry_loop_for_pattern};
     use anyhow::{anyhow, bail, Result};
     use std::collections::{BTreeMap, BTreeSet};
     use tokio::time::Duration;
@@ -263,7 +263,9 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register = retry_loop!(client.get_register(address));
+        let register = run_w_backoff(|| client.get_register(address), 10).await?;
+
+        //let register = run_w_backoff(|| client.get_register(address), backoff);
 
         assert!(register.is_private());
         assert_eq!(*register.name(), name);
@@ -278,7 +280,7 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let register = retry_loop!(client.get_register(address));
+        let register = run_w_backoff(|| client.get_register(address), 10).await?;
 
         assert!(register.is_public());
         assert_eq!(*register.name(), name);
@@ -301,11 +303,15 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register = retry_loop!(client.get_register(address));
+        let register = run_w_backoff(|| client.get_register(address), 10).await?;
 
         assert_eq!(register.size(None)?, 0);
 
-        let permissions = retry_loop!(client.get_register_permissions_for_user(address, owner));
+        let permissions = run_w_backoff(
+            || client.get_register_permissions_for_user(address, owner),
+            10,
+        )
+        .await?;
 
         match permissions {
             Permissions::Private(user_perms) => {
@@ -339,7 +345,11 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let permissions = retry_loop!(client.get_register_permissions_for_user(address, owner));
+        let permissions = run_w_backoff(
+            || client.get_register_permissions_for_user(address, owner),
+            10,
+        )
+        .await?;
 
         match permissions {
             Permissions::Public(user_perms) => {
@@ -377,8 +387,11 @@ mod tests {
             .await?;
 
         // write to the register
-        let value1_hash =
-            retry_loop!(client.write_to_register(address, b"VALUE1".to_vec(), BTreeSet::new()));
+        let value1_hash = run_w_backoff(
+            || client.write_to_register(address, b"VALUE1".to_vec(), BTreeSet::new()),
+            10,
+        )
+        .await?;
 
         // now check last entry
         let hashes = retry_loop_for_pattern!(client.read_register(address), Ok(hashes) if !hashes.is_empty())?;
@@ -388,8 +401,11 @@ mod tests {
         assert_eq!(current, Some(&(value1_hash, b"VALUE1".to_vec())));
 
         // write to the register
-        let value2_hash =
-            retry_loop!(client.write_to_register(address, b"VALUE2".to_vec(), BTreeSet::new()));
+        let value2_hash = run_w_backoff(
+            || client.write_to_register(address, b"VALUE2".to_vec(), BTreeSet::new()),
+            10,
+        )
+        .await?;
 
         // and then lets check last entry
         let hashes =
@@ -432,7 +448,7 @@ mod tests {
             .await?;
 
         // Assert that the data is stored.
-        let current_owner = retry_loop!(client.get_register_owner(address));
+        let current_owner = run_w_backoff(|| client.get_register_owner(address), 10).await?;
 
         assert_eq!(owner, current_owner);
 
@@ -453,7 +469,7 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register = retry_loop!(client.get_register(address));
+        let register = run_w_backoff(|| client.get_register(address), 10).await?;
 
         assert!(register.is_private());
 
@@ -493,7 +509,7 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let register = retry_loop!(client.get_register(address));
+        let register = run_w_backoff(|| client.get_register(address), 10).await?;
         assert!(register.is_public());
 
         match client.delete_register(address).await {

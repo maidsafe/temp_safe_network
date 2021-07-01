@@ -371,9 +371,8 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair};
+    use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff};
     use crate::messaging::client::{CmdError, Error as ErrorMessage};
-    use crate::retry_loop;
     use crate::types::{MapAction, MapKind, MapValues};
     use anyhow::{anyhow, bail, Result};
     use std::time::Duration;
@@ -571,7 +570,11 @@ mod tests {
         let some_client = create_test_client(None).await?;
         let owner = some_client.public_key();
 
-        let _ = retry_loop!(some_client.store_map(name, tag, owner, MapKind::Public, None, None));
+        let _ = run_w_backoff(
+            || some_client.store_map(name, tag, owner, MapKind::Public, None, None),
+            10,
+        )
+        .await?;
 
         let mut client = create_test_client(None).await?;
 
@@ -601,14 +604,20 @@ mod tests {
         let _ = permissions.insert(random_user, permission_set);
 
         let test_data_name = XorName(rand::random());
-        let address = retry_loop!(client.store_map(
-            test_data_name,
-            15000u64,
-            random_pk,
-            MapKind::Private,
-            None,
-            Some(permissions.clone())
-        ));
+        let address = run_w_backoff(
+            || {
+                client.store_map(
+                    test_data_name,
+                    15000u64,
+                    random_pk,
+                    MapKind::Private,
+                    None,
+                    Some(permissions.clone()),
+                )
+            },
+            10,
+        )
+        .await?;
 
         let res = client.get_map_shell(address).await;
         match res {
