@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.1](https://github.com/maidsafe/sn_cli/compare/v0.31.0...v0.31.1) (2021-07-01)
+
+
+### Features
+
+* **args:** add clear_data arg for Join cmd ([c64f34d](https://github.com/maidsafe/sn_cli/commit/c64f34dd9e524b8bc9f0045f404e88e7bed29166))
+* **node:** take local and public args for node join ([a4920a6](https://github.com/maidsafe/sn_cli/commit/a4920a6739b784697f8b5832f276b07d630f475a))
+
 ## [0.31.0](https://github.com/maidsafe/sn_cli/compare/v0.30.2...v0.31.0) (2021-06-30)
 
 
