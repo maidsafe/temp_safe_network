@@ -25,8 +25,7 @@ async fn main() -> Result<()> {
     let bootstrap_contacts = read_network_conn_info()?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_contacts);
-    let mut client =
-        Client::new(None, None, Some(bootstrap_contacts), DEFAULT_QUERY_TIMEOUT).await?;
+    let client = Client::new(None, None, Some(bootstrap_contacts), DEFAULT_QUERY_TIMEOUT).await?;
 
     let pk = client.public_key();
     println!("Client Public Key: {}", pk);
