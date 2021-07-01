@@ -8,6 +8,7 @@
 
 mod api;
 mod bootstrap;
+mod comm;
 mod connectivity;
 mod delivery_group;
 mod enduser_registry;
@@ -16,26 +17,27 @@ mod messaging;
 mod msg_handling;
 mod split_barrier;
 
+pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
+pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
+
 use self::{
     enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
 };
 use crate::messaging::{
-    node::{DstInfo, Network, NodeMsg, Proposal, Section, SectionSigned, SignatureAggregator},
-    DstLocation, MessageId, SectionAuthorityProvider, WireMsg,
+    node::{Network, NodeMsg, Proposal, Section, SectionSigned, SignatureAggregator},
+    MessageId, SectionAuthorityProvider,
 };
-use crate::routing::routing_api::command::Command;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
-    messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
     relocation::RelocateState,
+    routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionKeysProvider, SectionUtils},
     Elders, Event, NodeElderChange,
 };
-pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
@@ -49,6 +51,7 @@ const KEY_CACHE_SIZE: u8 = 5;
 
 // State + logic of a routing node.
 pub(crate) struct Core {
+    pub(crate) comm: Comm,
     node: Node,
     section: Section,
     network: Network,
@@ -69,6 +72,7 @@ pub(crate) struct Core {
 impl Core {
     // Creates `Core` for a regular node.
     pub fn new(
+        comm: Comm,
         node: Node,
         section: Section,
         section_key_share: Option<SectionKeyShare>,
@@ -77,6 +81,7 @@ impl Core {
         let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share);
 
         Self {
+            comm,
             node,
             section,
             network: Network::new(),

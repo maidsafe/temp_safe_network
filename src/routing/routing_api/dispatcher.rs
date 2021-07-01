@@ -6,16 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{comm::SendStatus, Comm, Command, Event};
+use super::{Command, Event};
 use crate::messaging::{
-    node::{JoinAsRelocatedResponse, JoinRejectionReason, JoinResponse, NodeMsg, Section},
-    DstLocation, MsgKind, NodeMsgAuthority, NodeSigned, WireMsg,
+    node::{NodeMsg, Section},
+    DstLocation, MsgKind, WireMsg,
 };
 use crate::routing::{
-    core::Core, error::Result, messages::WireMsgUtils, node::Node, peer::PeerUtils,
-    section::SectionPeersUtils, section::SectionUtils, Error, XorName,
+    core::{Core, SendStatus},
+    error::Result,
+    messages::WireMsgUtils,
+    node::Node,
+    peer::PeerUtils,
+    section::SectionPeersUtils,
+    section::SectionUtils,
+    Error, XorName,
 };
-use crate::types::PublicKey;
 use itertools::Itertools;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
@@ -27,18 +32,16 @@ use tracing::Instrument;
 // `Command` Dispatcher.
 pub(crate) struct Dispatcher {
     pub(super) core: RwLock<Core>,
-    pub(super) comm: Comm,
 
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
 }
 
 impl Dispatcher {
-    pub fn new(state: Core, comm: Comm) -> Self {
+    pub fn new(core: Core) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         Self {
-            core: RwLock::new(state),
-            comm,
+            core: RwLock::new(core),
             cancel_timer_tx,
             cancel_timer_rx,
         }
@@ -47,6 +50,13 @@ impl Dispatcher {
     /// Send provided Event to the user which shall receive it through the EventStream
     pub async fn send_event(&self, event: Event) {
         self.core.read().await.send_event(event).await
+    }
+
+    // Terminate this routing instance - cancel all scheduled timers including any future ones,
+    // close all network connections and stop accepting new connections.
+    pub async fn terminate(&self) {
+        let _ = self.cancel_timer_tx.send(true);
+        self.core.read().await.comm.terminate().await;
     }
 
     /// Handles the given command and transitively any new commands that are produced during its
@@ -60,19 +70,25 @@ impl Dispatcher {
         Ok(())
     }
 
+    // Note: this indirecton is needed. Trying to call `spawn(self.handle_commands(...))` directly
+    // inside `handle_commands` causes compile error about type check cycle.
+    fn spawn_handle_commands(self: Arc<Self>, command: Command) {
+        let _ = tokio::spawn(self.handle_commands(command));
+    }
+
     /// Handles a single command.
     pub async fn handle_command(&self, command: Command) -> Result<Vec<Command>> {
         // Create a tracing span containing info about the current node. This is very useful when
         // analyzing logs produced by running multiple nodes within the same process, for example
         // from integration tests.
         let span = {
-            let state = self.core.read().await;
+            let core = self.core.read().await;
             trace_span!(
                 "handle_command",
-                name = %state.node().name(),
-                prefix = format_args!("({:b})", state.section().prefix()),
-                age = state.node().age(),
-                elder = state.is_elder(),
+                name = %core.node().name(),
+                prefix = format_args!("({:b})", core.section().prefix()),
+                age = core.node().age(),
+                elder = core.is_elder(),
             )
         };
 
@@ -88,64 +104,9 @@ impl Dispatcher {
         .await
     }
 
-    // Terminate this routing instance - cancel all scheduled timers including any future ones,
-    // close all network connections and stop accepting new connections.
-    pub fn terminate(&self) {
-        let _ = self.cancel_timer_tx.send(true);
-        self.comm.terminate()
-    }
-
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
             Command::HandleMessage { sender, wire_msg } => {
-                // TODO: move this to the handlers
-                // Let's see if we need to do a reachability test
-                /*
-                TODO: we need to be able to know if this is a Join request up front,
-                or simply moving this to the Join handlers will be enough
-                let failure = match &msg {
-                    NodeMsg::JoinRequest(join_request) => {
-                        // Do this check only for the initial join request
-                        if join_request.resource_proof_response.is_none()
-                            && self.comm.is_reachable(sender).await.is_err()
-                        {
-                            Some(NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                                JoinRejectionReason::NodeNotReachable(*sender),
-                            ))))
-                        } else {
-                            None
-                        }
-                    }
-                    NodeMsg::JoinAsRelocatedRequest(join_request) => {
-                        // Do this check only for the initial join request
-                        if join_request.relocate_payload.is_none()
-                            && self.comm.is_reachable(sender).await.is_err()
-                        {
-                            Some(NodeMsg::JoinAsRelocatedResponse(Box::new(
-                                JoinAsRelocatedResponse::NodeNotReachable(*sender),
-                            )))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                };
-
-                if let Some(node_msg) = failure {
-                    let section_key = *self.core.read().await.section().chain.last_key();
-                    if let NodeMsgAuthority::Node(NodeSigned { public_key, .. }) =
-                        wire_msg.msg_authority()
-                    {
-                        trace!("Sending {:?} to {}", node_msg, sender);
-
-                        return Ok(vec![self.core.read().await.send_direct_message(
-                            (XorName::from(PublicKey::from(public_key)), *sender),
-                            node_msg,
-                            section_key,
-                        )?]);
-                    }
-                }*/
-
                 self.core
                     .write()
                     .await
@@ -200,7 +161,8 @@ impl Dispatcher {
                 .into_iter()
                 .collect()),
             Command::HandleRelocationComplete { node, section } => {
-                self.handle_relocation_complete(node, section).await
+                self.handle_relocation_complete(node, section).await;
+                Ok(vec![])
             }
             Command::SetJoinsAllowed(joins_allowed) => {
                 self.core.read().await.set_joins_allowed(joins_allowed)
@@ -257,19 +219,21 @@ impl Dispatcher {
                     .get(&name)
                     .map(|member_info| member_info.peer)
                 {
-                    if self.comm.is_reachable(peer.addr()).await.is_err() {
+                    if self
+                        .core
+                        .read()
+                        .await
+                        .comm
+                        .is_reachable(peer.addr())
+                        .await
+                        .is_err()
+                    {
                         commands.push(Command::ProposeOffline(*peer.name()));
                     }
                 }
                 Ok(commands)
             }
         }
-    }
-
-    // Note: this indirecton is needed. Trying to call `spawn(self.handle_commands(...))` directly
-    // inside `handle_commands` causes compile error about type check cycle.
-    fn spawn_handle_commands(self: Arc<Self>, command: Command) {
-        let _ = tokio::spawn(self.handle_commands(command));
     }
 
     async fn send_message(
@@ -283,6 +247,9 @@ impl Dispatcher {
             | MsgKind::NodeBlsShareSignedMsg(_)
             | MsgKind::SectionSignedMsg(_) => {
                 let status = self
+                    .core
+                    .read()
+                    .await
                     .comm
                     .send(recipients, delivery_group_size, wire_msg)
                     .await?;
@@ -304,6 +271,9 @@ impl Dispatcher {
                 // by having the send_on_existing_connection to return SendStatus
                 for (name, addr) in recipients {
                     if self
+                        .core
+                        .read()
+                        .await
                         .comm
                         .send_on_existing_connection(&[(*name, *addr)], wire_msg.clone())
                         .await
@@ -321,6 +291,9 @@ impl Dispatcher {
             }
             MsgKind::SectionInfoMsg => {
                 let _ = self
+                    .core
+                    .read()
+                    .await
                     .comm
                     .send_on_existing_connection(recipients, wire_msg)
                     .await;
@@ -346,25 +319,17 @@ impl Dispatcher {
         }
     }
 
-    async fn handle_relocation_complete(
-        &self,
-        new_node: Node,
-        new_section: Section,
-    ) -> Result<Vec<Command>> {
+    async fn handle_relocation_complete(&self, new_node: Node, new_section: Section) {
         let previous_name = self.core.read().await.node().name();
         let new_keypair = new_node.keypair.clone();
 
-        let mut state = self.core.write().await;
-        let event_tx = state.event_tx.clone();
-        *state = Core::new(new_node, new_section, None, event_tx);
+        let mut core = self.core.write().await;
+        *core = core.relocated(new_node, new_section).await;
 
-        state
-            .send_event(Event::Relocated {
-                previous_name,
-                new_keypair,
-            })
-            .await;
-
-        Ok(vec![])
+        core.send_event(Event::Relocated {
+            previous_name,
+            new_keypair,
+        })
+        .await;
     }
 }

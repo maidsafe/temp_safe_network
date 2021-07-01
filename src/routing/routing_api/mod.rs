@@ -9,40 +9,32 @@
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub(crate) mod comm;
 pub(crate) mod command;
 
+mod config;
 mod dispatcher;
 mod event;
 mod event_stream;
 
 pub use self::{
+    config::Config,
     event::{Elders, Event, NodeElderChange, SendStream},
     event_stream::EventStream,
 };
 
-use self::{
-    comm::{Comm, ConnectionEvent},
-    command::Command,
-    dispatcher::Dispatcher,
-};
-use crate::messaging::{
-    node::{NodeMsg, Peer},
-    DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
-};
+use self::{command::Command, dispatcher::Dispatcher};
+use crate::messaging::{node::Peer, DstLocation, EndUser, SectionAuthorityProvider, WireMsg};
 use crate::routing::{
-    core::{join_network, Core},
+    core::{join_network, Comm, ConnectionEvent, Core},
     ed25519,
     error::Result,
-    messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
     section::{SectionAuthorityProviderUtils, SectionUtils},
-    Error, TransportConfig, MIN_ADULT_AGE,
+    Error, MIN_ADULT_AGE,
 };
-use bytes::Bytes;
-use ed25519_dalek::{Keypair, PublicKey, Signature, Signer, KEYPAIR_LENGTH};
+use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::{
@@ -53,27 +45,6 @@ use std::{
 };
 use tokio::{sync::mpsc, task};
 use xor_name::{Prefix, XorName};
-
-/// Routing configuration.
-#[derive(Debug)]
-pub struct Config {
-    /// If true, configures the node to start a new network instead of joining an existing one.
-    pub first: bool,
-    /// The `Keypair` of the node or `None` for randomly generated one.
-    pub keypair: Option<Keypair>,
-    /// Configuration for the underlying network transport.
-    pub transport_config: TransportConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            first: false,
-            keypair: None,
-            transport_config: TransportConfig::default(),
-        }
-    }
-}
 
 /// Interface for sending and receiving messages to and from other nodes, in the role of a full
 /// routing node.
@@ -107,7 +78,7 @@ impl Routing {
         let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
         let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
 
-        let (core, comm, backlog) = if config.first {
+        let (core, backlog) = if config.first {
             // Genesis node having a fix age of 255.
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
             let node_name = ed25519::name(&keypair.public);
@@ -116,7 +87,7 @@ impl Routing {
 
             let comm = Comm::new(config.transport_config, connection_event_tx).await?;
             let node = Node::new(keypair, comm.our_connection_info());
-            let core = Core::first_node(node, event_tx)?;
+            let core = Core::first_node(comm, node, event_tx)?;
 
             let section = core.section();
 
@@ -134,20 +105,25 @@ impl Routing {
             })
             .await;
 
-            (core, comm, vec![])
+            (core, vec![])
         } else {
             info!("{} Bootstrapping a new node.", node_name);
             let (comm, bootstrap_addr) =
                 Comm::bootstrap(config.transport_config, connection_event_tx).await?;
-            let node = Node::new(keypair, comm.our_connection_info());
-            let (node, section, backlog) =
-                join_network(node, &comm, &mut connection_event_rx, bootstrap_addr).await?;
-            let core = Core::new(node, section, None, event_tx);
+            let joining_node = Node::new(keypair, comm.our_connection_info());
+            let (node, section, backlog) = join_network(
+                joining_node,
+                &comm,
+                &mut connection_event_rx,
+                bootstrap_addr,
+            )
+            .await?;
+            let core = Core::new(comm, node, section, None, event_tx);
 
-            (core, comm, backlog)
+            (core, backlog)
         };
 
-        let dispatcher = Arc::new(Dispatcher::new(core, comm));
+        let dispatcher = Arc::new(Dispatcher::new(core));
         let event_stream = EventStream::new(event_rx);
         info!("{} Bootstrapped!", node_name);
 
@@ -241,8 +217,8 @@ impl Routing {
     }
 
     /// Returns connection info of this node.
-    pub fn our_connection_info(&self) -> SocketAddr {
-        self.dispatcher.comm.our_connection_info()
+    pub async fn our_connection_info(&self) -> SocketAddr {
+        self.dispatcher.core.read().await.our_connection_info()
     }
 
     /// Returns the Section Signed Chain
@@ -402,7 +378,7 @@ impl Routing {
 
 impl Drop for Routing {
     fn drop(&mut self) {
-        self.dispatcher.terminate()
+        futures::executor::block_on(self.dispatcher.terminate());
     }
 }
 
@@ -419,10 +395,6 @@ async fn handle_connection_events(
 ) {
     while let Some(event) = incoming_conns.recv().await {
         match event {
-            ConnectionEvent::Received((src, bytes)) => {
-                trace!("New message ({} bytes) received from: {}", bytes.len(), src);
-                handle_message(dispatcher.clone(), bytes, src).await;
-            }
             ConnectionEvent::Disconnected(addr) => {
                 trace!("Lost connection to {:?}", addr);
                 let _ = dispatcher
@@ -430,34 +402,38 @@ async fn handle_connection_events(
                     .handle_commands(Command::HandleConnectionLost(addr))
                     .await;
             }
+            ConnectionEvent::Received((sender, bytes)) => {
+                trace!(
+                    "New message ({} bytes) received from: {}",
+                    bytes.len(),
+                    sender
+                );
+                let wire_msg = match WireMsg::from(bytes) {
+                    Ok(wire_msg) => wire_msg,
+                    Err(error) => {
+                        error!("Failed to deserialize message header: {}", error);
+                        return;
+                    }
+                };
+
+                let span = {
+                    let mut core = dispatcher.core.write().await;
+
+                    if !core.add_to_filter(&wire_msg).await {
+                        trace!(
+                            "not handling message - already handled: {:?}",
+                            wire_msg.msg_id()
+                        );
+                        return;
+                    }
+
+                    trace_span!("handle_message", name = %core.node().name(), %sender)
+                };
+                let _span_guard = span.enter();
+
+                let command = Command::HandleMessage { sender, wire_msg };
+                let _ = task::spawn(dispatcher.clone().handle_commands(command));
+            }
         }
     }
-}
-
-async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: SocketAddr) {
-    let wire_msg = match WireMsg::from(bytes) {
-        Ok(wire_msg) => wire_msg,
-        Err(error) => {
-            error!("Failed to deserialize message header: {}", error);
-            return;
-        }
-    };
-
-    let span = {
-        let mut core = dispatcher.core.write().await;
-
-        if !core.add_to_filter(&wire_msg).await {
-            trace!(
-                "not handling message - already handled: {:?}",
-                wire_msg.msg_id()
-            );
-            return;
-        }
-
-        trace_span!("handle_message", name = %core.node().name(), %sender)
-    };
-    let _span_guard = span.enter();
-
-    let command = Command::HandleMessage { sender, wire_msg };
-    let _ = task::spawn(dispatcher.handle_commands(command));
 }

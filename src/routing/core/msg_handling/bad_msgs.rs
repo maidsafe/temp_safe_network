@@ -9,10 +9,10 @@
 use super::Core;
 use crate::messaging::{
     node::{DstInfo, NodeMsg, Peer},
-    DstLocation, NodeMsgAuthority, WireMsg,
+    NodeMsgAuthority,
 };
 use crate::routing::{
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    messages::NodeMsgAuthorityUtils,
     peer::PeerUtils,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
@@ -53,7 +53,7 @@ impl Core {
         &self,
         sender: Peer,
         dst_section_key: BlsPublicKey,
-        mut bounced_msg: NodeMsg,
+        bounced_msg: NodeMsg,
     ) -> Result<Command> {
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();

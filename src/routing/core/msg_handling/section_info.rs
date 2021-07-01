@@ -8,13 +8,12 @@
 
 use super::super::Core;
 use crate::messaging::{
-    node::{DstInfo, NodeMsg},
+    node::NodeMsg,
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DstLocation, MessageType, SectionAuthorityProvider, WireMsg,
+    DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     error::Result,
-    messages::WireMsgUtils,
     network::NetworkUtils,
     peer::PeerUtils,
     routing_api::command::Command,

@@ -23,8 +23,6 @@ use crate::routing::{
     peer::PeerUtils,
     section::{SectionPeersUtils, SectionUtils},
 };
-use bls::PublicKey as BlsPublicKey;
-use std::marker::Sized;
 use xor_name::XorName;
 
 /// Find all nodes to relocate after a churn event and create the relocate actions for them.
@@ -99,53 +97,6 @@ impl RelocateDetailsUtils for RelocateDetails {
     }
 }
 
-/*
-/// NodeMsg with NodeMsg::Relocate in a convenient wrapper.
-pub trait SignedRelocateDetailsUtils {
-    fn new(signed_msg: NodeMsg) -> Result<Self, Error>
-    where
-        Self: Sized;
-
-    fn relocate_details(&self) -> Result<&RelocateDetails, Error>;
-
-    fn signed_msg(&self) -> &NodeMsg;
-
-    fn dst(&self) -> Result<&XorName, Error>;
-
-    fn dst_key(&self) -> Result<BlsPublicKey, Error>;
-}
-
-impl SignedRelocateDetailsUtils for SignedRelocateDetails {
-    fn new(signed_msg: NodeMsg) -> Result<Self, Error> {
-        if let NodeMsg::Relocate(_) = signed_msg.variant {
-            Ok(Self { signed_msg })
-        } else {
-            Err(Error::InvalidMessage)
-        }
-    }
-
-    fn relocate_details(&self) -> Result<&RelocateDetails, Error> {
-        if let NodeMsg::Relocate(details) = &self.signed_msg.variant {
-            Ok(details)
-        } else {
-            error!("SignedRelocateDetails does not contain NodeMsg::Relocate");
-            Err(Error::InvalidMessage)
-        }
-    }
-
-    fn signed_msg(&self) -> &NodeMsg {
-        &self.signed_msg
-    }
-
-    fn dst(&self) -> Result<&XorName, Error> {
-        Ok(&self.relocate_details()?.dst)
-    }
-
-    fn dst_key(&self) -> Result<BlsPublicKey, Error> {
-        Ok(self.relocate_details()?.dst_key)
-    }
-}
-*/
 pub trait RelocatePayloadUtils {
     fn new(
         details: NodeMsg,

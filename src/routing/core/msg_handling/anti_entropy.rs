@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{DstInfo, JoinResponse, NodeMsg, Section},
+    node::{JoinResponse, NodeMsg, Section},
     DstLocation, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
@@ -142,7 +142,7 @@ fn process(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::DstLocation;
+    use crate::messaging::{node::DstInfo, DstLocation};
     use crate::routing::{
         dkg::test_utils::section_signed,
         ed25519,

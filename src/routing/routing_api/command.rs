@@ -7,10 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSigSet, DstInfo, KeyedSig, NodeMsg, Proposal, Section},
-    section_info::SectionInfoMsg,
-    DstLocation, Itinerary, MessageId, MessageType, NodeMsgAuthority, SectionAuthorityProvider,
-    WireMsg,
+    node::{DkgFailureSigSet, KeyedSig, Proposal, Section},
+    SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
 use std::{

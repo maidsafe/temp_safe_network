@@ -9,8 +9,8 @@
 use super::Core;
 use crate::messaging::{
     node::{
-        DkgKey, DstInfo, ElderCandidates, JoinResponse, Network, NodeMsg, NodeState, Peer,
-        PlainMessage, Proposal, RelocateDetails, RelocatePromise, Section, SectionSigned,
+        DkgKey, ElderCandidates, JoinResponse, Network, NodeMsg, NodeState, Peer, Proposal,
+        RelocateDetails, RelocatePromise, Section, SectionSigned,
     },
     DstLocation, WireMsg,
 };

@@ -9,12 +9,11 @@
 use super::super::Core;
 use crate::messaging::{
     node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, NodeMsg, Proposal},
-    DstLocation, SectionAuthorityProvider, WireMsg,
+    SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::{commands::DkgCommands, DkgFailureSigSetUtils},
     error::{Error, Result},
-    messages::WireMsgUtils,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionPeersUtils, SectionUtils},
 };
