@@ -118,8 +118,11 @@ impl<T: Data> DataStore<T> {
         self.do_delete(&file_path).await?;
 
         // pre-reserve space
-        self.used_space.write()
-            .await.increase(self.id, consumed_space).await?;
+        self.used_space
+            .write()
+            .await
+            .increase(self.id, consumed_space)
+            .await?;
 
         let used_total_space_after = self.used_space.read().await.total().await;
         trace!("use space total after add: {:?}", used_total_space_after);
