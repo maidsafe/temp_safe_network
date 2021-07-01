@@ -90,15 +90,21 @@ async fn run_node() -> Result<()> {
     // Set up logging
     // ==============
 
-    // we manually determine level filter instead of using tracing EnvFilter.
-    let level_filter = config.verbose();
-    let module_log_filter = format!("{}={}", MODULE_NAME, level_filter.to_string());
+    let filter = match EnvFilter::try_from_env("RUST_LOG") {
+        Ok(filter) => filter,
+        // If we have an error (ie RUST_LOG not set or otherwise), we check the verbosity flags
+        Err(_) => {
+            // we manually determine level filter instead of using tracing EnvFilter.
+            let level_filter = config.verbose();
+            let module_log_filter = format!("{}={}", MODULE_NAME, level_filter.to_string());
 
-    let filter = EnvFilter::from_default_env().add_directive(
-        module_log_filter
-            .parse()
-            .map_err(|_| anyhow!("Could not parse module log filter"))?,
-    );
+            EnvFilter::from_default_env().add_directive(
+                module_log_filter
+                    .parse()
+                    .map_err(|_| anyhow!("Could not parse module log filter"))?,
+            )
+        }
+    };
 
     // Guard (if we're writing to a file) should be kept in scope until end of main and therefore should not be _optional_guard
     // https://tracing.rs/tracing_appender/non_blocking/index.html1
@@ -119,8 +125,7 @@ async fn run_node() -> Result<()> {
 
         tracing_subscriber::fmt()
             .with_writer(non_blocking)
-            .with_max_level(level_filter)
-            // eg : .with_env_filter("my_crate=info,my_crate::my_mod=debug,[my_span]=trace")
+            // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
             .with_env_filter(filter)
             .with_thread_names(true)
             // here we choose log style output... do we want json for prod + analysis?
