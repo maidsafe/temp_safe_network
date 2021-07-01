@@ -11,10 +11,7 @@ use super::{
     messaging::{send, send_error, send_support, send_to_nodes},
     role::{AdultRole, ElderRole, Role},
 };
-use crate::messaging::{
-    node::{NodeMsg, NodeQuery},
-    Aggregation, MessageId,
-};
+use crate::messaging::MessageId;
 use crate::node::{
     chunk_store::ChunkStore,
     event_mapping::MsgContext,
@@ -26,8 +23,6 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tracing::{debug, info};
 use xor_name::XorName;
-
-const DATA_SECTION_TARGET_COUNT: usize = 3;
 
 #[derive(Debug)]
 pub enum NodeTask {
@@ -320,43 +315,17 @@ impl Node {
                 client_sig,
                 origin,
             } => {
-                // TODO: remove this conditional branching
-                // routing should take care of this
-                let data_section_addr = query.dst_address();
-                let network_api = self.network_api.clone();
                 let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
-                    let duties = if network_api.our_prefix().await.matches(&data_section_addr) {
-                        vec![
-                            elder
-                                .meta_data
-                                // this is a write here as we write the liveness check for each adult
-                                .write()
-                                .await
-                                .read(query, msg_id, client_sig.public_key, origin)
-                                .await?,
-                        ]
-                    } else {
-                        let targets = network_api
-                            .get_closest_elders_to(
-                                &data_section_addr,
-                                msg_id,
-                                DATA_SECTION_TARGET_COUNT,
-                            )
-                            .await?;
-                        vec![NodeDuty::SendToNodes {
-                            msg: NodeMsg::NodeQuery {
-                                query: NodeQuery::Metadata {
-                                    query,
-                                    client_sig,
-                                    origin,
-                                },
-                                id: msg_id,
-                            },
-                            targets,
-                            aggregation: Aggregation::None,
-                        }]
-                    };
+                    let duties = vec![
+                        elder
+                            .meta_data
+                            // this is a write here as we write the liveness check for each adult
+                            .write()
+                            .await
+                            .read(query, msg_id, client_sig.public_key, origin)
+                            .await?,
+                    ];
                     Ok(NodeTask::from(duties))
                 });
                 Ok(NodeTask::Thread(handle))

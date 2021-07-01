@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{Itinerary, MessageId, MessageType};
+use crate::messaging::{Itinerary, MessageType};
 use crate::node::{state_db::store_network_keypair, utils, Config as NodeConfig, Error, Result};
 use crate::routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
@@ -15,7 +15,6 @@ use crate::routing::{
 use crate::types::{PublicKey, Signature, SignatureShare};
 use bls::PublicKeySet;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
-use rand::{seq::SliceRandom, SeedableRng};
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use std::{
@@ -144,24 +143,6 @@ impl Network {
             .matching_section(name)
             .await
             .map(|provider| provider.section_key())
-            .map_err(From::from)
-    }
-
-    pub async fn get_closest_elders_to(
-        &self,
-        name: &XorName,
-        msg_id: MessageId,
-        count: usize,
-    ) -> Result<BTreeSet<XorName>> {
-        self.routing
-            .matching_section(name)
-            .await
-            .map(|auth_provider| {
-                let mut targets: Vec<_> = auth_provider.names().iter().cloned().collect();
-                let mut rng = rand_chacha::ChaChaRng::from_seed(*msg_id.as_ref());
-                targets.shuffle(&mut rng);
-                targets.into_iter().take(count).collect()
-            })
             .map_err(From::from)
     }
 
