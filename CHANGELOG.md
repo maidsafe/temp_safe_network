@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.6.0](https://github.com/maidsafe/safe_network/compare/v0.5.3...v0.6.0) (2021-07-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* log format and filenaming changed now we use tracing's
+rotation and appender
+
+### Features
+
+* use tracing instead of log ([2e4df7b](https://github.com/maidsafe/safe_network/commit/2e4df7bb10cc593a62cd13ae01fe613a34bcaba4))
+
+
+### Bug Fixes
+
+* ensure RUST_LOG takes precedence ([f27d2bf](https://github.com/maidsafe/safe_network/commit/f27d2bfe4dea1093f4b64d1b93590c8e3f8707ed))
+
+
+* set ci logs, and use compact by default ([1cff0b1](https://github.com/maidsafe/safe_network/commit/1cff0b1616738e02830dd78f8685c26a37854b78))
+
 ### [0.5.3](https://github.com/maidsafe/safe_network/compare/v0.5.2...v0.5.3) (2021-06-30)
 
 
