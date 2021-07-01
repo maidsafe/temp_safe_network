@@ -28,6 +28,7 @@
 )]
 
 use anyhow::{anyhow, Error as AnyhowError, Result};
+use rand::Rng;
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
@@ -61,7 +62,7 @@ fn main() {
 }
 
 async fn run_node() -> Result<()> {
-    let config = match Config::new() {
+    let mut config = match Config::new() {
         Ok(cfg) => cfg,
         Err(e) => {
             println!("Failed to create Config: {:?}", e);
@@ -169,12 +170,23 @@ async fn run_node() -> Result<()> {
         BOOTSTRAP_RETRY_TIME
     );
 
-    let (node, event_stream) = loop {
+    let mut port_rng = rand::thread_rng();
+    let mut port_number = port_rng.gen_range(1024, 65535);
+
+    let (mut node, event_stream) = loop {
+        config.network_config.local_port = Some(port_number);
         match Node::new(&config).await {
             Ok(result) => break result,
             Err(Error::Routing(routing::Error::TryJoinLater)) => {
                 println!("{}", log);
                 info!("{}", log);
+            }
+            Err(Error::Routing(routing::Error::CannotConnectEndpoint {
+                err: qp2p::Error::CannotAssignPort(port),
+            })) => {
+                info!("Port {} already in use. Trying random port.", port);
+                port_number = port_rng.gen_range(1024, 65535);
+                continue;
             }
             Err(Error::Routing(routing::Error::NodeNotReachable(addr))) => {
                 let err_msg = format!(
