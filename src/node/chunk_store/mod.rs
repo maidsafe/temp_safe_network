@@ -73,7 +73,7 @@ impl ChunkStore {
         self.store.keys().await
     }
 
-    pub async fn remove_chunk(&mut self, address: &ChunkAddress) -> Result<()> {
+    pub async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         self.store.delete(address).await
     }
 
@@ -101,7 +101,7 @@ impl ChunkStore {
     }
 
     pub async fn write(
-        &mut self,
+        &self,
         write: &ChunkWrite,
         msg_id: MessageId,
         requester: PublicKey,
@@ -146,7 +146,7 @@ impl ChunkStore {
         }
     }
 
-    async fn try_store(&mut self, data: &Chunk) -> Result<NodeDuty> {
+    async fn try_store(&self, data: &Chunk) -> Result<NodeDuty> {
         if self.store.has(data.address()).await {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
@@ -170,7 +170,7 @@ impl ChunkStore {
     }
 
     /// Stores a chunk that Elders sent to it for replication.
-    pub async fn store_for_replication(&mut self, chunk: Chunk) -> Result<NodeDuty> {
+    pub async fn store_for_replication(&self, chunk: Chunk) -> Result<NodeDuty> {
         if self.store.has(chunk.address()).await {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",

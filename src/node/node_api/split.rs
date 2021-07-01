@@ -17,7 +17,7 @@ use std::collections::BTreeSet;
 
 impl Node {
     /// Called on split reported from routing layer.
-    pub(crate) async fn begin_split_as_newbie(&mut self, our_key: PublicKey) -> Result<()> {
+    pub(crate) async fn begin_split_as_newbie(&self, our_key: PublicKey) -> Result<()> {
         let section_key = self.network_api.section_public_key().await?;
         if our_key != section_key {
             return Err(Error::Logic(format!(

@@ -109,17 +109,17 @@ impl Metadata {
     }
 
     /// Adds a given node to the list of full nodes.
-    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
+    pub async fn increase_full_node_count(&self, node_id: PublicKey) {
         self.elder_stores
-            .chunk_records_mut()
+            .chunk_records()
             .increase_full_node_count(node_id)
             .await
     }
 
     // When receiving the chunk from remaining holders, we ask new holders to store it.
-    pub async fn republish_chunk(&mut self, chunk: Chunk) -> Result<NodeDuty> {
+    pub async fn republish_chunk(&self, chunk: Chunk) -> Result<NodeDuty> {
         self.elder_stores
-            .chunk_records_mut()
+            .chunk_records()
             .republish_chunk(chunk)
             .await
     }

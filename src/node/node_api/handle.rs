@@ -9,7 +9,7 @@
 use super::{
     interaction::push_state,
     messaging::{send, send_error, send_support, send_to_nodes},
-    role::{AdultRole, Role},
+    role::{AdultRole, ElderRole, Role},
 };
 use crate::messaging::{
     node::{NodeMsg, NodeQuery},
@@ -23,7 +23,7 @@ use crate::node::{
 };
 use crate::routing::ELDER_SIZE;
 use std::sync::Arc;
-use tokio::{sync::RwLock, task::JoinHandle};
+use tokio::task::JoinHandle;
 use tracing::{debug, info};
 use xor_name::XorName;
 
@@ -44,7 +44,7 @@ impl From<NodeDuties> for NodeTask {
 
 impl Node {
     ///
-    pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeTask> {
+    pub async fn handle(&self, duty: NodeDuty) -> Result<NodeTask> {
         if !matches!(duty, NodeDuty::NoOp) {
             debug!("Handling NodeDuty: {:?}", duty);
         }
@@ -52,7 +52,7 @@ impl Node {
         match duty {
             NodeDuty::Genesis => {
                 self.level_up().await?;
-                let elder = self.role.as_elder_mut()?;
+                let elder = self.as_elder().await?;
                 *elder.received_initial_sync.write().await = true;
                 Ok(NodeTask::None)
             }
@@ -68,13 +68,13 @@ impl Node {
                     if self.network_api.our_prefix().await.is_empty()
                         && self.network_api.section_chain().await.len() <= ELDER_SIZE
                     {
-                        let elder = self.role.as_elder_mut()?;
+                        let elder = self.as_elder().await?;
                         *elder.received_initial_sync.write().await = true;
                     }
                     Ok(NodeTask::None)
                 } else {
                     info!("Updating on elder churn");
-                    let elder = self.role.as_elder_mut()?.clone();
+                    let elder = self.as_elder().await?;
                     let network = self.network_api.clone();
                     let handle = tokio::spawn(async move {
                         let msg_id =
@@ -98,7 +98,7 @@ impl Node {
                 remaining,
             } => {
                 let our_name = self.our_name().await;
-                let mut adult_role = self.role.as_adult()?.clone();
+                let adult_role = self.as_adult().await?;
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(
                         adult_role
@@ -131,7 +131,7 @@ impl Node {
                     Ok(NodeTask::None)
                 } else {
                     info!("Beginning split as Oldie");
-                    let elder = self.role.as_elder()?.clone();
+                    let elder = self.as_elder().await?;
                     let network = self.network_api.clone();
                     let handle = tokio::spawn(async move {
                         Ok(NodeTask::from(
@@ -168,7 +168,7 @@ impl Node {
             }
             NodeDuty::ProcessLostMember { name, .. } => {
                 info!("Member Lost: {:?}", name);
-                let elder = self.role.as_elder_mut()?.clone();
+                let elder = self.as_elder().await?;
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     let our_adults = network_api.our_adults().await;
@@ -185,7 +185,7 @@ impl Node {
             //
             // ---------- Levelling --------------
             NodeDuty::SynchState { metadata } => {
-                let elder = self.role.as_elder()?.clone();
+                let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(vec![
                         Self::synch_state(&elder, metadata).await?,
@@ -196,20 +196,19 @@ impl Node {
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
                 let capacity = self.used_space.max_capacity().await;
-                self.role = Role::Adult(AdultRole {
-                    chunks: Arc::new(RwLock::new(
-                        ChunkStore::new(self.node_info.root_dir.as_path(), capacity).await?,
-                    )),
+                let store = ChunkStore::new(self.node_info.root_dir.as_path(), capacity).await?;
+                *self.role.write().await = Role::Adult(AdultRole {
+                    chunks: Arc::new(store),
                 });
                 Ok(NodeTask::None)
             }
             //
             // -------- Immutable chunks --------
             NodeDuty::ReadChunk { read, msg_id } => {
-                let adult = self.role.as_adult()?.clone();
+                let adult = self.as_adult().await?;
                 let handle = tokio::spawn(async move {
-                    let mut ops = vec![adult.chunks.read().await.read(&read, msg_id).await];
-                    ops.extend(adult.chunks.read().await.check_storage().await?);
+                    let mut ops = vec![adult.chunks.read(&read, msg_id).await];
+                    ops.extend(adult.chunks.check_storage().await?);
                     Ok(NodeTask::from(ops))
                 });
                 Ok(NodeTask::Thread(handle))
@@ -219,27 +218,25 @@ impl Node {
                 msg_id,
                 client_sig,
             } => {
-                let adult = self.role.as_adult()?.clone();
+                let adult = self.as_adult().await?;
                 let handle = tokio::spawn(async move {
                     let mut ops = vec![
                         adult
                             .chunks
-                            .write()
-                            .await
                             .write(&write, msg_id, client_sig.public_key)
                             .await?,
                     ];
-                    ops.extend(adult.chunks.read().await.check_storage().await?);
+                    ops.extend(adult.chunks.check_storage().await?);
                     Ok(NodeTask::from(ops))
                 });
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ProcessRepublish { chunk, msg_id, .. } => {
                 info!("Processing republish with MessageId: {:?}", msg_id);
-                let elder = self.role.as_elder()?.clone();
+                let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(vec![
-                        elder.meta_data.write().await.republish_chunk(chunk).await?,
+                        elder.meta_data.read().await.republish_chunk(chunk).await?,
                     ]))
                 });
                 Ok(NodeTask::Thread(handle))
@@ -256,11 +253,11 @@ impl Node {
             //
             // ------- Misc ------------
             NodeDuty::IncrementFullNodeCount { node_id } => {
-                let elder = self.role.as_elder_mut()?.clone();
+                let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
                     elder
                         .meta_data
-                        .write()
+                        .read()
                         .await
                         .increase_full_node_count(node_id)
                         .await;
@@ -327,7 +324,7 @@ impl Node {
                 // routing should take care of this
                 let data_section_addr = query.dst_address();
                 let network_api = self.network_api.clone();
-                let elder = self.role.as_elder_mut()?.clone();
+                let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
                     let duties = if network_api.our_prefix().await.matches(&data_section_addr) {
                         vec![
@@ -370,7 +367,7 @@ impl Node {
                 origin,
                 client_sig,
             } => {
-                let elder = self.role.as_elder_mut()?.clone();
+                let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(vec![
                         elder
@@ -389,7 +386,7 @@ impl Node {
                 correlation_id,
                 src,
             } => {
-                let elder = self.role.as_elder_mut()?.clone();
+                let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(
                         elder
@@ -403,20 +400,25 @@ impl Node {
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ReplicateChunk { chunk, .. } => {
-                let adult = self.role.as_adult_mut()?.clone();
+                let adult = self.as_adult().await?;
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(vec![
-                        adult
-                            .chunks
-                            .write()
-                            .await
-                            .store_for_replication(chunk)
-                            .await?,
+                        adult.chunks.store_for_replication(chunk).await?,
                     ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::NoOp => Ok(NodeTask::None),
         }
+    }
+
+    async fn as_adult(&self) -> Result<AdultRole> {
+        let role = self.role.read().await;
+        Ok(role.as_adult()?.clone())
+    }
+
+    async fn as_elder(&self) -> Result<ElderRole> {
+        let role = self.role.read().await;
+        Ok(role.as_elder()?.clone())
     }
 }

@@ -117,6 +117,10 @@ impl ElderStores {
         }
     }
 
+    pub fn chunk_records(&self) -> &ChunkRecords {
+        &self.chunk_records
+    }
+
     pub fn chunk_records_mut(&mut self) -> &mut ChunkRecords {
         &mut self.chunk_records
     }
