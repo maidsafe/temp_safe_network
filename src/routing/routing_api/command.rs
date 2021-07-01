@@ -51,8 +51,8 @@ pub(crate) enum Command {
         delivery_group_size: usize,
         wire_msg: WireMsg,
     },
-    /// Send `UserMessage` with the given source and destination.
-    SendUserMessage(WireMsg),
+    /// Relay a message according to its destination.
+    RelayMessage(WireMsg),
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
     /// command is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },
@@ -80,26 +80,6 @@ pub(crate) enum Command {
     StartConnectivityTest(XorName),
     /// Test Connectivity
     TestConnectivity(XorName),
-}
-
-impl Command {
-    /// Convenience method to create `Command::SendMessage` with a single recipient.
-    pub fn send_message_to_node(recipient: (XorName, SocketAddr), wire_msg: WireMsg) -> Self {
-        Self::send_message_to_nodes(vec![recipient], 1, wire_msg)
-    }
-
-    /// Convenience method to create `Command::SendMessage` with multiple recipients.
-    pub fn send_message_to_nodes(
-        recipients: Vec<(XorName, SocketAddr)>,
-        delivery_group_size: usize,
-        wire_msg: WireMsg,
-    ) -> Self {
-        Self::SendMessage {
-            recipients,
-            delivery_group_size,
-            wire_msg,
-        }
-    }
 }
 
 impl Debug for Command {
@@ -141,10 +121,7 @@ impl Debug for Command {
                 .field("delivery_group_size", delivery_group_size)
                 .field("wire_msg", wire_msg)
                 .finish(),
-            Self::SendUserMessage(wire_msg) => f
-                .debug_struct("SendUserMessage")
-                .field("wire_msg", wire_msg)
-                .finish(),
+            Self::RelayMessage(wire_msg) => f.debug_tuple("RelayMessage").field(wire_msg).finish(),
             Self::ScheduleTimeout { duration, token } => f
                 .debug_struct("ScheduleTimeout")
                 .field("duration", duration)

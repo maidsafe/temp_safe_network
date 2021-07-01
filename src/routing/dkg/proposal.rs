@@ -54,12 +54,6 @@ impl<'a> Serialize for SignableView<'a> {
             Proposal::Offline(node_state) => node_state.serialize(serializer),
             Proposal::SectionInfo(info) => info.serialize(serializer),
             Proposal::OurElders(info) => info.sig.public_key.serialize(serializer),
-            // Proposal::TheirKey { prefix, key } => (prefix, key).serialize(serializer),
-            // Proposal::TheirKnowledge { prefix, key } => (prefix, key).serialize(serializer),
-            Proposal::AccumulateAtSrc { message, .. } => {
-                unimplemented!();
-                //message.as_signable().serialize(serializer)
-            }
             Proposal::JoinsAllowed(joins_allowed) => joins_allowed.serialize(serializer),
         }
     }

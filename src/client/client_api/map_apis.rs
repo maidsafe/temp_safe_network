@@ -355,17 +355,6 @@ impl Client {
 
         self.delete_map_user_perms(address, user, version).await
     }
-
-    /// Sends an ownership transfer request.
-    pub fn change_map_owner(
-        &self,
-        _name: XorName,
-        _tag: u64,
-        _new_owner: PublicKey,
-        _version: u64,
-    ) -> Result<(), Error> {
-        unimplemented!();
-    }
 }
 
 #[cfg(test)]

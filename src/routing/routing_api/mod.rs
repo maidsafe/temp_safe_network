@@ -107,7 +107,7 @@ impl Routing {
         let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
         let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
 
-        let (state, comm, backlog) = if config.first {
+        let (core, comm, backlog) = if config.first {
             // Genesis node having a fix age of 255.
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
             let node_name = ed25519::name(&keypair.public);
@@ -116,9 +116,9 @@ impl Routing {
 
             let comm = Comm::new(config.transport_config, connection_event_tx).await?;
             let node = Node::new(keypair, comm.our_connection_info());
-            let state = Core::first_node(node, event_tx)?;
+            let core = Core::first_node(node, event_tx)?;
 
-            let section = state.section();
+            let section = core.section();
 
             let elders = Elders {
                 prefix: *section.prefix(),
@@ -128,14 +128,13 @@ impl Routing {
                 removed: BTreeSet::new(),
             };
 
-            state
-                .send_event(Event::EldersChanged {
-                    elders,
-                    self_status_change: NodeElderChange::Promoted,
-                })
-                .await;
+            core.send_event(Event::EldersChanged {
+                elders,
+                self_status_change: NodeElderChange::Promoted,
+            })
+            .await;
 
-            (state, comm, vec![])
+            (core, comm, vec![])
         } else {
             info!("{} Bootstrapping a new node.", node_name);
             let (comm, bootstrap_addr) =
@@ -143,12 +142,12 @@ impl Routing {
             let node = Node::new(keypair, comm.our_connection_info());
             let (node, section, backlog) =
                 join_network(node, &comm, &mut connection_event_rx, bootstrap_addr).await?;
-            let state = Core::new(node, section, None, event_tx);
+            let core = Core::new(node, section, None, event_tx);
 
-            (state, comm, backlog)
+            (core, comm, backlog)
         };
 
-        let dispatcher = Arc::new(Dispatcher::new(state, comm));
+        let dispatcher = Arc::new(Dispatcher::new(core, comm));
         let event_stream = EventStream::new(event_rx);
         info!("{} Bootstrapped!", node_name);
 
@@ -339,16 +338,16 @@ impl Routing {
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        let state = self.dispatcher.core.read().await;
-        state.matching_section(name)
+        let core = self.dispatcher.core.read().await;
+        core.matching_section(name)
     }
 
     /// Send a message.
     /// Messages sent here, either section to section or node to node are signed
     /// and validated upon receipt by routing itself.
-    pub async fn send_message(&self, wire_msg: WireMsg) -> Result<()> {
+    pub async fn send_message(&self, mut wire_msg: WireMsg) -> Result<()> {
         if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
-            if self.our_prefix().await.matches(&xorname) {
+            if self.our_prefix().await.matches(xorname) {
                 let addr = self
                     .dispatcher
                     .core
@@ -358,43 +357,33 @@ impl Routing {
                     .copied();
 
                 if let Some(socket_addr) = addr {
+                    // Send a message to a client peer.
+                    // Messages sent to a client are not signed
+                    // or validated as part of the routing library.
                     debug!("Sending client msg to {:?}", socket_addr);
-                    return self
-                        .send_message_to_client(socket_addr, *xorname, wire_msg)
-                        .await;
+
+                    let recipients = vec![(*xorname, socket_addr)];
+                    wire_msg.set_dst_section_pk(*self.section_chain().await.last_key());
+
+                    let command = Command::SendMessage {
+                        recipients,
+                        delivery_group_size: 1,
+                        wire_msg,
+                    };
+                    return self.dispatcher.clone().handle_commands(command).await;
                 } else {
                     debug!(
                         "Could not find socketaddr corresponding to socket_id {:?}",
                         socket_id
                     );
-                    debug!("Relaying user message instead.. (Command::SendUserMessage)");
+                    debug!("Relaying user message instead.. (Command::SendMessage)");
                 }
             } else {
-                debug!("Relaying message with sending user message (Command::SendUserMessage)");
+                debug!("Relaying message with sending user message (Command::SendMessage)");
             }
         }
 
-        let command = Command::SendUserMessage(wire_msg);
-        self.dispatcher.clone().handle_commands(command).await
-    }
-
-    /// Send a message to a client peer.
-    /// Messages sent to a client are not signed or validated as part of the
-    /// routing library.
-    async fn send_message_to_client(
-        &self,
-        recipient_addr: SocketAddr,
-        user_xorname: XorName,
-        mut wire_msg: WireMsg,
-    ) -> Result<()> {
-        wire_msg.set_dst_section_pk(*self.section_chain().await.last_key());
-        wire_msg.set_dst_xorname(user_xorname);
-
-        let command = Command::SendMessage {
-            recipients: vec![(user_xorname, recipient_addr)],
-            delivery_group_size: 1,
-            wire_msg,
-        };
+        let command = Command::RelayMessage(wire_msg);
         self.dispatcher.clone().handle_commands(command).await
     }
 
@@ -402,11 +391,6 @@ impl Routing {
     /// `Error::InvalidState` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         self.dispatcher.core.read().await.public_key_set()
-    }
-
-    /// Returns our section signed chain.
-    pub async fn our_history(&self) -> SecuredLinkedList {
-        self.dispatcher.core.read().await.section().chain().clone()
     }
 
     /// Returns our index in the current BLS group if this node is a member of one, or
@@ -460,9 +444,9 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
     };
 
     let span = {
-        let mut state = dispatcher.core.write().await;
+        let mut core = dispatcher.core.write().await;
 
-        if !state.add_to_filter(&wire_msg).await {
+        if !core.add_to_filter(&wire_msg).await {
             trace!(
                 "not handling message - already handled: {:?}",
                 wire_msg.msg_id()
@@ -470,7 +454,7 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
             return;
         }
 
-        trace_span!("handle_message", name = %state.node().name(), %sender)
+        trace_span!("handle_message", name = %core.node().name(), %sender)
     };
     let _span_guard = span.enter();
 

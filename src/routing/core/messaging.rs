@@ -133,36 +133,13 @@ impl Core {
             section_chain: self.section.chain().clone(),
         }));
 
-        let wire_msg = WireMsg::single_src(
-            &self.node,
-            DstLocation::DirectAndUnrouted(*self.section.chain().last_key()),
-            node_msg,
-            self.section.authority_provider().section_key(),
-        )?;
+        let dst_section_pk = *self.section.chain().last_key();
+        let cmd = self.send_direct_message((name, addr), node_msg, dst_section_pk)?;
 
-        Ok(Command::send_message_to_node((name, addr), wire_msg))
+        Ok(cmd)
     }
 
     pub(crate) fn send_sync(&mut self, section: Section, network: Network) -> Result<Vec<Command>> {
-        let send = |node_msg, recipients: Vec<(XorName, SocketAddr)>| -> Result<_> {
-            trace!("Send {:?} to {:?}", node_msg, recipients);
-
-            let wire_msg = WireMsg::single_src(
-                &self.node,
-                DstLocation::DirectAndUnrouted(*self.section_chain().last_key()),
-                node_msg,
-                self.section.authority_provider().section_key(),
-            )?;
-
-            Ok(Command::send_message_to_nodes(
-                recipients.clone(),
-                recipients.len(),
-                wire_msg,
-            ))
-        };
-
-        let mut commands = vec![];
-
         let (elders, non_elders): (Vec<_>, _) = section
             .active_members()
             .filter(|peer| peer.name() != &self.node.name())
@@ -171,40 +148,26 @@ impl Core {
 
         // Send the trimmed state to non-elders. The trimmed state contains only the knowledge of
         // own section.
+        let dst_section_pk = *self.section_chain().last_key();
         let node_msg = NodeMsg::Sync {
             section: section.clone(),
             network: Network::new(),
         };
-        commands.push(send(node_msg, non_elders)?);
+
+        let cmd = self.send_direct_message_to_nodes(non_elders, node_msg, dst_section_pk)?;
+
+        let mut commands = vec![cmd];
 
         // Send the full state to elders.
         // The full state contains the whole section chain.
         let node_msg = NodeMsg::Sync { section, network };
-        commands.push(send(node_msg, elders)?);
+        let cmd = self.send_direct_message_to_nodes(elders, node_msg, dst_section_pk)?;
+        commands.push(cmd);
 
         Ok(commands)
     }
 
     pub(crate) fn send_sync_to_adults(&mut self) -> Result<Vec<Command>> {
-        let send = |node_msg, recipients: Vec<_>| -> Result<_> {
-            trace!("Send {:?} to {:?}", node_msg, recipients);
-
-            let wire_msg = WireMsg::single_src(
-                &self.node,
-                DstLocation::DirectAndUnrouted(*self.section_chain().last_key()),
-                node_msg,
-                self.section.authority_provider().section_key(),
-            )?;
-
-            Ok(Command::send_message_to_nodes(
-                recipients.clone(),
-                recipients.len(),
-                wire_msg,
-            ))
-        };
-
-        let mut commands = vec![];
-
         let adults: Vec<_> = self
             .section
             .live_adults()
@@ -216,9 +179,10 @@ impl Core {
             network: Network::new(),
         };
 
-        commands.push(send(node_msg, adults)?);
+        let dst_section_pk = *self.section_chain().last_key();
+        let cmd = self.send_direct_message_to_nodes(adults, node_msg, dst_section_pk)?;
 
-        Ok(commands)
+        Ok(vec![cmd])
     }
 
     pub(crate) fn send_relocate(
@@ -298,37 +262,6 @@ impl Core {
         )
     }
 
-    pub(crate) fn create_aggregate_at_src_proposal(
-        &self,
-        dst: DstLocation,
-        node_msg: NodeMsg,
-        proof_chain_first_key: Option<&BlsPublicKey>,
-    ) -> Result<Proposal> {
-        let proof_chain = self.create_proof_chain(proof_chain_first_key)?;
-        let dst_key = if let Some(name) = dst.name() {
-            self.section_key_by_name(&name)
-        } else {
-            // NOTE: `dst` is `Direct`. We use this when we want the message to accumulate at the
-            // destination and also be handled only there. We only do this if the recipient is in
-            // our section, so it's OK to use our latest key as the `dst_key`.
-            *self.section.chain().last_key()
-        };
-
-        let message = PlainMessage {
-            src: self.section.prefix().name(),
-            dst,
-            dst_key,
-            node_msg,
-        };
-
-        let proposal = Proposal::AccumulateAtSrc {
-            message: Box::new(message),
-            proof_chain,
-        };
-        trace!("Created aggregate at source proposal {:?}", proposal);
-        Ok(proposal)
-    }
-
     pub(crate) fn send_message_for_dst_accumulation(
         &self,
         src: XorName,
@@ -388,11 +321,11 @@ impl Core {
             let count = others.len();
             let dst_section_pk = self.section_key_by_name(&others[0].0);
             wire_msg.set_dst_section_pk(dst_section_pk);
-            commands.push(Command::send_message_to_nodes(
-                others,
-                count,
-                wire_msg.clone(),
-            ));
+            commands.push(Command::SendMessage {
+                recipients: others,
+                delivery_group_size: count,
+                wire_msg: wire_msg.clone(),
+            });
         }
 
         if handle {
@@ -437,16 +370,41 @@ impl Core {
         &self,
         recipient: (XorName, SocketAddr),
         node_msg: NodeMsg,
-        dst_pk: BlsPublicKey,
+        dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(dst_pk),
+            DstLocation::DirectAndUnrouted(dst_section_pk),
             node_msg,
             self.section.authority_provider().section_key(),
         )?;
 
-        Ok(Command::send_message_to_node(recipient, wire_msg))
+        Ok(Command::SendMessage {
+            recipients: vec![recipient],
+            delivery_group_size: 1,
+            wire_msg,
+        })
+    }
+
+    pub(crate) fn send_direct_message_to_nodes(
+        &self,
+        recipients: Vec<(XorName, SocketAddr)>,
+        node_msg: NodeMsg,
+        dst_section_pk: BlsPublicKey,
+    ) -> Result<Command> {
+        let wire_msg = WireMsg::single_src(
+            &self.node,
+            DstLocation::DirectAndUnrouted(dst_section_pk),
+            node_msg,
+            self.section.authority_provider().section_key(),
+        )?;
+        let delivery_group_size = recipients.len();
+
+        Ok(Command::SendMessage {
+            recipients,
+            delivery_group_size,
+            wire_msg,
+        })
     }
 
     // TODO: consider changing this so it sends only to a subset of the elders
@@ -461,17 +419,8 @@ impl Core {
             .collect();
 
         let dst_section_pk = *self.section_chain().last_key();
-        let wire_msg = WireMsg::single_src(
-            &self.node,
-            DstLocation::DirectAndUnrouted(dst_section_pk),
-            node_msg,
-            self.section.authority_provider().section_key(),
-        )?;
+        let cmd = self.send_direct_message_to_nodes(targets, node_msg, dst_section_pk)?;
 
-        Ok(Command::send_message_to_nodes(
-            targets.clone(),
-            targets.len(),
-            wire_msg,
-        ))
+        Ok(cmd)
     }
 }

@@ -56,27 +56,6 @@ impl Core {
             Proposal::OurElders(section_auth) => {
                 self.handle_our_elders_agreement(section_auth, sig).await
             }
-            Proposal::AccumulateAtSrc { message, .. } => {
-                let dst_name = if let Some(name) = message.dst.name() {
-                    name
-                } else {
-                    error!(
-                        "Not handling AccumulateAtSrc {:?}: No dst_name found",
-                        *message
-                    );
-                    return Err(Error::InvalidDstLocation);
-                };
-                let dst_section_pk = message.dst_key;
-                Ok(vec![self.handle_accumulate_at_src_agreement(
-                    *message,
-                    self.section.chain().clone(),
-                    sig,
-                    DstInfo {
-                        dst: dst_name,
-                        dst_section_pk,
-                    },
-                )?])
-            }
             Proposal::JoinsAllowed(joins_allowed) => {
                 self.joins_allowed = joins_allowed.1;
                 Ok(vec![])
@@ -220,21 +199,14 @@ impl Core {
                 .map(|peer| (*peer.name(), *peer.addr()))
                 .collect();
             if !sync_recipients.is_empty() {
-                let wire_msg = WireMsg::single_src(
-                    &self.node,
-                    DstLocation::DirectAndUnrouted(sig.public_key),
-                    NodeMsg::Sync {
-                        section: self.section.clone(),
-                        network: self.network.clone(),
-                    },
-                    self.section.authority_provider().section_key(),
-                )?;
-                let len = sync_recipients.len();
-                commands.push(Command::send_message_to_nodes(
-                    sync_recipients,
-                    len,
-                    wire_msg,
-                ));
+                let node_msg = NodeMsg::Sync {
+                    section: self.section.clone(),
+                    network: self.network.clone(),
+                };
+                let cmd =
+                    self.send_direct_message_to_nodes(sync_recipients, node_msg, sig.public_key)?;
+
+                commands.push(cmd);
             }
 
             // Send the `OurElder` proposal to all of the to-be-elders so it's aggregated by them.
@@ -279,26 +251,5 @@ impl Core {
         }
 
         self.update_state(snapshot).await
-    }
-
-    fn handle_accumulate_at_src_agreement(
-        &self,
-        message: PlainMessage,
-        section_chain: SecuredLinkedList,
-        sig: KeyedSig,
-        dst_info: DstInfo,
-    ) -> Result<Command> {
-        unimplemented!();
-        /*
-        TODO: we should not use the same HandleMessage for this,
-        but a new command so we don't pass a sender as None making
-        msg handling codebase complex.
-
-        let message = WireMsg::section_src(message, sig, section_chain)?;
-        Ok(Command::HandleMessage {
-            message,
-            sender: None,
-            dst_info,
-        })*/
     }
 }

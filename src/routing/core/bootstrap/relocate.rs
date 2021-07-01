@@ -254,7 +254,7 @@ impl JoiningAsRelocated {
             &self.node,
             DstLocation::DirectAndUnrouted(self.dst_section_key),
             node_msg,
-            self.dst_section_key,
+            self.genesis_key,
         )?;
 
         let cmd = Command::SendMessage {
