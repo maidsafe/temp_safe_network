@@ -9,25 +9,20 @@
 use std::cmp;
 
 use crate::messaging::{
-    node::{
-        DstInfo, KeyedSig, MembershipState, NodeMsg, NodeState, PlainMessage, Proposal,
-        SectionSigned,
-    },
-    DstLocation, SectionAuthorityProvider, WireMsg,
+    node::{KeyedSig, MembershipState, NodeMsg, NodeState, Proposal, SectionSigned},
+    SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::SectionSignedUtils,
     error::Result,
-    messages::WireMsgUtils,
     network::NetworkUtils,
     peer::PeerUtils,
     routing_api::command::Command,
     section::{
         ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils,
     },
-    Error, Event, MIN_AGE,
+    Event, MIN_AGE,
 };
-use secured_linked_list::SecuredLinkedList;
 use xor_name::XorName;
 
 use super::Core;

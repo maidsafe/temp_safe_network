@@ -20,7 +20,7 @@ mod user_msg;
 
 use super::Core;
 use crate::messaging::{
-    node::{DstInfo, Error as AggregatorError, JoinResponse, NodeMsg, Proposal},
+    node::{Error as AggregatorError, NodeMsg, Proposal},
     DstLocation, MessageId, MessageType, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
@@ -33,7 +33,6 @@ use crate::routing::{
     Event,
 };
 use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
 use std::{iter, net::SocketAddr};
 
 // Message handling
@@ -79,9 +78,7 @@ impl Core {
 
         match message_type {
             MessageType::SectionInfo {
-                msg_id,
-                dst_location,
-                msg,
+                dst_location, msg, ..
             } => Ok(self
                 .handle_section_info_msg(sender, dst_location, msg)
                 .await),
@@ -349,6 +346,7 @@ impl Core {
             }
             NodeMsg::JoinRequest(join_request) => {
                 self.handle_join_request(msg_authority.peer(sender)?, *join_request)
+                    .await
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 if self.is_not_elder()
@@ -362,6 +360,7 @@ impl Core {
                     *join_request,
                     known_keys,
                 )
+                .await
             }
             NodeMsg::BouncedUntrustedMessage {
                 msg: bounced_msg,

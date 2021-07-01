@@ -12,7 +12,6 @@ use crate::messaging::node::{
     JoinResponse, NodeMsg, Peer,
 };
 use crate::routing::{
-    core::WireMsgUtils,
     error::Result,
     peer::PeerUtils,
     relocation::RelocatePayloadUtils,
@@ -26,7 +25,7 @@ use bls::PublicKey as BlsPublicKey;
 
 // Message handling
 impl Core {
-    pub(crate) fn handle_join_request(
+    pub(crate) async fn handle_join_request(
         &mut self,
         peer: Peer,
         join_request: JoinRequest,
@@ -139,7 +138,24 @@ impl Core {
                 return Ok(vec![]);
             }
         } else {
-            return Ok(vec![self.send_resource_proof_challenge(&peer)?]);
+            // Do reachability check only for the initial join request
+            let cmd = if self.comm.is_reachable(peer.addr()).await.is_err() {
+                let node_msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+                    JoinRejectionReason::NodeNotReachable(*peer.addr()),
+                )));
+
+                trace!("Sending {:?} to {}", node_msg, peer);
+                self.send_direct_message(
+                    (*peer.name(), *peer.addr()),
+                    node_msg,
+                    *self.section.chain().last_key(),
+                )?
+            } else {
+                // It's reachable, let's then send the proof challenge
+                self.send_resource_proof_challenge(&peer)?
+            };
+
+            return Ok(vec![cmd]);
         }
 
         Ok(vec![Command::ProposeOnline {
@@ -149,7 +165,7 @@ impl Core {
         }])
     }
 
-    pub(crate) fn handle_join_as_relocated_request(
+    pub(crate) async fn handle_join_as_relocated_request(
         &mut self,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
@@ -159,9 +175,16 @@ impl Core {
         let relocate_payload = if let Some(relocate_payload) = join_request.relocate_payload {
             relocate_payload
         } else {
-            let node_msg = NodeMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
-            ));
+            // Do reachability check
+            let node_msg = if self.comm.is_reachable(peer.addr()).await.is_err() {
+                NodeMsg::JoinAsRelocatedResponse(Box::new(
+                    JoinAsRelocatedResponse::NodeNotReachable(*peer.addr()),
+                ))
+            } else {
+                NodeMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
+                    self.section.authority_provider().clone(),
+                )))
+            };
 
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![self.send_direct_message(

@@ -6,15 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, enduser_registry::SocketId, Core};
+use super::{delivery_group, enduser_registry::SocketId, Comm, Core};
 use crate::messaging::{
-    node::{DstInfo, Network, NodeMsg, NodeState, Peer, Proposal, Section},
-    EndUser, Itinerary, MessageId, MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
+    node::{DstInfo, Network, NodeState, Peer, Proposal, Section},
+    EndUser, MessageId, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     dkg::commands::DkgCommands,
     error::Result,
-    messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
@@ -29,9 +28,25 @@ use xor_name::{Prefix, XorName};
 
 impl Core {
     // Creates `Core` for the first node in the network
-    pub fn first_node(node: Node, event_tx: mpsc::Sender<Event>) -> Result<Self> {
+    pub fn first_node(comm: Comm, node: Node, event_tx: mpsc::Sender<Event>) -> Result<Self> {
         let (section, section_key_share) = Section::first_node(node.peer())?;
-        Ok(Self::new(node, section, Some(section_key_share), event_tx))
+        Ok(Self::new(
+            comm,
+            node,
+            section,
+            Some(section_key_share),
+            event_tx,
+        ))
+    }
+
+    pub async fn relocated(&self, new_node: Node, new_section: Section) -> Self {
+        Self::new(
+            self.comm.async_clone().await,
+            new_node,
+            new_section,
+            None,
+            self.event_tx.clone(),
+        )
     }
 
     pub fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<&EndUser> {
@@ -70,6 +85,11 @@ impl Core {
 
     pub fn is_not_elder(&self) -> bool {
         !self.is_elder()
+    }
+
+    /// Returns connection info of this node.
+    pub fn our_connection_info(&self) -> SocketAddr {
+        self.comm.our_connection_info()
     }
 
     /// Tries to sign with the secret corresponding to the provided BLS public key

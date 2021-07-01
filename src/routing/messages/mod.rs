@@ -23,10 +23,7 @@ use crate::routing::{
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use secured_linked_list::{error::Error as SecuredLinkedListError, SecuredLinkedList};
-use serde::Serialize;
-use std::fmt::Debug;
-use thiserror::Error;
+use secured_linked_list::SecuredLinkedList;
 use xor_name::XorName;
 
 // Utilities for WireMsg.

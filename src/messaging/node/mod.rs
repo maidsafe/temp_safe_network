@@ -38,7 +38,6 @@ use crate::messaging::{
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use hex_fmt::HexFmt;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};

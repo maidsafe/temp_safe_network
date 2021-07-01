@@ -8,22 +8,19 @@
 
 use crate::messaging::{
     node::{
-        DstInfo, JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, ResourceProofResponse,
-        Section,
+        JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, ResourceProofResponse, Section,
     },
-    DstLocation, MessageType, MsgKind, NodeMsgAuthority, NodeSigned, WireMsg,
+    DstLocation, MessageType, MsgKind, NodeSigned, WireMsg,
 };
 use crate::routing::{
+    core::{Comm, ConnectionEvent, SendStatus},
     dkg::SectionSignedUtils,
     ed25519,
     error::{Error, Result},
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
-    routing_api::{
-        comm::{Comm, ConnectionEvent, SendStatus},
-        command::Command,
-    },
+    routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
     FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
@@ -455,7 +452,10 @@ async fn send_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{node::NodeState, SectionAuthorityProvider};
+    use crate::messaging::{
+        node::{DstInfo, NodeState},
+        SectionAuthorityProvider,
+    };
     use crate::routing::{
         dkg::test_utils::*,
         error::Error as RoutingError,

@@ -8,10 +8,10 @@
 
 use crate::messaging::{
     node::{
-        DstInfo, JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, RelocateDetails,
-        RelocatePayload, Section,
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, RelocateDetails, RelocatePayload,
+        Section,
     },
-    DstLocation, MessageType, SectionAuthorityProvider, SectionSigned, WireMsg,
+    DstLocation, SectionAuthorityProvider, SectionSigned, WireMsg,
 };
 use crate::routing::{
     dkg::SectionSignedUtils,

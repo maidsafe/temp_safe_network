@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{MessageType, WireMsg};
+use crate::messaging::WireMsg;
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -15,14 +15,16 @@ use qp2p::{Endpoint, QuicP2p};
 use std::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
-    sync::RwLock,
 };
-use tokio::{sync::mpsc, task};
+use tokio::{
+    sync::{mpsc, RwLock},
+    task,
+};
 use xor_name::XorName;
 
 // Communication component of the node to interact with other nodes.
 pub(crate) struct Comm {
-    _quic_p2p: QuicP2p,
+    quic_p2p: QuicP2p,
     endpoint: Endpoint,
     // Sender for connection events. Kept here so we can clone it and pass it to the incoming
     // messages handler every time we establish new connection. It's kept in an `Option` so we can
@@ -59,10 +61,18 @@ impl Comm {
         ));
 
         Ok(Self {
-            _quic_p2p: quic_p2p,
+            quic_p2p: quic_p2p,
             endpoint,
             event_tx: RwLock::new(Some(event_tx)),
         })
+    }
+
+    pub async fn async_clone(&self) -> Self {
+        Self {
+            quic_p2p: self.quic_p2p.clone(),
+            endpoint: self.endpoint.clone(),
+            event_tx: RwLock::new(self.event_tx.read().await.clone()),
+        }
     }
 
     pub async fn bootstrap(
@@ -92,7 +102,7 @@ impl Comm {
 
         Ok((
             Self {
-                _quic_p2p: quic_p2p,
+                quic_p2p: quic_p2p,
                 endpoint,
                 event_tx: RwLock::new(Some(event_tx)),
             },
@@ -101,13 +111,9 @@ impl Comm {
     }
 
     // Close all existing connections and stop accepting new ones.
-    pub fn terminate(&self) {
+    pub async fn terminate(&self) {
         self.endpoint.close();
-        let _ = self
-            .event_tx
-            .write()
-            .unwrap_or_else(|err| err.into_inner())
-            .take();
+        let _ = self.event_tx.write().await.take();
     }
 
     pub fn our_connection_info(&self) -> SocketAddr {
@@ -337,7 +343,7 @@ pub enum SendStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{section_info::SectionInfoMsg, DstInfo, WireMsg};
+    use crate::messaging::{section_info::SectionInfoMsg, DstInfo, MessageType, WireMsg};
     use crate::types::PublicKey;
     use anyhow::Result;
     use assert_matches::assert_matches;
