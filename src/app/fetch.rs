@@ -544,6 +544,9 @@ impl Safe {
                     ))),
                 }
             }
+            SafeContentType::Wallet { .. } => Err(Error::EmptyContent(
+                "Temporarily disabled feature".to_string(),
+            )),
         }
     }
 

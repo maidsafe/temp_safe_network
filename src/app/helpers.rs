@@ -17,10 +17,10 @@ use std::{
     time,
 };
 
-/// The conversion from coin to raw value
-const COIN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
-// The maximum amount of safecoin that can be represented by a single `Token`
-const MAX_COINS_VALUE: u64 = (u32::max_value() as u64 + 1) * COIN_TO_RAW_CONVERSION - 1;
+/// The conversion from token to raw value
+const TOKEN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
+/// The maximum amount of safetoken that can be represented by a single `Token`
+const MAX_TOKENS_VALUE: u64 = (u32::max_value() as u64 + 1) * TOKEN_TO_RAW_CONVERSION - 1;
 
 #[allow(dead_code)]
 pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
@@ -34,20 +34,20 @@ pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
         })
 }
 
-pub fn parse_coins_amount(amount_str: &str) -> Result<Token> {
+pub fn parse_tokens_amount(amount_str: &str) -> Result<Token> {
     Token::from_str(amount_str).map_err(|err| {
         match err {
             SafeNdError::ExcessiveValue => Error::InvalidAmount(format!(
-                "Invalid safecoins amount '{}', it exceeds the maximum possible value '{}'",
-                amount_str, Token::from_nano(MAX_COINS_VALUE)
+                "Invalid tokens amount '{}', it exceeds the maximum possible value '{}'",
+                amount_str, Token::from_nano(MAX_TOKENS_VALUE)
             )),
             SafeNdError::LossOfPrecision => {
-                Error::InvalidAmount(format!("Invalid safecoins amount '{}', the minimum possible amount is one nano coin (0.000000001)", amount_str))
+                Error::InvalidAmount(format!("Invalid tokens amount '{}', the minimum possible amount is one nano token (0.000000001)", amount_str))
             }
             SafeNdError::FailedToParse(msg) => {
-                Error::InvalidAmount(format!("Invalid safecoins amount '{}' ({})", amount_str, msg))
+                Error::InvalidAmount(format!("Invalid tokens amount '{}' ({})", amount_str, msg))
             },
-            _ => Error::InvalidAmount(format!("Invalid safecoins amount '{}'", amount_str)),
+            _ => Error::InvalidAmount(format!("Invalid tokens amount '{}'", amount_str)),
         }
     })
 }
