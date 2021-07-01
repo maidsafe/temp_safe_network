@@ -98,14 +98,16 @@ impl Node {
             reward_key,
         };
 
+        let used_space = UsedSpace::new(config.max_capacity());
+
         let node = Self {
             role: Arc::new(RwLock::new(Role::Adult(AdultRole {
                 chunks: Arc::new(
-                    ChunkStore::new(node_info.root_dir.as_path(), config.max_capacity()).await?,
+                    ChunkStore::new(node_info.root_dir.as_path(), used_space.clone()).await?,
                 ),
             }))),
             node_info,
-            used_space: UsedSpace::new(config.max_capacity()),
+            used_space,
             network_api: network_api.clone(),
         };
 

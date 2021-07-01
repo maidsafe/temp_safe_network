@@ -139,6 +139,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
 
 [[package]]
+name = "async-recursion"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7d78656ba01f1b93024b7c3a0467f1608e4be67d725749fdcd7d2c7678fd7a2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1857,9 +1868,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.12.4"
+version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2dc3747d01a30d5112520fd74a68b140bb8f3f48f373ad1c54c4cfe9d3745bd"
+checksum = "9fb8c15dba81d4f39f1c5fad500ba41ca05d76d00a4c4c8fe0d191cae3fc9fd8"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2318,6 +2329,7 @@ version = "0.6.1"
 dependencies = [
  "anyhow",
  "assert_matches",
+ "async-recursion",
  "async-trait",
  "base64 0.10.1",
  "bincode",

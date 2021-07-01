@@ -19,8 +19,6 @@ use tracing::info;
 impl Node {
     /// Level up a newbie to an oldie on promotion
     pub async fn level_up(&self) -> Result<()> {
-        self.used_space.reset().await?;
-
         let adult_storage_info = AdultsStorageInfo::new();
         let adult_reader = AdultReader::new(self.network_api.clone());
         let capacity_reader = CapacityReader::new(adult_storage_info.clone(), adult_reader.clone());
@@ -29,9 +27,12 @@ impl Node {
 
         //
         // start handling metadata
-        let max_capacity = self.used_space.max_capacity().await;
-        let meta_data =
-            Metadata::new(&self.node_info.path(), max_capacity, capacity.clone()).await?;
+        let meta_data = Metadata::new(
+            &self.node_info.path(),
+            self.used_space.clone(),
+            capacity.clone(),
+        )
+        .await?;
 
         *self.role.write().await = Role::Elder(ElderRole::new(meta_data, false));
 

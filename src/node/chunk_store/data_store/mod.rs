@@ -21,16 +21,12 @@ use std::{
     marker::PhantomData,
     path::{Path, PathBuf},
 };
-use tracing::{info, trace};
-
-use std::sync::Arc;
 use tokio::fs::{self, DirEntry, File};
 use tokio::io::AsyncWriteExt; // for write_all()
-use tokio::sync::RwLock;
-use used_space::StoreId;
+use tracing::info;
 pub use used_space::UsedSpace;
 
-const CHUNK_STORE_DIR: &str = "chunks";
+const DB_DIR: &str = "database";
 
 /// The max name length for a chunk file.
 const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
@@ -40,8 +36,7 @@ const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 pub(crate) struct DataStore<T: Data> {
     dir: PathBuf,
     // Maximum space allowed for all `DataStore`s to consume.
-    used_space: Arc<RwLock<UsedSpace>>,
-    id: StoreId,
+    used_space: UsedSpace,
     _phantom: PhantomData<T>,
 }
 
@@ -57,19 +52,18 @@ where
     ///
     /// The maximum storage space is defined by `max_capacity`.  This specifies the max usable by
     /// _all_ `DataStores`, not per `DataStore`.
-    pub async fn new<P: AsRef<Path>>(root: P, max_capacity: u64) -> Result<Self> {
-        let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
+    pub async fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
+        let dir = root.as_ref().join(DB_DIR).join(Self::subdir());
 
         if fs::read(&dir).await.is_err() {
             Self::create_new_root(&dir).await?
         }
 
-        let used_space = UsedSpace::new(max_capacity);
-        let id = used_space.add_local_store(&dir).await?;
+        used_space.add_dir(&dir);
+
         Ok(DataStore {
             dir,
-            used_space: Arc::new(RwLock::new(used_space)),
-            id,
+            used_space,
             _phantom: PhantomData,
         })
     }
@@ -99,23 +93,13 @@ impl<T: Data> DataStore<T> {
         let consumed_space = serialised_chunk.len() as u64;
 
         info!("consumed space: {:?}", consumed_space);
-        let max_capacity = self.used_space.read().await.max_capacity().await;
-        info!("max : {:?}", max_capacity);
-        let used_total_space = self.used_space.read().await.total().await;
-        info!("use space total : {:?}", used_total_space);
 
         let file_path = self.file_path(chunk.id())?;
         self.do_delete(&file_path).await?;
 
-        // pre-reserve space
-        self.used_space
-            .write()
-            .await
-            .increase(self.id, consumed_space)
-            .await?;
-
-        let used_total_space_after = self.used_space.read().await.total().await;
-        trace!("use space total after add: {:?}", used_total_space_after);
+        if !self.used_space.can_consume(consumed_space).await {
+            return Err(Error::NotEnoughSpace);
+        }
 
         let mut file = File::create(&file_path).await?;
         let res = file.write_all(&serialised_chunk).await;
@@ -127,11 +111,6 @@ impl<T: Data> DataStore<T> {
             }
             Err(e) => {
                 info!("Writing chunk failed!");
-                self.used_space
-                    .write()
-                    .await
-                    .decrease(self.id, consumed_space)
-                    .await?;
                 Err(e.into())
             }
         }
@@ -145,13 +124,13 @@ impl<T: Data> DataStore<T> {
         self.do_delete(&self.file_path(id)?).await
     }
 
-    /// Used space to max space ratio.
+    /// Used space to max capacity ratio.
     pub async fn used_space_ratio(&self) -> f64 {
         let used = self.total_used_space().await;
-        let total = self.used_space.read().await.max_capacity().await;
-        let used_space_ratio = used as f64 / total as f64;
+        let max_capacity = self.used_space.max_capacity();
+        let used_space_ratio = used as f64 / max_capacity as f64;
         info!("Used space: {:?}", used);
-        info!("Total space: {:?}", total);
+        info!("Max capacity: {:?}", max_capacity);
         info!("Used space ratio: {:?}", used_space_ratio);
         used_space_ratio
     }
@@ -174,7 +153,7 @@ impl<T: Data> DataStore<T> {
     }
 
     pub async fn total_used_space(&self) -> u64 {
-        self.used_space.read().await.total().await
+        self.used_space.total().await
     }
 
     /// Tests if a data chunk has been previously stored under `id`.
@@ -205,12 +184,7 @@ impl<T: Data> DataStore<T> {
     }
 
     async fn do_delete(&self, file_path: &Path) -> Result<()> {
-        if let Ok(metadata) = fs::metadata(file_path).await {
-            self.used_space
-                .write()
-                .await
-                .decrease(self.id, metadata.len())
-                .await?;
+        if let Ok(_metadata) = fs::metadata(file_path).await {
             fs::remove_file(file_path).await.map_err(From::from)
         } else {
             Ok(())

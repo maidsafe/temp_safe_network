@@ -358,8 +358,58 @@ mod tests {
     use crate::types::{PrivateChunk, PublicChunk};
     use anyhow::{anyhow, bail, Result};
     use bincode::deserialize;
+    use futures::future::join_all;
     use self_encryption::Storage;
-    use tokio::time::Duration;
+    use tokio::time::{Duration, Instant};
+
+    // Test storing and getting public Blob.
+    #[tokio::test]
+    #[ignore = "too heavy for CI"]
+    pub async fn parallel_timings() -> Result<()> {
+        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
+
+        let handles = (0..1000_usize)
+            .map(|i| (i, client.clone()))
+            .map(|(i, client)| {
+                tokio::spawn(async move {
+                    let value = generate_random_vector::<u8>(1000);
+                    let _ = client.store_public_blob(&value).await?;
+                    println!("Iter: {}", i);
+                    let res: Result<()> = Ok(());
+                    res
+                })
+            });
+
+        let results = join_all(handles).await;
+
+        for res1 in results {
+            if let Ok(res2) = res1 {
+                if res2.is_err() {
+                    println!("Error: {:?}", res2);
+                }
+            } else {
+                println!("Error: {:?}", res1);
+            }
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "too heavy for CI"]
+    pub async fn one_by_one_timings() -> Result<()> {
+        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
+
+        for i in 0..1000_usize {
+            let value = generate_random_vector::<u8>(1000);
+            let now = Instant::now();
+            let _ = client.store_public_blob(&value).await?;
+            let elapsed = now.elapsed();
+            println!("Iter: {}, in {} millis", i, elapsed.as_millis());
+        }
+
+        Ok(())
+    }
 
     // Test storing and getting public Blob.
     #[tokio::test]

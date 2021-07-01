@@ -190,8 +190,9 @@ impl Node {
             }
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
-                let capacity = self.used_space.max_capacity().await;
-                let store = ChunkStore::new(self.node_info.root_dir.as_path(), capacity).await?;
+                let store =
+                    ChunkStore::new(self.node_info.root_dir.as_path(), self.used_space.clone())
+                        .await?;
                 *self.role.write().await = Role::Adult(AdultRole {
                     chunks: Arc::new(store),
                 });

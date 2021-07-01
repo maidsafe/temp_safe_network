@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
+use crate::node::chunk_store::UsedSpace;
 use crate::node::{
     error::convert_to_error_message, event_store::EventStore, node_ops::NodeDuty, Error, Result,
 };
@@ -37,6 +38,7 @@ use xor_name::{Prefix, XorName};
 /// Operations over the data type Register.
 pub(super) struct RegisterStorage {
     path: PathBuf,
+    _used_space: UsedSpace,
     store: DashMap<XorName, TransientEntry>,
 }
 
@@ -48,9 +50,11 @@ struct StateEntry {
 }
 
 impl RegisterStorage {
-    pub(super) fn new(path: &Path, _max_capacity: u64) -> Self {
+    pub(super) fn new(path: &Path, _used_space: UsedSpace) -> Self {
+        _used_space.add_dir(path);
         Self {
             path: path.to_path_buf(),
+            _used_space,
             store: DashMap::new(),
         }
     }
@@ -91,6 +95,10 @@ impl RegisterStorage {
     /// --- Writing ---
 
     pub(super) async fn write(&self, op: RegisterCmd) -> Result<NodeDuty> {
+        // let required_space = std::mem::size_of::<RegisterCmd>() as u64;
+        // if !self.used_space.can_consume(required_space).await {
+        //     return Err(Error::NotEnoughSpace);
+        // }
         let msg_id = op.msg_id;
         let origin = op.origin;
         let write_result = self.apply(op).await;

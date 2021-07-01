@@ -63,9 +63,9 @@ pub(crate) struct ChunkStore {
 }
 
 impl ChunkStore {
-    pub async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
+    pub async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            store: DataStore::<Chunk>::new(path, max_capacity).await?,
+            store: DataStore::<Chunk>::new(path, used_space).await?,
         })
     }
 
@@ -160,6 +160,7 @@ impl ChunkStore {
         Ok(NodeDuty::NoOp)
     }
 
+    // TODO: this is redundant, see if it can be omitted
     pub async fn check_storage(&self) -> Result<NodeDuties> {
         info!("Checking used storage");
         if self.store.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
