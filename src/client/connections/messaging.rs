@@ -14,7 +14,7 @@ use crate::messaging::{
     MessageId,
 };
 use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
-use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
+use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tokio::{sync::mpsc::channel, task::JoinHandle, time::timeout};
@@ -252,7 +252,7 @@ impl Session {
         );
 
         // We send the same message to all Elders concurrently
-        let mut tasks = FuturesUnordered::new();
+        let tasks = FuturesUnordered::new();
         let (sender, mut receiver) = channel::<QueryResponse>(7);
 
         let pending_queries_for_thread = pending_queries.clone();
@@ -265,10 +265,13 @@ impl Session {
                 .insert(msg_id, sender);
         });
 
+        let responses_discarded = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
+
         // Set up response listeners
         for socket in elders {
             let endpoint = endpoint.clone();
             let msg_bytes = msg_bytes.clone();
+            let counter_clone = responses_discarded.clone();
             let task_handle = tokio::spawn(async move {
                 endpoint.connect_to(&socket).await?;
 
@@ -285,12 +288,26 @@ impl Session {
                             err
                         );
                         result = Err(Error::SendingQuery);
+                        if attempt <= NUMBER_OF_RETRIES {
+                            let millis = 2_u64.pow(attempt as u32 - 1) * 100;
+                            tokio::time::sleep(std::time::Duration::from_millis(millis)).await
+                        }
                     } else {
                         trace!("ClientMsg with id: {:?}, sent to {}", &msg_id, &socket);
                         result = Ok(());
                         break;
                     }
                 }
+
+                match &result {
+                    Err(err) => {
+                        error!("Error sending Query to elder: {:?} ", err);
+                        let mut a = counter_clone.lock().await;
+                        *a += 1;
+                    }
+                    Ok(()) => (),
+                }
+
                 result
             });
 
@@ -309,18 +326,13 @@ impl Session {
         // have to review the approach.
         let mut responses_discarded: usize = 0;
 
-        // Send all queries first
-        while let Some(result) = tasks.next().await {
-            match result {
-                Err(err) => {
-                    error!("Error spawning task to send query: {:?} ", err);
-                    responses_discarded += 1;
-                }
-                Ok(Err(err)) => {
-                    error!("Error sending Query to elder: {:?} ", err);
-                    responses_discarded += 1;
-                }
-                _ => (),
+        // Send all queries concurrently
+        let results = join_all(tasks).await;
+
+        for result in results {
+            if let Err(err) = result {
+                error!("Error spawning task to send query: {:?} ", err);
+                responses_discarded += 1;
             }
         }
 

@@ -9,13 +9,53 @@
 #[cfg(test)]
 mod test_client;
 
+use crate::client::Error;
 use crate::types::Keypair;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context, Result as AnyhowResult};
 use dirs_next::home_dir;
 use std::path::Path;
 use std::{collections::HashSet, fs::File, io::BufReader, net::SocketAddr};
 #[cfg(test)]
 pub use test_client::{create_test_client, create_test_client_with, init_logger};
+
+use exponential_backoff::Backoff;
+use std::future::Future;
+use std::time::Duration;
+
+///
+pub type ClientResult<T> = Result<T, Error>;
+
+///
+pub async fn run_w_backoff<F, Fut, T>(f: F, retries: u8) -> ClientResult<T>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = ClientResult<T>>,
+{
+    run_w_backoff_base(f, retries, Error::NoResponse).await
+}
+
+///
+pub async fn run_w_backoff_base<F, Fut, T, E>(f: F, retries: u8, on_fail: E) -> Result<T, E>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+{
+    let backoff = get_backoff_policy(retries);
+    for duration in &backoff {
+        match f().await {
+            Ok(val) => return Ok(val),
+            Err(_) => tokio::time::sleep(duration).await,
+        }
+    }
+
+    Err(on_fail)
+}
+
+fn get_backoff_policy(retries: u8) -> Backoff {
+    let min = Duration::from_millis(100);
+    let max = Duration::from_secs(10);
+    Backoff::new(retries as u32, min, max)
+}
 
 // Relative path from $HOME where to read the genesis node connection information from
 const GENESIS_CONN_INFO_FILEPATH: &str = ".safe/node/node_connection_info.config";
@@ -27,7 +67,7 @@ pub fn gen_ed_keypair() -> Keypair {
 }
 
 /// Read local network bootstrapping/connection information
-pub fn read_network_conn_info() -> Result<HashSet<SocketAddr>> {
+pub fn read_network_conn_info() -> AnyhowResult<HashSet<SocketAddr>> {
     let user_dir = home_dir().ok_or_else(|| anyhow!("Could not fetch home directory"))?;
     let conn_info_path = user_dir.join(Path::new(GENESIS_CONN_INFO_FILEPATH));
 
