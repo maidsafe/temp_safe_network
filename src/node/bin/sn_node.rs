@@ -106,10 +106,7 @@ async fn run_node() -> Result<()> {
         }
     };
 
-    // Guard (if we're writing to a file) should be kept in scope until end of main and therefore should not be _optional_guard
-    // https://tracing.rs/tracing_appender/non_blocking/index.html1
-    #[allow(unused)]
-    let optional_guard = if let Some(log_dir) = config.log_dir() {
+    let _optional_guard = if let Some(log_dir) = config.log_dir() {
         println!("Starting logging to file");
         let file_appender = tracing_appender::rolling::hourly(log_dir, "sn_node.log");
 
