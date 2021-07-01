@@ -242,9 +242,49 @@ mod tests {
         Error as DtError, PublicKey,
     };
     use anyhow::{anyhow, bail, Result};
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        time::Instant,
+    };
     use tokio::time::Duration;
     use xor_name::XorName;
+
+    #[tokio::test]
+    #[ignore = "too heavy for CI"]
+    pub async fn measure_upload_times() -> Result<()> {
+        let mut total = 0;
+
+        let name = XorName(rand::random());
+        let tag = 10;
+        let client = create_test_client(None).await?;
+
+        let owner = client.public_key();
+        let mut perms = BTreeMap::<User, PublicPermissions>::new();
+        let _ = perms.insert(User::Key(owner), PublicPermissions::new(true));
+
+        let address = client
+            .store_public_register(name, tag, owner, perms)
+            .await?;
+
+        for i in 0..1000_usize {
+            let now = Instant::now();
+
+            // write to the register
+            let _value1_hash = run_w_backoff(
+                || client.write_to_register(address, b"VALUE1".to_vec(), BTreeSet::new()),
+                10,
+            )
+            .await?;
+
+            let elapsed = now.elapsed().as_millis();
+            total += elapsed;
+            println!("Iter # {}, elapsed: {}", i, elapsed);
+        }
+
+        println!("Total elapsed: {}", total);
+
+        Ok(())
+    }
 
     /**** Register data tests ****/
 
@@ -264,8 +304,6 @@ mod tests {
             .await?;
 
         let register = run_w_backoff(|| client.get_register(address), 10).await?;
-
-        //let register = run_w_backoff(|| client.get_register(address), backoff);
 
         assert!(register.is_private());
         assert_eq!(*register.name(), name);
