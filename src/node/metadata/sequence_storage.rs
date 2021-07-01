@@ -52,9 +52,9 @@ impl SequenceStorage {
         Ok(SequenceDataExchange(the_data))
     }
 
-    pub async fn update(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
+    pub async fn update(&self, seq_data: SequenceDataExchange) -> Result<()> {
         debug!("Updating Sequence DataStore");
-        let data_store = &mut self.chunks;
+        let data_store = &self.chunks;
         let SequenceDataExchange(data) = seq_data;
 
         for (_key, value) in data {
@@ -98,7 +98,7 @@ impl SequenceStorage {
     }
 
     pub(super) async fn write(
-        &mut self,
+        &self,
         write: SequenceWrite,
         msg_id: MessageId,
         requester: PublicKey,
@@ -116,12 +116,7 @@ impl SequenceStorage {
         }
     }
 
-    async fn store(
-        &mut self,
-        data: &Sequence,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
+    async fn store(&self, data: &Sequence, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
         let result = if self.chunks.has(data.address()).await {
             Err(Error::DataExists)
         } else {
@@ -164,7 +159,7 @@ impl SequenceStorage {
     }
 
     async fn delete(
-        &mut self,
+        &self,
         address: SequenceAddress,
         msg_id: MessageId,
         requester: PublicKey,
@@ -339,7 +334,7 @@ impl SequenceStorage {
     }
 
     async fn edit(
-        &mut self,
+        &self,
         write_op: SequenceOp<SequenceEntry>,
         msg_id: MessageId,
         requester: PublicKey,
@@ -367,7 +362,7 @@ impl SequenceStorage {
     }
 
     async fn edit_chunk<F>(
-        &mut self,
+        &self,
         address: SequenceAddress,
         action: SequenceAction,
         requester: PublicKey,

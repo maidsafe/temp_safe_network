@@ -62,7 +62,7 @@ impl AdultRole {
     }
 
     async fn republish_and_cache(
-        &mut self,
+        &self,
         address: &ChunkAddress,
         our_name: &XorName,
         new_adults: &BTreeSet<XorName>,

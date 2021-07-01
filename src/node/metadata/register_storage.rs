@@ -61,7 +61,7 @@ impl RegisterStorage {
     }
 
     pub(super) async fn write(
-        &mut self,
+        &self,
         write: RegisterWrite,
         msg_id: MessageId,
         requester: PublicKey,
@@ -79,12 +79,7 @@ impl RegisterStorage {
         }
     }
 
-    async fn store(
-        &mut self,
-        data: &Register,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
+    async fn store(&self, data: &Register, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
         let result = if self.chunks.has(data.address()).await {
             Err(Error::DataExists)
         } else {
@@ -125,7 +120,7 @@ impl RegisterStorage {
     }
 
     async fn delete(
-        &mut self,
+        &self,
         address: Address,
         msg_id: MessageId,
         requester: PublicKey,
@@ -254,7 +249,7 @@ impl RegisterStorage {
     }
 
     async fn edit(
-        &mut self,
+        &self,
         write_op: RegisterOp<Entry>,
         msg_id: MessageId,
         requester: PublicKey,
@@ -279,7 +274,7 @@ impl RegisterStorage {
     }
 
     async fn edit_chunk<F>(
-        &mut self,
+        &self,
         address: Address,
         action: Action,
         requester: PublicKey,

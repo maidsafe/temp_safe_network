@@ -94,7 +94,7 @@ async fn successful_put() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut data_store = DataStore::<TestData>::new(root.path(), u64::MAX).await?;
+    let data_store = DataStore::<TestData>::new(root.path(), u64::MAX).await?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &TestData {
@@ -129,7 +129,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
     let mut rng = new_rng();
     let root = temp_dir()?;
     let capacity = 32;
-    let mut data_store = DataStore::new(root.path(), capacity).await?;
+    let data_store = DataStore::new(root.path(), capacity).await?;
 
     let data = TestData {
         id: Id(rng.gen()),
@@ -153,7 +153,7 @@ async fn delete() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut data_store = DataStore::new(root.path(), u64::MAX).await?;
+    let data_store = DataStore::new(root.path(), u64::MAX).await?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate() {
         let the_data = &TestData {
@@ -169,7 +169,7 @@ async fn delete() -> Result<()> {
         loop {
             let used_space = data_store.total_used_space().await;
             println!(
-                "-----looping used : {:?} tesrget size: {:?}",
+                "-----looping used : {:?} target size: {:?}",
                 used_space, size
             );
             if &used_space == size {
@@ -213,7 +213,7 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut data_store = DataStore::new(root.path(), u64::MAX).await?;
+    let data_store = DataStore::new(root.path(), u64::MAX).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         data_store
@@ -239,7 +239,7 @@ async fn overwrite_value() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut data_store = DataStore::new(root.path(), u64::MAX).await?;
+    let data_store = DataStore::new(root.path(), u64::MAX).await?;
 
     for (data, size) in chunks.data_and_sizes {
         data_store
@@ -289,7 +289,7 @@ async fn keys() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut data_store = DataStore::new(root.path(), u64::MAX).await?;
+    let data_store = DataStore::new(root.path(), u64::MAX).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);

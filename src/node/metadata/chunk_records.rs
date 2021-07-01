@@ -70,7 +70,7 @@ impl ChunkRecords {
     }
 
     pub(super) async fn write(
-        &mut self,
+        &self,
         write: ChunkWrite,
         msg_id: MessageId,
         client_sig: ClientSig,
@@ -107,7 +107,7 @@ impl ChunkRecords {
     }
 
     async fn send_chunks_to_adults(
-        &mut self,
+        &self,
         chunk: Chunk,
         msg_id: MessageId,
         client_sig: ClientSig,
@@ -144,7 +144,7 @@ impl ChunkRecords {
     }
 
     async fn store(
-        &mut self,
+        &self,
         chunk: Chunk,
         msg_id: MessageId,
         client_sig: ClientSig,
@@ -222,7 +222,7 @@ impl ChunkRecords {
     }
 
     async fn delete(
-        &mut self,
+        &self,
         address: ChunkAddress,
         msg_id: MessageId,
         client_sig: ClientSig,

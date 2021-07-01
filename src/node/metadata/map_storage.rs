@@ -51,9 +51,9 @@ impl MapStorage {
         Ok(MapDataExchange(the_data))
     }
 
-    pub async fn update(&mut self, map_data: MapDataExchange) -> Result<()> {
+    pub async fn update(&self, map_data: MapDataExchange) -> Result<()> {
         debug!("Updating Map DataStore");
-        let data_store = &mut self.chunks;
+        let data_store = &self.chunks;
         let MapDataExchange(data) = map_data;
 
         for (_key, value) in data {
@@ -93,7 +93,7 @@ impl MapStorage {
     }
 
     pub(super) async fn write(
-        &mut self,
+        &self,
         write: MapWrite,
         msg_id: MessageId,
         requester: PublicKey,
@@ -150,7 +150,7 @@ impl MapStorage {
 
     /// Get Map from the chunk store, update it, and overwrite the stored chunk.
     async fn edit_chunk<F>(
-        &mut self,
+        &self,
         address: &MapAddress,
         origin: EndUser,
         msg_id: MessageId,
@@ -171,7 +171,7 @@ impl MapStorage {
     }
 
     /// Put Map.
-    async fn create(&mut self, data: &Map, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
+    async fn create(&self, data: &Map, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
         let result = if self.chunks.has(data.address()).await {
             Err(Error::DataExists)
         } else {
@@ -181,7 +181,7 @@ impl MapStorage {
     }
 
     async fn delete(
-        &mut self,
+        &self,
         address: MapAddress,
         msg_id: MessageId,
         requester: PublicKey,
@@ -206,7 +206,7 @@ impl MapStorage {
 
     /// Delete Map user permissions.
     async fn delete_user_permissions(
-        &mut self,
+        &self,
         address: MapAddress,
         user: PublicKey,
         version: u64,
@@ -224,7 +224,7 @@ impl MapStorage {
 
     /// Edit Map.
     async fn edit_entries(
-        &mut self,
+        &self,
         address: MapAddress,
         actions: MapEntryActions,
         msg_id: MessageId,
