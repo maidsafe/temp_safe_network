@@ -28,9 +28,10 @@ use std::{
 };
 use tracing::{info, trace};
 
+use std::sync::Arc;
 use tokio::fs::{self, DirEntry, File};
 use tokio::io::AsyncWriteExt; // for write_all()
-
+use tokio::sync::RwLock;
 use used_space::StoreId;
 pub use used_space::UsedSpace;
 
@@ -49,7 +50,7 @@ pub(crate) type RegisterDataStore = DataStore<Register>;
 pub(crate) struct DataStore<T: Data> {
     dir: PathBuf,
     // Maximum space allowed for all `DataStore`s to consume.
-    used_space: UsedSpace,
+    used_space: Arc<RwLock<UsedSpace>>,
     id: StoreId,
     _phantom: PhantomData<T>,
 }
@@ -77,7 +78,7 @@ where
         let id = used_space.add_local_store(&dir).await?;
         Ok(DataStore {
             dir,
-            used_space,
+            used_space: Arc::new(RwLock::new(used_space)),
             id,
             _phantom: PhantomData,
         })
@@ -102,24 +103,25 @@ impl<T: Data> DataStore<T> {
     /// an IO error, it returns `Error::Io`.
     ///
     /// If a chunk with the same id already exists, it will be overwritten.
-    pub async fn put(&mut self, chunk: &T) -> Result<()> {
+    pub async fn put(&self, chunk: &T) -> Result<()> {
         info!("Writing chunk");
         let serialised_chunk = utils::serialise(chunk)?;
         let consumed_space = serialised_chunk.len() as u64;
 
         info!("consumed space: {:?}", consumed_space);
-        let max_capacity = self.used_space.max_capacity().await;
+        let max_capacity = self.used_space.read().await.max_capacity().await;
         info!("max : {:?}", max_capacity);
-        let used_total_space = self.used_space.total().await;
+        let used_total_space = self.used_space.read().await.total().await;
         info!("use space total : {:?}", used_total_space);
 
         let file_path = self.file_path(chunk.id())?;
         self.do_delete(&file_path).await?;
 
         // pre-reserve space
-        self.used_space.increase(self.id, consumed_space).await?;
+        self.used_space.write()
+            .await.increase(self.id, consumed_space).await?;
 
-        let used_total_space_after = self.used_space.total().await;
+        let used_total_space_after = self.used_space.read().await.total().await;
         trace!("use space total after add: {:?}", used_total_space_after);
 
         let mut file = File::create(&file_path).await?;
@@ -132,7 +134,11 @@ impl<T: Data> DataStore<T> {
             }
             Err(e) => {
                 info!("Writing chunk failed!");
-                self.used_space.decrease(self.id, consumed_space).await?;
+                self.used_space
+                    .write()
+                    .await
+                    .decrease(self.id, consumed_space)
+                    .await?;
                 Err(e.into())
             }
         }
@@ -142,14 +148,14 @@ impl<T: Data> DataStore<T> {
     ///
     /// If the data doesn't exist, it does nothing and returns `Ok`.  In the case of an IO error, it
     /// returns `Error::Io`.
-    pub async fn delete(&mut self, id: &T::Id) -> Result<()> {
+    pub async fn delete(&self, id: &T::Id) -> Result<()> {
         self.do_delete(&self.file_path(id)?).await
     }
 
     /// Used space to max space ratio.
     pub async fn used_space_ratio(&self) -> f64 {
         let used = self.total_used_space().await;
-        let total = self.used_space.max_capacity().await;
+        let total = self.used_space.read().await.max_capacity().await;
         let used_space_ratio = used as f64 / total as f64;
         info!("Used space: {:?}", used);
         info!("Total space: {:?}", total);
@@ -175,7 +181,7 @@ impl<T: Data> DataStore<T> {
     }
 
     pub async fn total_used_space(&self) -> u64 {
-        self.used_space.total().await
+        self.used_space.read().await.total().await
     }
 
     /// Tests if a data chunk has been previously stored under `id`.
@@ -205,9 +211,13 @@ impl<T: Data> DataStore<T> {
         Ok(keys)
     }
 
-    async fn do_delete(&mut self, file_path: &Path) -> Result<()> {
+    async fn do_delete(&self, file_path: &Path) -> Result<()> {
         if let Ok(metadata) = fs::metadata(file_path).await {
-            self.used_space.decrease(self.id, metadata.len()).await?;
+            self.used_space
+                .write()
+                .await
+                .decrease(self.id, metadata.len())
+                .await?;
             fs::remove_file(file_path).await.map_err(From::from)
         } else {
             Ok(())

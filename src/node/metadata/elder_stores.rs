@@ -67,7 +67,7 @@ impl ElderStores {
     }
 
     pub async fn write(
-        &mut self,
+        &self,
         cmd: DataCmd,
         msg_id: MessageId,
         client_sig: ClientSig,
@@ -120,7 +120,7 @@ impl ElderStores {
         })
     }
 
-    pub async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
+    pub async fn update(&self, data: DataExchange) -> Result<(), Error> {
         self.map_storage.update(data.map_data).await?;
         self.sequence_storage.update(data.seq_data).await?;
         self.chunk_records.update(data.chunk_data).await;
