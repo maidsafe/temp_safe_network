@@ -233,6 +233,7 @@ pub fn node_join(
     contacts: &HashSet<SocketAddr>,
     local_addr: Option<SocketAddr>,
     public_addr: Option<SocketAddr>,
+    clear_data: bool,
 ) -> Result<()> {
     let node_path = get_node_bin_path(node_path)?;
 
@@ -271,6 +272,10 @@ pub fn node_join(
         sn_launch_tool_args.push(public);
     }
 
+    if clear_data {
+        sn_launch_tool_args.push("--clear-data");
+    }
+
     let mut verbosity_arg = String::from("-");
     if verbosity > 0 {
         let v = "y".repeat(verbosity as usize);
@@ -289,7 +294,7 @@ pub fn node_join(
         sn_launch_tool_args.push(peer);
     }
 
-    println!(
+    debug!(
         "Running network launch tool with args: {:?}",
         sn_launch_tool_args
     );

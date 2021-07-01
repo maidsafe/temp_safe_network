@@ -3555,7 +3555,7 @@ dependencies = [
  "sn_api",
  "sn_cmd_test_utilities",
  "sn_data_types",
- "sn_launch_tool 0.2.2",
+ "sn_launch_tool 0.3.1",
  "structopt",
  "tokio 1.7.1",
  "walkdir",
@@ -3600,8 +3600,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.2.2"
-source = "git+https://github.com/yoga07/sn_launch_tool?branch=addr#7145282e34519996c65aa9459f87fee486d7c97a"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "705865e747f4664ee80182357579135c7274ba9371b1a8a89a7b2467a86349cd"
 dependencies = [
  "dirs-next 1.0.2",
  "env_logger 0.8.4",
@@ -3612,9 +3613,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.2.3"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "705865e747f4664ee80182357579135c7274ba9371b1a8a89a7b2467a86349cd"
+checksum = "9575f640091a94f972a047bcce21b265f9c2643a68c75cfb24063d26bf30cbfb"
 dependencies = [
  "dirs-next 1.0.2",
  "env_logger 0.8.4",

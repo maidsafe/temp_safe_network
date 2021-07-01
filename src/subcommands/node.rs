@@ -56,6 +56,9 @@ pub enum NodeSubCommands {
         #[structopt(short = "p", long)]
         /// External address provided for the node
         public_addr: Option<SocketAddr>,
+        /// Delete all data from a previous node running on the same PC
+        #[structopt(long = "clear-data")]
+        clear_data: bool,
     },
     #[structopt(name = "run-baby-fleming")]
     /// Run nodes to form a local single-section Safe network
@@ -114,6 +117,7 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
             hard_coded_contacts,
             local_addr,
             public_addr,
+            clear_data,
         }) => {
             let network_contacts = if hard_coded_contacts.is_empty() {
                 if let Some(name) = network_name {
@@ -141,6 +145,7 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
                 &network_contacts,
                 local_addr,
                 public_addr,
+                clear_data,
             )
         }
         Some(NodeSubCommands::Run {
