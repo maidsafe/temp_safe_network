@@ -169,7 +169,7 @@ async fn run_node() -> Result<()> {
         BOOTSTRAP_RETRY_TIME
     );
 
-    let (mut node, event_stream) = loop {
+    let (node, event_stream) = loop {
         match Node::new(&config).await {
             Ok(result) => break result,
             Err(Error::Routing(routing::Error::TryJoinLater)) => {

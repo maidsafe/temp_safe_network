@@ -66,7 +66,7 @@ pub struct Node {
     network_api: Network,
     node_info: NodeInfo,
     used_space: UsedSpace,
-    role: Role,
+    role: Arc<RwLock<Role>>,
 }
 
 impl Node {
@@ -99,11 +99,11 @@ impl Node {
         };
 
         let node = Self {
-            role: Role::Adult(AdultRole {
-                chunks: Arc::new(RwLock::new(
+            role: Arc::new(RwLock::new(Role::Adult(AdultRole {
+                chunks: Arc::new(
                     ChunkStore::new(node_info.root_dir.as_path(), config.max_capacity()).await?,
-                )),
-            }),
+                ),
+            }))),
             node_info,
             used_space: UsedSpace::new(config.max_capacity()),
             network_api: network_api.clone(),
@@ -158,7 +158,7 @@ impl Node {
     /// Starts the node, and runs the main event loop.
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
-    pub async fn run(&mut self, network_events: EventStream) -> Result<()> {
+    pub async fn run(&self, network_events: EventStream) -> Result<()> {
         let network_api = self.network_api.clone();
         let event_lock = Arc::new(Mutex::new(network_events));
         let routing_task_handle = tokio::spawn(Self::process_routing_event(
@@ -200,7 +200,7 @@ impl Node {
     }
 
     fn handle_and_get_threads(
-        &mut self,
+        &self,
         op: NodeDuty,
         ctx: Option<MsgContext>,
     ) -> BoxFuture<Vec<JoinHandle<Result<NodeTask>>>> {

@@ -84,7 +84,7 @@ impl ChunkRecords {
     }
 
     /// Adds a given node to the list of full nodes.
-    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
+    pub async fn increase_full_node_count(&self, node_id: PublicKey) {
         let full_adults = self.capacity.full_adults_count().await;
         info!("No. of full Adults: {:?}", full_adults);
         info!("Increasing full Adults count");
@@ -96,10 +96,8 @@ impl ChunkRecords {
     /// Removes a given node from the list of full nodes.
     #[allow(unused)] // TODO: Remove node from full list at 50% ?
     async fn decrease_full_adults_count_if_present(&mut self, node_name: XorName) {
-        info!(
-            "No. of Full Nodes: {:?}",
-            self.capacity.full_adults_count().await
-        );
+        let full_adults = self.capacity.full_adults_count().await;
+        info!("No. of full Adults: {:?}", full_adults);
         info!("Checking if {:?} is present as full_node", node_name);
         self.capacity
             .remove_full_adults(btree_set!(node_name))
@@ -245,7 +243,7 @@ impl ChunkRecords {
         })
     }
 
-    pub(super) async fn republish_chunk(&mut self, chunk: Chunk) -> Result<NodeDuty> {
+    pub(super) async fn republish_chunk(&self, chunk: Chunk) -> Result<NodeDuty> {
         let owner = chunk.owner();
         let target_holders = self.capacity.get_chunk_holder_adults(chunk.name()).await;
         // deterministic msg id for aggregation

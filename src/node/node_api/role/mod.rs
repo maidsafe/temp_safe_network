@@ -33,7 +33,6 @@ impl Debug for Role {
 }
 
 impl Role {
-    #[allow(unused)]
     pub fn as_adult(&self) -> Result<&AdultRole> {
         match self {
             Self::Adult(adult) => Ok(adult),
@@ -41,21 +40,7 @@ impl Role {
         }
     }
 
-    pub fn as_adult_mut(&mut self) -> Result<&mut AdultRole> {
-        match self {
-            Self::Adult(adult) => Ok(adult),
-            _ => Err(Error::NotAnAdult),
-        }
-    }
-
     pub fn as_elder(&self) -> Result<&ElderRole> {
-        match self {
-            Self::Elder(elder) => Ok(elder),
-            _ => Err(Error::NotAnElder),
-        }
-    }
-
-    pub fn as_elder_mut(&mut self) -> Result<&mut ElderRole> {
         match self {
             Self::Elder(elder) => Ok(elder),
             _ => Err(Error::NotAnElder),

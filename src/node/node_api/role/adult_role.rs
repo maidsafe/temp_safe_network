@@ -21,24 +21,23 @@ use crate::types::{Chunk, ChunkAddress};
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{info, trace, warn};
 
 #[derive(Clone)]
 pub(crate) struct AdultRole {
     // immutable chunks
-    pub chunks: Arc<RwLock<ChunkStore>>,
+    pub chunks: Arc<ChunkStore>,
 }
 
 impl AdultRole {
     pub async fn reorganize_chunks(
-        &mut self,
+        &self,
         our_name: XorName,
         new_adults: BTreeSet<XorName>,
         lost_adults: BTreeSet<XorName>,
         remaining: BTreeSet<XorName>,
     ) -> Result<NodeDuties> {
-        let keys = self.chunks.read().await.keys().await?;
+        let keys = self.chunks.keys().await?;
         let mut data_for_replication = BTreeMap::new();
         for addr in keys.iter() {
             if let Some((data, holders)) = self
@@ -81,9 +80,9 @@ impl AdultRole {
         if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
             info!("Republishing chunk at {:?}", address);
             trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
-            let chunk = self.chunks.read().await.get_chunk(address).await.ok()?;
+            let chunk = self.chunks.get_chunk(address).await.ok()?;
             if we_are_not_holder_anymore {
-                if let Err(err) = self.chunks.write().await.remove_chunk(address).await {
+                if let Err(err) = self.chunks.remove_chunk(address).await {
                     warn!("Error deleting chunk during republish: {:?}", err);
                 }
             }
