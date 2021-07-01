@@ -27,14 +27,13 @@
     unused_results
 )]
 
-use anyhow::{Error as AnyhowError, Result};
+use anyhow::{anyhow, Error as AnyhowError, Result};
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
 use tracing::{self, error, info};
-use tracing_subscriber;
 use tracing_subscriber::filter::EnvFilter;
 const MODULE_NAME: &str = "safe_network";
 
@@ -66,7 +65,8 @@ async fn run_node() -> Result<()> {
         Ok(cfg) => cfg,
         Err(e) => {
             println!("Failed to create Config: {:?}", e);
-            return Ok(exit(1));
+            exit(1);
+            return Ok(());
         }
     };
 
@@ -94,7 +94,11 @@ async fn run_node() -> Result<()> {
     let level_filter = config.verbose();
     let module_log_filter = format!("{}={}", MODULE_NAME, level_filter.to_string());
 
-    let filter = EnvFilter::from_default_env().add_directive(module_log_filter.parse()?);
+    let filter = EnvFilter::from_default_env().add_directive(
+        module_log_filter
+            .parse()
+            .map_err(|_| anyhow!("Could not parse module log filter"))?,
+    );
 
     // Guard (if we're writing to a file) should be kept in scope until end of main and therefore should not be _optional_guard
     // https://tracing.rs/tracing_appender/non_blocking/index.html1
@@ -120,8 +124,8 @@ async fn run_node() -> Result<()> {
             .with_env_filter(filter)
             .with_thread_names(true)
             // here we choose log style output... do we want json for prod + analysis?
-            // can be compact, pretty, json... there are more...
-            // .compact()
+            // can be compact, pretty, json...
+            .compact()
             // .pretty()
             // .json()
             .init();
@@ -212,11 +216,15 @@ async fn run_node() -> Result<()> {
     }
 
     match node.run(event_stream).await {
-        Ok(()) => Ok(exit(0)),
+        Ok(()) => {
+            exit(0);
+            Ok(())
+        }
         Err(e) => {
             println!("Cannot start node due to error: {:?}", e);
             error!("Cannot start node due to error: {:?}", e);
-            Ok(exit(1))
+            exit(1);
+            Ok(())
         }
     }
 }

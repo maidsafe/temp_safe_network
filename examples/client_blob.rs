@@ -16,8 +16,6 @@ use std::{
     time::Duration,
 };
 use tokio::time::sleep;
-use tracing::{debug, error, info, span, warn, Level};
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {
