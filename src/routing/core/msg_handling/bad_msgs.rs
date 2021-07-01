@@ -33,34 +33,18 @@ impl Core {
     ) -> Result<Command> {
         let src_name = msg_authority.name();
 
-        let bounce_dst_key = self.section_key_by_name(&src_name);
+        let bounce_dst_section_pk = self.section_key_by_name(&src_name);
         let dst_info = DstInfo {
             dst: src_name,
-            dst_section_pk: bounce_dst_key,
+            dst_section_pk: bounce_dst_section_pk,
         };
-        let bounce_msg = WireMsg::single_src(
-            &self.node,
-            DstLocation::DirectAndUnrouted(bounce_dst_key),
-            NodeMsg::BouncedUntrustedMessage {
-                msg: Box::new(node_msg),
-                dst_info,
-            },
-            self.section.authority_provider().section_key(),
-        )?;
 
-        let cmd = Command::send_message_to_node((src_name, sender), bounce_msg);
-
-        /*************************
-        unimplemented!();
-        FIXME: this used to be the case only when the message was
-        built internally at msg_handling/agreement.rs
-        in handle_accumulate_at_src_agreement()
-        setting the sneder to None.
-        We should generate a different type of Command for such casse rather than setting
-        the serder to None in HandleMessage as we used to.
-
-        self.send_message_to_our_elders(bounce_msg)
-        *************************/
+        let bounce_node_msg = NodeMsg::BouncedUntrustedMessage {
+            msg: Box::new(node_msg),
+            dst_info,
+        };
+        let cmd =
+            self.send_direct_message((src_name, sender), bounce_node_msg, bounce_dst_section_pk)?;
 
         Ok(cmd)
     }
@@ -68,7 +52,7 @@ impl Core {
     pub(crate) fn handle_bounced_untrusted_message(
         &self,
         sender: Peer,
-        dst_key: BlsPublicKey,
+        dst_section_key: BlsPublicKey,
         mut bounced_msg: NodeMsg,
     ) -> Result<Command> {
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
@@ -81,7 +65,7 @@ impl Core {
                 // Problem is we can't extend that chain as it would invalidate the signature. We
                 // must construct a new message instead.
                 let section = section
-                    .extend_chain(&dst_key, self.section.chain())
+                    .extend_chain(&dst_section_key, self.section.chain())
                     .map_err(|err| {
                         error!("extending section chain failed: {:?}", err);
                         Error::InvalidMessage // TODO: more specific error
@@ -92,17 +76,12 @@ impl Core {
             bounced_msg => bounced_msg,
         };
 
-        let wire_msg = WireMsg::single_src(
-            &self.node,
-            DstLocation::DirectAndUnrouted(dst_key),
+        let cmd = self.send_direct_message(
+            (*sender.name(), *sender.addr()),
             new_node_msg,
-            self.section.authority_provider().section_key(),
+            dst_section_key,
         )?;
 
-        trace!("resending with extended signed");
-        Ok(Command::send_message_to_node(
-            (*sender.name(), *sender.addr()),
-            wire_msg,
-        ))
+        Ok(cmd)
     }
 }

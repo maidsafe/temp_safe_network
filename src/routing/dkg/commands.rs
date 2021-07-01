@@ -52,21 +52,15 @@ impl DkgCommand {
                 message,
             } => {
                 let node_msg = NodeMsg::DkgMessage { dkg_key, message };
-                let message =
+                let wire_msg =
                     WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
+                let delivery_group_size = recipients.len();
 
-                unimplemented!();
-                /*
-                Ok(Command::send_message_to_nodes(
-                    recipients.clone(),
-                    recipients.len(),
-                    message,
-                    DstInfo {
-                        dst: XorName::random(),
-                        dst_section_pk: key,
-                    },
-                ))
-                */
+                Ok(Command::SendMessage {
+                    recipients,
+                    delivery_group_size,
+                    wire_msg,
+                })
             }
             Self::ScheduleTimeout { duration, token } => {
                 Ok(Command::ScheduleTimeout { duration, token })
@@ -89,20 +83,15 @@ impl DkgCommand {
                     sig,
                     failed_participants,
                 };
-                let message =
+                let wire_msg =
                     WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
+                let delivery_group_size = recipients.len();
 
-                unimplemented!();
-                /*
-                Ok(Command::send_message_to_nodes(
-                    recipients.clone(),
-                    recipients.len(),
-                    message,
-                    DstInfo {
-                        dst: XorName::random(),
-                        dst_section_pk: key,
-                    },
-                ))*/
+                Ok(Command::SendMessage {
+                    recipients,
+                    delivery_group_size,
+                    wire_msg,
+                })
             }
             Self::HandleFailureAgreement(signeds) => Ok(Command::HandleDkgFailure(signeds)),
         }

@@ -102,19 +102,15 @@ impl Core {
         };
         let truncated_chain = chain.get_proof_chain_to_current(&given_key)?;
         let section_auth = self.section.section_signed_authority_provider();
+
         let node_msg = NodeMsg::SectionKnowledge {
             src_info: (section_auth.clone(), truncated_chain),
             msg: Some(returned_msg),
         };
-
         let dst_section_key = self.section_key_by_name(&src_name);
-        let wire_msg = WireMsg::single_src(
-            self.node(),
-            DstLocation::DirectAndUnrouted(dst_section_key),
-            node_msg,
-            self.section.authority_provider().section_key(),
-        )?;
 
-        Ok(Command::send_message_to_node((src_name, sender), wire_msg))
+        let cmd = self.send_direct_message((src_name, sender), node_msg, dst_section_key)?;
+
+        Ok(cmd)
     }
 }

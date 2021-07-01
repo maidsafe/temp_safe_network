@@ -163,33 +163,28 @@ impl Core {
                 self.print_network_stats();
 
                 // Sending SectionKnowledge to other sections for new SAP.
-                let section_auth = self.section.section_signed_authority_provider();
+                let signed_sap = self.section.section_signed_authority_provider().clone();
                 let node_msg = NodeMsg::SectionKnowledge {
-                    src_info: (section_auth.clone(), self.section.chain().clone()),
+                    src_info: (signed_sap, self.section.chain().clone()),
                     msg: None,
                 };
+
                 for sap in self.network.all() {
-                    let msg = WireMsg::single_src(
-                        &self.node,
-                        DstLocation::DirectAndUnrouted(section_auth.value.section_key()),
-                        node_msg.clone(),
-                        section_auth.value.section_key(),
-                    )?;
                     let targets: Vec<_> = sap
                         .elders()
                         .iter()
                         .map(|(name, addr)| (*name, *addr))
                         .collect();
-                    let len = targets.len();
-                    unimplemented!();
-                    /*
-                    let dst_info = DstInfo {
-                        dst: XorName::random(),
-                        dst_section_pk: sap.section_key(),
-                    };
+
                     trace!("Sending updated SectionInfo to all known sections");
-                    commands.push(Command::send_message_to_nodes(targets, len, msg, dst_info));
-                    */
+                    let dst_section_pk = sap.section_key();
+                    let cmd = self.send_direct_message_to_nodes(
+                        targets,
+                        node_msg.clone(),
+                        dst_section_pk,
+                    )?;
+
+                    commands.push(cmd);
                 }
             }
 

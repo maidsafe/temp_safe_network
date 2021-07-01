@@ -110,14 +110,6 @@ pub enum Proposal {
     /// Which we can use to update the section section authority provider and the section chain at
     /// the same time as a single atomic operation without needing to cache anything.
     OurElders(SectionSigned<SectionAuthorityProvider>),
-    /// Proposal to accumulate the message at the source (that is, our section) and then send it to
-    /// its destination.
-    AccumulateAtSrc {
-        /// Message to be accumulated
-        message: Box<PlainMessage>,
-        /// Verifiable section chain
-        proof_chain: SecuredLinkedList,
-    },
     /// Proposal to change whether new nodes are allowed to join our section.
     JoinsAllowed((MessageId, bool)),
 }
