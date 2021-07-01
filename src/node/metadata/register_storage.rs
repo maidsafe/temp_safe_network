@@ -23,25 +23,35 @@ use crate::{
     },
     types::DataAddress,
 };
+use dashmap::DashMap;
+use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::{Path, PathBuf},
 };
+use tokio::sync::RwLock;
 use tracing::info;
 use xor_name::{Prefix, XorName};
 
 /// Operations over the data type Register.
 pub(super) struct RegisterStorage {
     path: PathBuf,
-    store: BTreeMap<XorName, (Register, EventStore<RegisterCmd>)>,
+    store: DashMap<XorName, TransientEntry>,
+}
+
+type TransientEntry = Arc<RwLock<Option<StateEntry>>>;
+
+struct StateEntry {
+    state: Register,
+    history: EventStore<RegisterCmd>,
 }
 
 impl RegisterStorage {
     pub(super) fn new(path: &Path, _max_capacity: u64) -> Self {
         Self {
             path: path.to_path_buf(),
-            store: BTreeMap::new(),
+            store: DashMap::new(),
         }
     }
 
@@ -51,19 +61,20 @@ impl RegisterStorage {
     pub(super) async fn get_data_of(&self, prefix: Prefix) -> Result<RegisterDataExchange> {
         let mut the_data = BTreeMap::default();
 
-        for (key, (_, history)) in self
-            .store
-            .iter()
-            .filter(|(_, (map, _))| prefix.matches(map.name()))
-        {
-            let _ = the_data.insert(*key, history.get_all());
+        for entry in self.store.iter() {
+            let (key, val) = entry.pair();
+            if let Some(entry) = val.read().await.as_ref() {
+                if prefix.matches(entry.state.name()) {
+                    let _ = the_data.insert(*key, entry.history.get_all());
+                }
+            }
         }
 
         Ok(RegisterDataExchange(the_data))
     }
 
     /// On receiving data from Elders when promoted.
-    pub async fn update(&mut self, reg_data: RegisterDataExchange) -> Result<()> {
+    pub async fn update(&self, reg_data: RegisterDataExchange) -> Result<()> {
         debug!("Updating Register store");
 
         let RegisterDataExchange(data) = reg_data;
@@ -79,14 +90,14 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(super) async fn write(&mut self, op: RegisterCmd) -> Result<NodeDuty> {
+    pub(super) async fn write(&self, op: RegisterCmd) -> Result<NodeDuty> {
         let msg_id = op.msg_id;
         let origin = op.origin;
         let write_result = self.apply(op).await;
         self.ok_or_error(write_result, msg_id, origin).await
     }
 
-    async fn apply(&mut self, op: RegisterCmd) -> Result<()> {
+    async fn apply(&self, op: RegisterCmd) -> Result<()> {
         let RegisterCmd {
             write,
             msg_id,
@@ -103,29 +114,44 @@ impl RegisterStorage {
                 if self.store.contains_key(&key) {
                     return Err(Error::DataExists);
                 }
-                let mut store = new_store(key, self.path.as_path())?;
+                let mut store = get_store(key, self.path.as_path())?;
                 let _ = store.append(op)?;
-                let _ = self.store.insert(key, (map, store));
+                let _ = self.store.insert(
+                    key,
+                    Arc::new(RwLock::new(Some(StateEntry {
+                        state: map,
+                        history: store,
+                    }))),
+                );
                 Ok(())
             }
             Delete(_) => {
                 let result = match self.store.get(&key) {
-                    Some((register, store)) => {
-                        if register.address().is_public() {
-                            return Err(Error::InvalidMessage(
-                                msg_id,
-                                "Cannot delete public Register".to_string(),
-                            ));
-                        }
+                    Some(entry) => {
+                        let (key, val) = entry.pair();
+                        // aqcuire write lock when deleting
+                        if let Some(entry) = val.write().await.as_ref() {
+                            if entry.state.address().is_public() {
+                                return Err(Error::InvalidMessage(
+                                    msg_id,
+                                    "Cannot delete public Register".to_string(),
+                                ));
+                            }
 
-                        // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
-                        // register.check_permission(action, Some(client_sig.public_key))?;
+                            // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
+                            // register.check_permission(action, Some(client_sig.public_key))?;
 
-                        if client_sig.public_key != register.owner() {
-                            Err(Error::InvalidOwner(client_sig.public_key))
-                        } else {
+                            if client_sig.public_key != entry.state.owner() {
+                                Err(Error::InvalidOwner(client_sig.public_key))
+                            } else {
+                                info!("Deleting Register");
+                                entry.history.as_deletable().delete()
+                            }
+                        } else if let Ok(store) = get_store(*key, self.path.as_path()) {
                             info!("Deleting Register");
                             store.as_deletable().delete()
+                        } else {
+                            Ok(())
                         }
                     }
                     None => Ok(()),
@@ -138,17 +164,46 @@ impl RegisterStorage {
                 result
             }
             Edit(reg_op) => {
-                let (register, store) = match self.store.get_mut(&key) {
-                    Some(entry) => entry,
+                let existing = match self.store.get(&key) {
+                    Some(entry) => entry.value().clone(),
                     None => return Err(Error::NoSuchData(DataAddress::Register(address))),
+                };
+                let mut cache = existing.write().await;
+                let entry = if let Some(cached_entry) = cache.as_mut() {
+                    cached_entry
+                } else {
+                    // read from disk
+                    let history = get_store(key, self.path.as_path())?;
+                    let mut reg = None;
+                    // apply all ops
+                    for op in history.get_all() {
+                        if let New(register) = op.write {
+                            reg = Some(register);
+                        } else if let Some(register) = &mut reg {
+                            if let Edit(reg_op) = op.write {
+                                register.apply_op(reg_op).map_err(Error::NetworkData)?;
+                            }
+                        }
+                    }
+
+                    let new_entry = match reg.take() {
+                        Some(state) => StateEntry { state, history },
+                        None => return Err(Error::NoSuchData(DataAddress::Register(address))),
+                    };
+
+                    let _ = cache.replace(new_entry);
+
+                    cache.as_mut().unwrap()
                 };
 
                 info!("Editing Register");
-                register.check_permissions(Action::Write, Some(client_sig.public_key))?;
-                let result = register.apply_op(reg_op).map_err(Error::NetworkData);
+                entry
+                    .state
+                    .check_permissions(Action::Write, Some(client_sig.public_key))?;
+                let result = entry.state.apply_op(reg_op).map_err(Error::NetworkData);
 
                 if result.is_ok() {
-                    store.append(op)?;
+                    entry.history.append(op)?;
                     info!("Editing Register SUCCESSFUL!");
                 } else {
                     info!("Editing Register FAILED!");
@@ -193,7 +248,7 @@ impl RegisterStorage {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self.get_register(&address, Action::Read, requester).await {
-            Ok(register) => Ok(register.clone()),
+            Ok(register) => Ok(register),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
@@ -211,16 +266,20 @@ impl RegisterStorage {
         address: &Address,
         action: Action,
         requester: PublicKey,
-    ) -> Result<&Register> {
-        match self.store.get(&to_id(address)?) {
-            Some((register, _)) => {
-                let _ = register
-                    .check_permissions(action, Some(requester))
-                    .map_err(Error::from)?;
-                Ok(register)
-            }
-            None => Err(Error::NoSuchData(DataAddress::Register(*address))),
-        }
+    ) -> Result<Register> {
+        let existing = match self.store.get(&to_id(address)?) {
+            Some(entry) => entry.value().clone(),
+            None => return Err(Error::NoSuchData(DataAddress::Register(*address))),
+        };
+        let cache = existing.read().await;
+        let StateEntry { state, .. } = cache
+            .as_ref()
+            .ok_or_else(|| Error::NoSuchData(DataAddress::Register(*address)))?;
+        state
+            .check_permissions(action, Some(requester))
+            .map_err(Error::from)?;
+
+        Ok(state.clone())
     }
 
     async fn read_register(
@@ -347,7 +406,7 @@ fn to_id(address: &Address) -> Result<XorName> {
         .as_bytes()]))
 }
 
-fn new_store(id: XorName, path: &Path) -> Result<EventStore<RegisterCmd>> {
+fn get_store(id: XorName, path: &Path) -> Result<EventStore<RegisterCmd>> {
     let db_dir = path.join("register".to_string());
     EventStore::new(id, db_dir.as_path())
 }
