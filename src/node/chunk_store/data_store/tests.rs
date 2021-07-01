@@ -10,7 +10,7 @@ use super::{
     data::{Data, DataId},
     DataStore, Result as DataStoreResult, Subdir,
 };
-use crate::node::{to_db_key::ToDbKey, Error, Result};
+use crate::node::{chunk_store::UsedSpace, to_db_key::ToDbKey, Error, Result};
 use crate::routing::XorName;
 use crate::types::{ChunkAddress, DataAddress};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
@@ -94,7 +94,8 @@ async fn successful_put() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let data_store = DataStore::<TestData>::new(root.path(), u64::MAX).await?;
+    let used_space = UsedSpace::new(u64::MAX);
+    let data_store = DataStore::<TestData>::new(root.path(), used_space).await?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &TestData {
@@ -129,7 +130,8 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
     let mut rng = new_rng();
     let root = temp_dir()?;
     let capacity = 32;
-    let data_store = DataStore::new(root.path(), capacity).await?;
+    let used_space = UsedSpace::new(capacity);
+    let data_store = DataStore::new(root.path(), used_space).await?;
 
     let data = TestData {
         id: Id(rng.gen()),
@@ -153,7 +155,8 @@ async fn delete() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let data_store = DataStore::new(root.path(), u64::MAX).await?;
+    let used_space = UsedSpace::new(u64::MAX);
+    let data_store = DataStore::new(root.path(), used_space).await?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate() {
         let the_data = &TestData {
@@ -213,7 +216,8 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let data_store = DataStore::new(root.path(), u64::MAX).await?;
+    let used_space = UsedSpace::new(u64::MAX);
+    let data_store = DataStore::new(root.path(), used_space).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         data_store
@@ -239,7 +243,8 @@ async fn overwrite_value() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let data_store = DataStore::new(root.path(), u64::MAX).await?;
+    let used_space = UsedSpace::new(u64::MAX);
+    let data_store = DataStore::new(root.path(), used_space).await?;
 
     for (data, size) in chunks.data_and_sizes {
         data_store
@@ -272,7 +277,8 @@ async fn overwrite_value() -> Result<()> {
 #[tokio::test]
 async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let root = temp_dir()?;
-    let data_store: DataStore<TestData> = DataStore::new(root.path(), u64::MAX).await?;
+    let used_space = UsedSpace::new(u64::MAX);
+    let data_store: DataStore<TestData> = DataStore::new(root.path(), used_space).await?;
 
     let id = Id(new_rng().gen());
     match data_store.get(&id).await {
@@ -289,7 +295,8 @@ async fn keys() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let data_store = DataStore::new(root.path(), u64::MAX).await?;
+    let used_space = UsedSpace::new(u64::MAX);
+    let data_store = DataStore::new(root.path(), used_space).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);

@@ -40,6 +40,8 @@ use std::{
 };
 use xor_name::XorName;
 
+use super::chunk_store::UsedSpace;
+
 /// This module is called `Metadata`
 /// as a preparation for the responsibilities
 /// it will have eventually, after `Data Hierarchy Refinement`
@@ -51,11 +53,11 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub async fn new(path: &Path, max_capacity: u64, capacity: Capacity) -> Result<Self> {
+    pub async fn new(path: &Path, used_space: UsedSpace, capacity: Capacity) -> Result<Self> {
         let chunk_records = ChunkRecords::new(capacity);
-        let map_storage = MapStorage::new(path, max_capacity);
-        let sequence_storage = SequenceStorage::new(path, max_capacity);
-        let register_storage = RegisterStorage::new(path, max_capacity);
+        let map_storage = MapStorage::new(path, used_space.max_capacity()); // to be removed so we don't care to implement this
+        let sequence_storage = SequenceStorage::new(path, used_space.max_capacity()); // to be removed so we don't care to implement this
+        let register_storage = RegisterStorage::new(path, used_space);
         let elder_stores = ElderStores::new(
             chunk_records,
             map_storage,

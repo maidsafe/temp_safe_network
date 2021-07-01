@@ -18,6 +18,7 @@ use std::{
 use xor_name::XorName;
 
 const DB_EXTENSION: &str = ".db";
+const DB_DIR: &str = "database";
 
 /// Disk storage for transfers.
 pub struct EventStore<TEvent: Debug + Serialize + DeserializeOwned> {
@@ -40,8 +41,9 @@ impl<'a, TEvent: Debug + Serialize + DeserializeOwned> EventStore<TEvent>
 where
     TEvent: 'a,
 {
-    pub fn new(id: XorName, db_dir: &Path) -> Result<Self> {
+    pub fn new(id: XorName, root_dir: &Path) -> Result<Self> {
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
+        let db_dir = root_dir.join(DB_DIR);
         let db_path = db_dir.join(db_name.clone());
         Ok(Self {
             db: utils::new_auto_dump_db(db_dir, db_name)?,
