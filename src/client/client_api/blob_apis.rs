@@ -314,7 +314,7 @@ impl Client {
                 PrivateChunk::new(contents, self.public_key()).into()
             };
 
-            // If data map chunk is less thatn 1MB return it so it can be directly sent to the network
+            // If data map chunk is less that 1MB return it so it can be directly sent to the network
             if chunk.validate_size() {
                 return Ok(chunk);
             } else {

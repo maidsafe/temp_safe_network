@@ -43,3 +43,39 @@ pub(crate) fn decode<I: AsRef<str>, O: DeserializeOwned>(encoded: I) -> Result<O
     }
     deserialise(&decoded).map_err(|e| Error::FailedToParse(e.to_string()))
 }
+
+/// Easily create a `BTreeSet`.
+#[macro_export]
+macro_rules! btree_set {
+    ($($item:expr),*) => {{
+        let mut _set = ::std::collections::BTreeSet::new();
+        $(
+            let _ = _set.insert($item);
+        )*
+        _set
+    }};
+
+    ($($item:expr),*,) => {
+        btree_set![$($item),*]
+    };
+}
+
+/// Easily create a `BTreeMap` with the key => value syntax.
+#[macro_export]
+macro_rules! btree_map {
+    () => ({
+        ::std::collections::BTreeMap::new()
+    });
+
+    ($($key:expr => $value:expr),*) => {{
+        let mut _map = ::std::collections::BTreeMap::new();
+        $(
+            let _ = _map.insert($key, $value);
+        )*
+        _map
+    }};
+
+    ($($key:expr => $value:expr),*,) => {
+        btree_map![$($key => $value),*]
+    };
+}

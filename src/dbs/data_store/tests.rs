@@ -8,15 +8,14 @@
 
 use super::{
     data::{Data, DataId},
-    DataStore, Result as DataStoreResult, Subdir,
+    DataStore, Error, Result as DataStoreResult, Result, Subdir, ToDbKey, UsedSpace,
 };
-use crate::node::{chunk_store::UsedSpace, to_db_key::ToDbKey, Error, Result};
-use crate::routing::XorName;
 use crate::types::{ChunkAddress, DataAddress};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, u64};
 use tempdir::TempDir;
+use xor_name::XorName;
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct TestData {
@@ -208,7 +207,12 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
 
     match data_store.put(&data).await {
         Err(Error::NotEnoughSpace) => (),
-        x => return Err(crate::node::Error::Logic(format!("Unexpected: {:?}", x))),
+        x => {
+            return Err(super::Error::InvalidOperation(format!(
+                "Unexpected: {:?}",
+                x
+            )))
+        }
     }
 
     Ok(())
@@ -316,8 +320,13 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
 
     let id = Id(new_rng().gen());
     match data_store.get(&id).await {
-        Err(Error::NoSuchData(_)) => (),
-        x => return Err(crate::node::Error::Logic(format!("Unexpected {:?}", x))),
+        Err(Error::KeyNotFound(_)) => (),
+        x => {
+            return Err(super::Error::InvalidOperation(format!(
+                "Unexpected {:?}",
+                x
+            )))
+        }
     }
 
     Ok(())

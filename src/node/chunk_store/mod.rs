@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod data_store;
+//mod data_store;
 
 use super::node_ops::{MsgType, OutgoingMsg};
+use crate::dbs::{Data, DataId, DataStore, Subdir, UsedSpace};
 use crate::node::{
     node_ops::{NodeDuties, NodeDuty},
     Result,
@@ -23,14 +24,11 @@ use crate::{
     node::Error,
     types::DataAddress,
 };
-use data_store::{Data, DataId, DataStore, Subdir};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
 };
 use tracing::info;
-
-pub use data_store::UsedSpace;
 
 /// At 50% full, the node will report that it's reaching full capacity.
 pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;
@@ -70,15 +68,18 @@ impl ChunkStore {
     }
 
     pub async fn keys(&self) -> Result<Vec<ChunkAddress>> {
-        self.store.keys().await
+        self.store.keys().await.map_err(Error::from)
     }
 
     pub async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
-        self.store.delete(address).await
+        self.store.delete(address).await.map_err(Error::from)
     }
 
     pub async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
-        self.store.get(address).await
+        self.store
+            .get(address)
+            .await
+            .map_err(|_| Error::NoSuchData(DataAddress::Chunk(*address)))
     }
 
     pub async fn read(&self, read: &ChunkRead, msg_id: MessageId) -> NodeDuty {

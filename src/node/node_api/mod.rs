@@ -13,9 +13,10 @@ mod messaging;
 mod role;
 mod split;
 
+use crate::dbs::UsedSpace;
 use crate::messaging::client::ClientMsg;
 use crate::node::{
-    chunk_store::{ChunkStore, UsedSpace},
+    chunk_store::ChunkStore,
     error::convert_to_error_message,
     event_mapping::{map_routing_event, Mapping, MsgContext},
     network::Network,

@@ -6,15 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::to_db_key::ToDbKey;
-use crate::types::DataAddress;
-use serde::{de::DeserializeOwned, Serialize};
+use super::{Error, Result};
+use serde::{Deserialize, Serialize};
 
-pub trait Data: Serialize + DeserializeOwned {
-    type Id: DataId;
-    fn id(&self) -> &Self::Id;
+/// Wrapper for raw bincode::serialise.
+pub fn serialise<T: Serialize>(data: &T) -> Result<Vec<u8>> {
+    bincode::serialize(data).map_err(|err| Error::Serialize(err.as_ref().to_string()))
 }
 
-pub trait DataId: ToDbKey + PartialEq + Eq + DeserializeOwned {
-    fn to_data_address(&self) -> DataAddress;
+/// Wrapper for bincode::deserialize.
+pub(crate) fn deserialise<'a, T>(bytes: &'a [u8]) -> Result<T>
+where
+    T: Deserialize<'a>,
+{
+    bincode::deserialize(bytes).map_err(|err| Error::Deserialize(err.as_ref().to_string()))
 }

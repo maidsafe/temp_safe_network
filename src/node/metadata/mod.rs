@@ -14,17 +14,17 @@ mod map_storage;
 mod register_storage;
 mod sequence_storage;
 
+use crate::dbs::UsedSpace;
 use crate::messaging::{
     client::{
         ClientMsg, ClientSig, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
-use crate::node::error::Error;
 use crate::node::{
     capacity::Capacity,
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
-    Result,
+    Error, Result,
 };
 use crate::routing::Prefix;
 use crate::types::{Chunk, PublicKey};
@@ -39,8 +39,6 @@ use std::{
     path::Path,
 };
 use xor_name::XorName;
-
-use super::chunk_store::UsedSpace;
 
 /// This module is called `Metadata`
 /// as a preparation for the responsibilities

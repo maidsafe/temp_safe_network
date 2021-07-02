@@ -9,16 +9,18 @@
 
 //! SAFE network data types.
 
+/// Register data type
+pub mod register;
+/// Encoding utils
+pub mod utils;
+
 mod chunk;
 mod errors;
 mod keys;
 mod map;
-/// Register data type
-pub mod register;
 mod section;
 mod sequence;
 mod token;
-mod utils;
 
 pub use chunk::{
     Address as ChunkAddress, Chunk, Kind as ChunkKind, PrivateChunk, PublicChunk,
