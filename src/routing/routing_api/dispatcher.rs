@@ -47,11 +47,6 @@ impl Dispatcher {
         }
     }
 
-    /// Send provided Event to the user which shall receive it through the EventStream
-    pub async fn send_event(&self, event: Event) {
-        self.core.read().await.send_event(event).await
-    }
-
     // Terminate this routing instance - cancel all scheduled timers including any future ones,
     // close all network connections and stop accepting new connections.
     pub async fn terminate(&self) {
@@ -284,7 +279,11 @@ impl Dispatcher {
                             addr,
                             wire_msg
                         );
-                        self.send_event(Event::ClientLost(*addr)).await;
+                        self.core
+                            .read()
+                            .await
+                            .send_event(Event::ClientLost(*addr))
+                            .await
                     }
                 }
                 vec![]

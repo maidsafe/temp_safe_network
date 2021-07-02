@@ -7,9 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::super::Core;
-use crate::messaging::node::{
-    JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-    JoinResponse, NodeMsg, Peer,
+use crate::messaging::{
+    node::{
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
+        JoinResponse, NodeMsg, Peer,
+    },
+    WireMsg,
 };
 use crate::routing::{
     error::Result,
@@ -244,12 +247,9 @@ impl Core {
         }
 
         // Check for signatures and trust of the relocate_payload msg
-        let payload_section_signed = relocate_payload.section_signed;
-        unimplemented!();
-        /*
-        TODO: serialise relocation details
-        let serialised_relocate_details = bincode::serialize(relocate_payload.details);
+        let serialised_relocate_details = WireMsg::serialize_msg_payload(&details)?;
 
+        let payload_section_signed = &relocate_payload.section_signed;
         let is_signautre_valid = payload_section_signed.section_pk.verify(
             &payload_section_signed.sig.signature,
             serialised_relocate_details,
@@ -266,7 +266,7 @@ impl Core {
             );
             return Ok(vec![]);
         }
-        */
+
         // Requires the node name matches the age.
         let age = details.age;
         if age != peer.age() {

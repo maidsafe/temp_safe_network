@@ -12,11 +12,8 @@ use crate::messaging::{
     NodeMsgAuthority,
 };
 use crate::routing::{
-    messages::NodeMsgAuthorityUtils,
-    peer::PeerUtils,
-    routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
-    Error, Result,
+    messages::NodeMsgAuthorityUtils, peer::PeerUtils, routing_api::command::Command,
+    section::SectionUtils, Error, Result,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;
