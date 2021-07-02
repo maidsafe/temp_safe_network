@@ -11,17 +11,17 @@
 mod data;
 #[cfg(test)]
 mod tests;
+mod to_db_key;
 mod used_space;
 
-use crate::node::to_db_key;
-use crate::node::to_db_key::ToDbKey;
-use crate::node::utils;
-use crate::node::{Error, Result};
+pub use to_db_key::ToDbKey;
+pub use used_space::UsedSpace;
+
+use super::{encoding::serialise, Error, Result}; // TODO: FIX
 pub use data::{Data, DataId};
 use sled::Db;
 use std::{marker::PhantomData, path::Path};
 use tracing::info;
-pub use used_space::UsedSpace;
 
 const DB_DIR: &str = "db";
 
@@ -51,7 +51,7 @@ where
 
         used_space.add_dir(&dir);
 
-        let sled = sled::open(&dir).map_err(|e| Error::Logic(e.to_string()))?;
+        let sled = sled::open(&dir).map_err(Error::from)?;
 
         Ok(DataStore {
             used_space,
@@ -70,9 +70,7 @@ impl<T: Data> DataStore<T> {
     /// Tests if a data chunk has been previously stored under `id`.
     pub async fn has(&self, id: &T::Id) -> Result<bool> {
         let key = id.to_db_key()?;
-        self.sled
-            .contains_key(key)
-            .map_err(|e| Error::Logic(e.to_string()))
+        self.sled.contains_key(key).map_err(Error::from)
     }
 
     /// Deletes the data chunk stored under `id`.
@@ -81,10 +79,7 @@ impl<T: Data> DataStore<T> {
     /// returns `Error::Io`.
     pub async fn delete(&self, id: &T::Id) -> Result<()> {
         let key = id.to_db_key()?;
-        self.sled
-            .remove(key)
-            .map_err(|e| Error::Logic(e.to_string()))
-            .map(|_| ())
+        self.sled.remove(key).map_err(Error::from).map(|_| ())
     }
 
     /// Stores a new data chunk.
@@ -96,7 +91,7 @@ impl<T: Data> DataStore<T> {
     pub async fn put(&self, chunk: &T) -> Result<()> {
         info!("Writing chunk");
 
-        let serialised_chunk = utils::serialise(chunk)?.to_vec();
+        let serialised_chunk = serialise(chunk)?.to_vec();
         let consumed_space = serialised_chunk.len() as u64;
         info!("consumed space: {:?}", consumed_space);
         if !self.used_space.can_consume(consumed_space).await {
@@ -113,7 +108,7 @@ impl<T: Data> DataStore<T> {
             }
             Err(e) => {
                 info!("Writing chunk failed!");
-                Err(Error::Logic(e.to_string()))
+                Err(Error::Sled(e))
             }
         }
     }
@@ -126,7 +121,7 @@ impl<T: Data> DataStore<T> {
         let res = self
             .sled
             .get(key)
-            .map_err(|_| Error::NoSuchData(id.to_data_address()))?;
+            .map_err(|_| Error::KeyNotFound(format!("{:?}", id.to_data_address())))?;
 
         if let Some(data) = res {
             let chunk = bincode::deserialize::<T>(&data)?;
@@ -136,7 +131,7 @@ impl<T: Data> DataStore<T> {
             }
         }
 
-        Err(Error::NoSuchData(id.to_data_address()))
+        Err(Error::KeyNotFound(format!("{:?}", id.to_data_address())))
     }
 
     /// Used space to max capacity ratio.
@@ -158,8 +153,8 @@ impl<T: Data> DataStore<T> {
             .iter()
             .flatten()
             .map(|(key, _)| {
-                let db_key =
-                    &String::from_utf8(key.to_vec()).map_err(|e| Error::Logic(e.to_string()))?;
+                let db_key = &String::from_utf8(key.to_vec())
+                    .map_err(|e| Error::InvalidOperation(e.to_string()))?;
                 to_db_key::from_db_key(db_key)
             })
             .flatten()

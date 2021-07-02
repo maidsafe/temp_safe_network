@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::utils;
-use crate::node::{to_db_key::ToDbKey, Error, Result};
+use super::{new_auto_dump_db, Error, Result, ToDbKey};
 use pickledb::PickleDb;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -44,7 +43,7 @@ where
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         let db_path = db_dir.join(db_name.clone());
         Ok(Self {
-            db: utils::new_auto_dump_db(db_dir, db_name)?,
+            db: new_auto_dump_db(db_dir, db_name)?,
             db_path,
             _phantom: PhantomData::default(),
         })
@@ -86,7 +85,7 @@ where
     pub fn append(&mut self, event: TEvent) -> Result<()> {
         let key = &self.db.total_keys().to_string();
         if self.db.exists(key) {
-            return Err(Error::Logic(format!(
+            return Err(Error::InvalidOperation(format!(
                 "Key exists: {}. Event: {:?}",
                 key, event
             )));

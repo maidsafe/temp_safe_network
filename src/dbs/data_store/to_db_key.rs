@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{utils, Error, Result};
+use super::{super::encoding::deserialise, Error, Result};
 use crate::types::{
-    register::Address, ChunkAddress, Keypair, MapAddress, PublicKey, SequenceAddress,
+    register::Address, utils, ChunkAddress, Keypair, MapAddress, PublicKey, SequenceAddress,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use xor_name::XorName;
@@ -22,10 +22,9 @@ pub trait ToDbKey: Serialize {
     }
 }
 
-#[allow(unused)]
 pub fn from_db_key<T: DeserializeOwned>(key: &str) -> Result<T> {
-    let decoded = hex::decode(key).map_err(|e| Error::Logic(e.to_string()))?;
-    utils::deserialise(&decoded)
+    let decoded = hex::decode(key).map_err(|e| Error::InvalidOperation(e.to_string()))?;
+    deserialise(&decoded)
 }
 
 impl ToDbKey for SequenceAddress {}

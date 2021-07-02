@@ -7,12 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{Itinerary, MessageType};
-use crate::node::{state_db::store_network_keypair, utils, Config as NodeConfig, Error, Result};
+use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
     SectionAuthorityProviderUtils,
 };
-use crate::types::{PublicKey, Signature, SignatureShare};
+use crate::types::{utils, PublicKey, Signature, SignatureShare};
 use bls::PublicKeySet;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use secured_linked_list::SecuredLinkedList;

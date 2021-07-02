@@ -7,9 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
-use crate::node::{
-    error::convert_to_error_message, event_store::EventStore, node_ops::NodeDuty, Error, Result,
-};
+use crate::dbs::EventStore;
+use crate::node::{error::convert_to_error_message, node_ops::NodeDuty, Error, Result};
 use crate::routing::Prefix;
 use crate::types::{
     Error as DtError, Map, MapAction, MapAddress as Address, MapPermissionSet, MapValue, PublicKey,
@@ -99,7 +98,7 @@ impl MapStorage {
                     return Err(Error::DataExists);
                 }
                 let mut store = new_store(key, self.path.as_path())?;
-                let _ = store.append(op)?;
+                let _ = store.append(op).map_err(Error::from)?;
                 let _ = self.store.insert(key, (map, store));
                 Ok(())
             }
@@ -108,7 +107,7 @@ impl MapStorage {
                     Some((map, store)) => match map.check_is_owner(&client_sig.public_key) {
                         Ok(()) => {
                             info!("Deleting Map");
-                            store.as_deletable().delete()
+                            store.as_deletable().delete().map_err(Error::from)
                         }
                         Err(_e) => {
                             info!("Error: Delete Map called by non-owner");
@@ -140,7 +139,7 @@ impl MapStorage {
                     .map_err(Error::from)?;
                 map.set_user_permissions(user, permissions.clone(), version)
                     .map_err(Error::from)?;
-                store.append(op)
+                store.append(op).map_err(Error::from)
             }
             DelUserPermissions { user, version, .. } => {
                 let (map, store) = match self.store.get_mut(&key) {
@@ -151,7 +150,7 @@ impl MapStorage {
                     .map_err(Error::from)?;
                 map.del_user_permissions(user, version)
                     .map_err(Error::from)?;
-                store.append(op)
+                store.append(op).map_err(Error::from)
             }
             Edit { changes, .. } => {
                 let (map, store) = match self.store.get_mut(&key) {
@@ -160,7 +159,7 @@ impl MapStorage {
                 };
                 map.mutate_entries(changes, &client_sig.public_key)
                     .map_err(Error::from)?;
-                store.append(op)
+                store.append(op).map_err(Error::from)
             }
         }
     }
@@ -470,7 +469,7 @@ fn to_id(address: &Address) -> Result<XorName> {
 
 fn new_store(id: XorName, path: &Path) -> Result<EventStore<MapCmd>> {
     let db_dir = path.join("db").join("map".to_string());
-    EventStore::new(id, db_dir.as_path())
+    EventStore::new(id, db_dir.as_path()).map_err(Error::from)
 }
 
 impl Display for MapStorage {
