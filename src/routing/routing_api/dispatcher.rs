@@ -279,11 +279,6 @@ impl Dispatcher {
                             addr,
                             wire_msg
                         );
-                        self.core
-                            .read()
-                            .await
-                            .send_event(Event::ClientLost(*addr))
-                            .await
                     }
                 }
                 vec![]

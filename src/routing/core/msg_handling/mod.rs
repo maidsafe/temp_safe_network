@@ -20,17 +20,19 @@ mod sync;
 
 use super::Core;
 use crate::messaging::{
-    node::{Error as AggregatorError, NodeMsg, Proposal},
-    DstLocation, EndUser, MessageId, MessageType, NodeMsgAuthority, WireMsg,
+    node::{NodeMsg, Proposal},
+    BlsShareSigned, DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority,
+    WireMsg,
 };
 use crate::routing::{
+    core::AggregatorError,
     error::{Error, Result},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network::NetworkUtils,
     relocation::RelocateState,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
-    Event,
+    Event, MessageReceived,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::{iter, net::SocketAddr};
@@ -40,7 +42,7 @@ impl Core {
     pub(crate) async fn handle_message(
         &mut self,
         sender: SocketAddr,
-        wire_msg: WireMsg,
+        mut wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
         // Check if the message is for us
         let dst_location = wire_msg.dst_location();
@@ -63,6 +65,13 @@ impl Core {
             );
             return Ok(vec![]);
         }
+
+        // TODO: aggregation needs to be handled at each particular message
+        // that needs aggregation. This logic shall be moved to those msg handlers.
+        // For now we assume to be aggregated if it contains a BLS Share sig as authority.
+        if !self.aggregate_message_and_stop(&mut wire_msg)? {
+            return Ok(vec![]);
+        };
 
         // We can now deserialize the payload of the incoming message
         let message_type = match wire_msg.to_message() {
@@ -247,16 +256,6 @@ impl Core {
         node_msg: NodeMsg,
         known_keys: &[BlsPublicKey],
     ) -> Result<Vec<Command>> {
-        /*
-        TODO: aggregation needs to be hanlded at each particular message
-        that needs aggregation. This logic shall be moved to those msg handlers
-        let node_msg = if let Some(msg) = self.aggregate_message(node_msg)? {
-            msg
-        } else {
-            return Ok(vec![]);
-        };
-        */
-
         let src_name = msg_authority.name();
 
         match node_msg {
@@ -378,7 +377,6 @@ impl Core {
                 returned_msg,
                 sender,
                 src_name,
-                msg_authority.src_location().to_dst(),
             )?]),
             NodeMsg::DkgStart {
                 dkg_key,
@@ -459,53 +457,119 @@ impl Core {
 
                 Ok(vec![])
             }
-            node_msg_types => {
+            // The following type of messages are all handled by upper sn_node layer,
+            // with a couple of exceptcions which may be targetting a client/end-user.
+            // In the future the sn-node layer won't be receiving Events but just
+            // plugging in msg handlers, so this is expected to change.
+            NodeMsg::NodeCmd(node_cmd) => {
+                self.send_event(Event::MessageReceived {
+                    msg_id,
+                    msg: MessageReceived::NodeCmd(node_cmd),
+                })
+                .await;
+                Ok(vec![])
+            }
+            NodeMsg::NodeCmdError {
+                error,
+                correlation_id,
+            } => {
+                self.send_event(Event::MessageReceived {
+                    msg_id,
+                    msg: MessageReceived::NodeCmdError {
+                        error,
+                        correlation_id,
+                    },
+                })
+                .await;
+                Ok(vec![])
+            }
+            NodeMsg::NodeEvent {
+                event,
+                correlation_id,
+            } => {
+                self.send_event(Event::MessageReceived {
+                    msg_id,
+                    msg: MessageReceived::NodeEvent {
+                        event,
+                        correlation_id,
+                    },
+                })
+                .await;
+                Ok(vec![])
+            }
+            NodeMsg::NodeQuery(node_query) => {
+                self.send_event(Event::MessageReceived {
+                    msg_id,
+                    msg: MessageReceived::NodeQuery(node_query),
+                })
+                .await;
+                Ok(vec![])
+            }
+            NodeMsg::NodeQueryResponse {
+                response,
+                correlation_id,
+            } => {
                 if let DstLocation::EndUser(EndUser { xorname, socket_id }) = dst_location {
                     self.handle_end_user_message(xorname, socket_id).await
                 } else {
                     // We send them to sn_node layer as an event
-                    unimplemented!();
-                    /*self.send_event(Event::MessageReceived {
-                        content,
-                        src,
-                        dst,
-                        sig,
-                        section_pk,
+                    self.send_event(Event::MessageReceived {
+                        msg_id,
+                        msg: MessageReceived::NodeQueryResponse {
+                            response,
+                            correlation_id,
+                        },
                     })
                     .await;
 
-                    Ok(vec![])*/
+                    Ok(vec![])
                 }
+            }
+            NodeMsg::NodeMsgError {
+                error,
+                correlation_id,
+            } => {
+                self.send_event(Event::MessageReceived {
+                    msg_id,
+                    msg: MessageReceived::NodeMsgError {
+                        error,
+                        correlation_id,
+                    },
+                })
+                .await;
+                Ok(vec![])
             }
         }
     }
 
-    fn aggregate_message(&mut self, msg: NodeMsg) -> Result<Option<NodeMsg>> {
-        unimplemented!();
-        /*
-        let sig_share = if let NodeMsgAuthority::BlsShare { sig_share, .. } = &msg.src {
-            sig_share
-        } else {
-            // Not an aggregating message, return unchanged.
-            return Ok(Some(msg));
-        };
+    fn aggregate_message_and_stop(&mut self, wire_msg: &mut WireMsg) -> Result<bool> {
+        let sig_share =
+            if let MsgKind::NodeBlsShareSignedMsg(BlsShareSigned { sig_share, .. }) =
+                wire_msg.msg_kind()
+            {
+                sig_share
+            } else {
+                // not a msg to aggregate, return without modifying it
+                return Ok(false);
+            };
 
-        let signed_bytes =
-            bincode::serialize(&msg.signable_view()).map_err(|_| Error::InvalidMessage)?;
         match self
             .message_aggregator
-            .add(&signed_bytes, sig_share.clone())
+            .add(&wire_msg.payload, sig_share.clone())
         {
             Ok(sig) => {
-                trace!("Successfully accumulated signatures for message: {:?}", msg);
-                Ok(Some(msg.into_dst_accumulated(sig)?))
+                trace!(
+                    "Successfully accumulated signatures for message: {:?}",
+                    wire_msg
+                );
+                wire_msg.into_dst_accumulated(sig)?;
+                Ok(false)
             }
-            Err(AggregatorError::NotEnoughShares) => Ok(None),
+            Err(AggregatorError::NotEnoughShares) => Ok(true),
             Err(err) => {
                 error!("Error accumulating message at dst: {:?}", err);
                 Err(Error::InvalidSignatureShare)
             }
         }
-        */
     }
 }

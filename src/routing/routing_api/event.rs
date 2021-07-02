@@ -7,16 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    client::ClientMsg, node::KeyedSig, ClientSigned, DstLocation, EndUser, SrcLocation,
+    client::ClientMsg,
+    node::{NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse},
+    ClientSigned, EndUser, MessageId,
 };
-use bytes::Bytes;
+use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Keypair;
-use hex_fmt::HexFmt;
 pub use qp2p::{RecvStream, SendStream};
 use std::{
     collections::BTreeSet,
     fmt::{self, Debug, Formatter},
-    net::SocketAddr,
     sync::Arc,
 };
 use xor_name::{Prefix, XorName};
@@ -39,7 +39,7 @@ pub struct Elders {
     /// The prefix of the section.
     pub prefix: Prefix,
     /// The BLS public key of a section.
-    pub key: bls::PublicKey,
+    pub key: BlsPublicKey,
     /// Remaining Elders in our section.
     pub remaining: BTreeSet<XorName>,
     /// New Elders in our section.
@@ -57,18 +57,12 @@ pub struct Elders {
 /// been reached, i.e. enough members of the section have sent the same message.
 #[allow(clippy::large_enum_variant)]
 pub enum Event {
-    /// Received a message.
+    /// Received a message from another Node.
     MessageReceived {
-        /// The content of the message.
-        content: Bytes,
-        /// The source location that sent the message.
-        src: SrcLocation,
-        /// The destination location that receives the message.
-        dst: DstLocation,
-        /// The signature if the message was set to be aggregated at source.
-        sig: Option<KeyedSig>,
-        /// The Sender's Section PK.
-        section_pk: bls::PublicKey,
+        /// The message ID
+        msg_id: MessageId,
+        /// The message.
+        msg: MessageReceived,
     },
     /// A new peer joined our section.
     MemberJoined {
@@ -115,20 +109,17 @@ pub enum Event {
         /// New keypair to be used after relocation.
         new_keypair: Arc<Keypair>,
     },
-    /// Disconnected or failed to connect - restart required.
-    RestartRequired,
     /// Received a message from a client node.
     ClientMsgReceived {
         /// The content of the message.
         msg: Box<ClientMsg>,
         /// Client authority
         client_signed: ClientSigned,
-        /// The SocketAddr and PublicKey that sent the message.
-        /// (Note: socket_id will be a random hash, to map against the actual socketaddr)
+        /// The end user that sent the message.
+        /// Its xorname is derived from the client public key,
+        /// and the socket_id maps against the actual socketaddr
         user: EndUser,
     },
-    /// Failed in sending a message to client, or connection to client is lost
-    ClientLost(SocketAddr),
     /// Notify the current list of adult nodes, in case of churning.
     AdultsChanged {
         /// Remaining Adults in our section.
@@ -143,15 +134,11 @@ pub enum Event {
 impl Debug for Event {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         match self {
-            Self::MessageReceived {
-                content, src, dst, ..
-            } => write!(
-                formatter,
-                "MessageReceived {{ content: \"{:<8}\", src: {:?}, dst: {:?} }}",
-                HexFmt(content),
-                src,
-                dst
-            ),
+            Self::MessageReceived { msg_id, msg } => formatter
+                .debug_struct("MessageReceived")
+                .field("msg_id", msg_id)
+                .field("msg", msg)
+                .finish(),
             Self::MemberJoined {
                 name,
                 previous_name,
@@ -197,13 +184,11 @@ impl Debug for Event {
                 .field("previous_name", previous_name)
                 .field("new_keypair", new_keypair)
                 .finish(),
-            Self::RestartRequired => write!(formatter, "RestartRequired"),
             Self::ClientMsgReceived { msg, user, .. } => write!(
                 formatter,
                 "ClientMsgReceived {{ msg: {:?}, src: {:?} }}",
                 msg, user,
             ),
-            Self::ClientLost(addr) => write!(formatter, "ClientLost({:?})", addr),
             Self::AdultsChanged {
                 remaining,
                 added,
@@ -216,4 +201,42 @@ impl Debug for Event {
                 .finish(),
         }
     }
+}
+
+/// Type of messages that are received from a peer
+#[derive(Debug)]
+pub enum MessageReceived {
+    /// Cmds only sent a among Nodes in the network.
+    NodeCmd(NodeCmd),
+    /// An error of a NodeCmd.
+    NodeCmdError {
+        /// The error.
+        error: NodeCmdError,
+        /// ID of causing cmd.
+        correlation_id: MessageId,
+    },
+    /// Events only sent among Nodes in the network.
+    NodeEvent {
+        /// Request.
+        event: NodeEvent,
+        /// ID of causing cmd.
+        correlation_id: MessageId,
+    },
+    /// Queries is a read-only operation.
+    NodeQuery(NodeQuery),
+    /// The response to a query, containing the query result.
+    NodeQueryResponse {
+        /// QueryResponse.
+        response: NodeQueryResponse,
+        /// ID of causing query.
+        correlation_id: MessageId,
+    },
+    /// The returned error, from any msg handling on recipient node.
+    NodeMsgError {
+        /// The error.
+        // TODO: return node::Error instead
+        error: crate::messaging::client::Error,
+        /// ID of causing cmd.
+        correlation_id: MessageId,
+    },
 }

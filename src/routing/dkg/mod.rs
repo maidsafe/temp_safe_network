@@ -20,7 +20,7 @@ pub(crate) use self::{
     proposal::{ProposalAggregator, ProposalError, ProposalUtils},
     voter::DkgVoter,
 };
-pub(crate) use crate::messaging::node::{KeyedSig, SigShare, SignatureAggregator};
+pub(crate) use crate::messaging::node::{KeyedSig, SigShare};
 pub use section_signed::SectionSignedUtils;
 use serde::Serialize;
 

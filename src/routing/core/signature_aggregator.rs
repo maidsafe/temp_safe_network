@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::signed::{KeyedSig, SigShare};
+use crate::messaging::node::{KeyedSig, SigShare};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -16,7 +16,7 @@ use thiserror::Error;
 use tiny_keccak::{Hasher, Sha3};
 
 /// Default duration since their last modification after which all unaggregated entries expire.
-pub const DEFAULT_EXPIRATION: Duration = Duration::from_secs(120);
+const DEFAULT_EXPIRATION: Duration = Duration::from_secs(120);
 
 type Digest256 = [u8; 32];
 

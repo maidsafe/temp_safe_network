@@ -20,15 +20,26 @@ use crate::node::{
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error,
 };
+use crate::routing::MessageReceived;
 use tracing::debug;
 
-pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
+pub fn map_node_msg(
+    msg_id: MessageId,
+    msg: MessageReceived, /*, src: SrcLocation, dst: DstLocation*/
+) -> Mapping {
     debug!(
         "Handling Node message received event with id {}: {:?}",
-        msg.id(),
-        msg
+        msg_id, msg
     );
+    Mapping {
+        op: match_node_msg(msg, src),
+        ctx: Some(MsgContext {
+            msg: MsgType::Node(msg),
+            src,
+        }),
+    }
 
+    /*
     match &dst {
         DstLocation::Section(_) | DstLocation::Node(_) => Mapping {
             op: match_node_msg(msg.clone(), src),
@@ -70,17 +81,15 @@ pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping
             }
         }
     }
+    */
 }
 
-fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
+fn match_node_msg(msg: MessageReceived, origin: SrcLocation) -> NodeDuty {
     match msg {
         // Churn synch
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData { metadata }),
-            ..
-        } => NodeDuty::SynchState { metadata },
+        NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReceiveExistingData { metadata })) => NodeDuty::SynchState { metadata },
         // ------ metadata ------
-        NodeMsg::NodeQuery {
+        MessageReceived::NodeQuery {
             query:
                 NodeQuery::Metadata {
                     query,
@@ -98,7 +107,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
                 origin,
             }
         }
-        NodeMsg::NodeCmd {
+        MessageReceived::NodeCmd {
             cmd:
                 NodeCmd::Metadata {
                     cmd,
@@ -118,7 +127,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
         }
         //
         // ------ Adult ------
-        NodeMsg::NodeQuery {
+        MessageReceived::NodeQuery {
             query: NodeQuery::Chunks { query, .. },
             id,
             ..
@@ -126,7 +135,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             read: query,
             msg_id: id,
         },
-        NodeMsg::NodeCmd {
+        MessageReceived::NodeCmd {
             cmd: NodeCmd::Chunks {
                 cmd, client_sig, ..
             },
@@ -138,28 +147,28 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             client_sig,
         },
         // this cmd is accumulated, thus has authority
-        NodeMsg::NodeCmd {
+        MessageReceived::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk)),
             id,
         } => NodeDuty::ReplicateChunk { chunk, msg_id: id },
-        NodeMsg::NodeCmd {
+        MessageReceived::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk)),
             id,
         } => NodeDuty::ProcessRepublish { chunk, msg_id: id },
         // Aggregated by us, for security
-        NodeMsg::NodeQuery {
+        MessageReceived::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
             id,
             ..
         } => NodeDuty::GetSectionElders { msg_id: id, origin },
         //
         // ------ system cmd ------
-        NodeMsg::NodeCmd {
+        MessageReceived::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::StorageFull { node_id, .. }),
             ..
         } => NodeDuty::IncrementFullNodeCount { node_id },
         // --- Adult Operation response ---
-        NodeMsg::NodeQueryResponse {
+        MessageReceived::NodeQueryResponse {
             response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(res)),
             correlation_id,
             ..

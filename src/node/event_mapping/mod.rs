@@ -18,8 +18,7 @@ use crate::node::{
     network::Network,
     node_ops::{MsgType, NodeDuty, OutgoingLazyError},
 };
-use crate::routing::XorName;
-use crate::routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
+use crate::routing::{Event as RoutingEvent, NodeElderChange, XorName, MIN_AGE};
 use crate::types::PublicKey;
 use client_msg::map_client_msg;
 use node_msg::map_node_msg;
@@ -42,33 +41,7 @@ pub struct MsgContext {
 pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
     info!("Handling RoutingEvent: {:?}", event);
     match event {
-        RoutingEvent::MessageReceived {
-            content, src, dst, ..
-        } => match NodeMsg::from(content) {
-            Ok(msg) => map_node_msg(msg, src, dst),
-            Err(error) => {
-                warn!("Error decoding msg bytes, sent from {:?}", src);
-
-                // We generate a random message id here since we cannot
-                // retrieve the message id from the message received
-                let msg_id = MessageId::new();
-
-                Mapping {
-                    op: NodeDuty::SendError(OutgoingLazyError {
-                        msg: ProcessingError::new(
-                            Some(ErrorMessage::Serialization(format!(
-                                "Could not deserialize Message at node: {:?}",
-                                error
-                            ))),
-                            None,
-                            msg_id,
-                        ),
-                        dst: src.to_dst(),
-                    }),
-                    ctx: None,
-                }
-            }
-        },
+        RoutingEvent::MessageReceived { msg_id, msg } => map_node_msg(msg_id, msg),
         RoutingEvent::ClientMsgReceived { msg, user } => map_client_msg(&msg, user),
         RoutingEvent::SectionSplit {
             elders,

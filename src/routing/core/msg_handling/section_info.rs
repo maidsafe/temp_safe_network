@@ -91,7 +91,6 @@ impl Core {
         returned_msg: Box<NodeMsg>,
         sender: SocketAddr,
         src_name: XorName,
-        dst_location: DstLocation,
     ) -> Result<Command> {
         let chain = self.section.chain();
         let given_key = if let Some(key) = given_key {

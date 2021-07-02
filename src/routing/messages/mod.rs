@@ -11,7 +11,7 @@ mod msg_authority;
 
 pub use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
-    node::{KeyedSig, NodeMsg, PlainMessage, SigShare},
+    node::{KeyedSig, NodeMsg, SigShare},
     BlsShareSigned, ClientSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority, NodeSigned,
     SectionSigned, WireMsg,
 };
@@ -23,7 +23,6 @@ use crate::routing::{
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use secured_linked_list::SecuredLinkedList;
 use xor_name::XorName;
 
 // Utilities for WireMsg.
@@ -44,13 +43,13 @@ pub(crate) trait WireMsgUtils {
         src_name: XorName,
         dst: DstLocation,
         node_msg: NodeMsg,
-        proof_chain: SecuredLinkedList,
+        src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error>;
-    /*
-        /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
-        /// Returns errors if src is not `BlsShare` or if the signed is invalid.
-        fn into_dst_accumulated(self, sig: KeyedSig) -> Result<WireMsg>;
-    */
+
+    /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
+    /// Returns errors if src is not `BlsShare` or if the signed is invalid.
+    fn into_dst_accumulated(&mut self, sig: KeyedSig) -> Result<()>;
+
     /// Creates a signed message from single node.
     fn single_src(
         node: &Node,
@@ -153,74 +152,68 @@ impl WireMsgUtils for WireMsg {
         src_name: XorName,
         dst: DstLocation,
         node_msg: NodeMsg,
-        section_chain: SecuredLinkedList,
+        src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error> {
-        unimplemented!();
-        /*
-        let serialized = bincode::serialize(&SignableView {
-            dst: &dst,
-            variant: &variant,
-        })
-        .map_err(|_| Error::InvalidMessage)?;
+        let msg_payload =
+            WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let signature_share = key_share.secret_key_share.sign(&serialized);
+        let signature_share = key_share.secret_key_share.sign(&msg_payload);
         let sig_share = SigShare {
             public_key_set: key_share.public_key_set.clone(),
             index: key_share.index,
             signature_share,
         };
 
-        let src = MsgAuthority::BlsShare {
+        let msg_authority = NodeMsgAuthority::BlsShare(BlsShareSigned {
             src_name,
             sig_share,
-            section_chain: section_chain.clone(),
-        };
+            section_pk: src_section_pk,
+        });
 
-        Self::new_signed(src, dst, variant, *section_chain.last_key())
-        */
+        Self::new_signed(msg_payload, msg_authority, dst)
     }
 
-    /*
-        /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
-        /// Returns errors if src is not `BlsShare` or if the signed is invalid.
-        fn into_dst_accumulated(mut self, sig: KeyedSig) -> Result<WireMsg> {
-            let (sig_share, src_name, section_chain) = if let MsgAuthority::BlsShare {
+    /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
+    /// Returns errors if authority  is not `BlsShare` or if the signed is invalid.
+    fn into_dst_accumulated(&mut self, sig: KeyedSig) -> Result<()> {
+        let (section_pk, src_name, sig_share) =
+            if let MsgKind::NodeBlsShareSignedMsg(BlsShareSigned {
+                section_pk,
+                src_name,
                 sig_share,
-                src_name,
-                section_chain,
-            } = &self.src
+            }) = self.msg_kind()
             {
-                (sig_share.clone(), *src_name, section_chain)
+                (*section_pk, *src_name, sig_share)
             } else {
-                error!("not a message for dst accumulation");
+                error!("Not a message for dst accumulation: {:?}", self);
                 return Err(Error::InvalidMessage);
             };
 
-            if sig_share.public_key_set.public_key() != sig.public_key {
-                error!("signed public key doesn't match signed share public key");
-                return Err(Error::InvalidMessage);
-            }
-
-            if sig.public_key != self.section_pk {
-                error!("signed public key doesn't match the attached section PK");
-                return Err(Error::InvalidMessage);
-            }
-
-            let bytes = bincode::serialize(&self.signable_view()).map_err(|_| Error::InvalidMessage)?;
-
-            if !sig.verify(&bytes) {
-                return Err(Error::FailedSignature);
-            }
-
-            self.src = MsgAuthority::Section {
-                sig,
-                src_name,
-                section_chain: section_chain.clone(),
-            };
-
-            Ok(self)
+        if sig_share.public_key_set.public_key() != sig.public_key {
+            error!(
+                "Signed public key doesn't match signed share public key: {:?}",
+                self
+            );
+            return Err(Error::InvalidMessage);
         }
-    */
+
+        if sig.public_key != section_pk {
+            error!("Signed public key doesn't match the section PK: {:?}", self);
+            return Err(Error::InvalidMessage);
+        }
+
+        if !sig.verify(&self.payload) {
+            return Err(Error::FailedSignature);
+        }
+
+        self.header.msg_envelope.msg_kind = MsgKind::SectionSignedMsg(SectionSigned {
+            section_pk,
+            src_name,
+            sig,
+        });
+
+        Ok(())
+    }
 
     /// Creates a signed message from single node.
     fn single_src(

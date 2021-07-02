@@ -15,16 +15,18 @@ mod enduser_registry;
 mod message_filter;
 mod messaging;
 mod msg_handling;
+mod signature_aggregator;
 mod split_barrier;
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
+pub(crate) use signature_aggregator::{Error as AggregatorError, SignatureAggregator};
 
 use self::{
     enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
 };
 use crate::messaging::{
-    node::{Network, NodeMsg, Proposal, Section, SectionSigned, SignatureAggregator},
+    node::{Network, NodeMsg, Proposal, Section, SectionSigned},
     MessageId, SectionAuthorityProvider,
 };
 use crate::routing::{

@@ -6,9 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{KeyedSig, SigShare, SignatureAggregator};
+use super::{KeyedSig, SigShare};
 use crate::messaging::node::Proposal;
-use crate::routing::error::Result;
+use crate::routing::{
+    core::{AggregatorError, SignatureAggregator},
+    error::Result,
+};
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 
@@ -79,7 +82,7 @@ impl ProposalAggregator {
 #[derive(Debug, Error)]
 pub enum ProposalError {
     #[error("failed to aggregate signature shares: {0}")]
-    Aggregation(#[from] crate::messaging::node::Error),
+    Aggregation(#[from] AggregatorError),
     #[error("invalid proposal")]
     Invalid,
 }
