@@ -469,7 +469,7 @@ fn to_id(address: &Address) -> Result<XorName> {
 }
 
 fn new_store(id: XorName, path: &Path) -> Result<EventStore<MapCmd>> {
-    let db_dir = path.join("map".to_string());
+    let db_dir = path.join("db").join("map".to_string());
     EventStore::new(id, db_dir.as_path())
 }
 
