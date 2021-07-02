@@ -6,25 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Implementation of the "Node" node for the SAFE Network.
+use super::ToDbKey;
+use crate::types::DataAddress;
+use serde::{de::DeserializeOwned, Serialize};
 
-mod capacity;
-mod chaos;
-mod chunk_store;
-/// Configuration handling
-pub mod config_handler;
-mod error;
-mod event_mapping;
-mod metadata;
-mod network;
-mod node_api;
-mod node_ops;
+pub trait Data: Serialize + DeserializeOwned {
+    type Id: DataId;
+    fn id(&self) -> &Self::Id;
+}
 
-/// Docs
-pub mod state_db;
-
-pub use crate::node::{
-    config_handler::{add_connection_info, set_connection_info, Config},
-    error::{Error, Result},
-    node_api::Node,
-};
+pub trait DataId: ToDbKey + PartialEq + Eq + DeserializeOwned {
+    fn to_data_address(&self) -> DataAddress;
+}

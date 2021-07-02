@@ -56,9 +56,6 @@ pub enum Error {
     /// Key does not exist
     #[error("Key does not exist")]
     NoSuchKey,
-    /// Node NotEnoughSpace error
-    #[error("Node does not have sufficient space to store chunk")]
-    NotEnoughSpace,
     /// Duplicate Entries in this push
     #[error("Duplicate entries provided")]
     DuplicateEntryKeys,

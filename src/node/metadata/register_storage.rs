@@ -7,10 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
-use crate::node::chunk_store::UsedSpace;
-use crate::node::{
-    error::convert_to_error_message, event_store::EventStore, node_ops::NodeDuty, Error, Result,
-};
+use crate::dbs::{EventStore, UsedSpace};
+use crate::node::{error::convert_to_error_message, node_ops::NodeDuty, Error, Result};
 use crate::types::{
     register::{Action, Address, Register, User},
     PublicKey,
@@ -153,11 +151,11 @@ impl RegisterStorage {
                                 Err(Error::InvalidOwner(client_sig.public_key))
                             } else {
                                 info!("Deleting Register");
-                                entry.history.as_deletable().delete()
+                                entry.history.as_deletable().delete().map_err(Error::from)
                             }
                         } else if let Ok(store) = get_store(*key, self.path.as_path()) {
                             info!("Deleting Register");
-                            store.as_deletable().delete()
+                            store.as_deletable().delete().map_err(Error::from)
                         } else {
                             Ok(())
                         }
@@ -416,7 +414,7 @@ fn to_id(address: &Address) -> Result<XorName> {
 
 fn get_store(id: XorName, path: &Path) -> Result<EventStore<RegisterCmd>> {
     let db_dir = path.join("db").join("map".to_string());
-    EventStore::new(id, db_dir.as_path())
+    EventStore::new(id, db_dir.as_path()).map_err(Error::from)
 }
 
 impl Display for RegisterStorage {

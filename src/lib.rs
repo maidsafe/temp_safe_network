@@ -63,6 +63,7 @@
 extern crate tracing;
 
 pub mod client;
+mod dbs;
 /// The messaging interface to the network. Messages sent and serialised in line with this module should be acted upon by the network.
 pub mod messaging;
 pub mod node;

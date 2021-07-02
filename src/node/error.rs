@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::dbs;
 use crate::messaging::{client::Error as ErrorMessage, MessageId, MessageType};
 use crate::routing::Prefix;
 use crate::types::{DataAddress, Error as DtError, PublicKey};
@@ -30,9 +31,9 @@ pub enum Error {
     /// Not enough in the section to perform Chunk operation
     #[error("Not enough Adults available in Section({0:?}) to perform operation")]
     NoAdults(Prefix),
-    /// Not enough space in `DataStore` to perform `put`.
-    #[error("Not enough space")]
-    NotEnoughSpace,
+    /// Database error.
+    #[error("Database error:: {0}")]
+    Database(#[from] dbs::Error),
     /// Not enough storage available on the network.
     #[error("Not enough storage available on the network")]
     NetworkFull,
@@ -105,9 +106,9 @@ pub enum Error {
     /// Creating temp directory failed.
     #[error("Could not create temp store: {0}")]
     TempDirCreationFailed(String),
-    /// Chunk Store Id could not be found
-    #[error("Could not fetch StoreId")]
-    NoStoreId,
+    // /// Chunk Store Id could not be found
+    // #[error("Could not fetch StoreId")]
+    // NoStoreId,
     /// Threshold crypto combine signatures error
     #[error("Could not combine signatures")]
     CouldNotCombineSignatures,
@@ -132,9 +133,6 @@ pub enum Error {
     /// Network message error.
     #[error("Network message error:: {0}")]
     Message(#[from] crate::messaging::Error),
-    /// PickleDb error.
-    #[error("PickleDb error:: {0}")]
-    PickleDb(#[from] pickledb::error::Error),
     /// NetworkData error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] crate::types::Error),
@@ -173,7 +171,6 @@ pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
         Error::InvalidMessage(_, msg) => ErrorMessage::InvalidOperation(msg),
         Error::InvalidOwner(key) => ErrorMessage::InvalidOwners(key),
         Error::NoSuchData(address) => ErrorMessage::DataNotFound(address),
-        Error::NotEnoughSpace => ErrorMessage::NotEnoughSpace,
         Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
         Error::DataExists => ErrorMessage::DataExists,
         Error::NetworkData(error) => convert_dt_error_to_error_message(error),
