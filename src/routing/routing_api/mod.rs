@@ -18,7 +18,7 @@ mod event_stream;
 
 pub use self::{
     config::Config,
-    event::{Elders, Event, NodeElderChange, SendStream},
+    event::{Elders, Event, MessageReceived, NodeElderChange, SendStream},
     event_stream::EventStream,
 };
 

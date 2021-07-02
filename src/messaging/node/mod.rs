@@ -15,7 +15,6 @@ mod plain_message;
 mod prefix_map;
 mod relocation;
 mod section;
-mod signature_aggregator;
 mod signed;
 
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionSigned};
@@ -30,7 +29,6 @@ pub use plain_message::PlainMessage;
 pub use prefix_map::PrefixMap;
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::{ElderCandidates, MembershipState, NodeState, Peer, Section, SectionPeers};
-pub use signature_aggregator::{Error, SignatureAggregator};
 pub use signed::{KeyedSig, SigShare};
 
 use crate::messaging::{

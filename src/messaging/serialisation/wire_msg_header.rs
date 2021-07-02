@@ -19,7 +19,7 @@ const MESSAGING_PROTO_VERSION: u16 = 1u16;
 // Header to be serialisied at the front of the wire message.
 // This header contains the information needed to deserialize the payload.
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct WireMsgHeader {
+pub struct WireMsgHeader {
     // We serialise a header size field, but we don't know it up front until we serialise it.
     // header_size: u16,
     version: u16,

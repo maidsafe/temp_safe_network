@@ -283,7 +283,7 @@ impl Core {
             src,
             dst,
             node_msg,
-            self.section.chain().clone(),
+            *self.section.chain().last_key(),
         )?;
 
         trace!(
