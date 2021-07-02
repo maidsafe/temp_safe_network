@@ -23,7 +23,7 @@ use std::{marker::PhantomData, path::Path};
 use tracing::info;
 pub use used_space::UsedSpace;
 
-const DB_DIR: &str = "database";
+const DB_DIR: &str = "db";
 
 /// `DataStore` is a store of data held as serialised files on disk, implementing a maximum disk
 /// usage to restrict storage.
