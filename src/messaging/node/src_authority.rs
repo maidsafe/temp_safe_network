@@ -6,9 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::fmt::{self, Debug};
+
 use super::signed::{KeyedSig, SigShare};
 use ed25519_dalek::PublicKey;
 use ed25519_dalek::Signature;
+use hex_fmt::HexFmt;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -19,7 +22,7 @@ use xor_name::XorName;
 /// agains the pub key and we know th epub key then we are good. If the proof is not recognised we
 /// ask for a longer chain that can be recognised). Therefore we don't need to sign this field.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SrcAuthority {
     /// Authority of a single peer.
     Node {
@@ -46,4 +49,38 @@ pub enum SrcAuthority {
         /// SectionChain of the sender's section.
         section_chain: SecuredLinkedList,
     },
+}
+
+impl Debug for SrcAuthority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Node {
+                public_key,
+                signature,
+            } => write!(
+                f,
+                "Node {{ public_key: {:10?}, signature: {:10?} }}",
+                HexFmt(public_key),
+                HexFmt(signature)
+            ),
+            Self::BlsShare {
+                src_name,
+                sig_share,
+                section_chain,
+            } => write!(
+                f,
+                "BlsShare {{ src_name: {:?}, sig_share: {:?}, section_chain: {:?} ",
+                src_name, sig_share, section_chain
+            ),
+            Self::Section {
+                src_name,
+                sig,
+                section_chain,
+            } => write!(
+                f,
+                "Section {{ src_name: {:?}, sig: {:?}, section_chain: {:?}",
+                src_name, sig, section_chain
+            ),
+        }
+    }
 }
