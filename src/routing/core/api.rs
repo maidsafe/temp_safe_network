@@ -8,7 +8,7 @@
 
 use super::{delivery_group, enduser_registry::SocketId, Comm, Core};
 use crate::messaging::{
-    node::{DstInfo, Network, NodeState, Peer, Proposal, Section},
+    node::{Network, NodeState, Peer, Proposal, Section},
     EndUser, MessageId, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
@@ -18,7 +18,7 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionUtils},
+    section::{NodeStateUtils, SectionUtils},
     Error, Event,
 };
 use secured_linked_list::SecuredLinkedList;
@@ -212,78 +212,6 @@ impl Core {
         Ok(Some(command))
     }
 
-    /*
-    TODO: it seems we don't need this, when the user calls to send
-    a message it's simply relayed to the corresponding destinaion with Command::RelayMessage
-
-        pub async fn send_user_message(&self, wire_msg: WireMsg) -> Result<Vec<Command>> {
-            let dst_name = if let Some(name) = wire_msg.dst_location().name() {
-                name
-            } else {
-                trace!(
-                    "Not sending user message {:?} -> {:?}: direct dst not supported",
-                    wire_msg.msg_kind(),
-                    wire_msg.dst_location()
-                );
-                return Err(Error::InvalidDstLocation);
-            };
-            let dst_section_pk = self.section_key_by_name(&dst_name);
-
-            /*
-            unimplemented!();
-            TODO: aggregation as a top level msg flag is being removed, we need
-            to double check if the logic below is needed at all, or it can be simply
-            removed since each msg type handler will ta<ke care of this
-
-            // TODO: don't require this serialize or perhaps even variant altogether?
-            let variant = NodeMsg::UserMessage(content.serialize()?.to_vec());
-
-            // If the msg is to be aggregated at dst, we don't vote among our peers,
-            // we simply send the msg as our vote to the dst.
-            let msg = if itinerary.aggregate_at_dst() {
-                NodeMsg::for_dst_accumulation(
-                    self.section_keys_provider.key_share()?,
-                    itinerary.src.name(),
-                    itinerary.dst,
-                    variant,
-                    self.section.chain().clone(),
-                )?
-            } else if itinerary.aggregate_at_src() {
-                let proposal = self.create_aggregate_at_src_proposal(itinerary.dst, variant, None)?;
-                return self.propose(proposal);
-            } else {
-             NodeMsg::single_src(
-                    &self.node,
-                    dst,
-                    variant,
-                    self.section.authority_provider().section_key(),
-                )?
-            };
-            */
-            let mut commands = vec![];
-
-            // TODO: consider removing this, we are getting duplicate msgs by it
-            /*
-            if itinerary
-                .dst
-                .contains(&self.node.name(), self.section.prefix())
-            {
-                commands.push(Command::HandleMessage {
-                    sender: Some(self.node.addr),
-                    message: msg.clone(),
-                    dst_info: DstInfo {
-                        dst: dst_name,
-                        dst_section_pk,
-                    },
-                });
-            }
-            */
-
-            commands.extend(self.relay_message(wire_msg).await?);
-
-            Ok(commands)
-        }
-    */
     // Setting the JoinsAllowed triggers a round Proposal::SetJoinsAllowed to update the flag.
     pub fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();

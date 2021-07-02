@@ -10,18 +10,18 @@ mod agreement;
 mod anti_entropy;
 mod bad_msgs;
 mod dkg;
+mod end_user;
 mod join;
 mod proposals;
 mod relocation;
 mod resource_proof;
 mod section_info;
 mod sync;
-mod user_msg;
 
 use super::Core;
 use crate::messaging::{
     node::{Error as AggregatorError, NodeMsg, Proposal},
-    DstLocation, MessageId, MessageType, NodeMsgAuthority, WireMsg,
+    DstLocation, EndUser, MessageId, MessageType, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
     error::{Error, Result},
@@ -459,9 +459,23 @@ impl Core {
 
                 Ok(vec![])
             }
-            _node_msg_types => {
-                // TODO: send them to sn_node layer as an event
-                unimplemented!();
+            node_msg_types => {
+                if let DstLocation::EndUser(EndUser { xorname, socket_id }) = dst_location {
+                    self.handle_end_user_message(xorname, socket_id).await
+                } else {
+                    // We send them to sn_node layer as an event
+                    unimplemented!();
+                    /*self.send_event(Event::MessageReceived {
+                        content,
+                        src,
+                        dst,
+                        sig,
+                        section_pk,
+                    })
+                    .await;
+
+                    Ok(vec![])*/
+                }
             }
         }
     }

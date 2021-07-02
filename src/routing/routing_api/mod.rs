@@ -352,10 +352,10 @@ impl Routing {
                         "Could not find socketaddr corresponding to socket_id {:?}",
                         socket_id
                     );
-                    debug!("Relaying user message instead.. (Command::SendMessage)");
+                    debug!("Relaying user message instead.. (Command::RelayMessage)");
                 }
             } else {
-                debug!("Relaying message with sending user message (Command::SendMessage)");
+                debug!("Relaying message with sending user message (Command::RelayMessage)");
             }
         }
 

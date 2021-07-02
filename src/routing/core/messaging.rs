@@ -25,8 +25,7 @@ use crate::routing::{
     section::{ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionKeyShare, SectionUtils},
 };
 use bls::PublicKey as BlsPublicKey;
-use secured_linked_list::SecuredLinkedList;
-use std::{cmp::Ordering, iter, net::SocketAddr, slice};
+use std::{net::SocketAddr, slice};
 use xor_name::XorName;
 
 impl Core {
@@ -339,31 +338,6 @@ impl Core {
         }
 
         commands
-    }
-
-    pub(crate) fn create_proof_chain(
-        &self,
-        additional_key: Option<&BlsPublicKey>,
-    ) -> Result<SecuredLinkedList> {
-        // The last key of the signed chain is the last section key for which we also have the
-        // secret key share. Ideally this is our current section key unless we haven't observed the
-        // DKG completion yet.
-        let last_key = self
-            .section_keys_provider
-            .key_share()?
-            .public_key_set
-            .public_key();
-
-        // Only include `additional_key` if it is older than `last_key` because `last_key` must be
-        // the actual last key of the resulting signed chain because it's the key that will be used
-        // to sign the message.
-        let additional_key = additional_key
-            .filter(|key| self.section.chain().cmp_by_position(key, &last_key) == Ordering::Less);
-
-        Ok(self
-            .section
-            .chain()
-            .minimize(iter::once(&last_key).chain(additional_key))?)
     }
 
     pub(crate) fn send_direct_message(
