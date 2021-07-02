@@ -128,6 +128,7 @@ async fn run_node() -> Result<()> {
             // here we choose log style output... do we want json for prod + analysis?
             // can be compact, pretty, json...
             .compact()
+            .with_ansi(false)
             // .pretty()
             // .json()
             .init();

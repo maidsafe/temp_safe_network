@@ -6,16 +6,28 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
 
 /// Signature created when a quorum of the section elders has agreed on something.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct KeyedSig {
     /// The BLS public key.
     pub public_key: bls::PublicKey,
     /// The BLS signature corresponding to the public key.
     pub signature: bls::Signature,
+}
+
+impl Debug for KeyedSig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "KeyedSig {{ public_key: {:10?}, signature: {:10?} }}",
+            HexFmt(self.public_key.to_bytes()),
+            HexFmt(self.signature.to_bytes())
+        )
+    }
 }
 
 impl KeyedSig {
