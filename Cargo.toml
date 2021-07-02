@@ -74,6 +74,7 @@ tracing-futures = "~0.2.5"
 tracing= "~0.1.26"
 exponential-backoff = "1.0.0"
 async-recursion = "0.3.2"
+sled = "0.34.6"
 
   [dependencies.ed25519-dalek]
   version = "1.0.0"

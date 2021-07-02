@@ -109,7 +109,7 @@ impl ChunkStore {
         match &write {
             ChunkWrite::New(data) => self.try_store(&data).await,
             ChunkWrite::DeletePrivate(head_address) => {
-                if !self.store.has(&head_address).await {
+                if !self.store.has(&head_address).await? {
                     info!(
                         "{}: Immutable chunk doesn't exist: {:?}",
                         self, head_address
@@ -147,7 +147,7 @@ impl ChunkStore {
     }
 
     async fn try_store(&self, data: &Chunk) -> Result<NodeDuty> {
-        if self.store.has(data.address()).await {
+        if self.store.has(data.address()).await? {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
@@ -172,7 +172,7 @@ impl ChunkStore {
 
     /// Stores a chunk that Elders sent to it for replication.
     pub async fn store_for_replication(&self, chunk: Chunk) -> Result<NodeDuty> {
-        if self.store.has(chunk.address()).await {
+        if self.store.has(chunk.address()).await? {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
