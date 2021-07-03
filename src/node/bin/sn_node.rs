@@ -127,7 +127,7 @@ async fn run_node() -> Result<()> {
             .with_thread_names(true)
             // here we choose log style output... do we want json for prod + analysis?
             // can be compact, pretty, json...
-            .compact()
+            .json()
             .with_ansi(false)
             // .pretty()
             // .json()
