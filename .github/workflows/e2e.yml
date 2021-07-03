@@ -12,8 +12,7 @@ env:
   RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
-  NODE_COUNT: "11" # this is a single section
-  # I've seen 30 nodes work on CI atm.
+  NODE_COUNT: "43" # this should be a split section
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
 
@@ -43,6 +42,18 @@ jobs:
           brew install coreutils
           alias timeout=gtimeout
 
+      - name: Mac isntall ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu isntall ripgrep
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows isntall ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
+
       # Cache.
       - name: Cargo cache registry, index and build
         uses: actions/cache@v2.1.4
@@ -62,6 +73,9 @@ jobs:
       - run: ./target/release/launch_network
         env:
           RUST_LOG: "safe_network=debug"
+
+      - name: Have we had a section split?
+        run: ./scripts/has_split.sh
 
       - name: Client blob tests against local network
         shell: bash
