@@ -67,7 +67,7 @@ impl Capacity {
 
     /// Registered holders not present in provided list of members
     /// will be removed from adult_storage_info and no longer tracked for liveness.
-    pub async fn retain_members_only(&mut self, members: &BTreeSet<XorName>) {
+    pub async fn retain_members_only(&self, members: &BTreeSet<XorName>) {
         self.writer.retain_members_only(members).await
     }
 }
@@ -161,7 +161,7 @@ impl CapacityWriter {
 
     /// Registered holders not present in provided list of members
     /// will be removed from adult_storage_info and no longer tracked for liveness.
-    pub async fn retain_members_only(&mut self, members: &BTreeSet<XorName>) {
+    pub async fn retain_members_only(&self, members: &BTreeSet<XorName>) {
         // full adults
         let mut full_adults = self.adult_storage_info.full_adults.write().await;
         let absent_adults = full_adults
