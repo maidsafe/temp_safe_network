@@ -213,7 +213,6 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dst_section_name = XorName::from(client_sig.public_key);
 
         let msg_id = MessageId::new();
         let msg = ClientMsg::Process(ProcessMsg::Query {
@@ -222,6 +221,7 @@ impl Session {
             client_sig,
         });
 
+        let dst_section_name = data_name;
         let msg_bytes = msg.serialize(dst_section_name, section_pk)?;
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest
