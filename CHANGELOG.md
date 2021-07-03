@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.0](https://github.com/maidsafe/safe_network/compare/v0.6.1...v0.7.0) (2021-07-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* transfers removed
+
+### Features
+
+* **data:** add event store ([f7bab91](https://github.com/maidsafe/safe_network/commit/f7bab910704c9665692c4e9efd2539ef8d6140d7))
+* **map:** remove unsequenced ([897c85e](https://github.com/maidsafe/safe_network/commit/897c85e184e07cf74788a8da54811acbca8af468))
+* **register:** replace btreemap w dashmap ([201c993](https://github.com/maidsafe/safe_network/commit/201c99322069ca06a50e66b2dfa3e46861148edf))
+
+
+### Bug Fixes
+
+* **db:** store all under same db dir ([3b00bb1](https://github.com/maidsafe/safe_network/commit/3b00bb1ee32b607b319c6ac69e1a404047b6022e))
+* remove node level check on query affinity ([781547c](https://github.com/maidsafe/safe_network/commit/781547cf4691ebd0c00d1333bb629f0ce6d52844))
+* **concurrency:** remove several bottlenecks ([08f84f7](https://github.com/maidsafe/safe_network/commit/08f84f75d3ec52518a8cde245b6d9fdc1cb165d4))
+* post-rebase issues ([ba66db1](https://github.com/maidsafe/safe_network/commit/ba66db1a7d981621af9ba512ae3b60d9701aa915))
+* **doctests:** replace outdated docs with TODO ([418ba37](https://github.com/maidsafe/safe_network/commit/418ba379d6db3fc8d1c884fb4d6f376ae8b708ee))
+* **tests:** update expected value ([dfa162d](https://github.com/maidsafe/safe_network/commit/dfa162d9e7fb0e24d715322cb5bf983771907603))
+
+
+* remove transfers, payments, rewards ([ffb6865](https://github.com/maidsafe/safe_network/commit/ffb6865907cf5fa854b37898ff256994df9b8e57))
+
 ### [0.6.1](https://github.com/maidsafe/safe_network/compare/v0.6.0...v0.6.1) (2021-07-01)
 
 ## [0.6.0](https://github.com/maidsafe/safe_network/compare/v0.5.3...v0.6.0) (2021-07-01)
