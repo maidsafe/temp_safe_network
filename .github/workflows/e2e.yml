@@ -111,11 +111,9 @@ jobs:
         shell: bash
         run: timeout 15m cargo test --release --features=always-joinable -- client_api::blob && sleep 5
       
-
       - name: Run example app for Blob API against local network
         shell: bash
         run: timeout 15m cargo run --release  --features=always-joinable --example client_blob
-
 
       - name: Node Logs
         if: failure() && matrix.os != 'windows-latest'
