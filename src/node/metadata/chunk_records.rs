@@ -59,7 +59,7 @@ impl ChunkRecords {
 
     /// Registered holders not present in provided list of members
     /// will be removed from adult_storage_info and no longer tracked for liveness.
-    pub async fn retain_members_only(&mut self, members: BTreeSet<XorName>) -> Result<()> {
+    pub async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
         // full adults
         self.capacity.retain_members_only(&members).await;
 
@@ -158,7 +158,7 @@ impl ChunkRecords {
 
     /// Needs attention!
     pub async fn record_adult_read_liveness(
-        &mut self,
+        &self,
         correlation_id: MessageId,
         response: QueryResponse,
         src: XorName,
@@ -173,7 +173,7 @@ impl ChunkRecords {
         // Removing correlation ids is bound to cause troubles,
         // as `DataNotFound` can come in before the `Ok` response comes in.
         if let Some((_address, end_user)) = self.adult_liveness.record_adult_read_liveness(
-            correlation_id,
+            &correlation_id,
             &src,
             response.is_success(),
         ) {
@@ -276,7 +276,7 @@ impl ChunkRecords {
     }
 
     pub(super) async fn read(
-        &mut self,
+        &self,
         read: &ChunkRead,
         msg_id: MessageId,
         origin: EndUser,
@@ -287,7 +287,7 @@ impl ChunkRecords {
     }
 
     async fn get(
-        &mut self,
+        &self,
         address: ChunkAddress,
         msg_id: MessageId,
         origin: EndUser,

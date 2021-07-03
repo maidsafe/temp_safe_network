@@ -66,7 +66,7 @@ impl Metadata {
     }
 
     pub async fn read(
-        &mut self,
+        &self,
         query: DataQuery,
         id: MessageId,
         requester: PublicKey,
@@ -79,20 +79,20 @@ impl Metadata {
     }
 
     pub async fn record_adult_read_liveness(
-        &mut self,
+        &self,
         correlation_id: MessageId,
         result: QueryResponse,
         src: XorName,
     ) -> Result<NodeDuties> {
         self.elder_stores
-            .chunk_records_mut()
+            .chunk_records()
             .record_adult_read_liveness(correlation_id, result, src)
             .await
     }
 
-    pub async fn retain_members_only(&mut self, members: BTreeSet<XorName>) -> Result<()> {
+    pub async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
         self.elder_stores
-            .chunk_records_mut()
+            .chunk_records()
             .retain_members_only(members)
             .await?;
         Ok(())
