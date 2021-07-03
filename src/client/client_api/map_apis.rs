@@ -500,6 +500,8 @@ mod tests {
     // 1. Put seq. map on the network and then delete it
     // 2. Try getting the data object. It should bail
     #[tokio::test]
+    // TODO: reenable all this when reworked and CRDT
+    #[ignore = "flaky test, can hang"]
     async fn del_private_map_test() -> Result<()> {
         let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
@@ -531,6 +533,8 @@ mod tests {
     // 1. Put unseq. map on the network and then delete it
     // 2. Try getting the data object. It should bail
     #[tokio::test]
+    // TODO: reenable all this when reworked and CRDT
+    #[ignore = "flaky test, can hang"]
     async fn del_public_map_test() -> Result<()> {
         let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
