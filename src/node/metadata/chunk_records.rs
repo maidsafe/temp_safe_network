@@ -156,6 +156,7 @@ impl ChunkRecords {
             .await
     }
 
+    /// Needs attention!
     pub async fn record_adult_read_liveness(
         &mut self,
         correlation_id: MessageId,
@@ -169,6 +170,8 @@ impl ChunkRecords {
             )));
         }
         let mut duties = vec![];
+        // Removing correlation ids is bound to cause troubles,
+        // as `DataNotFound` can come in before the `Ok` response comes in.
         if let Some((_address, end_user)) = self.adult_liveness.record_adult_read_liveness(
             correlation_id,
             &src,
@@ -181,6 +184,7 @@ impl ChunkRecords {
                     QueryResponse::GetChunk(Err(crate::messaging::client::Error::DataNotFound(_)))
                 ))
             {
+                info!("REMOVED CORRELATION ID: {}", correlation_id);
                 // We've already responded already with a success or the returned error is `DataNotFound`
                 // so do nothing
             } else {
@@ -190,6 +194,11 @@ impl ChunkRecords {
                     end_user,
                 )));
             }
+        } else if response.is_success() {
+            info!(
+                "NO READ OP FOUND FOR CORRELATION ID: {} (response: {:?})",
+                correlation_id, response
+            );
         }
         let mut unresponsive_adults = Vec::new();
         for (name, count) in self.adult_liveness.find_unresponsive_adults() {

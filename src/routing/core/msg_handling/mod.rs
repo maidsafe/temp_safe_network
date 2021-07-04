@@ -123,6 +123,14 @@ impl Core {
         let src_name = routing_msg.src.name();
 
         match routing_msg.variant {
+            Variant::ForwardClientMsg { msg, user } => {
+                // If elder, always handle Forward
+                if self.is_not_elder() {
+                    return Ok(vec![]);
+                }
+
+                self.handle_forwarded_message(msg, user).await
+            }
             Variant::SectionKnowledge {
                 src_info: (src_signed_sap, src_chain),
                 msg,

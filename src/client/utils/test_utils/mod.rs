@@ -26,6 +26,16 @@ use std::time::Duration;
 pub type ClientResult<T> = Result<T, Error>;
 
 ///
+pub async fn run_w_backoff_delayed<F, Fut, T>(f: F, retries: u8) -> ClientResult<T>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = ClientResult<T>>,
+{
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    run_w_backoff_base(f, retries, Error::NoResponse).await
+}
+
+///
 pub async fn run_w_backoff<F, Fut, T>(f: F, retries: u8) -> ClientResult<T>
 where
     F: Fn() -> Fut,
@@ -34,17 +44,11 @@ where
     run_w_backoff_base(f, retries, Error::NoResponse).await
 }
 
-async fn let_write_arrive() {
-    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-}
-
-///
-pub async fn run_w_backoff_base<F, Fut, T, E>(f: F, retries: u8, on_fail: E) -> Result<T, E>
+async fn run_w_backoff_base<F, Fut, T, E>(f: F, retries: u8, on_fail: E) -> Result<T, E>
 where
     F: Fn() -> Fut,
     Fut: Future<Output = Result<T, E>>,
 {
-    let_write_arrive().await;
     let backoff = get_backoff_policy(retries);
     for duration in &backoff {
         match f().await {

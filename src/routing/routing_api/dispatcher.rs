@@ -192,6 +192,7 @@ impl Dispatcher {
                 .handle_dkg_failure(signeds)
                 .map(|command| vec![command]),
             Command::SendMessage {
+                // send to network from routing layer
                 recipients,
                 delivery_group_size,
                 message,
@@ -200,6 +201,7 @@ impl Dispatcher {
                     .await
             }
             Command::SendUserMessage {
+                // send to network from node layer
                 itinerary,
                 content,
                 additional_proof_chain_key: _,

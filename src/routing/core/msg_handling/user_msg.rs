@@ -20,6 +20,20 @@ use bls::PublicKey;
 use bytes::Bytes;
 
 impl Core {
+    pub(crate) async fn handle_forwarded_message(
+        &mut self,
+        msg: ClientMsg,
+        user: EndUser,
+    ) -> Result<Vec<Command>> {
+        self.send_event(Event::ClientMsgReceived {
+            msg: Box::new(msg),
+            user,
+        })
+        .await;
+
+        Ok(vec![])
+    }
+
     pub(crate) async fn handle_user_message(
         &mut self,
         content: Bytes,

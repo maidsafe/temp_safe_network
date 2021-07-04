@@ -33,6 +33,13 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 /// Message variant
 pub enum Variant {
+    /// Forward a client msg
+    ForwardClientMsg {
+        /// The msg
+        msg: crate::messaging::client::ClientMsg,
+        /// The origin
+        user: crate::messaging::EndUser,
+    },
     /// Inform other sections about our section or vice-versa.
     SectionKnowledge {
         /// `SectionAuthorityProvider` and `SecuredLinkedList` of the sender's section, with the proof chain.
@@ -121,6 +128,7 @@ pub enum Variant {
 impl Debug for Variant {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
+            Self::ForwardClientMsg { .. } => f.debug_struct("ForwardClientMsg").finish(),
             Self::SectionKnowledge { .. } => f.debug_struct("SectionKnowledge").finish(),
             Self::UserMessage(payload) => write!(f, "UserMessage({:10})", HexFmt(payload)),
             Self::Sync { section, network } => f
