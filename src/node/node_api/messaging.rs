@@ -34,18 +34,25 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
     };
 
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
-    let dst_section_pk = network
-        .get_section_pk_by_name(&dst_name)
-        .await?
-        .bls()
-        .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
+
     let dst_info = DstInfo {
         // this is overwritten by routing at the moment...
         dst: dst_name,
-        dst_section_pk,
+        dst_section_pk: bls::SecretKey::random().public_key(),
     };
     let content = match msg.msg.clone() {
-        MsgType::Client(msg) => MessageType::Client { msg, dst_info },
+        MsgType::Client(msg) => MessageType::Client {
+            msg,
+            dst_info: DstInfo {
+                // this is overwritten by routing at the moment...
+                dst: dst_name,
+                dst_section_pk: network
+                    .get_section_pk_by_name(&dst_name)
+                    .await?
+                    .bls()
+                    .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?,
+            },
+        },
         MsgType::Node(msg) => {
             let src_section_pk = if itinerary.aggregate_at_dst() {
                 Some(

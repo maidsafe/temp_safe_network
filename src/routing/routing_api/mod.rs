@@ -22,7 +22,8 @@ use self::{
     dispatcher::Dispatcher,
 };
 use crate::messaging::{
-    node::Peer, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
+    node::{Peer, RoutingMsg},
+    DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::core::{join_network, Core};
 use crate::routing::{
@@ -493,11 +494,11 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
 
     let message_type = match wire_msg.to_message() {
         Ok(message_type) => message_type,
-        Err(error) => {
+        Err(err) => {
             error!(
                 "Failed to deserialize message payload ({:?}): {}",
                 wire_msg.msg_id(),
-                error
+                err
             );
             return;
         }
@@ -533,7 +534,7 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
             dst_info: _,
             src_section_pk: _,
         } => unimplemented!(),
-        MessageType::Client { msg, .. } => {
+        MessageType::Client { msg, dst_info } => {
             let end_user = dispatcher
                 .core
                 .read()
@@ -557,10 +558,10 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
                     // this node's keypair and use that as the socket id
                     match dispatcher.core.write().await.try_add(sender) {
                         Ok(end_user) => end_user,
-                        Err(err) => {
+                        Err(error) => {
                             error!(
                                 "Failed to cache client socket address for message {:?}: {:?}",
-                                msg, err
+                                msg, error
                             );
                             return;
                         }
@@ -568,12 +569,56 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
                 }
             };
 
-            let event = Event::ClientMsgReceived {
-                msg: Box::new(msg),
-                user: end_user,
-            };
+            if dispatcher
+                .core
+                .read()
+                .await
+                .section()
+                .prefix()
+                .matches(&dst_info.dst)
+            {
+                let event = Event::ClientMsgReceived {
+                    msg: Box::new(msg),
+                    user: end_user,
+                };
+                dispatcher.send_event(event).await;
+            } else {
+                let cmd = {
+                    let state = dispatcher.core.read().await;
+                    let node = state.node();
+                    let section = state.section();
 
-            dispatcher.send_event(event).await;
+                    let variant = crate::messaging::node::Variant::ForwardClientMsg {
+                        msg,
+                        user: end_user,
+                    };
+                    let to_relay = match RoutingMsg::single_src(
+                        node,
+                        DstLocation::Section(dst_info.dst),
+                        variant,
+                        section.authority_provider().section_key(),
+                    ) {
+                        Ok(msg) => msg,
+                        Err(error) => {
+                            error!("Failed create routing msg {:?}", error);
+                            return;
+                        }
+                    };
+                    match state.relay_message(&to_relay).await {
+                        Ok(Some(cmd)) => cmd,
+                        Ok(None) => {
+                            error!("Failed to relay msg, no cmd returned.");
+                            return;
+                        }
+                        Err(error) => {
+                            error!("Failed to relay msg {:?}", error);
+                            return;
+                        }
+                    }
+                };
+
+                let _ = task::spawn(dispatcher.handle_commands(cmd));
+            }
         }
     }
 }

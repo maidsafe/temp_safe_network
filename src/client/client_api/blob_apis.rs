@@ -352,7 +352,7 @@ mod tests {
     use crate::client::client_api::blob_storage::BlobStorage;
     use crate::client::utils::{
         generate_random_vector,
-        test_utils::{create_test_client, run_w_backoff},
+        test_utils::{create_test_client, run_w_backoff_delayed},
     };
     use crate::retry_err_loop;
     use crate::types::{PrivateChunk, PublicChunk};
@@ -427,7 +427,7 @@ mod tests {
 
         // Assert that the blob was written
         let fetched_data =
-            run_w_backoff(|| client.read_blob(public_address, None, None), 10).await?;
+            run_w_backoff_delayed(|| client.read_blob(public_address, None, None), 10).await?;
         assert_eq!(value, fetched_data);
 
         // Test storing public chunk with the same value.
@@ -454,7 +454,8 @@ mod tests {
         assert_eq!(expected_address, priv_address);
 
         // Assert that the blob is stored.
-        let fetched_data = run_w_backoff(|| client.read_blob(priv_address, None, None), 10).await?;
+        let fetched_data =
+            run_w_backoff_delayed(|| client.read_blob(priv_address, None, None), 10).await?;
         assert_eq!(value, fetched_data);
 
         // Test storing private chunk with the same value.
@@ -467,7 +468,7 @@ mod tests {
 
         // Assert that the public Blob is stored.
         let fetched_data =
-            run_w_backoff(|| client.read_blob(public_address, None, None), 10).await?;
+            run_w_backoff_delayed(|| client.read_blob(public_address, None, None), 10).await?;
         assert_eq!(value, fetched_data);
 
         // Delete Blob
@@ -496,7 +497,8 @@ mod tests {
         assert_eq!(new_addr, priv_address);
 
         // Assert that the Blob is stored again.
-        let fetched_data = run_w_backoff(|| client.read_blob(priv_address, None, None), 10).await?;
+        let fetched_data =
+            run_w_backoff_delayed(|| client.read_blob(priv_address, None, None), 10).await?;
         assert_eq!(value, fetched_data);
 
         Ok(())
@@ -510,10 +512,10 @@ mod tests {
         let address = client.store_private_blob(&value).await?;
 
         // let's make sure we have all chunks stored on the network
-        let _ = run_w_backoff(|| client.read_blob(address, None, None), 10).await?;
+        let _ = run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
 
         let fetched_data =
-            run_w_backoff(|| client.fetch_blob_from_network(address, false), 10).await?;
+            run_w_backoff_delayed(|| client.fetch_blob_from_network(address, false), 10).await?;
 
         let root_data_map = match deserialize(fetched_data.value())? {
             DataMapLevel::Root(data_map) => data_map,
@@ -566,7 +568,7 @@ mod tests {
         let address = client.store_public_blob(&data).await?;
 
         // let's make sure the public chunk is stored
-        let _ = run_w_backoff(|| client.read_blob(address, None, None), 10).await?;
+        let _ = run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
 
         // and now trying to read a private chunk with same address should fail
         let res = client
@@ -588,7 +590,7 @@ mod tests {
         let address = client.store_private_blob(&value).await?;
 
         // let's make sure the private chunk is stored
-        let _ = run_w_backoff(|| client.read_blob(address, None, None), 10).await?;
+        let _ = run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
 
         // and now trying to read a public chunk with same address should fail (timeout)
         let res = client
@@ -651,7 +653,7 @@ mod tests {
         let address = client.store_public_blob(&data).await?;
 
         let fetched_data =
-            run_w_backoff(|| client.read_blob(address, None, Some(size / 2)), 10).await?;
+            run_w_backoff_delayed(|| client.read_blob(address, None, Some(size / 2)), 10).await?;
         assert_eq!(fetched_data, data[0..size / 2].to_vec());
 
         // Test read second half
@@ -660,7 +662,7 @@ mod tests {
 
         let address = client.store_public_blob(&data).await?;
 
-        let fetched_data = run_w_backoff(
+        let fetched_data = run_w_backoff_delayed(
             || client.read_blob(address, Some(size / 2), Some(size / 2)),
             10,
         )
@@ -702,7 +704,8 @@ mod tests {
         };
 
         // now that it was put to the network we should be able to retrieve it
-        let fetched_data = run_w_backoff(|| client.read_blob(address, None, None), 10).await?;
+        let fetched_data =
+            run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
         // then the content should be what we put
         assert_eq!(fetched_data, raw_data);
 
