@@ -96,7 +96,6 @@ where
 
 #[cfg(test)]
 mod test {
-
     use super::EventStore;
     use crate::node::Result;
     use crate::types::Token;

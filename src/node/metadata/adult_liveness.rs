@@ -70,26 +70,38 @@ impl AdultLiveness {
     }
 
     pub fn retain_members_only(&self, current_members: BTreeSet<XorName>) {
-        let old_members = self
+        let all_keys: Vec<_> = self
             .closest_adults
             .iter()
             .map(|entry| *entry.key())
-            .collect::<Vec<_>>();
-        for name in old_members {
-            if !current_members.contains(&name) {
-                let _ = self.pending_ops.remove(&name);
-                let _ = self.closest_adults.remove(&name);
-                let message_ids = self
-                    .ops
-                    .iter()
-                    .map(|entry| *entry.key())
-                    .collect::<Vec<_>>();
-                // TODO(after T4): For write operations perhaps we need to write it to a different Adult
-                for msg_id in message_ids {
-                    self.remove_target(&msg_id, &name);
+            .collect();
+
+        let removed_members = all_keys
+            .iter()
+            .filter_map(|key| {
+                if !current_members.contains(key) {
+                    let _ = self.pending_ops.remove(key);
+                    let _ = self.closest_adults.remove(key);
+                    Some(*key)
+                } else {
+                    None
                 }
+            })
+            .collect::<Vec<_>>();
+
+        let message_ids = self
+            .ops
+            .iter()
+            .map(|entry| *entry.key())
+            .collect::<Vec<_>>();
+
+        for name in removed_members {
+            // TODO(after T4): For write operations perhaps we need to write it to a different Adult
+            for msg_id in &message_ids {
+                self.remove_target(msg_id, &name);
             }
         }
+
         self.recompute_closest_adults();
     }
 
@@ -139,35 +151,41 @@ impl AdultLiveness {
     }
 
     fn increment_pending_op(&self, targets: &BTreeSet<XorName>) {
+        let mut closest_changed = false;
+
         for node in targets {
-            *self.pending_ops.entry(*node).or_insert(0) += 1;
-            if !self.closest_adults.contains_key(node) {
-                let _ = self.closest_adults.insert(*node, Vec::new());
-                self.recompute_closest_adults();
+            if !self.pending_ops.contains_key(node) {
+                let _ = self.pending_ops.insert(*node, 1);
             }
+            if let Some(mut pair) = self.pending_ops.get_mut(node) {
+                *pair.value_mut() += 1;
+            }
+            if !self.closest_adults.contains_key(node) {
+                closest_changed = true;
+                let _ = self.closest_adults.insert(*node, Vec::new());
+            }
+        }
+
+        if closest_changed {
+            self.recompute_closest_adults();
         }
     }
 
-    // TODO: how severe is potential variance due to concurrency?
     pub fn recompute_closest_adults(&self) {
-        self.closest_adults
+        let all_keys: Vec<_> = self
+            .closest_adults
             .iter()
-            .map(|entry| {
-                let key = entry.key();
-                let closest_adults = self
-                    .closest_adults
-                    .iter()
-                    .map(|entry| *entry.key())
-                    .filter(|name| key != name)
-                    .sorted_by(|lhs, rhs| key.cmp_distance(lhs, rhs))
-                    .take(NEIGHBOUR_COUNT)
-                    .collect::<Vec<_>>();
-
-                (key.to_owned(), closest_adults)
-            })
-            .for_each(|(a, b)| {
-                let _ = self.closest_adults.insert(a, b);
-            });
+            .map(|entry| *entry.key())
+            .collect();
+        self.closest_adults.alter_all(|name, _| {
+            all_keys
+                .iter()
+                .filter(|&key| key != name)
+                .sorted_by(|lhs, rhs| name.cmp_distance(lhs, rhs))
+                .take(NEIGHBOUR_COUNT)
+                .copied()
+                .collect::<Vec<_>>()
+        });
     }
 
     // this is not an exact definition, thus has tolerance for variance due to concurrency
