@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::dbs;
-use crate::messaging::{client::Error as ErrorMessage, MessageId, MessageType};
+use crate::messaging::{client::Error as ErrorMessage, MessageId, WireMsg};
 use crate::routing::Prefix;
 use crate::types::{DataAddress, Error as DtError, PublicKey};
 use std::io;
@@ -162,7 +162,7 @@ pub enum Error {
     Configuration(String),
     /// Failed to send message to connection.
     #[error("Failed to send message to connection: {{0.0}}")]
-    UnableToSend(MessageType),
+    UnableToSend(WireMsg),
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {

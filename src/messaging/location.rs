@@ -10,41 +10,7 @@ use bls::PublicKey as BlsPublicKey;
 use serde::{Deserialize, Serialize};
 use xor_name::{Prefix, XorName};
 
-type SocketId = XorName;
-
-/// The planned route of a message.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub struct Itinerary {
-    /// Source
-    pub src: SrcLocation,
-    /// Destionation
-    pub dst: DstLocation,
-    // /// Wether this will be aggregated, and where.
-    // pub aggregation: Aggregation,
-}
-
-impl Itinerary {
-    /*
-        /// Elders will send their signed message, where recipients aggregate.
-        pub fn aggregate_at_dst(&self) -> bool {
-            matches!(self.aggregation, Aggregation::AtDestination)
-        }
-
-        /// Elders will aggregate a group sig before they each send one copy of it to dst.
-        pub fn aggregate_at_src(&self) -> bool {
-            matches!(self.aggregation, Aggregation::AtSource)
-        }
-    */
-    /// Name of the source
-    pub fn src_name(&self) -> XorName {
-        self.src.name()
-    }
-
-    /// Name of the destionation
-    pub fn dst_name(&self) -> Option<XorName> {
-        self.dst.name()
-    }
-}
+pub type SocketId = XorName;
 
 /// An EndUser is represented by the name
 /// it's proxied through, and its socket id.

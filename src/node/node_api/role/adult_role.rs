@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     node::{NodeCmd, NodeMsg, NodeSystemCmd},
-    Aggregation, MessageId,
+    MessageId,
 };
 use crate::node::{
     capacity::CHUNK_COPY_COUNT,
@@ -50,12 +50,10 @@ impl AdultRole {
         Ok(data_for_replication
             .into_iter()
             .map(|(data, targets)| NodeDuty::SendToNodes {
-                msg: NodeMsg::NodeCmd {
-                    cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
-                    id: MessageId::new(),
-                },
+                id: MessageId::new(),
+                msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(data))),
                 targets,
-                aggregation: Aggregation::None,
+                aggregation: false,
             })
             .collect::<Vec<_>>())
     }

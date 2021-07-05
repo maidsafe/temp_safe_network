@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     node::{NodeCmd, NodeMsg, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse},
-    Aggregation, DstLocation, MessageId, SrcLocation,
+    DstLocation, MessageId, SrcLocation,
 };
 use crate::node::{
     network::Network,
@@ -35,33 +35,36 @@ impl Node {
             key_set: network_api.our_public_key_set().await?,
         };
         Ok(vec![NodeDuty::Send(OutgoingMsg {
+            id: MessageId::in_response_to(&msg_id),
             msg: MsgType::Node(NodeMsg::NodeQueryResponse {
                 response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(
                     elders,
                 )),
                 correlation_id: msg_id,
-                id: MessageId::in_response_to(&msg_id),
             }),
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: origin.to_dst(),  // this will be a section
-            aggregation: Aggregation::AtDestination, // None,
+            dst: origin.to_dst(), // this will be a section
+            aggregation: true,
         })])
     }
 
     ///
     pub(crate) async fn notify_section_of_our_storage(network_api: &Network) -> Result<NodeDuty> {
         let node_id = PublicKey::from(network_api.public_key().await);
+        let section_pk = network_api.our_public_key_set().await?.public_key();
+
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Node(NodeMsg::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
+            id: MessageId::new(),
+            msg: MsgType::Node(NodeMsg::NodeCmd(NodeCmd::System(
+                NodeSystemCmd::StorageFull {
                     section: node_id.into(),
                     node_id,
-                }),
-                id: MessageId::new(),
-            }),
-            section_source: false, // sent as single node
-            dst: DstLocation::Section(node_id.into()),
-            aggregation: Aggregation::None,
+                },
+            ))),
+            dst: DstLocation::Section {
+                name: node_id.into(),
+                section_pk,
+            },
+            aggregation: false,
         }))
     }
 }
@@ -82,11 +85,11 @@ pub(crate) async fn push_state(
         .await?;
 
     Ok(NodeDuty::SendToNodes {
-        msg: NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData { metadata }),
-            id: msg_id,
-        },
+        id: msg_id,
+        msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
+            metadata,
+        })),
         targets: peers,
-        aggregation: Aggregation::None,
+        aggregation: false,
     })
 }

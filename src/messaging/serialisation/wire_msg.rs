@@ -179,6 +179,11 @@ impl WireMsg {
         self.header.msg_envelope.msg_id
     }
 
+    /// Update the message ID
+    pub fn set_msg_id(&mut self, msg_id: MessageId) {
+        self.header.msg_envelope.msg_id = msg_id;
+    }
+
     /// Return the kind of this message
     pub fn msg_kind(&self) -> &MsgKind {
         &self.header.msg_envelope.msg_kind

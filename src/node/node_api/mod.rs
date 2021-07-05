@@ -22,7 +22,7 @@ use crate::node::{
     error::convert_to_error_message,
     event_mapping::{map_routing_event, Mapping, MsgContext},
     network::Network,
-    node_ops::{MsgType, NodeDuty, OutgoingLazyError},
+    node_ops::{NodeDuty, OutgoingLazyError},
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
@@ -117,7 +117,7 @@ impl Node {
         let our_pid = std::process::id();
         let node_prefix = node.our_prefix().await;
         let node_name = node.our_name().await;
-        let our_conn_info = node.our_connection_info();
+        let our_conn_info = node.our_connection_info().await;
         let our_conn_info_json = serde_json::to_string(&our_conn_info)
             .unwrap_or_else(|_| "Failed to serialize connection info".into());
         println!(
@@ -135,8 +135,8 @@ impl Node {
     }
 
     /// Returns our connection info.
-    pub fn our_connection_info(&self) -> SocketAddr {
-        self.network_api.our_connection_info()
+    pub async fn our_connection_info(&self) -> SocketAddr {
+        self.network_api.our_connection_info().await
     }
 
     /// Returns our name.
@@ -253,18 +253,17 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
                 );
             NodeDuty::NoOp
         }
-        Some(MsgContext { msg, src }) => {
+        Some(MsgContext::Client {
+            msg: ClientMsg::Process(msg),
+            src,
+        }) => {
             warn!("Sending in response to a message: {:?}", msg);
-            match msg {
-                MsgType::Client(ClientMsg::Process(msg)) => {
-                    NodeDuty::SendError(OutgoingLazyError {
-                        msg: msg.create_processing_error(Some(convert_to_error_message(err))),
-                        dst: src.to_dst(),
-                    })
-                }
-                _ => NodeDuty::NoOp,
-            }
+            NodeDuty::SendError(OutgoingLazyError {
+                msg: msg.create_processing_error(Some(convert_to_error_message(err))),
+                dst: src.to_dst(),
+            })
         }
+        Some(_other) => NodeDuty::NoOp,
     }
 }
 

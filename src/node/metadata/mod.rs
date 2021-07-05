@@ -16,10 +16,8 @@ mod sequence_storage;
 
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    client::{
-        ClientMsg, ClientSig, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg, QueryResponse,
-    },
-    Aggregation, DstLocation, EndUser, MessageId,
+    client::{ClientMsg, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg, QueryResponse},
+    ClientSigned, DstLocation, EndUser, MessageId,
 };
 use crate::node::{
     capacity::Capacity,
@@ -106,10 +104,12 @@ impl Metadata {
         &mut self,
         cmd: DataCmd,
         id: MessageId,
-        client_sig: ClientSig,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        self.elder_stores.write(cmd, id, client_sig, origin).await
+        self.elder_stores
+            .write(cmd, id, client_signed, origin)
+            .await
     }
 
     /// Adds a given node to the list of full nodes.
@@ -149,26 +149,26 @@ fn build_client_query_response(
     origin: EndUser,
 ) -> OutgoingMsg {
     OutgoingMsg {
+        id: MessageId::in_response_to(&msg_id),
         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
             id: MessageId::in_response_to(&msg_id),
             response,
             correlation_id: msg_id,
         })),
-        section_source: false, // strictly this is not correct, but we don't expect responses to a response..
         dst: DstLocation::EndUser(origin),
-        aggregation: Aggregation::None,
+        aggregation: false,
     }
 }
 
 fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUser) -> OutgoingMsg {
     OutgoingMsg {
+        id: MessageId::in_response_to(&msg_id),
         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
             id: MessageId::in_response_to(&msg_id),
             error,
             correlation_id: msg_id,
         })),
-        section_source: false, // strictly this is not correct, but we don't expect responses to an error..
         dst: DstLocation::EndUser(origin),
-        aggregation: Aggregation::None,
+        aggregation: false,
     }
 }

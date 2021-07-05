@@ -202,8 +202,9 @@ impl Node {
             // -------- Immutable chunks --------
             NodeDuty::ReadChunk { read, msg_id } => {
                 let adult = self.as_adult().await?;
+                let our_section_pk = self.network_api.our_public_key_set().await?.public_key();
                 let handle = tokio::spawn(async move {
-                    let mut ops = vec![adult.chunks.read(&read, msg_id).await];
+                    let mut ops = vec![adult.chunks.read(&read, msg_id, our_section_pk).await];
                     ops.extend(adult.chunks.check_storage().await?);
                     Ok(NodeTask::from(ops))
                 });
@@ -212,14 +213,14 @@ impl Node {
             NodeDuty::WriteChunk {
                 write,
                 msg_id,
-                client_sig,
+                client_signed,
             } => {
                 let adult = self.as_adult().await?;
                 let handle = tokio::spawn(async move {
                     let mut ops = vec![
                         adult
                             .chunks
-                            .write(&write, msg_id, client_sig.public_key)
+                            .write(&write, msg_id, client_signed.public_key)
                             .await?,
                     ];
                     ops.extend(adult.chunks.check_storage().await?);
@@ -287,13 +288,14 @@ impl Node {
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::SendToNodes {
+                id,
                 msg,
                 targets,
                 aggregation,
             } => {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
-                    send_to_nodes(&msg, targets, aggregation, &network_api).await?;
+                    send_to_nodes(id, msg, targets, aggregation, &network_api).await?;
                     Ok(NodeTask::None)
                 });
                 Ok(NodeTask::Thread(handle))
@@ -313,7 +315,7 @@ impl Node {
             NodeDuty::ProcessRead {
                 query,
                 msg_id,
-                client_sig,
+                client_signed,
                 origin,
             } => {
                 let elder = self.as_elder().await?;
@@ -324,7 +326,7 @@ impl Node {
                             // this is a write here as we write the liveness check for each adult
                             .write()
                             .await
-                            .read(query, msg_id, client_sig.public_key, origin)
+                            .read(query, msg_id, client_signed.public_key, origin)
                             .await?,
                     ];
                     Ok(NodeTask::from(duties))
@@ -335,7 +337,7 @@ impl Node {
                 cmd,
                 msg_id,
                 origin,
-                client_sig,
+                client_signed,
             } => {
                 let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
@@ -344,7 +346,7 @@ impl Node {
                             .meta_data
                             .write()
                             .await
-                            .write(cmd, msg_id, client_sig, origin)
+                            .write(cmd, msg_id, client_signed, origin)
                             .await?,
                     ]))
                 });

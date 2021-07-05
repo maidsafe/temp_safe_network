@@ -21,8 +21,7 @@ mod sync;
 use super::Core;
 use crate::messaging::{
     node::{NodeMsg, Proposal},
-    BlsShareSigned, DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority,
-    WireMsg,
+    BlsShareSigned, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
     core::AggregatorError,
@@ -66,10 +65,8 @@ impl Core {
             return Ok(vec![]);
         }
 
-        // TODO: aggregation needs to be handled at each particular message
-        // that needs aggregation. This logic shall be moved to those msg handlers.
-        // For now we assume to be aggregated if it contains a BLS Share sig as authority.
-        if !self.aggregate_message_and_stop(&mut wire_msg)? {
+        // We assume to be aggregated if it contains a BLS Share sig as authority.
+        if self.aggregate_message_and_stop(&mut wire_msg)? {
             return Ok(vec![]);
         };
 
@@ -101,82 +98,13 @@ impl Core {
                     .await
             }
             MessageType::Client {
+                msg_id,
                 client_signed,
                 msg,
                 dst_location,
-                ..
             } => {
-                let user = match self.get_enduser_by_addr(&sender) {
-                    Some(end_user) => {
-                        debug!(
-                            "Message from client {}, socket id already exists: {:?}",
-                            sender, end_user
-                        );
-                        *end_user
-                    }
-                    None => {
-                        // This is the first time we receive a message from this client
-                        debug!("First message from client {}, creating a socket id", sender);
-
-                        // TODO: remove the enduser registry and simply encrypt socket
-                        // addr with this node's keypair and use that as the socket id
-                        match self.try_add_enduser(sender) {
-                            Ok(end_user) => end_user,
-                            Err(err) => {
-                                error!(
-                                    "Failed to cache client socket address for message {:?}: {:?}",
-                                    msg, err
-                                );
-                                return Ok(vec![]);
-                            }
-                        }
-                    }
-                };
-
-                let is_in_destination = match dst_location.name() {
-                    Some(dst_name) => self.section().prefix().matches(&dst_name),
-                    None => true, // it's a DirectAndUnrouted dst
-                };
-
-                if is_in_destination {
-                    // We send this message to be handled by the upper Node layer
-                    // through the public event stream API
-                    let event = Event::ClientMsgReceived {
-                        msg: Box::new(msg),
-                        client_signed,
-                        user,
-                    };
-                    self.send_event(event).await;
-                } else {
-                    let node_msg = NodeMsg::ForwardClientMsg {
-                        msg,
-                        user,
-                        client_signed,
-                    };
-                    let to_relay = match WireMsg::single_src(
-                        &self.node,
-                        dst_location,
-                        node_msg,
-                        self.section.authority_provider().section_key(),
-                    ) {
-                        Ok(msg) => msg,
-                        Err(error) => {
-                            error!("Failed create routing msg {:?}", error);
-                            return Ok(vec![]);
-                        }
-                    };
-                    match self.relay_message(to_relay).await {
-                        Ok(Some(cmd)) => return Ok(vec![cmd]),
-                        Ok(None) => {
-                            error!("Failed to relay msg, no cmd returned.");
-                        }
-                        Err(error) => {
-                            error!("Failed to relay msg {:?}", error);
-                        }
-                    }
-                }
-
-                Ok(vec![])
+                self.handle_end_user_message(sender, msg_id, client_signed, msg, dst_location)
+                    .await
             }
         }
     }
@@ -457,14 +385,15 @@ impl Core {
 
                 Ok(vec![])
             }
-            // The following type of messages are all handled by upper sn_node layer,
-            // with a couple of exceptcions which may be targetting a client/end-user.
-            // In the future the sn-node layer won't be receiving Events but just
-            // plugging in msg handlers, so this is expected to change.
+            // The following type of messages are all handled by upper sn_node layer.
+            // TODO: In the future the sn-node layer won't be receiving Events but just
+            // plugging in msg handlers.
             NodeMsg::NodeCmd(node_cmd) => {
                 self.send_event(Event::MessageReceived {
                     msg_id,
-                    msg: MessageReceived::NodeCmd(node_cmd),
+                    src: msg_authority.src_location(),
+                    dst: dst_location,
+                    msg: Box::new(MessageReceived::NodeCmd(node_cmd)),
                 })
                 .await;
                 Ok(vec![])
@@ -475,10 +404,12 @@ impl Core {
             } => {
                 self.send_event(Event::MessageReceived {
                     msg_id,
-                    msg: MessageReceived::NodeCmdError {
+                    src: msg_authority.src_location(),
+                    dst: dst_location,
+                    msg: Box::new(MessageReceived::NodeCmdError {
                         error,
                         correlation_id,
-                    },
+                    }),
                 })
                 .await;
                 Ok(vec![])
@@ -489,10 +420,12 @@ impl Core {
             } => {
                 self.send_event(Event::MessageReceived {
                     msg_id,
-                    msg: MessageReceived::NodeEvent {
+                    src: msg_authority.src_location(),
+                    dst: dst_location,
+                    msg: Box::new(MessageReceived::NodeEvent {
                         event,
                         correlation_id,
-                    },
+                    }),
                 })
                 .await;
                 Ok(vec![])
@@ -500,7 +433,9 @@ impl Core {
             NodeMsg::NodeQuery(node_query) => {
                 self.send_event(Event::MessageReceived {
                     msg_id,
-                    msg: MessageReceived::NodeQuery(node_query),
+                    src: msg_authority.src_location(),
+                    dst: dst_location,
+                    msg: Box::new(MessageReceived::NodeQuery(node_query)),
                 })
                 .await;
                 Ok(vec![])
@@ -509,21 +444,17 @@ impl Core {
                 response,
                 correlation_id,
             } => {
-                if let DstLocation::EndUser(EndUser { xorname, socket_id }) = dst_location {
-                    self.handle_end_user_message(xorname, socket_id).await
-                } else {
-                    // We send them to sn_node layer as an event
-                    self.send_event(Event::MessageReceived {
-                        msg_id,
-                        msg: MessageReceived::NodeQueryResponse {
-                            response,
-                            correlation_id,
-                        },
-                    })
-                    .await;
-
-                    Ok(vec![])
-                }
+                self.send_event(Event::MessageReceived {
+                    msg_id,
+                    src: msg_authority.src_location(),
+                    dst: dst_location,
+                    msg: Box::new(MessageReceived::NodeQueryResponse {
+                        response,
+                        correlation_id,
+                    }),
+                })
+                .await;
+                Ok(vec![])
             }
             NodeMsg::NodeMsgError {
                 error,
@@ -531,10 +462,12 @@ impl Core {
             } => {
                 self.send_event(Event::MessageReceived {
                     msg_id,
-                    msg: MessageReceived::NodeMsgError {
+                    src: msg_authority.src_location(),
+                    dst: dst_location,
+                    msg: Box::new(MessageReceived::NodeMsgError {
                         error,
                         correlation_id,
-                    },
+                    }),
                 })
                 .await;
                 Ok(vec![])

@@ -9,21 +9,14 @@
 mod client_msg;
 mod node_msg;
 
-use crate::messaging::{
-    client::{Error as ErrorMessage, ProcessingError},
-    node::NodeMsg,
-    MessageId, SrcLocation,
-};
-use crate::node::{
-    network::Network,
-    node_ops::{MsgType, NodeDuty, OutgoingLazyError},
-};
-use crate::routing::{Event as RoutingEvent, NodeElderChange, XorName, MIN_AGE};
+use crate::messaging::{client::ClientMsg, SrcLocation};
+use crate::node::{network::Network, node_ops::NodeDuty};
+use crate::routing::{Event as RoutingEvent, MessageReceived, NodeElderChange, XorName, MIN_AGE};
 use crate::types::PublicKey;
 use client_msg::map_client_msg;
 use node_msg::map_node_msg;
 use std::{thread::sleep, time::Duration};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace};
 
 #[derive(Debug)]
 pub struct Mapping {
@@ -32,17 +25,32 @@ pub struct Mapping {
 }
 
 #[derive(Debug, Clone)]
-pub struct MsgContext {
-    pub msg: MsgType,
-    pub src: SrcLocation,
+pub enum MsgContext {
+    Node {
+        msg: MessageReceived,
+        src: SrcLocation,
+    },
+    Client {
+        msg: ClientMsg,
+        src: SrcLocation,
+    },
 }
 
 // Process any routing event
 pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
     info!("Handling RoutingEvent: {:?}", event);
     match event {
-        RoutingEvent::MessageReceived { msg_id, msg } => map_node_msg(msg_id, msg),
-        RoutingEvent::ClientMsgReceived { msg, user } => map_client_msg(&msg, user),
+        RoutingEvent::MessageReceived {
+            msg_id,
+            src,
+            dst,
+            msg,
+        } => map_node_msg(msg_id, src, dst, *msg),
+        RoutingEvent::ClientMsgReceived {
+            msg,
+            client_signed,
+            user,
+        } => map_client_msg(*msg, client_signed, user),
         RoutingEvent::SectionSplit {
             elders,
             sibling_elders,

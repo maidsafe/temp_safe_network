@@ -9,7 +9,7 @@
 use crate::messaging::{
     client::ClientMsg,
     node::{NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse},
-    ClientSigned, EndUser, MessageId,
+    ClientSigned, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Keypair;
@@ -61,8 +61,12 @@ pub enum Event {
     MessageReceived {
         /// The message ID
         msg_id: MessageId,
+        /// Source location
+        src: SrcLocation,
+        /// Destination location
+        dst: DstLocation,
         /// The message.
-        msg: MessageReceived,
+        msg: Box<MessageReceived>,
     },
     /// A new peer joined our section.
     MemberJoined {
@@ -134,9 +138,16 @@ pub enum Event {
 impl Debug for Event {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         match self {
-            Self::MessageReceived { msg_id, msg } => formatter
+            Self::MessageReceived {
+                msg_id,
+                src,
+                dst,
+                msg,
+            } => formatter
                 .debug_struct("MessageReceived")
                 .field("msg_id", msg_id)
+                .field("src", src)
+                .field("dst", dst)
                 .field("msg", msg)
                 .finish(),
             Self::MemberJoined {
@@ -204,7 +215,7 @@ impl Debug for Event {
 }
 
 /// Type of messages that are received from a peer
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MessageReceived {
     /// Cmds only sent a among Nodes in the network.
     NodeCmd(NodeCmd),
