@@ -47,10 +47,11 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             msg,
         } => map_node_msg(msg_id, src, dst, *msg),
         RoutingEvent::ClientMsgReceived {
+            msg_id,
             msg,
             client_signed,
             user,
-        } => map_client_msg(*msg, client_signed, user),
+        } => map_client_msg(msg_id, *msg, client_signed, user),
         RoutingEvent::SectionSplit {
             elders,
             sibling_elders,

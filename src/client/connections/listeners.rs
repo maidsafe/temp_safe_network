@@ -11,7 +11,7 @@ use crate::client::Error;
 use crate::messaging::{
     client::{ClientMsg, CmdError, ProcessMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
-    MessageType, SectionAuthorityProvider, WireMsg,
+    MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
 use crate::types::PublicKey;
 use qp2p::IncomingMessages;
@@ -63,9 +63,9 @@ impl Session {
                         error!("Error handling network info message: {:?}", error);
                     }
                 }
-                MessageType::Client { msg, .. } => {
+                MessageType::Client { msg_id, msg, .. } => {
                     match msg {
-                        ClientMsg::Process(msg) => self.handle_client_msg(msg, src).await,
+                        ClientMsg::Process(msg) => self.handle_client_msg(msg_id, msg, src).await,
                         ClientMsg::ProcessingError(error) => {
                             warn!("Processing error received. {:?}", error);
                             // TODO: Handle lazy message errors
@@ -187,8 +187,8 @@ impl Session {
     }
 
     // Handle messages intended for client consumption (re: queries + commands)
-    async fn handle_client_msg(&self, msg: ProcessMsg, src: SocketAddr) {
-        debug!("ClientMsg with id {:?} received from {:?}", msg.id(), src);
+    async fn handle_client_msg(&self, msg_id: MessageId, msg: ProcessMsg, src: SocketAddr) {
+        debug!("ClientMsg with id {:?} received from {:?}", msg_id, src);
         let queries = self.pending_queries.clone();
         let error_sender = self.incoming_err_sender.clone();
 

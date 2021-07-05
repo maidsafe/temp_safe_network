@@ -197,7 +197,7 @@ impl Core {
                     return Ok(vec![]);
                 }
 
-                self.handle_forwarded_message(msg, user, client_signed)
+                self.handle_forwarded_message(msg_id, msg, user, client_signed)
                     .await
             }
             NodeMsg::SectionKnowledge {
