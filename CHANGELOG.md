@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.3](https://github.com/maidsafe/safe_network/compare/v0.7.2...v0.7.3) (2021-07-05)
+
+
+### Features
+
+* **metadata:** improve concurrency ([8464d81](https://github.com/maidsafe/safe_network/commit/8464d81d9adbcedcad3cd4c9b8167d88e3f220d3))
+
 ### [0.7.2](https://github.com/maidsafe/safe_network/compare/v0.7.1...v0.7.2) (2021-07-05)
 
 
