@@ -6,7 +6,6 @@ then
     exit
 fi
 
-
 echo "Checking logfiles to check for split"
 log_dir="$HOME/.safe/node/local-test-network"
 # -u needed here to search log dirs
@@ -14,7 +13,7 @@ prefix_count=$(rg "Prefix\(0\)" "$log_dir" -u | wc -l)
 
 if ! [ $prefix_count -gt 0 ]
     then
-        echo "No split, try changing INCREASED_COUNT in the script!"
+        echo "No split, try changing NODE_COUNT!"
         exit 100
 fi
 
