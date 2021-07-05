@@ -12,7 +12,7 @@ env:
   RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
-  NODE_COUNT: "43" # this should be a split section
+  NODE_COUNT: "33" # this should be a split section
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
 
@@ -75,43 +75,46 @@ jobs:
       - run: ./target/release/launch_network
         if: matrix.os != 'windows-latest'
         env:
-          RUST_LOG: "safe_network=debug"
+          RUST_LOG: "safe_network=trace"
 
       # TODO: windows with split section network has been failing w/ SO.
       # when we have that sorted we can reenable the full networks
       - run: ./target/release/launch_network
         if: matrix.os == 'windows-latest'
         env:
-          RUST_LOG: "safe_network=debug"
+          RUST_LOG: "safe_network=trace"
           NODE_COUNT: 11
+
+      - name: extra wait for CI split
+        run: sleep 120
 
       - name: Have we had a section split?
         run: ./scripts/has_split.sh
 
       - name: Client blob tests against local network
         shell: bash
-        run: timeout 35m cargo test --release -- client_api::blob && sleep 5
+        run: timeout 45m cargo test --release -- client_api::blob && sleep 5
       
       - name: Client transfer tests against local network
         shell: bash
-        run: timeout 15m cargo test --release -- client_api::transfer && sleep 5
+        run: timeout 25m cargo test --release -- client_api::transfer && sleep 5
       
       - name: Client map tests against local network
         shell: bash
-        run: timeout 15m cargo test --release -- client_api::map && sleep 5
+        run: timeout 25m cargo test --release -- client_api::map && sleep 5
       
       - name: Client reg tests against local network
         shell: bash
-        run: timeout 15m cargo test --release -- client_api::reg && sleep 5
+        run: timeout 25m cargo test --release -- client_api::reg && sleep 5
       
       - name: Client sequence tests against local network
         shell: bash
-        run: timeout 15m cargo test --release -- client_api::seq && sleep 5
+        run: timeout 25m cargo test --release -- client_api::seq && sleep 5
       
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: any remaining tests client...
         shell: bash
-        run: timeout 15m cargo test --release client_api -- --skip client_api::seq --skip client_api::map --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
+        run: timeout 25m cargo test --release client_api -- --skip client_api::seq --skip client_api::map --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
       
 
 

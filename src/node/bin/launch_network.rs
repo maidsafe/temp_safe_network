@@ -142,6 +142,9 @@ pub async fn run_network() -> Result<(), String> {
     let interval_as_int = &INTERVAL
         .parse::<u64>()
         .map_err(|_| String::from("Error parsing Interval argument"))?;
+    let node_count_as_int = &NODE_COUNT
+        .parse::<u64>()
+        .map_err(|_| String::from("Error parsing Node Count argument"))?;
 
     debug!(
         "Running network launch tool with args: {:?}",
@@ -152,7 +155,8 @@ pub async fn run_network() -> Result<(), String> {
     info!("Launching local Safe network...");
     run_with(Some(&sn_launch_tool_args))?;
 
-    let interval_duration = Duration::from_secs(interval_as_int * 15);
+    // leave a longer interval with more nodes to allow for splits if using split amounts
+    let interval_duration = Duration::from_secs(interval_as_int * node_count_as_int);
 
     sleep(interval_duration).await;
 
