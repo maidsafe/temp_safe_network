@@ -137,7 +137,7 @@ impl RegisterStorage {
                 if self.registers.contains_key(&key) {
                     return Err(Error::DataExists);
                 }
-                let mut db = load_db(key, self.path.as_path())?;
+                let mut db = load_db(key, self.path.as_path()).await?;
                 let _ = db.append(op)?;
                 let _ = self
                     .registers
@@ -147,9 +147,9 @@ impl RegisterStorage {
             Delete(_) => {
                 let result = match self.registers.get_mut(&key) {
                     None => {
-                        if let Ok(db) = load_db(key, self.path.as_path()) {
+                        if let Ok(db) = load_db(key, self.path.as_path()).await {
                             info!("Deleting Register");
-                            db.as_deletable().delete().map_err(Error::from)
+                            db.as_deletable().delete().await.map_err(Error::from)
                         } else {
                             Ok(())
                         }
@@ -169,11 +169,11 @@ impl RegisterStorage {
                                 Err(Error::InvalidOwner(client_sig.public_key))
                             } else {
                                 info!("Deleting Register");
-                                entry.db.as_deletable().delete().map_err(Error::from)
+                                entry.db.as_deletable().delete().await.map_err(Error::from)
                             }
-                        } else if let Ok(db) = load_db(key, self.path.as_path()) {
+                        } else if let Ok(db) = load_db(key, self.path.as_path()).await {
                             info!("Deleting Register");
-                            db.as_deletable().delete().map_err(Error::from)
+                            db.as_deletable().delete().await.map_err(Error::from)
                         } else {
                             Ok(())
                         }
@@ -195,7 +195,7 @@ impl RegisterStorage {
                     cached_entry
                 } else {
                     // read from disk
-                    let db = load_db(key, self.path.as_path())?;
+                    let db = load_db(key, self.path.as_path()).await?;
                     let mut reg = None;
                     // apply all ops
                     for op in db.get_all() {
@@ -432,9 +432,11 @@ fn to_id(address: &Address) -> Result<XorName> {
         .as_bytes()]))
 }
 
-fn load_db(id: XorName, path: &Path) -> Result<EventStore<RegisterCmd>> {
+async fn load_db(id: XorName, path: &Path) -> Result<EventStore<RegisterCmd>> {
     let db_dir = path.join("db").join("register".to_string());
-    EventStore::new(id, db_dir.as_path()).map_err(Error::from)
+    EventStore::new(id, db_dir.as_path())
+        .await
+        .map_err(Error::from)
 }
 
 impl Display for RegisterStorage {

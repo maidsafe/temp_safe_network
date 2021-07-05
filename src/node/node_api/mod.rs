@@ -75,7 +75,7 @@ impl Node {
     pub async fn new(config: &Config) -> Result<(Self, EventStream)> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
-        std::fs::create_dir_all(root_dir)?;
+        tokio::fs::create_dir_all(root_dir).await?;
 
         let reward_key = match get_reward_pk(root_dir).await? {
             Some(public_key) => PublicKey::Ed25519(public_key),

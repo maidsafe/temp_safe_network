@@ -97,7 +97,7 @@ impl MapStorage {
                 if self.store.contains_key(&key) {
                     return Err(Error::DataExists);
                 }
-                let mut store = new_store(key, self.path.as_path())?;
+                let mut store = new_store(key, self.path.as_path()).await?;
                 let _ = store.append(op).map_err(Error::from)?;
                 let _ = self.store.insert(key, (map, store));
                 Ok(())
@@ -107,7 +107,7 @@ impl MapStorage {
                     Some((map, store)) => match map.check_is_owner(&client_sig.public_key) {
                         Ok(()) => {
                             info!("Deleting Map");
-                            store.as_deletable().delete().map_err(Error::from)
+                            store.as_deletable().delete().await.map_err(Error::from)
                         }
                         Err(_e) => {
                             info!("Error: Delete Map called by non-owner");
@@ -467,9 +467,11 @@ fn to_id(address: &Address) -> Result<XorName> {
         .as_bytes()]))
 }
 
-fn new_store(id: XorName, path: &Path) -> Result<EventStore<MapCmd>> {
+async fn new_store(id: XorName, path: &Path) -> Result<EventStore<MapCmd>> {
     let db_dir = path.join("db").join("map".to_string());
-    EventStore::new(id, db_dir.as_path()).map_err(Error::from)
+    EventStore::new(id, db_dir.as_path())
+        .await
+        .map_err(Error::from)
 }
 
 impl Display for MapStorage {

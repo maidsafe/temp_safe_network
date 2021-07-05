@@ -13,12 +13,13 @@ use crate::routing::TransportConfig as NetworkConfig;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
-    fs::{self, File},
-    io::{self, BufReader},
+    io::{self},
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
 };
 use structopt::StructOpt;
+use tokio::fs::{self, File};
+use tokio::io::AsyncWriteExt;
 use tracing::{debug, Level};
 
 const CONFIG_FILE: &str = "node.config";
@@ -123,7 +124,7 @@ pub struct Config {
 impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default node config file location,
     /// and overrides values with any equivalent command line args.
-    pub fn new() -> Result<Self, Error> {
+    pub async fn new() -> Result<Self, Error> {
         // FIXME: Re-enable when we have rejoins working
         // let mut config = match Self::read_from_file() {
         //     Ok(Some(config)) => config,
@@ -141,14 +142,14 @@ impl Config {
 
         if command_line_args.hard_coded_contacts.is_empty() {
             debug!("Using node connection config file as no hard coded contacts were passed in");
-            if let Ok(info) = read_conn_info_from_file() {
+            if let Ok(info) = read_conn_info_from_file().await {
                 command_line_args.hard_coded_contacts = info;
             }
         }
 
         config.merge(command_line_args);
 
-        config.clear_data_from_disk().unwrap_or_else(|_| {
+        config.clear_data_from_disk().await.unwrap_or_else(|_| {
             tracing::error!("Error deleting data file from disk");
         });
 
@@ -330,11 +331,11 @@ impl Config {
     }
 
     // Clear data from of a previous node running on the same PC
-    fn clear_data_from_disk(&self) -> Result<()> {
+    async fn clear_data_from_disk(&self) -> Result<()> {
         if self.clear_data {
             let path = project_dirs()?.join(self.root_dir()?);
             if path.exists() {
-                std::fs::remove_dir_all(&path)?;
+                fs::remove_dir_all(&path).await?;
             }
         }
         Ok(())
@@ -342,19 +343,24 @@ impl Config {
 
     /// Reads the default node config file.
     #[allow(unused)]
-    fn read_from_file() -> Result<Option<Config>> {
+    async fn read_from_file() -> Result<Option<Config>> {
         let path = project_dirs()?.join(CONFIG_FILE);
 
-        match File::open(&path) {
-            Ok(file) => {
+        match fs::read(path.clone()).await {
+            Ok(content) => {
                 debug!("Reading settings from {}", path.display());
-                let reader = BufReader::new(file);
-                let config = serde_json::from_reader(reader)?;
-                Ok(config)
+
+                serde_json::from_slice(&content).map_err(|err| {
+                    warn!(
+                        "Could not parse content of config file '{:?}': {:?}",
+                        path, err
+                    );
+                    err.into()
+                })
             }
             Err(error) => {
                 if error.kind() == std::io::ErrorKind::NotFound {
-                    debug!("No config file available at {}", path.display());
+                    debug!("No config file available at {:?}", path);
                     Ok(None)
                 } else {
                     Err(error.into())
@@ -364,41 +370,41 @@ impl Config {
     }
 
     /// Writes the config file to disk
-    pub fn write_to_disk(&self) -> Result<()> {
-        write_file(CONFIG_FILE, self)
+    pub async fn write_to_disk(&self) -> Result<()> {
+        write_file(CONFIG_FILE, self).await
     }
 }
 
 /// Overwrites connection info at file.
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn set_connection_info(contact: SocketAddr) -> Result<()> {
-    write_file(CONNECTION_INFO_FILE, &vec![contact])
+pub async fn set_connection_info(contact: SocketAddr) -> Result<()> {
+    write_file(CONNECTION_INFO_FILE, &vec![contact]).await
 }
 
 /// Writes connection info to file for use by clients (and joining nodes when local network).
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn add_connection_info(contact: SocketAddr) -> Result<()> {
-    let hard_coded_contacts = if let Ok(mut hard_coded_contacts) = read_conn_info_from_file() {
+pub async fn add_connection_info(contact: SocketAddr) -> Result<()> {
+    let hard_coded_contacts = if let Ok(mut hard_coded_contacts) = read_conn_info_from_file().await
+    {
         let _ = hard_coded_contacts.insert(contact);
         hard_coded_contacts
     } else {
         vec![contact].into_iter().collect()
     };
 
-    write_file(CONNECTION_INFO_FILE, &hard_coded_contacts)
+    write_file(CONNECTION_INFO_FILE, &hard_coded_contacts).await
 }
 
 /// Reads the default node config file.
-fn read_conn_info_from_file() -> Result<HashSet<SocketAddr>> {
+async fn read_conn_info_from_file() -> Result<HashSet<SocketAddr>> {
     let path = project_dirs()?.join(CONNECTION_INFO_FILE);
 
-    match File::open(&path) {
-        Ok(file) => {
+    match fs::read(&path).await {
+        Ok(content) => {
             debug!("Reading connection info from {}", path.display());
-            let reader = BufReader::new(file);
-            let config = serde_json::from_reader(reader)?;
+            let config = serde_json::from_slice(&content)?;
             Ok(config)
         }
         Err(error) => {
@@ -410,17 +416,18 @@ fn read_conn_info_from_file() -> Result<HashSet<SocketAddr>> {
     }
 }
 
-fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<()>
+async fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<()>
 where
     T: Serialize,
 {
     let project_dirs = project_dirs()?;
-    fs::create_dir_all(project_dirs.clone())?;
+    fs::create_dir_all(project_dirs.clone()).await?;
 
     let path = project_dirs.join(file);
-    let mut file = File::create(&path)?;
-    serde_json::to_writer_pretty(&mut file, config)?;
-    file.sync_all()?;
+    let mut file = File::create(&path).await?;
+    let serialized = serde_json::to_string_pretty(config)?;
+    file.write_all(serialized.as_bytes()).await?;
+    file.sync_all().await?;
     Ok(())
 }
 

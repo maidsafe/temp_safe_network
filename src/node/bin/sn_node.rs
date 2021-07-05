@@ -44,7 +44,7 @@ use safe_network::routing;
 fn main() {
     let sn_node_thread = std::thread::Builder::new()
         .name("sn_node".to_string())
-        .stack_size(8 * 1024 * 1024)
+        .stack_size(16 * 1024 * 1024)
         .spawn(move || {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(run_node())?;
@@ -61,7 +61,7 @@ fn main() {
 }
 
 async fn run_node() -> Result<()> {
-    let config = match Config::new() {
+    let config = match Config::new().await {
         Ok(cfg) => cfg,
         Err(e) => {
             println!("Failed to create Config: {:?}", e);
@@ -209,13 +209,17 @@ async fn run_node() -> Result<()> {
     let our_conn_info = node.our_connection_info();
 
     if config.is_first() {
-        set_connection_info(our_conn_info).unwrap_or_else(|err| {
-            error!("Unable to write our connection info to disk: {:?}", err);
-        });
+        set_connection_info(our_conn_info)
+            .await
+            .unwrap_or_else(|err| {
+                error!("Unable to write our connection info to disk: {:?}", err);
+            });
     } else {
-        add_connection_info(our_conn_info).unwrap_or_else(|err| {
-            error!("Unable to add our connection info to disk: {:?}", err);
-        });
+        add_connection_info(our_conn_info)
+            .await
+            .unwrap_or_else(|err| {
+                error!("Unable to add our connection info to disk: {:?}", err);
+            });
     }
 
     match node.run(event_stream).await {

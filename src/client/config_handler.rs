@@ -9,13 +9,9 @@
 use crate::client::Error;
 use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashSet,
-    fs::File,
-    io::{self, BufReader},
-    net::SocketAddr,
-    path::Path,
-};
+use std::{collections::HashSet, net::SocketAddr, path::Path};
+use tokio::fs::{self};
+use tokio::io::{self};
 use tracing::{debug, warn};
 
 /// Configuration for sn_client.
@@ -27,7 +23,7 @@ pub struct Config {
 
 impl Config {
     /// Returns a new `Config` instance. Tries to read quic-p2p config from file.
-    pub fn new(
+    pub async fn new(
         config_file_path: Option<&Path>,
         bootstrap_config: Option<HashSet<SocketAddr>>,
     ) -> Self {
@@ -35,7 +31,7 @@ impl Config {
         // otherwise we use default qp2p config.
         let mut qp2p = match &config_file_path {
             None => QuicP2pConfig::default(),
-            Some(path) => match read_config_file(path) {
+            Some(path) => match read_config_file(path).await {
                 Err(Error::IoError(ref err)) if err.kind() == io::ErrorKind::NotFound => {
                     QuicP2pConfig {
                         bootstrap_cache_dir: path.parent().map(|p| p.display().to_string()),
@@ -55,29 +51,18 @@ impl Config {
     }
 }
 
-fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
-    match File::open(filepath) {
-        Ok(file) => {
-            debug!("Reading config file '{}' ...", filepath.display());
-            let reader = BufReader::new(file);
-            serde_json::from_reader(reader).map_err(|err| {
-                warn!(
-                    "Could not parse content of config file '{}': {}",
-                    filepath.display(),
-                    err
-                );
-                err.into()
-            })
-        }
-        Err(err) => {
-            warn!(
-                "Failed to open config file from '{}': {}",
-                filepath.display(),
-                err
-            );
-            Err(err.into())
-        }
-    }
+async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
+    debug!("Reading config file '{}' ...", filepath.display());
+    let contents = fs::read(filepath).await?;
+
+    serde_json::from_slice(&contents).map_err(|err| {
+        warn!(
+            "Could not parse content of config file '{}': {}",
+            filepath.display(),
+            err
+        );
+        err.into()
+    })
 }
 
 #[cfg(test)]
@@ -86,7 +71,9 @@ mod tests {
     use crate::client::utils::test_utils::init_logger;
     use anyhow::Result;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use std::{env::temp_dir, fs::create_dir_all};
+    use std::env::temp_dir;
+    use std::fs::File;
+    use tokio::fs::create_dir_all;
 
     // 1. Verify that `Config::new()` generates the correct default config
     //    when the file is not found. The default config shall have the provided
@@ -94,9 +81,9 @@ mod tests {
     // 2. Write the default config file to temp directory.
     // 3. Assert that `Config::new()` reads the default config written to disk.
     // 4. Verify that `Config::new()` returns the correct default config when no path is provided.
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn custom_config_path() -> Result<()> {
+    async fn custom_config_path() -> Result<()> {
         init_logger();
 
         let path = temp_dir();
@@ -105,7 +92,7 @@ mod tests {
 
         // In the absence of a config file, the config handler
         // should initialize bootstrap_cache_dir only
-        let config = Config::new(Some(&config_filepath), None);
+        let config = Config::new(Some(&config_filepath), None).await;
         // convert to string for assert
         let mut str_path = path
             .to_str()
@@ -124,17 +111,17 @@ mod tests {
         };
         assert_eq!(config, expected_config);
 
-        create_dir_all(path)?;
+        create_dir_all(path).await?;
         let mut file = File::create(&config_filepath)?;
 
         let config_on_disk = Config::default();
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = Config::new(Some(&config_filepath), None);
+        let read_cfg = Config::new(Some(&config_filepath), None).await;
         assert_eq!(config_on_disk, read_cfg);
 
-        let default_cfg = Config::new(None, None);
+        let default_cfg = Config::new(None, None).await;
         assert_eq!(Config::default(), default_cfg);
 
         Ok(())
