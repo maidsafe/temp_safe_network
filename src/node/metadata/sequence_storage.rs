@@ -31,18 +31,20 @@ use std::{
 };
 use tracing::{debug, info};
 use xor_name::XorName;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
     path: PathBuf,
-    store: BTreeMap<XorName, (Sequence, EventStore<SequenceCmd>)>,
+    store: Arc<RwLock<BTreeMap<XorName, (Sequence, EventStore<SequenceCmd>)>>>,
 }
 
 impl SequenceStorage {
     pub(super) fn new(path: &Path, _max_capacity: u64) -> Self {
         Self {
             path: path.to_path_buf(),
-            store: BTreeMap::new(),
+            store: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 
@@ -54,6 +56,7 @@ impl SequenceStorage {
 
         for (key, (_, history)) in self
             .store
+            .read().await
             .iter()
             .filter(|(_, (map, _))| prefix.matches(map.name()))
         {
@@ -64,7 +67,7 @@ impl SequenceStorage {
     }
 
     /// On receiving data from Elders when promoted.
-    pub(super) async fn update(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
+    pub(super) async fn update(&self, seq_data: SequenceDataExchange) -> Result<()> {
         debug!("Updating Sequence store");
 
         let SequenceDataExchange(data) = seq_data;
@@ -83,7 +86,7 @@ impl SequenceStorage {
     /// --- Writing ---
 
     pub(super) async fn write(
-        &mut self,
+        &self,
         msg_id: MessageId,
         origin: EndUser,
         write: SequenceWrite,
@@ -97,7 +100,7 @@ impl SequenceStorage {
         self.ok_or_error(write_result, msg_id, origin).await
     }
 
-    async fn apply(&mut self, op: SequenceCmd, client_auth: ClientAuthority) -> Result<()> {
+    async fn apply(&self, op: SequenceCmd, client_auth: ClientAuthority) -> Result<()> {
         let SequenceCmd { write, .. } = op.clone();
 
         let address = *write.address();
@@ -106,17 +109,17 @@ impl SequenceStorage {
         use SequenceWrite::*;
         match write {
             New(map) => {
-                if self.store.contains_key(&key) {
+                if self.store.read().await.contains_key(&key) {
                     return Err(Error::DataExists);
                 }
-                let mut store = new_store(key, self.path.as_path()).await?;
-                let _ = store.append(op)?;
-                let _ = self.store.insert(key, (map, store));
+                let mut event_store = new_store(key, self.path.as_path()).await?;
+                let _ = event_store.append(op)?;
+                let _ = self.store.write().await.insert(key, (map, event_store));
                 Ok(())
             }
             Delete(_) => {
-                let result = match self.store.get(&key) {
-                    Some((sequence, store)) => {
+                let result = match self.store.read().await.get(&key) {
+                    Some((sequence, event_store)) => {
                         if sequence.address().is_public() {
                             return Err(Error::InvalidOperation(
                                 "Cannot delete public Sequence".to_string(),
@@ -132,20 +135,21 @@ impl SequenceStorage {
                             Err(Error::InvalidOwner(client_pk))
                         } else {
                             info!("Deleting Sequence");
-                            store.as_deletable().delete().await.map_err(Error::from)
+                            event_store.as_deletable().delete().await.map_err(Error::from)
                         }
                     }
                     None => Ok(()),
                 };
 
                 if result.is_ok() {
-                    let _ = self.store.remove(&key);
+                    let _ = self.store.write().await.remove(&key);
                 }
 
                 result
             }
             Edit(reg_op) => {
-                let (sequence, store) = match self.store.get_mut(&key) {
+                let mut store =self.store.write().await;
+                let (sequence, event_store) = match store.get_mut(&key) {
                     Some(entry) => entry,
                     None => return Err(Error::NoSuchData(DataAddress::Sequence(address))),
                 };
@@ -155,7 +159,7 @@ impl SequenceStorage {
                 let result = sequence.apply_op(reg_op).map_err(Error::NetworkData);
 
                 if result.is_ok() {
-                    store.append(op)?;
+                    event_store.append(op)?;
                     info!("Editing Sequence SUCCESSFUL!");
                 } else {
                     info!("Editing Sequence FAILED!");
@@ -228,13 +232,13 @@ impl SequenceStorage {
         address: &Address,
         action: Action,
         requester: PublicKey,
-    ) -> Result<&Sequence> {
-        match self.store.get(&to_id(address)?) {
+    ) -> Result<Sequence> {
+        match self.store.read().await.get(&to_id(address)?) {
             Some((sequence, _)) => {
                 let _ = sequence
                     .check_permissions(action, Some(requester))
                     .map_err(Error::from)?;
-                Ok(sequence)
+                Ok(sequence.clone())
             }
             None => Err(Error::NoSuchData(DataAddress::Sequence(*address))),
         }

@@ -63,7 +63,7 @@ impl ElderStores {
     }
 
     pub(super) async fn write(
-        &mut self,
+        &self,
         cmd: DataCmd,
         msg_id: MessageId,
         client_auth: ClientAuthority,
@@ -110,7 +110,7 @@ impl ElderStores {
         })
     }
 
-    pub(super) async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
+    pub(super) async fn update(&self, data: DataExchange) -> Result<(), Error> {
         // todo: all this can be done in parallel
         self.register_storage.update(data.reg_data).await?;
         self.sequence_storage.update(data.seq_data).await?;

@@ -78,8 +78,7 @@ impl Node {
                         let our_adults = network.our_adults().await;
                         elder
                             .meta_data
-                            .write()
-                            .await
+
                             .retain_members_only(our_adults)
                             .await?;
                         Ok(NodeTask::from(ops))
@@ -169,8 +168,7 @@ impl Node {
                     let our_adults = network_api.our_adults().await;
                     elder
                         .meta_data
-                        .write()
-                        .await
+
                         .retain_members_only(our_adults)
                         .await?;
                     Ok(NodeTask::from(vec![NodeDuty::SetNodeJoinsAllowed(true)]))
@@ -233,7 +231,7 @@ impl Node {
                 let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(vec![
-                        elder.meta_data.read().await.republish_chunk(chunk).await?,
+                        elder.meta_data.republish_chunk(chunk).await?,
                     ]))
                 });
                 Ok(NodeTask::Thread(handle))
@@ -254,8 +252,7 @@ impl Node {
                 let handle = tokio::spawn(async move {
                     elder
                         .meta_data
-                        .read()
-                        .await
+                        
                         .increase_full_node_count(node_id)
                         .await;
                     // Accept a new node in place for the full node.
@@ -316,8 +313,6 @@ impl Node {
                         // this is a write here as we write the liveness check for each adult
                         elder
                             .meta_data
-                            .write()
-                            .await
                             .read(query, msg_id, *client_auth.public_key(), origin)
                             .await?,
                     ];
@@ -336,8 +331,6 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .meta_data
-                            .write()
-                            .await
                             .write(cmd, msg_id, client_auth, origin)
                             .await?,
                     ]))
@@ -355,8 +348,7 @@ impl Node {
                     Ok(NodeTask::from(
                         elder
                             .meta_data
-                            .write()
-                            .await
+
                             .record_adult_read_liveness(correlation_id, response, src)
                             .await?,
                     ))

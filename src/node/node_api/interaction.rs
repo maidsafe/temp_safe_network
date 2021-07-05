@@ -79,8 +79,6 @@ pub(crate) async fn push_state(
     // Create an aggregated map of all the metadata of the provided prefix
     let metadata = elder
         .meta_data
-        .read()
-        .await
         .get_data_exchange_packet(prefix)
         .await?;
 

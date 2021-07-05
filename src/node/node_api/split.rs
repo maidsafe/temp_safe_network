@@ -54,8 +54,6 @@ impl Node {
         // drop metadata state
         elder
             .meta_data
-            .write()
-            .await
             .retain_members_only(our_adults)
             .await?;
 

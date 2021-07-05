@@ -93,7 +93,7 @@ impl Metadata {
     }
 
     pub(crate) async fn write(
-        &mut self,
+        &self,
         cmd: DataCmd,
         id: MessageId,
         client_auth: ClientAuthority,
@@ -122,7 +122,7 @@ impl Metadata {
         self.elder_stores.get_data_of(prefix).await
     }
 
-    pub(crate) async fn update(&mut self, data: DataExchange) -> Result<()> {
+    pub(crate) async fn update(&self, data: DataExchange) -> Result<()> {
         self.elder_stores.update(data).await
     }
 }
