@@ -26,7 +26,7 @@ use bytes::Bytes;
 use xor_name::XorName;
 
 // Utilities for WireMsg.
-pub(crate) trait WireMsgUtils {
+pub trait WireMsgUtils {
     /// Verify this message is properly signed.
     fn check_signature(&self) -> Result<()>;
 
@@ -55,7 +55,7 @@ pub(crate) trait WireMsgUtils {
         node: &Node,
         dst: DstLocation,
         node_msg: NodeMsg,
-        section_key: BlsPublicKey,
+        src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg>;
 }
 
@@ -128,20 +128,21 @@ impl WireMsgUtils for WireMsg {
         // Create message id from msg authority signature
         let (id, msg_kind) = match node_msg_authority {
             NodeMsgAuthority::Node(node_signed) => (
-                MessageId::from_content(&node_signed.signature),
+                MessageId::from_content(&node_signed.signature).unwrap_or_default(),
                 MsgKind::NodeSignedMsg(node_signed),
             ),
             NodeMsgAuthority::BlsShare(bls_share_signed) => (
-                MessageId::from_content(&bls_share_signed.sig_share.signature_share.0),
+                MessageId::from_content(&bls_share_signed.sig_share.signature_share.0)
+                    .unwrap_or_default(),
                 MsgKind::NodeBlsShareSignedMsg(bls_share_signed),
             ),
             NodeMsgAuthority::Section(section_signed) => (
-                MessageId::from_content(&section_signed.sig.signature),
+                MessageId::from_content(&section_signed.sig.signature).unwrap_or_default(),
                 MsgKind::SectionSignedMsg(section_signed),
             ),
         };
 
-        let msg = WireMsg::new_msg(id.unwrap_or_default(), payload, msg_kind, dst)?;
+        let msg = WireMsg::new_msg(id, payload, msg_kind, dst)?;
 
         Ok(msg)
     }

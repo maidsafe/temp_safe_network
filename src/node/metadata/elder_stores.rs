@@ -11,8 +11,8 @@ use super::{
     sequence_storage::SequenceStorage,
 };
 use crate::messaging::{
-    client::{ClientSig, DataCmd, DataExchange, DataQuery, MapCmd, RegisterCmd, SequenceCmd},
-    EndUser, MessageId,
+    client::{DataCmd, DataExchange, DataQuery, MapCmd, RegisterCmd, SequenceCmd},
+    ClientSigned, EndUser, MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Error, Result};
 use crate::routing::Prefix;
@@ -70,7 +70,7 @@ impl ElderStores {
         &mut self,
         cmd: DataCmd,
         msg_id: MessageId,
-        client_sig: ClientSig,
+        client_sig: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         info!("Writing Data");

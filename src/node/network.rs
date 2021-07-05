@@ -6,24 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{Itinerary, MessageType};
+use crate::messaging::{node::NodeMsg, DstLocation, WireMsg};
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
     SectionAuthorityProviderUtils,
 };
-use crate::types::{utils, PublicKey, Signature, SignatureShare};
+use crate::types::PublicKey;
 use bls::PublicKeySet;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use secured_linked_list::SecuredLinkedList;
-use serde::Serialize;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-    path::Path,
-    sync::Arc,
-    usize,
-};
+use std::{collections::BTreeSet, net::SocketAddr, path::Path, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 ///
@@ -35,9 +28,6 @@ pub struct Network {
 #[allow(missing_docs)]
 impl Network {
     pub async fn new(root_dir: &Path, config: &NodeConfig) -> Result<(Self, EventStream)> {
-        // FIXME: Re-enable when we have rejoins working
-        // let keypair = get_network_keypair(root_dir).await?;
-
         let routing_config = RoutingConfig {
             first: config.is_first(),
             transport_config: config.network_config().clone(),
@@ -54,52 +44,6 @@ impl Network {
             },
             event_stream,
         ))
-    }
-
-    /// Sign with our node's ED25519 key
-    #[allow(unused)]
-    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
-        let data = utils::serialise(data)?;
-        let sig = self.routing.sign_as_node(&data).await;
-        Ok(Signature::Ed25519(sig))
-    }
-
-    /// Sign with our BLS PK Share
-    #[allow(unused)]
-    pub async fn sign_as_elder<T: Serialize>(&self, data: &T) -> Result<SignatureShare> {
-        let bls_pk = self
-            .routing
-            .public_key_set()
-            .await
-            .map_err(|_| Error::NoSectionPublicKey)?
-            .public_key();
-        let (index, share) = self
-            .routing
-            .sign_as_elder(&utils::serialise(data)?, &bls_pk)
-            .await
-            .map_err(Error::Routing)?;
-        Ok(SignatureShare { index, share })
-    }
-
-    /// Sign with our BLS PK Share
-    #[allow(unused)]
-    pub async fn sign_as_elder_raw<T: Serialize>(
-        &self,
-        data: &T,
-    ) -> Result<(usize, bls::SignatureShare)> {
-        let bls_pk = self
-            .routing
-            .public_key_set()
-            .await
-            .map_err(|_| Error::NoSectionPublicKey)?
-            .public_key();
-        let data = utils::serialise(data)?;
-        let share = self
-            .routing
-            .sign_as_elder(&data, &bls_pk)
-            .await
-            .map_err(Error::Routing)?;
-        Ok(share)
     }
 
     pub async fn age(&self) -> u8 {
@@ -129,23 +73,6 @@ impl Network {
         ))
     }
 
-    #[allow(unused)]
-    pub async fn sibling_public_key(&self) -> Option<PublicKey> {
-        let sibling_prefix = self.our_prefix().await.sibling();
-        self.routing
-            .section_key(&sibling_prefix)
-            .await
-            .map(PublicKey::Bls)
-    }
-
-    pub async fn matching_section(&self, name: &XorName) -> Result<bls::PublicKey> {
-        self.routing
-            .matching_section(name)
-            .await
-            .map(|provider| provider.section_key())
-            .map_err(From::from)
-    }
-
     pub async fn our_public_key_set(&self) -> Result<PublicKeySet> {
         self.routing.public_key_set().await.map_err(Error::Routing)
     }
@@ -162,13 +89,8 @@ impl Network {
         self.routing.name().await
     }
 
-    #[allow(unused)]
-    pub async fn our_age(&self) -> u8 {
-        self.routing.age().await
-    }
-
-    pub fn our_connection_info(&self) -> SocketAddr {
-        self.routing.our_connection_info()
+    pub async fn our_connection_info(&self) -> SocketAddr {
+        self.routing.our_connection_info().await
     }
 
     pub async fn our_prefix(&self) -> Prefix {
@@ -179,17 +101,8 @@ impl Network {
         self.routing.section_chain().await
     }
 
-    #[allow(unused)]
-    pub async fn matches_our_prefix(&self, name: &XorName) -> bool {
-        self.routing.matches_our_prefix(name).await
-    }
-
-    pub async fn send_message(
-        &self,
-        itinerary: Itinerary,
-        content: MessageType,
-    ) -> Result<(), RoutingError> {
-        self.routing.send_message(itinerary, content, None).await
+    pub async fn send_message(&self, wire_msg: WireMsg) -> Result<(), RoutingError> {
+        self.routing.send_message(wire_msg).await
     }
 
     pub async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
@@ -199,24 +112,9 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    /// Returns whether the node is Elder.
+    // Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
         self.routing.is_elder().await
-    }
-
-    /// get our PKshare
-    #[allow(unused)]
-    pub async fn our_public_key_share(&self) -> Result<PublicKey> {
-        let index = self.our_index().await?;
-        Ok(PublicKey::from(
-            self.our_public_key_set().await?.public_key_share(index),
-        ))
-    }
-
-    /// BLS key index in routing for key shares
-    #[allow(unused)]
-    pub async fn our_index(&self) -> Result<usize> {
-        self.routing.our_index().await.map_err(Error::Routing)
     }
 
     pub async fn our_elder_names(&self) -> BTreeSet<XorName> {
@@ -226,67 +124,6 @@ impl Network {
             .iter()
             .map(|p2p_node| *p2p_node.name())
             .collect::<BTreeSet<_>>()
-    }
-
-    #[allow(unused)]
-    pub async fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
-        self.routing
-            .our_elders()
-            .await
-            .iter()
-            .map(|p2p_node| (*p2p_node.name(), *p2p_node.addr()))
-            .collect::<Vec<_>>()
-    }
-
-    #[allow(unused)]
-    pub async fn our_elder_addresses_sorted_by_distance_to(
-        &self,
-        name: &XorName,
-    ) -> Vec<(XorName, SocketAddr)> {
-        self.routing
-            .our_elders_sorted_by_distance_to(name)
-            .await
-            .into_iter()
-            .map(|p2p_node| (*p2p_node.name(), *p2p_node.addr()))
-            .collect::<Vec<_>>()
-    }
-
-    #[allow(unused)]
-    pub async fn our_elder_names_sorted_by_distance_to(
-        &self,
-        name: &XorName,
-        count: usize,
-    ) -> Vec<XorName> {
-        self.routing
-            .our_elders_sorted_by_distance_to(name)
-            .await
-            .into_iter()
-            .take(count)
-            .map(|p2p_node| *p2p_node.name())
-            .collect::<Vec<_>>()
-    }
-
-    #[allow(unused)]
-    pub async fn our_members(&self) -> BTreeMap<XorName, u8> {
-        let elders: Vec<_> = self
-            .routing
-            .our_elders()
-            .await
-            .into_iter()
-            .map(|peer| (*peer.name(), peer.age()))
-            .collect();
-        let adults: Vec<_> = self
-            .routing
-            .our_adults()
-            .await
-            .into_iter()
-            .map(|peer| (*peer.name(), peer.age()))
-            .collect();
-
-        vec![elders, adults]
-            .into_iter()
-            .flatten()
-            .collect::<BTreeMap<XorName, u8>>()
     }
 
     pub async fn our_adults(&self) -> BTreeSet<XorName> {
@@ -305,5 +142,27 @@ impl Network {
             .into_iter()
             .map(|p2p_node| *p2p_node.name())
             .collect::<Vec<_>>()
+    }
+
+    pub async fn sign_msg_for_dst_accumulation(
+        &self,
+        node_msg: NodeMsg,
+        dst: DstLocation,
+    ) -> Result<WireMsg> {
+        self.routing
+            .sign_msg_for_dst_accumulation(node_msg, dst)
+            .await
+            .map_err(Error::Routing)
+    }
+
+    pub async fn sign_single_src_msg(
+        &self,
+        node_msg: NodeMsg,
+        dst: DstLocation,
+    ) -> Result<WireMsg> {
+        self.routing
+            .sign_single_src_msg(node_msg, dst)
+            .await
+            .map_err(Error::Routing)
     }
 }

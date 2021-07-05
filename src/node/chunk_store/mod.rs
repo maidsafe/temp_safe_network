@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//mod data_store;
-
 use super::node_ops::{MsgType, OutgoingMsg};
 use crate::dbs::{Data, DataId, DataStore, Subdir, UsedSpace};
 use crate::node::{
@@ -19,11 +17,12 @@ use crate::{
     messaging::{
         client::{ChunkRead, ChunkWrite, Error as ErrorMessage},
         node::{NodeDataQueryResponse, NodeMsg, NodeQueryResponse},
-        Aggregation, DstLocation, MessageId,
+        DstLocation, MessageId,
     },
     node::Error,
     types::DataAddress,
 };
+use bls::PublicKey as BlsPublicKey;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -82,7 +81,12 @@ impl ChunkStore {
             .map_err(|_| Error::NoSuchData(DataAddress::Chunk(*address)))
     }
 
-    pub async fn read(&self, read: &ChunkRead, msg_id: MessageId) -> NodeDuty {
+    pub async fn read(
+        &self,
+        read: &ChunkRead,
+        msg_id: MessageId,
+        section_pk: BlsPublicKey,
+    ) -> NodeDuty {
         let ChunkRead::Get(address) = read;
         let result = self
             .get_chunk(address)
@@ -90,14 +94,16 @@ impl ChunkStore {
             .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Chunk(*address)));
 
         NodeDuty::Send(OutgoingMsg {
+            id: MessageId::in_response_to(&msg_id),
             msg: MsgType::Node(NodeMsg::NodeQueryResponse {
                 response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
-                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
             }),
-            section_source: false, // sent as single node
-            dst: DstLocation::Section(*address.name()),
-            aggregation: Aggregation::None,
+            dst: DstLocation::Section {
+                name: *address.name(),
+                section_pk,
+            },
+            aggregation: false,
         })
     }
 

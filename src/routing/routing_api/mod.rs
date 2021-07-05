@@ -23,11 +23,15 @@ pub use self::{
 };
 
 use self::{command::Command, dispatcher::Dispatcher};
-use crate::messaging::{node::Peer, DstLocation, EndUser, SectionAuthorityProvider, WireMsg};
+use crate::messaging::{
+    node::{NodeMsg, Peer},
+    DstLocation, EndUser, SectionAuthorityProvider, WireMsg,
+};
 use crate::routing::{
     core::{join_network, Comm, ConnectionEvent, Core},
     ed25519,
     error::Result,
+    messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
@@ -316,6 +320,42 @@ impl Routing {
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         let core = self.dispatcher.core.read().await;
         core.matching_section(name)
+    }
+
+    /// Builds a WireMsg signed by this Node
+    pub async fn sign_single_src_msg(
+        &self,
+        node_msg: NodeMsg,
+        dst: DstLocation,
+    ) -> Result<WireMsg> {
+        WireMsg::single_src(
+            self.dispatcher.core.read().await.node(),
+            dst,
+            node_msg,
+            *self.section_chain().await.last_key(),
+        )
+    }
+
+    /// Builds a WireMsg signed for accumulateion at destination
+    pub async fn sign_msg_for_dst_accumulation(
+        &self,
+        node_msg: NodeMsg,
+        dst: DstLocation,
+    ) -> Result<WireMsg> {
+        let src = self.name().await;
+
+        WireMsg::for_dst_accumulation(
+            self.dispatcher
+                .core
+                .read()
+                .await
+                .key_share()
+                .map_err(|err| err)?,
+            src,
+            dst,
+            node_msg,
+            *self.section_chain().await.last_key(),
+        )
     }
 
     /// Send a message.

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::EndUser;
+use crate::messaging::{EndUser, SocketId};
 use crate::routing::error::{Error, Result};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
@@ -14,7 +14,6 @@ use std::{
 };
 use xor_name::{Prefix, XorName};
 
-pub type SocketId = XorName;
 pub(crate) struct EndUserRegistry {
     clients: BTreeMap<SocketAddr, EndUser>,
     socket_id_mapping: BTreeMap<SocketId, SocketAddr>,

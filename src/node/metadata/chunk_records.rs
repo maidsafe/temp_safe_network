@@ -8,9 +8,9 @@
 
 use crate::btree_set;
 use crate::messaging::{
-    client::{ChunkDataExchange, ChunkRead, ChunkWrite, ClientSig, CmdError, QueryResponse},
+    client::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
-    Aggregation, EndUser, MessageId,
+    ClientSigned, EndUser, MessageId,
 };
 use crate::node::{
     capacity::{Capacity, CHUNK_COPY_COUNT},
@@ -73,13 +73,13 @@ impl ChunkRecords {
         &self,
         write: ChunkWrite,
         msg_id: MessageId,
-        client_sig: ClientSig,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         use ChunkWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, client_sig, origin).await,
-            DeletePrivate(address) => self.delete(address, msg_id, client_sig, origin).await,
+            New(data) => self.store(data, msg_id, client_signed, origin).await,
+            DeletePrivate(address) => self.delete(address, msg_id, client_signed, origin).await,
         }
     }
 
@@ -108,7 +108,7 @@ impl ChunkRecords {
         &self,
         chunk: Chunk,
         msg_id: MessageId,
-        client_sig: ClientSig,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let target_holders = self.capacity.get_chunk_holder_adults(chunk.name()).await;
@@ -128,16 +128,14 @@ impl ChunkRecords {
         let blob_write = ChunkWrite::New(chunk);
 
         Ok(NodeDuty::SendToNodes {
+            id: msg_id,
+            msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
+                cmd: blob_write,
+                client_signed,
+                origin,
+            }),
             targets: target_holders,
-            msg: NodeMsg::NodeCmd {
-                cmd: NodeCmd::Chunks {
-                    cmd: blob_write,
-                    client_sig,
-                    origin,
-                },
-                id: msg_id,
-            },
-            aggregation: Aggregation::AtDestination,
+            aggregation: true,
         })
     }
 
@@ -145,14 +143,14 @@ impl ChunkRecords {
         &self,
         chunk: Chunk,
         msg_id: MessageId,
-        client_sig: ClientSig,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        if let Err(error) = validate_chunk_owner(&chunk, &client_sig.public_key) {
+        if let Err(error) = validate_chunk_owner(&chunk, &client_signed.public_key) {
             return self.send_error(error, msg_id, origin).await;
         }
 
-        self.send_chunks_to_adults(chunk, msg_id, client_sig, origin)
+        self.send_chunks_to_adults(chunk, msg_id, client_signed, origin)
             .await
     }
 
@@ -232,23 +230,22 @@ impl ChunkRecords {
         &self,
         address: ChunkAddress,
         msg_id: MessageId,
-        client_sig: ClientSig,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.capacity.get_chunk_holder_adults(address.name()).await;
 
-        let msg = NodeMsg::NodeCmd {
-            cmd: NodeCmd::Chunks {
-                cmd: ChunkWrite::DeletePrivate(address),
-                client_sig,
-                origin,
-            },
-            id: msg_id,
-        };
+        let msg = NodeMsg::NodeCmd(NodeCmd::Chunks {
+            cmd: ChunkWrite::DeletePrivate(address),
+            client_signed,
+            origin,
+        });
+
         Ok(NodeDuty::SendToNodes {
+            id: msg_id,
             msg,
             targets,
-            aggregation: Aggregation::AtDestination,
+            aggregation: true,
         })
     }
 
@@ -266,12 +263,10 @@ impl ChunkRecords {
         );
 
         Ok(NodeDuty::SendToNodes {
+            id: msg_id,
+            msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk))),
             targets: target_holders,
-            msg: NodeMsg::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk)),
-                id: msg_id,
-            },
-            aggregation: Aggregation::None,
+            aggregation: false,
         })
     }
 
@@ -308,18 +303,16 @@ impl ChunkRecords {
             .adult_liveness
             .new_read(msg_id, address, origin, targets.clone())
         {
-            let msg = NodeMsg::NodeQuery {
-                query: NodeQuery::Chunks {
-                    query: ChunkRead::Get(address),
-                    origin,
-                },
-                id: msg_id,
-            };
+            let msg = NodeMsg::NodeQuery(NodeQuery::Chunks {
+                query: ChunkRead::Get(address),
+                origin,
+            });
 
             Ok(NodeDuty::SendToNodes {
+                id: msg_id,
                 msg,
                 targets,
-                aggregation: Aggregation::None,
+                aggregation: false,
             })
         } else {
             info!(

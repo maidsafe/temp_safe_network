@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, enduser_registry::SocketId, Comm, Core};
+use super::{delivery_group, Comm, Core};
 use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, Section},
-    EndUser, MessageId, SectionAuthorityProvider, WireMsg,
+    EndUser, MessageId, SectionAuthorityProvider, SocketId, WireMsg,
 };
 use crate::routing::{
     dkg::commands::DkgCommands,
@@ -18,7 +18,7 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionUtils},
+    section::{NodeStateUtils, SectionKeyShare, SectionUtils},
     Error, Event,
 };
 use secured_linked_list::SecuredLinkedList;
@@ -141,6 +141,12 @@ impl Core {
     /// `Error::MissingSecretKeyShare` otherwise.
     pub fn our_index(&self) -> Result<usize> {
         Ok(self.section_keys_provider.key_share()?.index)
+    }
+
+    /// Returns our key share in the current BLS group if this node is a member of one, or
+    /// `Error::MissingSecretKeyShare` otherwise.
+    pub fn key_share(&self) -> Result<&SectionKeyShare> {
+        self.section_keys_provider.key_share()
     }
 
     pub async fn send_event(&self, event: Event) {

@@ -206,7 +206,7 @@ async fn run_node() -> Result<()> {
         sleep(Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60)).await;
     };
 
-    let our_conn_info = node.our_connection_info();
+    let our_conn_info = node.our_connection_info().await;
 
     if config.is_first() {
         set_connection_info(our_conn_info)

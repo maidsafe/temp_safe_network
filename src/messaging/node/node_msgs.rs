@@ -94,7 +94,7 @@ pub enum NodeQuery {
         /// The actual query message
         query: NodeDataQuery,
         /// Client signature
-        client_sig: ClientSigned,
+        client_signed: ClientSigned,
         /// The user that has initiated this query
         origin: EndUser,
     },

@@ -28,7 +28,7 @@ mod sap;
 
 pub use self::{
     errors::{Error, Result},
-    location::{DstLocation, EndUser, Itinerary, SrcLocation},
+    location::{DstLocation, EndUser, SocketId, SrcLocation},
     msg_id::{MessageId, MESSAGE_ID_LEN},
     msg_kind::{BlsShareSigned, ClientSigned, MsgKind, NodeSigned, SectionSigned},
     sap::SectionAuthorityProvider,
