@@ -18,11 +18,16 @@ use crate::node::{
 };
 use tracing::warn;
 
-pub fn map_client_msg(msg: ClientMsg, client_signed: ClientSigned, user: EndUser) -> Mapping {
+pub fn map_client_msg(
+    msg_id: MessageId,
+    msg: ClientMsg,
+    client_signed: ClientSigned,
+    user: EndUser,
+) -> Mapping {
     match &msg {
         ClientMsg::Process(process_msg) => {
             // Signature has already been validated by the routing layer
-            let op = map_client_process_msg(process_msg.clone(), user, client_signed);
+            let op = map_client_process_msg(msg_id, process_msg.clone(), user, client_signed);
 
             let ctx = Some(MsgContext::Client {
                 msg,
@@ -57,36 +62,24 @@ pub fn map_client_msg(msg: ClientMsg, client_signed: ClientSigned, user: EndUser
 }
 
 fn map_client_process_msg(
+    msg_id: MessageId,
     process_msg: ProcessMsg,
     origin: EndUser,
     client_signed: ClientSigned,
 ) -> NodeDuty {
-    let msg_id = process_msg.id();
-
     match process_msg {
-        ProcessMsg::Query {
-            query: Query::Data(query),
-            ..
-        } => NodeDuty::ProcessRead {
+        ProcessMsg::Query(Query::Data(query)) => NodeDuty::ProcessRead {
             query,
             msg_id,
             client_signed,
             origin,
         },
-        ProcessMsg::Cmd {
-            cmd: Cmd::Data { cmd, .. },
-            id,
-            ..
-        } =>
-        // FIXME: ******** validate client signature!!!! *********
-        {
-            NodeDuty::ProcessWrite {
-                cmd,
-                msg_id: id,
-                client_signed,
-                origin,
-            }
-        }
+        ProcessMsg::Cmd(Cmd::Data { cmd }) => NodeDuty::ProcessWrite {
+            cmd,
+            msg_id,
+            client_signed,
+            origin,
+        },
         _ => {
             let error_data = convert_to_error_message(Error::InvalidMessage(
                 msg_id,
@@ -100,7 +93,6 @@ fn map_client_process_msg(
                 msg: MsgType::Client(ClientMsg::ProcessingError(ProcessingError::new(
                     Some(error_data),
                     Some(process_msg),
-                    id,
                 ))),
                 dst: src.to_dst(),
                 aggregation: false,

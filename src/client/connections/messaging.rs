@@ -149,7 +149,7 @@ impl Session {
             .ok_or(Error::NoBlsSectionKey)?;
         let dst_section_name = cmd.dst_address();
 
-        let msg = ClientMsg::Process(ProcessMsg::Cmd { id: msg_id, cmd });
+        let msg = ClientMsg::Process(ProcessMsg::Cmd(cmd));
         let payload = WireMsg::serialize_msg_payload(&msg)?;
         let msg_kind = MsgKind::ClientMsg(client_signed);
         let dst_location = DstLocation::Section {
@@ -222,7 +222,7 @@ impl Session {
         let dst_section_name = data_name;
 
         let msg_id = MessageId::new();
-        let msg = ClientMsg::Process(ProcessMsg::Query { id: msg_id, query });
+        let msg = ClientMsg::Process(ProcessMsg::Query(query));
         let payload = WireMsg::serialize_msg_payload(&msg)?;
         let msg_kind = MsgKind::ClientMsg(client_signed);
         let dst_location = DstLocation::Section {

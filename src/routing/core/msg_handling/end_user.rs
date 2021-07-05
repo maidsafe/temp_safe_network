@@ -21,11 +21,13 @@ use std::net::SocketAddr;
 impl Core {
     pub(crate) async fn handle_forwarded_message(
         &mut self,
+        msg_id: MessageId,
         msg: ClientMsg,
         user: EndUser,
         client_signed: ClientSigned,
     ) -> Result<Vec<Command>> {
         self.send_event(Event::ClientMsgReceived {
+            msg_id,
             msg: Box::new(msg),
             user,
             client_signed,
@@ -81,7 +83,7 @@ impl Core {
         if is_in_destination {
             // We send this message to be handled by the upper Node layer
             // through the public event stream API
-            self.handle_forwarded_message(msg, user, client_signed)
+            self.handle_forwarded_message(msg_id, msg, user, client_signed)
                 .await
         } else {
             // Let's relay the client message then

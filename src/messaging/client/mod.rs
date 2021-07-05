@@ -75,8 +75,6 @@ pub struct SupportingInfo {
     pub info: SupportingInfoFor,
     /// The original message that triggered the error this update should be correcting
     pub source_message: ProcessMsg,
-    /// MessageId
-    pub id: MessageId,
     /// Correlates to a ProcessingError
     pub correlation_id: MessageId,
 }
@@ -91,19 +89,12 @@ impl SupportingInfo {
         info: SupportingInfoFor,
         source_message: ProcessMsg,
         correlation_id: MessageId,
-        id: MessageId,
     ) -> Self {
         Self {
             info,
             source_message,
-            id,
             correlation_id,
         }
-    }
-
-    /// Get msg id
-    pub fn id(&self) -> MessageId {
-        self.id
     }
 
     /// Get source message that originally triggered a ProcessingError. This should usually be replayed at source after applying supporting information
@@ -132,23 +123,15 @@ pub struct ProcessingError {
     reason: Option<Error>,
     /// Message that triggered this error
     source_message: Option<ProcessMsg>,
-    /// MessageId
-    id: MessageId,
 }
 
 impl ProcessingError {
     /// Construct a new error with the given reason and metadata.
-    pub fn new(reason: Option<Error>, source_message: Option<ProcessMsg>, id: MessageId) -> Self {
+    pub fn new(reason: Option<Error>, source_message: Option<ProcessMsg>) -> Self {
         Self {
             reason,
             source_message,
-            id,
         }
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> MessageId {
-        self.id
     }
 
     /// Get the [`ProcessMsg`] that caused the error.
@@ -173,19 +156,6 @@ impl ClientMsg {
             Err(crate::messaging::Error::FailedToParse(
                 "bytes as a client message".to_string(),
             ))
-        }
-    }
-
-    /// Gets the message ID.
-    pub fn id(&self) -> MessageId {
-        match self {
-            Self::Process(ProcessMsg::Cmd { id, .. })
-            | Self::Process(ProcessMsg::Query { id, .. })
-            | Self::Process(ProcessMsg::Event { id, .. })
-            | Self::Process(ProcessMsg::QueryResponse { id, .. })
-            | Self::Process(ProcessMsg::CmdError { id, .. })
-            | Self::ProcessingError(ProcessingError { id, .. }) => *id,
-            Self::SupportingInfo(SupportingInfo { id, .. }) => *id,
         }
     }
 
@@ -215,23 +185,11 @@ pub enum ProcessMsg {
     /// A Cmd is leads to a write / change of state.
     /// We expect them to be successful, and only return a msg
     /// if something went wrong.
-    Cmd {
-        /// Message ID.
-        id: MessageId,
-        /// Cmd.
-        cmd: Cmd,
-    },
+    Cmd(Cmd),
     /// Queries is a read-only operation.
-    Query {
-        /// Message ID.
-        id: MessageId,
-        /// Query.
-        query: Query,
-    },
+    Query(Query),
     /// An Event is a fact about something that happened.
     Event {
-        /// Message ID.
-        id: MessageId,
         /// Request.
         event: Event,
         /// ID of causing cmd.
@@ -239,8 +197,6 @@ pub enum ProcessMsg {
     },
     /// The response to a query, containing the query result.
     QueryResponse {
-        /// Message ID.
-        id: MessageId,
         /// QueryResponse.
         response: QueryResponse,
         /// ID of causing query.
@@ -248,8 +204,6 @@ pub enum ProcessMsg {
     },
     /// Cmd error.
     CmdError {
-        /// Message ID.
-        id: MessageId,
         /// The error.
         error: CmdError,
         /// ID of causing cmd.
@@ -264,19 +218,7 @@ impl ProcessMsg {
     pub fn create_processing_error(&self, reason: Option<Error>) -> ProcessingError {
         ProcessingError {
             source_message: Some(self.clone()),
-            id: MessageId::new(),
             reason,
-        }
-    }
-
-    /// Gets the message ID.
-    pub fn id(&self) -> MessageId {
-        match self {
-            Self::Cmd { id, .. }
-            | Self::Query { id, .. }
-            | Self::Event { id, .. }
-            | Self::QueryResponse { id, .. }
-            | Self::CmdError { id, .. } => *id,
         }
     }
 }

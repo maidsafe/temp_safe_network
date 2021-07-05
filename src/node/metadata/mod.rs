@@ -151,7 +151,6 @@ fn build_client_query_response(
     OutgoingMsg {
         id: MessageId::in_response_to(&msg_id),
         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
-            id: MessageId::in_response_to(&msg_id),
             response,
             correlation_id: msg_id,
         })),
@@ -164,7 +163,6 @@ fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUs
     OutgoingMsg {
         id: MessageId::in_response_to(&msg_id),
         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
-            id: MessageId::in_response_to(&msg_id),
             error,
             correlation_id: msg_id,
         })),

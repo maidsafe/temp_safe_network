@@ -115,6 +115,8 @@ pub enum Event {
     },
     /// Received a message from a client node.
     ClientMsgReceived {
+        /// The message ID
+        msg_id: MessageId,
         /// The content of the message.
         msg: Box<ClientMsg>,
         /// Client authority
@@ -195,10 +197,12 @@ impl Debug for Event {
                 .field("previous_name", previous_name)
                 .field("new_keypair", new_keypair)
                 .finish(),
-            Self::ClientMsgReceived { msg, user, .. } => write!(
+            Self::ClientMsgReceived {
+                msg_id, msg, user, ..
+            } => write!(
                 formatter,
-                "ClientMsgReceived {{ msg: {:?}, src: {:?} }}",
-                msg, user,
+                "ClientMsgReceived {{ msg_id: {}, msg: {:?}, src: {:?} }}",
+                msg_id, msg, user,
             ),
             Self::AdultsChanged {
                 remaining,
