@@ -8,8 +8,8 @@
 
 use anyhow::Result;
 use safe_network::node::Config;
-use std::{fs::remove_file, io};
 use structopt::StructOpt;
+use tokio::{fs::remove_file, io};
 
 // This example is to demonstrate how the node configuration is constructed
 // The node will attempt to read a cached config file from disk
@@ -18,7 +18,8 @@ use structopt::StructOpt;
 // Note: This is essentially a test, but, when using test filtering, StructOpt
 // tries to parse the filter as an argument passed resulting in a `UnmatchedArgument` error.
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     // Create some config and write it to disk
     let file_config = Config::default();
 
@@ -30,12 +31,12 @@ fn main() -> Result<()> {
     // );
     // file_config.network_config.local_port = Some(0);
     // file_config.network_config.external_port = Some(12345);
-    file_config.write_to_disk()?;
+    file_config.write_to_disk().await?;
 
     // This should load the config from disk and
     // use the command line arguments to overwrite the config
     // with any provided arguments
-    let config = Config::new()?;
+    let config = Config::new().await?;
 
     let command_line_args = Config::from_args();
 
@@ -194,12 +195,12 @@ fn main() -> Result<()> {
         )
     }
 
-    clear_disk_config()?;
+    clear_disk_config().await?;
 
     Ok(())
 }
 
-fn clear_disk_config() -> io::Result<()> {
+async fn clear_disk_config() -> io::Result<()> {
     let mut path = dirs_next::home_dir()
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found"))?;
 
@@ -207,5 +208,5 @@ fn clear_disk_config() -> io::Result<()> {
     path.push("node");
     path.push("node.config");
 
-    remove_file(path)
+    remove_file(path).await
 }

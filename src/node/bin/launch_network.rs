@@ -30,10 +30,11 @@
 use dirs_next::home_dir;
 use sn_launch_tool::run_with;
 use std::{
-    fs::{create_dir_all, remove_dir_all},
     path::PathBuf,
     process::{Command, Stdio},
 };
+use tokio::fs::{create_dir_all, remove_dir_all};
+
 use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
 
@@ -51,8 +52,10 @@ const NODE_COUNT: &str = "60";
 #[tokio::main]
 async fn main() -> Result<(), String> {
     let path = std::path::Path::new("nodes");
-    remove_dir_all(&path).unwrap_or(()); // Delete nodes directory if it exists;
-    create_dir_all(&path).expect("Cannot create nodes directory");
+    remove_dir_all(&path).await.unwrap_or(()); // Delete nodes directory if it exists;
+    create_dir_all(&path)
+        .await
+        .expect("Cannot create nodes directory");
 
     let args: Vec<&str> = vec!["build", "--release"];
     println!("Building current sn_node");
@@ -104,7 +107,7 @@ pub async fn run_network() -> Result<(), String> {
     let node_log_dir = base_log_dir.join(NODES_DIR);
     if !node_log_dir.exists() {
         debug!("Creating '{}' folder", node_log_dir.display());
-        create_dir_all(node_log_dir.clone()).map_err(|err| {
+        create_dir_all(node_log_dir.clone()).await.map_err(|err| {
             format!(
                 "Couldn't create target path to store nodes' generated data: {}",
                 err

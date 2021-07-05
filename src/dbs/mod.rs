@@ -15,15 +15,18 @@ pub use data_store::*;
 pub use errors::{Error, Result};
 pub use event_store::EventStore;
 use pickledb::{PickleDb, PickleDbDumpPolicy};
-use std::{fs, path::Path};
-
+use std::path::Path;
+use tokio::fs;
 ///
-pub fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(db_dir: D, db_name: N) -> Result<PickleDb> {
+pub async fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
+    db_dir: D,
+    db_name: N,
+) -> Result<PickleDb> {
     let db_path = db_dir.as_ref().join(db_name);
     match PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump) {
         Ok(db) => Ok(db),
         Err(_) => {
-            fs::create_dir_all(db_dir)?;
+            fs::create_dir_all(db_dir).await?;
             let mut db = PickleDb::new_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
 
             // dump is needed to actually write the db to disk.

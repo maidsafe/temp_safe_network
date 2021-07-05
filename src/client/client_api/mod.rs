@@ -79,7 +79,7 @@ impl Client {
             }
         };
 
-        let mut qp2p_config = Config::new(config_file_path, bootstrap_config).qp2p;
+        let mut qp2p_config = Config::new(config_file_path, bootstrap_config).await.qp2p;
         // We use feature `no-igd` so this will use the echo service only
         qp2p_config.forward_port = true;
 

@@ -9,11 +9,13 @@
 use super::{new_auto_dump_db, Error, Result, ToDbKey};
 use pickledb::PickleDb;
 use serde::{de::DeserializeOwned, Serialize};
+
 use std::{
     fmt::Debug,
     marker::PhantomData,
     path::{Path, PathBuf},
 };
+use tokio::fs;
 use xor_name::XorName;
 
 const DB_EXTENSION: &str = ".db";
@@ -30,8 +32,10 @@ pub struct DeletableStore {
 }
 
 impl DeletableStore {
-    pub fn delete(&self) -> Result<()> {
-        std::fs::remove_file(self.db_path.as_path()).map_err(Error::Io)
+    pub async fn delete(&self) -> Result<()> {
+        fs::remove_file(self.db_path.as_path())
+            .await
+            .map_err(Error::Io)
     }
 }
 
@@ -39,11 +43,11 @@ impl<'a, TEvent: Debug + Serialize + DeserializeOwned> EventStore<TEvent>
 where
     TEvent: 'a,
 {
-    pub fn new(id: XorName, db_dir: &Path) -> Result<Self> {
+    pub async fn new(id: XorName, db_dir: &Path) -> Result<Self> {
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         let db_path = db_dir.join(db_name.clone());
         Ok(Self {
-            db: new_auto_dump_db(db_dir, db_name)?,
+            db: new_auto_dump_db(db_dir, db_name).await?,
             db_path,
             _phantom: PhantomData::default(),
         })
@@ -102,13 +106,13 @@ mod test {
     use std::path::Path;
     use tempdir::TempDir;
 
-    #[test]
-    fn history() -> Result<()> {
+    #[tokio::test]
+    async fn history() -> Result<()> {
         let id = xor_name::XorName::random();
         let tmp_dir = TempDir::new("root")?;
         let db_dir = tmp_dir.into_path().join(Path::new(&"Token".to_string()));
 
-        let mut store = EventStore::new(id, db_dir.as_path())?;
+        let mut store = EventStore::new(id, db_dir.as_path()).await?;
 
         store.append(Token::from_nano(10))?;
 
