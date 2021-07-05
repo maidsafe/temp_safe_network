@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.2](https://github.com/maidsafe/safe_network/compare/v0.7.1...v0.7.2) (2021-07-05)
+
+
+### Bug Fixes
+
+* **routing:** forward client msgs when not for us ([1ce5920](https://github.com/maidsafe/safe_network/commit/1ce5920e4824d30690b6923ff17a2cc2109e3e2d))
+
 ### [0.7.1](https://github.com/maidsafe/safe_network/compare/v0.7.0...v0.7.1) (2021-07-03)
 
 
