@@ -32,7 +32,8 @@ mod errors;
 // Export public API.
 
 pub use client_api::Client;
-pub use errors::{Error, ErrorMessage};
+pub use errors::Error;
+pub use errors::ErrorMessage;
 pub use qp2p::Config as QuicP2pConfig;
 
 /// Client trait and related constants.

@@ -28,7 +28,7 @@ const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
 impl Session {
     /// Bootstrap to the network maintaining connections to several nodes.
-    pub async fn bootstrap(&mut self, client_pk: PublicKey) -> Result<(), Error> {
+    pub(crate) async fn bootstrap(&mut self, client_pk: PublicKey) -> Result<(), Error> {
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
             client_pk
@@ -107,7 +107,7 @@ impl Session {
     }
 
     /// Send a `ClientMsg` to the network without awaiting for a response.
-    pub async fn send_cmd(
+    pub(crate) async fn send_cmd(
         &self,
         cmd: Cmd,
         client_sig: ClientSig,
