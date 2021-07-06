@@ -8,16 +8,11 @@
 
 //! Implementation of the "Node" node for the SAFE Network.
 
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-    html_favicon_url = "https://maidsafe.net/img/favicon.ico",
-    test(attr(deny(warnings)))
-)]
 // For quick_error
 #![recursion_limit = "256"]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-    html_favicon_url = "https://maidsafe.net/img/favicon.ico",
+    html_favicon_url = "https://maidsafe.net/favicon.ico",
     test(attr(deny(warnings)))
 )]
 // Forbid some very bad patterns. Forbid is stronger than `deny`, preventing us from suppressing the
