@@ -97,24 +97,24 @@ jobs:
       
       - name: Client transfer tests against local network
         shell: bash
-        run: timeout 25m cargo test --release -- client_api::transfer && sleep 5
+        run: timeout 5m cargo test --release -- client_api::transfer && sleep 5
       
       - name: Client map tests against local network
         shell: bash
-        run: timeout 25m cargo test --release -- client_api::map && sleep 5
+        run: timeout 5m cargo test --release -- client_api::map && sleep 5
       
       - name: Client reg tests against local network
         shell: bash
-        run: timeout 25m cargo test --release -- client_api::reg && sleep 5
+        run: timeout 5m cargo test --release -- client_api::reg && sleep 5
       
       - name: Client sequence tests against local network
         shell: bash
-        run: timeout 25m cargo test --release -- client_api::seq && sleep 5
+        run: timeout 5m cargo test --release -- client_api::seq && sleep 5
       
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: any remaining tests client...
         shell: bash
-        run: timeout 25m cargo test --release client_api -- --skip client_api::seq --skip client_api::map --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
+        run: timeout 5m cargo test --release client_api -- --skip client_api::seq --skip client_api::map --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
       
 
 
