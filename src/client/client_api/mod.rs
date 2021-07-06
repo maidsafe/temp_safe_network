@@ -24,7 +24,7 @@ use std::{
     {collections::HashSet, net::SocketAddr, sync::Arc},
 };
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tokio::time::Duration;
 use tracing::{debug, info, trace};
 
@@ -38,7 +38,7 @@ pub struct Client {
     keypair: Keypair,
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
-    blob_cache: Arc<Mutex<LruCache<ChunkAddress, Chunk>>>,
+    blob_cache: Arc<RwLock<LruCache<ChunkAddress, Chunk>>>,
     pub(crate) query_timeout: Duration,
 }
 
@@ -101,7 +101,7 @@ impl Client {
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: Duration::from_secs(query_timeout),
-            blob_cache: Arc::new(Mutex::new(LruCache::new(BLOB_CACHE_CAP))),
+            blob_cache: Arc::new(RwLock::new(LruCache::new(BLOB_CACHE_CAP))),
         };
 
         Ok(client)
