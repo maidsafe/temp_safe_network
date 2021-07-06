@@ -17,13 +17,61 @@ env:
   SAFE_AUTH_PASSWORD: "y"
 
 jobs:
-  tests:
+  build-network: 
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust and required components
+      - uses: actions-rs/toolchain@v1
+        name: Install Rust & required components
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build launch local network
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      # Upload artifacts.
+      - uses: actions/upload-artifact@master
+        if: matrix.os != 'windows-latest'
+        with:
+          name: sn_node-${{ matrix.target }}
+          path: ./target/release/sn_node
+
+      # Upload artifacts.
+      - uses: actions/upload-artifact@master
+        if: matrix.os == 'windows-latest'
+        with:
+          name: sn_node-${{ matrix.target }}
+          path: ./target/release/sn_node.exe
+
+  tests:
+    needs: build-network
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: E2E tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
@@ -55,6 +103,12 @@ jobs:
       # - name: windows isntall ripgrep
       #   if: matrix.os == 'windows-latest'
       #   run: choco install ripgrep
+
+      # grab built network
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_node-x86_64-pc-windows-msvc-prod
+          path: artifacts/prod/x86_64-pc-windows-msvc/release
 
       # Cache.
       - name: Cargo cache registry, index and build
