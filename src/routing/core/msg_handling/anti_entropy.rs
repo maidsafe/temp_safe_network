@@ -17,13 +17,14 @@ use crate::routing::{
     network::NetworkUtils,
     node::Node,
     routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
+    section::SectionUtils,
+    SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::{cmp::Ordering, net::SocketAddr};
 
 impl Core {
-    pub async fn check_for_entropy(
+    pub(crate) async fn check_for_entropy(
         &self,
         node_msg: &NodeMsg,
         msg_authority: &NodeMsgAuthority,

@@ -13,8 +13,8 @@ use crate::messaging::{
 use crate::routing::{
     dkg::session::{Backlog, Session},
     ed25519::{self, Keypair},
-    section::{ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionKeyShare},
-    supermajority,
+    section::{ElderCandidatesUtils, SectionKeyShare},
+    supermajority, SectionAuthorityProviderUtils,
 };
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use std::collections::{BTreeSet, HashMap};
@@ -58,7 +58,7 @@ impl Default for DkgVoter {
 
 impl DkgVoter {
     // Starts a new DKG session.
-    pub fn start(
+    pub(crate) fn start(
         &mut self,
         keypair: &Keypair,
         dkg_key: DkgKey,
@@ -141,7 +141,11 @@ impl DkgVoter {
     }
 
     // Make key generator progress with timed phase.
-    pub fn handle_timeout(&mut self, keypair: &Keypair, timer_token: u64) -> Vec<DkgCommand> {
+    pub(crate) fn handle_timeout(
+        &mut self,
+        keypair: &Keypair,
+        timer_token: u64,
+    ) -> Vec<DkgCommand> {
         if let Some((dkg_key, session)) = self
             .sessions
             .iter_mut()
@@ -154,7 +158,7 @@ impl DkgVoter {
     }
 
     // Handle a received DkgMessage.
-    pub fn process_message(
+    pub(crate) fn process_message(
         &mut self,
         keypair: &Keypair,
         dkg_key: &DkgKey,
@@ -168,7 +172,7 @@ impl DkgVoter {
         }
     }
 
-    pub fn process_failure(
+    pub(crate) fn process_failure(
         &mut self,
         dkg_key: &DkgKey,
         failed_participants: &BTreeSet<XorName>,

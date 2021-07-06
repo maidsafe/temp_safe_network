@@ -30,8 +30,8 @@ use crate::routing::{
     network::NetworkUtils,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
-    Event, MessageReceived,
+    section::SectionUtils,
+    Event, MessageReceived, SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;

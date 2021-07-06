@@ -14,8 +14,7 @@ use self::stats::NetworkStats;
 use crate::routing::{
     dkg::{verify_sig, KeyedSig, SectionSignedUtils},
     peer::PeerUtils,
-    section::SectionAuthorityProviderUtils,
-    Error, Result,
+    Error, Result, SectionAuthorityProviderUtils,
 };
 
 use crate::messaging::{
@@ -26,7 +25,7 @@ use secured_linked_list::SecuredLinkedList;
 use std::iter;
 use xor_name::{Prefix, XorName};
 
-pub trait NetworkUtils {
+pub(super) trait NetworkUtils {
     fn new() -> Self;
 
     fn closest(&self, name: &XorName) -> Option<&SectionAuthorityProvider>;
@@ -266,7 +265,7 @@ impl NetworkUtils for Network {
     }
 }
 
-pub trait OtherSectionUtils {
+pub(super) trait OtherSectionUtils {
     fn verify(&self, section_chain: &SecuredLinkedList) -> bool;
 
     fn self_verify(&self) -> bool;

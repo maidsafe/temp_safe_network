@@ -23,19 +23,24 @@
 // ############################################################################
 // Public API
 // ############################################################################
+pub use self::error::AggregatorError;
+pub use self::error::ProposalError;
 pub use self::{
     cache::Cache,
     error::{Error, Result},
     peer::PeerUtils,
     routing_api::{
-        Config, Elders, Event, EventStream, MessageReceived, NodeElderChange, Routing, SendStream,
+        config::Config,
+        event::{Elders, Event, MessageReceived, NodeElderChange},
+        event_stream::EventStream,
+        Routing,
     },
     section::{
-        SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
-        MIN_AGE,
+        node_state::{FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE},
+        section_authority_provider::SectionAuthorityProviderUtils,
     },
 };
-pub use qp2p::Config as TransportConfig;
+pub use qp2p::{Config as TransportConfig, SendStream};
 
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 

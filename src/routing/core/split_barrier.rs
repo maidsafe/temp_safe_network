@@ -19,7 +19,7 @@ type Entry = (SectionSigned<SectionAuthorityProvider>, KeyedSig);
 pub(crate) struct SplitBarrier(Vec<Entry>);
 
 impl SplitBarrier {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self(Vec::new())
     }
 
@@ -29,7 +29,7 @@ impl SplitBarrier {
     //
     // Note: in case of a fork, it can return more than two proposals. In that case one of the
     // proposals will be for one subsection and all the others for the other subsection.
-    pub fn process(
+    pub(crate) fn process(
         &mut self,
         our_prefix: &Prefix,
         section_auth: SectionSigned<SectionAuthorityProvider>,

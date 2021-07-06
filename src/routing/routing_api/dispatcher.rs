@@ -30,7 +30,7 @@ use tokio::{
 use tracing::Instrument;
 
 // `Command` Dispatcher.
-pub(crate) struct Dispatcher {
+pub(super) struct Dispatcher {
     pub(super) core: RwLock<Core>,
 
     cancel_timer_tx: watch::Sender<bool>,
@@ -38,7 +38,7 @@ pub(crate) struct Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(core: Core) -> Self {
+    pub(super) fn new(core: Core) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         Self {
             core: RwLock::new(core),
@@ -49,14 +49,14 @@ impl Dispatcher {
 
     // Terminate this routing instance - cancel all scheduled timers including any future ones,
     // close all network connections and stop accepting new connections.
-    pub async fn terminate(&self) {
+    pub(super) async fn terminate(&self) {
         let _ = self.cancel_timer_tx.send(true);
         self.core.read().await.comm.terminate().await;
     }
 
     /// Handles the given command and transitively any new commands that are produced during its
     /// handling.
-    pub async fn handle_commands(self: Arc<Self>, command: Command) -> Result<()> {
+    pub(super) async fn handle_commands(self: Arc<Self>, command: Command) -> Result<()> {
         let commands = self.handle_command(command).await?;
         for command in commands {
             self.clone().spawn_handle_commands(command)
@@ -72,7 +72,7 @@ impl Dispatcher {
     }
 
     /// Handles a single command.
-    pub async fn handle_command(&self, command: Command) -> Result<Vec<Command>> {
+    pub(super) async fn handle_command(&self, command: Command) -> Result<Vec<Command>> {
         // Create a tracing span containing info about the current node. This is very useful when
         // analyzing logs produced by running multiple nodes within the same process, for example
         // from integration tests.

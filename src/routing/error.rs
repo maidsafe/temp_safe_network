@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::routing::dkg::ProposalError;
+pub use crate::routing::core::AggregatorError;
+pub use crate::routing::dkg::proposal::ProposalError;
 use qp2p::Error as Qp2pError;
 use secured_linked_list::error::Error as SecuredLinkedListError;
 use std::net::SocketAddr;

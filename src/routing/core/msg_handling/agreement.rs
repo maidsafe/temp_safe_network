@@ -18,10 +18,8 @@ use crate::routing::{
     network::NetworkUtils,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{
-        ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils,
-    },
-    Event, MIN_AGE,
+    section::{ElderCandidatesUtils, SectionPeersUtils, SectionUtils},
+    Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
 use xor_name::XorName;
 

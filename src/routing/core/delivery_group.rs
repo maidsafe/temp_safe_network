@@ -14,8 +14,8 @@ use crate::routing::{
     error::{Error, Result},
     network::NetworkUtils,
     peer::PeerUtils,
-    section::{SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
-    supermajority, ELDER_SIZE,
+    section::{SectionPeersUtils, SectionUtils},
+    supermajority, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use itertools::Itertools;
 use std::{cmp, iter};
@@ -167,8 +167,9 @@ mod tests {
         ed25519,
         section::{
             test_utils::{gen_addr, gen_section_authority_provider},
-            NodeStateUtils, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
+            NodeStateUtils,
         },
+        SectionAuthorityProviderUtils, MIN_ADULT_AGE,
     };
     use anyhow::{Context, Result};
     use rand::seq::IteratorRandom;

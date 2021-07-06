@@ -21,8 +21,8 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
-    FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+    section::SectionUtils,
+    SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
@@ -465,12 +465,9 @@ mod tests {
     use super::*;
     use crate::messaging::{node::NodeState, SectionAuthorityProvider};
     use crate::routing::{
-        dkg::test_utils::*,
-        error::Error as RoutingError,
-        messages::WireMsgUtils,
-        section::test_utils::*,
-        section::{NodeStateUtils, SectionAuthorityProviderUtils},
-        ELDER_SIZE, MIN_ADULT_AGE, MIN_AGE,
+        dkg::test_utils::*, error::Error as RoutingError, messages::WireMsgUtils,
+        section::test_utils::*, section::NodeStateUtils, SectionAuthorityProviderUtils, ELDER_SIZE,
+        MIN_ADULT_AGE, MIN_AGE,
     };
     use anyhow::{anyhow, Error, Result};
     use assert_matches::assert_matches;

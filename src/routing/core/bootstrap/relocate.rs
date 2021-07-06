@@ -22,7 +22,8 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
+    section::SectionUtils,
+    SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
@@ -43,7 +44,7 @@ pub(crate) struct JoiningAsRelocated {
 }
 
 impl JoiningAsRelocated {
-    pub fn new(
+    pub(crate) fn new(
         node: Node,
         genesis_key: BlsPublicKey,
         relocate_details: RelocateDetails,
@@ -66,7 +67,7 @@ impl JoiningAsRelocated {
 
     // Generates the first command to send a `JoinAsRelocatedRequest`, responses
     // shall be fed back with `handle_join_response` function.
-    pub fn start(&mut self, bootstrap_addrs: Vec<SocketAddr>) -> Result<Command> {
+    pub(crate) fn start(&mut self, bootstrap_addrs: Vec<SocketAddr>) -> Result<Command> {
         let dst_xorname = self.relocate_details.dst;
         let recipients: Vec<(XorName, SocketAddr)> = bootstrap_addrs
             .iter()
@@ -87,7 +88,7 @@ impl JoiningAsRelocated {
     // - `Redirect`: repeat join request with the new set of addresses.
     // - `Approval`: returns the `Section` to use by this node, completing the relocation.
     // - `NodeNotReachable`: returns an error, completing the relocation attempt.
-    pub async fn handle_join_response(
+    pub(crate) async fn handle_join_response(
         &mut self,
         join_response: JoinAsRelocatedResponse,
         sender: SocketAddr,

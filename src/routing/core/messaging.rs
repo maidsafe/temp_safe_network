@@ -22,7 +22,8 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionKeyShare, SectionUtils},
+    section::{ElderCandidatesUtils, SectionKeyShare, SectionUtils},
+    SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::{net::SocketAddr, slice};

@@ -15,7 +15,7 @@ use crate::routing::{
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 
-pub trait ProposalUtils {
+pub(crate) trait ProposalUtils {
     fn prove(
         &self,
         public_key_set: bls::PublicKeySet,
@@ -48,7 +48,7 @@ impl ProposalUtils for Proposal {
 }
 
 // View of a `Proposal` that can be serialized for the purpose of signing.
-pub struct SignableView<'a>(pub &'a Proposal);
+pub(crate) struct SignableView<'a>(pub(crate) &'a Proposal);
 
 impl<'a> Serialize for SignableView<'a> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -67,7 +67,7 @@ impl<'a> Serialize for SignableView<'a> {
 pub(crate) struct ProposalAggregator(SignatureAggregator);
 
 impl ProposalAggregator {
-    pub fn add(
+    pub(crate) fn add(
         &mut self,
         proposal: Proposal,
         sig_share: SigShare,
@@ -79,10 +79,16 @@ impl ProposalAggregator {
     }
 }
 
+/// Errors that can occur when handling DKG proposals.
 #[derive(Debug, Error)]
 pub enum ProposalError {
+    /// The proposal could not be aggregated due to some semantic error.
     #[error("failed to aggregate signature shares: {0}")]
     Aggregation(#[from] AggregatorError),
+
+    /// The proposal could not be serialized.
+    ///
+    /// Note that this would likely represent a bug in the proposal serialization logic.
     #[error("invalid proposal")]
     Invalid,
 }

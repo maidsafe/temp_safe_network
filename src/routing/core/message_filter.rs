@@ -17,7 +17,7 @@ const MAX_ENTRIES: usize = 15_000;
 
 /// An enum representing a result of message filtering
 #[derive(Eq, PartialEq)]
-pub enum FilteringResult {
+pub(crate) enum FilteringResult {
     /// We don't have the message in the filter yet
     NewMessage,
     /// We have the message in the filter
@@ -25,7 +25,7 @@ pub enum FilteringResult {
 }
 
 impl FilteringResult {
-    pub fn is_new(&self) -> bool {
+    pub(crate) fn is_new(&self) -> bool {
         match self {
             Self::NewMessage => true,
             Self::KnownMessage => false,
@@ -40,7 +40,7 @@ pub(crate) struct MessageFilter {
 }
 
 impl MessageFilter {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             incoming: Cache::with_expiry_duration_and_capacity(
                 INCOMING_EXPIRY_DURATION,
@@ -56,7 +56,11 @@ impl MessageFilter {
     // Filter outgoing `SNRoutingMessage`. Return whether this specific message has been seen recently
     // (and thus should not be sent, due to deduplication).
     //
-    pub async fn filter_outgoing(&self, wire_msg: &WireMsg, pub_id: &XorName) -> FilteringResult {
+    pub(crate) async fn filter_outgoing(
+        &self,
+        wire_msg: &WireMsg,
+        pub_id: &XorName,
+    ) -> FilteringResult {
         // Not filtering direct messages.
         if let DstLocation::DirectAndUnrouted(_) = wire_msg.dst_location() {
             return FilteringResult::NewMessage;
@@ -76,7 +80,7 @@ impl MessageFilter {
     }
 
     // Returns `true` if not already having it.
-    pub async fn add_to_filter(&self, msg_id: MessageId) -> bool {
+    pub(crate) async fn add_to_filter(&self, msg_id: MessageId) -> bool {
         let cur_value = self.incoming.set(msg_id, (), None).await;
 
         if cur_value.is_some() {
@@ -87,7 +91,7 @@ impl MessageFilter {
     }
 
     // Resets both incoming and outgoing filters.
-    pub async fn reset(&mut self) {
+    pub(crate) async fn reset(&mut self) {
         self.incoming.clear().await;
         self.outgoing.clear().await;
     }

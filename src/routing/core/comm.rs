@@ -34,7 +34,7 @@ pub(crate) struct Comm {
 }
 
 impl Comm {
-    pub async fn new(
+    pub(crate) async fn new(
         transport_config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> Result<Self> {
@@ -67,7 +67,7 @@ impl Comm {
         })
     }
 
-    pub async fn async_clone(&self) -> Self {
+    pub(crate) async fn async_clone(&self) -> Self {
         Self {
             quic_p2p: self.quic_p2p.clone(),
             endpoint: self.endpoint.clone(),
@@ -75,7 +75,7 @@ impl Comm {
         }
     }
 
-    pub async fn bootstrap(
+    pub(crate) async fn bootstrap(
         transport_config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> Result<(Self, SocketAddr)> {
@@ -111,17 +111,17 @@ impl Comm {
     }
 
     // Close all existing connections and stop accepting new ones.
-    pub async fn terminate(&self) {
+    pub(crate) async fn terminate(&self) {
         self.endpoint.close();
         let _ = self.event_tx.write().await.take();
     }
 
-    pub fn our_connection_info(&self) -> SocketAddr {
+    pub(crate) fn our_connection_info(&self) -> SocketAddr {
         self.endpoint.socket_addr()
     }
 
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
-    pub async fn send_on_existing_connection(
+    pub(crate) async fn send_on_existing_connection(
         &self,
         recipients: &[(XorName, SocketAddr)],
         mut wire_msg: WireMsg,
@@ -146,7 +146,7 @@ impl Comm {
     }
 
     /// Tests whether the peer is reachable.
-    pub async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
+    pub(crate) async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
         let qp2p_config = qp2p::Config {
             local_ip: Some(self.endpoint.local_addr().ip()),
             local_port: Some(0),
@@ -184,7 +184,7 @@ impl Comm {
     /// `SendStatus::MinDeliveryGroupSizeReached` or `SendStatus::MinDeliveryGroupSizeFailed` depending
     /// on if the minimum delivery group size is met or not. The failed recipients are sent along
     /// with the status. It returns a `SendStatus::AllRecipients` if message is sent to all the recipients.
-    pub async fn send(
+    pub(crate) async fn send(
         &self,
         recipients: &[(XorName, SocketAddr)],
         delivery_group_size: usize,
@@ -334,7 +334,7 @@ async fn handle_incoming_messages(
 
 /// Returns the status of the send operation.
 #[derive(Debug, Clone)]
-pub enum SendStatus {
+pub(crate) enum SendStatus {
     AllRecipients,
     MinDeliveryGroupSizeReached(Vec<SocketAddr>),
     MinDeliveryGroupSizeFailed(Vec<SocketAddr>),

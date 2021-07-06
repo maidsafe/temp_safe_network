@@ -20,22 +20,26 @@ pub(crate) struct EndUserRegistry {
 }
 
 impl EndUserRegistry {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             clients: BTreeMap::default(),
             socket_id_mapping: BTreeMap::default(),
         }
     }
 
-    pub fn get_enduser_by_addr(&self, socketaddr: &SocketAddr) -> Option<&EndUser> {
+    pub(crate) fn get_enduser_by_addr(&self, socketaddr: &SocketAddr) -> Option<&EndUser> {
         self.clients.get(socketaddr)
     }
 
-    pub fn get_socket_addr(&self, socket_id: SocketId) -> Option<&SocketAddr> {
+    pub(crate) fn get_socket_addr(&self, socket_id: SocketId) -> Option<&SocketAddr> {
         self.socket_id_mapping.get(&socket_id)
     }
 
-    pub fn try_add(&mut self, sender: SocketAddr, section_prefix: &Prefix) -> Result<EndUser> {
+    pub(crate) fn try_add(
+        &mut self,
+        sender: SocketAddr,
+        section_prefix: &Prefix,
+    ) -> Result<EndUser> {
         // create a unique socket id from client socket addr
         let socket_id = XorName::from_content(&[
             &bincode::serialize(&sender).map_err(|_| Error::FailedSignature)?

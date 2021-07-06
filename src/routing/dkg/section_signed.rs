@@ -11,7 +11,7 @@ use crate::messaging::node::SectionSigned;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 
-pub trait SectionSignedUtils<T: Serialize> {
+pub(crate) trait SectionSignedUtils<T: Serialize> {
     fn new(value: T, sig: KeyedSig) -> Self;
 
     fn verify(&self, section_chain: &SecuredLinkedList) -> bool;

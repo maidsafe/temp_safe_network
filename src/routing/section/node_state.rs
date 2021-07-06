@@ -25,7 +25,7 @@ pub const FIRST_SECTION_MIN_AGE: u8 = MIN_ADULT_AGE + 1;
 pub const FIRST_SECTION_MAX_AGE: u8 = 100;
 
 /// Information about a member of our section.
-pub trait NodeStateUtils {
+pub(crate) trait NodeStateUtils {
     // Creates a `NodeState` in the `Joined` state.
     fn joined(peer: Peer) -> NodeState;
 

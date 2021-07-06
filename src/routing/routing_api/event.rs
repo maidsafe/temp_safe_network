@@ -13,7 +13,6 @@ use crate::messaging::{
 };
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Keypair;
-pub use qp2p::{RecvStream, SendStream};
 use std::{
     collections::BTreeSet,
     fmt::{self, Debug, Formatter},

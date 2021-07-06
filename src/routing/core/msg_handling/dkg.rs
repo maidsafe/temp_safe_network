@@ -15,7 +15,8 @@ use crate::routing::{
     dkg::{commands::DkgCommands, DkgFailureSigSetUtils},
     error::{Error, Result},
     routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionPeersUtils, SectionUtils},
+    section::{SectionKeyShare, SectionPeersUtils, SectionUtils},
+    SectionAuthorityProviderUtils,
 };
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use std::{collections::BTreeSet, slice};

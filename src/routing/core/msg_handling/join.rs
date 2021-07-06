@@ -19,10 +19,8 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    section::{
-        SectionPeersUtils, SectionUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
-        MIN_ADULT_AGE,
-    },
+    section::{SectionPeersUtils, SectionUtils},
+    FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
 use bls::PublicKey as BlsPublicKey;
 
