@@ -8,33 +8,31 @@
 
 //! Cryptographic primitives.
 
-pub use ed25519_dalek::{
-    Keypair, PublicKey, SecretKey, Signature, Verifier, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
-};
+pub(super) use ed25519_dalek::{Keypair, PublicKey, Signature, Verifier};
 
 use ed25519_dalek::ExpandedSecretKey;
 use std::ops::RangeInclusive;
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// SHA3-256 hash digest.
-pub type Digest256 = [u8; 32];
+pub(super) type Digest256 = [u8; 32];
 
-pub fn sign(msg: &[u8], keypair: &Keypair) -> Signature {
+pub(super) fn sign(msg: &[u8], keypair: &Keypair) -> Signature {
     let expanded_secret_key = ExpandedSecretKey::from(&keypair.secret);
     expanded_secret_key.sign(msg, &keypair.public)
 }
 
-pub fn pub_key(name: &XorName) -> Result<PublicKey, ed25519_dalek::SignatureError> {
+pub(super) fn pub_key(name: &XorName) -> Result<PublicKey, ed25519_dalek::SignatureError> {
     PublicKey::from_bytes(&name.0)
 }
 
-pub fn name(public_key: &PublicKey) -> XorName {
+pub(super) fn name(public_key: &PublicKey) -> XorName {
     XorName(public_key.to_bytes())
 }
 
 #[cfg(test)]
 /// Construct a random `XorName` whose last byte represents the targeted age.
-pub fn gen_name_with_age(age: u8) -> XorName {
+pub(super) fn gen_name_with_age(age: u8) -> XorName {
     loop {
         let name = XorName::random();
         if age == name[XOR_NAME_LEN - 1] {
@@ -45,7 +43,7 @@ pub fn gen_name_with_age(age: u8) -> XorName {
 
 /// Construct a `Keypair` whose name is in the interval [start, end] (both endpoints inclusive).
 /// And the last byte equals to the targeted age.
-pub fn gen_keypair(range: &RangeInclusive<XorName>, age: u8) -> Keypair {
+pub(super) fn gen_keypair(range: &RangeInclusive<XorName>, age: u8) -> Keypair {
     let mut rng = rand::thread_rng();
 
     loop {
@@ -60,7 +58,7 @@ pub fn gen_keypair(range: &RangeInclusive<XorName>, age: u8) -> Keypair {
 #[cfg(test)]
 pub(crate) mod test_utils {
     use super::*;
-    use ed25519_dalek::SECRET_KEY_LENGTH;
+    use ed25519_dalek::{SecretKey, SECRET_KEY_LENGTH};
     use proptest::prelude::*;
 
     pub(crate) fn arbitrary_keypair() -> impl Strategy<Value = Keypair> {

@@ -8,7 +8,7 @@
 
 mod msg_authority;
 
-pub use self::msg_authority::NodeMsgAuthorityUtils;
+pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
     node::{NodeMsg, SigShare},
     BlsShareSigned, ClientSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority, NodeSigned,
@@ -25,7 +25,7 @@ use bytes::Bytes;
 use xor_name::XorName;
 
 // Utilities for WireMsg.
-pub trait WireMsgUtils {
+pub(crate) trait WireMsgUtils {
     /// Verify this message is properly signed.
     fn check_signature(&self) -> Result<()>;
 

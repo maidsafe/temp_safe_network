@@ -60,7 +60,7 @@ pub(crate) fn actions(
 
 /// Details of a relocation: which node to relocate, where to relocate it to and what age it should
 /// get once relocated.
-pub trait RelocateDetailsUtils {
+pub(super) trait RelocateDetailsUtils {
     fn new(section: &Section, network: &Network, peer: &Peer, dst: XorName) -> Self;
 
     fn with_age(
@@ -97,7 +97,7 @@ impl RelocateDetailsUtils for RelocateDetails {
     }
 }
 
-pub trait RelocatePayloadUtils {
+pub(super) trait RelocatePayloadUtils {
     fn new(
         details: NodeMsg,
         section_signed: SectionSigned,
@@ -174,7 +174,12 @@ pub(crate) enum RelocateAction {
 }
 
 impl RelocateAction {
-    pub fn new(section: &Section, network: &Network, peer: &Peer, churn_name: &XorName) -> Self {
+    pub(crate) fn new(
+        section: &Section,
+        network: &Network,
+        peer: &Peer,
+        churn_name: &XorName,
+    ) -> Self {
         let dst = dst(peer.name(), churn_name);
 
         if section.is_elder(peer.name()) {
@@ -187,7 +192,7 @@ impl RelocateAction {
         }
     }
 
-    pub fn dst(&self) -> &XorName {
+    pub(crate) fn dst(&self) -> &XorName {
         match self {
             Self::Instant(details) => &details.dst,
             Self::Delayed(promise) => &promise.dst,
@@ -195,7 +200,7 @@ impl RelocateAction {
     }
 
     #[cfg(test)]
-    pub fn name(&self) -> &XorName {
+    pub(crate) fn name(&self) -> &XorName {
         match self {
             Self::Instant(details) => &details.pub_id,
             Self::Delayed(promise) => &promise.name,
@@ -238,10 +243,8 @@ mod tests {
     use super::*;
     use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
-        dkg::test_utils::section_signed,
-        peer::test_utils::arbitrary_unique_peers,
-        routing_api::tests::SecretKeySet,
-        section::{NodeStateUtils, SectionAuthorityProviderUtils},
+        dkg::test_utils::section_signed, peer::test_utils::arbitrary_unique_peers,
+        routing_api::tests::SecretKeySet, section::NodeStateUtils, SectionAuthorityProviderUtils,
         ELDER_SIZE, MIN_AGE,
     };
     use anyhow::Result;

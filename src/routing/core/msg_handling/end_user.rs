@@ -12,10 +12,8 @@ use crate::messaging::{
     WireMsg,
 };
 use crate::routing::{
-    error::Result,
-    messages::WireMsgUtils,
-    routing_api::{command::Command, Event},
-    section::{SectionAuthorityProviderUtils, SectionUtils},
+    error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
+    Event, SectionAuthorityProviderUtils,
 };
 use bytes::Bytes;
 use std::net::SocketAddr;

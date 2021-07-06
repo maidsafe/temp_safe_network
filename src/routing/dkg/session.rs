@@ -17,7 +17,8 @@ use crate::routing::{
     },
     ed25519::{self, Keypair},
     routing_api::command,
-    section::{SectionAuthorityProviderUtils, SectionKeyShare},
+    section::SectionKeyShare,
+    SectionAuthorityProviderUtils,
 };
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use itertools::Itertools;
@@ -295,7 +296,7 @@ impl Backlog {
         Self(VecDeque::with_capacity(BACKLOG_CAPACITY))
     }
 
-    pub fn push(&mut self, dkg_key: DkgKey, message: DkgMessage) {
+    pub(crate) fn push(&mut self, dkg_key: DkgKey, message: DkgMessage) {
         if self.0.len() == self.0.capacity() {
             let _ = self.0.pop_front();
         }

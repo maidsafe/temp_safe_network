@@ -28,7 +28,11 @@ use xor_name::{Prefix, XorName};
 
 impl Core {
     // Creates `Core` for the first node in the network
-    pub fn first_node(comm: Comm, mut node: Node, event_tx: mpsc::Sender<Event>) -> Result<Self> {
+    pub(crate) fn first_node(
+        comm: Comm,
+        mut node: Node,
+        event_tx: mpsc::Sender<Event>,
+    ) -> Result<Self> {
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
 
@@ -42,7 +46,7 @@ impl Core {
         ))
     }
 
-    pub async fn relocated(&self, new_node: Node, new_section: Section) -> Self {
+    pub(crate) async fn relocated(&self, new_node: Node, new_section: Section) -> Self {
         Self::new(
             self.comm.async_clone().await,
             new_node,
@@ -52,51 +56,51 @@ impl Core {
         )
     }
 
-    pub fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<&EndUser> {
+    pub(crate) fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<&EndUser> {
         self.end_users.get_enduser_by_addr(sender)
     }
 
-    pub fn get_socket_addr(&self, id: SocketId) -> Option<&SocketAddr> {
+    pub(crate) fn get_socket_addr(&self, id: SocketId) -> Option<&SocketAddr> {
         self.end_users.get_socket_addr(id)
     }
 
-    pub fn try_add_enduser(&mut self, sender: SocketAddr) -> Result<EndUser> {
+    pub(crate) fn try_add_enduser(&mut self, sender: SocketAddr) -> Result<EndUser> {
         let section_prefix = self.section.prefix();
         self.end_users.try_add(sender, section_prefix)
     }
 
-    pub fn node(&self) -> &Node {
+    pub(crate) fn node(&self) -> &Node {
         &self.node
     }
 
-    pub fn section(&self) -> &Section {
+    pub(crate) fn section(&self) -> &Section {
         &self.section
     }
 
-    pub fn section_chain(&self) -> &SecuredLinkedList {
+    pub(crate) fn section_chain(&self) -> &SecuredLinkedList {
         self.section.chain()
     }
 
-    pub fn network(&self) -> &Network {
+    pub(crate) fn network(&self) -> &Network {
         &self.network
     }
 
     /// Is this node an elder?
-    pub fn is_elder(&self) -> bool {
+    pub(crate) fn is_elder(&self) -> bool {
         self.section.is_elder(&self.node.name())
     }
 
-    pub fn is_not_elder(&self) -> bool {
+    pub(crate) fn is_not_elder(&self) -> bool {
         !self.is_elder()
     }
 
     /// Returns connection info of this node.
-    pub fn our_connection_info(&self) -> SocketAddr {
+    pub(crate) fn our_connection_info(&self) -> SocketAddr {
         self.comm.our_connection_info()
     }
 
     /// Tries to sign with the secret corresponding to the provided BLS public key
-    pub fn sign_with_section_key_share(
+    pub(crate) fn sign_with_section_key_share(
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
@@ -105,7 +109,7 @@ impl Core {
     }
 
     /// Returns the current BLS public key set
-    pub fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+    pub(crate) fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         Ok(self
             .section_keys_provider
             .key_share()?
@@ -114,7 +118,7 @@ impl Core {
     }
 
     /// Returns the latest known public key of the section with `prefix`.
-    pub fn section_key(&self, prefix: &Prefix) -> Option<bls::PublicKey> {
+    pub(crate) fn section_key(&self, prefix: &Prefix) -> Option<bls::PublicKey> {
         if prefix == self.section.prefix() || prefix.is_extension_of(self.section.prefix()) {
             Some(*self.section.chain().last_key())
         } else {
@@ -132,7 +136,7 @@ impl Core {
     }
 
     /// Returns the info about the section matching the name.
-    pub fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
+    pub(crate) fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         if self.section.prefix().matches(name) {
             Ok(self.section.authority_provider().clone())
         } else {
@@ -142,17 +146,17 @@ impl Core {
 
     /// Returns our index in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
-    pub fn our_index(&self) -> Result<usize> {
+    pub(crate) fn our_index(&self) -> Result<usize> {
         Ok(self.section_keys_provider.key_share()?.index)
     }
 
     /// Returns our key share in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
-    pub fn key_share(&self) -> Result<&SectionKeyShare> {
+    pub(crate) fn key_share(&self) -> Result<&SectionKeyShare> {
         self.section_keys_provider.key_share()
     }
 
-    pub async fn send_event(&self, event: Event) {
+    pub(crate) async fn send_event(&self, event: Event) {
         // Note: cloning the sender to avoid mutable access. Should have negligible cost.
         if self.event_tx.clone().send(event).await.is_err() {
             error!("Event receiver has been closed");
@@ -169,12 +173,12 @@ impl Core {
             .into_commands(&self.node, *self.section_chain().last_key())
     }
 
-    pub async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
+    pub(crate) async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
         self.msg_filter.add_to_filter(wire_msg.msg_id()).await
     }
 
     // Send message over the network.
-    pub async fn relay_message(&self, mut wire_msg: WireMsg) -> Result<Option<Command>> {
+    pub(crate) async fn relay_message(&self, mut wire_msg: WireMsg) -> Result<Option<Command>> {
         let dst_location = wire_msg.dst_location();
         let (presumed_targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
@@ -222,7 +226,7 @@ impl Core {
     }
 
     // Setting the JoinsAllowed triggers a round Proposal::SetJoinsAllowed to update the flag.
-    pub fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
+    pub(crate) fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();
         if self.is_elder() && joins_allowed != self.joins_allowed {
             let active_members: Vec<XorName> = self
@@ -248,7 +252,7 @@ impl Core {
         Ok(commands)
     }
 
-    pub async fn make_online_proposal(
+    pub(crate) async fn make_online_proposal(
         &self,
         peer: Peer,
         previous_name: Option<XorName>,

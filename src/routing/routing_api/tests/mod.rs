@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#![allow(dead_code, unused_imports)]
+
 use super::{Comm, Command, Core, Dispatcher};
 use crate::messaging::{
     node::{
@@ -30,11 +32,11 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::{self, RelocatePayloadUtils},
     section::{
-        test_utils::*, ElderCandidatesUtils, NodeStateUtils, SectionAuthorityProviderUtils,
-        SectionKeyShare, SectionPeersUtils, SectionUtils, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
-        MIN_AGE,
+        test_utils::*, ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionPeersUtils,
+        SectionUtils,
     },
-    supermajority, Event, ELDER_SIZE,
+    supermajority, Event, SectionAuthorityProviderUtils, ELDER_SIZE, FIRST_SECTION_MIN_AGE,
+    MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
 use anyhow::{anyhow, Result};
@@ -1900,7 +1902,7 @@ pub(crate) struct SecretKeySet {
 }
 
 impl SecretKeySet {
-    pub fn random() -> Self {
+    pub(crate) fn random() -> Self {
         let poly = bls::poly::Poly::random(THRESHOLD, &mut rand::thread_rng());
         let key = bls::SecretKey::from_mut(&mut poly.evaluate(0));
         let set = bls::SecretKeySet::from(poly);
@@ -1908,7 +1910,7 @@ impl SecretKeySet {
         Self { set, key }
     }
 
-    pub fn secret_key(&self) -> &bls::SecretKey {
+    pub(crate) fn secret_key(&self) -> &bls::SecretKey {
         &self.key
     }
 }

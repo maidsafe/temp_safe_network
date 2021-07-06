@@ -20,7 +20,8 @@ mod split_barrier;
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
-pub(crate) use signature_aggregator::{Error as AggregatorError, SignatureAggregator};
+pub use signature_aggregator::Error as AggregatorError;
+pub(crate) use signature_aggregator::SignatureAggregator;
 
 use self::{
     enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
@@ -37,8 +38,8 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionKeysProvider, SectionUtils},
-    Elders, Event, NodeElderChange,
+    section::{SectionKeyShare, SectionKeysProvider, SectionUtils},
+    Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
 use itertools::Itertools;
 use resource_proof::ResourceProof;
@@ -47,8 +48,8 @@ use std::collections::BTreeSet;
 use tokio::sync::mpsc;
 use xor_name::{Prefix, XorName};
 
-pub const RESOURCE_PROOF_DATA_SIZE: usize = 64;
-pub const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
+pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
+pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
 const KEY_CACHE_SIZE: u8 = 5;
 
 // State + logic of a routing node.
@@ -73,7 +74,7 @@ pub(crate) struct Core {
 
 impl Core {
     // Creates `Core` for a regular node.
-    pub fn new(
+    pub(crate) fn new(
         comm: Comm,
         mut node: Node,
         section: Section,

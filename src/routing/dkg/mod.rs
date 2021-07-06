@@ -8,11 +8,11 @@
 
 pub(crate) mod commands;
 mod dkg_msgs_utils;
-mod proposal;
+pub(super) mod proposal;
 mod section_signed;
 mod session;
 #[cfg(test)]
-pub mod test_utils;
+pub(crate) mod test_utils;
 mod voter;
 
 pub(crate) use self::{
@@ -21,7 +21,7 @@ pub(crate) use self::{
     voter::DkgVoter,
 };
 pub(crate) use crate::messaging::node::{KeyedSig, SigShare};
-pub use section_signed::SectionSignedUtils;
+pub(super) use section_signed::SectionSignedUtils;
 use serde::Serialize;
 
 // Verify the integrity of `message` against `sig`.

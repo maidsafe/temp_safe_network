@@ -33,19 +33,19 @@ type Digest256 = [u8; 32];
 /// otherwise lead to invalid signature to be produced even though all the shares are valid.
 ///
 #[allow(missing_debug_implementations)]
-pub struct SignatureAggregator {
+pub(crate) struct SignatureAggregator {
     map: HashMap<Digest256, State>,
     expiration: Duration,
 }
 
 impl SignatureAggregator {
     /// Create new aggregator with default expiration.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::with_expiration(DEFAULT_EXPIRATION)
     }
 
     /// Create new aggregator with the given expiration.
-    pub fn with_expiration(expiration: Duration) -> Self {
+    pub(crate) fn with_expiration(expiration: Duration) -> Self {
         Self {
             map: Default::default(),
             expiration,
@@ -60,7 +60,7 @@ impl SignatureAggregator {
     /// shares still need to be added for that particular payload. This error could be safely
     /// ignored (it might still be useful perhaps for debugging). The other error variants, however,
     /// indicate failures and should be treated a such. See [Error] for more info.
-    pub fn add(&mut self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
+    pub(crate) fn add(&mut self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
         self.remove_expired();
 
         if !sig_share.verify(payload) {

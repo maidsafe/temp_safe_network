@@ -18,7 +18,7 @@ use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;
 use xor_name::XorName;
 
-pub trait NodeMsgAuthorityUtils {
+pub(crate) trait NodeMsgAuthorityUtils {
     fn src_location(&self) -> SrcLocation;
 
     fn name(&self) -> XorName;

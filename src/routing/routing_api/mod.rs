@@ -11,18 +11,18 @@ pub(crate) mod tests;
 
 pub(crate) mod command;
 
-mod config;
+pub(super) mod config;
 mod dispatcher;
-mod event;
-mod event_stream;
+pub(super) mod event;
+pub(super) mod event_stream;
 
-pub use self::{
+use self::{
+    command::Command,
     config::Config,
-    event::{Elders, Event, MessageReceived, NodeElderChange, SendStream},
+    dispatcher::Dispatcher,
+    event::{Elders, Event, NodeElderChange},
     event_stream::EventStream,
 };
-
-use self::{command::Command, dispatcher::Dispatcher};
 use crate::messaging::{
     node::{NodeMsg, Peer},
     DstLocation, EndUser, SectionAuthorityProvider, WireMsg,
@@ -35,8 +35,8 @@ use crate::routing::{
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
-    Error, MIN_ADULT_AGE,
+    section::SectionUtils,
+    Error, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
 };
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 use itertools::Itertools;

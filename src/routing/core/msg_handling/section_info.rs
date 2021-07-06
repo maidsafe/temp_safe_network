@@ -13,11 +13,8 @@ use crate::messaging::{
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
-    error::Result,
-    network::NetworkUtils,
-    peer::PeerUtils,
-    routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
+    error::Result, network::NetworkUtils, peer::PeerUtils, routing_api::command::Command,
+    section::SectionUtils, SectionAuthorityProviderUtils,
 };
 use std::net::SocketAddr;
 use xor_name::XorName;

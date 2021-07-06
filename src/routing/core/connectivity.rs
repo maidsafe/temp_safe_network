@@ -12,13 +12,14 @@ use crate::routing::{
     error::Result,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
+    section::{NodeStateUtils, SectionPeersUtils, SectionUtils},
+    SectionAuthorityProviderUtils,
 };
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
 impl Core {
-    pub fn handle_connection_lost(&self, addr: SocketAddr) -> Result<Vec<Command>> {
+    pub(crate) fn handle_connection_lost(&self, addr: SocketAddr) -> Result<Vec<Command>> {
         if let Some(peer) = self.section.find_joined_member_by_addr(&addr) {
             debug!(
                 "Possible connection loss detected with known peer {:?}",
@@ -35,7 +36,7 @@ impl Core {
         Ok(vec![])
     }
 
-    pub fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Command>> {
+    pub(crate) fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Command>> {
         let name = if let Some(peer) = self.section.find_joined_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
             *peer.name()
@@ -54,11 +55,11 @@ impl Core {
         Ok(commands)
     }
 
-    pub fn propose_offline(&self, name: XorName) -> Result<Vec<Command>> {
+    pub(crate) fn propose_offline(&self, name: XorName) -> Result<Vec<Command>> {
         self.cast_offline_proposals(&iter::once(name).collect())
     }
 
-    pub fn cast_offline_proposals(&self, names: &BTreeSet<XorName>) -> Result<Vec<Command>> {
+    pub(crate) fn cast_offline_proposals(&self, names: &BTreeSet<XorName>) -> Result<Vec<Command>> {
         // Don't send the `Offline` proposal to the peer being lost as that send would fail,
         // triggering a chain of further `Offline` proposals.
         let elders: Vec<_> = self

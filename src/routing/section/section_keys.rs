@@ -13,13 +13,13 @@ use std::{
 };
 
 /// All the key material needed to sign or combine signature for our section key.
-pub struct SectionKeyShare {
+pub(crate) struct SectionKeyShare {
     /// Public key set to verify threshold signatures and combine shares.
-    pub public_key_set: bls::PublicKeySet,
+    pub(crate) public_key_set: bls::PublicKeySet,
     /// Index of the owner of this key share within the set of all section elders.
-    pub index: usize,
+    pub(crate) index: usize,
     /// Secret Key share.
-    pub secret_key_share: bls::SecretKeyShare,
+    pub(crate) secret_key_share: bls::SecretKeyShare,
 }
 
 impl Debug for SectionKeyShare {
@@ -35,7 +35,7 @@ impl Debug for SectionKeyShare {
 
 /// Struct that holds the current section keys and helps with new key generation.
 #[derive(Debug)]
-pub struct SectionKeysProvider {
+pub(crate) struct SectionKeysProvider {
     /// A cache for current and previous section BLS keys.
     cache: MiniKeyCache,
     /// The new keys to use when section update completes.
@@ -47,7 +47,7 @@ pub struct SectionKeysProvider {
 }
 
 impl SectionKeysProvider {
-    pub fn new(cache_size: u8, current: Option<SectionKeyShare>) -> Self {
+    pub(crate) fn new(cache_size: u8, current: Option<SectionKeyShare>) -> Self {
         let mut provider = Self {
             pending: HashMap::new(),
             cache: MiniKeyCache::with_capacity(cache_size as usize),
@@ -60,11 +60,11 @@ impl SectionKeysProvider {
         provider
     }
 
-    pub fn key_share(&self) -> Result<&SectionKeyShare> {
+    pub(crate) fn key_share(&self) -> Result<&SectionKeyShare> {
         self.cache.get_most_recent()
     }
 
-    pub fn sign_with(
+    pub(crate) fn sign_with(
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
@@ -72,16 +72,16 @@ impl SectionKeysProvider {
         self.cache.sign_with(data, public_key)
     }
 
-    pub fn has_key_share(&self) -> bool {
+    pub(crate) fn has_key_share(&self) -> bool {
         self.cache.has_key_share()
     }
 
-    pub fn insert_dkg_outcome(&mut self, share: SectionKeyShare) {
+    pub(crate) fn insert_dkg_outcome(&mut self, share: SectionKeyShare) {
         let public_key = share.public_key_set.public_key();
         let _ = self.pending.insert(public_key, share);
     }
 
-    pub fn finalise_dkg(&mut self, public_key: &bls::PublicKey) {
+    pub(crate) fn finalise_dkg(&mut self, public_key: &bls::PublicKey) {
         if let Some(share) = self.pending.remove(public_key) {
             if let Some(evicted) = self.cache.add(public_key, share) {
                 trace!("evicted old key from cache: {:?}", evicted);
@@ -93,25 +93,25 @@ impl SectionKeysProvider {
 
 /// Implementation of super simple cache, for no more than a handfull of items.
 #[derive(Debug)]
-pub struct MiniKeyCache {
+struct MiniKeyCache {
     list: VecDeque<(bls::PublicKey, SectionKeyShare)>,
 }
 
 impl MiniKeyCache {
     /// Constructor for capacity based `KeyCache`.
-    pub fn with_capacity(capacity: usize) -> MiniKeyCache {
+    fn with_capacity(capacity: usize) -> MiniKeyCache {
         MiniKeyCache {
             list: VecDeque::with_capacity(capacity),
         }
     }
 
     /// Returns true if a key share exists.
-    pub fn has_key_share(&self) -> bool {
+    fn has_key_share(&self) -> bool {
         !self.list.is_empty()
     }
 
     /// Returns the most recently added key.
-    pub fn get_most_recent(&self) -> Result<&SectionKeyShare> {
+    fn get_most_recent(&self) -> Result<&SectionKeyShare> {
         if let Some((_, share)) = self.list.back() {
             return Ok(share);
         }
@@ -120,7 +120,7 @@ impl MiniKeyCache {
 
     /// Uses the secret key from cache, corresponding to
     /// the provided public key.
-    pub fn sign_with(
+    fn sign_with(
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
@@ -138,7 +138,7 @@ impl MiniKeyCache {
 
     /// Adds a new key to the cache, and removes + returns the oldest
     /// key if cache size is exceeded.
-    pub fn add(
+    fn add(
         &mut self,
         public_key: &bls::PublicKey,
         section_key_share: SectionKeyShare,

@@ -17,7 +17,7 @@ use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
 
-pub trait DkgKeyUtils {
+pub(crate) trait DkgKeyUtils {
     fn new(elder_candidates: &ElderCandidates, generation: u64) -> Self;
 }
 
@@ -39,7 +39,7 @@ impl DkgKeyUtils for DkgKey {
     }
 }
 
-pub trait DkgFailureSigUtils {
+pub(crate) trait DkgFailureSigUtils {
     fn new(keypair: &Keypair, failed_participants: &BTreeSet<XorName>, dkg_key: &DkgKey) -> Self;
 
     fn verify(&self, dkg_key: &DkgKey, failed_participants: &BTreeSet<XorName>) -> bool;
@@ -59,7 +59,7 @@ impl DkgFailureSigUtils for DkgFailureSig {
     }
 }
 
-pub trait DkgFailureSigSetUtils {
+pub(crate) trait DkgFailureSigSetUtils {
     fn insert(&mut self, sig: DkgFailureSig, failed_participants: &BTreeSet<XorName>) -> bool;
 
     fn has_agreement(&self, elder_candidates: &ElderCandidates) -> bool;
