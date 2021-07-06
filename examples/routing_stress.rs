@@ -36,14 +36,10 @@ use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
 
 use safe_network::messaging::{
-    client::ClientMsg,
-    client::ProcessingError,
-    location::{Aggregation, Itinerary},
-    DstInfo, DstLocation, MessageId, MessageType, SrcLocation, WireMsg,
+    client::Error::FailedToWriteFile, node::NodeMsg, DstLocation, MessageId,
 };
 use safe_network::routing::{
-    Cache, Config, Error as RoutingError, Event as RoutingEvent, NodeElderChange, Routing,
-    TransportConfig,
+    Cache, Config, Event as RoutingEvent, NodeElderChange, Routing, TransportConfig,
 };
 
 // Minimal delay between two consecutive prints of the network status.
@@ -214,7 +210,7 @@ impl Network {
 
     // Create new node and let it join the network.
     async fn create_node(&mut self, event_tx: Sender<Event>) {
-        let bootstrap_addrs = self.get_bootstrap_addrs();
+        let bootstrap_addrs = self.get_bootstrap_addrs().await;
 
         let id = self.new_node_id();
         let _ = self.nodes.insert(id, Node::Joining);
@@ -357,17 +353,15 @@ impl Network {
                         self.stats.relocation_successes += 1;
                     }
                 }
-                RoutingEvent::MessageReceived { content, dst, .. } => {
-                    let message = WireMsg::from(content)?;
-                    let dst = match dst {
-                        DstLocation::Section(name) => name,
-                        DstLocation::Node(name) => name,
-                        DstLocation::DirectAndUnrouted | DstLocation::EndUser(_) => {
+                RoutingEvent::MessageReceived { dst, .. } => {
+                    let (dst, dest_section_pk) = match dst {
+                        DstLocation::Section { name, section_pk } => (name, section_pk),
+                        DstLocation::Node { name, section_pk } => (name, section_pk),
+                        DstLocation::DirectAndUnrouted(_) | DstLocation::EndUser(_) => {
                             return Err(format_err!("unexpected probe message dst: {:?}", dst))
                         }
                     };
 
-                    let dest_section_pk = message.dst_section_pk();
                     self.probe_tracker.receive(&dst, &dest_section_pk).await;
                 }
                 _ => {
@@ -389,7 +383,7 @@ impl Network {
     }
 
     // Returns the socket addresses to bootstrap against.
-    fn get_bootstrap_addrs(&self) -> Vec<SocketAddr> {
+    async fn get_bootstrap_addrs(&self) -> Vec<SocketAddr> {
         // Number of bootstrap contacts to use. Use more than one to increase the chance of
         // successful bootstrap in case some of the bootstrap nodes get dropped.
         //
@@ -398,7 +392,9 @@ impl Network {
         const COUNT: usize = 1;
 
         // Use the oldest nodes in the network as the bootstrap contacts.
-        self.nodes
+        let mut nodes = vec![];
+        for (node, _) in self
+            .nodes
             .values()
             .filter_map(|node| match node {
                 Node::Joined { node, age, .. } => Some((node, age)),
@@ -406,8 +402,11 @@ impl Network {
             })
             .sorted_by(|(_, lhs_age), (_, rhs_age)| lhs_age.cmp(rhs_age).reverse())
             .take(COUNT)
-            .map(|(node, _)| node.our_connection_info())
-            .collect::<Vec<_>>()
+        {
+            nodes.push(node.our_connection_info().await);
+        }
+
+        nodes
     }
 
     // Send messages to probe network health.
@@ -456,29 +455,24 @@ impl Network {
         // `Relocated` event. Using the current node name instead of the one reported by the last
         // `Relocated` event reduced send errors due to src location mismatch which would cause the
         // section health to appear lower than it actually is.
-        let src = node.name().await;
 
         // just some valid message
-        let message = MessageType::Client {
-            msg: ClientMsg::ProcessingError(ProcessingError::new(None, None, MessageId::new())),
-            dst_info: DstInfo {
-                dst,
-                dst_section_pk: public_key_set.public_key(),
-            },
+        let node_msg = NodeMsg::NodeMsgError {
+            error: FailedToWriteFile,
+            correlation_id: MessageId::new(),
         };
 
-        let itinerary = Itinerary {
-            src: SrcLocation::Node(src),
-            dst: DstLocation::Section(dst),
-            aggregation: Aggregation::None,
+        let dst_location = DstLocation::Section {
+            name: dst,
+            section_pk: public_key_set.public_key(),
         };
 
-        match node.send_message(itinerary, message, None).await {
+        let wire_msg = node.sign_single_src_msg(node_msg, dst_location).await?;
+
+        match node.send_message(wire_msg).await {
             Ok(()) => Ok(true),
-            Err(RoutingError::InvalidSrcLocation) => Ok(false), // node name changed
-            Err(error) => {
-                Err(Error::from(error).context(format!("failed to send probe by {}", src)))
-            }
+            Err(error) => Err(Error::from(error)
+                .context(format!("failed to send probe by {}", node.name().await))),
         }
     }
 

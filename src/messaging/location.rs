@@ -29,9 +29,19 @@ pub enum SrcLocation {
     /// An EndUser.
     EndUser(EndUser),
     /// A single Node with the given name.
-    Node(XorName),
+    Node {
+        /// Name of the Node.
+        name: XorName,
+        /// Node's section public key
+        section_pk: BlsPublicKey,
+    },
     /// A Section close to a name.
-    Section(XorName),
+    Section {
+        /// Name of the Section.
+        name: XorName,
+        /// Section's public key
+        section_pk: BlsPublicKey,
+    },
 }
 
 impl SrcLocation {
@@ -39,19 +49,18 @@ impl SrcLocation {
     pub fn name(&self) -> XorName {
         match self {
             Self::EndUser(user) => user.xorname,
-            Self::Node(name) => *name,
-            Self::Section(name) => *name,
+            Self::Node { name, .. } => *name,
+            Self::Section { name, .. } => *name,
         }
     }
 
     /// Returns this location as `DstLocation`
     pub fn to_dst(self) -> DstLocation {
-        unimplemented!();
-        /*match self {
+        match self {
             Self::EndUser(user) => DstLocation::EndUser(user),
-            Self::Node(name) => DstLocation::Node(name),
-            Self::Section(name) => DstLocation::Section(name),
-        }*/
+            Self::Node { name, section_pk } => DstLocation::Node { name, section_pk },
+            Self::Section { name, section_pk } => DstLocation::Section { name, section_pk },
+        }
     }
 }
 

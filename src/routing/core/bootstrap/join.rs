@@ -24,6 +24,7 @@ use crate::routing::{
     section::{SectionAuthorityProviderUtils, SectionUtils},
     FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
+use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
@@ -102,7 +103,7 @@ impl<'a> Join<'a> {
 
     async fn join(
         mut self,
-        mut section_key: bls::PublicKey,
+        mut section_key: BlsPublicKey,
         mut recipients: Vec<(XorName, SocketAddr)>,
     ) -> Result<(Node, Section, Vec<Command>)> {
         // We send a first join request to obtain the resource challenge, which
@@ -284,7 +285,7 @@ impl<'a> Join<'a> {
         &mut self,
         join_request: JoinRequest,
         recipients: &[(XorName, SocketAddr)],
-        section_key: bls::PublicKey,
+        section_key: BlsPublicKey,
     ) -> Result<()> {
         info!("Sending {:?} to {:?}", join_request, recipients);
 
@@ -452,10 +453,7 @@ async fn send_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{
-        node::{DstInfo, NodeState},
-        SectionAuthorityProvider,
-    };
+    use crate::messaging::{node::NodeState, SectionAuthorityProvider};
     use crate::routing::{
         dkg::test_utils::*,
         error::Error as RoutingError,
@@ -503,7 +501,7 @@ mod tests {
         // Create the task that executes the body of the test, but don't run it either.
         let others = async {
             // Receive JoinRequest
-            let (message, recipients) = send_rx
+            let (wire_msg, recipients) = send_rx
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
@@ -512,11 +510,10 @@ mod tests {
                 recipients.iter().map(|(_name, addr)| *addr).collect();
             assert_eq!(bootstrap_addrs, [bootstrap_addr]);
 
-            let (message, dst_info) = assert_matches!(message, MessageType::Routing { msg, dst_info } =>
-                (msg, dst_info));
+            let node_msg = assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+                msg);
 
-            assert_eq!(dst_info.dst, *peer.name());
-            assert_matches!(message.variant, NodeMsg::JoinRequest(request) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(request) => {
                 assert!(request.resource_proof_response.is_none());
             });
 
@@ -526,18 +523,17 @@ mod tests {
                 NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(section_auth.clone()))),
                 &bootstrap_node,
                 section_auth.section_key(),
-                *peer.name(),
             )?;
 
             // Receive the second JoinRequest with correct section info
-            let (message, recipients) = send_rx
+            let (wire_msg, recipients) = send_rx
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
-            let (message, dst_info) = assert_matches!(message, MessageType::Routing { msg, dst_info } =>
-                (msg, dst_info));
+            let (node_msg, dst_location) = assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, dst_location,.. }) =>
+                (msg, dst_location));
 
-            assert_eq!(dst_info.dst_section_pk, pk);
+            assert_eq!(dst_location.section_pk(), Some(pk));
             itertools::assert_equal(
                 recipients,
                 section_auth
@@ -546,7 +542,7 @@ mod tests {
                     .map(|(name, addr)| (*name, *addr))
                     .collect::<Vec<_>>(),
             );
-            assert_matches!(message.variant, NodeMsg::JoinRequest(request) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(request) => {
                 assert_eq!(request.section_key, pk);
             });
 
@@ -564,7 +560,6 @@ mod tests {
                 })),
                 &bootstrap_node,
                 section_auth.value.section_key(),
-                *peer.name(),
             )?;
 
             Ok(())
@@ -594,13 +589,12 @@ mod tests {
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let name = node.name();
         let state = Join::new(node, send_tx, &mut recv_rx);
 
         let bootstrap_task = state.run(bootstrap_node.addr);
         let test_task = async move {
             // Receive JoinRequest
-            let (message, recipients) = send_rx
+            let (wire_msg, recipients) = send_rx
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
@@ -613,8 +607,8 @@ mod tests {
                 vec![bootstrap_node.addr]
             );
 
-            assert_matches!(message, MessageType::Routing { msg, .. } =>
-                assert_matches!(msg.variant, NodeMsg::JoinRequest{..}));
+            assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+                    assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             // Send JoinResponse::Redirect
             let new_bootstrap_addrs: BTreeMap<_, _> = (0..ELDER_SIZE)
@@ -630,12 +624,11 @@ mod tests {
                 }))),
                 &bootstrap_node,
                 section_auth.section_key(),
-                name,
             )?;
             task::yield_now().await;
 
             // Receive new JoinRequest with redirected bootstrap contacts
-            let (message, recipients) = send_rx
+            let (wire_msg, recipients) = send_rx
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
@@ -651,11 +644,11 @@ mod tests {
                     .collect::<Vec<_>>()
             );
 
-            let (message, dst_info) = assert_matches!(message, MessageType::Routing { msg, dst_info } =>
-                (msg, dst_info));
+            let (node_msg, dst_location) = assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, dst_location,.. }) =>
+                    (msg, dst_location));
 
-            assert_eq!(dst_info.dst_section_pk, pk_set.public_key());
-            assert_matches!(message.variant, NodeMsg::JoinRequest(req) => {
+            assert_eq!(dst_location.section_pk(), Some(pk_set.public_key()));
+            assert_matches!(node_msg, NodeMsg::JoinRequest(req) => {
                 assert_eq!(req.section_key, pk_set.public_key());
             });
 
@@ -685,18 +678,17 @@ mod tests {
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let node_name = node.name();
         let state = Join::new(node, send_tx, &mut recv_rx);
 
         let bootstrap_task = state.run(bootstrap_node.addr);
         let test_task = async {
-            let (message, _) = send_rx
+            let (wire_msg, _) = send_rx
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
 
-            assert_matches!(message, MessageType::Routing { msg, .. } =>
-                    assert_matches!(msg.variant, NodeMsg::JoinRequest{..}));
+            assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+                        assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             send_response(
                 &recv_tx,
@@ -707,7 +699,6 @@ mod tests {
                 }))),
                 &bootstrap_node,
                 section_auth.section_key(),
-                node_name,
             )?;
             task::yield_now().await;
 
@@ -724,17 +715,16 @@ mod tests {
                 }))),
                 &bootstrap_node,
                 section_auth.section_key(),
-                node_name,
             )?;
             task::yield_now().await;
 
-            let (message, _) = send_rx
+            let (wire_msg, _) = send_rx
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
 
-            assert_matches!(message, MessageType::Routing { msg, .. } =>
-                        assert_matches!(msg.variant, NodeMsg::JoinRequest{..}));
+            assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+                            assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             Ok(())
         };
@@ -762,18 +752,17 @@ mod tests {
             gen_addr(),
         );
 
-        let node_name = node.name();
         let state = Join::new(node, send_tx, &mut recv_rx);
 
         let bootstrap_task = state.run(bootstrap_node.addr);
         let test_task = async {
-            let (message, _) = send_rx
+            let (wire_msg, _) = send_rx
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
 
-            assert_matches!(message, MessageType::Routing { msg, .. } =>
-                            assert_matches!(msg.variant, NodeMsg::JoinRequest{..}));
+            assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+                                assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             send_response(
                 &recv_tx,
@@ -782,7 +771,6 @@ mod tests {
                 ))),
                 &bootstrap_node,
                 section_auth.section_key(),
-                node_name,
             )?;
 
             Ok(())
@@ -812,7 +800,6 @@ mod tests {
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let node_name = node.name();
 
         let (good_prefix, bad_prefix) = {
             let p0 = Prefix::default().pushed(false);
@@ -834,13 +821,14 @@ mod tests {
         let join_task = state.join(section_key, elders);
 
         let test_task = async {
-            let (message, _) = send_rx
+            let (wire_msg, _) = send_rx
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
 
-            let message = assert_matches!(message, MessageType::Routing{ msg, .. } => msg);
-            assert_matches!(message.variant, NodeMsg::JoinRequest(_));
+            let node_msg =
+                assert_matches!(wire_msg.to_message(), Ok(MessageType::Node{ msg, .. }) => msg);
+            assert_matches!(node_msg, NodeMsg::JoinRequest(_));
 
             // Send `Retry` with bad prefix
             send_response(
@@ -850,7 +838,6 @@ mod tests {
                 ))),
                 &bootstrap_node,
                 section_key,
-                node_name,
             )?;
             task::yield_now().await;
 
@@ -862,16 +849,16 @@ mod tests {
                 ))),
                 &bootstrap_node,
                 section_key,
-                node_name,
             )?;
 
-            let (message, _) = send_rx
+            let (wire_msg, _) = send_rx
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
 
-            let message = assert_matches!(message, MessageType::Routing{ msg, .. } => msg);
-            assert_matches!(message.variant, NodeMsg::JoinRequest(_));
+            let node_msg =
+                assert_matches!(wire_msg.to_message(), Ok(MessageType::Node{ msg, .. }) => msg);
+            assert_matches!(node_msg, NodeMsg::JoinRequest(_));
 
             Ok(())
         };
@@ -888,28 +875,20 @@ mod tests {
     // test helper
     fn send_response(
         recv_tx: &mpsc::Sender<ConnectionEvent>,
-        variant: NodeMsg,
+        node_msg: NodeMsg,
         bootstrap_node: &Node,
-        section_key: bls::PublicKey,
-        node_name: XorName,
+        section_pk: BlsPublicKey,
     ) -> Result<()> {
-        let message = NodeMsg::single_src(
+        let wire_msg = WireMsg::single_src(
             bootstrap_node,
-            DstLocation::DirectAndUnrouted,
-            variant,
-            section_key,
+            DstLocation::DirectAndUnrouted(section_pk),
+            node_msg,
+            section_pk,
         )?;
 
         recv_tx.try_send(ConnectionEvent::Received((
             bootstrap_node.addr,
-            MessageType::Routing {
-                msg: message,
-                dst_info: DstInfo {
-                    dst: node_name,
-                    dst_section_pk: section_key,
-                },
-            }
-            .serialize()?,
+            wire_msg.serialize()?,
         )))?;
 
         Ok(())

@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use tokio::time;
 use utils::*;
 use xor_name::XOR_NAME_LEN;
-
+/*
 #[tokio::test]
 async fn test_genesis_node() -> Result<()> {
     let keypair = Keypair::generate(&mut rand::thread_rng());
@@ -138,3 +138,4 @@ async fn test_startup_elders() -> Result<()> {
 
     Ok(())
 }
+*/

@@ -142,14 +142,14 @@ fn process(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{node::DstInfo, DstLocation};
+    use crate::messaging::{MessageType, NodeSigned};
     use crate::routing::{
         dkg::test_utils::section_signed,
         ed25519,
         section::test_utils::{gen_addr, gen_section_authority_provider},
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
-    use anyhow::{Context, Result};
+    use anyhow::{anyhow, Context, Result};
     use assert_matches::assert_matches;
     use secured_linked_list::SecuredLinkedList;
     use xor_name::Prefix;
@@ -158,16 +158,19 @@ mod tests {
     fn everything_up_to_date() -> Result<()> {
         let env = Env::new(1)?;
 
-        let msg = env.create_message(
+        let (node_msg, node_msg_auth) = env.create_message(
             &env.their_prefix,
             env.section.authority_provider().section_key(),
         )?;
-        let dst_info = DstInfo {
-            dst: XorName::random(),
-            dst_section_pk: *env.section.chain().last_key(),
-        };
 
-        let (msg_to_send, _) = process(&env.node, &env.section, &msg, dst_info)?;
+        let dst_section_pk = *env.section.chain().last_key();
+        let (msg_to_send, _) = process(
+            &env.node,
+            &env.section,
+            &node_msg,
+            &node_msg_auth,
+            dst_section_pk,
+        )?;
         assert_eq!(msg_to_send, None);
 
         Ok(())
@@ -180,16 +183,18 @@ mod tests {
         let our_new_sk = bls::SecretKey::random();
         let our_new_pk = our_new_sk.public_key();
 
-        let msg = env.create_message(
+        let (node_msg, node_msg_auth) = env.create_message(
             env.section.prefix(),
             env.section.authority_provider().section_key(),
         )?;
-        let dst_info = DstInfo {
-            dst: env.node.name(),
-            dst_section_pk: our_new_pk,
-        };
 
-        let (msg_to_send, _) = process(&env.node, &env.section, &msg, dst_info)?;
+        let (msg_to_send, _) = process(
+            &env.node,
+            &env.section,
+            &node_msg,
+            &node_msg_auth,
+            our_new_pk,
+        )?;
 
         assert_eq!(msg_to_send, None);
 
@@ -200,19 +205,27 @@ mod tests {
     fn outdated_dst_key_from_other_section() -> Result<()> {
         let env = Env::new(2)?;
 
-        let msg = env.create_message(
+        let (node_msg, node_msg_auth) = env.create_message(
             &env.their_prefix,
             env.section.authority_provider().section_key(),
         )?;
-        let dst_info = DstInfo {
-            dst: XorName::random(),
-            dst_section_pk: *env.section.chain().root_key(),
-        };
 
-        let (msg_to_send, _) = process(&env.node, &env.section, &msg, dst_info)?;
+        let dst_section_pk = *env.section.chain().root_key();
+        let (msg_to_send, _) = process(
+            &env.node,
+            &env.section,
+            &node_msg,
+            &node_msg_auth,
+            dst_section_pk,
+        )?;
 
-        assert_matches!(msg_to_send, Some(message) => {
-            assert_matches!(message.variant, Variant::SectionKnowledge { ref src_info, .. } => {
+        let wire_msg = msg_to_send.ok_or(anyhow!("expected an anti-entropy message"))?;
+        let msg_type = wire_msg
+            .to_message()
+            .context("failed to deserialised anti-entropy message")?;
+
+        assert_matches!(msg_type, MessageType::Node{msg,..} => {
+            assert_matches!(msg, NodeMsg::SectionKnowledge { ref src_info, .. } => {
                 assert_eq!(src_info.0.value, *env.section.authority_provider());
                 assert_eq!(src_info.1, *env.section.chain());
             });
@@ -225,16 +238,19 @@ mod tests {
     fn outdated_dst_key_from_our_section() -> Result<()> {
         let env = Env::new(2)?;
 
-        let msg = env.create_message(
+        let (node_msg, node_msg_auth) = env.create_message(
             env.section.prefix(),
             env.section.authority_provider().section_key(),
         )?;
-        let dst_info = DstInfo {
-            dst: XorName::random(),
-            dst_section_pk: *env.section.chain().root_key(),
-        };
 
-        let (msg_to_send, _) = process(&env.node, &env.section, &msg, dst_info)?;
+        let dst_section_pk = *env.section.chain().root_key();
+        let (msg_to_send, _) = process(
+            &env.node,
+            &env.section,
+            &node_msg,
+            &node_msg_auth,
+            dst_section_pk,
+        )?;
 
         assert_eq!(msg_to_send, None);
 
@@ -271,20 +287,26 @@ mod tests {
 
         fn create_message(
             &self,
-            src_section: &Prefix,
-            section_pk: bls::PublicKey,
-        ) -> Result<NodeMsg> {
+            src_section_prefix: &Prefix,
+            section_pk: BlsPublicKey,
+        ) -> Result<(NodeMsg, NodeMsgAuthority)> {
             let sender = Node::new(
-                ed25519::gen_keypair(&src_section.range_inclusive(), MIN_ADULT_AGE),
+                ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );
 
-            Ok(NodeMsg::single_src(
-                &sender,
-                DstLocation::Section(self.node.name()),
-                Variant::UserMessage(b"hello".to_vec()),
+            let node_msg = NodeMsg::StartConnectivityTest(XorName::random());
+            let msg_payload = WireMsg::serialize_msg_payload(&node_msg)
+                .context("Failed to create a test NodeMsg")?;
+
+            let signature = ed25519::sign(&msg_payload, &sender.keypair);
+            let node_msg_authority = NodeMsgAuthority::Node(NodeSigned {
+                public_key: sender.keypair.public,
                 section_pk,
-            )?)
+                signature,
+            });
+
+            Ok((node_msg, node_msg_authority))
         }
     }
 

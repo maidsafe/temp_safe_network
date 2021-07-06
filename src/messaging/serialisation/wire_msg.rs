@@ -234,7 +234,7 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            client::{ChunkRead, ClientMsg, DataQuery, ProcessMsg, Query},
+            client::{ChunkRead, ClientMsg, DataQuery, ProcessMsg},
             node::{NodeCmd, NodeMsg, NodeSystemCmd},
             ClientSigned, MessageId, NodeSigned,
         },
@@ -296,11 +296,15 @@ mod tests {
         let serialized = wire_msg.serialize()?;
 
         let new_wire_msg = wire_msg.clone();
-        let new_dst_location = DstLocation::Section {
-            name: XorName::random(),
-            section_pk: dst_section_pk,
+        let new_xorname = XorName::random();
+        let new_dst_section_pk = SecretKey::random().public_key();
+        let new_dst_location = DstLocation::Node {
+            name: new_xorname,
+            section_pk: new_dst_section_pk,
         };
-        wire_msg.update_dst_location(new_dst_location);
+        wire_msg.set_dst_xorname(new_xorname);
+        wire_msg.set_dst_section_pk(new_dst_section_pk);
+
         let serialised_new_dst_location = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -310,7 +314,7 @@ mod tests {
         assert_ne!(new_wire_msg, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst_location(), &new_dst_location);
-        assert_eq!(deserialized.dst_section_pk(), Some(dst_section_pk));
+        assert_eq!(deserialized.dst_section_pk(), Some(new_dst_section_pk));
         assert_eq!(deserialized.src_section_pk(), None);
 
         // test deserialisation of payload
@@ -395,12 +399,9 @@ mod tests {
 
         let msg_id = MessageId::new();
 
-        let client_msg = ClientMsg::Process(ProcessMsg::Query {
-            id: msg_id,
-            query: Query::Data(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
-                XorName::random(),
-            )))),
-        });
+        let client_msg = ClientMsg::Process(ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(
+            ChunkAddress::Private(XorName::random()),
+        ))));
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
         let client_signed = ClientSigned {

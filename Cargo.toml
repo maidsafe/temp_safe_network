@@ -13,15 +13,15 @@ version = "0.7.13"
 [profile.release]
 incremental = true
 
-#[[bin]]
-#name = "sn_node"
-#doc = false
-#path = "src/node/bin/sn_node.rs"
+[[bin]]
+name = "sn_node"
+doc = false
+path = "src/node/bin/sn_node.rs"
 
-#[[bin]]
-#name = "launch_network"
-#doc = false
-#path = "src/node/bin/launch_network.rs"
+[[bin]]
+name = "launch_network"
+doc = false
+path = "src/node/bin/launch_network.rs"
 
 [features]
 default = [ "testing" ]

@@ -9,14 +9,13 @@
 use super::{Comm, Command, Core, Dispatcher};
 use crate::messaging::{
     client::{ClientMsg, ProcessingError},
-    location::{Aggregation, Itinerary},
     node::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Network,
         NodeMsg, NodeState, Peer, PlainMessage, Proposal, RelocateDetails, RelocatePayload,
-        ResourceProofResponse, Section, SectionSigned, SignedRelocateDetails, Variant,
+        ResourceProofResponse, Section, SectionSigned,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DstInfo, DstLocation, MessageId, MessageType, SectionAuthorityProvider, SrcLocation,
+    DstLocation, MessageId, MessageType, SectionAuthorityProvider, SrcLocation,
 };
 use crate::routing::{
     core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
@@ -25,18 +24,17 @@ use crate::routing::{
         ProposalUtils,
     },
     ed25519,
-    event::Event,
-    messages::{MsgAuthorityUtils, PlainMessageUtils, WireMsgUtils},
+    messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
-    relocation::{self, RelocatePayloadUtils, SignedRelocateDetailsUtils},
+    relocation::{self, RelocatePayloadUtils},
     section::{
         test_utils::*, ElderCandidatesUtils, NodeStateUtils, SectionAuthorityProviderUtils,
         SectionKeyShare, SectionPeersUtils, SectionUtils, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
         MIN_AGE,
     },
-    supermajority, ELDER_SIZE,
+    supermajority, Event, ELDER_SIZE,
 };
 use crate::types::{Keypair, PublicKey};
 use anyhow::Result;
@@ -56,7 +54,7 @@ use tokio::{
 use xor_name::{Prefix, XorName};
 
 static TEST_EVENT_CHANNEL_SIZE: usize = 20;
-
+/*
 #[tokio::test]
 async fn receive_matching_get_section_request_as_elder() -> Result<()> {
     let node = create_node(MIN_ADULT_AGE);
@@ -1361,9 +1359,9 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
 async fn relocation_of_non_elder() -> Result<()> {
     relocation(RelocatedPeerRole::NonElder).await
 }
-
+*/
 const THRESHOLD: usize = supermajority(ELDER_SIZE) - 1;
-
+/*
 #[allow(dead_code)]
 enum RelocatedPeerRole {
     NonElder,
@@ -1736,7 +1734,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
     Ok(())
 }
-
+*/
 // TODO: add more tests here
 
 #[allow(unused)]

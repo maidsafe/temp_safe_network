@@ -23,7 +23,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use utils::*;
 use xor_name::XorName;
 use crate::routing;
-
+/*
 #[tokio::test]
 async fn test_messages_client_node() -> Result<()> {
     let (node, mut event_stream) = create_node(Config {
@@ -208,3 +208,4 @@ async fn test_messages_between_nodes() -> Result<()> {
 
     Err(format_err!("message not received"))
 }
+*/

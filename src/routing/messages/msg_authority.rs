@@ -34,15 +34,30 @@ pub trait NodeMsgAuthorityUtils {
 impl NodeMsgAuthorityUtils for NodeMsgAuthority {
     fn src_location(&self) -> SrcLocation {
         match self {
-            NodeMsgAuthority::Node(NodeSigned { public_key, .. }) => {
-                SrcLocation::Node(ed25519::name(public_key))
-            }
-            NodeMsgAuthority::BlsShare(BlsShareSigned { src_name, .. }) => {
-                SrcLocation::Section(*src_name)
-            }
-            NodeMsgAuthority::Section(SectionSigned { src_name, .. }) => {
-                SrcLocation::Section(*src_name)
-            }
+            NodeMsgAuthority::Node(NodeSigned {
+                public_key,
+                section_pk,
+                ..
+            }) => SrcLocation::Node {
+                name: ed25519::name(public_key),
+                section_pk: *section_pk,
+            },
+            NodeMsgAuthority::BlsShare(BlsShareSigned {
+                src_name,
+                section_pk,
+                ..
+            }) => SrcLocation::Section {
+                name: *src_name,
+                section_pk: *section_pk,
+            },
+            NodeMsgAuthority::Section(SectionSigned {
+                src_name,
+                section_pk,
+                ..
+            }) => SrcLocation::Section {
+                name: *src_name,
+                section_pk: *section_pk,
+            },
         }
     }
 
