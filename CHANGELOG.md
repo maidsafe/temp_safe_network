@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.5](https://github.com/maidsafe/safe_network/compare/v0.7.4...v0.7.5) (2021-07-06)
+
+
+### Bug Fixes
+
+* **audit:** remove unused encryption function and replace tmpdir with ([96d67a5](https://github.com/maidsafe/safe_network/commit/96d67a570c66b44e87643f0611c420882b418e42))
+* **client:** use RwLock for cache and fix client test by clearing the ([25e6a70](https://github.com/maidsafe/safe_network/commit/25e6a70cabe81961b44f5653378e86fc74a78f26))
+
 ### [0.7.4](https://github.com/maidsafe/safe_network/compare/v0.7.3...v0.7.4) (2021-07-05)
 
 ### [0.7.3](https://github.com/maidsafe/safe_network/compare/v0.7.2...v0.7.3) (2021-07-05)
