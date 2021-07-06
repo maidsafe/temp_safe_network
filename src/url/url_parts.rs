@@ -64,22 +64,22 @@ const INVALID_NRS_CHARS: [char; 30] = [
 // A simple struct to represent the basic components parsed
 // from a Safe URL without any decoding.
 //
-// This is kept internal to the crate, at least for now.
+// This is kept internal to the parent module.
 #[derive(Debug, Clone)]
-pub(crate) struct SafeUrlParts {
-    pub scheme: String,
-    pub public_name: String, // "a.b.name" in "a.b.name"
-    pub top_name: String,    // "name"     in "a.b.name"
-    pub sub_names: String,   // "a.b"      in "a.b.name"
-    pub sub_names_vec: Vec<String>,
-    pub path: String,
-    pub query_string: String,
-    pub fragment: String,
+pub(super) struct SafeUrlParts {
+    pub(super) scheme: String,
+    pub(super) public_name: String, // "a.b.name" in "a.b.name"
+    pub(super) top_name: String,    // "name"     in "a.b.name"
+    pub(super) sub_names: String,   // "a.b"      in "a.b.name"
+    pub(super) sub_names_vec: Vec<String>,
+    pub(super) path: String,
+    pub(super) query_string: String,
+    pub(super) fragment: String,
 }
 
 impl SafeUrlParts {
     // parses a URL into its component parts, performing basic validation.
-    pub fn parse(url: &str, ignore_labels_size: bool) -> Result<Self> {
+    pub(super) fn parse(url: &str, ignore_labels_size: bool) -> Result<Self> {
         // detect any invalid url chars before parsing
         validate_url_chars(url)?;
         // Note: we use rust-url for parsing because it is most widely used
