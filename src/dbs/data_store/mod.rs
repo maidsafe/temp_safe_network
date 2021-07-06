@@ -8,17 +8,17 @@
 
 //! A simple, persistent, disk-based key-value store.
 
-mod data;
+pub(super) mod data;
 #[cfg(test)]
 mod tests;
-mod to_db_key;
-mod used_space;
+pub(super) mod to_db_key;
+pub(super) mod used_space;
 
-pub use to_db_key::ToDbKey;
-pub use used_space::UsedSpace;
+use to_db_key::ToDbKey;
+use used_space::UsedSpace;
 
 use super::{encoding::serialise, Error, Result}; // TODO: FIX
-pub use data::{Data, DataId};
+use data::{Data, DataId};
 use sled::Db;
 use std::{marker::PhantomData, path::Path};
 use tracing::info;
@@ -46,7 +46,7 @@ where
     ///
     /// The maximum storage space is defined by `max_capacity`.  This specifies the max usable by
     /// _all_ `DataStores`, not per `DataStore`.
-    pub async fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
+    pub(crate) async fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
         let dir = root.as_ref().join(DB_DIR).join(Self::subdir());
 
         used_space.add_dir(&dir);
@@ -63,12 +63,12 @@ where
 
 impl<T: Data> DataStore<T> {
     ///
-    pub async fn total_used_space(&self) -> u64 {
+    pub(crate) async fn total_used_space(&self) -> u64 {
         self.used_space.total().await
     }
 
     /// Tests if a data chunk has been previously stored under `id`.
-    pub async fn has(&self, id: &T::Id) -> Result<bool> {
+    pub(crate) async fn has(&self, id: &T::Id) -> Result<bool> {
         let key = id.to_db_key()?;
         self.sled.contains_key(key).map_err(Error::from)
     }
@@ -77,7 +77,7 @@ impl<T: Data> DataStore<T> {
     ///
     /// If the data doesn't exist, it does nothing and returns `Ok`.  In the case of an IO error, it
     /// returns `Error::Io`.
-    pub async fn delete(&self, id: &T::Id) -> Result<()> {
+    pub(crate) async fn delete(&self, id: &T::Id) -> Result<()> {
         let key = id.to_db_key()?;
         self.sled.remove(key).map_err(Error::from).map(|_| ())
     }
@@ -88,7 +88,7 @@ impl<T: Data> DataStore<T> {
     /// an IO error, it returns `Error::Io`.
     ///
     /// If a chunk with the same id already exists, it will be overwritten.
-    pub async fn put(&self, chunk: &T) -> Result<()> {
+    pub(crate) async fn put(&self, chunk: &T) -> Result<()> {
         info!("Writing chunk");
 
         let serialised_chunk = serialise(chunk)?.to_vec();
@@ -116,7 +116,7 @@ impl<T: Data> DataStore<T> {
     /// Returns a data chunk previously stored under `id`.
     ///
     /// If the data file can't be accessed, it returns `Error::NoSuchData`.
-    pub async fn get(&self, id: &T::Id) -> Result<T> {
+    pub(crate) async fn get(&self, id: &T::Id) -> Result<T> {
         let key = id.to_db_key()?;
         let res = self
             .sled
@@ -135,7 +135,7 @@ impl<T: Data> DataStore<T> {
     }
 
     /// Used space to max capacity ratio.
-    pub async fn used_space_ratio(&self) -> f64 {
+    pub(crate) async fn used_space_ratio(&self) -> f64 {
         let used = self.total_used_space().await;
         let max_capacity = self.used_space.max_capacity();
         let used_space_ratio = used as f64 / max_capacity as f64;
@@ -147,7 +147,7 @@ impl<T: Data> DataStore<T> {
 
     /// Lists all keys of currently stored data.
     #[cfg_attr(not(test), allow(unused))]
-    pub async fn keys(&self) -> Result<Vec<T::Id>> {
+    pub(crate) async fn keys(&self) -> Result<Vec<T::Id>> {
         let keys = self
             .sled
             .iter()

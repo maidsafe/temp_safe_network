@@ -13,7 +13,7 @@ use crate::types::{
 use serde::{de::DeserializeOwned, Serialize};
 use xor_name::XorName;
 
-pub trait ToDbKey: Serialize {
+pub(crate) trait ToDbKey: Serialize {
     /// The encoded string representation of an identifier, used as a key in the context of a
     /// PickleDB <key,value> store.
     fn to_db_key(&self) -> Result<String> {
@@ -22,7 +22,7 @@ pub trait ToDbKey: Serialize {
     }
 }
 
-pub fn from_db_key<T: DeserializeOwned>(key: &str) -> Result<T> {
+pub(crate) fn from_db_key<T: DeserializeOwned>(key: &str) -> Result<T> {
     let decoded = hex::decode(key).map_err(|e| Error::InvalidOperation(e.to_string()))?;
     deserialise(&decoded)
 }
