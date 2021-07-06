@@ -24,23 +24,31 @@ use std::fmt::Debug;
 pub enum MessageType {
     /// Message about infrastructure
     SectionInfo {
+        /// Message ID
         msg_id: MessageId,
+        /// Message destination location
         dst_location: DstLocation,
         /// the message
         msg: SectionInfoMsg,
     },
     /// Client message
     Client {
+        /// Message ID
         msg_id: MessageId,
+        /// Client authority over this message
         client_signed: ClientSigned,
+        /// Message destination location
         dst_location: DstLocation,
         /// the message
         msg: ClientMsg,
     },
     /// Node to node message
     Node {
+        /// Message ID
         msg_id: MessageId,
+        /// Node authority over this message
         msg_authority: NodeMsgAuthority,
+        /// Message destination location
         dst_location: DstLocation,
         /// the message
         msg: NodeMsg,

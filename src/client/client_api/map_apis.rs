@@ -14,15 +14,11 @@ use crate::types::{
     Map, MapAddress, MapEntries, MapEntryActions, MapKind, MapPermissionSet, MapValue, PublicKey,
 };
 
-use crate::messaging::client::{DataCmd, DataQuery, MapRead, MapWrite, Query, QueryResponse};
+use crate::messaging::client::{DataCmd, DataQuery, MapRead, MapWrite, QueryResponse};
 
 use xor_name::XorName;
 
 use std::collections::{BTreeMap, BTreeSet};
-
-fn wrap_map_read(read: MapRead) -> Query {
-    Query::Data(DataQuery::Map(read))
-}
 
 impl Client {
     //-------------------
@@ -134,7 +130,7 @@ impl Client {
         trace!("Fetch Sequenced Mutable Data");
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::Get(address)))
+            .send_query(DataQuery::Map(MapRead::Get(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {
@@ -156,7 +152,7 @@ impl Client {
         trace!("Fetch MapValue for {:?}", address);
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::GetValue { address, key }))
+            .send_query(DataQuery::Map(MapRead::GetValue { address, key }))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {
@@ -173,7 +169,7 @@ impl Client {
         trace!("GetMapShell for {:?}", address);
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::GetShell(address)))
+            .send_query(DataQuery::Map(MapRead::GetShell(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {
@@ -195,7 +191,7 @@ impl Client {
         trace!("GetMapVersion for {:?}", address);
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::GetVersion(address)))
+            .send_query(DataQuery::Map(MapRead::GetVersion(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {
@@ -229,7 +225,7 @@ impl Client {
         trace!("ListMapEntries for {:?}", address.name());
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::ListEntries(address)))
+            .send_query(DataQuery::Map(MapRead::ListEntries(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {
@@ -248,7 +244,7 @@ impl Client {
         trace!("ListMapKeys for {:?}", address);
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::ListKeys(address)))
+            .send_query(DataQuery::Map(MapRead::ListKeys(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {
@@ -265,7 +261,7 @@ impl Client {
         trace!("List MapValues for {:?}", address.name());
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::ListValues(address)))
+            .send_query(DataQuery::Map(MapRead::ListValues(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {
@@ -290,7 +286,7 @@ impl Client {
         trace!("GetMapUserPermissions for {:?}", address);
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::ListUserPermissions {
+            .send_query(DataQuery::Map(MapRead::ListUserPermissions {
                 address,
                 user,
             }))
@@ -315,7 +311,7 @@ impl Client {
         trace!("List MapPermissions for {:?}", address);
 
         let query_result = self
-            .send_query(wrap_map_read(MapRead::ListPermissions(address)))
+            .send_query(DataQuery::Map(MapRead::ListPermissions(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {

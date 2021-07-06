@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{DstInfo, NodeMsg, Peer},
+    node::{NodeMsg, Peer},
     NodeMsgAuthority,
 };
 use crate::routing::{
@@ -31,14 +31,10 @@ impl Core {
         let src_name = msg_authority.name();
 
         let bounce_dst_section_pk = self.section_key_by_name(&src_name);
-        let dst_info = DstInfo {
-            dst: src_name,
-            dst_section_pk: bounce_dst_section_pk,
-        };
 
         let bounce_node_msg = NodeMsg::BouncedUntrustedMessage {
             msg: Box::new(node_msg),
-            dst_info,
+            dst_section_pk: bounce_dst_section_pk,
         };
         let cmd =
             self.send_direct_message((src_name, sender), bounce_node_msg, bounce_dst_section_pk)?;

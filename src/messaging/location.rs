@@ -10,6 +10,7 @@ use bls::PublicKey as BlsPublicKey;
 use serde::{Deserialize, Serialize};
 use xor_name::{Prefix, XorName};
 
+/// This maps to the SocketAddr at the Elders where the EndUser is proxied through.
 pub type SocketId = XorName;
 
 /// An EndUser is represented by the name
@@ -27,32 +28,13 @@ pub struct EndUser {
 pub enum SrcLocation {
     /// An EndUser.
     EndUser(EndUser),
-    /// A single node with the given name.
+    /// A single Node with the given name.
     Node(XorName),
-    /// A section close to a name.
+    /// A Section close to a name.
     Section(XorName),
 }
 
 impl SrcLocation {
-    /// Returns whether this location is a section.
-    pub fn is_section(&self) -> bool {
-        matches!(self, Self::Section(_))
-    }
-
-    /// Returns whether this location is an end user.
-    pub fn is_user(&self) -> bool {
-        matches!(self, Self::EndUser(_))
-    }
-
-    /// Returns whether the given name is part of this location
-    pub fn equals(&self, name: &XorName) -> bool {
-        match self {
-            Self::EndUser(user) => &user.xorname == name,
-            Self::Node(self_name) => name == self_name,
-            Self::Section(some_name) => name == some_name,
-        }
-    }
-
     /// Returns the name of this location.
     pub fn name(&self) -> XorName {
         match self {
@@ -80,12 +62,16 @@ pub enum DstLocation {
     EndUser(EndUser),
     /// Destination is a single node with the given name.
     Node {
+        /// Name of the Node.
         name: XorName,
+        /// Node's section public key
         section_pk: BlsPublicKey,
     },
     /// Destination are the nodes of the section whose prefix matches the given name.
     Section {
+        /// Name of the Section.
         name: XorName,
+        /// Section's public key
         section_pk: BlsPublicKey,
     },
     /// Destination is a specific node to be directly connected to,
@@ -94,16 +80,6 @@ pub enum DstLocation {
 }
 
 impl DstLocation {
-    /// Returns whether this location is a section.
-    pub fn is_section(&self) -> bool {
-        matches!(self, Self::Section { .. })
-    }
-
-    /// Returns whether this location is an end user.
-    pub fn is_user(&self) -> bool {
-        matches!(self, Self::EndUser(_))
-    }
-
     /// Returns the section pk if it's not EndUser.
     pub fn section_pk(&self) -> Option<BlsPublicKey> {
         match self {

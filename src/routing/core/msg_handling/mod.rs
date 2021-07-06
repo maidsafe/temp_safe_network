@@ -291,10 +291,10 @@ impl Core {
             }
             NodeMsg::BouncedUntrustedMessage {
                 msg: bounced_msg,
-                dst_info,
+                dst_section_pk,
             } => Ok(vec![self.handle_bounced_untrusted_message(
                 msg_authority.peer(sender)?,
-                dst_info.dst_section_pk,
+                dst_section_pk,
                 *bounced_msg,
             )?]),
             NodeMsg::SectionKnowledgeQuery {

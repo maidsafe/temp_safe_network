@@ -6,22 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Client messaging.
-
 mod chunk;
-mod cmd;
 mod data;
 mod data_exchange;
 mod duty;
 mod errors;
 mod map;
-mod query;
 mod register;
 mod sequence;
 
 pub use self::{
     chunk::{ChunkRead, ChunkWrite},
-    cmd::Cmd,
     data::{DataCmd, DataQuery},
     data_exchange::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
@@ -30,28 +25,24 @@ pub use self::{
     duty::{AdultDuties, Duty, NodeDuties},
     errors::{Error, Result},
     map::{MapCmd, MapRead, MapWrite},
-    query::Query,
     register::{RegisterCmd, RegisterRead, RegisterWrite},
     sequence::{SequenceCmd, SequenceRead, SequenceWrite},
 };
 
-use crate::messaging::{MessageId, MessageType, WireMsg};
+use crate::messaging::MessageId;
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey, Sequence,
     SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
     SequencePublicPolicy,
 };
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
 };
 
-/// Message envelope containing a Safe message payload,
-/// This struct also provides utilities to obtain the serialized bytes
-/// ready to send them over the wire.
+/// Client Message
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ClientMsg {
@@ -83,36 +74,6 @@ pub struct SupportingInfo {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SupportingInfoFor {}
 
-impl SupportingInfo {
-    /// Construct a wrapper for the given information and metadata.
-    pub fn new(
-        info: SupportingInfoFor,
-        source_message: ProcessMsg,
-        correlation_id: MessageId,
-    ) -> Self {
-        Self {
-            info,
-            source_message,
-            correlation_id,
-        }
-    }
-
-    /// Get source message that originally triggered a ProcessingError. This should usually be replayed at source after applying supporting information
-    pub fn source_message(&self) -> &ProcessMsg {
-        &self.source_message
-    }
-
-    /// Get the supporting information of this message
-    pub fn info(&self) -> &SupportingInfoFor {
-        &self.info
-    }
-
-    /// MessageId of the ProcessingError that triggered this InformationUpdate
-    pub fn correlation_id(&self) -> MessageId {
-        self.correlation_id
-    }
-}
-
 /// Our LazyMesssage error. Recipient was unable to process this message for some reason.
 /// The original message should be returned in full, and context can optionally be added via
 /// reason.
@@ -120,62 +81,9 @@ impl SupportingInfo {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProcessingError {
     /// Optional reason for the error. This should help the receiving node handle the error
-    reason: Option<Error>,
+    pub reason: Option<Error>,
     /// Message that triggered this error
-    source_message: Option<ProcessMsg>,
-}
-
-impl ProcessingError {
-    /// Construct a new error with the given reason and metadata.
-    pub fn new(reason: Option<Error>, source_message: Option<ProcessMsg>) -> Self {
-        Self {
-            reason,
-            source_message,
-        }
-    }
-
-    /// Get the [`ProcessMsg`] that caused the error.
-    pub fn source_message(&self) -> &Option<ProcessMsg> {
-        &self.source_message
-    }
-
-    /// The reason the error occurred (supplied by the recipient).
-    pub fn reason(&self) -> &Option<Error> {
-        &self.reason
-    }
-}
-
-impl ClientMsg {
-    /// Convenience function to deserialize a 'Message' from bytes received over the wire.
-    /// It returns an error if the bytes don't correspond to a client message.
-    pub fn from(bytes: Bytes) -> crate::messaging::Result<Self> {
-        let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::Client { msg, .. } = deserialized {
-            Ok(msg)
-        } else {
-            Err(crate::messaging::Error::FailedToParse(
-                "bytes as a client message".to_string(),
-            ))
-        }
-    }
-
-    /// return ProcessMessage if any
-    pub fn get_process(&self) -> Option<&ProcessMsg> {
-        match self {
-            Self::Process(msg) => Some(msg),
-            Self::ProcessingError(_) => None,
-            Self::SupportingInfo(msg) => Some(&msg.source_message()),
-        }
-    }
-
-    /// return ProcessMessage if any
-    pub fn get_processing_error(&self) -> Option<&ProcessingError> {
-        match self {
-            Self::Process(_) => None,
-            Self::SupportingInfo(_) => None,
-            Self::ProcessingError(error) => Some(error),
-        }
-    }
+    pub source_message: Option<ProcessMsg>,
 }
 
 ///
@@ -185,9 +93,9 @@ pub enum ProcessMsg {
     /// A Cmd is leads to a write / change of state.
     /// We expect them to be successful, and only return a msg
     /// if something went wrong.
-    Cmd(Cmd),
+    Cmd(DataCmd),
     /// Queries is a read-only operation.
-    Query(Query),
+    Query(DataQuery),
     /// An Event is a fact about something that happened.
     Event {
         /// Request.
@@ -209,18 +117,6 @@ pub enum ProcessMsg {
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
-}
-
-impl ProcessMsg {
-    /// Create a [`ProcessingError`] to indicate that this message could not be processed.
-    ///
-    /// Context for the error can optionally be supplied in `reason`.
-    pub fn create_processing_error(&self, reason: Option<Error>) -> ProcessingError {
-        ProcessingError {
-            source_message: Some(self.clone()),
-            reason,
-        }
-    }
 }
 
 ///
