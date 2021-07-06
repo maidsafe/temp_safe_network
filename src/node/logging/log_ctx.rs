@@ -6,26 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Implementation of the "Node" node for the SAFE Network.
+use crate::node::network::Network;
+use xor_name::Prefix;
 
-mod capacity;
-mod chaos;
-mod chunk_store;
-/// Configuration handling
-pub mod config_handler;
-mod error;
-mod event_mapping;
-mod logging;
-mod metadata;
-mod network;
-mod node_api;
-mod node_ops;
+#[derive(Debug)]
+pub struct LogCtx {
+    network: Network,
+}
 
-/// Docs
-pub mod state_db;
+impl LogCtx {
+    pub fn new(network: Network) -> Self {
+        Self { network }
+    }
 
-pub use crate::node::{
-    config_handler::{add_connection_info, set_connection_info, Config},
-    error::{Error, Result},
-    node_api::Node,
-};
+    pub async fn prefix(&self) -> Prefix {
+        self.network.our_prefix().await
+    }
+}

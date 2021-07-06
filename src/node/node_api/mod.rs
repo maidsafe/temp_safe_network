@@ -15,6 +15,8 @@ mod split;
 
 use crate::dbs::UsedSpace;
 use crate::messaging::client::ClientMsg;
+use crate::node::logging::log_ctx::LogCtx;
+use crate::node::logging::run_system_logger;
 use crate::node::{
     chunk_store::ChunkStore,
     error::convert_to_error_message,
@@ -126,6 +128,8 @@ impl Node {
             "Node PID: {:?}, prefix: {:?}, name: {}, connection info: {}",
             our_pid, node_prefix, node_name, our_conn_info_json,
         );
+
+        run_system_logger(LogCtx::new(network_api)).await;
 
         Ok((node, network_events))
     }
