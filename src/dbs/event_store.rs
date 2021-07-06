@@ -21,18 +21,18 @@ use xor_name::XorName;
 const DB_EXTENSION: &str = ".db";
 
 /// Disk storage for transfers.
-pub struct EventStore<TEvent: Debug + Serialize + DeserializeOwned> {
+pub(crate) struct EventStore<TEvent: Debug + Serialize + DeserializeOwned> {
     db: PickleDb,
     db_path: PathBuf,
     _phantom: PhantomData<TEvent>,
 }
 
-pub struct DeletableStore {
+pub(crate) struct DeletableStore {
     db_path: PathBuf,
 }
 
 impl DeletableStore {
-    pub async fn delete(&self) -> Result<()> {
+    pub(crate) async fn delete(&self) -> Result<()> {
         fs::remove_file(self.db_path.as_path())
             .await
             .map_err(Error::Io)
@@ -43,7 +43,7 @@ impl<'a, TEvent: Debug + Serialize + DeserializeOwned> EventStore<TEvent>
 where
     TEvent: 'a,
 {
-    pub async fn new(id: XorName, db_dir: &Path) -> Result<Self> {
+    pub(crate) async fn new(id: XorName, db_dir: &Path) -> Result<Self> {
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         let db_path = db_dir.join(db_name.clone());
         Ok(Self {
@@ -53,14 +53,14 @@ where
         })
     }
 
-    pub fn as_deletable(&self) -> DeletableStore {
+    pub(crate) fn as_deletable(&self) -> DeletableStore {
         DeletableStore {
             db_path: self.db_path.clone(),
         }
     }
 
     ///
-    pub fn get_all(&self) -> Vec<TEvent> {
+    pub(crate) fn get_all(&self) -> Vec<TEvent> {
         let keys = self.db.get_all();
 
         let mut events: Vec<(usize, TEvent)> = keys
@@ -86,7 +86,7 @@ where
     }
 
     ///
-    pub fn append(&mut self, event: TEvent) -> Result<()> {
+    pub(crate) fn append(&mut self, event: TEvent) -> Result<()> {
         let key = &self.db.total_keys().to_string();
         if self.db.exists(key) {
             return Err(Error::InvalidOperation(format!(

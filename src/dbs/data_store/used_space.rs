@@ -15,40 +15,40 @@ use std::sync::Arc;
 use tokio::fs;
 
 #[derive(Clone, Debug)]
-pub struct UsedSpace {
+pub(crate) struct UsedSpace {
     /// the maximum (inclusive) allocated space for storage
     max_capacity: u64,
     dirs: Arc<DashSet<PathBuf>>,
 }
 
 impl UsedSpace {
-    pub fn new(max_capacity: u64) -> Self {
+    pub(crate) fn new(max_capacity: u64) -> Self {
         Self {
             max_capacity,
             dirs: Arc::new(DashSet::new()),
         }
     }
 
-    pub fn add_dir(&self, dir: &Path) {
+    pub(crate) fn add_dir(&self, dir: &Path) {
         let _ = self.dirs.insert(dir.to_path_buf());
     }
 
-    // pub fn remove_dir(&self, dir: &Path) {
+    // pub(crate) fn remove_dir(&self, dir: &Path) {
     //     let _ = self.dirs.remove(&dir.to_path_buf());
     // }
 
-    pub fn max_capacity(&self) -> u64 {
+    pub(crate) fn max_capacity(&self) -> u64 {
         self.max_capacity
     }
 
-    pub async fn can_consume(&self, space: u64) -> bool {
+    pub(crate) async fn can_consume(&self, space: u64) -> bool {
         self.total()
             .await
             .checked_add(space)
             .map_or(false, |new_total| self.max_capacity >= new_total)
     }
 
-    pub async fn total(&self) -> u64 {
+    pub(crate) async fn total(&self) -> u64 {
         // todo: handle the error
         let handles = self
             .dirs

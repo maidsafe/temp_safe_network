@@ -51,7 +51,11 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub async fn new(path: &Path, used_space: UsedSpace, capacity: Capacity) -> Result<Self> {
+    pub(crate) async fn new(
+        path: &Path,
+        used_space: UsedSpace,
+        capacity: Capacity,
+    ) -> Result<Self> {
         let chunk_records = ChunkRecords::new(capacity);
         let map_storage = MapStorage::new(path, used_space.max_capacity()); // to be removed so we don't care to implement this
         let sequence_storage = SequenceStorage::new(path, used_space.max_capacity()); // to be removed so we don't care to implement this

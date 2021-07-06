@@ -10,11 +10,11 @@ use super::ToDbKey;
 use crate::types::DataAddress;
 use serde::{de::DeserializeOwned, Serialize};
 
-pub trait Data: Serialize + DeserializeOwned {
+pub(crate) trait Data: Serialize + DeserializeOwned {
     type Id: DataId;
     fn id(&self) -> &Self::Id;
 }
 
-pub trait DataId: ToDbKey + PartialEq + Eq + DeserializeOwned {
+pub(crate) trait DataId: ToDbKey + PartialEq + Eq + DeserializeOwned {
     fn to_data_address(&self) -> DataAddress;
 }

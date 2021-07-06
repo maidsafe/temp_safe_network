@@ -11,14 +11,20 @@ mod encoding;
 mod errors;
 mod event_store;
 
-pub use data_store::*;
-pub use errors::{Error, Result};
-pub use event_store::EventStore;
+use data_store::to_db_key::ToDbKey;
+pub(crate) use data_store::{
+    data::{Data, DataId},
+    used_space::UsedSpace,
+    DataStore, Subdir,
+};
+pub(crate) use errors::Error;
+use errors::Result;
+pub(crate) use event_store::EventStore;
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use std::path::Path;
 use tokio::fs;
 ///
-pub async fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
+pub(crate) async fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
     db_name: N,
 ) -> Result<PickleDb> {
