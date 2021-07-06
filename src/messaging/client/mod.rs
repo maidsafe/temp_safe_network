@@ -308,56 +308,37 @@ mod tests {
     }
 
     #[test]
-    fn generate_processing_error() -> Result<()> {
-        if let Some(keypair) = gen_keypairs().first() {
-            let public_key = keypair.public_key();
+    fn generate_processing_error() {
+        let msg = ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
+            XorName::random(),
+        ))));
+        let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
+        let lazy_error = ProcessingError {
+            reason: Some(Error::DataNotFound(random_addr.clone())),
+            source_message: Some(msg),
+        };
 
-            let msg = ProcessMsg::Query {
-                id: MessageId::new(),
-                query: Query::Data(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
-                    XorName::random(),
-                )))),
-            };
-            let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
-            let lazy_error =
-                msg.create_processing_error(Some(Error::DataNotFound(random_addr.clone())));
-
-            assert!(format!("{:?}", lazy_error).contains("Data(Blob(Get(Private"));
-            assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
-            assert!(
-                format!("{:?}", lazy_error).contains(&format!("DataNotFound({:?})", random_addr))
-            );
-
-            Ok(())
-        } else {
-            Err(anyhow!("Could not generate public key"))
-        }
+        assert!(format!("{:?}", lazy_error).contains("Blob(Get(Private"));
+        assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
+        assert!(format!("{:?}", lazy_error).contains(&format!("DataNotFound({:?})", random_addr)));
     }
 
     #[test]
-    fn debug_format_processing_error() -> Result<()> {
-        if let Some(keypair) = gen_keypairs().first() {
-            let public_key = keypair.public_key();
+    fn debug_format_processing_error() {
+        let chunk_addr = ChunkAddress::Public(XorName::random());
+        let random_addr = DataAddress::Chunk(chunk_addr);
+        let errored_response = ProcessingError {
+            reason: Some(Error::DataNotFound(random_addr.clone())),
+            source_message: Some(ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(
+                chunk_addr,
+            )))),
+        };
 
-            let chunk_addr = ChunkAddress::Public(XorName::random());
-            let random_addr = DataAddress::Chunk(chunk_addr);
-            let errored_response = ProcessingError {
-                reason: Some(Error::DataNotFound(random_addr.clone())),
-                source_message: Some(ProcessMsg::Query {
-                    id: MessageId::new(),
-                    query: Query::Data(DataQuery::Blob(ChunkRead::Get(chunk_addr))),
-                }),
-                id: MessageId::new(),
-            };
-
-            assert!(format!("{:?}", errored_response).contains("Data(Blob(Get(Public"));
-            assert!(format!("{:?}", errored_response).contains("ProcessingError"));
-            assert!(format!("{:?}", errored_response)
-                .contains(&format!("DataNotFound({:?})", random_addr)));
-            Ok(())
-        } else {
-            Err(anyhow!("Could not generate public key"))
-        }
+        assert!(format!("{:?}", errored_response).contains("Blob(Get(Public"));
+        assert!(format!("{:?}", errored_response).contains("ProcessingError"));
+        assert!(
+            format!("{:?}", errored_response).contains(&format!("DataNotFound({:?})", random_addr))
+        );
     }
 
     #[test]

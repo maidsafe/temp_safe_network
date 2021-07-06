@@ -343,7 +343,7 @@ pub enum SendStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{section_info::SectionInfoMsg, DstInfo, MessageType, WireMsg};
+    use crate::messaging::{section_info::SectionInfoMsg, DstLocation, WireMsg};
     use crate::types::PublicKey;
     use anyhow::Result;
     use assert_matches::assert_matches;
@@ -362,7 +362,7 @@ mod tests {
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
 
-        let mut original_message = new_section_info_message();
+        let mut original_message = new_section_info_message()?;
 
         let status = comm
             .send(
@@ -375,12 +375,12 @@ mod tests {
         assert_matches!(status, SendStatus::AllRecipients);
 
         if let Some(bytes) = peer0.rx.recv().await {
-            original_message.update_dst_info(None, Some(peer0._name));
-            assert_eq!(WireMsg::deserialize(bytes)?, original_message.clone());
+            original_message.set_dst_xorname(peer0._name);
+            assert_eq!(WireMsg::from(bytes)?, original_message.clone());
         }
 
         if let Some(bytes) = peer1.rx.recv().await {
-            assert_eq!(WireMsg::deserialize(bytes)?, original_message);
+            assert_eq!(WireMsg::from(bytes)?, original_message);
         }
 
         Ok(())
@@ -394,7 +394,7 @@ mod tests {
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
 
-        let mut original_message = new_section_info_message();
+        let mut original_message = new_section_info_message()?;
         let status = comm
             .send(
                 &[(peer0._name, peer0.addr), (peer1._name, peer1.addr)],
@@ -406,8 +406,8 @@ mod tests {
         assert_matches!(status, SendStatus::AllRecipients);
 
         if let Some(bytes) = peer0.rx.recv().await {
-            original_message.update_dst_info(None, Some(peer0._name));
-            assert_eq!(WireMsg::deserialize(bytes)?, original_message);
+            original_message.set_dst_xorname(peer0._name);
+            assert_eq!(WireMsg::from(bytes)?, original_message);
         }
 
         assert!(time::timeout(TIMEOUT, peer1.rx.recv())
@@ -436,7 +436,7 @@ mod tests {
             .send(
                 &[(XorName::random(), invalid_addr)],
                 1,
-                new_section_info_message(),
+                new_section_info_message()?,
             )
             .await?;
 
@@ -463,7 +463,7 @@ mod tests {
         let invalid_addr = get_invalid_addr().await?;
         let name = XorName::random();
 
-        let mut message = new_section_info_message();
+        let mut message = new_section_info_message()?;
         let _ = comm
             .send(
                 &[(name, invalid_addr), (peer._name, peer.addr)],
@@ -474,8 +474,8 @@ mod tests {
 
         // Using first name of the recipients to represent section_name.
         if let Some(bytes) = peer.rx.recv().await {
-            message.update_dst_info(None, Some(name));
-            assert_eq!(WireMsg::deserialize(bytes)?, message);
+            message.set_dst_xorname(name);
+            assert_eq!(WireMsg::from(bytes)?, message);
         }
         Ok(())
     }
@@ -495,7 +495,7 @@ mod tests {
         let invalid_addr = get_invalid_addr().await?;
         let name = XorName::random();
 
-        let mut message = new_section_info_message();
+        let mut message = new_section_info_message()?;
         let status = comm
             .send(
                 &[(name, invalid_addr), (peer._name, peer.addr)],
@@ -511,8 +511,8 @@ mod tests {
 
         // Using first name of the recipients to represent section_name.
         if let Some(bytes) = peer.rx.recv().await {
-            message.update_dst_info(None, Some(name));
-            assert_eq!(WireMsg::deserialize(bytes)?, message);
+            message.set_dst_xorname(name);
+            assert_eq!(WireMsg::from(bytes)?, message);
         }
         Ok(())
     }
@@ -529,13 +529,12 @@ mod tests {
 
         // Send the first message.
         let key0 = bls::SecretKey::random().public_key();
-        let msg0 = MessageType::SectionInfo {
-            msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key0)),
-            dst_info: DstInfo {
-                dst: name,
-                dst_section_pk: key0,
-            },
+        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key0));
+        let dst_location = DstLocation::Node {
+            name,
+            section_pk: key0,
         };
+        let msg0 = WireMsg::new_section_info_msg(&query, dst_location)?;
         let _ = send_comm
             .send(slice::from_ref(&(name, recv_addr)), 1, msg0.clone())
             .await?;
@@ -545,7 +544,7 @@ mod tests {
         // Receive one message and disconnect from the peer
         {
             if let Some((src, msg)) = time::timeout(TIMEOUT, incoming_msgs.next()).await? {
-                assert_eq!(WireMsg::deserialize(msg)?, msg0);
+                assert_eq!(WireMsg::from(msg)?, msg0);
                 msg0_received = true;
                 recv_endpoint.disconnect_from(&src).await?;
             }
@@ -554,13 +553,12 @@ mod tests {
 
         // Send the second message.
         let key1 = bls::SecretKey::random().public_key();
-        let msg1 = MessageType::SectionInfo {
-            msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key1)),
-            dst_info: DstInfo {
-                dst: name,
-                dst_section_pk: key1,
-            },
+        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key1));
+        let dst_location = DstLocation::Node {
+            name,
+            section_pk: key1,
         };
+        let msg1 = WireMsg::new_section_info_msg(&query, dst_location)?;
         let _ = send_comm
             .send(slice::from_ref(&(name, recv_addr)), 1, msg1.clone())
             .await?;
@@ -568,7 +566,7 @@ mod tests {
         let mut msg1_received = false;
 
         if let Some((_src, msg)) = time::timeout(TIMEOUT, incoming_msgs.next()).await? {
-            assert_eq!(WireMsg::deserialize(msg)?, msg1);
+            assert_eq!(WireMsg::from(msg)?, msg1);
             msg1_received = true;
         }
 
@@ -592,7 +590,7 @@ mod tests {
             .send(
                 slice::from_ref(&(XorName::random(), addr0)),
                 1,
-                new_section_info_message(),
+                new_section_info_message()?,
             )
             .await?;
 
@@ -615,15 +613,16 @@ mod tests {
         }
     }
 
-    fn new_section_info_message() -> MessageType {
+    fn new_section_info_message() -> Result<WireMsg> {
         let random_bls_pk = bls::SecretKey::random().public_key();
-        MessageType::SectionInfo {
-            msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(random_bls_pk)),
-            dst_location: DstLocation::Node {
-                name: XorName::random(),
-                section_pk: bls::SecretKey::random().public_key(),
-            },
-        }
+        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(random_bls_pk));
+        let dst_location = DstLocation::Node {
+            name: XorName::random(),
+            section_pk: bls::SecretKey::random().public_key(),
+        };
+
+        let wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
+        Ok(wire_msg)
     }
 
     struct Peer {

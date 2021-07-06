@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Utilities for sn_routing messages through the network.
-
 use crate::messaging::{
     node::{Network, Peer, Section},
     DstLocation,
@@ -189,7 +187,11 @@ mod tests {
             .choose(&mut rand::thread_rng())
             .context("too few elders")?;
 
-        let dst = DstLocation::Node(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Node {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send only to the dst node.
@@ -210,7 +212,11 @@ mod tests {
         let node_state = section_signed(&sk, node_state)?;
         assert!(section.update_member(node_state));
 
-        let dst = DstLocation::Node(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Node {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send only to the dst node.
@@ -225,7 +231,11 @@ mod tests {
         let (our_name, section, network, _) = setup_elder()?;
 
         let dst_name = section.prefix().substituted_in(rand::random());
-        let dst = DstLocation::Section(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Section {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to all our elders except us.
@@ -253,7 +263,11 @@ mod tests {
             .context("unknown section")?;
 
         let dst_name = choose_elder_name(section_auth1)?;
-        let dst = DstLocation::Node(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Node {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send only to the dst node.
@@ -272,7 +286,11 @@ mod tests {
             .context("unknown section")?;
 
         let dst_name = section_auth1.prefix.substituted_in(rand::random());
-        let dst = DstLocation::Node(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Node {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to all elders in the dst section
@@ -298,7 +316,11 @@ mod tests {
             .prefix
             .pushed(false)
             .substituted_in(rand::random());
-        let dst = DstLocation::Node(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Node {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to all elders in the dst section
@@ -322,7 +344,11 @@ mod tests {
             .context("unknown section")?;
 
         let dst_name = section_auth1.prefix.substituted_in(rand::random());
-        let dst = DstLocation::Section(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Section {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to all elders in the final dst section
@@ -348,7 +374,11 @@ mod tests {
             .prefix
             .pushed(false)
             .substituted_in(rand::random());
-        let dst = DstLocation::Section(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Section {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to a subset of elders in the intermediary dst section
@@ -370,7 +400,11 @@ mod tests {
         let (our_name, section, network) = setup_adult()?;
 
         let dst_name = choose_elder_name(section.authority_provider())?;
-        let dst = DstLocation::Node(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Node {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to all elders
@@ -385,7 +419,11 @@ mod tests {
         let (our_name, section, network) = setup_adult()?;
 
         let dst_name = section.prefix().substituted_in(rand::random());
-        let dst = DstLocation::Node(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Node {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to all elders
@@ -400,7 +438,11 @@ mod tests {
         let (our_name, section, network) = setup_adult()?;
 
         let dst_name = section.prefix().substituted_in(rand::random());
-        let dst = DstLocation::Section(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Section {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to all elders
@@ -417,7 +459,11 @@ mod tests {
         let dst_name = Prefix::default()
             .pushed(true)
             .substituted_in(rand::random());
-        let dst = DstLocation::Node(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Node {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to all elders
@@ -434,7 +480,11 @@ mod tests {
         let dst_name = Prefix::default()
             .pushed(true)
             .substituted_in(rand::random());
-        let dst = DstLocation::Section(dst_name);
+        let section_pk = section.authority_provider().section_key();
+        let dst = DstLocation::Section {
+            name: dst_name,
+            section_pk,
+        };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
 
         // Send to all elders
