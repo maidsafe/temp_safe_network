@@ -8,21 +8,21 @@
 
 use super::Client;
 use crate::client::Error;
-use crate::messaging::{client::Cmd, ClientSigned};
+use crate::messaging::{client::DataCmd, ClientSigned};
 use crate::types::{PublicKey, Signature};
 use std::net::SocketAddr;
 use tracing::debug;
 
 impl Client {
-    /// Send a signed Cmd to the network
+    /// Send a signed DataCmd to the network
     pub(crate) async fn send_signed_command(
         &self,
-        cmd: Cmd,
+        cmd: DataCmd,
         client_pk: PublicKey,
         signature: Signature,
         target: Option<SocketAddr>,
     ) -> Result<(), Error> {
-        debug!("Sending Cmd: {:?}", cmd);
+        debug!("Sending DataCmd: {:?}", cmd);
         let client_sig = ClientSigned {
             public_key: client_pk,
             signature,
@@ -31,9 +31,13 @@ impl Client {
         self.session.send_cmd(cmd, client_sig, target).await
     }
 
-    // Send a Cmd to the network without awaiting for a response.
+    // Send a DataCmd to the network without awaiting for a response.
     // This function is a helper private to this module.
-    pub(crate) async fn send_cmd(&self, cmd: Cmd, target: Option<SocketAddr>) -> Result<(), Error> {
+    pub(crate) async fn send_cmd(
+        &self,
+        cmd: DataCmd,
+        target: Option<SocketAddr>,
+    ) -> Result<(), Error> {
         let client_pk = self.public_key();
         let signature = self.keypair.sign(b"TODO");
 

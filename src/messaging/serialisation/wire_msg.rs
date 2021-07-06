@@ -24,7 +24,9 @@ use xor_name::XorName;
 /// The WireMsg struct provides the utilities to serialize and deserialize messages.
 #[derive(Debug, PartialEq, Clone)]
 pub struct WireMsg {
+    /// Message header
     pub header: WireMsgHeader,
+    /// Serialised message
     pub payload: Bytes,
 }
 

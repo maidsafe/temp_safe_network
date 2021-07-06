@@ -8,7 +8,7 @@
 
 use super::Client;
 use crate::client::{connections::QueryResult, errors::Error};
-use crate::messaging::{client::Query, ClientSigned};
+use crate::messaging::{client::DataQuery, ClientSigned};
 use crate::types::{PublicKey, Signature};
 use tracing::debug;
 
@@ -16,7 +16,7 @@ impl Client {
     /// Send a Query to the network and await a response
     pub(crate) async fn send_signed_query(
         &self,
-        query: Query,
+        query: DataQuery,
         client_pk: PublicKey,
         signature: Signature,
     ) -> Result<QueryResult, Error> {
@@ -31,7 +31,7 @@ impl Client {
 
     // Send a Query to the network and await a response.
     // This function is a helper private to this module.
-    pub(crate) async fn send_query(&self, query: Query) -> Result<QueryResult, Error> {
+    pub(crate) async fn send_query(&self, query: DataQuery) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
         let signature = self.keypair.sign(b"TODO");
 

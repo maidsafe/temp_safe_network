@@ -45,17 +45,6 @@ use std::{
 };
 use xor_name::XorName;
 
-/// Message destination information
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Ord, PartialOrd, Eq)]
-pub struct DstInfo {
-    /// destination xorname
-    pub dst: XorName,
-    /// Destination section pk
-    /// This is used to check we are communicating with the correct section.
-    /// An out of date key here will result in Anti-Entropy updates being received.
-    pub dst_section_pk: BlsPublicKey,
-}
-
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
@@ -100,10 +89,10 @@ pub enum NodeMsg {
     /// Sent from a node that can't establish the trust of the contained message to its original
     /// source in order for them to provide new proof that the node would trust.
     BouncedUntrustedMessage {
-        /// Routing message
+        /// Untrsuted Node message
         msg: Box<NodeMsg>,
-        /// Destination info
-        dst_info: DstInfo,
+        /// Currently known section pk of the source
+        dst_section_pk: BlsPublicKey,
     },
     /// Sent to the new elder candidates to start the DKG process.
     DkgStart {
@@ -216,10 +205,13 @@ impl Debug for NodeMsg {
             Self::JoinAsRelocatedResponse(response) => {
                 write!(f, "JoinAsRelocatedResponse({:?})", response)
             }
-            Self::BouncedUntrustedMessage { msg, dst_info } => f
+            Self::BouncedUntrustedMessage {
+                msg,
+                dst_section_pk,
+            } => f
                 .debug_struct("BouncedUntrustedMessage")
                 .field("message", msg)
-                .field("dst_info", dst_info)
+                .field("dst_section_pk", dst_section_pk)
                 .finish(),
             Self::DkgStart {
                 dkg_key,

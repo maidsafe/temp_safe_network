@@ -15,7 +15,7 @@ mod register_apis;
 mod sequence_apis;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
-use crate::messaging::client::{Cmd, CmdError, DataCmd};
+use crate::messaging::client::{CmdError, DataCmd};
 use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
 use lru::LruCache;
 use rand::rngs::OsRng;
@@ -132,9 +132,6 @@ impl Client {
     // Private helper to obtain payment proof for a data command, send it to the network,
     // and also apply the payment to local replica actor.
     async fn pay_and_send_data_command(&self, cmd: DataCmd) -> Result<(), Error> {
-        // The _actual_ message
-        let cmd = Cmd::Data { cmd };
-
         self.send_cmd(cmd, None).await
     }
 

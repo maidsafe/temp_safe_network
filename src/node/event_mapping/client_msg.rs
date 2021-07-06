@@ -8,7 +8,7 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    client::{ClientMsg, Cmd, ProcessMsg, ProcessingError, Query},
+    client::{ClientMsg, ProcessMsg, ProcessingError},
     ClientSigned, EndUser, MessageId, SrcLocation,
 };
 use crate::node::{
@@ -68,13 +68,13 @@ fn map_client_process_msg(
     client_signed: ClientSigned,
 ) -> NodeDuty {
     match process_msg {
-        ProcessMsg::Query(Query::Data(query)) => NodeDuty::ProcessRead {
+        ProcessMsg::Query(query) => NodeDuty::ProcessRead {
             query,
             msg_id,
             client_signed,
             origin,
         },
-        ProcessMsg::Cmd(Cmd::Data { cmd }) => NodeDuty::ProcessWrite {
+        ProcessMsg::Cmd(cmd) => NodeDuty::ProcessWrite {
             cmd,
             msg_id,
             client_signed,
@@ -90,10 +90,10 @@ fn map_client_process_msg(
 
             NodeDuty::Send(OutgoingMsg {
                 id,
-                msg: MsgType::Client(ClientMsg::ProcessingError(ProcessingError::new(
-                    Some(error_data),
-                    Some(process_msg),
-                ))),
+                msg: MsgType::Client(ClientMsg::ProcessingError(ProcessingError {
+                    reason: Some(error_data),
+                    source_message: Some(process_msg),
+                })),
                 dst: src.to_dst(),
                 aggregation: false,
             })

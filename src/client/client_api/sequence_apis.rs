@@ -8,9 +8,7 @@
 
 use super::Client;
 use crate::client::Error;
-use crate::messaging::client::{
-    Cmd, DataCmd, DataQuery, Query, QueryResponse, SequenceRead, SequenceWrite,
-};
+use crate::messaging::client::{DataCmd, DataQuery, QueryResponse, SequenceRead, SequenceWrite};
 use crate::types::{
     PublicKey, Sequence, SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex,
     SequencePermissions, SequencePrivatePermissions, SequencePrivatePolicy,
@@ -19,10 +17,6 @@ use crate::types::{
 use std::collections::BTreeMap;
 use tracing::{debug, trace};
 use xor_name::XorName;
-
-fn wrap_seq_read(read: SequenceRead) -> Query {
-    Query::Data(DataQuery::Sequence(read))
-}
 
 impl Client {
     //----------------------
@@ -121,10 +115,6 @@ impl Client {
     ///
     pub async fn delete_sequence(&self, address: SequenceAddress) -> Result<(), Error> {
         let cmd = DataCmd::Sequence(SequenceWrite::Delete(address));
-
-        // The _actual_ message
-        let cmd = Cmd::Data { cmd };
-
         self.send_cmd(cmd, None).await
     }
 
@@ -184,7 +174,7 @@ impl Client {
         trace!("Get Sequence Data at {:?}", address.name());
         // Let's fetch the Sequence from the network
         let query_result = self
-            .send_query(wrap_seq_read(SequenceRead::Get(address)))
+            .send_query(DataQuery::Sequence(SequenceRead::Get(address)))
             .await?;
         let msg_id = query_result.msg_id;
         match query_result.response {

@@ -8,9 +8,7 @@
 
 use super::Client;
 use crate::client::Error;
-use crate::messaging::client::{
-    Cmd, DataCmd, DataQuery, Query, QueryResponse, RegisterRead, RegisterWrite,
-};
+use crate::messaging::client::{DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite};
 use crate::types::{
     register::{
         Address, Entry, EntryHash, Permissions, Policy, PrivatePermissions, PrivatePolicy,
@@ -83,10 +81,6 @@ impl Client {
     /// You're only able to delete a PrivateRegister. Public data can no be removed from the network.
     pub async fn delete_register(&self, address: Address) -> Result<(), Error> {
         let cmd = DataCmd::Register(RegisterWrite::Delete(address));
-
-        // The _actual_ message
-        let cmd = Cmd::Data { cmd };
-
         self.send_cmd(cmd, None).await
     }
 
@@ -138,7 +132,7 @@ impl Client {
     pub async fn get_register(&self, address: Address) -> Result<Register, Error> {
         trace!("Get Register data at {:?}", address.name());
         // Let's fetch the Register from the network
-        let query = Query::Data(DataQuery::Register(RegisterRead::Get(address)));
+        let query = DataQuery::Register(RegisterRead::Get(address));
         let query_result = self.send_query(query).await?;
         let msg_id = query_result.msg_id;
         match query_result.response {

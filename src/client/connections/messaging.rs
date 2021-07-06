@@ -9,7 +9,7 @@
 use super::{QueryResult, Session};
 use crate::client::Error;
 use crate::messaging::{
-    client::{ChunkRead, ClientMsg, Cmd, DataQuery, ProcessMsg, Query, QueryResponse},
+    client::{ChunkRead, ClientMsg, DataCmd, DataQuery, ProcessMsg, QueryResponse},
     section_info::SectionInfoMsg,
     ClientSigned, MessageId, WireMsg,
 };
@@ -110,7 +110,7 @@ impl Session {
     /// Send a `ClientMsg` to the network without awaiting for a response.
     pub(crate) async fn send_cmd(
         &self,
-        cmd: Cmd,
+        cmd: DataCmd,
         client_signed: ClientSigned,
         send_to_specific_elder: Option<SocketAddr>,
     ) -> Result<(), Error> {
@@ -200,7 +200,7 @@ impl Session {
     // pre-serialized payload.
     pub(crate) async fn send_query(
         &self,
-        query: Query,
+        query: DataQuery,
         client_signed: ClientSigned,
     ) -> Result<QueryResult, Error> {
         let data_name = query.dst_address();
@@ -208,7 +208,7 @@ impl Session {
         let endpoint = self.endpoint()?.clone();
         let pending_queries = self.pending_queries.clone();
 
-        let chunk_addr = if let Query::Data(DataQuery::Blob(ChunkRead::Get(address))) = query {
+        let chunk_addr = if let DataQuery::Blob(ChunkRead::Get(address)) = query {
             Some(address)
         } else {
             None
