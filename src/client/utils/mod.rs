@@ -10,68 +10,9 @@
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
-use crate::client::Error;
-use bincode::{deserialize, serialize};
-use miscreant::{Aead, Aes128SivAead};
 use rand::distributions::{Alphanumeric, Distribution, Standard};
 use rand::rngs::OsRng;
 use rand::{self, Rng};
-use serde::{Deserialize, Serialize};
-
-/// Length of the symmetric encryption key.
-pub const SYM_ENC_KEY_LEN: usize = 32;
-
-/// Length of the nonce used for symmetric encryption.
-pub const SYM_ENC_NONCE_LEN: usize = 16;
-
-/// Symmetric encryption key
-pub type SymEncKey = [u8; SYM_ENC_KEY_LEN];
-
-/// Symmetric encryption nonce
-pub type SymEncNonce = [u8; SYM_ENC_NONCE_LEN];
-
-#[derive(Serialize, Deserialize)]
-struct SymmetricEnc {
-    nonce: SymEncNonce,
-    cipher_text: Vec<u8>,
-}
-
-/// Generates a symmetric encryption key
-pub fn generate_sym_enc_key() -> SymEncKey {
-    rand::random()
-}
-
-/// Generates a nonce for symmetric encryption
-pub fn generate_nonce() -> SymEncNonce {
-    rand::random()
-}
-
-/// Symmetric encryption.
-/// If `nonce` is `None`, then it will be generated randomly.
-pub fn symmetric_encrypt(
-    plain_text: &[u8],
-    secret_key: &SymEncKey,
-    nonce: Option<&SymEncNonce>,
-) -> Result<Vec<u8>, Error> {
-    let nonce = match nonce {
-        Some(nonce) => *nonce,
-        None => generate_nonce(),
-    };
-
-    let mut cipher = Aes128SivAead::new(secret_key);
-    let cipher_text = cipher.encrypt(&nonce, &[], plain_text);
-
-    Ok(serialize(&SymmetricEnc { nonce, cipher_text })?)
-}
-
-/// Symmetric decryption.
-pub fn symmetric_decrypt(cipher_text: &[u8], secret_key: &SymEncKey) -> Result<Vec<u8>, Error> {
-    let SymmetricEnc { nonce, cipher_text } = deserialize::<SymmetricEnc>(cipher_text)?;
-    let mut cipher = Aes128SivAead::new(secret_key);
-    cipher
-        .decrypt(&nonce, &[], &cipher_text)
-        .map_err(|_| Error::SymmetricDecipherFailure)
-}
 
 /// Generates a `String` from `length` random UTF-8 `char`s.  Note that the NULL character will be
 /// excluded to allow conversion to a `CString` if required, and that the actual `len()` of the

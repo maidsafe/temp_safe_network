@@ -86,8 +86,8 @@ mod test {
         get_network_keypair, get_reward_pk, store_network_keypair, store_new_reward_keypair,
     };
     use anyhow::{anyhow, Result};
-    use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
-    use tempdir::TempDir;
+    use rand::rngs::OsRng;
+    use tempfile::{tempdir, TempDir};
 
     #[tokio::test]
     async fn pubkey_to_and_from_file() -> Result<()> {
@@ -126,7 +126,6 @@ mod test {
 
     // creates a temp dir
     fn create_temp_root() -> Result<TempDir> {
-        let rand_dir_name: String = thread_rng().sample_iter(&Alphanumeric).take(10).collect();
-        TempDir::new(&rand_dir_name).map_err(|e| anyhow!("Failed to create temp dir: {}", e))
+        tempdir().map_err(|e| anyhow!("Failed to create temp dir: {}", e))
     }
 }

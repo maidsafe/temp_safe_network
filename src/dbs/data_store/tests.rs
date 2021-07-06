@@ -14,7 +14,7 @@ use crate::types::{ChunkAddress, DataAddress};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, u64};
-use tempdir::TempDir;
+use tempfile::{tempdir, TempDir};
 use xor_name::XorName;
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -55,7 +55,7 @@ fn new_rng() -> ThreadRng {
 }
 
 fn temp_dir() -> DataStoreResult<TempDir> {
-    TempDir::new("test").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
+    tempdir().map_err(|e| Error::TempDirCreationFailed(e.to_string()))
 }
 
 struct Chunks {
