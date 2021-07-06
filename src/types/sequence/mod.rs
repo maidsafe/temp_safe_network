@@ -7,13 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod metadata;
+pub(super) mod metadata;
 mod seq_crdt;
 
 use super::{Error, PublicKey, Result};
-pub use metadata::{
-    Action, Address, Entries, Entry, Index, Kind, Perm, Permissions, Policy, PrivatePermissions,
-    PrivatePolicy, PublicPermissions, PublicPolicy, User,
+use metadata::{
+    Action, Address, Entries, Entry, Index, Kind, Perm, Permissions, PrivatePolicy, PublicPolicy,
+    User,
 };
 use seq_crdt::{CrdtOperation, SequenceCrdt};
 use serde::{Deserialize, Serialize};

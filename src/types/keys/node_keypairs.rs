@@ -7,8 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::super::keys::{BlsKeypairShare, SignatureShare};
 use super::super::{PublicKey, Signature};
+use crate::types::{BlsKeypairShare, SignatureShare};
 use bls::{serde_impl::SerdeSecret, PublicKeySet, SecretKeyShare as BlsSecretKeyShare};
 use ed25519_dalek::Keypair as Ed25519Keypair;
 use rand::{CryptoRng, Rng};

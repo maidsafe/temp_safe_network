@@ -279,7 +279,7 @@ pub(crate) mod tests {
         ]
     }
 
-    pub fn gen_keys() -> Vec<PublicKey> {
+    pub(crate) fn gen_keys() -> Vec<PublicKey> {
         gen_keypairs().iter().map(PublicKey::from).collect()
     }
 

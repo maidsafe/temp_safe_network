@@ -21,7 +21,7 @@ use thiserror::Error;
 pub type Result<T> = result::Result<T, Error>;
 
 /// Error debug struct
-pub struct ErrorDebug<'a, T>(pub &'a Result<T>);
+struct ErrorDebug<'a, T>(&'a Result<T>);
 
 impl<'a, T> Debug for ErrorDebug<'a, T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
