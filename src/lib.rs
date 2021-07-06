@@ -12,7 +12,7 @@
 #![recursion_limit = "256"]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-    html_favicon_url = "https://maidsafe.net/favicon.ico",
+    html_favicon_url = "https://maidsafe.net/img/favicon.ico",
     test(attr(deny(warnings)))
 )]
 // Forbid some very bad patterns. Forbid is stronger than `deny`, preventing us from suppressing the
