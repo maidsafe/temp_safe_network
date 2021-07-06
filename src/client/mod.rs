@@ -21,10 +21,11 @@
 //!
 //! Setting up a random client for read only access:
 //!
-/// # Examples
-///
-/// TODO: update once data types are crdt compliant
-///
+//! # Examples
+//!
+//! TODO: update once data types are crdt compliant
+//!
+
 mod connections;
 mod errors;
 
