@@ -126,6 +126,7 @@ jobs:
       # TODO: Upload all logs as artifacts....
       - name: Node Logs
         run: |
+          echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
           cat $HOME/.safe/node/local-test-network/sn-node-genesis/sn_node.log*
         if: failure()
