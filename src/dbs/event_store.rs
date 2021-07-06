@@ -104,12 +104,12 @@ mod test {
     use crate::node::Result;
     use crate::types::Token;
     use std::path::Path;
-    use tempdir::TempDir;
+    use tempfile::tempdir;
 
     #[tokio::test]
     async fn history() -> Result<()> {
         let id = xor_name::XorName::random();
-        let tmp_dir = TempDir::new("root")?;
+        let tmp_dir = tempdir()?;
         let db_dir = tmp_dir.into_path().join(Path::new(&"Token".to_string()));
 
         let mut store = EventStore::new(id, db_dir.as_path()).await?;
