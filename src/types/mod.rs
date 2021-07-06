@@ -28,8 +28,11 @@ pub use chunk::{
 };
 pub use errors::{Error, Result};
 pub use keys::{
-    BlsKeypairShare, Keypair, NodeKeypairs, OwnerType, PublicKey, SecretKey, Signature,
-    SignatureShare, Signing,
+    keypair::{BlsKeypairShare, Keypair, OwnerType, Signing},
+    node_keypairs::NodeKeypairs,
+    public_key::PublicKey,
+    secret_key::SecretKey,
+    signature::{Signature, SignatureShare},
 };
 pub use map::{
     Action as MapAction, Address as MapAddress, Entries as MapEntries,
@@ -39,12 +42,15 @@ pub use map::{
 pub use register::Address as RegisterAddress;
 pub use section::SectionElders;
 pub use sequence::{
-    Action as SequenceAction, Address as SequenceAddress, Data as Sequence, DataOp as SequenceOp,
-    Entries as SequenceEntries, Entry as SequenceEntry, Index as SequenceIndex,
-    Kind as SequenceKind, Permissions as SequencePermissions, Policy as SequencePolicy,
-    PrivatePermissions as SequencePrivatePermissions, PrivatePolicy as SequencePrivatePolicy,
-    PrivateSeqData, PublicPermissions as SequencePublicPermissions,
-    PublicPolicy as SequencePublicPolicy, PublicSeqData, User as SequenceUser,
+    metadata::{
+        Action as SequenceAction, Address as SequenceAddress, Entries as SequenceEntries,
+        Entry as SequenceEntry, Index as SequenceIndex, Kind as SequenceKind,
+        Permissions as SequencePermissions, Policy as SequencePolicy,
+        PrivatePermissions as SequencePrivatePermissions, PrivatePolicy as SequencePrivatePolicy,
+        PublicPermissions as SequencePublicPermissions, PublicPolicy as SequencePublicPolicy,
+        User as SequenceUser,
+    },
+    Data as Sequence, DataOp as SequenceOp, PrivateSeqData, PublicSeqData,
 };
 pub use token::Token;
 

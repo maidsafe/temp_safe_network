@@ -10,8 +10,10 @@
 use super::super::{utils, Error, PublicKey, Result, Signature};
 use super::metadata::Entries;
 use super::metadata::{Address, Entry, Index, Perm};
-pub use crdts::list::Op;
-use crdts::{list::List, CmRDT};
+use crdts::{
+    list::{List, Op},
+    CmRDT,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug, Display},

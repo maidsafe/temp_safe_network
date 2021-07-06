@@ -38,7 +38,7 @@ pub struct CrdtOperation<T> {
 
 /// Register data type as a CRDT with Access Control
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd)]
-pub struct RegisterCrdt {
+pub(super) struct RegisterCrdt {
     /// Address on the network of this piece of data
     address: Address,
     /// CRDT to store the actual data, i.e. the items of the Register.
@@ -60,7 +60,7 @@ impl Display for RegisterCrdt {
 
 impl RegisterCrdt {
     /// Constructs a new 'RegisterCrdt'.
-    pub fn new(address: Address) -> Self {
+    pub(super) fn new(address: Address) -> Self {
         Self {
             address,
             data: MerkleReg::new(),
@@ -68,18 +68,18 @@ impl RegisterCrdt {
     }
 
     /// Returns the address.
-    pub fn address(&self) -> &Address {
+    pub(super) fn address(&self) -> &Address {
         &self.address
     }
 
     /// Returns total number of items in the register.
-    pub fn size(&self) -> u64 {
+    pub(super) fn size(&self) -> u64 {
         (self.data.num_nodes() + self.data.num_orphans()) as u64
     }
 
     /// Write a new entry to the RegisterCrdt, returning the hash
     /// of the entry and the CRDT operation without a signature
-    pub fn write(
+    pub(super) fn write(
         &mut self,
         entry: Entry,
         parents: BTreeSet<EntryHash>,
@@ -103,7 +103,7 @@ impl RegisterCrdt {
     }
 
     /// Apply a remote data CRDT operation to this replica of the RegisterCrdt.
-    pub fn apply_op(&mut self, op: CrdtOperation<Entry>) -> Result<()> {
+    pub(super) fn apply_op(&mut self, op: CrdtOperation<Entry>) -> Result<()> {
         // Let's first check the op is validly signed.
         // Note: Perms for the op are checked at the upper Register layer.
         let sig = op.signature.ok_or(Error::CrdtMissingOpSignature)?;
@@ -127,12 +127,12 @@ impl RegisterCrdt {
     }
 
     /// Get the entry corresponding to the provided `hash` if it exists.
-    pub fn get(&self, hash: EntryHash) -> Option<&Entry> {
+    pub(super) fn get(&self, hash: EntryHash) -> Option<&Entry> {
         self.data.node(hash).map(|node| &node.value)
     }
 
     /// Read the last entry, or entries if there are branches.
-    pub fn read(&self) -> BTreeSet<(EntryHash, Entry)> {
+    pub(super) fn read(&self) -> BTreeSet<(EntryHash, Entry)> {
         self.data
             .read()
             .hashes_and_nodes()
