@@ -16,14 +16,14 @@ use xor_name::{XorName, XOR_NAME_LEN};
 /// Network storage is the concrete type which self_encryption crate will use
 /// to put or get data from the network.
 #[derive(Clone)]
-pub struct BlobStorage {
+pub(super) struct BlobStorage {
     client: Client,
     public: bool,
 }
 
 impl BlobStorage {
     /// Create a new BlobStorage instance.
-    pub fn new(client: Client, public: bool) -> Self {
+    pub(super) fn new(client: Client, public: bool) -> Self {
         Self { client, public }
     }
 }
@@ -111,13 +111,13 @@ impl Storage for BlobStorage {
 /// Network storage is the concrete type which self_encryption crate will use
 /// to put or get data from the network.
 #[derive(Clone)]
-pub struct BlobStorageDryRun {
+pub(super) struct BlobStorageDryRun {
     privately_owned: Option<PublicKey>,
 }
 
 impl BlobStorageDryRun {
     /// Create a new BlobStorage instance.
-    pub fn new(privately_owned: Option<PublicKey>) -> Self {
+    pub(super) fn new(privately_owned: Option<PublicKey>) -> Self {
         Self { privately_owned }
     }
 }

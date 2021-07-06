@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use crate::messaging::{client::Error as ErrorMessage, Error as MessagingError};
+pub use crate::messaging::client::Error as ErrorMessage;
 use crate::messaging::{
     client::{CmdError, QueryResponse},
-    MessageId,
+    Error as MessagingError, MessageId,
 };
 use crate::types::Error as DtError;
 use qp2p::Error as QuicP2pError;

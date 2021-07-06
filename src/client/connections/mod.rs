@@ -31,13 +31,13 @@ type QueryResponseSender = Sender<QueryResponse>;
 type PendingQueryResponses = Arc<RwLock<HashMap<MessageId, QueryResponseSender>>>;
 
 pub(crate) struct QueryResult {
-    pub response: QueryResponse,
-    pub msg_id: MessageId,
+    pub(super) response: QueryResponse,
+    pub(super) msg_id: MessageId,
 }
 
 #[derive(Clone, Debug)]
-pub struct Session {
-    pub section_key_set: Arc<RwLock<Option<PublicKeySet>>>,
+pub(super) struct Session {
+    pub(super) section_key_set: Arc<RwLock<Option<PublicKeySet>>>,
     qp2p: QuicP2p,
     pending_queries: PendingQueryResponses,
     incoming_err_sender: Arc<Sender<CmdError>>,
@@ -51,7 +51,10 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(qp2p_config: QuicP2pConfig, err_sender: Sender<CmdError>) -> Result<Self, Error> {
+    pub(super) fn new(
+        qp2p_config: QuicP2pConfig,
+        err_sender: Sender<CmdError>,
+    ) -> Result<Self, Error> {
         debug!("QP2p config: {:?}", qp2p_config);
 
         let qp2p = qp2p::QuicP2p::with_config(Some(qp2p_config), Default::default(), true)?;
@@ -69,11 +72,11 @@ impl Session {
     }
 
     /// Get the elders count of our section elders as provided by SectionInfo
-    pub async fn known_elders_count(&self) -> usize {
+    pub(super) async fn known_elders_count(&self) -> usize {
         self.all_known_elders.read().await.len()
     }
 
-    pub fn endpoint(&self) -> Result<&Endpoint, Error> {
+    pub(super) fn endpoint(&self) -> Result<&Endpoint, Error> {
         match self.endpoint.borrow() {
             Some(endpoint) => Ok(endpoint),
             None => {
@@ -83,7 +86,7 @@ impl Session {
         }
     }
 
-    pub async fn section_key(&self) -> Result<PublicKey, Error> {
+    pub(super) async fn section_key(&self) -> Result<PublicKey, Error> {
         let keys = self.section_key_set.read().await.clone();
 
         match keys.borrow() {
