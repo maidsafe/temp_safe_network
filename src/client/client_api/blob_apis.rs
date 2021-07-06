@@ -114,7 +114,7 @@ impl Client {
         allow_cache: bool,
     ) -> Result<Chunk, Error> {
         if allow_cache {
-            if let Some(chunk) = self.blob_cache.lock().await.get_mut(&head_address) {
+            if let Some(chunk) = self.blob_cache.write().await.get(&head_address) {
                 trace!("Blob chunk retrieved from cache: {:?}", head_address);
                 return Ok(chunk.clone());
             }
@@ -133,7 +133,7 @@ impl Client {
         if allow_cache {
             let _ = self
                 .blob_cache
-                .lock()
+                .write()
                 .await
                 .put(head_address, chunk.clone());
         }
@@ -143,7 +143,7 @@ impl Client {
 
     /// Clear the client's blob cache
     pub async fn clear_blob_cache(&mut self) {
-        self.blob_cache.lock().await.clear()
+        self.blob_cache.write().await.clear()
     }
 
     pub(crate) async fn delete_chunk_from_network(
@@ -359,7 +359,7 @@ mod tests {
     use anyhow::{anyhow, bail, Result};
     use bincode::deserialize;
     use futures::future::join_all;
-    use self_encryption::Storage;
+    use self_encryption::{SelfEncryptionError, Storage};
     use tokio::time::{Duration, Instant};
 
     const BLOB_TEST_QUERY_TIMEOUT: u64 = 60;
@@ -529,11 +529,22 @@ mod tests {
         client.clear_blob_cache().await;
 
         client.query_timeout = Duration::from_secs(5); // override with a short timeout
-        let mut blob_storage = BlobStorage::new(client, false);
+        let mut blob_storage = BlobStorage::new(client.clone(), false);
+
+        async fn fetch(
+            client: &mut Client,
+            blob_storage: &mut BlobStorage,
+            name: &[u8],
+        ) -> Result<Vec<u8>, SelfEncryptionError> {
+            client.clear_blob_cache().await;
+            blob_storage.get(name).await
+        }
 
         if let DataMap::Chunks(chunks) = root_data_map {
             for chunk in chunks {
-                let _ = retry_err_loop!(blob_storage.get(&chunk.hash));
+                // If get succeedes it's put in the cache so use helper function
+                // that clears the cache before calling `get()`
+                let _ = retry_err_loop!(fetch(&mut client, &mut blob_storage, &chunk.hash));
             }
             Ok(())
         } else {
