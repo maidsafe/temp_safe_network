@@ -20,8 +20,8 @@
     html_favicon_url = "https://maidsafe.net/img/favicon.ico",
     test(attr(deny(warnings)))
 )]
-// For explanation of lint checks, run `rustc -W help` or see
-// https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
+// Forbid some very bad patterns. Forbid is stronger than `deny`, preventing us from suppressing the
+// lint with `#[allow(...)]` et-all.
 #![forbid(
     arithmetic_overflow,
     mutable_transmutes,
@@ -29,7 +29,7 @@
     unknown_crate_types,
     unsafe_code
 )]
-// For explanation of lint checks, run `rustc -W help`.
+// Turn on some additional warnings to encourage good style.
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -39,24 +39,7 @@
     unused_import_braces,
     unused_qualifications,
     unused_results,
-    bad_style,
-    improper_ctypes,
-    missing_docs,
-    non_shorthand_field_patterns,
-    overflowing_literals,
-    stable_features,
-    unconditional_recursion,
-    unknown_lints,
-    unused,
-    unused_allocation,
-    unused_attributes,
-    unused_comparisons,
-    unused_features,
-    unused_parens,
-    while_true,
-    clippy::unicode_not_nfc,
-    clippy::wrong_pub_self_convention,
-    deprecated
+    clippy::unicode_not_nfc
 )]
 
 #[macro_use]
