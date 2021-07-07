@@ -81,7 +81,7 @@ impl Client {
     /// You're only able to delete a PrivateRegister. Public data can no be removed from the network.
     pub async fn delete_register(&self, address: Address) -> Result<(), Error> {
         let cmd = DataCmd::Register(RegisterWrite::Delete(address));
-        self.send_cmd(cmd, None).await
+        self.send_cmd(cmd).await
     }
 
     /// Write to Register

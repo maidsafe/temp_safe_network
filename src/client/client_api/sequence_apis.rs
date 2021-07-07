@@ -115,7 +115,7 @@ impl Client {
     ///
     pub async fn delete_sequence(&self, address: SequenceAddress) -> Result<(), Error> {
         let cmd = DataCmd::Sequence(SequenceWrite::Delete(address));
-        self.send_cmd(cmd, None).await
+        self.send_cmd(cmd).await
     }
 
     /// Append to Sequence

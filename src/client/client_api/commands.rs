@@ -8,40 +8,45 @@
 
 use super::Client;
 use crate::client::Error;
-use crate::messaging::{client::DataCmd, ClientSigned};
+use crate::messaging::{
+    client::{ClientMsg, DataCmd, ProcessMsg},
+    ClientSigned, WireMsg,
+};
 use crate::types::{PublicKey, Signature};
-use std::net::SocketAddr;
+use bytes::Bytes;
 use tracing::debug;
 
 impl Client {
-    /// Send a signed DataCmd to the network
-    pub(crate) async fn send_signed_command(
+    /// Send a signed DataCmd to the network.
+    /// This is to be part of a public API, for the user to
+    /// provide the serialised and already signed command.
+    pub async fn send_signed_command(
         &self,
         cmd: DataCmd,
         client_pk: PublicKey,
+        serialised_cmd: Bytes,
         signature: Signature,
-        target: Option<SocketAddr>,
     ) -> Result<(), Error> {
         debug!("Sending DataCmd: {:?}", cmd);
-        let client_sig = ClientSigned {
+        let client_signed = ClientSigned {
             public_key: client_pk,
             signature,
         };
 
-        self.session.send_cmd(cmd, client_sig, target).await
+        self.session
+            .send_cmd(cmd, client_signed, serialised_cmd)
+            .await
     }
 
     // Send a DataCmd to the network without awaiting for a response.
     // This function is a helper private to this module.
-    pub(crate) async fn send_cmd(
-        &self,
-        cmd: DataCmd,
-        target: Option<SocketAddr>,
-    ) -> Result<(), Error> {
+    pub(crate) async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
         let client_pk = self.public_key();
-        let signature = self.keypair.sign(b"TODO");
+        let msg = ClientMsg::Process(ProcessMsg::Cmd(cmd.clone()));
+        let serialised_cmd = WireMsg::serialize_msg_payload(&msg)?;
+        let signature = self.keypair.sign(&serialised_cmd);
 
-        self.send_signed_command(cmd, client_pk, signature, target)
+        self.send_signed_command(cmd, client_pk, serialised_cmd, signature)
             .await
     }
 }
