@@ -367,7 +367,7 @@ mod tests {
     // Test storing and getting public Blob.
     #[tokio::test]
     #[ignore = "too heavy for CI"]
-    pub async fn parallel_timings() -> Result<()> {
+    async fn parallel_timings() -> Result<()> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let handles = (0..1000_usize)
@@ -399,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "too heavy for CI"]
-    pub async fn one_by_one_timings() -> Result<()> {
+    async fn one_by_one_timings() -> Result<()> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         for i in 0..1000_usize {
@@ -415,7 +415,7 @@ mod tests {
 
     // Test storing and getting public Blob.
     #[tokio::test]
-    pub async fn public_blob_test() -> Result<()> {
+    async fn public_blob_test() -> Result<()> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
         let value = generate_random_vector::<u8>(10);
         let (_, expected_address) = Client::blob_data_map(value.clone(), None).await?;
@@ -440,7 +440,7 @@ mod tests {
 
     // Test storing, getting, and deleting private chunk.
     #[tokio::test]
-    pub async fn private_blob_test() -> Result<()> {
+    async fn private_blob_test() -> Result<()> {
         let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let value = generate_random_vector::<u8>(10);
@@ -505,7 +505,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn private_delete_large() -> Result<()> {
+    async fn private_delete_large() -> Result<()> {
         let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let value = generate_random_vector::<u8>(1024 * 1024);
@@ -557,21 +557,21 @@ mod tests {
 
     // Test creating and retrieving a 1kb blob.
     #[tokio::test]
-    pub async fn create_and_retrieve_1kb_pub_unencrypted() -> Result<()> {
+    async fn create_and_retrieve_1kb_pub_unencrypted() -> Result<()> {
         let size = 1024;
         gen_data_then_create_and_retrieve(size, true).await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn create_and_retrieve_1kb_private_unencrypted() -> Result<()> {
+    async fn create_and_retrieve_1kb_private_unencrypted() -> Result<()> {
         let size = 1024;
         gen_data_then_create_and_retrieve(size, false).await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn create_and_retrieve_1kb_put_pub_retrieve_private() -> Result<()> {
+    async fn create_and_retrieve_1kb_put_pub_retrieve_private() -> Result<()> {
         let size = 1024;
         let data = generate_random_vector(size);
 
@@ -591,7 +591,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn create_and_retrieve_1kb_put_private_retrieve_pub() -> Result<()> {
+    async fn create_and_retrieve_1kb_put_private_retrieve_pub() -> Result<()> {
         let size = 1024;
 
         let value = generate_random_vector(size);
@@ -613,14 +613,14 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn create_and_retrieve_1mb_public() -> Result<()> {
+    async fn create_and_retrieve_1mb_public() -> Result<()> {
         let size = 1024 * 1024;
         gen_data_then_create_and_retrieve(size, true).await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn create_and_retrieve_1mb_private() -> Result<()> {
+    async fn create_and_retrieve_1mb_private() -> Result<()> {
         let size = 1024 * 1024;
         gen_data_then_create_and_retrieve(size, false).await?;
         Ok(())
@@ -630,14 +630,14 @@ mod tests {
     // 10mb (ie. more than 1 chunk)
     // ----------------------------------------------------------------
     #[tokio::test]
-    pub async fn create_and_retrieve_10mb_private() -> Result<()> {
+    async fn create_and_retrieve_10mb_private() -> Result<()> {
         let size = 1024 * 1024 * 10;
         gen_data_then_create_and_retrieve(size, false).await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn create_and_retrieve_10mb_public() -> Result<()> {
+    async fn create_and_retrieve_10mb_public() -> Result<()> {
         let size = 1024 * 1024 * 10;
         gen_data_then_create_and_retrieve(size, true).await?;
         Ok(())
@@ -645,14 +645,14 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "too heavy for CI"]
-    pub async fn create_and_retrieve_100mb_public() -> Result<()> {
+    async fn create_and_retrieve_100mb_public() -> Result<()> {
         let size = 1024 * 1024 * 100;
         gen_data_then_create_and_retrieve(size, true).await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn create_and_retrieve_index_based() -> Result<()> {
+    async fn create_and_retrieve_index_based() -> Result<()> {
         create_and_index_based_retrieve(1024).await
     }
 

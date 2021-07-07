@@ -394,7 +394,7 @@ mod tests {
     /// Sequence data tests ///
 
     #[tokio::test]
-    pub async fn sequence_basics() -> Result<()> {
+    async fn sequence_basics() -> Result<()> {
         let client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
@@ -433,7 +433,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn sequence_private_permissions() -> Result<()> {
+    async fn sequence_private_permissions() -> Result<()> {
         let client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15000;
@@ -502,7 +502,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn sequence_public_permissions() -> Result<()> {
+    async fn sequence_public_permissions() -> Result<()> {
         let client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
@@ -573,7 +573,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn append_to_sequence() -> Result<()> {
+    async fn append_to_sequence() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = create_test_client(None).await?;
@@ -656,7 +656,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn sequence_owner() -> Result<()> {
+    async fn sequence_owner() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = create_test_client(None).await?;
@@ -677,7 +677,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn sequence_can_delete_private() -> Result<()> {
+    async fn sequence_can_delete_private() -> Result<()> {
         let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15000;
@@ -718,7 +718,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn sequence_cannot_delete_public() -> Result<()> {
+    async fn sequence_cannot_delete_public() -> Result<()> {
         let mut client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
