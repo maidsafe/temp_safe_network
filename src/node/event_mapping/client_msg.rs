@@ -18,7 +18,7 @@ use crate::node::{
 };
 use tracing::warn;
 
-pub fn map_client_msg(
+pub(super) fn map_client_msg(
     msg_id: MessageId,
     msg: ClientMsg,
     client_signed: ClientSigned,

@@ -49,16 +49,16 @@ const JOINING_TIMEOUT: u64 = 180; // 180 seconds
 
 /// Static info about the node.
 #[derive(Clone, Debug)]
-pub struct NodeInfo {
+struct NodeInfo {
     ///
-    pub root_dir: PathBuf,
+    root_dir: PathBuf,
     /// The key used by the node to receive earned rewards.
-    pub reward_key: PublicKey,
+    reward_key: PublicKey,
 }
 
 impl NodeInfo {
     ///
-    pub fn path(&self) -> &Path {
+    fn path(&self) -> &Path {
         self.root_dir.as_path()
     }
 }

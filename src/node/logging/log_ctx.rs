@@ -10,16 +10,16 @@ use crate::node::network::Network;
 use xor_name::Prefix;
 
 #[derive(Debug)]
-pub struct LogCtx {
+pub(crate) struct LogCtx {
     network: Network,
 }
 
 impl LogCtx {
-    pub fn new(network: Network) -> Self {
+    pub(crate) fn new(network: Network) -> Self {
         Self { network }
     }
 
-    pub async fn prefix(&self) -> Prefix {
+    pub(crate) async fn prefix(&self) -> Prefix {
         self.network.our_prefix().await
     }
 }

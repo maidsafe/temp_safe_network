@@ -73,7 +73,7 @@ impl RegisterStorage {
     }
 
     /// On receiving data from Elders when promoted.
-    pub async fn update(&self, reg_data: RegisterDataExchange) -> Result<()> {
+    pub(super) async fn update(&self, reg_data: RegisterDataExchange) -> Result<()> {
         debug!("Updating Register store");
 
         let RegisterDataExchange(data) = reg_data;

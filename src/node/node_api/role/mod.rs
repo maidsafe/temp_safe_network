@@ -33,14 +33,14 @@ impl Debug for Role {
 }
 
 impl Role {
-    pub fn as_adult(&self) -> Result<&AdultRole> {
+    pub(crate) fn as_adult(&self) -> Result<&AdultRole> {
         match self {
             Self::Adult(adult) => Ok(adult),
             _ => Err(Error::NotAnAdult),
         }
     }
 
-    pub fn as_elder(&self) -> Result<&ElderRole> {
+    pub(crate) fn as_elder(&self) -> Result<&ElderRole> {
         match self {
             Self::Elder(elder) => Ok(elder),
             _ => Err(Error::NotAnElder),

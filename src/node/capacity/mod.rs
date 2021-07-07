@@ -10,17 +10,17 @@ mod adult_storage_info;
 
 use crate::node::metadata::adult_reader::AdultReader;
 use crate::routing::{Prefix, XorName};
-pub use adult_storage_info::AdultsStorageInfo;
+pub(super) use adult_storage_info::AdultsStorageInfo;
 use std::collections::BTreeSet;
 
 // The number of separate copies of a blob chunk which should be maintained.
-pub(crate) const CHUNK_COPY_COUNT: usize = 4;
+pub(super) const CHUNK_COPY_COUNT: usize = 4;
 
 /// A util for sharing the
 /// info on data capacity among the
 /// chunk storing nodes in the section.
 #[derive(Clone)]
-pub struct Capacity {
+pub(crate) struct Capacity {
     reader: CapacityReader,
     writer: CapacityWriter,
 }
@@ -32,54 +32,54 @@ impl Capacity {
     }
 
     /// Get the sections's current Prefix
-    pub async fn our_prefix(&self) -> Prefix {
+    pub(super) async fn our_prefix(&self) -> Prefix {
         self.reader.our_prefix().await
     }
 
     /// Whether the adult is recorded as full
-    pub async fn is_full(&self, adult: &XorName) -> bool {
+    pub(super) async fn is_full(&self, adult: &XorName) -> bool {
         self.reader.is_full(adult).await
     }
 
     /// Number of full chunk storing nodes in the section.
-    pub async fn full_adults_count(&self) -> u8 {
+    pub(super) async fn full_adults_count(&self) -> u8 {
         self.reader.full_adults_count().await
     }
 
     /// Number of full chunk storing nodes in the section.
-    pub async fn full_adults_matching(&self, prefix: Prefix) -> BTreeSet<XorName> {
+    pub(super) async fn full_adults_matching(&self, prefix: Prefix) -> BTreeSet<XorName> {
         self.reader.full_adults_matching(prefix).await
     }
 
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
-    pub async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
+    pub(super) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
         self.reader.get_chunk_holder_adults(target).await
     }
 
-    pub async fn insert_full_adults(&self, full_adults: BTreeSet<XorName>) {
+    pub(super) async fn insert_full_adults(&self, full_adults: BTreeSet<XorName>) {
         self.writer.insert_full_adults(full_adults).await
     }
 
-    pub async fn remove_full_adults(&self, full_adults: BTreeSet<XorName>) {
+    pub(super) async fn remove_full_adults(&self, full_adults: BTreeSet<XorName>) {
         self.writer.remove_full_adults(full_adults).await
     }
 
     /// Registered holders not present in provided list of members
     /// will be removed from adult_storage_info and no longer tracked for liveness.
-    pub async fn retain_members_only(&self, members: &BTreeSet<XorName>) {
+    pub(super) async fn retain_members_only(&self, members: &BTreeSet<XorName>) {
         self.writer.retain_members_only(members).await
     }
 }
 
 #[derive(Clone)]
-pub struct CapacityReader {
+pub(super) struct CapacityReader {
     reader: AdultReader,
     adult_storage_info: AdultsStorageInfo,
 }
 
 #[derive(Clone)]
-pub struct CapacityWriter {
+pub(super) struct CapacityWriter {
     reader: AdultReader,
     adult_storage_info: AdultsStorageInfo,
 }
@@ -94,12 +94,12 @@ impl CapacityReader {
     }
 
     /// Get the sections's current Prefix
-    pub async fn our_prefix(&self) -> Prefix {
+    pub(super) async fn our_prefix(&self) -> Prefix {
         self.reader.our_prefix().await
     }
 
     /// Whether the adult is recorded as full
-    pub async fn is_full(&self, adult: &XorName) -> bool {
+    pub(super) async fn is_full(&self, adult: &XorName) -> bool {
         self.adult_storage_info
             .full_adults
             .read()
@@ -108,12 +108,12 @@ impl CapacityReader {
     }
 
     /// Number of full chunk storing nodes in the section.
-    pub async fn full_adults_count(&self) -> u8 {
+    pub(super) async fn full_adults_count(&self) -> u8 {
         self.adult_storage_info.full_adults.read().await.len() as u8
     }
 
     /// Number of full chunk storing nodes in the section.
-    pub async fn full_adults_matching(&self, prefix: Prefix) -> BTreeSet<XorName> {
+    pub(super) async fn full_adults_matching(&self, prefix: Prefix) -> BTreeSet<XorName> {
         self.adult_storage_info
             .full_adults
             .read()
@@ -126,7 +126,7 @@ impl CapacityReader {
 
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
-    pub async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
+    pub(super) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.adult_storage_info.full_adults.read().await;
         self.reader
             .non_full_adults_closest_to(&target, &full_adults, CHUNK_COPY_COUNT)
@@ -143,7 +143,7 @@ impl CapacityWriter {
         }
     }
 
-    pub async fn insert_full_adults(&self, full_adults: BTreeSet<XorName>) {
+    pub(super) async fn insert_full_adults(&self, full_adults: BTreeSet<XorName>) {
         let mut orig_full_adults = self.adult_storage_info.full_adults.write().await;
 
         for adult in full_adults {
@@ -151,7 +151,7 @@ impl CapacityWriter {
         }
     }
 
-    pub async fn remove_full_adults(&self, full_adults: BTreeSet<XorName>) {
+    pub(super) async fn remove_full_adults(&self, full_adults: BTreeSet<XorName>) {
         let mut orig_full_adults = self.adult_storage_info.full_adults.write().await;
 
         for adult in full_adults {
@@ -161,7 +161,7 @@ impl CapacityWriter {
 
     /// Registered holders not present in provided list of members
     /// will be removed from adult_storage_info and no longer tracked for liveness.
-    pub async fn retain_members_only(&self, members: &BTreeSet<XorName>) {
+    pub(super) async fn retain_members_only(&self, members: &BTreeSet<XorName>) {
         // full adults
         let mut full_adults = self.adult_storage_info.full_adults.write().await;
         let absent_adults = full_adults

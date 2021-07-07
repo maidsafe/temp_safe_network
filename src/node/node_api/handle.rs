@@ -25,7 +25,7 @@ use tracing::{debug, info};
 use xor_name::XorName;
 
 #[derive(Debug)]
-pub enum NodeTask {
+pub(super) enum NodeTask {
     None,
     Result(Box<(NodeDuties, Option<MsgContext>)>),
     Thread(JoinHandle<Result<NodeTask>>),
@@ -39,7 +39,7 @@ impl From<NodeDuties> for NodeTask {
 
 impl Node {
     ///
-    pub async fn handle(&self, duty: NodeDuty) -> Result<NodeTask> {
+    pub(super) async fn handle(&self, duty: NodeDuty) -> Result<NodeTask> {
         if !matches!(duty, NodeDuty::NoOp) {
             debug!("Handling NodeDuty: {:?}", duty);
         }

@@ -63,7 +63,7 @@ impl SequenceStorage {
     }
 
     /// On receiving data from Elders when promoted.
-    pub async fn update(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
+    pub(super) async fn update(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
         debug!("Updating Sequence store");
 
         let SequenceDataExchange(data) = seq_data;

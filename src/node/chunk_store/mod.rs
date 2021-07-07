@@ -30,7 +30,7 @@ use std::{
 use tracing::info;
 
 /// At 50% full, the node will report that it's reaching full capacity.
-pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;
+pub(super) const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;
 
 impl Data for Chunk {
     type Id = ChunkAddress;
@@ -60,28 +60,28 @@ pub(crate) struct ChunkStore {
 }
 
 impl ChunkStore {
-    pub async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub(crate) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             store: DataStore::<Chunk>::new(path, used_space).await?,
         })
     }
 
-    pub async fn keys(&self) -> Result<Vec<ChunkAddress>> {
+    pub(crate) async fn keys(&self) -> Result<Vec<ChunkAddress>> {
         self.store.keys().await.map_err(Error::from)
     }
 
-    pub async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
+    pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         self.store.delete(address).await.map_err(Error::from)
     }
 
-    pub async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
+    pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         self.store
             .get(address)
             .await
             .map_err(|_| Error::NoSuchData(DataAddress::Chunk(*address)))
     }
 
-    pub async fn read(
+    pub(crate) async fn read(
         &self,
         read: &ChunkRead,
         msg_id: MessageId,
@@ -107,7 +107,7 @@ impl ChunkStore {
         })
     }
 
-    pub async fn write(
+    pub(crate) async fn write(
         &self,
         write: &ChunkWrite,
         msg_id: MessageId,
@@ -168,7 +168,7 @@ impl ChunkStore {
     }
 
     // TODO: this is redundant, see if it can be omitted
-    pub async fn check_storage(&self) -> Result<NodeDuties> {
+    pub(crate) async fn check_storage(&self) -> Result<NodeDuties> {
         info!("Checking used storage");
         if self.store.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
             Ok(NodeDuties::from(NodeDuty::ReachingMaxCapacity))
@@ -178,7 +178,7 @@ impl ChunkStore {
     }
 
     /// Stores a chunk that Elders sent to it for replication.
-    pub async fn store_for_replication(&self, chunk: Chunk) -> Result<NodeDuty> {
+    pub(crate) async fn store_for_replication(&self, chunk: Chunk) -> Result<NodeDuty> {
         if self.store.has(chunk.address()).await? {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
