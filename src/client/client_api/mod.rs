@@ -132,7 +132,7 @@ impl Client {
     // Private helper to obtain payment proof for a data command, send it to the network,
     // and also apply the payment to local replica actor.
     async fn pay_and_send_data_command(&self, cmd: DataCmd) -> Result<(), Error> {
-        self.send_cmd(cmd, None).await
+        self.send_cmd(cmd).await
     }
 
     #[cfg(test)]

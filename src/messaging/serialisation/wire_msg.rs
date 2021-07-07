@@ -14,8 +14,8 @@ use crate::messaging::{
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use cookie_factory::{combinator::slice, gen_simple};
+use custom_debug::Debug;
 use serde::Serialize;
-use std::fmt::Debug;
 use xor_name::XorName;
 
 /// In order to send a message over the wire, it needs to be serialized
@@ -27,6 +27,7 @@ pub struct WireMsg {
     /// Message header
     pub header: WireMsgHeader,
     /// Serialised message
+    #[debug(skip)]
     pub payload: Bytes,
 }
 

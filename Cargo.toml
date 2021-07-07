@@ -31,6 +31,7 @@ always-joinable = [ ]
 
 [dependencies]
 base64 = "~0.10.1"
+custom_debug = "0.5.0"
 hex = "~0.3.2"
 lazy_static = "1"
 pickledb = "~0.4.0"

@@ -9,12 +9,13 @@
 use super::{QueryResult, Session};
 use crate::client::Error;
 use crate::messaging::{
-    client::{ChunkRead, ClientMsg, DataCmd, DataQuery, ProcessMsg, QueryResponse},
+    client::{ChunkRead, DataCmd, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
     ClientSigned, MessageId, WireMsg,
 };
 use crate::messaging::{DstLocation, MsgKind};
 use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
+use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
@@ -112,32 +113,28 @@ impl Session {
         &self,
         cmd: DataCmd,
         client_signed: ClientSigned,
-        send_to_specific_elder: Option<SocketAddr>,
+        payload: Bytes,
     ) -> Result<(), Error> {
-        let msg_id = MessageId::new();
         let endpoint = self.endpoint()?.clone();
 
-        let elders = if let Some(socket) = send_to_specific_elder {
-            vec![socket]
-        } else {
-            self.connected_elders
-                .read()
-                .await
-                .keys()
-                .cloned()
-                .collect::<Vec<SocketAddr>>()
-        };
+        let elders = self
+            .connected_elders
+            .read()
+            .await
+            .keys()
+            .cloned()
+            .collect::<Vec<SocketAddr>>();
 
+        let msg_id = MessageId::new();
         debug!(
             "Sending command w/id {:?}, to {} Elders",
             msg_id,
             elders.len()
         );
 
-        let src_addr = endpoint.socket_addr();
         trace!(
             "Sending (from {}) command message {:?} w/ id: {:?}",
-            src_addr,
+            endpoint.socket_addr(),
             cmd,
             msg_id
         );
@@ -147,15 +144,13 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dst_section_name = cmd.dst_address();
 
-        let msg = ClientMsg::Process(ProcessMsg::Cmd(cmd));
-        let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let msg_kind = MsgKind::ClientMsg(client_signed);
+        let dst_section_name = cmd.dst_address();
         let dst_location = DstLocation::Section {
             name: dst_section_name,
             section_pk,
         };
+        let msg_kind = MsgKind::ClientMsg(client_signed);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let msg_bytes = wire_msg.serialize()?;
@@ -195,16 +190,13 @@ impl Session {
         Ok(())
     }
 
-    /// Send a Query `ClientMsg` to the network awaiting for the response.
-    // TODO: `client_signed` will be generated from serialized `query`, so this should take a
-    // pre-serialized payload.
+    /// Send a `ClientMsg` to the network awaiting for the response.
     pub(crate) async fn send_query(
         &self,
         query: DataQuery,
         client_signed: ClientSigned,
+        payload: Bytes,
     ) -> Result<QueryResult, Error> {
-        let data_name = query.dst_address();
-
         let endpoint = self.endpoint()?.clone();
         let pending_queries = self.pending_queries.clone();
 
@@ -219,16 +211,14 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dst_section_name = data_name;
 
-        let msg_id = MessageId::new();
-        let msg = ClientMsg::Process(ProcessMsg::Query(query));
-        let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let msg_kind = MsgKind::ClientMsg(client_signed);
+        let data_name = query.dst_address();
         let dst_location = DstLocation::Section {
-            name: dst_section_name,
+            name: data_name,
             section_pk,
         };
+        let msg_id = MessageId::new();
+        let msg_kind = MsgKind::ClientMsg(client_signed);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let msg_bytes = wire_msg.serialize()?;
@@ -257,7 +247,7 @@ impl Session {
 
         debug!(
             "Sending query message {:?}, to the {} Elders closest to data name: {:?}",
-            msg, elders_len, elders
+            query, elders_len, elders
         );
 
         // We send the same message to all Elders concurrently
