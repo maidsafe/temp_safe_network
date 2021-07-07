@@ -10,7 +10,8 @@ pub mod log_ctx;
 mod system;
 
 use self::log_ctx::LogCtx;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use sysinfo::AsU32;
 use sysinfo::{System, SystemExt};
 use system::Process;
 use tokio::time::MissedTickBehavior;
@@ -20,7 +21,6 @@ const LOG_INTERVAL: Duration = std::time::Duration::from_secs(30);
 
 pub async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) {
     let mut system = System::new_all();
-    let mut last_log = Instant::now();
     initial_log(&mut system, &ctx).await;
 
     initial_log(&mut system, &ctx).await;
@@ -29,7 +29,7 @@ pub async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) {
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip); // default is `Burst`, probably not what we want
         loop {
             let _ = interval.tick().await;
-            log(&mut last_log, &mut system, &ctx, print_resources_usage).await;
+            log(&mut system, &ctx, print_resources_usage).await;
         }
     });
 }
@@ -48,14 +48,7 @@ fn fmt(string: Option<String>) -> String {
 }
 
 #[tracing::instrument]
-async fn log(
-    last_log: &mut Instant,
-    system: &mut System,
-    ctx: &LogCtx,
-    print_resources_usage: bool,
-) {
-    *last_log = Instant::now();
-
+async fn log(system: &mut System, ctx: &LogCtx, print_resources_usage: bool) {
     system.refresh_all();
 
     let prefix: &str = &format!("{}", ctx.prefix().await.name());
@@ -83,10 +76,10 @@ async fn log(
         "System load avg",
     );
 
-    let our_pid = &(std::process::id() as usize);
+    let our_pid = &std::process::id();
 
     for (pid, proc_) in system.processes() {
-        if *pid != *our_pid as i32 {
+        if pid.as_u32() != *our_pid {
             continue;
         }
 
