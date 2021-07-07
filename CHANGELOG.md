@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.10](https://github.com/maidsafe/safe_network/compare/v0.7.9...v0.7.10) (2021-07-07)
+
+
+### Features
+
+* add flags for json + resource logging output ([f7977bb](https://github.com/maidsafe/safe_network/commit/f7977bb3ea1a3592fececa199ea1b6bc0d2a98a2))
+* **logs:** add periodic resource usage logging ([b0aaf59](https://github.com/maidsafe/safe_network/commit/b0aaf591f745b826bd1fdbbb8bfafc0f09a43600))
+
+
+### Bug Fixes
+
+* **logs:** use json formatting for better parsing ([85e094d](https://github.com/maidsafe/safe_network/commit/85e094d6f364ce87fad55bde82573c57c0421acf))
+* **windows:** pid comparator changed for x-platform stability ([e89e9eb](https://github.com/maidsafe/safe_network/commit/e89e9eb9f98febab6716fbc451641b3523f16030))
+
 ### [0.7.9](https://github.com/maidsafe/safe_network/compare/v0.7.8...v0.7.9) (2021-07-07)
 
 ### [0.7.8](https://github.com/maidsafe/safe_network/compare/v0.7.7...v0.7.8) (2021-07-06)
