@@ -52,10 +52,7 @@ impl Node {
 
         let our_adults = network_api.our_adults().await;
         // drop metadata state
-        elder
-            .meta_data
-            .retain_members_only(our_adults)
-            .await?;
+        elder.meta_data.retain_members_only(our_adults).await?;
 
         Ok(ops)
     }

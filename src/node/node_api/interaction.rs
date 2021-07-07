@@ -77,10 +77,7 @@ pub(crate) async fn push_state(
     peers: BTreeSet<XorName>,
 ) -> Result<NodeDuty> {
     // Create an aggregated map of all the metadata of the provided prefix
-    let metadata = elder
-        .meta_data
-        .get_data_exchange_packet(prefix)
-        .await?;
+    let metadata = elder.meta_data.get_data_exchange_packet(prefix).await?;
 
     Ok(NodeDuty::SendToNodes {
         msg_id,

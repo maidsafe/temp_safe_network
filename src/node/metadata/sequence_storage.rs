@@ -24,15 +24,15 @@ use crate::{
     },
     types::DataAddress,
 };
+use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::{Path, PathBuf},
 };
+use tokio::sync::RwLock;
 use tracing::{debug, info};
 use xor_name::XorName;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
@@ -56,7 +56,8 @@ impl SequenceStorage {
 
         for (key, (_, history)) in self
             .store
-            .read().await
+            .read()
+            .await
             .iter()
             .filter(|(_, (map, _))| prefix.matches(map.name()))
         {
@@ -135,7 +136,11 @@ impl SequenceStorage {
                             Err(Error::InvalidOwner(client_pk))
                         } else {
                             info!("Deleting Sequence");
-                            event_store.as_deletable().delete().await.map_err(Error::from)
+                            event_store
+                                .as_deletable()
+                                .delete()
+                                .await
+                                .map_err(Error::from)
                         }
                     }
                     None => Ok(()),
@@ -148,7 +153,7 @@ impl SequenceStorage {
                 result
             }
             Edit(reg_op) => {
-                let mut store =self.store.write().await;
+                let mut store = self.store.write().await;
                 let (sequence, event_store) = match store.get_mut(&key) {
                     Some(entry) => entry,
                     None => return Err(Error::NoSuchData(DataAddress::Sequence(address))),

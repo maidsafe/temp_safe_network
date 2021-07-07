@@ -76,11 +76,7 @@ impl Node {
                             MessageId::combine(&[our_prefix.name().0, XorName::from(our_key).0]);
                         let ops = vec![push_state(&elder, our_prefix, msg_id, new_elders).await?];
                         let our_adults = network.our_adults().await;
-                        elder
-                            .meta_data
-
-                            .retain_members_only(our_adults)
-                            .await?;
+                        elder.meta_data.retain_members_only(our_adults).await?;
                         Ok(NodeTask::from(ops))
                     });
                     Ok(NodeTask::Thread(handle))
@@ -166,11 +162,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     let our_adults = network_api.our_adults().await;
-                    elder
-                        .meta_data
-
-                        .retain_members_only(our_adults)
-                        .await?;
+                    elder.meta_data.retain_members_only(our_adults).await?;
                     Ok(NodeTask::from(vec![NodeDuty::SetNodeJoinsAllowed(true)]))
                 });
                 Ok(NodeTask::Thread(handle))
@@ -250,11 +242,7 @@ impl Node {
             NodeDuty::IncrementFullNodeCount { node_id } => {
                 let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
-                    elder
-                        .meta_data
-                        
-                        .increase_full_node_count(node_id)
-                        .await;
+                    elder.meta_data.increase_full_node_count(node_id).await;
                     // Accept a new node in place for the full node.
                     Ok(NodeTask::from(vec![NodeDuty::SetNodeJoinsAllowed(true)]))
                 });
@@ -348,7 +336,6 @@ impl Node {
                     Ok(NodeTask::from(
                         elder
                             .meta_data
-
                             .record_adult_read_liveness(correlation_id, response, src)
                             .await?,
                     ))
