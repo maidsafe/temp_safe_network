@@ -13,6 +13,7 @@ use self::log_ctx::LogCtx;
 use std::time::{Duration, Instant};
 use sysinfo::{System, SystemExt};
 use system::Process;
+use tokio::time::MissedTickBehavior;
 use tracing::trace;
 
 const LOG_INTERVAL: Duration = std::time::Duration::from_secs(30);
@@ -21,15 +22,14 @@ pub async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) {
     let mut system = System::new_all();
     let mut last_log = Instant::now();
     initial_log(&mut system, &ctx).await;
-    log(&mut last_log, &mut system, &ctx, print_resources_usage).await;
+
+    initial_log(&mut system, &ctx).await;
     let _ = tokio::task::spawn(async move {
+        let mut interval = tokio::time::interval(LOG_INTERVAL);
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip); // default is `Burst`, probably not what we want
         loop {
-            let elapsed = last_log.elapsed();
-            if elapsed >= LOG_INTERVAL {
-                log(&mut last_log, &mut system, &ctx, print_resources_usage).await;
-            } else {
-                tokio::time::sleep(LOG_INTERVAL - elapsed).await;
-            }
+            let _ = interval.tick().await;
+            log(&mut last_log, &mut system, &ctx, print_resources_usage).await;
         }
     });
 }

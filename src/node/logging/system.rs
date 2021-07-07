@@ -6,48 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::ffi::OsString;
-use sysinfo::{DiskType, ProcessExt};
-
-/// Struct containing a disk information.
-#[derive(Debug)]
-pub struct Disk {
-    pub type_: DiskType,
-    pub name: OsString,
-    pub file_system: String,
-    pub mount_point: OsString,
-    pub total_space: u64,
-    pub available_space: u64,
-}
-
-#[derive(Debug)]
-pub struct DiskUsage {
-    /// Total number of written bytes.
-    pub total_written_bytes: u64,
-    /// Number of written bytes since the last refresh.
-    pub written_bytes: u64,
-    /// Total number of read bytes.
-    pub total_read_bytes: u64,
-    /// Number of read bytes since the last refresh.
-    pub read_bytes: u64,
-}
-
-#[derive(Debug)]
-pub struct Network {
-    pub name: String,
-    pub received: u64,
-    pub total_received: u64,
-    pub transmitted: u64,
-    pub total_transmitted: u64,
-    pub packets_received: u64,
-    pub total_packets_received: u64,
-    pub packets_transmitted: u64,
-    pub total_packets_transmitted: u64,
-    pub errors_on_received: u64,
-    pub total_errors_on_received: u64,
-    pub errors_on_transmitted: u64,
-    pub total_errors_on_transmitted: u64,
-}
+use sysinfo::{DiskUsage, ProcessExt};
 
 /// Struct containing a process' information.
 #[derive(Debug)]
