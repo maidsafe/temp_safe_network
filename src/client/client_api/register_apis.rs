@@ -251,7 +251,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "too heavy for CI"]
-    pub async fn measure_upload_times() -> Result<()> {
+    async fn measure_upload_times() -> Result<()> {
         let mut total = 0;
 
         let name = XorName(rand::random());
@@ -289,7 +289,7 @@ mod tests {
     /**** Register data tests ****/
 
     #[tokio::test]
-    pub async fn register_basics() -> Result<()> {
+    async fn register_basics() -> Result<()> {
         let client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
@@ -330,7 +330,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn register_private_permissions() -> Result<()> {
+    async fn register_private_permissions() -> Result<()> {
         let client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15000;
@@ -371,7 +371,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn register_public_permissions() -> Result<()> {
+    async fn register_public_permissions() -> Result<()> {
         let client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
@@ -411,7 +411,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn register_write() -> Result<()> {
+    async fn register_write() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = create_test_client(None).await?;
@@ -473,7 +473,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn register_owner() -> Result<()> {
+    async fn register_owner() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = create_test_client(None).await?;
@@ -494,7 +494,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn register_can_delete_private() -> Result<()> {
+    async fn register_can_delete_private() -> Result<()> {
         let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15000;
@@ -533,7 +533,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn register_cannot_delete_public() -> Result<()> {
+    async fn register_cannot_delete_public() -> Result<()> {
         let client = create_test_client(None).await?;
 
         let name = XorName(rand::random());
