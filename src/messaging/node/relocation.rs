@@ -11,7 +11,7 @@
 use super::NodeMsg;
 use crate::messaging::SectionSigned;
 use bls::PublicKey as BlsPublicKey;
-pub use ed25519_dalek::{Keypair, Signature, Verifier};
+use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
