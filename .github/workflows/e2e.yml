@@ -49,7 +49,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release
+          args: --release --features=always-joinable
 
       # Upload artifacts.
       - uses: actions/upload-artifact@master
@@ -57,6 +57,12 @@ jobs:
         with:
           name: sn_node-${{ matrix.target }}
           path: ./target/release/sn_node
+      
+      - uses: actions/upload-artifact@master
+        if: matrix.os != 'windows-latest'
+        with:
+          name: launch_network-${{ matrix.target }}
+          path: ./target/release/launch_network
 
       # Upload artifacts.
       - uses: actions/upload-artifact@master
@@ -64,6 +70,12 @@ jobs:
         with:
           name: sn_node-${{ matrix.target }}
           path: ./target/release/sn_node.exe
+      # Upload artifacts.
+      - uses: actions/upload-artifact@master
+        if: matrix.os == 'windows-latest'
+        with:
+          name: sn_node-${{ matrix.target }}
+          path: ./target/release/launch_network.exe
 
   tests:
     needs: build-network
@@ -106,9 +118,28 @@ jobs:
 
       # grab built network
       - uses: actions/download-artifact@master
+        if: matrix.os != 'windows-latest'
         with:
-          name: sn_node-x86_64-pc-windows-msvc-prod
-          path: artifacts/prod/x86_64-pc-windows-msvc/release
+          name: sn_node-${{ matrix.target }}
+          path: artifacts/
+
+      - uses: actions/download-artifact@master
+        if: matrix.os != 'windows-latest'
+        with:
+          name: launch_network-${{ matrix.target }}
+          path: artifacts/
+     
+      - uses: actions/download-artifact@master
+        if: matrix.os == 'windows-latest'
+        with:
+          name: launch_network-${{ matrix.target }}.exe
+          path: artifacts/
+      
+      - uses: actions/download-artifact@master
+        if: matrix.os == 'windows-latest'
+        with:
+          name: sn_node-${{ matrix.target }}.exe
+          path: artifacts/
 
       # Cache.
       - name: Cargo cache registry, index and build
@@ -120,35 +151,35 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build launch local network
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
-      
-      - run: ./target/release/launch_network
+      - name: Launch local network
         if: matrix.os != 'windows-latest'
         env:
           RUST_LOG: "safe_network=trace"
-
-      # TODO: windows with split section network has been failing w/ SO.
-      # when we have that sorted we can reenable the full networks
-      - run: ./target/release/launch_network
+        run: |
+          ls
+          ls artifacts
+          cp artifacts/sn_node-${{ matrix.target }} artifacts/sn_node
+          ./artifacts/launch_network-${{ matrix.target }}
+     
+      - name: Launch local network
         if: matrix.os == 'windows-latest'
         env:
           RUST_LOG: "safe_network=trace"
+          # TODO: windows with split section network has been failing w/ SO.
+          # when we have that sorted we can reenable the full networks
           NODE_COUNT: 11
-
+        run: |
+          ls
+          ls artifacts
+          cp artifacts/sn_node-${{ matrix.target }}.exe artifacts/sn_node.exe
+          ./artifacts/launch_network-${{ matrix.target }}
+      
       - name: extra wait for CI split
         run: sleep 120
 
       - name: Have we had a section split?
         run: ./scripts/has_split.sh
 
-      - name: Client blob tests against local network
-        shell: bash
-        run: timeout 45m cargo test --release -- client_api::blob && sleep 5
-      
       - name: Client transfer tests against local network
         shell: bash
         run: timeout 25m cargo test --release -- client_api::transfer && sleep 5
@@ -170,12 +201,123 @@ jobs:
         shell: bash
         run: timeout 25m cargo test --release client_api -- --skip client_api::seq --skip client_api::map --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
       
-
-
       - name: Run example app for Blob API against local network
         shell: bash
         run: timeout 15m cargo run --release --example client_blob
 
+      # TODO: Upload all logs as artifacts....
+      - name: Node Logs
+        run: |
+          ls $HOME/.safe/node/local-test-network
+          cat $HOME/.safe/node/local-test-network/sn-node-genesis/sn_node.log*
+        if: failure()
+
+  blobs:
+    needs: build-network
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: E2E blob tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust and required components
+      - uses: actions-rs/toolchain@v1
+        name: Install Rust & required components
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Mac setup timeout
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install coreutils
+          alias timeout=gtimeout
+
+      - name: Mac isntall ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu isntall ripgrep
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get -y install ripgrep
+      
+      # TODO: windows with split section network has been failing w/ SO.
+      # when we have that sorted we can reenable this
+      # - name: windows isntall ripgrep
+      #   if: matrix.os == 'windows-latest'
+      #   run: choco install ripgrep
+
+      # grab built network
+      - uses: actions/download-artifact@master
+        if: matrix.os != 'windows-latest'
+        with:
+          name: sn_node-${{ matrix.target }}
+          path: artifacts/
+
+      - uses: actions/download-artifact@master
+        if: matrix.os != 'windows-latest'
+        with:
+          name: launch_network-${{ matrix.target }}
+          path: artifacts/
+     
+      - uses: actions/download-artifact@master
+        if: matrix.os == 'windows-latest'
+        with:
+          name: launch_network-${{ matrix.target }}.exe
+          path: artifacts/
+      
+      - uses: actions/download-artifact@master
+        if: matrix.os == 'windows-latest'
+        with:
+          name: sn_node-${{ matrix.target }}.exe
+          path: artifacts/
+
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Launch local network
+        if: matrix.os != 'windows-latest'
+        env:
+          RUST_LOG: "safe_network=trace"
+        run: |
+          ls
+          ls artifacts
+          cp artifacts/sn_node-${{ matrix.target }} artifacts/sn_node
+          ./artifacts/launch_network-${{ matrix.target }}
+     
+      - name: Launch local network
+        if: matrix.os == 'windows-latest'
+        env:
+          RUST_LOG: "safe_network=trace"
+          # TODO: windows with split section network has been failing w/ SO.
+          # when we have that sorted we can reenable the full networks
+          NODE_COUNT: 11
+        run: |
+          ls
+          ls artifacts
+          cp artifacts/sn_node-${{ matrix.target }}.exe artifacts/sn_node.exe
+          ./artifacts/launch_network-${{ matrix.target }}
+      
+      - name: extra wait for CI split
+        run: sleep 120
+
+      - name: Have we had a section split?
+        run: ./scripts/has_split.sh
+
+      - name: Client blob tests against local network
+        shell: bash
+        run: timeout 45m cargo test --release -- client_api::blob && sleep 5
 
       # TODO: Upload all logs as artifacts....
       - name: Node Logs
