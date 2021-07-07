@@ -30,6 +30,7 @@
     missing_docs,
     trivial_casts,
     trivial_numeric_casts,
+    unreachable_pub,
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
@@ -40,18 +41,11 @@
 #[macro_use]
 extern crate tracing;
 
-#[warn(unreachable_pub)]
 pub mod client;
-#[warn(unreachable_pub)]
 mod dbs;
 /// The messaging interface to the network. Messages sent and serialised in line with this module should be acted upon by the network.
-#[warn(unreachable_pub)]
 pub mod messaging;
-#[warn(unreachable_pub)]
 pub mod node;
-#[warn(unreachable_pub)]
 pub mod routing;
-#[warn(unreachable_pub)]
 pub mod types;
-#[warn(unreachable_pub)]
 pub mod url;
