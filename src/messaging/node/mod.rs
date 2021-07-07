@@ -26,7 +26,11 @@ pub use node_msgs::{
 };
 pub use prefix_map::PrefixMap;
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
-pub use section::{ElderCandidates, MembershipState, NodeState, Peer, Section, SectionPeers};
+pub use section::ElderCandidates;
+pub use section::MembershipState;
+pub use section::NodeState;
+pub use section::Peer;
+pub use section::{Section, SectionPeers};
 pub use signed::{KeyedSig, SigShare};
 
 use crate::messaging::{

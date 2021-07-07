@@ -20,7 +20,7 @@ use std::{
 use xor_name::{Prefix, XorName};
 
 /// SHA3-256 hash digest.
-pub type Digest256 = [u8; 32];
+type Digest256 = [u8; 32];
 
 /// Unique identifier of a DKG session.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

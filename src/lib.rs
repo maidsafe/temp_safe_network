@@ -45,6 +45,7 @@ pub mod client;
 #[warn(unreachable_pub)]
 mod dbs;
 /// The messaging interface to the network. Messages sent and serialised in line with this module should be acted upon by the network.
+#[warn(unreachable_pub)]
 pub mod messaging;
 pub mod node;
 #[warn(unreachable_pub)]
