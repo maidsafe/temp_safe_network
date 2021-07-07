@@ -74,7 +74,7 @@ jobs:
       - uses: actions/upload-artifact@master
         if: matrix.os == 'windows-latest'
         with:
-          name: sn_node-${{ matrix.os }}
+          name: launch_network-${{ matrix.os }}.exe
           path: ./target/release/launch_network.exe
 
   tests:
