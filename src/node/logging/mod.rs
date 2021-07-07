@@ -17,16 +17,16 @@ use tracing::trace;
 
 const LOG_INTERVAL: Duration = std::time::Duration::from_secs(30);
 
-pub async fn run_system_logger(ctx: LogCtx) {
+pub async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) {
     let mut system = System::new_all();
     let mut last_log = Instant::now();
     initial_log(&mut system, &ctx).await;
-    log(&mut last_log, &mut system, &ctx).await;
+    log(&mut last_log, &mut system, &ctx, print_resources_usage).await;
     let _ = tokio::task::spawn(async move {
         loop {
             let elapsed = last_log.elapsed();
             if elapsed >= LOG_INTERVAL {
-                log(&mut last_log, &mut system, &ctx).await;
+                log(&mut last_log, &mut system, &ctx, print_resources_usage).await;
             } else {
                 tokio::time::sleep(LOG_INTERVAL - elapsed).await;
             }
@@ -48,7 +48,12 @@ fn fmt(string: Option<String>) -> String {
 }
 
 #[tracing::instrument]
-async fn log(last_log: &mut Instant, system: &mut System, ctx: &LogCtx) {
+async fn log(
+    last_log: &mut Instant,
+    system: &mut System,
+    ctx: &LogCtx,
+    print_resources_usage: bool,
+) {
     *last_log = Instant::now();
 
     system.refresh_all();
@@ -81,13 +86,22 @@ async fn log(last_log: &mut Instant, system: &mut System, ctx: &LogCtx) {
     let our_pid = &(std::process::id() as usize);
 
     for (pid, proc_) in system.processes() {
-        if pid != our_pid {
+        if *pid != *our_pid as i32 {
             continue;
         }
-        trace!(
-            prefix,
-            "Node resource usage: {:?}",
-            Process::map(proc_, processor_count)
-        );
+
+        if print_resources_usage {
+            println!(
+                "{:?} Node resource usage: {:?}",
+                prefix,
+                Process::map(proc_, processor_count)
+            )
+        } else {
+            trace!(
+                prefix,
+                "Node resource usage: {:?}",
+                Process::map(proc_, processor_count)
+            );
+        }
     }
 }

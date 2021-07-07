@@ -120,18 +120,18 @@ async fn run_node() -> Result<()> {
             // .buffered_lines_limit(buffered_lines_limit)
             .finish(file_appender);
 
-        tracing_subscriber::fmt()
+        let builder = tracing_subscriber::fmt()
             .with_writer(non_blocking)
             // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
             .with_env_filter(filter)
             .with_thread_names(true)
-            // here we choose log style output... do we want json for prod + analysis?
-            // can be compact, pretty, json...
-            .json()
-            .with_ansi(false)
-            // .pretty()
-            // .json()
-            .init();
+            .with_ansi(false);
+
+        if config.json_logs {
+            builder.json().init();
+        } else {
+            builder.compact().init();
+        }
 
         Some(guard)
     } else {

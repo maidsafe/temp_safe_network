@@ -62,6 +62,12 @@ pub struct Config {
     /// Attempt to self-update without starting the node process
     #[structopt(long)]
     pub update_only: bool,
+    /// Outputs logs in json format for easier processing
+    #[structopt(short, long)]
+    pub json_logs: bool,
+    /// print node resourse usage to stdout
+    #[structopt(long)]
+    pub resource_logs: bool,
     /// Delete all data from a previous node running on the same PC
     #[structopt(long)]
     pub clear_data: bool,
@@ -188,6 +194,9 @@ impl Config {
         if let Some(root_dir) = &config.root_dir {
             self.root_dir = Some(root_dir.clone());
         }
+
+        self.json_logs = config.json_logs;
+        self.resource_logs = config.resource_logs;
 
         if config.verbose > 0 {
             self.verbose = config.verbose;
