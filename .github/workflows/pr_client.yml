@@ -4,14 +4,10 @@ on: pull_request
 
 
 env:
-  # Run all cargo commands with --verbose.
-  CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
-  # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  
   # Run test suite.
   client-tests:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -56,3 +52,48 @@ jobs:
         shell: bash
         # e2e client tests are run in the separate e2e.yml action
         run: cargo test --release client --doc
+
+  client-tests-arm:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Client Doc Tests on ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf]
+    steps:
+      - uses: actions/checkout@v2
+      # test for changes. (dont use baked in GHA pr/paths filter as then job wont run and we can't require itz)
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'src/client/**'
+              - 'src/messaging/**'
+              - 'src/types/**'
+
+      - uses: actions-rs/toolchain@v1
+        if: steps.changes.outputs.src == 'true'
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cargo cache registry, index and build
+        if: steps.changes.outputs.src == 'true'
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Run Doc Tests on ${{ matrix.target }} with cross
+        if: steps.changes.outputs.src == 'true'
+        shell: bash
+        run: cross test --release client --doc --target ${{ matrix.target }}

@@ -9,17 +9,14 @@ name: Types Changes
 on: pull_request
 
 env:
-  # Run all cargo commands with --verbose.
-  CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
-  # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
 jobs:
  
-  routing-tests:
+  data-types-tests:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Routing Tests
+    name: Data Types Tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
