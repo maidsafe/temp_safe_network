@@ -36,7 +36,7 @@ use xor_name::XorName;
 /// and is sent on the wire to some other dst(s) on the network.
 
 /// Vec of NodeDuty
-pub type NodeDuties = Vec<NodeDuty>;
+pub(super) type NodeDuties = Vec<NodeDuty>;
 
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]

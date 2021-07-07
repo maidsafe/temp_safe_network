@@ -46,20 +46,20 @@ impl ChunkRecords {
         }
     }
 
-    pub async fn get_data_of(&self, prefix: Prefix) -> ChunkDataExchange {
+    pub(super) async fn get_data_of(&self, prefix: Prefix) -> ChunkDataExchange {
         // Prepare full_adult details
         let full_adults = self.capacity.full_adults_matching(prefix).await;
         ChunkDataExchange { full_adults }
     }
 
-    pub async fn update(&self, chunk_data: ChunkDataExchange) {
+    pub(super) async fn update(&self, chunk_data: ChunkDataExchange) {
         let ChunkDataExchange { full_adults } = chunk_data;
         self.capacity.insert_full_adults(full_adults).await
     }
 
     /// Registered holders not present in provided list of members
     /// will be removed from adult_storage_info and no longer tracked for liveness.
-    pub async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
+    pub(super) async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
         // full adults
         self.capacity.retain_members_only(&members).await;
 
@@ -84,7 +84,7 @@ impl ChunkRecords {
     }
 
     /// Adds a given node to the list of full nodes.
-    pub async fn increase_full_node_count(&self, node_id: PublicKey) {
+    pub(super) async fn increase_full_node_count(&self, node_id: PublicKey) {
         let full_adults = self.capacity.full_adults_count().await;
         info!("No. of full Adults: {:?}", full_adults);
         info!("Increasing full Adults count");
@@ -142,7 +142,7 @@ impl ChunkRecords {
     }
 
     /// Needs attention!
-    pub async fn record_adult_read_liveness(
+    pub(super) async fn record_adult_read_liveness(
         &self,
         correlation_id: MessageId,
         response: QueryResponse,

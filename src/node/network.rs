@@ -21,13 +21,13 @@ use xor_name::{Prefix, XorName};
 
 ///
 #[derive(Clone, Debug)]
-pub struct Network {
+pub(crate) struct Network {
     routing: Arc<RoutingNode>,
 }
 
 #[allow(missing_docs)]
 impl Network {
-    pub async fn new(root_dir: &Path, config: &NodeConfig) -> Result<(Self, EventStream)> {
+    pub(crate) async fn new(root_dir: &Path, config: &NodeConfig) -> Result<(Self, EventStream)> {
         let routing_config = RoutingConfig {
             first: config.is_first(),
             transport_config: config.network_config().clone(),
@@ -46,15 +46,15 @@ impl Network {
         ))
     }
 
-    pub async fn age(&self) -> u8 {
+    pub(crate) async fn age(&self) -> u8 {
         self.routing.age().await
     }
 
-    pub async fn public_key(&self) -> Ed25519PublicKey {
+    pub(crate) async fn public_key(&self) -> Ed25519PublicKey {
         self.routing.public_key().await
     }
 
-    pub async fn propose_offline(&self, name: XorName) -> Result<()> {
+    pub(crate) async fn propose_offline(&self, name: XorName) -> Result<()> {
         // Notify the entire section to test connectivity to this node
         self.routing.start_connectivity_test(name).await?;
         self.routing
@@ -64,7 +64,7 @@ impl Network {
     }
 
     /// Returns public key of our section public key set.
-    pub async fn section_public_key(&self) -> Result<PublicKey> {
+    pub(crate) async fn section_public_key(&self) -> Result<PublicKey> {
         Ok(PublicKey::Bls(
             self.routing
                 .public_key_set()
@@ -75,16 +75,16 @@ impl Network {
     }
 
     /// Returns our section's public key.
-    pub async fn our_section_public_key(&self) -> BlsPublicKey {
+    pub(crate) async fn our_section_public_key(&self) -> BlsPublicKey {
         self.routing.our_section().await.public_key_set.public_key()
     }
 
-    pub async fn our_public_key_set(&self) -> Result<PublicKeySet> {
+    pub(crate) async fn our_public_key_set(&self) -> Result<PublicKeySet> {
         let pk_set = self.routing.public_key_set().await?;
         Ok(pk_set)
     }
 
-    pub async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
+    pub(crate) async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
         self.routing
             .matching_section(name)
             .await
@@ -92,37 +92,37 @@ impl Network {
             .map_err(From::from)
     }
 
-    pub async fn our_name(&self) -> XorName {
+    pub(crate) async fn our_name(&self) -> XorName {
         self.routing.name().await
     }
 
-    pub async fn our_connection_info(&self) -> SocketAddr {
+    pub(crate) async fn our_connection_info(&self) -> SocketAddr {
         self.routing.our_connection_info().await
     }
 
-    pub async fn our_prefix(&self) -> Prefix {
+    pub(crate) async fn our_prefix(&self) -> Prefix {
         self.routing.our_prefix().await
     }
 
-    pub async fn section_chain(&self) -> SecuredLinkedList {
+    pub(crate) async fn section_chain(&self) -> SecuredLinkedList {
         self.routing.section_chain().await
     }
 
-    pub async fn send_message(&self, wire_msg: WireMsg) -> Result<(), RoutingError> {
+    pub(crate) async fn send_message(&self, wire_msg: WireMsg) -> Result<(), RoutingError> {
         self.routing.send_message(wire_msg).await
     }
 
-    pub async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
+    pub(crate) async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
         self.routing.set_joins_allowed(joins_allowed).await?;
         Ok(())
     }
 
     // Returns whether the node is Elder.
-    pub async fn is_elder(&self) -> bool {
+    pub(crate) async fn is_elder(&self) -> bool {
         self.routing.is_elder().await
     }
 
-    pub async fn our_elder_names(&self) -> BTreeSet<XorName> {
+    pub(crate) async fn our_elder_names(&self) -> BTreeSet<XorName> {
         self.routing
             .our_elders()
             .await
@@ -131,7 +131,7 @@ impl Network {
             .collect::<BTreeSet<_>>()
     }
 
-    pub async fn our_adults(&self) -> BTreeSet<XorName> {
+    pub(crate) async fn our_adults(&self) -> BTreeSet<XorName> {
         self.routing
             .our_adults()
             .await
@@ -140,7 +140,7 @@ impl Network {
             .collect::<BTreeSet<_>>()
     }
 
-    pub async fn our_adults_sorted_by_distance_to(&self, name: &XorName) -> Vec<XorName> {
+    pub(crate) async fn our_adults_sorted_by_distance_to(&self, name: &XorName) -> Vec<XorName> {
         self.routing
             .our_adults_sorted_by_distance_to(name)
             .await
@@ -149,7 +149,7 @@ impl Network {
             .collect::<Vec<_>>()
     }
 
-    pub async fn sign_msg_for_dst_accumulation(
+    pub(crate) async fn sign_msg_for_dst_accumulation(
         &self,
         node_msg: NodeMsg,
         dst: DstLocation,
@@ -161,7 +161,7 @@ impl Network {
         Ok(wire_msg)
     }
 
-    pub async fn sign_single_src_msg(
+    pub(crate) async fn sign_single_src_msg(
         &self,
         node_msg: NodeMsg,
         dst: DstLocation,

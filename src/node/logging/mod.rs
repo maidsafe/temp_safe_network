@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod log_ctx;
+pub(super) mod log_ctx;
 mod system;
 
 use self::log_ctx::LogCtx;
@@ -19,7 +19,7 @@ use tracing::trace;
 
 const LOG_INTERVAL: Duration = std::time::Duration::from_secs(30);
 
-pub async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) {
+pub(super) async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) {
     let mut system = System::new_all();
     initial_log(&mut system, &ctx).await;
 

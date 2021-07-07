@@ -23,7 +23,7 @@ use crate::node::{
 use crate::routing::MessageReceived;
 use tracing::debug;
 
-pub fn map_node_msg(
+pub(super) fn map_node_msg(
     msg_id: MessageId,
     src: SrcLocation,
     dst: DstLocation,

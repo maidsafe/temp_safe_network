@@ -26,11 +26,11 @@ use tracing::{info, trace, warn};
 #[derive(Clone)]
 pub(crate) struct AdultRole {
     // immutable chunks
-    pub chunks: Arc<ChunkStore>,
+    pub(crate) chunks: Arc<ChunkStore>,
 }
 
 impl AdultRole {
-    pub async fn reorganize_chunks(
+    pub(crate) async fn reorganize_chunks(
         &self,
         our_name: XorName,
         new_adults: BTreeSet<XorName>,

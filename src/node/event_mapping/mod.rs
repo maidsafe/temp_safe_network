@@ -19,13 +19,13 @@ use std::{thread::sleep, time::Duration};
 use tracing::{debug, error, info, trace};
 
 #[derive(Debug)]
-pub struct Mapping {
-    pub op: NodeDuty,
-    pub ctx: Option<MsgContext>,
+pub(super) struct Mapping {
+    pub(super) op: NodeDuty,
+    pub(super) ctx: Option<MsgContext>,
 }
 
 #[derive(Debug, Clone)]
-pub enum MsgContext {
+pub(super) enum MsgContext {
     Node {
         msg: MessageReceived,
         src: SrcLocation,
@@ -37,7 +37,7 @@ pub enum MsgContext {
 }
 
 // Process any routing event
-pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
+pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
     info!("Handling RoutingEvent: {:?}", event);
     match event {
         RoutingEvent::MessageReceived {
@@ -226,7 +226,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
     }
 }
 
-pub async fn log_network_stats(network_api: &Network) {
+pub(super) async fn log_network_stats(network_api: &Network) {
     let adults = network_api.our_adults().await.len();
     let elders = network_api.our_elder_names().await.len();
     let prefix = network_api.our_prefix().await;

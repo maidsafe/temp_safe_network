@@ -29,14 +29,14 @@ struct ReadOperation {
     responded_with_success: bool,
 }
 
-pub struct AdultLiveness {
+pub(crate) struct AdultLiveness {
     ops: DashMap<MessageId, ReadOperation>,
     pending_ops: DashMap<XorName, usize>,
     closest_adults: DashMap<XorName, Vec<XorName>>,
 }
 
 impl AdultLiveness {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             ops: DashMap::new(),
             pending_ops: DashMap::new(),
@@ -46,7 +46,7 @@ impl AdultLiveness {
 
     // Inserts a new read operation
     // Returns false if the operation already existed.
-    pub fn new_read(
+    pub(crate) fn new_read(
         &self,
         msg_id: MessageId,
         head_address: ChunkAddress,
@@ -72,7 +72,7 @@ impl AdultLiveness {
         new_operation
     }
 
-    pub fn retain_members_only(&self, current_members: BTreeSet<XorName>) {
+    pub(crate) fn retain_members_only(&self, current_members: BTreeSet<XorName>) {
         let all_keys: Vec<_> = self
             .closest_adults
             .iter()
@@ -108,7 +108,7 @@ impl AdultLiveness {
         self.recompute_closest_adults();
     }
 
-    pub fn remove_target(&self, msg_id: &MessageId, name: &XorName) {
+    pub(crate) fn remove_target(&self, msg_id: &MessageId, name: &XorName) {
         if let Some(mut count) = self.pending_ops.get_mut(name) {
             let counter = *count;
             if counter > 0 {
@@ -128,7 +128,7 @@ impl AdultLiveness {
         }
     }
 
-    pub fn record_adult_read_liveness(
+    pub(crate) fn record_adult_read_liveness(
         &self,
         correlation_id: &MessageId,
         src: &XorName,
@@ -175,7 +175,7 @@ impl AdultLiveness {
         }
     }
 
-    pub fn recompute_closest_adults(&self) {
+    pub(crate) fn recompute_closest_adults(&self) {
         let all_keys: Vec<_> = self
             .closest_adults
             .iter()
@@ -193,7 +193,7 @@ impl AdultLiveness {
     }
 
     // this is not an exact definition, thus has tolerance for variance due to concurrency
-    pub fn find_unresponsive_adults(&self) -> Vec<(XorName, usize)> {
+    pub(crate) fn find_unresponsive_adults(&self) -> Vec<(XorName, usize)> {
         let mut unresponsive_adults = Vec::new();
         for entry in &self.closest_adults {
             let (adult, neighbours) = entry.pair();

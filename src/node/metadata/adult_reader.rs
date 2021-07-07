@@ -13,23 +13,23 @@ use crate::routing::{Prefix, XorName};
 use crate::node::network::Network;
 
 #[derive(Clone)]
-pub struct AdultReader {
+pub(crate) struct AdultReader {
     network: Network,
 }
 
 impl AdultReader {
     /// Access to the current state of our adult constellation
-    pub fn new(network: Network) -> Self {
+    pub(crate) fn new(network: Network) -> Self {
         Self { network }
     }
 
     /// Get the sections's current Prefix
-    pub async fn our_prefix(&self) -> Prefix {
+    pub(crate) async fn our_prefix(&self) -> Prefix {
         self.network.our_prefix().await
     }
 
     /// Dynamic state
-    pub async fn non_full_adults_closest_to(
+    pub(crate) async fn non_full_adults_closest_to(
         &self,
         name: &XorName,
         full_adults: &BTreeSet<XorName>,
