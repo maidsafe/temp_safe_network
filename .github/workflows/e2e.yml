@@ -19,7 +19,7 @@ env:
 jobs:
   build-network: 
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: E2E tests
+    name: Build network bins
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -55,32 +55,32 @@ jobs:
       - uses: actions/upload-artifact@master
         if: matrix.os != 'windows-latest'
         with:
-          name: sn_node-${{ matrix.target }}
+          name: sn_node-${{ matrix.os }}
           path: ./target/release/sn_node
       
       - uses: actions/upload-artifact@master
         if: matrix.os != 'windows-latest'
         with:
-          name: launch_network-${{ matrix.target }}
+          name: launch_network-${{ matrix.os }}
           path: ./target/release/launch_network
 
       # Upload artifacts.
       - uses: actions/upload-artifact@master
         if: matrix.os == 'windows-latest'
         with:
-          name: sn_node-${{ matrix.target }}
+          name: sn_node-${{ matrix.os }}
           path: ./target/release/sn_node.exe
       # Upload artifacts.
       - uses: actions/upload-artifact@master
         if: matrix.os == 'windows-latest'
         with:
-          name: sn_node-${{ matrix.target }}
+          name: sn_node-${{ matrix.os }}
           path: ./target/release/launch_network.exe
 
   tests:
     needs: build-network
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: E2E tests
+    name: run basic tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -120,25 +120,25 @@ jobs:
       - uses: actions/download-artifact@master
         if: matrix.os != 'windows-latest'
         with:
-          name: sn_node-${{ matrix.target }}
+          name: sn_node-${{ matrix.os }}
           path: artifacts/
 
       - uses: actions/download-artifact@master
         if: matrix.os != 'windows-latest'
         with:
-          name: launch_network-${{ matrix.target }}
+          name: launch_network-${{ matrix.os }}
           path: artifacts/
      
       - uses: actions/download-artifact@master
         if: matrix.os == 'windows-latest'
         with:
-          name: launch_network-${{ matrix.target }}.exe
+          name: launch_network-${{ matrix.os }}.exe
           path: artifacts/
       
       - uses: actions/download-artifact@master
         if: matrix.os == 'windows-latest'
         with:
-          name: sn_node-${{ matrix.target }}.exe
+          name: sn_node-${{ matrix.os }}.exe
           path: artifacts/
 
       # Cache.
@@ -158,8 +158,8 @@ jobs:
         run: |
           ls
           ls artifacts
-          cp artifacts/sn_node-${{ matrix.target }} artifacts/sn_node
-          ./artifacts/launch_network-${{ matrix.target }}
+          cp artifacts/sn_node-${{ matrix.os }} target/release/sn_node
+          ./artifacts/launch_network-${{ matrix.os }}
      
       - name: Launch local network
         if: matrix.os == 'windows-latest'
@@ -171,8 +171,8 @@ jobs:
         run: |
           ls
           ls artifacts
-          cp artifacts/sn_node-${{ matrix.target }}.exe artifacts/sn_node.exe
-          ./artifacts/launch_network-${{ matrix.target }}
+          cp artifacts/sn_node-${{ matrix.os }}.exe target/release/sn_node.exe
+          ./artifacts/launch_network-${{ matrix.os }}
       
       - name: extra wait for CI split
         run: sleep 120
@@ -255,25 +255,25 @@ jobs:
       - uses: actions/download-artifact@master
         if: matrix.os != 'windows-latest'
         with:
-          name: sn_node-${{ matrix.target }}
+          name: sn_node-${{ matrix.os }}
           path: artifacts/
 
       - uses: actions/download-artifact@master
         if: matrix.os != 'windows-latest'
         with:
-          name: launch_network-${{ matrix.target }}
+          name: launch_network-${{ matrix.os }}
           path: artifacts/
      
       - uses: actions/download-artifact@master
         if: matrix.os == 'windows-latest'
         with:
-          name: launch_network-${{ matrix.target }}.exe
+          name: launch_network-${{ matrix.os }}.exe
           path: artifacts/
       
       - uses: actions/download-artifact@master
         if: matrix.os == 'windows-latest'
         with:
-          name: sn_node-${{ matrix.target }}.exe
+          name: sn_node-${{ matrix.os }}.exe
           path: artifacts/
 
       # Cache.
@@ -293,8 +293,8 @@ jobs:
         run: |
           ls
           ls artifacts
-          cp artifacts/sn_node-${{ matrix.target }} artifacts/sn_node
-          ./artifacts/launch_network-${{ matrix.target }}
+          cp artifacts/sn_node-${{ matrix.os }} target/release/sn_node
+          ./artifacts/launch_network-${{ matrix.os }}
      
       - name: Launch local network
         if: matrix.os == 'windows-latest'
@@ -306,8 +306,8 @@ jobs:
         run: |
           ls
           ls artifacts
-          cp artifacts/sn_node-${{ matrix.target }}.exe artifacts/sn_node.exe
-          ./artifacts/launch_network-${{ matrix.target }}
+          cp artifacts/sn_node-${{ matrix.os }}.exe target/release/sn_node.exe
+          ./artifacts/launch_network-${{ matrix.os }}
       
       - name: extra wait for CI split
         run: sleep 120
