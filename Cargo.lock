@@ -2331,7 +2331,6 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-futures",
- "tracing-log",
  "tracing-subscriber",
  "uhttp_uri",
  "url",

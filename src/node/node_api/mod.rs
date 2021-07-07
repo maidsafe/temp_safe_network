@@ -129,7 +129,7 @@ impl Node {
             our_pid, node_prefix, node_name, our_conn_info_json,
         );
 
-        run_system_logger(LogCtx::new(network_api)).await;
+        run_system_logger(LogCtx::new(network_api), config.resource_logs).await;
 
         Ok((node, network_events))
     }
