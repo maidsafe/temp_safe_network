@@ -1,14 +1,9 @@
 name: Standard PR Checks
 
-
 on: pull_request
-  
 
 env:
-  # Run all cargo commands with --verbose.
-  CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
-  # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
 jobs:
@@ -75,6 +70,38 @@ jobs:
       - name: Build
         run: cargo build
 
+  build-script-arm:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Build ${{ matrix.target }} with cross
+        run: cross build --release --target ${{ matrix.target }}
+
   cargo-udeps:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unused dependency check
@@ -104,7 +131,7 @@ jobs:
       run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
 
     - uses: EmbarkStudios/cargo-deny-action@v1
-  
+
   check_pr_size:
       if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
       name: Check PR size doesn't break set limit
