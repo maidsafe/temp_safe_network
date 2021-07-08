@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.11](https://github.com/maidsafe/safe_network/compare/v0.7.10...v0.7.11) (2021-07-08)
+
+
+### Bug Fixes
+
+* no concurrent chunks; go back a SE version ([18c000c](https://github.com/maidsafe/safe_network/commit/18c000c8170e9aff7d940b02e0006e40b64696b5))
+
 ### [0.7.10](https://github.com/maidsafe/safe_network/compare/v0.7.9...v0.7.10) (2021-07-07)
 
 
