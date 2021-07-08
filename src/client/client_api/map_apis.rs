@@ -382,7 +382,7 @@ mod tests {
     // 2. Fetch the shell version, entries, keys, values anv verify them
     // 3. Fetch the entire. data object and verify
     #[tokio::test]
-    pub async fn public_map_test() -> Result<()> {
+    async fn public_map_test() -> Result<()> {
         let client = create_test_client(None).await?;
 
         let name = XorName::random();
@@ -440,7 +440,7 @@ mod tests {
     // 2. Fetch the shell version, entries, keys, values anv verify them
     // 3. Fetch the entire. data object and verify
     #[tokio::test]
-    pub async fn private_map_test() -> Result<()> {
+    async fn private_map_test() -> Result<()> {
         let client = create_test_client(None).await?;
 
         let name = XorName::random();
@@ -500,7 +500,9 @@ mod tests {
     // 1. Put seq. map on the network and then delete it
     // 2. Try getting the data object. It should bail
     #[tokio::test]
-    pub async fn del_private_map_test() -> Result<()> {
+    // TODO: reenable all this when reworked and CRDT
+    #[ignore = "flaky test, can hang"]
+    async fn del_private_map_test() -> Result<()> {
         let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
@@ -531,7 +533,9 @@ mod tests {
     // 1. Put unseq. map on the network and then delete it
     // 2. Try getting the data object. It should bail
     #[tokio::test]
-    pub async fn del_public_map_test() -> Result<()> {
+    // TODO: reenable all this when reworked and CRDT
+    #[ignore = "flaky test, can hang"]
+    async fn del_public_map_test() -> Result<()> {
         let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
@@ -562,7 +566,7 @@ mod tests {
     // 1. Create a client that PUTs some map on the network
     // 2. Create a different client that tries to delete the data. It should bail.
     #[tokio::test]
-    pub async fn del_public_map_permission_test() -> Result<()> {
+    async fn del_public_map_permission_test() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 15001;
         let mapref = MapAddress::Public { name, tag };
@@ -588,8 +592,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "Has been failing for a long time, fix coming up."]
-    pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client() -> Result<()>
-    {
+    async fn map_cannot_initially_put_data_with_another_owner_than_current_client() -> Result<()> {
         let client = create_test_client(None).await?;
         let mut permissions: BTreeMap<_, _> = Default::default();
         let permission_set = MapPermissionSet::new()
@@ -644,7 +647,7 @@ mod tests {
     // 3. Fetch the list of permissions and verify the edit.
     // 4. Delete a user's permissions from the permission set and verify the deletion.
     #[tokio::test]
-    pub async fn map_can_modify_permissions_test() -> Result<()> {
+    async fn map_can_modify_permissions_test() -> Result<()> {
         let client = create_test_client(None).await?;
         let name = XorName(rand::random());
         let tag = 15001;
@@ -720,7 +723,7 @@ mod tests {
     // 3. List the entries and verify that the mutation was applied.
     // 4. Fetch a value for a particular key and verify
     #[tokio::test]
-    pub async fn map_mutations_test() -> Result<()> {
+    async fn map_mutations_test() -> Result<()> {
         let client = create_test_client(None).await?;
         let name = XorName::random();
         let val_1 = XorName::random();

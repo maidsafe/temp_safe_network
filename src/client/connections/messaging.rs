@@ -246,7 +246,7 @@ impl Session {
             return Err(Error::InsufficientElderConnections(elders_len));
         }
 
-        info!(
+        debug!(
             "Sending query message {:?}, to the {} Elders closest to data name: {:?}",
             msg, elders_len, elders
         );

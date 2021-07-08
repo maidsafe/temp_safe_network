@@ -175,7 +175,7 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     #[tokio::test]
-    pub async fn client_creation() -> Result<()> {
+    async fn client_creation() -> Result<()> {
         let _client = create_test_client(None).await?;
 
         Ok(())
@@ -183,7 +183,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
-    pub async fn client_nonsense_bootstrap_fails() -> Result<()> {
+    async fn client_nonsense_bootstrap_fails() -> Result<()> {
         let mut nonsense_bootstrap = HashSet::new();
         let _ = nonsense_bootstrap.insert(SocketAddr::new(
             IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -195,7 +195,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn client_creation_with_existing_keypair() -> Result<()> {
+    async fn client_creation_with_existing_keypair() -> Result<()> {
         let mut rng = OsRng;
         let full_id = Keypair::new_ed25519(&mut rng);
         let pk = full_id.public_key();
@@ -207,7 +207,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn long_lived_connection_survives() -> Result<()> {
+    async fn long_lived_connection_survives() -> Result<()> {
         let client = create_test_client(None).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
 
