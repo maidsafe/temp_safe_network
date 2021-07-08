@@ -12,7 +12,6 @@ use safe_network::client::utils::generate_random_vector;
 use safe_network::client::utils::test_utils::read_network_conn_info;
 use safe_network::client::{Client, Error, DEFAULT_QUERY_TIMEOUT};
 use tokio::runtime::Runtime;
-use tokio::time::Duration;
 
 /// This bench requires a network already set up
 async fn put_kbs(amount: usize) -> Result<(), Error> {
