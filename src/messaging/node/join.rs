@@ -24,7 +24,7 @@ pub struct JoinRequest {
 }
 
 /// Joining peer's proof of resolvement of given resource proofing challenge.
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 pub struct ResourceProofResponse {
     #[allow(missing_docs)]
     pub solution: u64,
@@ -33,6 +33,7 @@ pub struct ResourceProofResponse {
     #[allow(missing_docs)]
     pub nonce: [u8; 32],
     #[allow(missing_docs)]
+    #[debug(with = "crate::types::Signature::fmt_ed25519")]
     pub nonce_signature: Signature,
 }
 

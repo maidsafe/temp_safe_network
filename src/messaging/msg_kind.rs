@@ -62,13 +62,15 @@ pub struct ClientSigned {
 }
 
 /// Authority of a single peer.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 pub struct NodeSigned {
     /// Section key of the source.
     pub section_pk: BlsPublicKey,
     /// Public key of the source peer.
+    #[debug(with = "PublicKey::fmt_ed25519")]
     pub public_key: EdPublicKey,
     /// Ed25519 signature of the message corresponding to the public key of the source peer.
+    #[debug(with = "Signature::fmt_ed25519")]
     pub signature: EdSignature,
 }
 
