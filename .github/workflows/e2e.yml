@@ -23,7 +23,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -169,8 +169,8 @@ jobs:
           # when we have that sorted we can reenable the full networks
           NODE_COUNT: 11
         run: |
-          ls
           ls artifacts
+          chmod +x artifacts/*
           cp artifacts/sn_node.exe target/release/sn_node.exe
           ./artifacts/launch_network.exe
       
@@ -291,8 +291,8 @@ jobs:
         env:
           RUST_LOG: "safe_network=trace"
         run: |
-          ls
           ls artifacts
+          chmod +x artifacts/*
           cp artifacts/sn_node target/release/sn_node
           ./artifacts/launch_network
      
@@ -304,8 +304,8 @@ jobs:
           # when we have that sorted we can reenable the full networks
           NODE_COUNT: 11
         run: |
-          ls
           ls artifacts
+          chmod +x artifacts/*
           cp artifacts/sn_node.exe target/release/sn_node.exe
           ./artifacts/launch_network.exe
       
