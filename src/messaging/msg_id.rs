@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{Error, Result};
+use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tiny_keccak::{Hasher, Sha3};
@@ -20,8 +21,10 @@ pub const MESSAGE_ID_LEN: usize = 32;
 /// This is used for deduplication: Since the network sends messages redundantly along different
 /// routes, the same message will usually arrive more than once at any given node. A message with
 /// an ID that is already in the cache will be ignored.
-#[derive(Debug, Ord, PartialOrd, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub struct MessageId([u8; MESSAGE_ID_LEN]);
+#[derive(
+    Ord, PartialOrd, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, custom_debug::Debug,
+)]
+pub struct MessageId(#[debug(with = "Self::fmt_bytes")] [u8; MESSAGE_ID_LEN]);
 
 impl MessageId {
     /// Generates a new `MessageId` with random content.
@@ -71,6 +74,10 @@ impl MessageId {
         hasher.finalize(&mut output);
 
         Self(output)
+    }
+
+    fn fmt_bytes(bytes: &[u8; MESSAGE_ID_LEN], f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:0.10}", HexFmt(bytes))
     }
 }
 
