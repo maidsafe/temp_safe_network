@@ -10,7 +10,6 @@ env:
   RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
-  RUST_LOG: "info"
   NODE_COUNT: "43" # this should be a split section
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
@@ -23,7 +22,7 @@ jobs:
     strategy:
       matrix:
         # os: [ubuntu-latest]
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -74,14 +73,14 @@ jobs:
       - run: ./target/release/launch_network
         if: matrix.os != 'windows-latest'
         env:
-          RUST_LOG: "safe_network=debug"
+          RUST_LOG: "safe_network=trace"
 
       # TODO: windows with split section network has been failing w/ SO.
       # when we have that sorted we can reenable the full networks
       - run: ./target/release/launch_network
         if: matrix.os == 'windows-latest'
         env:
-          RUST_LOG: "safe_network=debug"
+          RUST_LOG: "safe_network=trace"
           NODE_COUNT: 11
 
       - name: extra wait for CI split
