@@ -333,8 +333,7 @@ mod tests {
     fn debug_format_functional() -> Result<()> {
         if let Some(key) = gen_keys().first() {
             let errored_response = QueryResponse::GetSequence(Err(Error::AccessDenied(*key)));
-            assert!(format!("{:?}", errored_response)
-                .contains("GetSequence(Err(AccessDenied(PublicKey::"));
+            assert!(format!("{:?}", errored_response).contains("GetSequence(Err(AccessDenied("));
             Ok(())
         } else {
             Err(anyhow!("Could not generate public key"))

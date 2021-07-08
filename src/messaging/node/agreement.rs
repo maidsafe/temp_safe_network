@@ -35,11 +35,13 @@ impl DkgKey {
 }
 
 /// One signed failure for a DKG round by a given PublicKey
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 pub struct DkgFailureSig {
     #[allow(missing_docs)]
+    #[debug(with = "crate::types::PublicKey::fmt_ed25519")]
     pub public_key: PublicKey,
     #[allow(missing_docs)]
+    #[debug(with = "crate::types::Signature::fmt_ed25519")]
     pub signature: Signature,
 }
 

@@ -15,8 +15,12 @@
 
 use super::super::utils;
 
+use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
-use std::hash::{Hash, Hasher};
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+};
 
 /// A signature share, with its index in the combined collection.
 #[derive(Clone, Hash, Eq, PartialEq, PartialOrd, Serialize, Deserialize, Debug)]
@@ -28,10 +32,11 @@ pub struct SignatureShare {
 }
 
 /// Wrapper for different signature types.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum Signature {
     /// Ed25519 signature.
+    #[debug(with = "Self::fmt_ed25519")]
     Ed25519(ed25519_dalek::Signature),
     /// BLS signature.
     Bls(bls::Signature),
@@ -54,6 +59,14 @@ impl Signature {
             Self::Ed25519(sig) => Some(sig),
             _ => None,
         }
+    }
+
+    // ed25519_dalek::Signature has overly verbose debug output, so we provide our own
+    pub(crate) fn fmt_ed25519(
+        sig: &ed25519_dalek::Signature,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        write!(f, "Signature({:0.10})", HexFmt(sig))
     }
 }
 

@@ -16,6 +16,7 @@
 use super::super::{utils, Error, Result};
 use super::super::{Keypair, Signature};
 
+use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
 use signature::Verifier;
 use std::{
@@ -28,10 +29,10 @@ use std::{
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Wrapper for different public key types.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 pub enum PublicKey {
     /// Ed25519 public key.
-    Ed25519(ed25519_dalek::PublicKey),
+    Ed25519(#[debug(with = "Self::fmt_ed25519")] ed25519_dalek::PublicKey),
     /// BLS public key.
     Bls(bls::PublicKey),
     /// BLS public key share.
@@ -150,6 +151,11 @@ impl PublicKey {
     /// Creates from z-base-32 encoded string.
     pub fn decode_from_zbase32<I: AsRef<str>>(encoded: I) -> Result<Self> {
         utils::decode(encoded)
+    }
+
+    // ed25519_dalek::PublicKey has overly verbose debug output, so we provide our own
+    pub(crate) fn fmt_ed25519(pk: &ed25519_dalek::PublicKey, f: &mut Formatter) -> fmt::Result {
+        write!(f, "PublicKey({:0.10})", HexFmt(pk.as_bytes()))
     }
 }
 
