@@ -156,10 +156,9 @@ jobs:
         env:
           RUST_LOG: "safe_network=trace"
         run: |
-          ls
           ls artifacts
-          cp artifacts/sn_node-${{ matrix.os }} target/release/sn_node
-          ./artifacts/launch_network-${{ matrix.os }}
+          cp artifacts/sn_node target/release/sn_node
+          ./artifacts/launch_network
      
       - name: Launch local network
         if: matrix.os == 'windows-latest'
@@ -171,8 +170,8 @@ jobs:
         run: |
           ls
           ls artifacts
-          cp artifacts/sn_node-${{ matrix.os }}.exe target/release/sn_node.exe
-          ./artifacts/launch_network-${{ matrix.os }}
+          cp artifacts/sn_node.exe target/release/sn_node.exe
+          ./artifacts/launch_network.exe
       
       - name: extra wait for CI split
         run: sleep 120
