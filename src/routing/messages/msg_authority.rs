@@ -88,7 +88,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
             NodeMsgAuthority::Node(_) => true,
             NodeMsgAuthority::BlsShare(BlsShareSigned { section_pk, .. })
             | NodeMsgAuthority::Section(SectionSigned { section_pk, .. }) => {
-                known_keys.iter().find(|key| *key == section_pk).is_some()
+                known_keys.iter().any(|key| key == section_pk)
             }
         }
     }

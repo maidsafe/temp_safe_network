@@ -11,7 +11,6 @@ mod join;
 mod join_as_relocated;
 mod network;
 mod node_msgs;
-mod plain_message;
 mod prefix_map;
 mod relocation;
 mod section;
@@ -25,7 +24,6 @@ pub use node_msgs::{
     NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
     NodeQueryResponse, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
 };
-pub use plain_message::PlainMessage;
 pub use prefix_map::PrefixMap;
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::{ElderCandidates, MembershipState, NodeState, Peer, Section, SectionPeers};

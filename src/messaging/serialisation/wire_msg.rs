@@ -88,14 +88,19 @@ impl WireMsg {
     pub fn serialize(&self) -> Result<Bytes> {
         // First we create a buffer with the capacity
         // needed to serialize the wire msg
-        let max_length = WireMsgHeader::max_size() as usize + self.payload.len();
+        // FIXME: don't multiplying the max size by a factor of 10 and calculate the correct size.
+        let max_length = 10 * (WireMsgHeader::max_size() as usize + self.payload.len());
         let mut buffer = vec![0u8; max_length];
 
         let (buf_at_payload, bytes_written) = self.header.write(&mut buffer)?;
 
         // ...and finally we write the bytes of the serialized payload to the original buffer
         let _ = gen_simple(slice(self.payload.clone()), buf_at_payload).map_err(|err| {
-            Error::Serialisation(format!("message payload couldn't be serialized: {}", err))
+            Error::Serialisation(format!(
+                "message payload (size {}) couldn't be serialized: {}",
+                self.payload.len(),
+                err
+            ))
         })?;
 
         // We can now return the buffer containing the written bytes
@@ -104,7 +109,7 @@ impl WireMsg {
     }
 
     /// Deserialize the payload from this WireMsg returning a MessageType instance.
-    pub fn to_message(self) -> Result<MessageType> {
+    pub fn into_message(self) -> Result<MessageType> {
         match self.header.msg_envelope.msg_kind {
             MsgKind::SectionInfoMsg => {
                 let msg: SectionInfoMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
@@ -127,7 +132,7 @@ impl WireMsg {
 
                 Ok(MessageType::Client {
                     msg_id: self.header.msg_envelope.msg_id,
-                    client_signed: client_signed,
+                    client_signed,
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })
@@ -226,7 +231,7 @@ impl WireMsg {
     /// Convenience function which creates a temporary WireMsg from the provided
     /// bytes, returning the deserialized message.
     pub fn deserialize(bytes: Bytes) -> Result<MessageType> {
-        Self::from(bytes)?.to_message()
+        Self::from(bytes)?.into_message()
     }
 }
 
@@ -271,7 +276,7 @@ mod tests {
 
         // test deserialisation of payload
         assert_eq!(
-            deserialized.to_message()?,
+            deserialized.into_message()?,
             MessageType::SectionInfo {
                 msg_id: wire_msg.msg_id(),
                 dst_location,
@@ -320,7 +325,7 @@ mod tests {
 
         // test deserialisation of payload
         assert_eq!(
-            deserialized.to_message()?,
+            deserialized.into_message()?,
             MessageType::SectionInfo {
                 msg_id: wire_msg.msg_id(),
                 dst_location: new_dst_location,
@@ -361,7 +366,7 @@ mod tests {
 
         let msg_kind = MsgKind::NodeSignedMsg(node_signed.clone());
 
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind.clone(), dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -374,12 +379,12 @@ mod tests {
 
         // test deserialisation of payload
         assert_eq!(
-            deserialized.to_message()?,
+            deserialized.into_message()?,
             MessageType::Node {
                 msg_id: wire_msg.msg_id(),
                 msg_authority: NodeMsgAuthority::Node(node_signed),
                 dst_location,
-                msg: node_msg.clone(),
+                msg: node_msg,
             }
         );
 
@@ -412,7 +417,7 @@ mod tests {
 
         let msg_kind = MsgKind::ClientMsg(client_signed.clone());
 
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind.clone(), dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -425,12 +430,12 @@ mod tests {
 
         // test deserialisation of payload
         assert_eq!(
-            deserialized.to_message()?,
+            deserialized.into_message()?,
             MessageType::Client {
                 msg_id: wire_msg.msg_id(),
                 client_signed,
                 dst_location,
-                msg: client_msg.clone(),
+                msg: client_msg,
             }
         );
 

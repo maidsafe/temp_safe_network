@@ -75,12 +75,15 @@ impl Core {
     // Creates `Core` for a regular node.
     pub fn new(
         comm: Comm,
-        node: Node,
+        mut node: Node,
         section: Section,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
     ) -> Self {
         let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share);
+
+        // make sure the Node has the correct local addr as Comm
+        node.addr = comm.our_connection_info();
 
         Self {
             comm,
