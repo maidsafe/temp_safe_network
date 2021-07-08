@@ -68,7 +68,7 @@ jobs:
       - uses: actions/upload-artifact@master
         if: matrix.os == 'windows-latest'
         with:
-          name: sn_node-${{ matrix.os }}
+          name: sn_node-${{ matrix.os }}.exe
           path: ./target/release/sn_node.exe
       # Upload artifacts.
       - uses: actions/upload-artifact@master
