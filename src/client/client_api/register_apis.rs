@@ -92,14 +92,14 @@ impl Client {
         &self,
         address: Address,
         entry: Entry,
-        parents: BTreeSet<EntryHash>,
+        children: BTreeSet<EntryHash>,
     ) -> Result<EntryHash, Error> {
         // First we fetch it so we can get the causality info,
         // either from local CRDT replica or from the network if not found
         let mut register = self.get_register(address).await?;
 
         // We can now write the entry to the Register
-        let (hash, mut op) = register.write(entry, parents)?;
+        let (hash, mut op) = register.write(entry, children)?;
         let bytes = bincode::serialize(&op.crdt_op)?;
         let signature = self.keypair.sign(&bytes);
         op.signature = Some(signature);

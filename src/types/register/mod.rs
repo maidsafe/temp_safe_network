@@ -162,11 +162,11 @@ impl Register {
     pub fn write(
         &mut self,
         entry: Entry,
-        parents: BTreeSet<EntryHash>,
+        children: BTreeSet<EntryHash>,
     ) -> Result<(EntryHash, RegisterOp<Entry>)> {
         self.check_permissions(Action::Write, None)?;
 
-        self.crdt.write(entry, parents, self.authority)
+        self.crdt.write(entry, children, self.authority)
     }
 
     /// Apply a signed data CRDT operation.
@@ -345,14 +345,14 @@ mod tests {
 
         let (entry1_hash, _) = register.write(entry1.to_vec(), BTreeSet::new())?;
 
-        // this creates a fork since entry1 is not set as parent of entry2
+        // this creates a fork since entry1 is not set as child of entry2
         let (entry2_hash, _) = register.write(entry2.clone(), BTreeSet::new())?;
 
-        // we'll write entry2 but having the entry1 and entry2 as parents,
+        // we'll write entry2 but having the entry1 and entry2 as children,
         // i.e. solving the fork created by them
-        let parents = vec![entry1_hash, entry2_hash].into_iter().collect();
+        let children = vec![entry1_hash, entry2_hash].into_iter().collect();
 
-        let (entry3_hash, _) = register.write(entry3.clone(), parents)?;
+        let (entry3_hash, _) = register.write(entry3.clone(), children)?;
 
         assert_eq!(register.size(None)?, 3);
 
@@ -858,21 +858,21 @@ mod tests {
             let dataset_length = dataset.len() as u64;
 
             // insert our data at replicas
-            let mut parents = BTreeSet::new();
+            let mut children = BTreeSet::new();
             for data in dataset {
                 // Write an item on replica1
-                let (hash, op) = replica1.write(data, parents.clone())?;
+                let (hash, op) = replica1.write(data, children.clone())?;
                 let write_op = sign_register_op(op, &owner_keypair)?;
                 // now apply that op to replica 2
                 replica2.apply_op(write_op)?;
-                parents = vec![hash].into_iter().collect();
+                children = vec![hash].into_iter().collect();
             }
 
             verify_data_convergence(vec![replica1, replica2], dataset_length)?;
         }
 
         #[test]
-        fn proptest_reg_converge_with_many_random_data_random_entry_parents(
+        fn proptest_reg_converge_with_many_random_data_random_entry_children(
             dataset in generate_dataset(1000)
         ) {
             // Instantiate the same Register on two replicas
@@ -900,12 +900,12 @@ mod tests {
             let mut list_of_hashes = Vec::new();
             let mut rng = thread_rng();
             for data in dataset {
-                // choose a random set of parents
-                let num_of_parents: usize = rng.gen();
-                let parents: BTreeSet<_> = list_of_hashes.choose_multiple(&mut OsRng, num_of_parents).cloned().collect();
+                // choose a random set of children
+                let num_of_children: usize = rng.gen();
+                let children: BTreeSet<_> = list_of_hashes.choose_multiple(&mut OsRng, num_of_children).cloned().collect();
 
-                // Write an item on replica1 using the randomly generated set of parents
-                let (hash, op) = replica1.write(data, parents)?;
+                // Write an item on replica1 using the randomly generated set of children
+                let (hash, op) = replica1.write(data, children)?;
                 let write_op = sign_register_op(op, &owner_keypair)?;
 
                 // now apply that op to replica 2
@@ -925,17 +925,17 @@ mod tests {
             let dataset_length = dataset.len() as u64;
 
             // insert our data at replicas
-            let mut parents = BTreeSet::new();
+            let mut children = BTreeSet::new();
             for data in dataset {
                 // first generate an op from one replica...
-                let (hash, op)= replicas[0].write(data, parents)?;
+                let (hash, op)= replicas[0].write(data, children)?;
                 let signed_op = sign_register_op(op, &owner_keypair)?;
 
                 // then apply this to all replicas
                 for replica in &mut replicas {
                     replica.apply_op(signed_op.clone())?;
                 }
-                parents = vec![hash].into_iter().collect();
+                children = vec![hash].into_iter().collect();
             }
 
             verify_data_convergence(replicas, dataset_length)?;
@@ -953,12 +953,12 @@ mod tests {
             // generate an ops set from one replica
             let mut ops = vec![];
 
-            let mut parents = BTreeSet::new();
+            let mut children = BTreeSet::new();
             for data in dataset {
-                let (hash, op) = replicas[0].write(data, parents)?;
+                let (hash, op) = replicas[0].write(data, children)?;
                 let signed_op = sign_register_op(op, &owner_keypair)?;
                 ops.push(signed_op);
-                parents = vec![hash].into_iter().collect();
+                children = vec![hash].into_iter().collect();
             }
 
             // now we randomly shuffle ops and apply at each replica
@@ -984,14 +984,14 @@ mod tests {
 
             // generate an ops set using random replica for each data
             let mut ops = vec![];
-            let mut parents = BTreeSet::new();
+            let mut children = BTreeSet::new();
             for data in dataset {
                 if let Some(replica) = replicas.choose_mut(&mut OsRng)
                 {
-                    let (hash, op) = replica.write(data, parents)?;
+                    let (hash, op) = replica.write(data, children)?;
                     let signed_op = sign_register_op(op, &owner_keypair)?;
                     ops.push(signed_op);
-                    parents = vec![hash].into_iter().collect();
+                    children = vec![hash].into_iter().collect();
                 }
             }
 
@@ -1037,13 +1037,13 @@ mod tests {
             let dataset_length = dataset.len() as u64;
 
             let mut ops = vec![];
-            let mut parents = BTreeSet::new();
+            let mut children = BTreeSet::new();
             for (data, delivery_chance) in dataset {
-                let (hash, op)= replica1.write(data, parents)?;
+                let (hash, op)= replica1.write(data, children)?;
                 let signed_op = sign_register_op(op, &owner_keypair)?;
 
                 ops.push((signed_op, delivery_chance));
-                parents = vec![hash].into_iter().collect();
+                children = vec![hash].into_iter().collect();
             }
 
             for (op, delivery_chance) in ops.clone() {
@@ -1076,16 +1076,16 @@ mod tests {
 
             // generate an ops set using random replica for each data
             let mut ops = vec![];
-            let mut parents = BTreeSet::new();
+            let mut children = BTreeSet::new();
             for (data, delivery_chance) in dataset {
                 // a random index within the replicas range
                 let index: usize = OsRng.gen_range(0, replicas.len());
                 let replica = &mut replicas[index];
 
-                let (hash, op)=replica.write(data, parents)?;
+                let (hash, op)=replica.write(data, children)?;
                 let signed_op = sign_register_op(op, &owner_keypair)?;
                 ops.push((signed_op, delivery_chance));
-                parents = vec![hash].into_iter().collect();
+                children = vec![hash].into_iter().collect();
             }
 
             let opslen = ops.len() as u64;
@@ -1125,14 +1125,14 @@ mod tests {
 
             // generate the real ops set using random replica for each data
             let mut ops = vec![];
-            let mut parents = BTreeSet::new();
+            let mut children = BTreeSet::new();
             for data in dataset {
                 if let Some(replica) = replicas.choose_mut(&mut OsRng)
                 {
-                    let (hash, op)=replica.write(data, parents)?;
+                    let (hash, op)=replica.write(data, children)?;
                     let signed_op = sign_register_op(op, &owner_keypair)?;
                     ops.push(signed_op);
-                    parents = vec![hash].into_iter().collect();
+                    children = vec![hash].into_iter().collect();
                 }
             }
 
@@ -1143,13 +1143,13 @@ mod tests {
             let mut bogus_replica = Register::new_public(random_owner_keypair.public_key(), xorname, tag, None);
 
             // add bogus ops from bogus replica + bogus data
-            let mut parents = BTreeSet::new();
+            let mut children = BTreeSet::new();
             for data in bogus_dataset {
-                let (hash, op)=bogus_replica.write(data, parents)?;
+                let (hash, op)=bogus_replica.write(data, children)?;
                 let bogus_op = sign_register_op(op, &random_owner_keypair)?;
                 bogus_replica.apply_op(bogus_op.clone())?;
                 ops.push(bogus_op);
-                parents = vec![hash].into_iter().collect();
+                children = vec![hash].into_iter().collect();
             }
 
             let opslen = ops.len();

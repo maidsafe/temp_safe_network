@@ -512,9 +512,9 @@ dependencies = [
 
 [[package]]
 name = "crdts"
-version = "6.3.3"
+version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de3662f88000c93f9c208d361ffc828c3a061369122f0d2e7805abbee4ce7a4c"
+checksum = "956308b472c0958e72a02842f7ccd1407ad2695b18e1ba170463e9936aca4039"
 dependencies = [
  "num",
  "quickcheck",
