@@ -157,6 +157,7 @@ jobs:
           RUST_LOG: "safe_network=trace"
         run: |
           ls artifacts
+          chmod +x artifacts/*
           cp artifacts/sn_node target/release/sn_node
           ./artifacts/launch_network
      
