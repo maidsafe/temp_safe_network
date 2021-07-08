@@ -219,9 +219,9 @@ mod tests {
             dst_section_pk,
         )?;
 
-        let wire_msg = msg_to_send.ok_or(anyhow!("expected an anti-entropy message"))?;
+        let wire_msg = msg_to_send.ok_or_else(|| anyhow!("expected an anti-entropy message"))?;
         let msg_type = wire_msg
-            .to_message()
+            .into_message()
             .context("failed to deserialised anti-entropy message")?;
 
         assert_matches!(msg_type, MessageType::Node{msg,..} => {

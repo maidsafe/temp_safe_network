@@ -254,10 +254,9 @@ impl Core {
             &payload_section_signed.sig.signature,
             serialised_relocate_details,
         );
-        let is_key_unknown = known_keys
+        let is_key_unknown = !known_keys
             .iter()
-            .find(|key| **key == payload_section_signed.section_pk)
-            .is_none();
+            .any(|key| *key == payload_section_signed.section_pk);
 
         if !is_signautre_valid || is_key_unknown {
             debug!(

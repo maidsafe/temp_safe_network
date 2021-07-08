@@ -103,8 +103,9 @@ pub(crate) async fn send_to_nodes(
 
     // we create a dummy/random dst location,
     // we will set it correctly for each msg and target
+    let name = network.our_name().await;
     let dummy_dst_location = DstLocation::Node {
-        name: network.our_name().await,
+        name,
         section_pk: network
             .section_public_key()
             .await?

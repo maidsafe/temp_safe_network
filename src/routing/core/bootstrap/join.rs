@@ -17,7 +17,7 @@ use crate::routing::{
     dkg::SectionSignedUtils,
     ed25519,
     error::{Error, Result},
-    messages::WireMsgUtils,
+    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
     peer::PeerUtils,
     routing_api::command::Command,
@@ -315,22 +315,32 @@ impl<'a> Join<'a> {
                             self.backlog_message(Command::HandleMessage { sender, wire_msg });
                             continue;
                         }
-                        MsgKind::NodeSignedMsg(NodeSigned { public_key, .. }) => {
+                        MsgKind::NodeSignedMsg(NodeSigned { .. }) => {
                             // TOOD: find a way we don't need to reconstruct the WireMsg
-                            let msg_id = wire_msg.msg_id();
                             let payload = wire_msg.payload.clone();
                             let msg_kind = wire_msg.msg_kind().clone();
-                            let dst_location = wire_msg.dst_location().clone();
-                            let pk = public_key.clone();
-                            match wire_msg.to_message() {
+                            match wire_msg.into_message() {
                                 Ok(MessageType::Node {
                                     msg: NodeMsg::JoinResponse(resp),
+                                    msg_authority,
                                     ..
-                                }) => (*resp, sender, ed25519::name(&pk)),
+                                }) => (*resp, sender, msg_authority.src_location().name()),
                                 Ok(
-                                    MessageType::Client { .. }
-                                    | MessageType::SectionInfo { .. }
-                                    | MessageType::Node { .. },
+                                    MessageType::Client {
+                                        msg_id,
+                                        dst_location,
+                                        ..
+                                    }
+                                    | MessageType::SectionInfo {
+                                        msg_id,
+                                        dst_location,
+                                        ..
+                                    }
+                                    | MessageType::Node {
+                                        msg_id,
+                                        dst_location,
+                                        ..
+                                    },
                                 ) => {
                                     // We just put the WireMsg in the backlog then
                                     if let Ok(wire_msg) =
@@ -510,7 +520,7 @@ mod tests {
                 recipients.iter().map(|(_name, addr)| *addr).collect();
             assert_eq!(bootstrap_addrs, [bootstrap_addr]);
 
-            let node_msg = assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+            let node_msg = assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, .. }) =>
                 msg);
 
             assert_matches!(node_msg, NodeMsg::JoinRequest(request) => {
@@ -530,7 +540,7 @@ mod tests {
                 .recv()
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
-            let (node_msg, dst_location) = assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, dst_location,.. }) =>
+            let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, dst_location,.. }) =>
                 (msg, dst_location));
 
             assert_eq!(dst_location.section_pk(), Some(pk));
@@ -607,7 +617,7 @@ mod tests {
                 vec![bootstrap_node.addr]
             );
 
-            assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+            assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, .. }) =>
                     assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             // Send JoinResponse::Redirect
@@ -644,7 +654,7 @@ mod tests {
                     .collect::<Vec<_>>()
             );
 
-            let (node_msg, dst_location) = assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, dst_location,.. }) =>
+            let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, dst_location,.. }) =>
                     (msg, dst_location));
 
             assert_eq!(dst_location.section_pk(), Some(pk_set.public_key()));
@@ -687,7 +697,7 @@ mod tests {
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
 
-            assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+            assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, .. }) =>
                         assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             send_response(
@@ -723,7 +733,7 @@ mod tests {
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
 
-            assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+            assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, .. }) =>
                             assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             Ok(())
@@ -761,7 +771,7 @@ mod tests {
                 .await
                 .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
 
-            assert_matches!(wire_msg.to_message(), Ok(MessageType::Node { msg, .. }) =>
+            assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, .. }) =>
                                 assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             send_response(
@@ -827,7 +837,7 @@ mod tests {
                 .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
 
             let node_msg =
-                assert_matches!(wire_msg.to_message(), Ok(MessageType::Node{ msg, .. }) => msg);
+                assert_matches!(wire_msg.into_message(), Ok(MessageType::Node{ msg, .. }) => msg);
             assert_matches!(node_msg, NodeMsg::JoinRequest(_));
 
             // Send `Retry` with bad prefix
@@ -857,7 +867,7 @@ mod tests {
                 .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
 
             let node_msg =
-                assert_matches!(wire_msg.to_message(), Ok(MessageType::Node{ msg, .. }) => msg);
+                assert_matches!(wire_msg.into_message(), Ok(MessageType::Node{ msg, .. }) => msg);
             assert_matches!(node_msg, NodeMsg::JoinRequest(_));
 
             Ok(())

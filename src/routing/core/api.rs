@@ -28,7 +28,10 @@ use xor_name::{Prefix, XorName};
 
 impl Core {
     // Creates `Core` for the first node in the network
-    pub fn first_node(comm: Comm, node: Node, event_tx: mpsc::Sender<Event>) -> Result<Self> {
+    pub fn first_node(comm: Comm, mut node: Node, event_tx: mpsc::Sender<Event>) -> Result<Self> {
+        // make sure the Node has the correct local addr as Comm
+        node.addr = comm.our_connection_info();
+
         let (section, section_key_share) = Section::first_node(node.peer())?;
         Ok(Self::new(
             comm,

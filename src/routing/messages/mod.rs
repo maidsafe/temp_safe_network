@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod msg_authority;
-// mod plain_message;
 
 pub use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
@@ -48,7 +47,7 @@ pub trait WireMsgUtils {
 
     /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
     /// Returns errors if src is not `BlsShare` or if the signed is invalid.
-    fn into_dst_accumulated(&mut self, sig: KeyedSig) -> Result<()>;
+    fn aggregate_signature(&mut self, sig: KeyedSig) -> Result<()>;
 
     /// Creates a signed message from single node.
     fn single_src(
@@ -176,7 +175,7 @@ impl WireMsgUtils for WireMsg {
 
     /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
     /// Returns errors if authority  is not `BlsShare` or if the signed is invalid.
-    fn into_dst_accumulated(&mut self, sig: KeyedSig) -> Result<()> {
+    fn aggregate_signature(&mut self, sig: KeyedSig) -> Result<()> {
         let (section_pk, src_name, sig_share) =
             if let MsgKind::NodeBlsShareSignedMsg(BlsShareSigned {
                 section_pk,

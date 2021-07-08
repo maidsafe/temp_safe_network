@@ -71,7 +71,7 @@ impl Core {
         };
 
         // We can now deserialize the payload of the incoming message
-        let message_type = match wire_msg.to_message() {
+        let message_type = match wire_msg.into_message() {
             Ok(message_type) => message_type,
             Err(error) => {
                 error!(
@@ -495,7 +495,7 @@ impl Core {
                     "Successfully accumulated signatures for message: {:?}",
                     wire_msg
                 );
-                wire_msg.into_dst_accumulated(sig)?;
+                wire_msg.aggregate_signature(sig)?;
                 Ok(false)
             }
             Err(AggregatorError::NotEnoughShares) => Ok(true),

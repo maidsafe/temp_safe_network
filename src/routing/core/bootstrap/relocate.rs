@@ -57,7 +57,7 @@ impl JoiningAsRelocated {
             genesis_key,
             dst_section_key,
             relocate_details,
-            node_msg: node_msg,
+            node_msg,
             node_msg_sig: section_signed,
             used_recipients: HashSet::<SocketAddr>::new(),
             relocate_payload: None,

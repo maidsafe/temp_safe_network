@@ -61,7 +61,7 @@ impl Comm {
         ));
 
         Ok(Self {
-            quic_p2p: quic_p2p,
+            quic_p2p,
             endpoint,
             event_tx: RwLock::new(Some(event_tx)),
         })
@@ -102,7 +102,7 @@ impl Comm {
 
         Ok((
             Self {
-                quic_p2p: quic_p2p,
+                quic_p2p,
                 endpoint,
                 event_tx: RwLock::new(Some(event_tx)),
             },

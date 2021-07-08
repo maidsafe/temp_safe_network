@@ -114,6 +114,12 @@ impl Routing {
             info!("{} Bootstrapping a new node.", node_name);
             let (comm, bootstrap_addr) =
                 Comm::bootstrap(config.transport_config, connection_event_tx).await?;
+            info!(
+                "{} Joining as a new node from {} to {}",
+                node_name,
+                comm.our_connection_info(),
+                bootstrap_addr
+            );
             let joining_node = Node::new(keypair, comm.our_connection_info());
             let (node, section, backlog) = join_network(
                 joining_node,
@@ -328,11 +334,12 @@ impl Routing {
         node_msg: NodeMsg,
         dst: DstLocation,
     ) -> Result<WireMsg> {
+        let src_section_pk = *self.section_chain().await.last_key();
         WireMsg::single_src(
             self.dispatcher.core.read().await.node(),
             dst,
             node_msg,
-            *self.section_chain().await.last_key(),
+            src_section_pk,
         )
     }
 
@@ -343,6 +350,7 @@ impl Routing {
         dst: DstLocation,
     ) -> Result<WireMsg> {
         let src = self.name().await;
+        let src_section_pk = *self.section_chain().await.last_key();
 
         WireMsg::for_dst_accumulation(
             self.dispatcher
@@ -354,7 +362,7 @@ impl Routing {
             src,
             dst,
             node_msg,
-            *self.section_chain().await.last_key(),
+            src_section_pk,
         )
     }
 
@@ -452,7 +460,7 @@ async fn handle_connection_events(
                     Ok(wire_msg) => wire_msg,
                     Err(error) => {
                         error!("Failed to deserialize message header: {}", error);
-                        return;
+                        continue;
                     }
                 };
 
@@ -464,7 +472,7 @@ async fn handle_connection_events(
                             "not handling message - already handled: {:?}",
                             wire_msg.msg_id()
                         );
-                        return;
+                        continue;
                     }
 
                     trace_span!("handle_message", name = %core.node().name(), %sender)
@@ -476,4 +484,6 @@ async fn handle_connection_events(
             }
         }
     }
+
+    error!("Fatal error, the stream for incoming connections has been unexpectedly closed. No new connections or messages can be received from the network from here on.");
 }
