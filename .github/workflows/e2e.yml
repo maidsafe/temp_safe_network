@@ -22,7 +22,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # os: [ubuntu-latest]
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
@@ -49,11 +48,9 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get -y install ripgrep
       
-      # TODO: windows with split section network has been failing w/ SO.
-      # when we have that sorted we can reenable this
-      # - name: windows isntall ripgrep
-      #   if: matrix.os == 'windows-latest'
-      #   run: choco install ripgrep
+      - name: windows isntall ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
 
       # Cache.
       - name: Cargo cache registry, index and build
@@ -72,17 +69,9 @@ jobs:
           args: --release --features=always-joinable
       
       - run: ./target/release/launch_network
-        if: matrix.os != 'windows-latest'
         env:
           RUST_LOG: "safe_network=trace"
 
-      # TODO: windows with split section network has been failing w/ SO.
-      # when we have that sorted we can reenable the full networks
-      - run: ./target/release/launch_network
-        if: matrix.os == 'windows-latest'
-        env:
-          RUST_LOG: "safe_network=trace"
-          NODE_COUNT: 11
 
       - name: extra wait for CI split
         run: sleep 220
