@@ -482,7 +482,7 @@ impl Core {
             {
                 sig_share
             } else {
-                // not a msg to aggregate, return without modifying it
+                // not a msg to aggregate signatures with, return without modifying it
                 return Ok(false);
             };
 
@@ -491,11 +491,11 @@ impl Core {
             .add(&wire_msg.payload, sig_share.clone())
         {
             Ok(sig) => {
+                wire_msg.aggregate_signature(sig)?;
                 trace!(
                     "Successfully accumulated signatures for message: {:?}",
                     wire_msg
                 );
-                wire_msg.aggregate_signature(sig)?;
                 Ok(false)
             }
             Err(AggregatorError::NotEnoughShares) => Ok(true),

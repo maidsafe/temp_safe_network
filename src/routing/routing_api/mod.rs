@@ -87,7 +87,11 @@ impl Routing {
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
             let node_name = ed25519::name(&keypair.public);
 
-            info!("{} Starting a new network as the genesis node.", node_name);
+            info!(
+                "{} Starting a new network as the genesis node (PID: {}).",
+                node_name,
+                std::process::id()
+            );
 
             let comm = Comm::new(config.transport_config, connection_event_tx).await?;
             let node = Node::new(keypair, comm.our_connection_info());
@@ -115,8 +119,9 @@ impl Routing {
             let (comm, bootstrap_addr) =
                 Comm::bootstrap(config.transport_config, connection_event_tx).await?;
             info!(
-                "{} Joining as a new node from {} to {}",
+                "{} Joining as a new node (PID: {}) from {} to {}",
                 node_name,
+                std::process::id(),
                 comm.our_connection_info(),
                 bootstrap_addr
             );
@@ -412,7 +417,7 @@ impl Routing {
     }
 
     /// Returns the current BLS public key set if this node has one, or
-    /// `Error::InvalidState` otherwise.
+    /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         self.dispatcher.core.read().await.public_key_set()
     }
@@ -469,8 +474,9 @@ async fn handle_connection_events(
 
                     if !core.add_to_filter(&wire_msg).await {
                         trace!(
-                            "not handling message - already handled: {:?}",
-                            wire_msg.msg_id()
+                            "not handling message {:?} from {}, already handled",
+                            wire_msg.msg_id(),
+                            sender,
                         );
                         continue;
                     }

@@ -93,15 +93,12 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
             cmd,
             client_signed,
             origin,
-        }) => {
-            // FIXME: ******** validate client signature!!!! *********
-            NodeDuty::ProcessWrite {
-                cmd,
-                msg_id,
-                client_signed,
-                origin,
-            }
-        }
+        }) => NodeDuty::ProcessWrite {
+            cmd,
+            msg_id,
+            client_signed,
+            origin,
+        },
         //
         // ------ Adult ------
         MessageReceived::NodeQuery(NodeQuery::Chunks { query, .. }) => NodeDuty::ReadChunk {

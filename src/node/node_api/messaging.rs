@@ -106,11 +106,7 @@ pub(crate) async fn send_to_nodes(
     let name = network.our_name().await;
     let dummy_dst_location = DstLocation::Node {
         name,
-        section_pk: network
-            .section_public_key()
-            .await?
-            .bls()
-            .ok_or(Error::NoSectionPublicKey)?,
+        section_pk: network.our_section_public_key().await,
     };
 
     let mut wire_msg = if aggregation {

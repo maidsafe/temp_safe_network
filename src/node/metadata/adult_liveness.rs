@@ -24,6 +24,7 @@ const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
 struct ReadOperation {
     head_address: ChunkAddress,
     origin: EndUser,
+    origin_msg_id: MessageId,
     targets: BTreeSet<XorName>,
     responded_with_success: bool,
 }
@@ -50,12 +51,14 @@ impl AdultLiveness {
         msg_id: MessageId,
         head_address: ChunkAddress,
         origin: EndUser,
+        origin_msg_id: MessageId,
         targets: BTreeSet<XorName>,
     ) -> bool {
         let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
             let _ = entry.insert(ReadOperation {
                 head_address,
                 origin,
+                origin_msg_id,
                 targets: targets.clone(),
                 responded_with_success: false,
             });
@@ -130,13 +133,14 @@ impl AdultLiveness {
         correlation_id: &MessageId,
         src: &XorName,
         success: bool,
-    ) -> Option<(ChunkAddress, EndUser)> {
+    ) -> Option<(ChunkAddress, EndUser, MessageId)> {
         self.remove_target(correlation_id, src);
         let op = self.ops.get_mut(&correlation_id);
         op.and_then(|mut op| {
             let ReadOperation {
                 head_address,
                 origin,
+                origin_msg_id,
                 targets,
                 responded_with_success,
             } = op.value_mut();
@@ -145,7 +149,7 @@ impl AdultLiveness {
                 None
             } else {
                 *responded_with_success = success;
-                Some((*head_address, *origin))
+                Some((*head_address, *origin, *origin_msg_id))
             }
         })
     }

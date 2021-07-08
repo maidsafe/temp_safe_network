@@ -85,7 +85,7 @@ pub(crate) async fn push_state(
         .await?;
 
     Ok(NodeDuty::SendToNodes {
-        id: msg_id,
+        msg_id,
         msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
             metadata,
         })),

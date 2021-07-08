@@ -145,14 +145,14 @@ impl Display for Metadata {
 
 fn build_client_query_response(
     response: QueryResponse,
-    msg_id: MessageId,
+    correlation_id: MessageId,
     origin: EndUser,
 ) -> OutgoingMsg {
     OutgoingMsg {
-        id: MessageId::in_response_to(&msg_id),
+        id: MessageId::in_response_to(&correlation_id),
         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
             response,
-            correlation_id: msg_id,
+            correlation_id,
         })),
         dst: DstLocation::EndUser(origin),
         aggregation: false,
