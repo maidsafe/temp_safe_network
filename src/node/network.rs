@@ -13,7 +13,7 @@ use crate::routing::{
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
-use bls::PublicKeySet;
+use bls::{PublicKey as BlsPublicKey, PublicKeySet};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::Path, sync::Arc};
@@ -63,6 +63,7 @@ impl Network {
             .map_err(|_| Error::NotAnElder)
     }
 
+    /// Returns public key of our section public key set.
     pub async fn section_public_key(&self) -> Result<PublicKey> {
         Ok(PublicKey::Bls(
             self.routing
@@ -73,8 +74,14 @@ impl Network {
         ))
     }
 
+    /// Returns our section's public key.
+    pub async fn our_section_public_key(&self) -> BlsPublicKey {
+        self.routing.our_section().await.public_key_set.public_key()
+    }
+
     pub async fn our_public_key_set(&self) -> Result<PublicKeySet> {
-        self.routing.public_key_set().await.map_err(Error::Routing)
+        let pk_set = self.routing.public_key_set().await?;
+        Ok(pk_set)
     }
 
     pub async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
@@ -106,10 +113,8 @@ impl Network {
     }
 
     pub async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
-        self.routing
-            .set_joins_allowed(joins_allowed)
-            .await
-            .map_err(Error::Routing)
+        self.routing.set_joins_allowed(joins_allowed).await?;
+        Ok(())
     }
 
     // Returns whether the node is Elder.
@@ -149,10 +154,11 @@ impl Network {
         node_msg: NodeMsg,
         dst: DstLocation,
     ) -> Result<WireMsg> {
-        self.routing
+        let wire_msg = self
+            .routing
             .sign_msg_for_dst_accumulation(node_msg, dst)
-            .await
-            .map_err(Error::Routing)
+            .await?;
+        Ok(wire_msg)
     }
 
     pub async fn sign_single_src_msg(
@@ -160,9 +166,7 @@ impl Network {
         node_msg: NodeMsg,
         dst: DstLocation,
     ) -> Result<WireMsg> {
-        self.routing
-            .sign_single_src_msg(node_msg, dst)
-            .await
-            .map_err(Error::Routing)
+        let wire_msg = self.routing.sign_single_src_msg(node_msg, dst).await?;
+        Ok(wire_msg)
     }
 }

@@ -79,7 +79,7 @@ impl ChunkRecords {
         use ChunkWrite::*;
         match write {
             New(data) => self.store(data, msg_id, client_signed, origin).await,
-            DeletePrivate(address) => self.delete(address, msg_id, client_signed, origin).await,
+            DeletePrivate(address) => self.delete(address, client_signed, origin).await,
         }
     }
 
@@ -104,15 +104,19 @@ impl ChunkRecords {
             .await;
     }
 
-    async fn send_chunks_to_adults(
+    async fn store(
         &self,
         chunk: Chunk,
         msg_id: MessageId,
         client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let target_holders = self.capacity.get_chunk_holder_adults(chunk.name()).await;
+        if let Err(error) = validate_chunk_owner(&chunk, &client_signed.public_key) {
+            return self.send_error(error, msg_id, origin).await;
+        }
 
+        // Let's send chunks to adults
+        let target_holders = self.capacity.get_chunk_holder_adults(chunk.name()).await;
         info!("Storing {} copies of the chunk", target_holders.len());
 
         if CHUNK_COPY_COUNT > target_holders.len() {
@@ -125,33 +129,16 @@ impl ChunkRecords {
                 .await;
         }
 
-        let blob_write = ChunkWrite::New(chunk);
-
         Ok(NodeDuty::SendToNodes {
-            id: msg_id,
+            msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
-                cmd: blob_write,
+                cmd: ChunkWrite::New(chunk),
                 client_signed,
                 origin,
             }),
             targets: target_holders,
             aggregation: true,
         })
-    }
-
-    async fn store(
-        &self,
-        chunk: Chunk,
-        msg_id: MessageId,
-        client_signed: ClientSigned,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        if let Err(error) = validate_chunk_owner(&chunk, &client_signed.public_key) {
-            return self.send_error(error, msg_id, origin).await;
-        }
-
-        self.send_chunks_to_adults(chunk, msg_id, client_signed, origin)
-            .await
     }
 
     /// Needs attention!
@@ -170,11 +157,10 @@ impl ChunkRecords {
         let mut duties = vec![];
         // Removing correlation ids is bound to cause troubles,
         // as `DataNotFound` can come in before the `Ok` response comes in.
-        if let Some((_address, end_user)) = self.adult_liveness.record_adult_read_liveness(
-            &correlation_id,
-            &src,
-            response.is_success(),
-        ) {
+        if let Some((_address, end_user, origin_msg_id)) = self
+            .adult_liveness
+            .record_adult_read_liveness(&correlation_id, &src, response.is_success())
+        {
             // If a full adult responds with error. Drop the response
             if (!response.is_success() && self.capacity.is_full(&src).await)
                 || (matches!(
@@ -188,7 +174,7 @@ impl ChunkRecords {
             } else {
                 duties.push(NodeDuty::Send(build_client_query_response(
                     response,
-                    correlation_id,
+                    origin_msg_id,
                     end_user,
                 )));
             }
@@ -229,31 +215,26 @@ impl ChunkRecords {
     async fn delete(
         &self,
         address: ChunkAddress,
-        msg_id: MessageId,
         client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.capacity.get_chunk_holder_adults(address.name()).await;
 
-        let msg = NodeMsg::NodeCmd(NodeCmd::Chunks {
-            cmd: ChunkWrite::DeletePrivate(address),
-            client_signed,
-            origin,
-        });
-
         Ok(NodeDuty::SendToNodes {
-            id: msg_id,
-            msg,
+            msg_id: MessageId::new(),
+            msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
+                cmd: ChunkWrite::DeletePrivate(address),
+                client_signed,
+                origin,
+            }),
             targets,
             aggregation: true,
         })
     }
 
     pub(super) async fn republish_chunk(&self, chunk: Chunk) -> Result<NodeDuty> {
-        let owner = chunk.owner();
         let target_holders = self.capacity.get_chunk_holder_adults(chunk.name()).await;
-        // deterministic msg id for aggregation
-        let msg_id = MessageId::from_content(&(*chunk.name(), owner, &target_holders))?;
+        let msg_id = MessageId::new();
 
         info!(
             "Republishing chunk {:?} to holders {:?} with MessageId {:?}",
@@ -263,7 +244,7 @@ impl ChunkRecords {
         );
 
         Ok(NodeDuty::SendToNodes {
-            id: msg_id,
+            msg_id,
             msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk))),
             targets: target_holders,
             aggregation: false,
@@ -299,9 +280,12 @@ impl ChunkRecords {
                 .await;
         }
 
+        // deterministic msg id based on content
+        let new_msg_id = MessageId::from_content(&(msg_id, address))?;
+
         if self
             .adult_liveness
-            .new_read(msg_id, address, origin, targets.clone())
+            .new_read(new_msg_id, address, origin, msg_id, targets.clone())
         {
             let msg = NodeMsg::NodeQuery(NodeQuery::Chunks {
                 query: ChunkRead::Get(address),
@@ -309,7 +293,7 @@ impl ChunkRecords {
             });
 
             Ok(NodeDuty::SendToNodes {
-                id: msg_id,
+                msg_id: new_msg_id,
                 msg,
                 targets,
                 aggregation: false,
