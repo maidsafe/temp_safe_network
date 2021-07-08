@@ -82,12 +82,12 @@ impl RegisterCrdt {
     pub(super) fn write(
         &mut self,
         entry: Entry,
-        parents: BTreeSet<EntryHash>,
+        children: BTreeSet<EntryHash>,
         source: PublicKey,
     ) -> Result<(EntryHash, CrdtOperation<Entry>)> {
         let address = *self.address();
 
-        let crdt_op = self.data.write(entry, parents);
+        let crdt_op = self.data.write(entry, children);
         self.data.apply(crdt_op.clone());
         let hash = crdt_op.hash();
 
@@ -131,7 +131,7 @@ impl RegisterCrdt {
         self.data.node(hash).map(|node| &node.value)
     }
 
-    /// Read the last entry, or entries if there are branches.
+    /// Read current entries (multiple entries occur on concurrent writes).
     pub(super) fn read(&self) -> BTreeSet<(EntryHash, Entry)> {
         self.data
             .read()
