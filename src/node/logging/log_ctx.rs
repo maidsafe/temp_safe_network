@@ -9,7 +9,6 @@
 use crate::node::network::Network;
 use xor_name::Prefix;
 
-#[derive(Debug)]
 pub(crate) struct LogCtx {
     network: Network,
 }

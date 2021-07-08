@@ -11,18 +11,19 @@ use crate::routing::peer::PeerUtils;
 use crate::types::PublicKey;
 use ed25519_dalek::Keypair;
 use std::{
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Display, Formatter},
     net::SocketAddr,
     sync::Arc,
 };
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Information and state of our node
-#[derive(Clone)]
+#[derive(Clone, custom_debug::Debug)]
 pub(crate) struct Node {
     // Keep the secret key in Arc to allow Clone while also preventing multiple copies to exist in
     // memory which might be insecure.
     // TODO: find a way to not require `Clone`.
+    #[debug(skip)]
     pub(crate) keypair: Arc<Keypair>,
     pub(crate) addr: SocketAddr,
 }
@@ -52,16 +53,6 @@ impl Node {
 impl Display for Node {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.name())
-    }
-}
-
-impl Debug for Node {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Node")
-            .field("name", &self.name())
-            .field("addr", &self.addr)
-            .field("age", &self.age())
-            .finish()
     }
 }
 

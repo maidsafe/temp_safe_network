@@ -10,31 +10,20 @@ use super::{section::NodeState, signed::KeyedSig};
 use crate::messaging::{MessageId, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey, Signature};
-use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
-use std::{
-    borrow::Borrow,
-    collections::BTreeSet,
-    fmt::{self, Debug, Formatter},
-};
+use std::{borrow::Borrow, collections::BTreeSet};
 use xor_name::{Prefix, XorName};
 
 /// SHA3-256 hash digest.
 type Digest256 = [u8; 32];
 
 /// Unique identifier of a DKG session.
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct DkgKey {
     /// A hash of the peers and prefix of the specific session.
     pub hash: Digest256,
     /// The generation, as in the length of the section chain main branch.
     pub generation: u64,
-}
-
-impl Debug for DkgKey {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "DkgKey({:10}/{})", HexFmt(&self.hash), self.generation)
-    }
 }
 
 /// One signed failure for a DKG round by a given PublicKey

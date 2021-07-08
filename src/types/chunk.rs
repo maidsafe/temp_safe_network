@@ -10,22 +10,20 @@
 use super::{utils, Error, PublicKey, XorName};
 use bincode::serialized_size;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{
-    fmt::{self, Debug, Formatter},
-    u64,
-};
+use std::u64;
 
 /// Maximum allowed size for a serialised Chunk to grow to.
 pub const MAX_CHUNK_SIZE_IN_BYTES: u64 = 1024 * 1024 + 10 * 1024;
 
 /// Private Chunk: an immutable chunk of data which can be deleted. Can only be fetched
 /// by the listed owner.
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, custom_debug::Debug)]
 pub struct PrivateChunk {
     /// Network address. Omitted when serialising and calculated from the `value` and `owner` when
     /// deserialising.
     address: Address,
     /// Contained chunk.
+    #[debug(skip)]
     value: Vec<u8>,
     /// Contains a set of owners of this chunk.
     owner: PublicKey,
@@ -97,20 +95,14 @@ impl<'de> Deserialize<'de> for PrivateChunk {
     }
 }
 
-impl Debug for PrivateChunk {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        // TODO: Output owners?
-        write!(formatter, "PrivateChunk {:?}", self.name())
-    }
-}
-
 /// Public Chunk: an immutable chunk of data which cannot be deleted.
-#[derive(Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Hash, Clone, Eq, PartialEq, Ord, PartialOrd, custom_debug::Debug)]
 pub struct PublicChunk {
     /// Network address. Omitted when serialising and calculated from the `value` when
     /// deserialising.
     address: Address,
     /// Contained chunk.
+    #[debug(skip)]
     value: Vec<u8>,
 }
 
@@ -164,12 +156,6 @@ impl<'de> Deserialize<'de> for PublicChunk {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value: Vec<u8> = Deserialize::deserialize(deserializer)?;
         Ok(PublicChunk::new(value))
-    }
-}
-
-impl Debug for PublicChunk {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "PublicChunk {:?}", self.name())
     }
 }
 

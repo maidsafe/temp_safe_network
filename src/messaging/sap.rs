@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
     collections::BTreeMap,
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
 use xor_name::{Prefix, XorName};
@@ -21,7 +21,7 @@ use xor_name::{Prefix, XorName};
 ///
 /// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being
 /// added or removed, or the section splitting or merging.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
 pub struct SectionAuthorityProvider {
     /// The section prefix. It matches all the members' names.
     pub prefix: Prefix,
@@ -34,18 +34,6 @@ pub struct SectionAuthorityProvider {
 impl Borrow<Prefix> for SectionAuthorityProvider {
     fn borrow(&self) -> &Prefix {
         &self.prefix
-    }
-}
-
-impl Debug for SectionAuthorityProvider {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(
-            formatter,
-            "SectionAuthorityProvider {{ prefix: ({:b}), section_key: {:?}, elders: {{{:?}}} }}",
-            self.prefix,
-            self.public_key_set.public_key(),
-            self.elders.iter().format(", "),
-        )
     }
 }
 

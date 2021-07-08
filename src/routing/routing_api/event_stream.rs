@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Event;
-use std::fmt::{self, Debug, Formatter};
 use tokio::sync::mpsc;
+
 /// Stream of routing node events
+#[allow(missing_debug_implementations)]
 pub struct EventStream {
     events_rx: mpsc::Receiver<Event>,
 }
@@ -22,11 +23,5 @@ impl EventStream {
     /// Returns next event
     pub async fn next(&mut self) -> Option<Event> {
         self.events_rx.recv().await
-    }
-}
-
-impl Debug for EventStream {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "EventStream")
     }
 }

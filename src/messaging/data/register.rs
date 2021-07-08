@@ -12,7 +12,6 @@ use crate::types::{
     PublicKey,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use xor_name::XorName;
 
 /// [`Register`] read operations.
@@ -73,7 +72,7 @@ pub struct RegisterCmd {
 
 /// [`Register`] write operations.
 #[allow(clippy::large_enum_variant)]
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum RegisterWrite {
     /// Create a new [`Register`] on the network.
     New(Register),
@@ -144,19 +143,5 @@ impl RegisterWrite {
             Self::New(data) => Some(data.owner()),
             _ => None,
         }
-    }
-}
-
-impl fmt::Debug for RegisterWrite {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            formatter,
-            "RegisterWrite::{}",
-            match self {
-                RegisterWrite::New(register) => format!("New({:?})", register.address()),
-                RegisterWrite::Delete(address) => format!("Delete({:?})", address),
-                RegisterWrite::Edit(op) => format!("Edit({:?})", op),
-            }
-        )
     }
 }

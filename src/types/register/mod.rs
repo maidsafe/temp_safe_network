@@ -21,28 +21,12 @@ use reg_crdt::{CrdtOperation, RegisterCrdt};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt::{self, Debug, Formatter},
     hash::Hash,
 };
 use xor_name::XorName;
 
 /// Register mutation operation to apply to Register.
 pub type RegisterOp<T> = CrdtOperation<T>;
-
-impl Debug for RegisterCrdt {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(
-            formatter,
-            "{} Register {:?}",
-            if self.address().is_public() {
-                "Public"
-            } else {
-                "Private"
-            },
-            self.address().name()
-        )
-    }
-}
 
 /// Object storing the Register
 #[derive(Clone, Eq, PartialEq, PartialOrd, Hash, Serialize, Deserialize, Debug)]

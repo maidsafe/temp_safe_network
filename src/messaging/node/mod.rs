@@ -36,16 +36,12 @@ pub use signed::{KeyedSig, SigShare};
 use crate::messaging::{data::DataMsg, ClientSigned, EndUser, MessageId, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeSet,
-    fmt::{self, Debug, Formatter},
-};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
 pub enum NodeMsg {
@@ -171,114 +167,4 @@ pub enum NodeMsg {
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
-}
-
-impl Debug for NodeMsg {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Self::ForwardDataMsg { .. } => f.debug_struct("ForwardDataMsg").finish(),
-            Self::SectionKnowledge { .. } => f.debug_struct("SectionKnowledge").finish(),
-            Self::Sync { section, network } => f
-                .debug_struct("Sync")
-                .field("section_auth", &section.section_auth.value)
-                .field("section_key", section.chain.last_key())
-                .field(
-                    "other_prefixes",
-                    &format_args!(
-                        "({:b})",
-                        network
-                            .sections
-                            .iter()
-                            .map(|info| &info.section_auth.value.prefix)
-                            .format(", ")
-                    ),
-                )
-                .finish(),
-            Self::Relocate(payload) => write!(f, "Relocate({:?})", payload),
-            Self::StartConnectivityTest(name) => write!(f, "StartConnectivityTest({:?})", name),
-            Self::RelocatePromise(payload) => write!(f, "RelocatePromise({:?})", payload),
-            Self::JoinRequest(payload) => write!(f, "JoinRequest({:?})", payload),
-            Self::JoinResponse(response) => write!(f, "JoinResponse({:?})", response),
-            Self::JoinAsRelocatedRequest(payload) => {
-                write!(f, "JoinAsRelocatedRequest({:?})", payload)
-            }
-            Self::JoinAsRelocatedResponse(response) => {
-                write!(f, "JoinAsRelocatedResponse({:?})", response)
-            }
-            Self::BouncedUntrustedMessage {
-                msg,
-                dst_section_pk,
-            } => f
-                .debug_struct("BouncedUntrustedMessage")
-                .field("message", msg)
-                .field("dst_section_pk", dst_section_pk)
-                .finish(),
-            Self::DkgStart {
-                dkg_key,
-                elder_candidates,
-            } => f
-                .debug_struct("DkgStart")
-                .field("dkg_key", dkg_key)
-                .field("elder_candidates", elder_candidates)
-                .finish(),
-            Self::DkgMessage { dkg_key, message } => f
-                .debug_struct("DkgMessage")
-                .field("dkg_key", &dkg_key)
-                .field("message", message)
-                .finish(),
-            Self::DkgFailureObservation {
-                dkg_key,
-                sig,
-                failed_participants,
-            } => f
-                .debug_struct("DkgFailureObservation")
-                .field("dkg_key", dkg_key)
-                .field("sig", sig)
-                .field("failed_participants", failed_participants)
-                .finish(),
-            Self::DkgFailureAgreement(proofs) => {
-                f.debug_tuple("DkgFailureAgreement").field(proofs).finish()
-            }
-            Self::Propose { content, sig_share } => f
-                .debug_struct("Propose")
-                .field("content", content)
-                .field("sig_share", sig_share)
-                .finish(),
-            Self::SectionKnowledgeQuery { .. } => write!(f, "SectionKnowledgeQuery"),
-            Self::NodeCmd(node_cmd) => write!(f, "NodeCmd({:?})", node_cmd),
-            Self::NodeCmdError {
-                error,
-                correlation_id,
-            } => f
-                .debug_struct("NodeCmdError")
-                .field("error", error)
-                .field("correlation_id", correlation_id)
-                .finish(),
-            Self::NodeEvent {
-                event,
-                correlation_id,
-            } => f
-                .debug_struct("NodeEvent")
-                .field("event", event)
-                .field("correlation_id", correlation_id)
-                .finish(),
-            Self::NodeQuery(node_query) => write!(f, "NodeQuery({:?})", node_query),
-            Self::NodeQueryResponse {
-                response,
-                correlation_id,
-            } => f
-                .debug_struct("NodeQueryResponse")
-                .field("response", response)
-                .field("correlation_id", correlation_id)
-                .finish(),
-            Self::NodeMsgError {
-                error,
-                correlation_id,
-            } => f
-                .debug_struct("NodeMsgError")
-                .field("error", error)
-                .field("correlation_id", correlation_id)
-                .finish(),
-        }
-    }
 }

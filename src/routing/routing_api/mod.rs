@@ -41,12 +41,7 @@ use crate::routing::{
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use std::{
-    collections::BTreeSet,
-    fmt::{self, Debug, Formatter},
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::{sync::mpsc, task};
 use xor_name::{Prefix, XorName};
 
@@ -57,6 +52,7 @@ use xor_name::{Prefix, XorName};
 /// location. Its methods can be used to send requests and responses as either an individual
 /// `Node` or as a part of a section or group location. Their `src` argument indicates that
 /// role, and can be `crate::messaging::SrcLocation::Node` or `crate::messaging::SrcLocation::Section`.
+#[allow(missing_debug_implementations)]
 pub struct Routing {
     dispatcher: Arc<Dispatcher>,
 }
@@ -431,12 +427,6 @@ impl Routing {
 impl Drop for Routing {
     fn drop(&mut self) {
         futures::executor::block_on(self.dispatcher.terminate());
-    }
-}
-
-impl Debug for Routing {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "Routing")
     }
 }
 

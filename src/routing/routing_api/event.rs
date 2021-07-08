@@ -13,11 +13,7 @@ use crate::messaging::{
 };
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Keypair;
-use std::{
-    collections::BTreeSet,
-    fmt::{self, Debug, Formatter},
-    sync::Arc,
-};
+use std::{collections::BTreeSet, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 /// A flag in EldersChanged event, indicating
@@ -55,6 +51,7 @@ pub struct Elders {
 /// `Request` and `Response` events from section locations are only raised once the majority has
 /// been reached, i.e. enough members of the section have sent the same message.
 #[allow(clippy::large_enum_variant)]
+#[derive(custom_debug::Debug)]
 pub enum Event {
     /// Received a message from another Node.
     MessageReceived {
@@ -110,6 +107,7 @@ pub enum Event {
         /// Old name before the relocation.
         previous_name: XorName,
         /// New keypair to be used after relocation.
+        #[debug(skip)]
         new_keypair: Arc<Keypair>,
     },
     /// Received a message from a client node.
@@ -134,87 +132,6 @@ pub enum Event {
         /// Removed Adults in our section.
         removed: BTreeSet<XorName>,
     },
-}
-
-impl Debug for Event {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        match self {
-            Self::MessageReceived {
-                msg_id,
-                src,
-                dst,
-                msg,
-            } => formatter
-                .debug_struct("MessageReceived")
-                .field("msg_id", msg_id)
-                .field("src", src)
-                .field("dst", dst)
-                .field("msg", msg)
-                .finish(),
-            Self::MemberJoined {
-                name,
-                previous_name,
-                age,
-            } => formatter
-                .debug_struct("MemberJoined")
-                .field("name", name)
-                .field("previous_name", previous_name)
-                .field("age", age)
-                .finish(),
-            Self::MemberLeft { name, age } => formatter
-                .debug_struct("MemberLeft")
-                .field("name", name)
-                .field("age", age)
-                .finish(),
-            Self::SectionSplit {
-                elders,
-                sibling_elders,
-                self_status_change,
-            } => formatter
-                .debug_struct("EldersChanged")
-                .field("elders", elders)
-                .field("sibling_elders", sibling_elders)
-                .field("self_status_change", self_status_change)
-                .finish(),
-            Self::EldersChanged {
-                elders,
-                self_status_change,
-            } => formatter
-                .debug_struct("EldersChanged")
-                .field("elders", elders)
-                .field("self_status_change", self_status_change)
-                .finish(),
-            Self::RelocationStarted { previous_name } => formatter
-                .debug_struct("RelocationStarted")
-                .field("previous_name", previous_name)
-                .finish(),
-            Self::Relocated {
-                previous_name,
-                new_keypair,
-            } => formatter
-                .debug_struct("Relocated")
-                .field("previous_name", previous_name)
-                .field("new_keypair", new_keypair)
-                .finish(),
-            Self::DataMsgReceived {
-                msg_id, msg, user, ..
-            } => write!(
-                formatter,
-                "DataMsgReceived {{ msg_id: {}, msg: {:?}, src: {:?} }}",
-                msg_id, msg, user,
-            ),
-            Self::AdultsChanged {
-                remaining,
-                added,
-                removed,
-            } => formatter
-                .debug_struct("AdultsChanged")
-                .field("remaining", remaining)
-                .field("added", added)
-                .field("removed", removed)
-                .finish(),
-        }
-    }
 }
 
 /// Type of messages that are received from a peer

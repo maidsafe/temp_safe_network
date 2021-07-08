@@ -28,7 +28,7 @@ use std::{
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Wrapper for different public key types.
-#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PublicKey {
     /// Ed25519 public key.
     Ed25519(ed25519_dalek::PublicKey),
@@ -210,31 +210,6 @@ impl From<bls::PublicKeyShare> for PublicKey {
 impl From<&Keypair> for PublicKey {
     fn from(keypair: &Keypair) -> Self {
         keypair.public_key()
-    }
-}
-
-impl Debug for PublicKey {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "PublicKey::")?;
-        match self {
-            Self::Ed25519(pub_key) => {
-                write!(
-                    formatter,
-                    "Ed25519({:<8})",
-                    hex::encode(&pub_key.to_bytes())
-                )
-            }
-            Self::Bls(pub_key) => write!(
-                formatter,
-                "Bls({:<8})",
-                hex::encode(&pub_key.to_bytes()[..XOR_NAME_LEN])
-            ),
-            Self::BlsShare(pub_key) => write!(
-                formatter,
-                "BlsShare({:<8})",
-                hex::encode(&pub_key.to_bytes()[..XOR_NAME_LEN])
-            ),
-        }
     }
 }
 

@@ -16,7 +16,7 @@ use crate::routing::{
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use std::{collections::BTreeSet, fmt::Debug, net::SocketAddr, time::Duration};
+use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use xor_name::XorName;
 
 #[derive(Debug)]

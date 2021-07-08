@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, net::SocketAddr};
+use std::{collections::BTreeMap, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
 /// The information about elder candidates in a DKG round.

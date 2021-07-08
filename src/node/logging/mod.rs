@@ -46,7 +46,7 @@ fn fmt(string: Option<String>) -> String {
     string.unwrap_or_else(|| "Unknown".to_string())
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(ctx))]
 async fn log(system: &mut System, ctx: &LogCtx, print_resources_usage: bool) {
     system.refresh_all();
 

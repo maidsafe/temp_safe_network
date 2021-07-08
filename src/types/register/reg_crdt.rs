@@ -37,7 +37,7 @@ pub struct CrdtOperation<T> {
 }
 
 /// Register data type as a CRDT with Access Control
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd)]
 pub(super) struct RegisterCrdt {
     /// Address on the network of this piece of data
     address: Address,

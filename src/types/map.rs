@@ -19,14 +19,13 @@ use super::{utils, Error, PublicKey, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
-    fmt::{self, Debug, Formatter},
     mem,
 };
 use xor_name::XorName;
 
 /// Map that is unpublished on the network. This data can only be fetched by the owner or
 /// those in the permissions fields with `Permission::Read` access.
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Map {
     /// Network address.
     address: Address,
@@ -42,25 +41,13 @@ pub struct Map {
     owner: PublicKey,
 }
 
-impl Debug for Map {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "Map {:?}", self.name())
-    }
-}
-
 /// A value in a Map.
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Value {
     /// Pointer.
     pub pointer: XorName,
     /// Version, incremented sequentially for any change to `data`.
     pub version: u64,
-}
-
-impl Debug for Value {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:<8} :: {}", hex::encode(&self.pointer), self.version)
-    }
 }
 
 /// Wrapper type for lists of values.

@@ -9,7 +9,7 @@
 
 use super::super::{utils, Error, PublicKey, Result, XorName};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
+use std::{collections::BTreeMap, hash::Hash};
 
 /// An action on Sequence data type.
 #[derive(Clone, Debug, Copy, Eq, PartialEq)]

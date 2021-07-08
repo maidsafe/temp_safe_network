@@ -12,35 +12,15 @@ use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::VecDeque,
-    fmt::{self, Debug, Formatter},
-    net::SocketAddr,
-};
+use std::{collections::VecDeque, net::SocketAddr};
 
 /// Request to join a section
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct JoinRequest {
     /// The public key of the section to join.
     pub section_key: BlsPublicKey,
     /// Proof of the resouce proofing.
     pub resource_proof_response: Option<ResourceProofResponse>,
-}
-
-impl Debug for JoinRequest {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter
-            .debug_struct("JoinRequest")
-            .field("section_key", &self.section_key)
-            .field(
-                "resource_proof_response",
-                &self
-                    .resource_proof_response
-                    .as_ref()
-                    .map(|proof| proof.solution),
-            )
-            .finish()
-    }
 }
 
 /// Joining peer's proof of resolvement of given resource proofing challenge.
@@ -57,7 +37,7 @@ pub struct ResourceProofResponse {
 }
 
 /// Response to a request to join a section
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum JoinResponse {
     /// Challenge sent from existing elder nodes to the joining peer for resource proofing.
@@ -91,37 +71,6 @@ pub enum JoinResponse {
     },
     /// Join was rejected
     Rejected(JoinRejectionReason),
-}
-
-impl Debug for JoinResponse {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Self::ResourceChallenge {
-                data_size,
-                difficulty,
-                ..
-            } => f
-                .debug_struct("ResourceChallenge")
-                .field("data_size", data_size)
-                .field("difficulty", difficulty)
-                .finish(),
-            Self::Retry(section_auth) => write!(f, "Retry({:?})", section_auth),
-            Self::Redirect(section_auth) => write!(f, "Redirect({:?})", section_auth),
-            Self::Approval {
-                genesis_key,
-                section_auth,
-                node_state,
-                section_chain,
-            } => f
-                .debug_struct("Approval")
-                .field("genesis_key", genesis_key)
-                .field("section_auth", section_auth)
-                .field("node_state", node_state)
-                .field("section_chain", section_chain)
-                .finish(),
-            Self::Rejected(reason) => write!(f, "Rejected({:?})", reason),
-        }
-    }
 }
 
 /// Reason of a join request being rejected
