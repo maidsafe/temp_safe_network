@@ -7,30 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::routing::error::{Error, Result};
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt::{self, Debug, Formatter},
-};
+use std::collections::{HashMap, VecDeque};
 
 /// All the key material needed to sign or combine signature for our section key.
+#[derive(custom_debug::Debug)]
 pub(crate) struct SectionKeyShare {
     /// Public key set to verify threshold signatures and combine shares.
     pub(crate) public_key_set: bls::PublicKeySet,
     /// Index of the owner of this key share within the set of all section elders.
     pub(crate) index: usize,
     /// Secret Key share.
+    #[debug(skip)]
     pub(crate) secret_key_share: bls::SecretKeyShare,
-}
-
-impl Debug for SectionKeyShare {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "SectionKeyShare {{ public_key: {:?}, index: {}, .. }}",
-            self.public_key_set.public_key(),
-            self.index
-        )
-    }
 }
 
 /// Struct that holds the current section keys and helps with new key generation.

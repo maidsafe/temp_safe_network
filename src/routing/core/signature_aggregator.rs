@@ -9,7 +9,6 @@
 use crate::messaging::node::{KeyedSig, SigShare};
 use std::{
     collections::HashMap,
-    fmt::Debug,
     time::{Duration, Instant},
 };
 use thiserror::Error;

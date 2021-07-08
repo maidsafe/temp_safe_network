@@ -10,12 +10,8 @@ use crate::messaging::WireMsg;
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
-use hex_fmt::HexFmt;
 use qp2p::{Endpoint, QuicP2p};
-use std::{
-    fmt::{self, Debug, Formatter},
-    net::SocketAddr,
-};
+use std::net::SocketAddr;
 use tokio::{
     sync::{mpsc, RwLock},
     task,
@@ -298,18 +294,10 @@ impl Drop for Comm {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum ConnectionEvent {
     Received((SocketAddr, Bytes)),
     Disconnected(SocketAddr),
-}
-
-impl Debug for ConnectionEvent {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Self::Received((src, msg)) => write!(f, "Received(src: {}, msg: {})", src, HexFmt(msg)),
-            Self::Disconnected(addr) => write!(f, "Disconnected({})", addr),
-        }
-    }
 }
 
 async fn handle_disconnection_events(

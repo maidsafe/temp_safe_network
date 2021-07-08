@@ -12,7 +12,6 @@ use crate::types::{
     SequenceIndex as Index, SequenceOp, SequenceUser as User,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use xor_name::XorName;
 
 /// [`Sequence`] read operations.
@@ -128,7 +127,7 @@ pub struct SequenceCmd {
 
 /// [`Sequence`] write operations.
 #[allow(clippy::large_enum_variant)]
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SequenceWrite {
     /// Create a new [`Sequence`] on the network.
     New(Sequence),
@@ -202,20 +201,5 @@ impl SequenceWrite {
             Self::New(data) => Some(data.owner()),
             _ => None,
         }
-    }
-}
-
-impl fmt::Debug for SequenceWrite {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use SequenceWrite::*;
-        write!(
-            formatter,
-            "SequenceWrite::{}",
-            match self {
-                New(seq) => format!("New({:?})", seq.address()),
-                Delete(address) => format!("Delete({:?})", address),
-                Edit(op) => format!("Edit({:?})", op),
-            }
-        )
     }
 }

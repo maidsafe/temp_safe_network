@@ -18,7 +18,7 @@ use metadata::{
 use seq_crdt::{CrdtOperation, SequenceCrdt};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::{fmt::Debug, hash::Hash};
+use std::hash::Hash;
 use xor_name::XorName;
 
 // Type of data used for the 'Actor' in CRDT vector clocks

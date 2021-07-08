@@ -11,13 +11,10 @@ use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{self, Debug, Formatter},
-    net::SocketAddr,
-};
+use std::net::SocketAddr;
 
 /// Request to join a section as relocated from another section
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct JoinAsRelocatedRequest {
     /// The public key of the section to join.
     pub section_key: BlsPublicKey,
@@ -25,24 +22,8 @@ pub struct JoinAsRelocatedRequest {
     pub relocate_payload: Option<RelocatePayload>,
 }
 
-impl Debug for JoinAsRelocatedRequest {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter
-            .debug_struct("JoinAsRelocatedRequest")
-            .field("section_key", &self.section_key)
-            .field(
-                "relocate_payload",
-                &self
-                    .relocate_payload
-                    .as_ref()
-                    .map(|payload| &payload.details),
-            )
-            .finish()
-    }
-}
-
 /// Response to a request to join a section as relocated
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum JoinAsRelocatedResponse {
     /// Up to date section information for a joining peer to retry its join request with
@@ -63,24 +44,4 @@ pub enum JoinAsRelocatedResponse {
     },
     /// The requesting node is not externally reachable
     NodeNotReachable(SocketAddr),
-}
-
-impl Debug for JoinAsRelocatedResponse {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Self::Retry(section_auth) => write!(f, "Retry({:?})", section_auth),
-            Self::Redirect(section_auth) => write!(f, "Redirect({:?})", section_auth),
-            Self::Approval {
-                section_auth,
-                node_state,
-                section_chain,
-            } => f
-                .debug_struct("Approval")
-                .field("section_auth", section_auth)
-                .field("node_state", node_state)
-                .field("section_chain", section_chain)
-                .finish(),
-            Self::NodeNotReachable(addr) => write!(f, "NodeNotReachable({})", addr),
-        }
-    }
 }

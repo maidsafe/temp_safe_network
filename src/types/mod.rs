@@ -56,7 +56,6 @@ pub use token::Token;
 
 use register::Register;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 use xor_name::XorName;
 
 /// Object storing a data variant.

@@ -64,8 +64,9 @@ impl NodeInfo {
 }
 
 /// Main node struct.
-#[derive(Debug)]
+#[derive(custom_debug::Debug)]
 pub struct Node {
+    #[debug(skip)]
     network_api: Network,
     node_info: NodeInfo,
     used_space: UsedSpace,

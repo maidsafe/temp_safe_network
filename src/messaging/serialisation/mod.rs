@@ -14,7 +14,6 @@ use super::{
     data::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, BlsShareSigned, ClientSigned,
     DstLocation, MessageId, NodeSigned, SectionSigned,
 };
-use std::fmt::Debug;
 
 /// Type of message.
 /// Note this is part of this crate's public API but this enum is

@@ -10,7 +10,7 @@ use crate::messaging::{DstLocation, Error, MessageId, MsgKind, Result};
 use bytes::Bytes;
 use cookie_factory::{bytes::be_u16, combinator::slice, gen, gen_simple};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, mem::size_of};
+use std::mem::size_of;
 
 // Current version of the messaging protocol.
 // At this point this implementation supports only this version.

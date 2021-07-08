@@ -9,7 +9,7 @@
 
 use super::super::{utils, Result, XorName};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, hash::Hash};
+use std::hash::Hash;
 
 /// An action on Register data type.
 #[derive(Clone, Debug, Copy, Eq, PartialEq)]

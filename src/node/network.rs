@@ -20,7 +20,7 @@ use std::{collections::BTreeSet, net::SocketAddr, path::Path, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 ///
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct Network {
     routing: Arc<RoutingNode>,
 }

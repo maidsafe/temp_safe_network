@@ -16,10 +16,7 @@
 use super::super::utils;
 
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{self, Debug, Formatter},
-    hash::{Hash, Hasher},
-};
+use std::hash::{Hash, Hasher};
 
 /// A signature share, with its index in the combined collection.
 #[derive(Clone, Hash, Eq, PartialEq, PartialOrd, Serialize, Deserialize, Debug)]
@@ -31,7 +28,7 @@ pub struct SignatureShare {
 }
 
 /// Wrapper for different signature types.
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum Signature {
     /// Ed25519 signature.
@@ -89,16 +86,5 @@ impl From<(usize, bls::SignatureShare)> for Signature {
 impl Hash for Signature {
     fn hash<H: Hasher>(&self, state: &mut H) {
         utils::serialise(&self).hash(state)
-    }
-}
-
-impl Debug for Signature {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "Signature::")?;
-        match self {
-            Self::Ed25519(_) => write!(formatter, "Ed25519(..)"),
-            Self::Bls(_) => write!(formatter, "Bls(..)"),
-            Self::BlsShare(_) => write!(formatter, "BlsShare(..)"),
-        }
     }
 }

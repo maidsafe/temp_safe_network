@@ -10,7 +10,7 @@
 use super::errors::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::{
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Display, Formatter},
     str::FromStr,
 };
 
@@ -20,7 +20,7 @@ const TOKEN_TO_RAW_POWER_OF_10_CONVERSION: u32 = 9;
 /// The conversion from Token to raw value
 const TOKEN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 /// Structure representing a Token amount.
 pub struct Token(u64);
 
@@ -85,12 +85,6 @@ impl FromStr for Token {
         };
 
         Ok(Self::from_nano(converted_units + remainder))
-    }
-}
-
-impl Debug for Token {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        Display::fmt(self, formatter)
     }
 }
 

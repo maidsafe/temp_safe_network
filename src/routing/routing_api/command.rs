@@ -12,7 +12,6 @@ use crate::messaging::{
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
 use std::{
-    fmt::{self, Debug, Formatter},
     net::SocketAddr,
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
@@ -20,6 +19,7 @@ use std::{
 
 /// Command for node.
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 pub(crate) enum Command {
     /// Handle `message` from `sender`.
     /// holding the WireMsg that has been received from the network,
@@ -78,78 +78,6 @@ pub(crate) enum Command {
     StartConnectivityTest(XorName),
     /// Test Connectivity
     TestConnectivity(XorName),
-}
-
-impl Debug for Command {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Self::HandleMessage { sender, wire_msg } => f
-                .debug_struct("HandleMessage")
-                .field("sender", sender)
-                .field("wire_msg", wire_msg)
-                .finish(),
-            Self::HandleTimeout(token) => f.debug_tuple("HandleTimeout").field(token).finish(),
-            Self::HandleConnectionLost(addr) => {
-                f.debug_tuple("HandleConnectionLost").field(addr).finish()
-            }
-            Self::HandlePeerLost(addr) => f.debug_tuple("HandlePeerLost").field(addr).finish(),
-            Self::HandleAgreement { proposal, sig } => f
-                .debug_struct("HandleAgreement")
-                .field("proposal", proposal)
-                .field("sig.public_key", &sig.public_key)
-                .finish(),
-            Self::HandleDkgOutcome {
-                section_auth,
-                outcome,
-            } => f
-                .debug_struct("HandleDkgOutcome")
-                .field("section_auth", section_auth)
-                .field("outcome", &outcome.public_key_set.public_key())
-                .finish(),
-            Self::HandleDkgFailure(signeds) => {
-                f.debug_tuple("HandleDkgFailure").field(signeds).finish()
-            }
-            Self::SendMessage {
-                recipients,
-                delivery_group_size,
-                wire_msg,
-            } => f
-                .debug_struct("SendMessage")
-                .field("recipients", recipients)
-                .field("delivery_group_size", delivery_group_size)
-                .field("wire_msg", wire_msg)
-                .finish(),
-            Self::RelayMessage(wire_msg) => f.debug_tuple("RelayMessage").field(wire_msg).finish(),
-            Self::ScheduleTimeout { duration, token } => f
-                .debug_struct("ScheduleTimeout")
-                .field("duration", duration)
-                .field("token", token)
-                .finish(),
-            Self::HandleRelocationComplete { node, section } => f
-                .debug_struct("HandleRelocationComplete")
-                .field("node", node)
-                .field("section", section)
-                .finish(),
-            Self::SetJoinsAllowed(joins_allowed) => f
-                .debug_tuple("SetJoinsAllowed")
-                .field(joins_allowed)
-                .finish(),
-            Self::ProposeOnline {
-                peer,
-                previous_name,
-                ..
-            } => f
-                .debug_struct("ProposeOnline")
-                .field("peer", peer)
-                .field("previous_name", previous_name)
-                .finish(),
-            Self::ProposeOffline(name) => f.debug_tuple("ProposeOffline").field(name).finish(),
-            Self::TestConnectivity(name) => f.debug_tuple("TestConnectivity").field(name).finish(),
-            Self::StartConnectivityTest(name) => {
-                f.debug_tuple("StartConnectivityTest").field(name).finish()
-            }
-        }
-    }
 }
 
 /// Generate unique timer token.

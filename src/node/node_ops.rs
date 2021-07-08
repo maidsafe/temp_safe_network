@@ -16,10 +16,7 @@ use crate::messaging::{
 };
 use crate::routing::Prefix;
 use crate::types::{Chunk, PublicKey};
-use std::{
-    collections::BTreeSet,
-    fmt::{Debug, Formatter},
-};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// Internal messages are what is passed along
@@ -40,6 +37,7 @@ pub(super) type NodeDuties = Vec<NodeDuty>;
 
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 pub enum NodeDuty {
     ReadChunk {
         msg_id: MessageId,
@@ -168,55 +166,6 @@ impl From<NodeDuty> for NodeDuties {
             vec![]
         } else {
             vec![duty]
-        }
-    }
-}
-
-impl Debug for NodeDuty {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Genesis { .. } => write!(f, "Genesis"),
-            Self::ReadChunk { .. } => write!(f, "ReadChunk"),
-            Self::WriteChunk { .. } => write!(f, "WriteChunk"),
-            Self::ProcessRepublish { .. } => write!(f, "ProcessRepublish"),
-            Self::RecordAdultReadLiveness {
-                correlation_id,
-                response,
-                src,
-            } => write!(
-                f,
-                "RecordAdultReadLiveness {{ correlation_id: {}, response: {:?}, src: {} }}",
-                correlation_id, response, src
-            ),
-            Self::LevelDown => write!(f, "LevelDown"),
-            Self::SynchState { .. } => write!(f, "SynchState"),
-            Self::EldersChanged { .. } => write!(f, "EldersChanged"),
-            Self::AdultsChanged { .. } => write!(f, "AdultsChanged"),
-            Self::SectionSplit { .. } => write!(f, "SectionSplit"),
-            Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
-            Self::NoOp => write!(f, "No op."),
-            Self::ReachingMaxCapacity => write!(f, "ReachingMaxCapacity"),
-            Self::ProcessLostMember { .. } => write!(f, "ProcessLostMember"),
-            //Self::ProcessRelocatedMember { .. } => write!(f, "ProcessRelocatedMember"),
-            Self::IncrementFullNodeCount { .. } => write!(f, "IncrementFullNodeCount"),
-            Self::SetNodeJoinsAllowed(_) => write!(f, "SetNodeJoinsAllowed"),
-            Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),
-            Self::SendError(msg) => write!(f, "SendError [ msg: {:?} ]", msg),
-            Self::SendSupport(msg) => write!(f, "SendSupport [ msg: {:?} ]", msg),
-            Self::SendToNodes {
-                msg_id,
-                msg,
-                targets,
-                aggregation,
-            } => write!(
-                f,
-                "SendToNodes [ msg_id: {}, msg: {:?}, targets: {:?}, aggregation: {:?} ]",
-                msg_id, msg, targets, aggregation
-            ),
-            Self::ProcessRead { .. } => write!(f, "ProcessRead"),
-            Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
-            Self::ReplicateChunk { .. } => write!(f, "ReplicateChunk"),
-            Self::ProposeOffline(nodes) => write!(f, "ProposeOffline({:?})", nodes),
         }
     }
 }

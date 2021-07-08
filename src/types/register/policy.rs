@@ -10,7 +10,7 @@
 use super::super::{Error, PublicKey, Result};
 use super::Action;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
+use std::{collections::BTreeMap, hash::Hash};
 
 /// Wrapper type for permissions, which can be public or private.
 #[derive(Clone, Serialize, Deserialize, PartialEq, PartialOrd, Ord, Eq, Hash, Debug)]

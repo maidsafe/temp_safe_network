@@ -20,10 +20,9 @@ use bls::{self, serde_impl::SerdeSecret, PublicKeySet};
 use ed25519_dalek::Signer;
 use rand::{CryptoRng, Rng};
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Debug, Formatter};
 use std::sync::Arc;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 /// Entity that owns the data or tokens.
 pub enum OwnerType {
     /// Single owner
@@ -76,18 +75,6 @@ impl OwnerType {
     }
 }
 
-impl Debug for OwnerType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            OwnerType::Single(_) => Debug::fmt(&self, f),
-            OwnerType::Multi(key_set) => write!(
-                f,
-                "OwnerType::Multi(PkSet {{ public_key: {:?} }})",
-                key_set.public_key()
-            ),
-        }
-    }
-}
 /// Ability to sign and validate data/tokens, as well as specify the type of ownership of that data
 pub trait Signing {
     ///
@@ -117,22 +104,12 @@ impl Signing for Keypair {
 }
 
 /// Wrapper for different keypair types.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, custom_debug::Debug)]
 pub enum Keypair {
     /// Ed25519 keypair.
-    Ed25519(Arc<ed25519_dalek::Keypair>),
+    Ed25519(#[debug(skip)] Arc<ed25519_dalek::Keypair>),
     /// BLS keypair share.
     BlsShare(Arc<BlsKeypairShare>),
-}
-
-impl Debug for Keypair {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "Keypair::")?;
-        match self {
-            Self::Ed25519(_) => write!(formatter, "Ed25519(..)"),
-            Self::BlsShare(_) => write!(formatter, "BlsShare(..)"),
-        }
-    }
 }
 
 // Need to manually implement this due to a missing impl in `Ed25519::Keypair`.
@@ -221,29 +198,17 @@ impl From<ed25519_dalek::SecretKey> for Keypair {
 }
 
 /// BLS keypair share.
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 pub struct BlsKeypairShare {
     /// Share index.
     pub index: usize,
     /// Secret key share.
+    #[debug(skip)]
     pub secret: SerdeSecret<bls::SecretKeyShare>,
     /// Public key share.
     pub public: bls::PublicKeyShare,
     /// Public key set. Necessary for producing proofs.
     pub public_key_set: PublicKeySet,
-}
-
-impl Debug for BlsKeypairShare {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "BlsKeyPairShare {{ index: {:?}, secret: {:?}, public: {:?}, public_key_set: PkSet {{ public_key: {:?} }} }}",
-            self.index,
-            self.secret,
-            self.public,
-            self.public_key_set.public_key()
-        )
-    }
 }
 
 #[cfg(test)]

@@ -10,9 +10,7 @@ use super::node::{KeyedSig, SigShare};
 use crate::types::{PublicKey, Signature};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey as EdPublicKey, Signature as EdSignature};
-use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Debug};
 use xor_name::XorName;
 
 /// Source authority of a message.
@@ -22,7 +20,7 @@ use xor_name::XorName;
 /// against the public key and we know the public key then we are good. If the proof is not
 /// recognised we can ask for a longer chain that can be recognised).
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgKind {
     /// A section information message, which doesn't have any message authority.
     ///
@@ -94,49 +92,4 @@ pub struct SectionSigned {
     pub src_name: XorName,
     /// BLS proof of the message corresponding to the source section.
     pub sig: KeyedSig,
-}
-
-impl Debug for MsgKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::SectionInfoMsg => write!(f, "SectionInfoMsg"),
-            Self::DataMsg(ClientSigned {
-                public_key,
-                signature,
-            }) => write!(
-                f,
-                "DataMsg {{ public_key: {:?}, signature: {:?} }}",
-                public_key, signature
-            ),
-            Self::NodeSignedMsg(NodeSigned {
-                section_pk,
-                public_key,
-                signature,
-            }) => write!(
-                f,
-                "NodeSignedMsg {{ section_pk: {:?}, public_key: {:10?}, signature: {:10?} }}",
-                section_pk,
-                HexFmt(public_key),
-                HexFmt(signature)
-            ),
-            Self::NodeBlsShareSignedMsg(BlsShareSigned {
-                section_pk,
-                src_name,
-                sig_share,
-            }) => write!(
-                f,
-                "NodeBlsShareSignedMsg {{ section_pk: {:?}, src_name: {:?}, sig_share: {:?} ",
-                section_pk, src_name, sig_share
-            ),
-            Self::SectionSignedMsg(SectionSigned {
-                section_pk,
-                src_name,
-                sig,
-            }) => write!(
-                f,
-                "Section {{ section_pk: {:?}, src_name: {:?}, sig: {:?}",
-                section_pk, src_name, sig
-            ),
-        }
-    }
 }
