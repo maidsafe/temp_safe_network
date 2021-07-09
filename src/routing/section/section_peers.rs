@@ -13,11 +13,7 @@ use crate::messaging::{
 };
 use crate::routing::{peer::PeerUtils, section::NodeStateUtils};
 use itertools::Itertools;
-use std::{
-    cmp::Ordering,
-    collections::btree_map::{self, Entry},
-    mem,
-};
+use std::{cmp::Ordering, collections::btree_map::Entry, mem};
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about members of our section.
@@ -175,16 +171,6 @@ impl SectionPeersUtils for SectionPeers {
             .into_iter()
             .filter(|(name, _)| prefix.matches(name))
             .collect();
-    }
-}
-
-pub struct IntoIter(btree_map::IntoIter<XorName, SectionSigned<NodeState>>);
-
-impl Iterator for IntoIter {
-    type Item = SectionSigned<NodeState>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(_, info)| info)
     }
 }
 
