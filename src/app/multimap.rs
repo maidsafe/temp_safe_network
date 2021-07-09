@@ -149,7 +149,7 @@ impl Safe {
                 // this is a tombstone entry created to delete some old entries
                 continue;
             }
-            let key_val = Self::decode_multimap_entry(&entry)?;
+            let key_val = Self::decode_multimap_entry(entry)?;
             multimap_key_vals.insert((*hash, key_val));
         }
         Ok(multimap_key_vals)
@@ -188,7 +188,7 @@ impl Safe {
     }
 
     fn decode_multimap_entry(entry: &[u8]) -> Result<MultimapKeyValue> {
-        rmp_serde::from_slice(&entry)
+        rmp_serde::from_slice(entry)
             .map_err(|err| Error::ContentError(format!("Couldn't parse Multimap entry: {:?}", err)))
     }
 }

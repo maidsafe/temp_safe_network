@@ -553,7 +553,7 @@ impl Safe {
         )?;
 
         // TODO: do we want ownership from other PKs yet?
-        let xorname = self.safe_client.store_public_blob(&data, dry_run).await?;
+        let xorname = self.safe_client.store_public_blob(data, dry_run).await?;
 
         let xorurl = SafeUrl::encode_blob(xorname, content_type, self.xorurl_base)?;
 
@@ -755,10 +755,10 @@ async fn files_map_sync(
                 // We need to add a new FileItem
                 if add_or_update_file_item(
                     safe,
-                    &local_file_name,
+                    local_file_name,
                     &normalised_file_name,
-                    &file_path,
-                    &FileMeta::from_path(&local_file_name, follow_links)?,
+                    file_path,
+                    &FileMeta::from_path(local_file_name, follow_links)?,
                     None, // no xorurl link
                     false,
                     dry_run,
@@ -790,15 +790,15 @@ async fn files_map_sync(
             }
             Some(file_item) => {
                 let is_modified =
-                    is_file_item_modified(safe, &Path::new(local_file_name), file_item).await;
+                    is_file_item_modified(safe, Path::new(local_file_name), file_item).await;
                 if force || (compare_file_content && is_modified) {
                     // We need to update the current FileItem
                     if add_or_update_file_item(
                         safe,
-                        &local_file_name,
+                        local_file_name,
                         &normalised_file_name,
-                        &file_path,
-                        &FileMeta::from_path(&local_file_name, follow_links)?,
+                        file_path,
+                        &FileMeta::from_path(local_file_name, follow_links)?,
                         None, // no xorurl link
                         true,
                         dry_run,
@@ -928,7 +928,7 @@ async fn files_map_add_link(
             // Let's update FileItem if the link is different or it doesn't exist in the files_map
             match files_map.get(file_name) {
                 Some(current_file_item) => {
-                    let mut file_meta = FileMeta::from_file_item(&current_file_item);
+                    let mut file_meta = FileMeta::from_file_item(current_file_item);
                     file_meta.file_type = file_type;
                     file_meta.file_size = file_size.to_string();
 
@@ -946,7 +946,7 @@ async fn files_map_add_link(
                                 safe,
                                 file_name,
                                 file_name,
-                                &file_path,
+                                file_path,
                                 &file_meta,
                                 Some(file_link),
                                 true,
@@ -981,8 +981,8 @@ async fn files_map_add_link(
                         safe,
                         file_name,
                         file_name,
-                        &file_path,
-                        &FileMeta::from_type_and_size(&file_type, &file_size),
+                        file_path,
+                        &FileMeta::from_type_and_size(&file_type, file_size),
                         Some(file_link),
                         false,
                         true,
@@ -1132,9 +1132,9 @@ async fn files_map_create(
             safe,
             &file_name,
             &final_name,
-            &Path::new(&file_name),
+            Path::new(&file_name),
             &FileMeta::from_path(&file_name, follow_links)?,
-            if link.is_empty() { None } else { Some(&link) },
+            if link.is_empty() { None } else { Some(link) },
             false,
             dry_run,
             &mut files_map,

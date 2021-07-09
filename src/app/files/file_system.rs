@@ -44,7 +44,7 @@ pub(crate) async fn upload_file_to_net(
 
 // Simply change Windows style path separator into `/`
 pub(crate) fn normalise_path_separator(from: &str) -> String {
-    str::replace(&from, "\\", "/")
+    str::replace(from, "\\", "/")
 }
 
 // Walk the local filesystem starting from `location`, creating a list of files paths,
@@ -59,7 +59,7 @@ pub(crate) async fn file_system_dir_walk(
 ) -> Result<ProcessedFiles> {
     let file_path = Path::new(location);
     info!("Reading files from {}", file_path.display());
-    let (metadata, _) = get_metadata(&file_path, follow_links)?;
+    let (metadata, _) = get_metadata(file_path, follow_links)?;
     if metadata.is_dir() || !recursive {
         // TODO: option to enable following symlinks?
         // We now compare both FilesMaps to upload the missing files
@@ -77,7 +77,7 @@ pub(crate) async fn file_system_dir_walk(
             info!("Processing {}...", current_path_str);
             let normalised_path = normalise_path_separator(&current_path_str);
 
-            let result = get_metadata(&current_file_path, follow_links);
+            let result = get_metadata(current_file_path, follow_links);
             match result {
                 Ok((metadata, _)) => {
                     if metadata.file_type().is_dir() {
@@ -110,7 +110,7 @@ pub(crate) async fn file_system_dir_walk(
                         );
                     }
                     if metadata.file_type().is_file() {
-                        match upload_file_to_net(safe, &current_file_path, dry_run).await {
+                        match upload_file_to_net(safe, current_file_path, dry_run).await {
                             Ok(xorurl) => {
                                 processed_files.insert(
                                     normalised_path,
@@ -170,7 +170,7 @@ pub(crate) async fn file_system_single_file(
 ) -> Result<ProcessedFiles> {
     let file_path = Path::new(location);
     info!("Reading file {}", file_path.display());
-    let (metadata, _) = get_metadata(&file_path, true)?; // follows symlinks.
+    let (metadata, _) = get_metadata(file_path, true)?; // follows symlinks.
 
     // We now compare both FilesMaps to upload the missing files
     let mut processed_files = BTreeMap::new();
@@ -181,7 +181,7 @@ pub(crate) async fn file_system_single_file(
             location
         )))
     } else {
-        match upload_file_to_net(safe, &file_path, dry_run).await {
+        match upload_file_to_net(safe, file_path, dry_run).await {
             Ok(xorurl) => {
                 processed_files.insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), xorurl));
             }

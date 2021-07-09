@@ -145,7 +145,7 @@ impl Safe {
             ))
         } else {
             let mut nrs_map = NrsMap::default();
-            let link = nrs_map.update(&name, link, default, hard_link)?;
+            let link = nrs_map.update(name, link, default, hard_link)?;
             let mut processed_entries = ProcessedEntries::new();
             processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
 
@@ -289,13 +289,13 @@ impl Safe {
 
                 debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
                 let nrs_map =
-                    serde_json::from_str(&String::from_utf8_lossy(&serialised_nrs_map.as_slice()))
+                    serde_json::from_str(&String::from_utf8_lossy(serialised_nrs_map.as_slice()))
                         .map_err(|err| {
-                            Error::ContentError(format!(
-                                "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
-                                err
-                            ))
-                        })?;
+                        Error::ContentError(format!(
+                            "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
+                            err
+                        ))
+                    })?;
 
                 Ok((version, nrs_map))
             }
@@ -633,7 +633,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_validate_name_with_slash() -> Result<()> {
         let nrs_name = "name/with/slash";
-        match validate_nrs_name(&nrs_name) {
+        match validate_nrs_name(nrs_name) {
             Ok(_) => Err(anyhow!(
                 "Unexpectedly validated nrs name with slashes {}",
                 nrs_name

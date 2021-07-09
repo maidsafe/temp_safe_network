@@ -28,26 +28,27 @@ use xor_name::{XorName, XOR_NAME_LEN};
 const SHA3_512_HASH_LEN: usize = 64;
 
 // Type tag value used for the Map which holds the Safe's content on the network.
+#[allow(dead_code)]
 const SAFE_TYPE_TAG: u64 = 1_300;
 
 /// Derive Passphrase, Password and Salt (in order).
 pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     let mut passphrase_hasher = Sha3::v512();
     let mut passphrase_hash = [0; SHA3_512_HASH_LEN];
-    passphrase_hasher.update(&acc_passphrase);
+    passphrase_hasher.update(acc_passphrase);
     passphrase_hasher.finalize(&mut passphrase_hash);
     let passphrase = passphrase_hash.to_vec();
 
     let mut salt_hasher = Sha3::v512();
     let mut salt_hash = [0; SHA3_512_HASH_LEN];
     let salt_bytes = &passphrase_hash[SHA3_512_HASH_LEN / 2..];
-    salt_hasher.update(&salt_bytes);
+    salt_hasher.update(salt_bytes);
     salt_hasher.finalize(&mut salt_hash);
     let salt = salt_hash.to_vec();
 
     let mut password_hasher = Sha3::v512();
     let mut password_hash = [0; SHA3_512_HASH_LEN];
-    password_hasher.update(&acc_password);
+    password_hasher.update(acc_password);
     password_hasher.finalize(&mut password_hash);
     let password = password_hash.to_vec();
 
@@ -58,7 +59,7 @@ pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, V
 fn create_ed25519_keypair_from_seed(seeder: &[u8]) -> Keypair {
     let mut hasher = Sha3::v256();
     let mut seed = [0; 32];
-    hasher.update(&seeder);
+    hasher.update(seeder);
     hasher.finalize(&mut seed);
     let mut rng = StdRng::from_seed(seed);
     Keypair::new_ed25519(&mut rng)
@@ -84,7 +85,7 @@ pub fn generate_network_address(passphrase: &[u8], salt: &[u8]) -> Result<XorNam
 
     const ITERATIONS: u32 = 10_000u32;
 
-    pbkdf2::pbkdf2::<Hmac<Sha3_256>>(passphrase, &salt, ITERATIONS, &mut id.0[..]);
+    pbkdf2::pbkdf2::<Hmac<Sha3_256>>(passphrase, salt, ITERATIONS, &mut id.0[..]);
 
     Ok(id)
 }
@@ -94,8 +95,11 @@ pub fn generate_network_address(passphrase: &[u8], salt: &[u8]) -> Result<XorNam
 pub struct SafeAuthenticator {
     // We keep the client instantiated with the derived keypair, along
     // with the address of the Map which holds its Safe on the network.
+    #[allow(dead_code)]
     safe: Option<(Client, MapAddress)>,
+    #[allow(dead_code)]
     config_path: Option<PathBuf>,
+    #[allow(dead_code)]
     bootstrap_contacts: Option<HashSet<SocketAddr>>,
 }
 
@@ -310,7 +314,7 @@ impl SafeAuthenticator {
         // is_a_safe_unlocked
     }
 
-    pub async fn decode_req(&self, req: &str) -> Result<SafeAuthReq> {
+    pub async fn decode_req(&self, _req: &str) -> Result<SafeAuthReq> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
         // match IpcMsg::from_string(req) {

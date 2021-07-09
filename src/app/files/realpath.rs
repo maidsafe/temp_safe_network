@@ -59,7 +59,7 @@ impl RealPath for FilesMap {
 
                     match &self.get(&tmppath) {
                         Some(fileitem) => {
-                            let meta = FileMeta::from_file_item(&fileitem);
+                            let meta = FileMeta::from_file_item(fileitem);
 
                             if meta.is_symlink() {
                                 nlinks += 1;
@@ -90,7 +90,7 @@ impl RealPath for FilesMap {
                                     newpath
                                 };
 
-                                while let Some(n) = iter.next() {
+                                for n in &mut iter {
                                     target.push(n)
                                 }
 

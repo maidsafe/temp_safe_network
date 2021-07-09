@@ -24,8 +24,8 @@ const MAX_TOKENS_VALUE: u64 = (u32::max_value() as u64 + 1) * TOKEN_TO_RAW_CONVE
 
 #[allow(dead_code)]
 pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
-    PublicKey::ed25519_from_hex(&hex_str)
-        .or_else(|_| PublicKey::bls_from_hex(&hex_str))
+    PublicKey::ed25519_from_hex(hex_str)
+        .or_else(|_| PublicKey::bls_from_hex(hex_str))
         .map_err(|_| {
             Error::InvalidInput(format!(
                 "Invalid (Ed25519/BLS) public key bytes: {}",

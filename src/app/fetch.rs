@@ -296,7 +296,7 @@ impl Safe {
                     match &files_map.get(&realpath) {
                         Some(file_item) => match file_item.get("type") {
                             Some(file_type) => {
-                                if FileMeta::filetype_is_file(&file_type) {
+                                if FileMeta::filetype_is_file(file_type) {
                                     match file_item.get("link") {
                                         Some(link) => {
                                             let new_target_xorurl = SafeUrl::from_url(link)?;
@@ -314,7 +314,7 @@ impl Safe {
                                             return Err(Error::ContentError(msg));
                                         }
                                     }
-                                } else if FileMeta::filetype_is_symlink(&file_type) {
+                                } else if FileMeta::filetype_is_symlink(file_type) {
                                     let msg = format!(
                                         "symlink should not be present in resolved real path. {}",
                                         realpath

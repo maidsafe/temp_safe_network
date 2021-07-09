@@ -54,7 +54,7 @@ pub fn parse_hex(hex_str: &str) -> Vec<u8> {
 }
 
 pub fn ed_sk_from_hex(hex_str: &str) -> Result<ed25519_dalek::SecretKey> {
-    let sk_bytes = parse_hex(&hex_str);
+    let sk_bytes = parse_hex(hex_str);
     ed25519_dalek::SecretKey::from_bytes(&sk_bytes).map_err(|_| {
         Error::InvalidInput("Failed to deserialize provided Ed25519 secret key".to_string())
     })
