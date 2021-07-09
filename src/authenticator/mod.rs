@@ -8,26 +8,17 @@
 // Software.
 
 use crate::{
-    ipc::{
-        req::{AuthReq, IpcReq},
-        resp::{AuthGranted, IpcResp},
-        IpcMsg,
-    },
-    Error, Result, SafeAuthReq,
+    ipc::{req::AuthReq, resp::AuthGranted},
+    Result, SafeAuthReq,
 };
 use hmac::Hmac;
-use log::{debug, info, trace};
-use rand::rngs::{OsRng, StdRng};
+use rand::rngs::StdRng;
 use rand_core::SeedableRng;
-use safe_network::client::{
-    client_api::Client, Error as ClientError, ErrorMessage::NoSuchEntry, DEFAULT_QUERY_TIMEOUT,
-};
-use safe_network::types::{
-    Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions, MapValue,
-};
+use safe_network::client::client_api::Client;
+use safe_network::types::{Keypair, MapAddress};
 use sha3::Sha3_256;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     net::SocketAddr,
     path::{Path, PathBuf},
 };
@@ -110,16 +101,17 @@ pub struct SafeAuthenticator {
 
 impl SafeAuthenticator {
     pub fn new(
-        config_dir_path: Option<&Path>,
-        bootstrap_contacts: Option<HashSet<SocketAddr>>,
+        _config_dir_path: Option<&Path>,
+        _bootstrap_contacts: Option<HashSet<SocketAddr>>,
     ) -> Self {
-        let config_path = config_dir_path.map(|p| p.to_path_buf());
+        unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
+        // let config_path = config_dir_path.map(|p| p.to_path_buf());
 
-        Self {
-            safe: None,
-            config_path,
-            bootstrap_contacts,
-        }
+        // Self {
+        //     safe: None,
+        //     config_path,
+        //     bootstrap_contacts,
+        // }
     }
 
     /// # Create Safe
@@ -175,52 +167,53 @@ impl SafeAuthenticator {
     /// }
     /// # });
     ///```
-    pub async fn create(&mut self, passphrase: &str, password: &str) -> Result<()> {
-        debug!("Attempting to create a Safe from provided passphrase and password.");
+    pub async fn create(&mut self, _passphrase: &str, _password: &str) -> Result<()> {
+        unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
+        // debug!("Attempting to create a Safe from provided passphrase and password.");
 
-        let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
-        let data_owner = keypair.public_key();
+        // let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
+        // let data_owner = keypair.public_key();
 
-        debug!("Creating Safe to be owned by PublicKey: {:?}", data_owner);
+        // debug!("Creating Safe to be owned by PublicKey: {:?}", data_owner);
 
-        let client = Client::new(
-            Some(keypair),
-            self.config_path.as_deref(),
-            self.bootstrap_contacts.clone(),
-            DEFAULT_QUERY_TIMEOUT,
-        )
-        .await?;
-        trace!("Client instantiated properly!");
+        // let client = Client::new(
+        //     Some(keypair),
+        //     self.config_path.as_deref(),
+        //     self.bootstrap_contacts.clone(),
+        //     DEFAULT_QUERY_TIMEOUT,
+        // )
+        // .await?;
+        // trace!("Client instantiated properly!");
 
-        // Create Map data to store the list of keypairs generated for
-        // each of the user's applications.
-        let permission_set = MapPermissionSet::new()
-            .allow(MapAction::Read)
-            .allow(MapAction::Insert)
-            .allow(MapAction::Update)
-            .allow(MapAction::Delete)
-            .allow(MapAction::ManagePermissions);
+        // // Create Map data to store the list of keypairs generated for
+        // // each of the user's applications.
+        // let permission_set = MapPermissionSet::new()
+        //     .allow(MapAction::Read)
+        //     .allow(MapAction::Insert)
+        //     .allow(MapAction::Update)
+        //     .allow(MapAction::Delete)
+        //     .allow(MapAction::ManagePermissions);
 
-        let mut permission_map = BTreeMap::new();
-        permission_map.insert(data_owner, permission_set);
+        // let mut permission_map = BTreeMap::new();
+        // permission_map.insert(data_owner, permission_set);
 
-        // TODO: encrypt content
-        let map_address = client
-            .store_seq_map(
-                location,
-                SAFE_TYPE_TAG,
-                data_owner,
-                None,
-                Some(permission_map),
-            )
-            .await
-            .map_err(|err| {
-                Error::AuthenticatorError(format!("Failed to store Safe on a Map: {}", err))
-            })?;
-        debug!("Map stored successfully for new Safe!");
+        // // TODO: encrypt content
+        // let map_address = client
+        //     .store_seq_map(
+        //         location,
+        //         SAFE_TYPE_TAG,
+        //         data_owner,
+        //         None,
+        //         Some(permission_map),
+        //     )
+        //     .await
+        //     .map_err(|err| {
+        //         Error::AuthenticatorError(format!("Failed to store Safe on a Map: {}", err))
+        //     })?;
+        // debug!("Map stored successfully for new Safe!");
 
-        self.safe = Some((client, map_address));
-        Ok(())
+        // self.safe = Some((client, map_address));
+        // Ok(())
     }
 
     /// # Unlock
@@ -264,68 +257,76 @@ impl SafeAuthenticator {
     /// }
     /// # });
     ///```
-    pub async fn unlock(&mut self, passphrase: &str, password: &str) -> Result<()> {
-        debug!("Attempting to unlock a Safe...");
+    pub async fn unlock(&mut self, _passphrase: &str, _password: &str) -> Result<()> {
+        unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
-        let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
+        // debug!("Attempting to unlock a Safe...");
 
-        debug!(
-            "Unlocking Safe owned by PublicKey: {:?}",
-            keypair.public_key()
-        );
+        // let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
 
-        let client = Client::new(
-            Some(keypair),
-            self.config_path.as_deref(),
-            self.bootstrap_contacts.clone(),
-            DEFAULT_QUERY_TIMEOUT,
-        )
-        .await?;
-        trace!("Client instantiated properly!");
+        // debug!(
+        //     "Unlocking Safe owned by PublicKey: {:?}",
+        //     keypair.public_key()
+        // );
 
-        let map_address = MapAddress::Seq {
-            name: location,
-            tag: SAFE_TYPE_TAG,
-        };
+        // let client = Client::new(
+        //     Some(keypair),
+        //     self.config_path.as_deref(),
+        //     self.bootstrap_contacts.clone(),
+        //     DEFAULT_QUERY_TIMEOUT,
+        // )
+        // .await?;
+        // trace!("Client instantiated properly!");
 
-        // Attempt to retrieve Map to make sure it actually exists
-        let _ = client.get_map(map_address).await?;
-        debug!("Safe unlocked successfully!");
+        // let map_address = MapAddress::Seq {
+        //     name: location,
+        //     tag: SAFE_TYPE_TAG,
+        // };
 
-        self.safe = Some((client, map_address));
-        Ok(())
+        // // Attempt to retrieve Map to make sure it actually exists
+        // let _ = client.get_map(map_address).await?;
+        // debug!("Safe unlocked successfully!");
+
+        // self.safe = Some((client, map_address));
+        // Ok(())
     }
 
     pub fn lock(&mut self) -> Result<()> {
-        debug!("Locking Safe...");
-        self.safe = None;
-        Ok(())
+        unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
+
+        // debug!("Locking Safe...");
+        // self.safe = None;
+        // Ok(())
     }
 
     pub fn is_a_safe_unlocked(&self) -> bool {
-        let is_a_safe_unlocked = self.safe.is_some();
-        debug!(
-            "Is there a Safe currently unlocked?: {}",
-            is_a_safe_unlocked
-        );
-        is_a_safe_unlocked
+        unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
+
+        // let is_a_safe_unlocked = self.safe.is_some();
+        // debug!(
+        //     "Is there a Safe currently unlocked?: {}",
+        //     is_a_safe_unlocked
+        // );
+        // is_a_safe_unlocked
     }
 
     pub async fn decode_req(&self, req: &str) -> Result<SafeAuthReq> {
-        match IpcMsg::from_string(req) {
-            Ok(IpcMsg::Req(IpcReq::Auth(app_auth_req))) => {
-                debug!("Auth request string decoded: {:?}", app_auth_req);
-                Ok(SafeAuthReq::Auth(app_auth_req))
-            }
-            Ok(other) => Err(Error::AuthError(format!(
-                "Failed to decode string as an authorisation request, it's a: '{:?}'",
-                other
-            ))),
-            Err(error) => Err(Error::AuthenticatorError(format!(
-                "Failed to decode request: {:?}",
-                error
-            ))),
-        }
+        unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
+
+        // match IpcMsg::from_string(req) {
+        //     Ok(IpcMsg::Req(IpcReq::Auth(app_auth_req))) => {
+        //         debug!("Auth request string decoded: {:?}", app_auth_req);
+        //         Ok(SafeAuthReq::Auth(app_auth_req))
+        //     }
+        //     Ok(other) => Err(Error::AuthError(format!(
+        //         "Failed to decode string as an authorisation request, it's a: '{:?}'",
+        //         other
+        //     ))),
+        //     Err(error) => Err(Error::AuthenticatorError(format!(
+        //         "Failed to decode request: {:?}",
+        //         error
+        //     ))),
+        // }
     }
 
     // TODO: update terminology around apps auth here
@@ -334,29 +335,31 @@ impl SafeAuthenticator {
     }
 
     /// Decode requests and trigger application authorisation against the current client
-    pub async fn authorise_app(&self, req: &str) -> Result<String> {
-        let ipc_req = IpcMsg::from_string(req).map_err(|err| {
-            Error::AuthenticatorError(format!("Failed to decode authorisation request: {:?}", err))
-        })?;
+    pub async fn authorise_app(&self, _req: &str) -> Result<String> {
+        unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
-        debug!("Auth request string decoded: {:?}", ipc_req);
+        // let ipc_req = IpcMsg::from_string(req).map_err(|err| {
+        //     Error::AuthenticatorError(format!("Failed to decode authorisation request: {:?}", err))
+        // })?;
 
-        match ipc_req {
-            IpcMsg::Req(IpcReq::Auth(app_auth_req)) => {
-                info!("Request was recognised as an application auth request");
-                debug!("Decoded request: {:?}", app_auth_req);
-                self.gen_auth_response(app_auth_req).await
-            }
-            IpcMsg::Req(IpcReq::Unregistered(user_data)) => {
-                info!("Request was recognised as an unregistered auth request");
-                debug!("Decoded request: {:?}", user_data);
+        // debug!("Auth request string decoded: {:?}", ipc_req);
 
-                self.gen_unreg_auth_response()
-            }
-            IpcMsg::Resp { .. } | IpcMsg::Err(..) => Err(Error::AuthError(
-                "The request was not recognised as a valid auth request".to_string(),
-            )),
-        }
+        // match ipc_req {
+        //     IpcMsg::Req(IpcReq::Auth(app_auth_req)) => {
+        //         info!("Request was recognised as an application auth request");
+        //         debug!("Decoded request: {:?}", app_auth_req);
+        //         self.gen_auth_response(app_auth_req).await
+        //     }
+        //     IpcMsg::Req(IpcReq::Unregistered(user_data)) => {
+        //         info!("Request was recognised as an unregistered auth request");
+        //         debug!("Decoded request: {:?}", user_data);
+
+        //         self.gen_unreg_auth_response()
+        //     }
+        //     IpcMsg::Resp { .. } | IpcMsg::Err(..) => Err(Error::AuthError(
+        //         "The request was not recognised as a valid auth request".to_string(),
+        //     )),
+        // }
     }
 
     /// Authenticate an app request.
@@ -364,139 +367,141 @@ impl SafeAuthenticator {
     /// First, this function searches for an app info in the Safe.
     /// If the app is found, then the `AuthGranted` struct is returned based on that information.
     /// If the app is not found in the Safe, then it will be authenticated.
-    pub async fn authenticate(&self, auth_req: AuthReq) -> Result<AuthGranted> {
-        debug!(
-            "Retrieving/generating keypair for an application: {:?}",
-            auth_req
-        );
-        if let Some((client, map_address)) = &self.safe {
-            let app_id = auth_req.app_id.as_bytes().to_vec();
-            let keypair = match client.get_map_value(*map_address, app_id.clone()).await {
-                Ok(value) => {
-                    // This app already has its own keypair
-                    trace!(
-                        "The app ('{}') already has a Keypair in the Safe",
-                        auth_req.app_id
-                    );
+    pub async fn authenticate(&self, _auth_req: AuthReq) -> Result<AuthGranted> {
+        unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
-                    // TODO: support for scenario when app was previously revoked,
-                    // in which case we should generate a new keypair
+        // debug!(
+        //     "Retrieving/generating keypair for an application: {:?}",
+        //     auth_req
+        // );
+        // if let Some((client, map_address)) = &self.safe {
+        //     let app_id = auth_req.app_id.as_bytes().to_vec();
+        //     let keypair = match client.get_map_value(*map_address, app_id.clone()).await {
+        //         Ok(value) => {
+        //             // This app already has its own keypair
+        //             trace!(
+        //                 "The app ('{}') already has a Keypair in the Safe",
+        //                 auth_req.app_id
+        //             );
 
-                    let keypair_bytes = match value {
-                        MapValue::Seq(seq_value) => seq_value.data,
-                        MapValue::Unseq(data) => data,
-                    };
-                    let keypair_str = String::from_utf8(keypair_bytes).map_err(|_err| {
-                        Error::AuthError(
-                            "The Safe contains an invalid keypair associated to this app"
-                                .to_string(),
-                        )
-                    })?;
-                    let keypair: Keypair = serde_json::from_str(&keypair_str).map_err(|_err| {
-                        Error::AuthError(
-                            "The Safe contains an invalid keypair associated to this app"
-                                .to_string(),
-                        )
-                    })?;
+        //             // TODO: support for scenario when app was previously revoked,
+        //             // in which case we should generate a new keypair
 
-                    debug!(
-                        "Keypair for the app being authorised ('{}') retrieved from the Safe: {}",
-                        auth_req.app_id,
-                        keypair.public_key()
-                    );
+        //             let keypair_bytes = match value {
+        //                 MapValue::Seq(seq_value) => seq_value.data,
+        //                 MapValue::Unseq(data) => data,
+        //             };
+        //             let keypair_str = String::from_utf8(keypair_bytes).map_err(|_err| {
+        //                 Error::AuthError(
+        //                     "The Safe contains an invalid keypair associated to this app"
+        //                         .to_string(),
+        //                 )
+        //             })?;
+        //             let keypair: Keypair = serde_json::from_str(&keypair_str).map_err(|_err| {
+        //                 Error::AuthError(
+        //                     "The Safe contains an invalid keypair associated to this app"
+        //                         .to_string(),
+        //                 )
+        //             })?;
 
-                    keypair
-                }
-                Err(ClientError::ErrorMessage {
-                    source: NoSuchEntry,
-                    ..
-                }) => {
-                    // This is the first time this app is being authorised,
-                    // thus let's generate a keypair for it
-                    trace!(
-                        "The app ('{}') was not assigned a Keypair yet in the Safe. Generating one for it...",
-                        auth_req.app_id
-                    );
-                    let mut rng = OsRng;
-                    let keypair = Keypair::new_ed25519(&mut rng);
+        //             debug!(
+        //                 "Keypair for the app being authorised ('{}') retrieved from the Safe: {}",
+        //                 auth_req.app_id,
+        //                 keypair.public_key()
+        //             );
 
-                    let keypair_str = serde_json::to_string(&keypair).map_err(|err| {
-                        Error::AuthError(format!(
-                            "Failed to serialised keypair to store it in the Safe: {}",
-                            err
-                        ))
-                    })?;
+        //             keypair
+        //         }
+        //         Err(ClientError::ErrorMessage {
+        //             source: NoSuchEntry,
+        //             ..
+        //         }) => {
+        //             // This is the first time this app is being authorised,
+        //             // thus let's generate a keypair for it
+        //             trace!(
+        //                 "The app ('{}') was not assigned a Keypair yet in the Safe. Generating one for it...",
+        //                 auth_req.app_id
+        //             );
+        //             let mut rng = OsRng;
+        //             let keypair = Keypair::new_ed25519(&mut rng);
 
-                    debug!(
-                        "New keypair generated for app ('{}') being authorised: {}",
-                        auth_req.app_id,
-                        keypair.public_key()
-                    );
+        //             let keypair_str = serde_json::to_string(&keypair).map_err(|err| {
+        //                 Error::AuthError(format!(
+        //                     "Failed to serialised keypair to store it in the Safe: {}",
+        //                     err
+        //                 ))
+        //             })?;
 
-                    // Store the keypair in the Safe, mapped to the app id
-                    let map_actions =
-                        MapSeqEntryActions::new().ins(app_id, keypair_str.as_bytes().to_vec(), 0);
+        //             debug!(
+        //                 "New keypair generated for app ('{}') being authorised: {}",
+        //                 auth_req.app_id,
+        //                 keypair.public_key()
+        //             );
 
-                    client
-                        .edit_map_entries(*map_address, MapEntryActions::Seq(map_actions))
-                        .await?;
+        //             // Store the keypair in the Safe, mapped to the app id
+        //             let map_actions =
+        //                 MapSeqEntryActions::new().ins(app_id, keypair_str.as_bytes().to_vec(), 0);
 
-                    keypair
-                }
-                Err(err) => {
-                    return Err(Error::AuthError(format!(
-                        "Failed to retrieve keypair from the Safe: {}",
-                        err
-                    )))
-                }
-            };
+        //             client
+        //                 .edit_map_entries(*map_address, MapEntryActions::Seq(map_actions))
+        //                 .await?;
 
-            Ok(AuthGranted {
-                app_keypair: keypair,
-                bootstrap_config: self.bootstrap_contacts.clone(),
-            })
-        } else {
-            Err(Error::AuthenticatorError(
-                "No Safe is currently unlocked".to_string(),
-            ))
-        }
+        //             keypair
+        //         }
+        //         Err(err) => {
+        //             return Err(Error::AuthError(format!(
+        //                 "Failed to retrieve keypair from the Safe: {}",
+        //                 err
+        //             )))
+        //         }
+        //     };
+
+        //     Ok(AuthGranted {
+        //         app_keypair: keypair,
+        //         bootstrap_config: self.bootstrap_contacts.clone(),
+        //     })
+        // } else {
+        //     Err(Error::AuthenticatorError(
+        //         "No Safe is currently unlocked".to_string(),
+        //     ))
+        // }
     }
 
     // Helper function to generate an app authorisation response
-    async fn gen_auth_response(&self, auth_req: AuthReq) -> Result<String> {
-        let auth_granted = self.authenticate(auth_req).await.map_err(|err| {
-            Error::AuthenticatorError(format!(
-                "Failed to authorise application on the network: {}",
-                err
-            ))
-        })?;
+    // async fn gen_auth_response(&self, auth_req: AuthReq) -> Result<String> {
+    //     let auth_granted = self.authenticate(auth_req).await.map_err(|err| {
+    //         Error::AuthenticatorError(format!(
+    //             "Failed to authorise application on the network: {}",
+    //             err
+    //         ))
+    //     })?;
 
-        debug!("Encoding response with auth credentials auth granted...");
-        let resp = serde_json::to_string(&IpcMsg::Resp(IpcResp::Auth(Ok(auth_granted)))).map_err(
-            |err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)),
-        )?;
+    //     debug!("Encoding response with auth credentials auth granted...");
+    //     let resp = serde_json::to_string(&IpcMsg::Resp(IpcResp::Auth(Ok(auth_granted)))).map_err(
+    //         |err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)),
+    //     )?;
 
-        debug!("Returning auth response generated");
+    //     debug!("Returning auth response generated");
 
-        Ok(resp)
-    }
+    //     Ok(resp)
+    // }
 
     // Helper function to generate an unregistered authorisation response
-    fn gen_unreg_auth_response(&self) -> Result<String> {
-        let bootstrap_contacts = self.bootstrap_contacts.clone().ok_or_else(|| {
-            Error::AuthenticatorError("Bootstrap contacts information not available".to_string())
-        })?;
+    // fn gen_unreg_auth_response(&self) -> Result<String> {
+    //     let bootstrap_contacts = self.bootstrap_contacts.clone().ok_or_else(|| {
+    //         Error::AuthenticatorError("Bootstrap contacts information not available".to_string())
+    //     })?;
 
-        debug!("Encoding response... {:?}", bootstrap_contacts);
-        let resp =
-            serde_json::to_string(&IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_contacts))))
-                .map_err(|err| {
-                    Error::AuthenticatorError(format!("Failed to encode response: {:?}", err))
-                })?;
+    //     debug!("Encoding response... {:?}", bootstrap_contacts);
+    //     let resp =
+    //         serde_json::to_string(&IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_contacts))))
+    //             .map_err(|err| {
+    //                 Error::AuthenticatorError(format!("Failed to encode response: {:?}", err))
+    //             })?;
 
-        debug!("Returning unregistered auth response generated: {:?}", resp);
-        Ok(resp)
-    }
+    //     debug!("Returning unregistered auth response generated: {:?}", resp);
+    //     Ok(resp)
+    // }
 }
 
 #[cfg(test)]
