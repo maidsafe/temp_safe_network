@@ -29,8 +29,10 @@ pub struct ResourceProofResponse {
     #[allow(missing_docs)]
     pub solution: u64,
     #[allow(missing_docs)]
+    #[debug(skip)]
     pub data: VecDeque<u8>,
     #[allow(missing_docs)]
+    #[debug(skip)]
     pub nonce: [u8; 32],
     #[allow(missing_docs)]
     #[debug(with = "crate::types::Signature::fmt_ed25519")]
