@@ -114,8 +114,7 @@ pub enum Error {
     /// The signature combination failed even though there are enough valid signature shares. This
     /// should probably never happen.
     #[error("failed to combine signature shares: {0}")]
-    // TODO: add '#[from]` when `threshold_crytpo::Error` implements `std::error::Error`
-    Combine(bls::error::Error),
+    Combine(#[from] bls::error::Error),
 }
 
 struct State {

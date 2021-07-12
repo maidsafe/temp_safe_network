@@ -246,8 +246,19 @@ impl Core {
             return Ok(vec![]);
         }
 
+        // Requires the node name matches the age.
+        let age = details.age;
+        if age != peer.age() {
+            debug!(
+                "Ignoring JoinAsRelocatedRequest from {} - relocation age ({}) doesn't match peer's age ({}).",
+                peer, age,peer.age(),
+            );
+            return Ok(vec![]);
+        }
+
         // Check for signatures and trust of the relocate_payload msg
-        let serialised_relocate_details = WireMsg::serialize_msg_payload(&details)?;
+        let serialised_relocate_details =
+            WireMsg::serialize_msg_payload(&NodeMsg::Relocate(details.clone()))?;
 
         let payload_section_signed = &relocate_payload.section_signed;
         let is_signautre_valid = payload_section_signed.section_pk.verify(
@@ -262,16 +273,6 @@ impl Core {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - invalid signature or untrusted src.",
                 peer
-            );
-            return Ok(vec![]);
-        }
-
-        // Requires the node name matches the age.
-        let age = details.age;
-        if age != peer.age() {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - required age {:?} not presented.",
-                peer, age,
             );
             return Ok(vec![]);
         }

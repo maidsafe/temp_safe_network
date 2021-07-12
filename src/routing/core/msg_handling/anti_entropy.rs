@@ -31,8 +31,8 @@ impl Core {
         sender: SocketAddr,
     ) -> Result<(Option<Command>, bool)> {
         if self.is_not_elder() {
-            // Adult nodes do need to carry out entropy checking, however the message shall always
-            // be handled.
+            // Adult nodes do need to carry out entropy checking,
+            // however the message shall always be handled.
             return Ok((None, true));
         }
 

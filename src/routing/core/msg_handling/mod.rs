@@ -21,7 +21,7 @@ mod sync;
 use super::Core;
 use crate::messaging::{
     node::{NodeMsg, Proposal},
-    BlsShareSigned, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, WireMsg,
+    BlsShareSigned, DstLocation, MessageId, MessageType, NodeMsgAuthority, SectionSigned, WireMsg,
 };
 use crate::routing::{
     core::AggregatorError,
@@ -34,6 +34,7 @@ use crate::routing::{
     Event, MessageReceived,
 };
 use bls::PublicKey as BlsPublicKey;
+use bytes::Bytes;
 use std::{iter, net::SocketAddr};
 
 // Message handling
@@ -41,7 +42,7 @@ impl Core {
     pub(crate) async fn handle_message(
         &mut self,
         sender: SocketAddr,
-        mut wire_msg: WireMsg,
+        wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
         // Check if the message is for us
         let dst_location = wire_msg.dst_location();
@@ -65,12 +66,8 @@ impl Core {
             return Ok(vec![]);
         }
 
-        // We assume to be aggregated if it contains a BLS Share sig as authority.
-        if self.aggregate_message_and_stop(&mut wire_msg)? {
-            return Ok(vec![]);
-        };
-
         // We can now deserialize the payload of the incoming message
+        let payload = wire_msg.payload.clone();
         let message_type = match wire_msg.into_message() {
             Ok(message_type) => message_type,
             Err(error) => {
@@ -94,7 +91,7 @@ impl Core {
                 dst_location,
                 msg,
             } => {
-                self.handle_node_message(sender, msg_id, msg_authority, dst_location, msg)
+                self.handle_node_message(sender, msg_id, msg_authority, dst_location, msg, payload)
                     .await
             }
             MessageType::Client {
@@ -114,9 +111,10 @@ impl Core {
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,
-        msg_authority: NodeMsgAuthority,
+        mut msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
         node_msg: NodeMsg,
+        payload: Bytes,
     ) -> Result<Vec<Command>> {
         // Let's now verify the section key in the msg authority is trusted
         // based on our current knowledge of the network and sections chains.
@@ -140,7 +138,7 @@ impl Core {
             node_msg
         );
 
-        // Let's check for entropy before we proceed to finally process the node message
+        // Let's check for entropy before we proceed further
         let (ae_command, shall_be_handled) = self
             .check_for_entropy(&node_msg, &msg_authority, &dst_location, sender)
             .await?;
@@ -157,17 +155,27 @@ impl Core {
                 msg_id
             );
 
-            commands.extend(
-                self.handle_verified_node_message(
-                    sender,
-                    msg_id,
-                    msg_authority,
-                    dst_location,
-                    node_msg,
-                    &known_keys,
-                )
-                .await?,
-            );
+            // We assume to be aggregated if it contains a BLS Share sig as authority.
+            match self.aggregate_message_and_stop(&msg_id, &mut msg_authority, payload) {
+                Ok(false) => {
+                    commands.extend(
+                        self.handle_verified_node_message(
+                            sender,
+                            msg_id,
+                            msg_authority,
+                            dst_location,
+                            node_msg,
+                            &known_keys,
+                        )
+                        .await?,
+                    );
+                }
+                Err(Error::InvalidSignatureShare) => {
+                    let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
+                    commands.push(cmd);
+                }
+                Ok(true) | Err(_) => {}
+            }
         }
 
         Ok(commands)
@@ -475,27 +483,53 @@ impl Core {
         }
     }
 
-    fn aggregate_message_and_stop(&mut self, wire_msg: &mut WireMsg) -> Result<bool> {
-        let sig_share =
-            if let MsgKind::NodeBlsShareSignedMsg(BlsShareSigned { sig_share, .. }) =
-                wire_msg.msg_kind()
+    // Convert the provided NodeMsgAuthority to be a `Section` message
+    // authority on successful accumulation. Also return 'true' if
+    // current message shall not be processed any further.
+    fn aggregate_message_and_stop(
+        &mut self,
+        msg_id: &MessageId,
+        msg_authority: &mut NodeMsgAuthority,
+        payload: Bytes,
+    ) -> Result<bool> {
+        let (section_pk, src_name, sig_share) =
+            if let NodeMsgAuthority::BlsShare(BlsShareSigned {
+                section_pk,
+                src_name,
+                sig_share,
+            }) = msg_authority
             {
-                sig_share
+                (section_pk, src_name, sig_share)
             } else {
-                // not a msg to aggregate signatures with, return without modifying it
+                // not a msg to aggregate signatures with,
+                // return wihout modifying msg_authority
                 return Ok(false);
             };
 
-        match self
-            .message_aggregator
-            .add(&wire_msg.payload, sig_share.clone())
-        {
+        match self.message_aggregator.add(&payload, sig_share.clone()) {
             Ok(sig) => {
-                wire_msg.aggregate_signature(sig)?;
-                trace!(
-                    "Successfully accumulated signatures for message: {:?}",
-                    wire_msg
-                );
+                if sig_share.public_key_set.public_key() != sig.public_key {
+                    error!(
+                        "Signed public key doesn't match signed share public key in msg with id: {}",
+                        msg_id
+                    );
+                    return Err(Error::InvalidMessage);
+                }
+
+                if &sig.public_key != section_pk {
+                    error!(
+                        "Signed public key doesn't match the section PK in msg with id {}: {:?}",
+                        msg_id, section_pk
+                    );
+                    return Err(Error::InvalidMessage);
+                }
+
+                *msg_authority = NodeMsgAuthority::Section(SectionSigned {
+                    section_pk: *section_pk,
+                    src_name: *src_name,
+                    sig,
+                });
+
                 Ok(false)
             }
             Err(AggregatorError::NotEnoughShares) => Ok(true),

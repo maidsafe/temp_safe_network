@@ -10,7 +10,7 @@ mod msg_authority;
 
 pub use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
-    node::{KeyedSig, NodeMsg, SigShare},
+    node::{NodeMsg, SigShare},
     BlsShareSigned, ClientSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority, NodeSigned,
     SectionSigned, WireMsg,
 };
@@ -44,10 +44,6 @@ pub trait WireMsgUtils {
         node_msg: NodeMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error>;
-
-    /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
-    /// Returns errors if src is not `BlsShare` or if the signed is invalid.
-    fn aggregate_signature(&mut self, sig: KeyedSig) -> Result<()>;
 
     /// Creates a signed message from single node.
     fn single_src(
@@ -171,48 +167,6 @@ impl WireMsgUtils for WireMsg {
         });
 
         Self::new_signed(msg_payload, msg_authority, dst)
-    }
-
-    /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
-    /// Returns errors if authority  is not `BlsShare` or if the signed is invalid.
-    fn aggregate_signature(&mut self, sig: KeyedSig) -> Result<()> {
-        let (section_pk, src_name, sig_share) =
-            if let MsgKind::NodeBlsShareSignedMsg(BlsShareSigned {
-                section_pk,
-                src_name,
-                sig_share,
-            }) = self.msg_kind()
-            {
-                (*section_pk, *src_name, sig_share)
-            } else {
-                error!("Not a message for dst accumulation: {:?}", self);
-                return Err(Error::InvalidMessage);
-            };
-
-        if sig_share.public_key_set.public_key() != sig.public_key {
-            error!(
-                "Signed public key doesn't match signed share public key: {:?}",
-                self
-            );
-            return Err(Error::InvalidMessage);
-        }
-
-        if sig.public_key != section_pk {
-            error!("Signed public key doesn't match the section PK: {:?}", self);
-            return Err(Error::InvalidMessage);
-        }
-
-        if !sig.verify(&self.payload) {
-            return Err(Error::FailedSignature);
-        }
-
-        self.header.msg_envelope.msg_kind = MsgKind::SectionSignedMsg(SectionSigned {
-            section_pk,
-            src_name,
-            sig,
-        });
-
-        Ok(())
     }
 
     /// Creates a signed message from single node.

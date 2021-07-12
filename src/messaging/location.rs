@@ -110,8 +110,6 @@ impl DstLocation {
     }
 
     /// Returns whether the given name of the given prefix is part of this location.
-    ///
-    /// Returns None if `prefix` does not match `name`.
     pub fn contains(&self, name: &XorName, prefix: &Prefix) -> bool {
         if !prefix.matches(name) {
             return false;

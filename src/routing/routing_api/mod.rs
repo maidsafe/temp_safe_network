@@ -372,8 +372,7 @@ impl Routing {
     }
 
     /// Send a message.
-    /// Messages sent here, either section to section or node to node are signed
-    /// and validated upon receipt by routing itself.
+    /// Messages sent here, either section to section or node to node.
     pub async fn send_message(&self, mut wire_msg: WireMsg) -> Result<()> {
         if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
             if self.our_prefix().await.matches(xorname) {
