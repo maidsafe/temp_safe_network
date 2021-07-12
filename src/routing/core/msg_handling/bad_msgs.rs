@@ -36,10 +36,8 @@ impl Core {
             msg: Box::new(node_msg),
             dst_section_pk: bounce_dst_section_pk,
         };
-        let cmd =
-            self.send_direct_message((src_name, sender), bounce_node_msg, bounce_dst_section_pk)?;
 
-        Ok(cmd)
+        self.send_direct_message((src_name, sender), bounce_node_msg, bounce_dst_section_pk)
     }
 
     pub(crate) fn handle_bounced_untrusted_message(

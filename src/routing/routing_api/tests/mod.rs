@@ -10,15 +10,15 @@ use super::{Comm, Command, Core, Dispatcher};
 use crate::messaging::{
     node::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Network,
-        NodeMsg, NodeState, Peer, Proposal, RelocateDetails, RelocatePayload, RelocatePromise,
+        NodeMsg, NodeState, Peer, Proposal, RelocateDetails, RelocatePayload,
         ResourceProofResponse, Section, SectionSigned,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DstLocation, MessageId, MessageType, MsgKind, SectionAuthorityProvider,
+    DstLocation, MessageId, MessageType, MsgKind, NodeSigned, SectionAuthorityProvider,
     SectionSigned as MsgKindSectionSigned, WireMsg,
 };
 use crate::routing::{
-    core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
+    core::{ConnectionEvent, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     dkg::{
         test_utils::{prove, section_signed},
         ProposalUtils,
@@ -34,11 +34,13 @@ use crate::routing::{
         SectionKeyShare, SectionPeersUtils, SectionUtils, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
         MIN_AGE,
     },
-    supermajority, Event, MessageReceived, ELDER_SIZE,
+    supermajority, Event, ELDER_SIZE,
 };
 use crate::types::{Keypair, PublicKey};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use assert_matches::assert_matches;
+use ed25519_dalek::Signer;
+use rand::rngs::OsRng;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use std::{
@@ -56,14 +58,16 @@ use xor_name::{Prefix, XorName};
 static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 
 #[tokio::test]
-#[ignore]
 async fn receive_matching_get_section_request_as_elder() -> Result<()> {
-    let node = create_node(MIN_ADULT_AGE);
+    let node = create_node(MIN_ADULT_AGE, None);
+    let node_name = node.name();
     let core = Core::first_node(
         create_comm().await?,
         node,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
     )?;
+    let node_section_pk = *core.section().chain().last_key();
+    let section_auth = core.section().authority_provider().clone();
     let dispatcher = Dispatcher::new(core);
 
     let new_node_comm = create_comm().await?;
@@ -71,12 +75,11 @@ async fn receive_matching_get_section_request_as_elder() -> Result<()> {
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
         new_node_comm.our_connection_info(),
     );
-    let new_node_name = new_node.name();
 
     let query = SectionInfoMsg::GetSectionQuery(PublicKey::from(new_node.keypair.public));
     let dst_location = DstLocation::Node {
-        name: new_node_name,
-        section_pk: bls::SecretKey::random().public_key(),
+        name: node_name,
+        section_pk: node_section_pk,
     };
     let wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
 
@@ -101,16 +104,15 @@ async fn receive_matching_get_section_request_as_elder() -> Result<()> {
     assert_matches!(
         received_wire_msg.into_message(),
         Ok(MessageType::SectionInfo {
-            msg: SectionInfoMsg::GetSectionResponse(GetSectionResponse::Success { .. }),
+            msg: SectionInfoMsg::GetSectionResponse(GetSectionResponse::Success(received_section_auth)),
             ..
-        })
+        }) => assert_eq!(received_section_auth, section_auth)
     );
 
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
     let good_prefix = Prefix::default().pushed(false);
 
@@ -118,7 +120,8 @@ async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
     let (section_auth, _, _) = gen_section_authority_provider(good_prefix, ELDER_SIZE);
     let (section, _) = create_section(&sk_set, &section_auth)?;
 
-    let node = create_node(MIN_ADULT_AGE);
+    let node = create_node(MIN_ADULT_AGE, Some(good_prefix));
+    let node_name = node.name();
     let core = Core::new(
         create_comm().await?,
         node,
@@ -126,6 +129,7 @@ async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
         None,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
     );
+    let node_section_pk = *core.section().chain().last_key();
     let dispatcher = Dispatcher::new(core);
 
     let mut rng = rand::thread_rng();
@@ -144,8 +148,8 @@ async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
 
     let query = SectionInfoMsg::GetSectionQuery(random_pk);
     let dst_location = DstLocation::Node {
-        name: new_node_name,
-        section_pk: bls::SecretKey::random().public_key(),
+        name: node_name,
+        section_pk: node_section_pk,
     };
     let wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
 
@@ -182,7 +186,7 @@ async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
 
 #[tokio::test]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
-    let node = create_node(FIRST_SECTION_MIN_AGE);
+    let node = create_node(FIRST_SECTION_MIN_AGE, None);
     let core = Core::first_node(
         create_comm().await?,
         node,
@@ -235,7 +239,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
 #[tokio::test]
 async fn receive_join_request_with_resource_proof_response() -> Result<()> {
-    let node = create_node(FIRST_SECTION_MIN_AGE);
+    let node = create_node(FIRST_SECTION_MIN_AGE, None);
     let core = Core::first_node(
         create_comm().await?,
         node,
@@ -305,7 +309,6 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
 async fn receive_join_request_from_relocated_node() -> Result<()> {
     let (section_auth, mut nodes) = create_section_auth();
 
@@ -315,6 +318,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
     let node = nodes.remove(0);
+    let node_name = node.name();
     let core = Core::new(
         create_comm().await?,
         node,
@@ -334,7 +338,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let relocate_details = RelocateDetails {
         pub_id: relocated_node_old_name,
-        dst: rand::random(),
+        dst: node_name,
         dst_key: section_key,
         age: relocated_node.age(),
     };
@@ -344,7 +348,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let signature = sk_set.secret_key().sign(payload);
     let section_signed = MsgKindSectionSigned {
         section_pk: section_key,
-        src_name: Prefix::default().name(),
+        src_name: node_name,
         sig: KeyedSig {
             public_key: section_key,
             signature,
@@ -375,7 +379,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         })
         .await?;
 
-    let mut test_connectivity = false;
+    let mut propose_cmd_returned = false;
 
     for command in commands {
         if let Command::ProposeOnline {
@@ -388,11 +392,11 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
             assert_eq!(previous_name, Some(relocated_node_old_name));
             assert_eq!(dst_key, Some(section_key));
 
-            test_connectivity = true;
+            propose_cmd_returned = true;
         }
     }
 
-    assert!(test_connectivity);
+    assert!(propose_cmd_returned);
 
     Ok(())
 }
@@ -899,7 +903,6 @@ async fn handle_untrusted_message_from_peer() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
 async fn handle_untrusted_accumulated_message() -> Result<()> {
     handle_untrusted_message(UntrustedMessageSource::Accumulation).await
 }
@@ -915,28 +918,15 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     let chain = SecuredLinkedList::new(pk0);
 
     let (section_auth, _) = create_section_auth();
-
     let sender = *section_auth
         .addresses()
         .get(0)
-        .expect("section_auth is empty");
-    let expected_recipients = match source {
-        UntrustedMessageSource::Peer => {
-            // When the untrusted message is sent from a single peer, we should bounce it back to
-            // that peer.
-            vec![sender]
-        }
-        UntrustedMessageSource::Accumulation => {
-            // When the untrusted message is the result of message accumulation, we should bounce
-            // it to our elders.
-            section_auth.addresses()
-        }
-    };
+        .ok_or_else(|| anyhow!("section_auth is empty"))?;
 
-    let section_signed_section_auth = section_signed(&sk0, section_auth)?;
-    let section = Section::new(pk0, chain.clone(), section_signed_section_auth)?;
+    let section_signed_section_auth = section_signed(&sk0, section_auth.clone())?;
+    let mut section = Section::new(pk0, chain, section_signed_section_auth)?;
 
-    let node = create_node(MIN_ADULT_AGE);
+    let node = create_node(MIN_ADULT_AGE, None);
     let node_name = node.name();
     let core = Core::new(
         create_comm().await?,
@@ -947,27 +937,41 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     );
     let dispatcher = Dispatcher::new(core);
 
+    // Create a any message signed by a key not known to the node.
     let sk1 = bls::SecretKey::random();
     let pk1 = sk1.public_key();
-
-    // Create a any message signed by a key not known to the node.
-    let original_node_msg = NodeMsg::RelocatePromise(RelocatePromise {
-        name: XorName::random(),
-        dst: XorName::random(),
-    });
+    let unknown_chain = SecuredLinkedList::new(pk1);
+    // we corrupt the section chain so it's unknown
+    section.chain = unknown_chain;
+    let original_node_msg = NodeMsg::Sync {
+        section,
+        network: Network::new(),
+    };
     let payload = WireMsg::serialize_msg_payload(&original_node_msg)?;
-    let signature = sk1.sign(&payload);
-    let msg_kind = MsgKind::SectionSignedMsg(MsgKindSectionSigned {
-        section_pk: pk1,
-        src_name: Prefix::default().name(),
-        sig: KeyedSig {
-            public_key: pk1,
-            signature,
-        },
-    });
+    let expected_recipients = vec![sender];
+    let msg_kind = match source {
+        UntrustedMessageSource::Peer => {
+            let mut rng = OsRng {};
+            let keypair = ed25519_dalek::Keypair::generate(&mut rng);
+            MsgKind::NodeSignedMsg(NodeSigned {
+                section_pk: pk1,
+                public_key: keypair.public,
+                signature: keypair.sign(&payload),
+            })
+        }
+        UntrustedMessageSource::Accumulation => MsgKind::SectionSignedMsg(MsgKindSectionSigned {
+            section_pk: pk1,
+            src_name: Prefix::default().name(),
+            sig: KeyedSig {
+                public_key: pk1,
+                signature: sk1.sign(&payload),
+            },
+        }),
+    };
+
     let dst_location = DstLocation::Section {
         name: node_name,
-        section_pk: pk1,
+        section_pk: pk0,
     };
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst_location)?;
 
@@ -1018,7 +1022,6 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
 }
 
 #[tokio::test]
-#[ignore]
 async fn handle_bounced_untrusted_message() -> Result<()> {
     let (section_auth, mut nodes, sk_set0) =
         gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
@@ -1067,7 +1070,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
             msg: Box::new(original_node_msg.clone()),
             dst_section_pk: pk0,
         },
-        *section.chain().last_key(),
+        pk0,
     )?;
 
     let commands = dispatcher
@@ -1077,7 +1080,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         })
         .await?;
 
-    let mut message_sent = false;
+    let mut message_resent = false;
 
     for command in commands {
         let (recipients, wire_msg) = match command {
@@ -1091,24 +1094,19 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
 
         match wire_msg.into_message() {
             Ok(MessageType::Node {
-                msg:
-                    NodeMsg::BouncedUntrustedMessage {
-                        msg,
-                        dst_section_pk,
-                    },
-                ..
+                msg, dst_location, ..
             }) => {
                 assert_eq!(recipients, [(other_node.name(), other_node.addr)]);
-                assert_eq!(*msg, original_node_msg);
-                assert_eq!(dst_section_pk, pk0);
+                assert_eq!(msg, original_node_msg);
+                assert_eq!(dst_location.section_pk(), Some(pk0));
 
-                message_sent = true;
+                message_resent = true;
             }
             _ => continue,
         }
     }
 
-    assert!(message_sent);
+    assert!(message_resent);
 
     Ok(())
 }
@@ -1229,11 +1227,11 @@ async fn handle_untrusted_sync() -> Result<()> {
     let new_section = Section::new(pk0, chain.truncate(2), section_signed_new_section_auth)?;
 
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let node = create_node(MIN_ADULT_AGE);
+    let node = create_node(MIN_ADULT_AGE, None);
     let core = Core::new(create_comm().await?, node, old_section, None, event_tx);
     let dispatcher = Dispatcher::new(core);
 
-    let sender = create_node(MIN_ADULT_AGE);
+    let sender = create_node(MIN_ADULT_AGE, None);
     let original_node_msg = NodeMsg::Sync {
         section: new_section.clone(),
         network: Network::new(),
@@ -1324,7 +1322,7 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
         network: Network::new(),
     };
 
-    let sender = create_node(MIN_ADULT_AGE);
+    let sender = create_node(MIN_ADULT_AGE, None);
     let bounced_node_msg = NodeMsg::BouncedUntrustedMessage {
         msg: Box::new(original_node_msg),
         dst_section_pk: pk0,
@@ -1400,7 +1398,6 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let node_state = NodeState::joined(non_elder_peer);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     assert!(section.update_member(node_state));
-    println!("non_elder joined.");
     let node = nodes.remove(0);
     let core = Core::new(
         create_comm().await?,
@@ -1476,13 +1473,11 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
 async fn node_message_to_self() -> Result<()> {
     message_to_self(MessageDst::Node).await
 }
 
 #[tokio::test]
-#[ignore]
 async fn section_message_to_self() -> Result<()> {
     message_to_self(MessageDst::Section).await
 }
@@ -1493,63 +1488,60 @@ enum MessageDst {
 }
 
 async fn message_to_self(dst: MessageDst) -> Result<()> {
-    let node = create_node(MIN_ADULT_AGE);
-    let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let core = Core::first_node(create_comm().await?, node, event_tx)?;
-    let peer = core.node().peer();
+    let node = create_node(MIN_ADULT_AGE, None);
+    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let comm = Comm::new(
+        qp2p::Config {
+            local_ip: Some(Ipv4Addr::LOCALHOST.into()),
+            ..Default::default()
+        },
+        comm_tx,
+    )
+    .await?;
+    let core = Core::first_node(comm, node, event_tx)?;
+    let node = core.node().clone();
     let section_pk = *core.section_chain().last_key();
-
-    let sending_node = create_node(MIN_ADULT_AGE);
-    let sending_core = Core::first_node(
-        create_comm().await?,
-        sending_node.clone(),
-        mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-    )?;
-    let src_section_pk = *sending_core.section_chain().last_key();
-    let dispatcher = Dispatcher::new(sending_core);
+    let dispatcher = Dispatcher::new(core);
 
     let dst_location = match dst {
         MessageDst::Node => DstLocation::Node {
-            name: *peer.name(),
+            name: node.name(),
             section_pk,
         },
         MessageDst::Section => DstLocation::Section {
-            name: *peer.name(),
+            name: node.name(),
             section_pk,
         },
     };
 
-    let node_msg_error = crate::messaging::client::Error::FailedToWriteFile;
-    let node_msg_correlation_id = MessageId::new();
     let node_msg = NodeMsg::NodeMsgError {
-        error: node_msg_error.clone(),
-        correlation_id: node_msg_correlation_id,
+        error: crate::messaging::client::Error::FailedToWriteFile,
+        correlation_id: MessageId::new(),
     };
-    let wire_msg = WireMsg::single_src(
-        &sending_node,
-        dst_location,
-        node_msg.clone(),
-        src_section_pk,
-    )?;
+    let wire_msg = WireMsg::single_src(&node, dst_location, node_msg.clone(), section_pk)?;
 
     let commands = dispatcher
         .handle_command(Command::SendMessage {
-            recipients: vec![(*peer.name(), *peer.addr())],
+            recipients: vec![(node.name(), node.addr)],
             delivery_group_size: 1,
             wire_msg,
         })
         .await?;
 
     assert!(commands.is_empty());
-    assert_matches!(event_rx.recv().await, Some(Event::MessageReceived { src, dst, msg, .. }) => {
-        assert_eq!(src.name(), sending_node.name());
+
+    let msg_type = assert_matches!(comm_rx.recv().await, Some(ConnectionEvent::Received((sender, bytes))) => {
+        assert_eq!(sender, node.addr);
+        assert_matches!(WireMsg::deserialize(bytes), Ok(msg_type) => msg_type)
+    });
+
+    assert_matches!(msg_type, MessageType::Node { msg, dst_location: dst, .. } => {
         assert_eq!(dst, dst_location);
-        assert_matches!(
-            *msg,
-            MessageReceived::NodeMsgError { error, correlation_id, .. } => {
-            assert_eq!(error, node_msg_error);
-            assert_eq!(correlation_id, node_msg_correlation_id);
-        });
+        assert_eq!(
+            msg,
+            node_msg
+        );
     });
 
     Ok(())
@@ -1559,7 +1551,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
 async fn handle_elders_update() -> Result<()> {
     // Start with section that has `ELDER_SIZE` elders with age 6, 1 non-elder with age 5 and one
     // to-be-elder with age 7:
-    let node = create_node(MIN_AGE + 2);
+    let node = create_node(MIN_AGE + 2, None);
     let mut other_elder_peers: Vec<_> = iter::repeat_with(|| create_peer(MIN_AGE + 2))
         .take(ELDER_SIZE - 1)
         .collect();
@@ -1681,7 +1673,7 @@ async fn handle_elders_update() -> Result<()> {
 // Test that demoted node still sends `Sync` messages on split.
 #[tokio::test]
 async fn handle_demote_during_split() -> Result<()> {
-    let node = create_node(MIN_ADULT_AGE);
+    let node = create_node(MIN_ADULT_AGE, None);
     let node_name = node.name();
 
     let prefix0 = Prefix::default().pushed(false);
@@ -1814,9 +1806,9 @@ fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> Peer {
     peer
 }
 
-fn create_node(age: u8) -> Node {
+fn create_node(age: u8, prefix: Option<Prefix>) -> Node {
     Node::new(
-        ed25519::gen_keypair(&Prefix::default().range_inclusive(), age),
+        ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
         gen_addr(),
     )
 }
