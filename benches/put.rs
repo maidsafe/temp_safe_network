@@ -21,8 +21,6 @@ async fn put_kbs(amount: usize) -> Result<(), Error> {
     let client = Client::new(None, None, Some(contact_info), DEFAULT_QUERY_TIMEOUT).await?;
     let address = client.store_public_blob(&data).await?;
 
-    // small wait for write to go on
-    // tokio::time::sleep(Duration::from_secs(2)).await;
     // let's make sure the public chunk is stored
     let received_data = client.read_blob(address, None, None).await?;
 
