@@ -51,6 +51,9 @@ pub(crate) trait SectionPeersUtils {
     /// Returns whether the given peer is a joined member of our section.
     fn is_joined(&self, name: &XorName) -> bool;
 
+    /// Returns whether the given peer is already relocated to our section.
+    fn is_relocated(&self, name: &XorName) -> bool;
+
     /// Update a member of our section.
     /// Returns whether anything actually changed.
     fn update(&mut self, new_info: SectionSigned<NodeState>) -> bool;
@@ -134,6 +137,13 @@ impl SectionPeersUtils for SectionPeers {
             .get(name)
             .map(|info| info.value.state == MembershipState::Joined)
             .unwrap_or(false)
+    }
+
+    /// Returns whether the given peer is already relocated to our section.
+    fn is_relocated(&self, name: &XorName) -> bool {
+        self.members
+            .values()
+            .any(|info| info.value.previous_name == Some(*name))
     }
 
     /// Update a member of our section.

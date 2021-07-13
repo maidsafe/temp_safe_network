@@ -84,8 +84,6 @@ pub enum Proposal {
     Online {
         /// Current node state
         node_state: NodeState,
-        /// Previous name if relocated.
-        previous_name: Option<XorName>,
         /// The key of the destination section that the joining node knows, if any.
         dst_key: Option<BlsPublicKey>,
     },

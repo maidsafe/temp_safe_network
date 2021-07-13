@@ -27,7 +27,7 @@ pub const FIRST_SECTION_MAX_AGE: u8 = 100;
 /// Information about a member of our section.
 pub(crate) trait NodeStateUtils {
     // Creates a `NodeState` in the `Joined` state.
-    fn joined(peer: Peer) -> NodeState;
+    fn joined(peer: Peer, previous_name: Option<XorName>) -> NodeState;
 
     // Is the age > `MIN_AGE`?
     fn is_mature(&self) -> bool;
@@ -40,10 +40,11 @@ pub(crate) trait NodeStateUtils {
 
 impl NodeStateUtils for NodeState {
     // Creates a `NodeState` in the `Joined` state.
-    fn joined(peer: Peer) -> NodeState {
+    fn joined(peer: Peer, previous_name: Option<XorName>) -> NodeState {
         NodeState {
             peer,
             state: MembershipState::Joined,
+            previous_name,
         }
     }
 

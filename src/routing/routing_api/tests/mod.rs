@@ -419,10 +419,9 @@ async fn aggregate_proposals() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let new_peer = create_peer(MIN_AGE);
-    let node_state = NodeState::joined(new_peer);
+    let node_state = NodeState::joined(new_peer, None);
     let proposal = Proposal::Online {
         node_state,
-        previous_name: None,
         dst_key: None,
     };
 
@@ -532,7 +531,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     for peer in section_auth.peers() {
         let mut peer = peer;
         peer.set_reachable(true);
-        let node_state = NodeState::joined(peer);
+        let node_state = NodeState::joined(peer, None);
         let sig = prove(sk_set.secret_key(), &node_state)?;
         let _ = section.update_member(SectionSigned {
             value: node_state,
@@ -558,10 +557,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
     let new_peer = create_peer(MIN_AGE + 2);
-    let node_state = NodeState::joined(new_peer);
+    let node_state = NodeState::joined(new_peer, Some(XorName::random()));
     let proposal = Proposal::Online {
         node_state,
-        previous_name: Some(XorName::random()),
         dst_key: Some(sk_set.secret_key().public_key()),
     };
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
@@ -617,10 +615,9 @@ async fn handle_online_command(
     dispatcher: &Dispatcher,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<HandleOnlineStatus> {
-    let node_state = NodeState::joined(*peer);
+    let node_state = NodeState::joined(*peer, None);
     let proposal = Proposal::Online {
         node_state,
-        previous_name: None,
         dst_key: None,
     };
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
@@ -702,6 +699,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     let node_state = NodeState {
         peer,
         state: MembershipState::Left,
+        previous_name: None,
     };
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     let _ = section.update_member(node_state);
@@ -765,7 +763,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
     let existing_peer = create_peer(MIN_AGE);
-    let node_state = NodeState::joined(existing_peer);
+    let node_state = NodeState::joined(existing_peer, None);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     let _ = section.update_member(node_state);
 
@@ -783,6 +781,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let node_state = NodeState {
         peer: existing_peer,
         state: MembershipState::Left,
+        previous_name: None,
     };
     let proposal = Proposal::Offline(node_state);
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
@@ -807,7 +806,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
     let existing_peer = create_peer(MIN_AGE);
-    let node_state = NodeState::joined(existing_peer);
+    let node_state = NodeState::joined(existing_peer, None);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     let _ = section.update_member(node_state);
 
@@ -1397,7 +1396,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
     let non_elder_peer = create_peer(MIN_AGE);
-    let node_state = NodeState::joined(non_elder_peer);
+    let node_state = NodeState::joined(non_elder_peer, None);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     assert!(section.update_member(node_state));
     let node = nodes.remove(0);
@@ -1572,7 +1571,7 @@ async fn handle_elders_update() -> Result<()> {
     let (mut section0, section_key_share) = create_section(&sk_set0, &section_auth0)?;
 
     for peer in &[adult_peer, promoted_peer] {
-        let node_state = NodeState::joined(*peer);
+        let node_state = NodeState::joined(*peer, None);
         let node_state = section_signed(sk_set0.secret_key(), node_state)?;
         assert!(section0.update_member(node_state));
     }
@@ -1704,7 +1703,7 @@ async fn handle_demote_during_split() -> Result<()> {
     let (mut section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0)?;
 
     for peer in peers_b.iter().chain(iter::once(&peer_c)) {
-        let node_state = NodeState::joined(*peer);
+        let node_state = NodeState::joined(*peer, None);
         let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
         assert!(section.update_member(node_state));
     }
@@ -1857,7 +1856,7 @@ fn create_section(
     for peer in section_auth.peers() {
         let mut peer = peer;
         peer.set_reachable(true);
-        let node_state = NodeState::joined(peer);
+        let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(sk_set.secret_key(), node_state)?;
         let _ = section.update_member(node_state);
     }
@@ -1875,8 +1874,7 @@ fn create_section(
 fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<(Proposal, KeyedSig)> {
     loop {
         let proposal = Proposal::Online {
-            node_state: NodeState::joined(create_peer(MIN_ADULT_AGE)),
-            previous_name: Some(rand::random()),
+            node_state: NodeState::joined(create_peer(MIN_ADULT_AGE), Some(rand::random())),
             dst_key: None,
         };
 
