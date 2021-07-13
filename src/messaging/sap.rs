@@ -17,8 +17,10 @@ use std::{
 };
 use xor_name::{Prefix, XorName};
 
-/// A new `SectionAuthorityProvider` is created whenever the elders change,
-/// due to an elder being added or removed, or the section splitting or merging.
+/// Details of section authority.
+///
+/// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being
+/// added or removed, or the section splitting or merging.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
 pub struct SectionAuthorityProvider {
     /// The section prefix. It matches all the members' names.

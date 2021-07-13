@@ -30,12 +30,12 @@ impl MessageId {
         Self(XorName::random().0)
     }
 
-    /// Generates a new MessageId containing provided bytes
+    /// Generates a new `MessageId` containing provided bytes.
     pub fn with(id: [u8; MESSAGE_ID_LEN]) -> Self {
         Self(id)
     }
 
-    /// Generate a message id deterministically derived from a piece of data
+    /// Generate a message id deterministically derived from a piece of data.
     pub fn from_content<T: Serialize>(content: &T) -> Result<Self> {
         // Here we use XorName just as a helper to generate the id
         let msg_id = Self(
@@ -48,7 +48,7 @@ impl MessageId {
         Ok(msg_id)
     }
 
-    /// Generates a new MessageId based on provided id.
+    /// Generates a new `MessageId` based on provided id.
     pub fn in_response_to(src: &Self) -> Self {
         let mut hasher = Sha3::v256();
         let mut output = [0; MESSAGE_ID_LEN];
@@ -58,7 +58,7 @@ impl MessageId {
         Self(output)
     }
 
-    /// Generates a new based on provided sources.
+    /// Generates a new `MessageId` deterministically derived from provided sources.
     pub fn combine(sources: &[[u8; MESSAGE_ID_LEN]]) -> Self {
         let mut hash_bytes = Vec::new();
         for src in sources.iter() {

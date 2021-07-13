@@ -13,13 +13,12 @@ use xor_name::{Prefix, XorName};
 /// This maps to the SocketAddr at the Elders where the EndUser is proxied through.
 pub type SocketId = XorName;
 
-/// An EndUser is represented by the name
-/// it's proxied through, and its socket id.
+/// An EndUser is represented by the name it's proxied through, and its socket id.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub struct EndUser {
-    /// The name it's proxied through
+    /// The name it's proxied through.
     pub xorname: XorName,
-    /// This maps to the SocketAddr at the Elders where the EndUser is proxied through.
+    /// This maps to the SocketAddr at the Elders where the `EndUser` is proxied through.
     pub socket_id: SocketId,
 }
 
@@ -32,14 +31,14 @@ pub enum SrcLocation {
     Node {
         /// Name of the Node.
         name: XorName,
-        /// Node's section public key
+        /// Node's section public key.
         section_pk: BlsPublicKey,
     },
     /// A Section close to a name.
     Section {
         /// Name of the Section.
         name: XorName,
-        /// Section's public key
+        /// Section's public key.
         section_pk: BlsPublicKey,
     },
 }
@@ -54,7 +53,9 @@ impl SrcLocation {
         }
     }
 
-    /// Returns this location as `DstLocation`
+    /// Converts this source location into a [`DstLocation`].
+    ///
+    /// `EndUser`, `Node`, and `Section` source variants have corresponding destination variants.
     pub fn to_dst(self) -> DstLocation {
         match self {
             Self::EndUser(user) => DstLocation::EndUser(user),
@@ -73,18 +74,19 @@ pub enum DstLocation {
     Node {
         /// Name of the Node.
         name: XorName,
-        /// Node's section public key
+        /// Node's section public key.
         section_pk: BlsPublicKey,
     },
     /// Destination are the nodes of the section whose prefix matches the given name.
     Section {
         /// Name of the Section.
         name: XorName,
-        /// Section's public key
+        /// Section's public key.
         section_pk: BlsPublicKey,
     },
-    /// Destination is a specific node to be directly connected to,
-    /// and so the message is unrouted. The destination's known section key is provided.
+    /// Destination is a specific node to be directly connected to, and so the message is unrouted.
+    ///
+    /// The destination's known section key is provided.
     DirectAndUnrouted(BlsPublicKey),
 }
 
