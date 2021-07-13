@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     client::{
-        ChunkRead, ChunkWrite, ClientMsg, DataCmd, DataExchange, DataQuery, ProcessingError,
+        ChunkRead, ChunkWrite, DataCmd, DataExchange, DataMsg, DataQuery, ProcessingError,
         QueryResponse, SupportingInfo,
     },
     node::NodeMsg,
@@ -235,7 +235,7 @@ pub struct OutgoingMsg {
 #[allow(clippy::large_enum_variant)]
 pub enum MsgType {
     Node(NodeMsg),
-    Client(ClientMsg),
+    Client(DataMsg),
 }
 
 #[derive(Debug, Clone)]

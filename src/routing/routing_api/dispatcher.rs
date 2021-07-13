@@ -261,7 +261,7 @@ impl Dispatcher {
                 }
                 .map_err(|e: Error| e)?
             }
-            MsgKind::ClientMsg(_) => {
+            MsgKind::DataMsg(_) => {
                 // TODO: send them all together without cloning WireMsg
                 // by having the send_on_existing_connection to return SendStatus
                 for (name, addr) in recipients {

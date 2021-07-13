@@ -9,7 +9,7 @@
 use super::Client;
 use crate::client::Error;
 use crate::messaging::{
-    client::{ClientMsg, DataCmd, ProcessMsg},
+    client::{DataCmd, DataMsg, ProcessMsg},
     ClientSigned, WireMsg,
 };
 use crate::types::{PublicKey, Signature};
@@ -42,7 +42,7 @@ impl Client {
     // This function is a helper private to this module.
     pub(crate) async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
         let client_pk = self.public_key();
-        let msg = ClientMsg::Process(ProcessMsg::Cmd(cmd.clone()));
+        let msg = DataMsg::Process(ProcessMsg::Cmd(cmd.clone()));
         let serialised_cmd = WireMsg::serialize_msg_payload(&msg)?;
         let signature = self.keypair.sign(&serialised_cmd);
 

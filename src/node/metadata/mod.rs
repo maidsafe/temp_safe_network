@@ -16,7 +16,7 @@ mod sequence_storage;
 
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    client::{ClientMsg, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg, QueryResponse},
+    client::{CmdError, DataCmd, DataExchange, DataMsg, DataQuery, ProcessMsg, QueryResponse},
     ClientSigned, DstLocation, EndUser, MessageId,
 };
 use crate::node::{
@@ -150,7 +150,7 @@ fn build_client_query_response(
 ) -> OutgoingMsg {
     OutgoingMsg {
         id: MessageId::in_response_to(&correlation_id),
-        msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
+        msg: MsgType::Client(DataMsg::Process(ProcessMsg::QueryResponse {
             response,
             correlation_id,
         })),
@@ -162,7 +162,7 @@ fn build_client_query_response(
 fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUser) -> OutgoingMsg {
     OutgoingMsg {
         id: MessageId::in_response_to(&msg_id),
-        msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
+        msg: MsgType::Client(DataMsg::Process(ProcessMsg::CmdError {
             error,
             correlation_id: msg_id,
         })),

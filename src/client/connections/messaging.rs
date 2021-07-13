@@ -108,7 +108,7 @@ impl Session {
         Ok(())
     }
 
-    /// Send a `ClientMsg` to the network without awaiting for a response.
+    /// Send a `DataMsg` to the network without awaiting for a response.
     pub(crate) async fn send_cmd(
         &self,
         cmd: DataCmd,
@@ -151,7 +151,7 @@ impl Session {
             name: dst_section_name,
             section_pk,
         };
-        let msg_kind = MsgKind::ClientMsg(client_signed);
+        let msg_kind = MsgKind::DataMsg(client_signed);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let msg_bytes = wire_msg.serialize()?;
@@ -191,7 +191,7 @@ impl Session {
         Ok(())
     }
 
-    /// Send a `ClientMsg` to the network awaiting for the response.
+    /// Send a `DataMsg` to the network awaiting for the response.
     pub(crate) async fn send_query(
         &self,
         query: DataQuery,
@@ -219,7 +219,7 @@ impl Session {
             section_pk,
         };
         let msg_id = MessageId::new();
-        let msg_kind = MsgKind::ClientMsg(client_signed);
+        let msg_kind = MsgKind::DataMsg(client_signed);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let msg_bytes = wire_msg.serialize()?;
@@ -297,7 +297,7 @@ impl Session {
                             tokio::time::sleep(std::time::Duration::from_millis(millis)).await
                         }
                     } else {
-                        trace!("ClientMsg with id: {:?}, sent to {}", &msg_id, &socket);
+                        trace!("DataMsg with id: {:?}, sent to {}", &msg_id, &socket);
                         result = Ok(());
                         break;
                     }

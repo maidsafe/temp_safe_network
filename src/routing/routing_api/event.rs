@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    client::ClientMsg,
+    client::DataMsg,
     node::{NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse},
     ClientSigned, DstLocation, EndUser, MessageId, SrcLocation,
 };
@@ -113,11 +113,11 @@ pub enum Event {
         new_keypair: Arc<Keypair>,
     },
     /// Received a message from a client node.
-    ClientMsgReceived {
+    DataMsgReceived {
         /// The message ID
         msg_id: MessageId,
         /// The content of the message.
-        msg: Box<ClientMsg>,
+        msg: Box<DataMsg>,
         /// Client authority
         client_signed: ClientSigned,
         /// The end user that sent the message.
@@ -196,11 +196,11 @@ impl Debug for Event {
                 .field("previous_name", previous_name)
                 .field("new_keypair", new_keypair)
                 .finish(),
-            Self::ClientMsgReceived {
+            Self::DataMsgReceived {
                 msg_id, msg, user, ..
             } => write!(
                 formatter,
-                "ClientMsgReceived {{ msg_id: {}, msg: {:?}, src: {:?} }}",
+                "DataMsgReceived {{ msg_id: {}, msg: {:?}, src: {:?} }}",
                 msg_id, msg, user,
             ),
             Self::AdultsChanged {

@@ -310,7 +310,7 @@ impl<'a> Join<'a> {
             let (join_response, sender, src_name) = match event {
                 ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
-                        MsgKind::ClientMsg(_) | MsgKind::SectionInfoMsg => continue,
+                        MsgKind::DataMsg(_) | MsgKind::SectionInfoMsg => continue,
                         MsgKind::NodeBlsShareSignedMsg(_) | MsgKind::SectionSignedMsg(_) => {
                             self.backlog_message(Command::HandleMessage { sender, wire_msg });
                             continue;

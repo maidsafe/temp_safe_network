@@ -8,8 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    client::ClientMsg, node::NodeMsg, ClientSigned, DstLocation, EndUser, MessageId, MsgKind,
-    WireMsg,
+    client::DataMsg, node::NodeMsg, ClientSigned, DstLocation, EndUser, MessageId, MsgKind, WireMsg,
 };
 use crate::routing::{
     error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
@@ -22,11 +21,11 @@ impl Core {
     pub(crate) async fn handle_client_msg_received(
         &mut self,
         msg_id: MessageId,
-        msg: ClientMsg,
+        msg: DataMsg,
         user: EndUser,
         client_signed: ClientSigned,
     ) -> Result<Vec<Command>> {
-        self.send_event(Event::ClientMsgReceived {
+        self.send_event(Event::DataMsgReceived {
             msg_id,
             msg: Box::new(msg),
             user,
@@ -42,7 +41,7 @@ impl Core {
         sender: SocketAddr,
         msg_id: MessageId,
         client_signed: ClientSigned,
-        msg: ClientMsg,
+        msg: DataMsg,
         dst_location: DstLocation,
         payload: Bytes,
     ) -> Result<Vec<Command>> {
@@ -55,7 +54,7 @@ impl Core {
                             let wire_msg = WireMsg::new_msg(
                                 msg_id,
                                 payload,
-                                MsgKind::ClientMsg(client_signed),
+                                MsgKind::DataMsg(client_signed),
                                 dst_location,
                             )?;
 
@@ -110,7 +109,7 @@ impl Core {
                 .await
         } else {
             // Let's relay the client message then
-            let node_msg = NodeMsg::ForwardClientMsg {
+            let node_msg = NodeMsg::ForwardDataMsg {
                 msg,
                 user,
                 client_signed,

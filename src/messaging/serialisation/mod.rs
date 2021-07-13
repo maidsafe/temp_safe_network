@@ -11,7 +11,7 @@ mod wire_msg_header;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    client::ClientMsg, node::NodeMsg, section_info::SectionInfoMsg, BlsShareSigned, ClientSigned,
+    client::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, BlsShareSigned, ClientSigned,
     DstLocation, MessageId, NodeSigned, SectionSigned,
 };
 use std::fmt::Debug;
@@ -40,7 +40,7 @@ pub enum MessageType {
         /// Message destination location
         dst_location: DstLocation,
         /// the message
-        msg: ClientMsg,
+        msg: DataMsg,
     },
     /// Node to node message
     Node {

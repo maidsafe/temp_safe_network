@@ -49,8 +49,8 @@ use std::{
 /// Messages that a client can send to the network, and their possible responses.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum ClientMsg {
-    /// Messages that a client can send to the network, and their possible responses.
+pub enum DataMsg {
+    /// Data messages that a client or nodes can send, and their possible responses.
     Process(ProcessMsg),
 
     /// A response indicating that the recipient was unable to process a client's message.

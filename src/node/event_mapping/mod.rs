@@ -9,7 +9,7 @@
 mod client_msg;
 mod node_msg;
 
-use crate::messaging::{client::ClientMsg, SrcLocation};
+use crate::messaging::{client::DataMsg, SrcLocation};
 use crate::node::{network::Network, node_ops::NodeDuty};
 use crate::routing::{Event as RoutingEvent, MessageReceived, NodeElderChange, XorName, MIN_AGE};
 use crate::types::PublicKey;
@@ -31,7 +31,7 @@ pub(super) enum MsgContext {
         src: SrcLocation,
     },
     Client {
-        msg: ClientMsg,
+        msg: DataMsg,
         src: SrcLocation,
     },
 }
@@ -46,7 +46,7 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
             dst,
             msg,
         } => map_node_msg(msg_id, src, dst, *msg),
-        RoutingEvent::ClientMsgReceived {
+        RoutingEvent::DataMsgReceived {
             msg_id,
             msg,
             client_signed,

@@ -8,7 +8,7 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    client::ClientMsg, node::NodeMsg, section_info::SectionInfoMsg, DstLocation, Error, MessageId,
+    client::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, DstLocation, Error, MessageId,
     MessageType, MsgKind, NodeMsgAuthority, Result,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -125,8 +125,8 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::ClientMsg(client_signed) => {
-                let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+            MsgKind::DataMsg(client_signed) => {
+                let msg: DataMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Client message payload as Msgpack: {}", err))
                 })?;
 
@@ -240,7 +240,7 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            client::{ChunkRead, ClientMsg, DataQuery, ProcessMsg},
+            client::{ChunkRead, DataMsg, DataQuery, ProcessMsg},
             node::{NodeCmd, NodeMsg, NodeSystemCmd},
             ClientSigned, MessageId, NodeSigned,
         },
@@ -405,7 +405,7 @@ mod tests {
 
         let msg_id = MessageId::new();
 
-        let client_msg = ClientMsg::Process(ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(
+        let client_msg = DataMsg::Process(ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(
             ChunkAddress::Private(XorName::random()),
         ))));
 
@@ -415,7 +415,7 @@ mod tests {
             signature: src_client_keypair.sign(&payload),
         };
 
-        let msg_kind = MsgKind::ClientMsg(client_signed.clone());
+        let msg_kind = MsgKind::DataMsg(client_signed.clone());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
