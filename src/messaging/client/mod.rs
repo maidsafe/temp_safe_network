@@ -6,22 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Client messaging.
-
 mod chunk;
-mod cmd;
 mod data;
 mod data_exchange;
 mod duty;
 mod errors;
 mod map;
-mod query;
 mod register;
 mod sequence;
 
 pub use self::{
     chunk::{ChunkRead, ChunkWrite},
-    cmd::Cmd,
     data::{DataCmd, DataQuery},
     data_exchange::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
@@ -30,39 +25,24 @@ pub use self::{
     duty::{AdultDuties, Duty, NodeDuties},
     errors::{Error, Result},
     map::{MapCmd, MapRead, MapWrite},
-    query::Query,
     register::{RegisterCmd, RegisterRead, RegisterWrite},
     sequence::{SequenceCmd, SequenceRead, SequenceWrite},
 };
 
-use crate::messaging::{MessageId, MessageType, WireMsg};
+use crate::messaging::MessageId;
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey, Sequence,
     SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
-    SequencePublicPolicy, Signature,
+    SequencePublicPolicy,
 };
-use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
 };
-use xor_name::XorName;
 
-/// Public key and signature provided by the client
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct ClientSig {
-    /// Client public key.
-    pub public_key: PublicKey,
-    /// Client signature.
-    pub signature: Signature,
-}
-
-/// Message envelope containing a Safe message payload,
-/// This struct also provides utilities to obtain the serialized bytes
-/// ready to send them over the wire.
+/// Client Message
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ClientMsg {
@@ -86,8 +66,6 @@ pub struct SupportingInfo {
     pub info: SupportingInfoFor,
     /// The original message that triggered the error this update should be correcting
     pub source_message: ProcessMsg,
-    /// MessageId
-    pub id: MessageId,
     /// Correlates to a ProcessingError
     pub correlation_id: MessageId,
 }
@@ -96,43 +74,6 @@ pub struct SupportingInfo {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SupportingInfoFor {}
 
-impl SupportingInfo {
-    /// Construct a wrapper for the given information and metadata.
-    pub fn new(
-        info: SupportingInfoFor,
-        source_message: ProcessMsg,
-        correlation_id: MessageId,
-        id: MessageId,
-    ) -> Self {
-        Self {
-            info,
-            source_message,
-            id,
-            correlation_id,
-        }
-    }
-
-    /// Get msg id
-    pub fn id(&self) -> MessageId {
-        self.id
-    }
-
-    /// Get source message that originally triggered a ProcessingError. This should usually be replayed at source after applying supporting information
-    pub fn source_message(&self) -> &ProcessMsg {
-        &self.source_message
-    }
-
-    /// Get the supporting information of this message
-    pub fn info(&self) -> &SupportingInfoFor {
-        &self.info
-    }
-
-    /// MessageId of the ProcessingError that triggered this InformationUpdate
-    pub fn correlation_id(&self) -> MessageId {
-        self.correlation_id
-    }
-}
-
 /// Our LazyMesssage error. Recipient was unable to process this message for some reason.
 /// The original message should be returned in full, and context can optionally be added via
 /// reason.
@@ -140,92 +81,9 @@ impl SupportingInfo {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProcessingError {
     /// Optional reason for the error. This should help the receiving node handle the error
-    reason: Option<Error>,
+    pub reason: Option<Error>,
     /// Message that triggered this error
-    source_message: Option<ProcessMsg>,
-    /// MessageId
-    id: MessageId,
-}
-
-impl ProcessingError {
-    /// Construct a new error with the given reason and metadata.
-    pub fn new(reason: Option<Error>, source_message: Option<ProcessMsg>, id: MessageId) -> Self {
-        Self {
-            reason,
-            source_message,
-            id,
-        }
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> MessageId {
-        self.id
-    }
-
-    /// Get the [`ProcessMsg`] that caused the error.
-    pub fn source_message(&self) -> &Option<ProcessMsg> {
-        &self.source_message
-    }
-
-    /// The reason the error occurred (supplied by the recipient).
-    pub fn reason(&self) -> &Option<Error> {
-        &self.reason
-    }
-}
-
-impl ClientMsg {
-    /// Convenience function to deserialize a 'Message' from bytes received over the wire.
-    /// It returns an error if the bytes don't correspond to a client message.
-    pub fn from(bytes: Bytes) -> crate::messaging::Result<Self> {
-        let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::Client { msg, .. } = deserialized {
-            Ok(msg)
-        } else {
-            Err(crate::messaging::Error::FailedToParse(
-                "bytes as a client message".to_string(),
-            ))
-        }
-    }
-
-    /// Serialize this Message into bytes ready to be sent over the wire.
-    pub fn serialize(
-        &self,
-        dst: XorName,
-        dst_section_pk: BlsPublicKey,
-    ) -> crate::messaging::Result<Bytes> {
-        WireMsg::serialize_client_msg(self, dst, dst_section_pk)
-    }
-
-    /// Gets the message ID.
-    pub fn id(&self) -> MessageId {
-        match self {
-            Self::Process(ProcessMsg::Cmd { id, .. })
-            | Self::Process(ProcessMsg::Query { id, .. })
-            | Self::Process(ProcessMsg::Event { id, .. })
-            | Self::Process(ProcessMsg::QueryResponse { id, .. })
-            | Self::Process(ProcessMsg::CmdError { id, .. })
-            | Self::ProcessingError(ProcessingError { id, .. }) => *id,
-            Self::SupportingInfo(SupportingInfo { id, .. }) => *id,
-        }
-    }
-
-    /// return ProcessMessage if any
-    pub fn get_process(&self) -> Option<&ProcessMsg> {
-        match self {
-            Self::Process(msg) => Some(msg),
-            Self::ProcessingError(_) => None,
-            Self::SupportingInfo(msg) => Some(&msg.source_message()),
-        }
-    }
-
-    /// return ProcessMessage if any
-    pub fn get_processing_error(&self) -> Option<&ProcessingError> {
-        match self {
-            Self::Process(_) => None,
-            Self::SupportingInfo(_) => None,
-            Self::ProcessingError(error) => Some(error),
-        }
-    }
+    pub source_message: Option<ProcessMsg>,
 }
 
 ///
@@ -235,27 +93,11 @@ pub enum ProcessMsg {
     /// A Cmd is leads to a write / change of state.
     /// We expect them to be successful, and only return a msg
     /// if something went wrong.
-    Cmd {
-        /// Message ID.
-        id: MessageId,
-        /// Cmd.
-        cmd: Cmd,
-        /// Public key and corresponding signature over the command
-        client_sig: ClientSig,
-    },
+    Cmd(DataCmd),
     /// Queries is a read-only operation.
-    Query {
-        /// Message ID.
-        id: MessageId,
-        /// Query.
-        query: Query,
-        /// Public key and corresponding signature over the query
-        client_sig: ClientSig,
-    },
+    Query(DataQuery),
     /// An Event is a fact about something that happened.
     Event {
-        /// Message ID.
-        id: MessageId,
         /// Request.
         event: Event,
         /// ID of causing cmd.
@@ -263,8 +105,6 @@ pub enum ProcessMsg {
     },
     /// The response to a query, containing the query result.
     QueryResponse {
-        /// Message ID.
-        id: MessageId,
         /// QueryResponse.
         response: QueryResponse,
         /// ID of causing query.
@@ -272,37 +112,11 @@ pub enum ProcessMsg {
     },
     /// Cmd error.
     CmdError {
-        /// Message ID.
-        id: MessageId,
         /// The error.
         error: CmdError,
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
-}
-
-impl ProcessMsg {
-    /// Create a [`ProcessingError`] to indicate that this message could not be processed.
-    ///
-    /// Context for the error can optionally be supplied in `reason`.
-    pub fn create_processing_error(&self, reason: Option<Error>) -> ProcessingError {
-        ProcessingError {
-            source_message: Some(self.clone()),
-            id: MessageId::new(),
-            reason,
-        }
-    }
-
-    /// Gets the message ID.
-    pub fn id(&self) -> MessageId {
-        match self {
-            Self::Cmd { id, .. }
-            | Self::Query { id, .. }
-            | Self::Event { id, .. }
-            | Self::QueryResponse { id, .. }
-            | Self::CmdError { id, .. } => *id,
-        }
-    }
 }
 
 ///
@@ -462,6 +276,7 @@ mod tests {
     use crate::types::{ChunkAddress, DataAddress, Keypair, MapKind, MapValue, PrivateChunk};
     use anyhow::{anyhow, Result};
     use std::convert::{TryFrom, TryInto};
+    use xor_name::XorName;
 
     fn gen_keypairs() -> Vec<Keypair> {
         let mut rng = rand::thread_rng();
@@ -476,7 +291,7 @@ mod tests {
         ]
     }
 
-    pub fn gen_keys() -> Vec<PublicKey> {
+    pub(crate) fn gen_keys() -> Vec<PublicKey> {
         gen_keypairs().iter().map(PublicKey::from).collect()
     }
 
@@ -493,66 +308,37 @@ mod tests {
     }
 
     #[test]
-    fn generate_processing_error() -> Result<()> {
-        if let Some(keypair) = gen_keypairs().first() {
-            let public_key = keypair.public_key();
-            let signature = keypair.sign(b"the query");
+    fn generate_processing_error() {
+        let msg = ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
+            XorName::random(),
+        ))));
+        let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
+        let lazy_error = ProcessingError {
+            reason: Some(Error::DataNotFound(random_addr.clone())),
+            source_message: Some(msg),
+        };
 
-            let msg = ProcessMsg::Query {
-                id: MessageId::new(),
-                query: Query::Data(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
-                    XorName::random(),
-                )))),
-                client_sig: ClientSig {
-                    public_key,
-                    signature,
-                },
-            };
-            let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
-            let lazy_error =
-                msg.create_processing_error(Some(Error::DataNotFound(random_addr.clone())));
-
-            assert!(format!("{:?}", lazy_error).contains("Data(Blob(Get(Private"));
-            assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
-            assert!(
-                format!("{:?}", lazy_error).contains(&format!("DataNotFound({:?})", random_addr))
-            );
-
-            Ok(())
-        } else {
-            Err(anyhow!("Could not generate public key"))
-        }
+        assert!(format!("{:?}", lazy_error).contains("Blob(Get(Private"));
+        assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
+        assert!(format!("{:?}", lazy_error).contains(&format!("DataNotFound({:?})", random_addr)));
     }
 
     #[test]
-    fn debug_format_processing_error() -> Result<()> {
-        if let Some(keypair) = gen_keypairs().first() {
-            let public_key = keypair.public_key();
-            let signature = keypair.sign(b"the query");
+    fn debug_format_processing_error() {
+        let chunk_addr = ChunkAddress::Public(XorName::random());
+        let random_addr = DataAddress::Chunk(chunk_addr);
+        let errored_response = ProcessingError {
+            reason: Some(Error::DataNotFound(random_addr.clone())),
+            source_message: Some(ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(
+                chunk_addr,
+            )))),
+        };
 
-            let chunk_addr = ChunkAddress::Public(XorName::random());
-            let random_addr = DataAddress::Chunk(chunk_addr);
-            let errored_response = ProcessingError {
-                reason: Some(Error::DataNotFound(random_addr.clone())),
-                source_message: Some(ProcessMsg::Query {
-                    id: MessageId::new(),
-                    query: Query::Data(DataQuery::Blob(ChunkRead::Get(chunk_addr))),
-                    client_sig: ClientSig {
-                        public_key,
-                        signature,
-                    },
-                }),
-                id: MessageId::new(),
-            };
-
-            assert!(format!("{:?}", errored_response).contains("Data(Blob(Get(Public"));
-            assert!(format!("{:?}", errored_response).contains("ProcessingError"));
-            assert!(format!("{:?}", errored_response)
-                .contains(&format!("DataNotFound({:?})", random_addr)));
-            Ok(())
-        } else {
-            Err(anyhow!("Could not generate public key"))
-        }
+        assert!(format!("{:?}", errored_response).contains("Blob(Get(Public"));
+        assert!(format!("{:?}", errored_response).contains("ProcessingError"));
+        assert!(
+            format!("{:?}", errored_response).contains(&format!("DataNotFound({:?})", random_addr))
+        );
     }
 
     #[test]
@@ -605,34 +391,6 @@ mod tests {
             Err(TryFromError::Response(e.clone())),
             Map::try_from(GetMap(Err(e)))
         );
-        Ok(())
-    }
-
-    #[test]
-    fn serialization() -> Result<()> {
-        let keypair = &gen_keypairs()[0];
-        let public_key = keypair.public_key();
-        let signature = keypair.sign(b"the query");
-
-        let id = MessageId::new();
-        let message = ClientMsg::Process(ProcessMsg::Query {
-            id,
-            query: Query::Data(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
-                XorName::random(),
-            )))),
-            client_sig: ClientSig {
-                public_key,
-                signature,
-            },
-        });
-
-        // test msgpack serialization
-        let dst = XorName::random();
-        let dst_section_pk = bls::SecretKey::random().public_key();
-        let serialized = message.serialize(dst, dst_section_pk)?;
-        let deserialized = ClientMsg::from(serialized)?;
-        assert_eq!(deserialized, message);
-
         Ok(())
     }
 }

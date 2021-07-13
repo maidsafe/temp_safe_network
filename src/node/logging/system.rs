@@ -10,15 +10,15 @@ use sysinfo::{DiskUsage, ProcessExt};
 
 /// Struct containing a process' information.
 #[derive(Debug)]
-pub struct Process {
-    pub memory: u64,
-    pub virtual_memory: u64,
-    pub cpu_usage: f32,
-    pub disk_usage: DiskUsage,
+pub(super) struct Process {
+    pub(super) memory: u64,
+    pub(super) virtual_memory: u64,
+    pub(super) cpu_usage: f32,
+    pub(super) disk_usage: DiskUsage,
 }
 
 impl Process {
-    pub fn map(process: &sysinfo::Process, processors: usize) -> Process {
+    pub(super) fn map(process: &sysinfo::Process, processors: usize) -> Process {
         let usage = process.disk_usage();
         Process {
             memory: process.memory(),

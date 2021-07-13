@@ -6,22 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::SectionAuthorityProviderUtils;
+use super::node_state::NodeStateUtils;
 use crate::messaging::{
     node::{MembershipState, NodeState, Peer, SectionPeers, SectionSigned},
     SectionAuthorityProvider,
 };
-use crate::routing::{peer::PeerUtils, section::NodeStateUtils};
+use crate::routing::{peer::PeerUtils, SectionAuthorityProviderUtils};
 use itertools::Itertools;
-use std::{
-    cmp::Ordering,
-    collections::btree_map::{self, Entry},
-    mem,
-};
+use std::{cmp::Ordering, collections::btree_map::Entry, mem};
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about members of our section.
-pub trait SectionPeersUtils {
+pub(crate) trait SectionPeersUtils {
     /// Returns an iterator over all current (joined) and past (left) members.
     fn all(&self) -> Box<dyn Iterator<Item = &NodeState> + '_>;
 
@@ -175,16 +171,6 @@ impl SectionPeersUtils for SectionPeers {
             .into_iter()
             .filter(|(name, _)| prefix.matches(name))
             .collect();
-    }
-}
-
-pub struct IntoIter(btree_map::IntoIter<XorName, SectionSigned<NodeState>>);
-
-impl Iterator for IntoIter {
-    type Item = SectionSigned<NodeState>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(_, info)| info)
     }
 }
 

@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//mod data_store;
-
 use super::node_ops::{MsgType, OutgoingMsg};
 use crate::dbs::{Data, DataId, DataStore, Subdir, UsedSpace};
 use crate::node::{
@@ -19,11 +17,12 @@ use crate::{
     messaging::{
         client::{ChunkRead, ChunkWrite, Error as ErrorMessage},
         node::{NodeDataQueryResponse, NodeMsg, NodeQueryResponse},
-        Aggregation, DstLocation, MessageId,
+        DstLocation, MessageId,
     },
     node::Error,
     types::DataAddress,
 };
+use bls::PublicKey as BlsPublicKey;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -31,7 +30,7 @@ use std::{
 use tracing::info;
 
 /// At 50% full, the node will report that it's reaching full capacity.
-pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;
+pub(super) const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;
 
 impl Data for Chunk {
     type Id = ChunkAddress;
@@ -61,28 +60,33 @@ pub(crate) struct ChunkStore {
 }
 
 impl ChunkStore {
-    pub async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub(crate) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             store: DataStore::<Chunk>::new(path, used_space).await?,
         })
     }
 
-    pub async fn keys(&self) -> Result<Vec<ChunkAddress>> {
+    pub(crate) async fn keys(&self) -> Result<Vec<ChunkAddress>> {
         self.store.keys().await.map_err(Error::from)
     }
 
-    pub async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
+    pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         self.store.delete(address).await.map_err(Error::from)
     }
 
-    pub async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
+    pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         self.store
             .get(address)
             .await
             .map_err(|_| Error::NoSuchData(DataAddress::Chunk(*address)))
     }
 
-    pub async fn read(&self, read: &ChunkRead, msg_id: MessageId) -> NodeDuty {
+    pub(crate) async fn read(
+        &self,
+        read: &ChunkRead,
+        msg_id: MessageId,
+        section_pk: BlsPublicKey,
+    ) -> NodeDuty {
         let ChunkRead::Get(address) = read;
         let result = self
             .get_chunk(address)
@@ -90,18 +94,20 @@ impl ChunkStore {
             .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Chunk(*address)));
 
         NodeDuty::Send(OutgoingMsg {
+            id: MessageId::in_response_to(&msg_id),
             msg: MsgType::Node(NodeMsg::NodeQueryResponse {
                 response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
-                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
             }),
-            section_source: false, // sent as single node
-            dst: DstLocation::Section(*address.name()),
-            aggregation: Aggregation::None,
+            dst: DstLocation::Section {
+                name: *address.name(),
+                section_pk,
+            },
+            aggregation: false,
         })
     }
 
-    pub async fn write(
+    pub(crate) async fn write(
         &self,
         write: &ChunkWrite,
         msg_id: MessageId,
@@ -162,7 +168,7 @@ impl ChunkStore {
     }
 
     // TODO: this is redundant, see if it can be omitted
-    pub async fn check_storage(&self) -> Result<NodeDuties> {
+    pub(crate) async fn check_storage(&self) -> Result<NodeDuties> {
         info!("Checking used storage");
         if self.store.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
             Ok(NodeDuties::from(NodeDuty::ReachingMaxCapacity))
@@ -172,7 +178,7 @@ impl ChunkStore {
     }
 
     /// Stores a chunk that Elders sent to it for replication.
-    pub async fn store_for_replication(&self, chunk: Chunk) -> Result<NodeDuty> {
+    pub(crate) async fn store_for_replication(&self, chunk: Chunk) -> Result<NodeDuty> {
         if self.store.has(chunk.address()).await? {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",

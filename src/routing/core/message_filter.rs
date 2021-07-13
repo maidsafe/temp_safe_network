@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{node::RoutingMsg, DstLocation, MessageId};
+use crate::messaging::{DstLocation, MessageId, WireMsg};
 use crate::routing::cache::Cache;
 use std::time::Duration;
 use xor_name::XorName;
@@ -17,7 +17,7 @@ const MAX_ENTRIES: usize = 15_000;
 
 /// An enum representing a result of message filtering
 #[derive(Eq, PartialEq)]
-pub enum FilteringResult {
+pub(crate) enum FilteringResult {
     /// We don't have the message in the filter yet
     NewMessage,
     /// We have the message in the filter
@@ -25,7 +25,7 @@ pub enum FilteringResult {
 }
 
 impl FilteringResult {
-    pub fn is_new(&self) -> bool {
+    pub(crate) fn is_new(&self) -> bool {
         match self {
             Self::NewMessage => true,
             Self::KnownMessage => false,
@@ -40,7 +40,7 @@ pub(crate) struct MessageFilter {
 }
 
 impl MessageFilter {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             incoming: Cache::with_expiry_duration_and_capacity(
                 INCOMING_EXPIRY_DURATION,
@@ -56,19 +56,23 @@ impl MessageFilter {
     // Filter outgoing `SNRoutingMessage`. Return whether this specific message has been seen recently
     // (and thus should not be sent, due to deduplication).
     //
-    pub async fn filter_outgoing(&self, msg: &RoutingMsg, pub_id: &XorName) -> FilteringResult {
+    pub(crate) async fn filter_outgoing(
+        &self,
+        wire_msg: &WireMsg,
+        pub_id: &XorName,
+    ) -> FilteringResult {
         // Not filtering direct messages.
-        if let DstLocation::DirectAndUnrouted = msg.dst {
+        if let DstLocation::DirectAndUnrouted(_) = wire_msg.dst_location() {
             return FilteringResult::NewMessage;
         }
 
         if self
             .outgoing
-            .set((msg.id, *pub_id), (), None)
+            .set((wire_msg.msg_id(), *pub_id), (), None)
             .await
             .is_some()
         {
-            trace!("Outgoing message filtered: {:?}", msg.id);
+            trace!("Outgoing message filtered: {:?}", wire_msg.msg_id());
             FilteringResult::KnownMessage
         } else {
             FilteringResult::NewMessage
@@ -76,8 +80,8 @@ impl MessageFilter {
     }
 
     // Returns `true` if not already having it.
-    pub async fn add_to_filter(&self, msg_id: &MessageId) -> bool {
-        let cur_value = self.incoming.set(*msg_id, (), None).await;
+    pub(crate) async fn add_to_filter(&self, msg_id: MessageId) -> bool {
+        let cur_value = self.incoming.set(msg_id, (), None).await;
 
         if cur_value.is_some() {
             trace!("Incoming message filtered: {:?}", msg_id);
@@ -87,7 +91,7 @@ impl MessageFilter {
     }
 
     // Resets both incoming and outgoing filters.
-    pub async fn reset(&mut self) {
+    pub(crate) async fn reset(&mut self) {
         self.incoming.clear().await;
         self.outgoing.clear().await;
     }

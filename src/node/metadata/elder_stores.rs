@@ -11,8 +11,8 @@ use super::{
     sequence_storage::SequenceStorage,
 };
 use crate::messaging::{
-    client::{ClientSig, DataCmd, DataExchange, DataQuery, MapCmd, RegisterCmd, SequenceCmd},
-    EndUser, MessageId,
+    client::{DataCmd, DataExchange, DataQuery, MapCmd, RegisterCmd, SequenceCmd},
+    ClientSigned, EndUser, MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Error, Result};
 use crate::routing::Prefix;
@@ -29,7 +29,7 @@ pub(super) struct ElderStores {
 }
 
 impl ElderStores {
-    pub fn new(
+    pub(super) fn new(
         chunk_records: ChunkRecords,
         map_storage: MapStorage,
         sequence_storage: SequenceStorage,
@@ -43,7 +43,7 @@ impl ElderStores {
         }
     }
 
-    pub async fn read(
+    pub(super) async fn read(
         &self,
         query: DataQuery,
         msg_id: MessageId,
@@ -66,11 +66,11 @@ impl ElderStores {
         }
     }
 
-    pub async fn write(
+    pub(super) async fn write(
         &mut self,
         cmd: DataCmd,
         msg_id: MessageId,
-        client_sig: ClientSig,
+        client_sig: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         info!("Writing Data");
@@ -117,12 +117,12 @@ impl ElderStores {
         }
     }
 
-    pub fn chunk_records(&self) -> &ChunkRecords {
+    pub(super) fn chunk_records(&self) -> &ChunkRecords {
         &self.chunk_records
     }
 
     // NB: Not yet including Register metadata.
-    pub async fn get_data_of(&self, prefix: Prefix) -> Result<DataExchange> {
+    pub(super) async fn get_data_of(&self, prefix: Prefix) -> Result<DataExchange> {
         // Prepare chunk_records, map and sequence data
         let chunk_data = self.chunk_records.get_data_of(prefix).await;
         let map_data = self.map_storage.get_data_of(prefix).await?;
@@ -137,7 +137,7 @@ impl ElderStores {
         })
     }
 
-    pub async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
+    pub(super) async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
         // todo: all this can be done in parallel
         self.map_storage.update(data.map_data).await?;
         self.register_storage.update(data.reg_data).await?;

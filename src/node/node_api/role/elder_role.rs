@@ -13,13 +13,13 @@ use tokio::sync::RwLock;
 #[derive(Clone)]
 pub(crate) struct ElderRole {
     // data operations
-    pub meta_data: Arc<RwLock<Metadata>>,
+    pub(crate) meta_data: Arc<RwLock<Metadata>>,
     // denotes if we received initial sync
-    pub received_initial_sync: Arc<RwLock<bool>>,
+    pub(crate) received_initial_sync: Arc<RwLock<bool>>,
 }
 
 impl ElderRole {
-    pub fn new(meta_data: Metadata, received_initial_sync: bool) -> Self {
+    pub(crate) fn new(meta_data: Metadata, received_initial_sync: bool) -> Self {
         ElderRole {
             meta_data: Arc::new(RwLock::new(meta_data)),
             received_initial_sync: Arc::new(RwLock::new(received_initial_sync)),

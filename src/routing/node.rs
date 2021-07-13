@@ -19,32 +19,32 @@ use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Information and state of our node
 #[derive(Clone)]
-pub struct Node {
+pub(crate) struct Node {
     // Keep the secret key in Arc to allow Clone while also preventing multiple copies to exist in
     // memory which might be insecure.
     // TODO: find a way to not require `Clone`.
-    pub keypair: Arc<Keypair>,
-    pub addr: SocketAddr,
+    pub(crate) keypair: Arc<Keypair>,
+    pub(crate) addr: SocketAddr,
 }
 
 impl Node {
-    pub fn new(keypair: Keypair, addr: SocketAddr) -> Self {
+    pub(crate) fn new(keypair: Keypair, addr: SocketAddr) -> Self {
         Self {
             keypair: Arc::new(keypair),
             addr,
         }
     }
 
-    pub fn peer(&self) -> Peer {
+    pub(crate) fn peer(&self) -> Peer {
         Peer::new(self.name(), self.addr)
     }
 
-    pub fn name(&self) -> XorName {
+    pub(crate) fn name(&self) -> XorName {
         XorName::from(PublicKey::from(self.keypair.public))
     }
 
     // Last byte of the name represents the age.
-    pub fn age(&self) -> u8 {
+    pub(crate) fn age(&self) -> u8 {
         self.name()[XOR_NAME_LEN - 1]
     }
 }

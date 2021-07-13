@@ -6,14 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::client::ClientMsg;
 use crate::messaging::{
     client::{
-        ChunkRead, ChunkWrite, ClientSig, DataCmd, DataExchange, DataQuery, ProcessingError,
+        ChunkRead, ChunkWrite, ClientMsg, DataCmd, DataExchange, DataQuery, ProcessingError,
         QueryResponse, SupportingInfo,
     },
     node::NodeMsg,
-    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
+    ClientSigned, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use crate::routing::Prefix;
 use crate::types::{Chunk, PublicKey};
@@ -37,23 +36,23 @@ use xor_name::XorName;
 /// and is sent on the wire to some other dst(s) on the network.
 
 /// Vec of NodeDuty
-pub type NodeDuties = Vec<NodeDuty>;
+pub(super) type NodeDuties = Vec<NodeDuty>;
 
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
     ReadChunk {
-        read: ChunkRead,
         msg_id: MessageId,
+        read: ChunkRead,
     },
     WriteChunk {
-        write: ChunkWrite,
         msg_id: MessageId,
-        client_sig: ClientSig,
+        write: ChunkWrite,
+        client_signed: ClientSigned,
     },
     ProcessRepublish {
-        chunk: Chunk,
         msg_id: MessageId,
+        chunk: Chunk,
     },
     /// Run at data-section Elders on receiving the result of
     /// read operations from Adults
@@ -133,29 +132,30 @@ pub enum NodeDuty {
     SendSupport(OutgoingSupportingInfo),
     /// Send the same request to each individual node.
     SendToNodes {
+        msg_id: MessageId,
         msg: NodeMsg,
         targets: BTreeSet<XorName>,
-        aggregation: Aggregation,
+        aggregation: bool,
     },
     /// Process read of data
     ProcessRead {
-        query: DataQuery,
         msg_id: MessageId,
-        client_sig: ClientSig,
+        query: DataQuery,
+        client_signed: ClientSigned,
         origin: EndUser,
     },
     /// Process write of data
     ProcessWrite {
-        cmd: DataCmd,
         msg_id: MessageId,
-        client_sig: ClientSig,
+        cmd: DataCmd,
+        client_signed: ClientSigned,
         origin: EndUser,
     },
     /// Receive a chunk that is being replicated.
     /// This is run at an Adult (the new holder).
     ReplicateChunk {
-        chunk: Chunk,
         msg_id: MessageId,
+        chunk: Chunk,
     },
     /// Create proposals to vote unresponsive nodes as offline
     ProposeOffline(Vec<XorName>),
@@ -204,13 +204,14 @@ impl Debug for NodeDuty {
             Self::SendError(msg) => write!(f, "SendError [ msg: {:?} ]", msg),
             Self::SendSupport(msg) => write!(f, "SendSupport [ msg: {:?} ]", msg),
             Self::SendToNodes {
+                msg_id,
                 msg,
                 targets,
                 aggregation,
             } => write!(
                 f,
-                "SendToNodes [ msg: {:?}, targets: {:?}, aggregation: {:?} ]",
-                msg, targets, aggregation
+                "SendToNodes [ msg_id: {}, msg: {:?}, targets: {:?}, aggregation: {:?} ]",
+                msg_id, msg, targets, aggregation
             ),
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
@@ -224,10 +225,10 @@ impl Debug for NodeDuty {
 
 #[derive(Debug, Clone)]
 pub struct OutgoingMsg {
+    pub id: MessageId,
     pub msg: MsgType,
     pub dst: DstLocation,
-    pub section_source: bool,
-    pub aggregation: Aggregation,
+    pub aggregation: bool,
 }
 
 #[derive(Debug, Clone)]

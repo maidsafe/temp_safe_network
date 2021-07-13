@@ -9,11 +9,13 @@
 use super::{QueryResult, Session};
 use crate::client::Error;
 use crate::messaging::{
-    client::{ChunkRead, ClientMsg, ClientSig, Cmd, DataQuery, ProcessMsg, Query, QueryResponse},
+    client::{ChunkRead, DataCmd, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
-    MessageId,
+    ClientSigned, MessageId, WireMsg,
 };
+use crate::messaging::{DstLocation, MsgKind};
 use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
+use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
@@ -109,34 +111,31 @@ impl Session {
     /// Send a `ClientMsg` to the network without awaiting for a response.
     pub(crate) async fn send_cmd(
         &self,
-        cmd: Cmd,
-        client_sig: ClientSig,
-        send_to_specific_elder: Option<SocketAddr>,
+        cmd: DataCmd,
+        client_signed: ClientSigned,
+        payload: Bytes,
     ) -> Result<(), Error> {
-        let msg_id = MessageId::new();
         let endpoint = self.endpoint()?.clone();
 
-        let elders = if let Some(socket) = send_to_specific_elder {
-            vec![socket]
-        } else {
-            self.connected_elders
-                .read()
-                .await
-                .keys()
-                .cloned()
-                .collect::<Vec<SocketAddr>>()
-        };
+        let elders = self
+            .connected_elders
+            .read()
+            .await
+            .keys()
+            .cloned()
+            .collect::<Vec<SocketAddr>>();
 
+        let msg_id = MessageId::new();
         debug!(
-            "Sending command w/id {:?}, to {} Elders",
+            "Sending command w/id {:?}, from {}, to {} Elders",
             msg_id,
+            endpoint.socket_addr(),
             elders.len()
         );
 
-        let src_addr = endpoint.socket_addr();
         trace!(
             "Sending (from {}) command message {:?} w/ id: {:?}",
-            src_addr,
+            endpoint.socket_addr(),
             cmd,
             msg_id
         );
@@ -146,15 +145,16 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
+
         let dst_section_name = cmd.dst_address();
+        let dst_location = DstLocation::Section {
+            name: dst_section_name,
+            section_pk,
+        };
+        let msg_kind = MsgKind::ClientMsg(client_signed);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        let msg = ClientMsg::Process(ProcessMsg::Cmd {
-            id: msg_id,
-            cmd,
-            client_sig,
-        });
-
-        let msg_bytes = msg.serialize(dst_section_name, section_pk)?;
+        let msg_bytes = wire_msg.serialize()?;
 
         // Send message to all Elders concurrently
         let mut tasks = Vec::default();
@@ -191,18 +191,17 @@ impl Session {
         Ok(())
     }
 
-    /// Send a Query `ClientMsg` to the network awaiting for the response.
+    /// Send a `ClientMsg` to the network awaiting for the response.
     pub(crate) async fn send_query(
         &self,
-        query: Query,
-        client_sig: ClientSig,
+        query: DataQuery,
+        client_signed: ClientSigned,
+        payload: Bytes,
     ) -> Result<QueryResult, Error> {
-        let data_name = query.dst_address();
-
         let endpoint = self.endpoint()?.clone();
         let pending_queries = self.pending_queries.clone();
 
-        let chunk_addr = if let Query::Data(DataQuery::Blob(ChunkRead::Get(address))) = query {
+        let chunk_addr = if let DataQuery::Blob(ChunkRead::Get(address)) = query {
             Some(address)
         } else {
             None
@@ -214,15 +213,16 @@ impl Session {
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
 
+        let data_name = query.dst_address();
+        let dst_location = DstLocation::Section {
+            name: data_name,
+            section_pk,
+        };
         let msg_id = MessageId::new();
-        let msg = ClientMsg::Process(ProcessMsg::Query {
-            id: msg_id,
-            query,
-            client_sig,
-        });
+        let msg_kind = MsgKind::ClientMsg(client_signed);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        let dst_section_name = data_name;
-        let msg_bytes = msg.serialize(dst_section_name, section_pk)?;
+        let msg_bytes = wire_msg.serialize()?;
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest
         // connected Elders to the data we are querying
@@ -247,8 +247,12 @@ impl Session {
         }
 
         debug!(
-            "Sending query message {:?}, to the {} Elders closest to data name: {:?}",
-            msg, elders_len, elders
+            "Sending query message {:?}, msg_id: {}, from {}, to the {} Elders closest to data name: {:?}",
+            query,
+            msg_id,
+            endpoint.socket_addr(),
+            elders_len,
+            elders
         );
 
         // We send the same message to all Elders concurrently
@@ -437,11 +441,27 @@ impl Session {
         // FIXME: we don't know our section PK. We must supply a pk for now we do a random one...
         let random_section_pk = bls::SecretKey::random().public_key();
 
-        let msg = SectionInfoMsg::GetSectionQuery(client_pk)
-            .serialize(dst_section_name, random_section_pk)?;
+        let msg_id = MessageId::new();
+        let query = SectionInfoMsg::GetSectionQuery(client_pk);
+        let payload = WireMsg::serialize_msg_payload(&query)?;
+        let msg_kind = MsgKind::SectionInfoMsg;
+        let dst_location = DstLocation::Section {
+            name: dst_section_name,
+            section_pk: random_section_pk,
+        };
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let msg_bytes = wire_msg.serialize()?;
+
+        debug!(
+            "Sending query message {:?}, msg_id {}, from {}, to bootstrapped node {} ",
+            query,
+            msg_id,
+            self.endpoint()?.socket_addr(),
+            bootstrapped_peer
+        );
 
         self.endpoint()?
-            .send_message(msg, bootstrapped_peer)
+            .send_message(msg_bytes, bootstrapped_peer)
             .await?;
 
         Ok(())

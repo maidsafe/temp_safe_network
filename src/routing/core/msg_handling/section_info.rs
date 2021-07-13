@@ -8,17 +8,13 @@
 
 use super::super::Core;
 use crate::messaging::{
-    node::{RoutingMsg, Variant},
+    node::NodeMsg,
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DstInfo, DstLocation, MessageType, SectionAuthorityProvider,
+    DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
-    error::Result,
-    messages::RoutingMsgUtils,
-    network::NetworkUtils,
-    peer::PeerUtils,
-    routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
+    error::Result, network::NetworkUtils, peer::PeerUtils, routing_api::command::Command,
+    section::SectionUtils, SectionAuthorityProviderUtils,
 };
 use std::net::SocketAddr;
 use xor_name::XorName;
@@ -28,16 +24,9 @@ impl Core {
     pub(crate) async fn handle_section_info_msg(
         &mut self,
         sender: SocketAddr,
+        mut dst_location: DstLocation,
         message: SectionInfoMsg,
-        dst_info: DstInfo, // The DstInfo contains the XorName of the sender and a random PK during the initial SectionQuery,
     ) -> Vec<Command> {
-        // Provide our PK as the dst PK, only redundant as the message
-        // itself contains details regarding relocation/registration.
-        let dst_info = DstInfo {
-            dst: dst_info.dst,
-            dst_section_pk: *self.section().chain().last_key(),
-        };
-
         match message {
             SectionInfoMsg::GetSectionQuery(public_key) => {
                 let name = XorName::from(public_key);
@@ -70,14 +59,21 @@ impl Core {
                 let response = SectionInfoMsg::GetSectionResponse(response);
                 debug!("Sending {:?} to {}", response, sender);
 
-                vec![Command::SendMessage {
-                    recipients: vec![(name, sender)],
-                    delivery_group_size: 1,
-                    message: MessageType::SectionInfo {
-                        msg: response,
-                        dst_info,
-                    },
-                }]
+                // Provide our PK as the dst PK, only redundant as the message
+                // itself contains details regarding relocation/registration.
+                dst_location.set_section_pk(*self.section().chain().last_key());
+
+                match WireMsg::new_section_info_msg(&response, dst_location) {
+                    Ok(wire_msg) => vec![Command::SendMessage {
+                        recipients: vec![(name, sender)],
+                        delivery_group_size: 1,
+                        wire_msg,
+                    }],
+                    Err(err) => {
+                        error!("Failed to build section info response msg: {:?}", err);
+                        vec![]
+                    }
+                }
             }
             SectionInfoMsg::GetSectionResponse(response) => {
                 error!("GetSectionResponse unexpectedly received: {:?}", response);
@@ -89,10 +85,9 @@ impl Core {
     pub(crate) fn handle_section_knowledge_query(
         &self,
         given_key: Option<bls::PublicKey>,
-        msg: Box<RoutingMsg>,
+        returned_msg: Box<NodeMsg>,
         sender: SocketAddr,
         src_name: XorName,
-        dst_location: DstLocation,
     ) -> Result<Command> {
         let chain = self.section.chain();
         let given_key = if let Some(key) = given_key {
@@ -102,25 +97,15 @@ impl Core {
         };
         let truncated_chain = chain.get_proof_chain_to_current(&given_key)?;
         let section_auth = self.section.section_signed_authority_provider();
-        let variant = Variant::SectionKnowledge {
-            src_info: (section_auth.clone(), truncated_chain),
-            msg: Some(msg),
-        };
 
-        let msg = RoutingMsg::single_src(
-            self.node(),
-            dst_location,
-            variant,
-            self.section.authority_provider().section_key(),
-        )?;
-        let key = self.section_key_by_name(&src_name);
-        Ok(Command::send_message_to_node(
-            (src_name, sender),
-            msg,
-            DstInfo {
-                dst: src_name,
-                dst_section_pk: key,
-            },
-        ))
+        let node_msg = NodeMsg::SectionKnowledge {
+            src_info: (section_auth.clone(), truncated_chain),
+            msg: Some(returned_msg),
+        };
+        let dst_section_key = self.section_key_by_name(&src_name);
+
+        let cmd = self.send_direct_message((src_name, sender), node_msg, dst_section_key)?;
+
+        Ok(cmd)
     }
 }

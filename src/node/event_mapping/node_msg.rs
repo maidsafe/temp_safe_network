@@ -13,32 +13,33 @@ use crate::messaging::{
         NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeSystemCmd,
         NodeSystemQuery,
     },
-    Aggregation, DstLocation, MessageId, SrcLocation,
+    DstLocation, MessageId, SrcLocation,
 };
 use crate::node::{
     error::convert_to_error_message,
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error,
 };
+use crate::routing::MessageReceived;
 use tracing::debug;
 
-pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
+pub(super) fn map_node_msg(
+    msg_id: MessageId,
+    src: SrcLocation,
+    dst: DstLocation,
+    msg: MessageReceived,
+) -> Mapping {
     debug!(
         "Handling Node message received event with id {}: {:?}",
-        msg.id(),
-        msg
+        msg_id, msg
     );
 
-    match &dst {
-        DstLocation::Section(_) | DstLocation::Node(_) => Mapping {
-            op: match_node_msg(msg.clone(), src),
-            ctx: Some(MsgContext {
-                msg: MsgType::Node(msg),
-                src,
-            }),
+    match dst {
+        DstLocation::Section { .. } | DstLocation::Node { .. } => Mapping {
+            op: match_node_msg(msg_id, msg.clone(), src),
+            ctx: Some(MsgContext::Node { msg, src }),
         },
         _ => {
-            let msg_id = msg.id();
             let error = convert_to_error_message(Error::InvalidMessage(
                 msg_id,
                 format!("Invalid dst: {:?}", msg),
@@ -54,136 +55,102 @@ pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping
 
             Mapping {
                 op: NodeDuty::Send(OutgoingMsg {
+                    id: MessageId::in_response_to(&msg_id),
                     msg: MsgType::Node(NodeMsg::NodeMsgError {
                         error,
-                        id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
                     }),
-                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: src.to_dst(),
-                    aggregation: Aggregation::AtDestination,
+                    aggregation: true,
                 }),
-                ctx: Some(MsgContext {
-                    msg: MsgType::Node(msg),
-                    src,
-                }),
+                ctx: Some(MsgContext::Node { msg, src }),
             }
         }
     }
 }
 
-fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
+fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) -> NodeDuty {
     match msg {
         // Churn synch
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData { metadata }),
-            ..
-        } => NodeDuty::SynchState { metadata },
+        MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
+            metadata,
+        })) => NodeDuty::SynchState { metadata },
         // ------ metadata ------
-        NodeMsg::NodeQuery {
-            query:
-                NodeQuery::Metadata {
-                    query,
-                    client_sig,
-                    origin,
-                },
-            id,
-            ..
-        } => {
+        MessageReceived::NodeQuery(NodeQuery::Metadata {
+            query,
+            client_signed,
+            origin,
+        }) => {
             // FIXME: ******** validate client signature!!!! *********
             NodeDuty::ProcessRead {
                 query,
-                msg_id: id,
-                client_sig,
+                msg_id,
+                client_signed,
                 origin,
             }
         }
-        NodeMsg::NodeCmd {
-            cmd:
-                NodeCmd::Metadata {
-                    cmd,
-                    client_sig,
-                    origin,
-                },
-            id,
-            ..
-        } => {
-            // FIXME: ******** validate client signature!!!! *********
-            NodeDuty::ProcessWrite {
-                cmd,
-                msg_id: id,
-                client_sig,
-                origin,
-            }
-        }
+        MessageReceived::NodeCmd(NodeCmd::Metadata {
+            cmd,
+            client_signed,
+            origin,
+        }) => NodeDuty::ProcessWrite {
+            cmd,
+            msg_id,
+            client_signed,
+            origin,
+        },
         //
         // ------ Adult ------
-        NodeMsg::NodeQuery {
-            query: NodeQuery::Chunks { query, .. },
-            id,
-            ..
-        } => NodeDuty::ReadChunk {
+        MessageReceived::NodeQuery(NodeQuery::Chunks { query, .. }) => NodeDuty::ReadChunk {
             read: query,
-            msg_id: id,
+            msg_id,
         },
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::Chunks {
-                cmd, client_sig, ..
-            },
-            id,
-            ..
-        } => NodeDuty::WriteChunk {
+        MessageReceived::NodeCmd(NodeCmd::Chunks {
+            cmd, client_signed, ..
+        }) => NodeDuty::WriteChunk {
             write: cmd,
-            msg_id: id,
-            client_sig,
+            msg_id,
+            client_signed,
         },
         // this cmd is accumulated, thus has authority
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk)),
-            id,
-        } => NodeDuty::ReplicateChunk { chunk, msg_id: id },
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk)),
-            id,
-        } => NodeDuty::ProcessRepublish { chunk, msg_id: id },
+        MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk))) => {
+            NodeDuty::ReplicateChunk { chunk, msg_id }
+        }
+        MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk))) => {
+            NodeDuty::ProcessRepublish { chunk, msg_id }
+        }
         // Aggregated by us, for security
-        NodeMsg::NodeQuery {
-            query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
-            id,
-            ..
-        } => NodeDuty::GetSectionElders { msg_id: id, origin },
+        MessageReceived::NodeQuery(NodeQuery::System(NodeSystemQuery::GetSectionElders)) => {
+            NodeDuty::GetSectionElders { msg_id, origin }
+        }
         //
         // ------ system cmd ------
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::StorageFull { node_id, .. }),
-            ..
-        } => NodeDuty::IncrementFullNodeCount { node_id },
+        MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::StorageFull {
+            node_id, ..
+        })) => NodeDuty::IncrementFullNodeCount { node_id },
         // --- Adult Operation response ---
-        NodeMsg::NodeQueryResponse {
+        MessageReceived::NodeQueryResponse {
             response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(res)),
             correlation_id,
-            ..
         } => NodeDuty::RecordAdultReadLiveness {
             response: QueryResponse::GetChunk(res),
             correlation_id,
             src: origin.name(),
         },
         _ => {
-            let msg_id = msg.id();
             let error = convert_to_error_message(Error::InvalidMessage(
                 msg_id,
                 format!("Invalid dst: {:?}", msg),
             ));
 
             NodeDuty::Send(OutgoingMsg {
+                id: MessageId::in_response_to(&msg_id),
                 msg: MsgType::Node(NodeMsg::NodeMsgError {
                     error,
-                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                 }),
-                section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                 dst: origin.to_dst(),
-                aggregation: Aggregation::AtDestination,
+                aggregation: true,
             })
         }
     }

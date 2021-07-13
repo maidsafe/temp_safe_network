@@ -12,13 +12,13 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[derive(Clone, Default)]
-pub struct AdultsStorageInfo {
-    pub full_adults: Arc<RwLock<BTreeSet<XorName>>>,
+pub(crate) struct AdultsStorageInfo {
+    pub(crate) full_adults: Arc<RwLock<BTreeSet<XorName>>>,
 }
 
 impl AdultsStorageInfo {
     ///
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let full_adults = Arc::new(RwLock::new(BTreeSet::new()));
         Self { full_adults }
     }

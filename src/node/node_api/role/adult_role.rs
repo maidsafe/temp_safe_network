@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     node::{NodeCmd, NodeMsg, NodeSystemCmd},
-    Aggregation, MessageId,
+    MessageId,
 };
 use crate::node::{
     capacity::CHUNK_COPY_COUNT,
@@ -26,11 +26,11 @@ use tracing::{info, trace, warn};
 #[derive(Clone)]
 pub(crate) struct AdultRole {
     // immutable chunks
-    pub chunks: Arc<ChunkStore>,
+    pub(crate) chunks: Arc<ChunkStore>,
 }
 
 impl AdultRole {
-    pub async fn reorganize_chunks(
+    pub(crate) async fn reorganize_chunks(
         &self,
         our_name: XorName,
         new_adults: BTreeSet<XorName>,
@@ -50,12 +50,10 @@ impl AdultRole {
         Ok(data_for_replication
             .into_iter()
             .map(|(data, targets)| NodeDuty::SendToNodes {
-                msg: NodeMsg::NodeCmd {
-                    cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
-                    id: MessageId::new(),
-                },
+                msg_id: MessageId::new(),
+                msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(data))),
                 targets,
-                aggregation: Aggregation::None,
+                aggregation: false,
             })
             .collect::<Vec<_>>())
     }

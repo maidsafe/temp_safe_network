@@ -6,13 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{KeyedSig, SigShare, SignatureAggregator};
+use super::{KeyedSig, SigShare};
 use crate::messaging::node::Proposal;
-use crate::routing::{error::Result, messages::PlainMessageUtils};
+use crate::routing::{
+    core::{AggregatorError, SignatureAggregator},
+    error::Result,
+};
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 
-pub trait ProposalUtils {
+pub(crate) trait ProposalUtils {
     fn prove(
         &self,
         public_key_set: bls::PublicKeySet,
@@ -45,7 +48,7 @@ impl ProposalUtils for Proposal {
 }
 
 // View of a `Proposal` that can be serialized for the purpose of signing.
-pub struct SignableView<'a>(pub &'a Proposal);
+pub(crate) struct SignableView<'a>(pub(crate) &'a Proposal);
 
 impl<'a> Serialize for SignableView<'a> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -54,11 +57,6 @@ impl<'a> Serialize for SignableView<'a> {
             Proposal::Offline(node_state) => node_state.serialize(serializer),
             Proposal::SectionInfo(info) => info.serialize(serializer),
             Proposal::OurElders(info) => info.sig.public_key.serialize(serializer),
-            // Proposal::TheirKey { prefix, key } => (prefix, key).serialize(serializer),
-            // Proposal::TheirKnowledge { prefix, key } => (prefix, key).serialize(serializer),
-            Proposal::AccumulateAtSrc { message, .. } => {
-                message.as_signable().serialize(serializer)
-            }
             Proposal::JoinsAllowed(joins_allowed) => joins_allowed.serialize(serializer),
         }
     }
@@ -69,7 +67,7 @@ impl<'a> Serialize for SignableView<'a> {
 pub(crate) struct ProposalAggregator(SignatureAggregator);
 
 impl ProposalAggregator {
-    pub fn add(
+    pub(crate) fn add(
         &mut self,
         proposal: Proposal,
         sig_share: SigShare,
@@ -81,10 +79,16 @@ impl ProposalAggregator {
     }
 }
 
+/// Errors that can occur when handling DKG proposals.
 #[derive(Debug, Error)]
 pub enum ProposalError {
+    /// The proposal could not be aggregated due to some semantic error.
     #[error("failed to aggregate signature shares: {0}")]
-    Aggregation(#[from] crate::messaging::node::Error),
+    Aggregation(#[from] AggregatorError),
+
+    /// The proposal could not be serialized.
+    ///
+    /// Note that this would likely represent a bug in the proposal serialization logic.
     #[error("invalid proposal")]
     Invalid,
 }

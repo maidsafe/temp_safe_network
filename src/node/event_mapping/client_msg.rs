@@ -8,8 +8,8 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    client::{ClientMsg, Cmd, ProcessMsg, ProcessingError, Query},
-    Aggregation, EndUser, MessageId, SrcLocation,
+    client::{ClientMsg, ProcessMsg, ProcessingError},
+    ClientSigned, EndUser, MessageId, SrcLocation,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -18,14 +18,19 @@ use crate::node::{
 };
 use tracing::warn;
 
-pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
-    match msg {
+pub(super) fn map_client_msg(
+    msg_id: MessageId,
+    msg: ClientMsg,
+    client_signed: ClientSigned,
+    user: EndUser,
+) -> Mapping {
+    match &msg {
         ClientMsg::Process(process_msg) => {
-            // FIXME: ******** validate client signature!!!! *********
-            let op = map_client_process_msg(process_msg.clone(), user);
+            // Signature has already been validated by the routing layer
+            let op = map_client_process_msg(msg_id, process_msg.clone(), user, client_signed);
 
-            let ctx = Some(MsgContext {
-                msg: MsgType::Client(msg.clone()),
+            let ctx = Some(MsgContext::Client {
+                msg,
                 src: SrcLocation::EndUser(user),
             });
 
@@ -56,35 +61,25 @@ pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
     }
 }
 
-fn map_client_process_msg(process_msg: ProcessMsg, origin: EndUser) -> NodeDuty {
-    let msg_id = process_msg.id();
-
+fn map_client_process_msg(
+    msg_id: MessageId,
+    process_msg: ProcessMsg,
+    origin: EndUser,
+    client_signed: ClientSigned,
+) -> NodeDuty {
     match process_msg {
-        ProcessMsg::Query {
-            query: Query::Data(query),
-            client_sig,
-            ..
-        } => NodeDuty::ProcessRead {
+        ProcessMsg::Query(query) => NodeDuty::ProcessRead {
             query,
             msg_id,
-            client_sig,
+            client_signed,
             origin,
         },
-        ProcessMsg::Cmd {
-            cmd: Cmd::Data { cmd, .. },
-            id,
-            client_sig,
-            ..
-        } =>
-        // FIXME: ******** validate client signature!!!! *********
-        {
-            NodeDuty::ProcessWrite {
-                cmd,
-                msg_id: id,
-                client_sig,
-                origin,
-            }
-        }
+        ProcessMsg::Cmd(cmd) => NodeDuty::ProcessWrite {
+            cmd,
+            msg_id,
+            client_signed,
+            origin,
+        },
         _ => {
             let error_data = convert_to_error_message(Error::InvalidMessage(
                 msg_id,
@@ -94,14 +89,13 @@ fn map_client_process_msg(process_msg: ProcessMsg, origin: EndUser) -> NodeDuty 
             let id = MessageId::in_response_to(&msg_id);
 
             NodeDuty::Send(OutgoingMsg {
-                msg: MsgType::Client(ClientMsg::ProcessingError(ProcessingError::new(
-                    Some(error_data),
-                    Some(process_msg),
-                    id,
-                ))),
-                section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                id,
+                msg: MsgType::Client(ClientMsg::ProcessingError(ProcessingError {
+                    reason: Some(error_data),
+                    source_message: Some(process_msg),
+                })),
                 dst: src.to_dst(),
-                aggregation: Aggregation::None,
+                aggregation: false,
             })
         }
     }

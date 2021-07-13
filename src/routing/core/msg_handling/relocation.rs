@@ -7,19 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::node::{
-    Peer, Proposal, RelocateDetails, RelocatePromise, RoutingMsg, SignedRelocateDetails,
+use crate::messaging::{
+    node::{NodeMsg, Peer, Proposal, RelocateDetails, RelocatePromise},
+    SectionSigned,
 };
 use crate::routing::{
     core::bootstrap::JoiningAsRelocated,
     error::Result,
     peer::PeerUtils,
-    relocation::{
-        self, RelocateAction, RelocateDetailsUtils, RelocateState, SignedRelocateDetailsUtils,
-    },
+    relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
-    Event, ELDER_SIZE,
+    section::{NodeStateUtils, SectionPeersUtils, SectionUtils},
+    Event, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use xor_name::XorName;
 
@@ -92,9 +91,11 @@ impl Core {
 
     pub(crate) async fn handle_relocate(
         &mut self,
-        details: SignedRelocateDetails,
+        relocate_details: RelocateDetails,
+        node_msg: NodeMsg,
+        section_signed: SectionSigned,
     ) -> Result<Option<Command>> {
-        if details.relocate_details()?.pub_id != self.node.name() {
+        if relocate_details.pub_id != self.node.name() {
             // This `Relocate` message is not for us - it's most likely a duplicate of a previous
             // message that we already handled.
             return Ok(None);
@@ -102,7 +103,7 @@ impl Core {
 
         debug!(
             "Received Relocate message to join the section at {}",
-            details.relocate_details()?.dst
+            relocate_details.dst
         );
 
         match self.relocate_state {
@@ -123,8 +124,13 @@ impl Core {
         // flow. This same instance will handle responses till relocation is complete.
         let genesis_key = *self.section.genesis_key();
         let bootstrap_addrs = self.section.authority_provider().addresses();
-        let mut joining_as_relocated =
-            JoiningAsRelocated::new(self.node.clone(), genesis_key, details)?;
+        let mut joining_as_relocated = JoiningAsRelocated::new(
+            self.node.clone(),
+            genesis_key,
+            relocate_details,
+            node_msg,
+            section_signed,
+        )?;
 
         let cmd = joining_as_relocated.start(bootstrap_addrs)?;
 
@@ -136,7 +142,7 @@ impl Core {
     pub(crate) async fn handle_relocate_promise(
         &mut self,
         promise: RelocatePromise,
-        msg: RoutingMsg,
+        msg: NodeMsg,
     ) -> Result<Vec<Command>> {
         // Check if we need to filter out the `RelocatePromise`.
         if promise.name == self.node.name() {
@@ -179,7 +185,7 @@ impl Core {
 
             // We are no longer elder. Send the promise back already.
             if self.is_not_elder() {
-                commands.push(self.send_message_to_our_elders(msg));
+                commands.push(self.send_message_to_our_elders(msg)?);
             }
 
             return Ok(commands);

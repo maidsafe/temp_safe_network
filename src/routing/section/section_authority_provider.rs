@@ -18,7 +18,7 @@ use std::{
 };
 
 /// The information about elder candidates in a DKG round.
-pub trait ElderCandidatesUtils {
+pub(crate) trait ElderCandidatesUtils {
     /// Creates a new `ElderCandidates` with the given members and prefix.
     fn new<I: IntoIterator<Item = Peer>>(elders: I, prefix: Prefix) -> Self;
 

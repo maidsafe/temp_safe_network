@@ -6,12 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{plain_message::PlainMessage, section::NodeState, signed::KeyedSig};
+use super::{section::NodeState, signed::KeyedSig};
 use crate::messaging::{MessageId, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;
-use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
@@ -21,7 +20,7 @@ use std::{
 use xor_name::{Prefix, XorName};
 
 /// SHA3-256 hash digest.
-pub type Digest256 = [u8; 32];
+type Digest256 = [u8; 32];
 
 /// Unique identifier of a DKG session.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -110,14 +109,6 @@ pub enum Proposal {
     /// Which we can use to update the section section authority provider and the section chain at
     /// the same time as a single atomic operation without needing to cache anything.
     OurElders(SectionSigned<SectionAuthorityProvider>),
-    /// Proposal to accumulate the message at the source (that is, our section) and then send it to
-    /// its destination.
-    AccumulateAtSrc {
-        /// Message to be accumulated
-        message: Box<PlainMessage>,
-        /// Verifiable section chain
-        proof_chain: SecuredLinkedList,
-    },
     /// Proposal to change whether new nodes are allowed to join our section.
     JoinsAllowed((MessageId, bool)),
 }

@@ -6,54 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use bls::PublicKey as BlsPublicKey;
 use serde::{Deserialize, Serialize};
 use xor_name::{Prefix, XorName};
 
-type SocketId = XorName;
-
-/// The planned route of a message.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub struct Itinerary {
-    /// Source
-    pub src: SrcLocation,
-    /// Destionation
-    pub dst: DstLocation,
-    /// Wether this will be aggregated, and where.
-    pub aggregation: Aggregation,
-}
-
-impl Itinerary {
-    /// Elders will send their signed message, where recipients aggregate.
-    pub fn aggregate_at_dst(&self) -> bool {
-        matches!(self.aggregation, Aggregation::AtDestination)
-    }
-
-    /// Elders will aggregate a group sig before they each send one copy of it to dst.
-    pub fn aggregate_at_src(&self) -> bool {
-        matches!(self.aggregation, Aggregation::AtSource)
-    }
-
-    /// Name of the source
-    pub fn src_name(&self) -> XorName {
-        self.src.name()
-    }
-
-    /// Name of the destionation
-    pub fn dst_name(&self) -> Option<XorName> {
-        self.dst.name()
-    }
-}
-
-/// Aggregation scheme
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub enum Aggregation {
-    /// No aggregation is made, eg. when the payload contains full authority.
-    None,
-    /// Elders will aggregate a group sig before they each send one copy of it to dst.
-    AtSource,
-    /// Elders will send their signed message, where recipients aggregate.
-    AtDestination,
-}
+/// This maps to the SocketAddr at the Elders where the EndUser is proxied through.
+pub type SocketId = XorName;
 
 /// An EndUser is represented by the name
 /// it's proxied through, and its socket id.
@@ -70,38 +28,29 @@ pub struct EndUser {
 pub enum SrcLocation {
     /// An EndUser.
     EndUser(EndUser),
-    /// A single node with the given name.
-    Node(XorName),
-    /// A section close to a name.
-    Section(XorName),
+    /// A single Node with the given name.
+    Node {
+        /// Name of the Node.
+        name: XorName,
+        /// Node's section public key
+        section_pk: BlsPublicKey,
+    },
+    /// A Section close to a name.
+    Section {
+        /// Name of the Section.
+        name: XorName,
+        /// Section's public key
+        section_pk: BlsPublicKey,
+    },
 }
 
 impl SrcLocation {
-    /// Returns whether this location is a section.
-    pub fn is_section(&self) -> bool {
-        matches!(self, Self::Section(_))
-    }
-
-    /// Returns whether this location is an end user.
-    pub fn is_user(&self) -> bool {
-        matches!(self, Self::EndUser(_))
-    }
-
-    /// Returns whether the given name is part of this location
-    pub fn equals(&self, name: &XorName) -> bool {
-        match self {
-            Self::EndUser(user) => &user.xorname == name,
-            Self::Node(self_name) => name == self_name,
-            Self::Section(some_name) => name == some_name,
-        }
-    }
-
     /// Returns the name of this location.
     pub fn name(&self) -> XorName {
         match self {
             Self::EndUser(user) => user.xorname,
-            Self::Node(name) => *name,
-            Self::Section(name) => *name,
+            Self::Node { name, .. } => *name,
+            Self::Section { name, .. } => *name,
         }
     }
 
@@ -109,8 +58,8 @@ impl SrcLocation {
     pub fn to_dst(self) -> DstLocation {
         match self {
             Self::EndUser(user) => DstLocation::EndUser(user),
-            Self::Node(name) => DstLocation::Node(name),
-            Self::Section(name) => DstLocation::Section(name),
+            Self::Node { name, section_pk } => DstLocation::Node { name, section_pk },
+            Self::Section { name, section_pk } => DstLocation::Section { name, section_pk },
         }
     }
 }
@@ -121,27 +70,46 @@ pub enum DstLocation {
     /// An EndUser.
     EndUser(EndUser),
     /// Destination is a single node with the given name.
-    Node(XorName),
+    Node {
+        /// Name of the Node.
+        name: XorName,
+        /// Node's section public key
+        section_pk: BlsPublicKey,
+    },
     /// Destination are the nodes of the section whose prefix matches the given name.
-    Section(XorName),
-    /// Destination is a specific node. To be directly connected to, and so the message is unrouted. `ConnectionInfo` is used to determine the target SocketAdrr for the message.
-    DirectAndUnrouted,
+    Section {
+        /// Name of the Section.
+        name: XorName,
+        /// Section's public key
+        section_pk: BlsPublicKey,
+    },
+    /// Destination is a specific node to be directly connected to,
+    /// and so the message is unrouted. The destination's known section key is provided.
+    DirectAndUnrouted(BlsPublicKey),
 }
 
 impl DstLocation {
-    /// Returns whether this location is a section.
-    pub fn is_section(&self) -> bool {
-        matches!(self, Self::Section(_))
+    /// Returns the section pk if it's not EndUser.
+    pub fn section_pk(&self) -> Option<BlsPublicKey> {
+        match self {
+            Self::EndUser(_) => None,
+            Self::Node { section_pk, .. } => Some(*section_pk),
+            Self::Section { section_pk, .. } => Some(*section_pk),
+            Self::DirectAndUnrouted(section_pk) => Some(*section_pk),
+        }
     }
 
-    /// Returns whether this location is an end user.
-    pub fn is_user(&self) -> bool {
-        matches!(self, Self::EndUser(_))
+    /// Updates the section pk if it's not EndUser.
+    pub fn set_section_pk(&mut self, pk: BlsPublicKey) {
+        match self {
+            Self::EndUser(_) => {}
+            Self::Node { section_pk, .. } => *section_pk = pk,
+            Self::Section { section_pk, .. } => *section_pk = pk,
+            Self::DirectAndUnrouted(section_pk) => *section_pk = pk,
+        }
     }
 
     /// Returns whether the given name of the given prefix is part of this location.
-    ///
-    /// Returns None if `prefix` does not match `name`.
     pub fn contains(&self, name: &XorName, prefix: &Prefix) -> bool {
         if !prefix.matches(name) {
             return false;
@@ -149,9 +117,13 @@ impl DstLocation {
 
         match self {
             Self::EndUser(user) => prefix.matches(&user.xorname),
-            Self::Node(self_name) => name == self_name,
-            Self::Section(self_name) => prefix.matches(self_name),
-            Self::DirectAndUnrouted => true,
+            Self::Node {
+                name: self_name, ..
+            } => name == self_name,
+            Self::Section {
+                name: self_name, ..
+            } => prefix.matches(self_name),
+            Self::DirectAndUnrouted(_) => true,
         }
     }
 
@@ -159,9 +131,19 @@ impl DstLocation {
     pub fn name(&self) -> Option<XorName> {
         match self {
             Self::EndUser(user) => Some(user.xorname),
-            Self::Node(name) => Some(*name),
-            Self::Section(name) => Some(*name),
-            Self::DirectAndUnrouted => None,
+            Self::Node { name, .. } => Some(*name),
+            Self::Section { name, .. } => Some(*name),
+            Self::DirectAndUnrouted(_) => None,
+        }
+    }
+
+    /// Updates the name of this location if it's not `DirectAndUnrouted`.
+    pub fn set_name(&mut self, new_name: XorName) {
+        match self {
+            Self::EndUser(EndUser { xorname, .. }) => *xorname = new_name,
+            Self::Node { name, .. } => *name = new_name,
+            Self::Section { name, .. } => *name = new_name,
+            Self::DirectAndUnrouted(_) => {}
         }
     }
 }

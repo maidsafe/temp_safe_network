@@ -9,67 +9,49 @@
 mod client_msg;
 mod node_msg;
 
-use crate::messaging::{
-    client::{Error as ErrorMessage, ProcessingError},
-    node::NodeMsg,
-    MessageId, SrcLocation,
-};
-use crate::node::{
-    network::Network,
-    node_ops::{MsgType, NodeDuty, OutgoingLazyError},
-};
-use crate::routing::XorName;
-use crate::routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
+use crate::messaging::{client::ClientMsg, SrcLocation};
+use crate::node::{network::Network, node_ops::NodeDuty};
+use crate::routing::{Event as RoutingEvent, MessageReceived, NodeElderChange, XorName, MIN_AGE};
 use crate::types::PublicKey;
 use client_msg::map_client_msg;
 use node_msg::map_node_msg;
 use std::{thread::sleep, time::Duration};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace};
 
 #[derive(Debug)]
-pub struct Mapping {
-    pub op: NodeDuty,
-    pub ctx: Option<MsgContext>,
+pub(super) struct Mapping {
+    pub(super) op: NodeDuty,
+    pub(super) ctx: Option<MsgContext>,
 }
 
 #[derive(Debug, Clone)]
-pub struct MsgContext {
-    pub msg: MsgType,
-    pub src: SrcLocation,
+pub(super) enum MsgContext {
+    Node {
+        msg: MessageReceived,
+        src: SrcLocation,
+    },
+    Client {
+        msg: ClientMsg,
+        src: SrcLocation,
+    },
 }
 
 // Process any routing event
-pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
+pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
     info!("Handling RoutingEvent: {:?}", event);
     match event {
         RoutingEvent::MessageReceived {
-            content, src, dst, ..
-        } => match NodeMsg::from(content) {
-            Ok(msg) => map_node_msg(msg, src, dst),
-            Err(error) => {
-                warn!("Error decoding msg bytes, sent from {:?}", src);
-
-                // We generate a random message id here since we cannot
-                // retrieve the message id from the message received
-                let msg_id = MessageId::new();
-
-                Mapping {
-                    op: NodeDuty::SendError(OutgoingLazyError {
-                        msg: ProcessingError::new(
-                            Some(ErrorMessage::Serialization(format!(
-                                "Could not deserialize Message at node: {:?}",
-                                error
-                            ))),
-                            None,
-                            msg_id,
-                        ),
-                        dst: src.to_dst(),
-                    }),
-                    ctx: None,
-                }
-            }
-        },
-        RoutingEvent::ClientMsgReceived { msg, user } => map_client_msg(&msg, user),
+            msg_id,
+            src,
+            dst,
+            msg,
+        } => map_node_msg(msg_id, src, dst, *msg),
+        RoutingEvent::ClientMsgReceived {
+            msg_id,
+            msg,
+            client_signed,
+            user,
+        } => map_client_msg(msg_id, *msg, client_signed, user),
         RoutingEvent::SectionSplit {
             elders,
             sibling_elders,
@@ -244,7 +226,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
     }
 }
 
-pub async fn log_network_stats(network_api: &Network) {
+pub(super) async fn log_network_stats(network_api: &Network) {
     let adults = network_api.our_adults().await.len();
     let elders = network_api.our_elder_names().await.len();
     let prefix = network_api.our_prefix().await;

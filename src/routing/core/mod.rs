@@ -8,35 +8,39 @@
 
 mod api;
 mod bootstrap;
+mod comm;
 mod connectivity;
 mod delivery_group;
 mod enduser_registry;
 mod message_filter;
 mod messaging;
 mod msg_handling;
+mod signature_aggregator;
 mod split_barrier;
+
+pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
+pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
+pub use signature_aggregator::Error as AggregatorError;
+pub(crate) use signature_aggregator::SignatureAggregator;
 
 use self::{
     enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
 };
-use crate::messaging::node::SignatureAggregator;
 use crate::messaging::{
-    node::{Network, Proposal, RoutingMsg, Section, SectionSigned, Variant},
-    DstInfo, DstLocation, MessageId, SectionAuthorityProvider,
+    node::{Network, NodeMsg, Proposal, Section, SectionSigned},
+    MessageId, SectionAuthorityProvider,
 };
-use crate::routing::routing_api::command::Command;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
-    event::{Elders, Event, NodeElderChange},
-    messages::RoutingMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
     relocation::RelocateState,
-    section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionKeysProvider, SectionUtils},
+    routing_api::command::Command,
+    section::{SectionKeyShare, SectionKeysProvider, SectionUtils},
+    Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
-pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
@@ -44,12 +48,13 @@ use std::collections::BTreeSet;
 use tokio::sync::mpsc;
 use xor_name::{Prefix, XorName};
 
-pub const RESOURCE_PROOF_DATA_SIZE: usize = 64;
-pub const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
+pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
+pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
 const KEY_CACHE_SIZE: u8 = 5;
 
 // State + logic of a routing node.
 pub(crate) struct Core {
+    pub(crate) comm: Comm,
     node: Node,
     section: Section,
     network: Network,
@@ -69,15 +74,20 @@ pub(crate) struct Core {
 
 impl Core {
     // Creates `Core` for a regular node.
-    pub fn new(
-        node: Node,
+    pub(crate) fn new(
+        comm: Comm,
+        mut node: Node,
         section: Section,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
     ) -> Self {
         let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share);
 
+        // make sure the Node has the correct local addr as Comm
+        node.addr = comm.our_connection_info();
+
         Self {
+            comm,
             node,
             section,
             network: Network::new(),
@@ -164,30 +174,28 @@ impl Core {
                 self.print_network_stats();
 
                 // Sending SectionKnowledge to other sections for new SAP.
-                let section_auth = self.section.section_signed_authority_provider();
-                let variant = Variant::SectionKnowledge {
-                    src_info: (section_auth.clone(), self.section.chain().clone()),
+                let signed_sap = self.section.section_signed_authority_provider().clone();
+                let node_msg = NodeMsg::SectionKnowledge {
+                    src_info: (signed_sap, self.section.chain().clone()),
                     msg: None,
                 };
+
                 for sap in self.network.all() {
-                    let msg = RoutingMsg::single_src(
-                        &self.node,
-                        DstLocation::DirectAndUnrouted,
-                        variant.clone(),
-                        section_auth.value.section_key(),
-                    )?;
                     let targets: Vec<_> = sap
                         .elders()
                         .iter()
                         .map(|(name, addr)| (*name, *addr))
                         .collect();
-                    let len = targets.len();
-                    let dst_info = DstInfo {
-                        dst: XorName::random(),
-                        dst_section_pk: sap.section_key(),
-                    };
+
                     trace!("Sending updated SectionInfo to all known sections");
-                    commands.push(Command::send_message_to_nodes(targets, len, msg, dst_info));
+                    let dst_section_pk = sap.section_key();
+                    let cmd = self.send_direct_message_to_nodes(
+                        targets,
+                        node_msg.clone(),
+                        dst_section_pk,
+                    )?;
+
+                    commands.push(cmd);
                 }
             }
 

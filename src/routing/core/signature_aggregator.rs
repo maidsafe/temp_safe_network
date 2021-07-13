@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::signed::{KeyedSig, SigShare};
+use crate::messaging::node::{KeyedSig, SigShare};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -16,7 +16,7 @@ use thiserror::Error;
 use tiny_keccak::{Hasher, Sha3};
 
 /// Default duration since their last modification after which all unaggregated entries expire.
-pub const DEFAULT_EXPIRATION: Duration = Duration::from_secs(120);
+const DEFAULT_EXPIRATION: Duration = Duration::from_secs(120);
 
 type Digest256 = [u8; 32];
 
@@ -33,19 +33,19 @@ type Digest256 = [u8; 32];
 /// otherwise lead to invalid signature to be produced even though all the shares are valid.
 ///
 #[allow(missing_debug_implementations)]
-pub struct SignatureAggregator {
+pub(crate) struct SignatureAggregator {
     map: HashMap<Digest256, State>,
     expiration: Duration,
 }
 
 impl SignatureAggregator {
     /// Create new aggregator with default expiration.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::with_expiration(DEFAULT_EXPIRATION)
     }
 
     /// Create new aggregator with the given expiration.
-    pub fn with_expiration(expiration: Duration) -> Self {
+    pub(crate) fn with_expiration(expiration: Duration) -> Self {
         Self {
             map: Default::default(),
             expiration,
@@ -60,7 +60,7 @@ impl SignatureAggregator {
     /// shares still need to be added for that particular payload. This error could be safely
     /// ignored (it might still be useful perhaps for debugging). The other error variants, however,
     /// indicate failures and should be treated a such. See [Error] for more info.
-    pub fn add(&mut self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
+    pub(crate) fn add(&mut self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
         self.remove_expired();
 
         if !sig_share.verify(payload) {
@@ -114,8 +114,7 @@ pub enum Error {
     /// The signature combination failed even though there are enough valid signature shares. This
     /// should probably never happen.
     #[error("failed to combine signature shares: {0}")]
-    // TODO: add '#[from]` when `threshold_crytpo::Error` implements `std::error::Error`
-    Combine(bls::error::Error),
+    Combine(#[from] bls::error::Error),
 }
 
 struct State {

@@ -8,9 +8,12 @@
 
 //! Relocation related types and utilities.
 
-use crate::messaging::node::{
-    Network, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, RoutingMsg,
-    Section, SignedRelocateDetails, Variant,
+use crate::messaging::{
+    node::{
+        Network, NodeMsg, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise,
+        Section,
+    },
+    SectionSigned,
 };
 use crate::routing::{
     core::JoiningAsRelocated,
@@ -20,8 +23,6 @@ use crate::routing::{
     peer::PeerUtils,
     section::{SectionPeersUtils, SectionUtils},
 };
-use bls::PublicKey as BlsPublicKey;
-use std::marker::Sized;
 use xor_name::XorName;
 
 /// Find all nodes to relocate after a churn event and create the relocate actions for them.
@@ -59,7 +60,7 @@ pub(crate) fn actions(
 
 /// Details of a relocation: which node to relocate, where to relocate it to and what age it should
 /// get once relocated.
-pub trait RelocateDetailsUtils {
+pub(super) trait RelocateDetailsUtils {
     fn new(section: &Section, network: &Network, peer: &Peer, dst: XorName) -> Self;
 
     fn with_age(
@@ -96,54 +97,13 @@ impl RelocateDetailsUtils for RelocateDetails {
     }
 }
 
-/// RoutingMsg with Variant::Relocate in a convenient wrapper.
-pub trait SignedRelocateDetailsUtils {
-    fn new(signed_msg: RoutingMsg) -> Result<Self, Error>
-    where
-        Self: Sized;
-
-    fn relocate_details(&self) -> Result<&RelocateDetails, Error>;
-
-    fn signed_msg(&self) -> &RoutingMsg;
-
-    fn dst(&self) -> Result<&XorName, Error>;
-
-    fn dst_key(&self) -> Result<BlsPublicKey, Error>;
-}
-
-impl SignedRelocateDetailsUtils for SignedRelocateDetails {
-    fn new(signed_msg: RoutingMsg) -> Result<Self, Error> {
-        if let Variant::Relocate(_) = signed_msg.variant {
-            Ok(Self { signed_msg })
-        } else {
-            Err(Error::InvalidMessage)
-        }
-    }
-
-    fn relocate_details(&self) -> Result<&RelocateDetails, Error> {
-        if let Variant::Relocate(details) = &self.signed_msg.variant {
-            Ok(details)
-        } else {
-            error!("SignedRelocateDetails does not contain Variant::Relocate");
-            Err(Error::InvalidMessage)
-        }
-    }
-
-    fn signed_msg(&self) -> &RoutingMsg {
-        &self.signed_msg
-    }
-
-    fn dst(&self) -> Result<&XorName, Error> {
-        Ok(&self.relocate_details()?.dst)
-    }
-
-    fn dst_key(&self) -> Result<BlsPublicKey, Error> {
-        Ok(self.relocate_details()?.dst_key)
-    }
-}
-
-pub trait RelocatePayloadUtils {
-    fn new(details: SignedRelocateDetails, new_name: &XorName, old_keypair: &Keypair) -> Self;
+pub(super) trait RelocatePayloadUtils {
+    fn new(
+        details: NodeMsg,
+        section_signed: SectionSigned,
+        new_name: &XorName,
+        old_keypair: &Keypair,
+    ) -> Self;
 
     fn verify_identity(&self, new_name: &XorName) -> bool;
 
@@ -151,17 +111,23 @@ pub trait RelocatePayloadUtils {
 }
 
 impl RelocatePayloadUtils for RelocatePayload {
-    fn new(details: SignedRelocateDetails, new_name: &XorName, old_keypair: &Keypair) -> Self {
+    fn new(
+        details: NodeMsg,
+        section_signed: SectionSigned,
+        new_name: &XorName,
+        old_keypair: &Keypair,
+    ) -> Self {
         let signature_of_new_name_with_old_key = ed25519::sign(&new_name.0, old_keypair);
 
         Self {
             details,
+            section_signed,
             signature_of_new_name_with_old_key,
         }
     }
 
     fn verify_identity(&self, new_name: &XorName) -> bool {
-        let details = if let Ok(details) = self.details.relocate_details() {
+        let details = if let Ok(details) = self.relocate_details() {
             details
         } else {
             return false;
@@ -179,7 +145,12 @@ impl RelocatePayloadUtils for RelocatePayload {
     }
 
     fn relocate_details(&self) -> Result<&RelocateDetails, Error> {
-        self.details.relocate_details()
+        if let NodeMsg::Relocate(relocate_details) = &self.details {
+            Ok(relocate_details)
+        } else {
+            error!("RelocateDetails does not contain a NodeMsg::Relocate");
+            Err(Error::InvalidMessage)
+        }
     }
 }
 
@@ -188,7 +159,7 @@ pub(crate) enum RelocateState {
     // while being an elder. It must keep fulfilling its duties as elder until its demoted, then it
     // can send the bytes (which are serialized `RelocatePromise` message) back to the elders who
     // will exchange it for an actual `Relocate` message.
-    Delayed(RoutingMsg),
+    Delayed(NodeMsg),
     // Relocation in progress.
     InProgress(Box<JoiningAsRelocated>),
 }
@@ -203,7 +174,12 @@ pub(crate) enum RelocateAction {
 }
 
 impl RelocateAction {
-    pub fn new(section: &Section, network: &Network, peer: &Peer, churn_name: &XorName) -> Self {
+    pub(crate) fn new(
+        section: &Section,
+        network: &Network,
+        peer: &Peer,
+        churn_name: &XorName,
+    ) -> Self {
         let dst = dst(peer.name(), churn_name);
 
         if section.is_elder(peer.name()) {
@@ -216,7 +192,7 @@ impl RelocateAction {
         }
     }
 
-    pub fn dst(&self) -> &XorName {
+    pub(crate) fn dst(&self) -> &XorName {
         match self {
             Self::Instant(details) => &details.dst,
             Self::Delayed(promise) => &promise.dst,
@@ -224,7 +200,7 @@ impl RelocateAction {
     }
 
     #[cfg(test)]
-    pub fn name(&self) -> &XorName {
+    pub(crate) fn name(&self) -> &XorName {
         match self {
             Self::Instant(details) => &details.pub_id,
             Self::Delayed(promise) => &promise.name,
@@ -267,10 +243,8 @@ mod tests {
     use super::*;
     use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
-        dkg::test_utils::section_signed,
-        peer::test_utils::arbitrary_unique_peers,
-        routing_api::tests::SecretKeySet,
-        section::{NodeStateUtils, SectionAuthorityProviderUtils},
+        dkg::test_utils::section_signed, peer::test_utils::arbitrary_unique_peers,
+        routing_api::tests::SecretKeySet, section::NodeStateUtils, SectionAuthorityProviderUtils,
         ELDER_SIZE, MIN_AGE,
     };
     use anyhow::Result;

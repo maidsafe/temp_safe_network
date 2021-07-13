@@ -11,7 +11,8 @@ mod node_state;
 mod peer;
 
 pub use candidates::ElderCandidates;
-pub use node_state::{MembershipState, NodeState};
+pub use node_state::MembershipState;
+pub use node_state::NodeState;
 pub use peer::Peer;
 
 use crate::messaging::{node::agreement::SectionSigned, SectionAuthorityProvider};

@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.15](https://github.com/maidsafe/safe_network/compare/v0.7.14...v0.7.15) (2021-07-13)
+
+
+### Bug Fixes
+
+* **routing:** Enable `unreachable_pub` lints ([9468aa9](https://github.com/maidsafe/safe_network/commit/9468aa9ba09da2a121c1c0f93eaebc21f5b91edf))
+
+### [0.7.14](https://github.com/maidsafe/safe_network/compare/v0.7.13...v0.7.14) (2021-07-13)
+
+
+### Features
+
+* **client:** properly sign client messages payload ([a98a5a0](https://github.com/maidsafe/safe_network/commit/a98a5a03e061102b3d4136c8a0eba65cd089d684))
+* **messaging:** make the dest section pk part of the dest location in the msg envelope ([7b1a72a](https://github.com/maidsafe/safe_network/commit/7b1a72ae23ba411213ee14c7e2a873ce9c0c0243))
+* **messaging:** merge node and routing msgs into a single NodeMsg type ([164a299](https://github.com/maidsafe/safe_network/commit/164a2990e1c968bc36609e1c01a871752a248b45))
+* **messaging:** moving message authority out to msg header for cheaper signature verifications ([8c4ee46](https://github.com/maidsafe/safe_network/commit/8c4ee463fc6d87783068969924cf69b8b5993a37))
+* **messaging:** re-introduce a MsgKind in the wire msg header which contains the msg authority ([7702d38](https://github.com/maidsafe/safe_network/commit/7702d388c32a43b8dcad094d4b9de3d437297503))
+* **messaging:** remove aggregation and msg id from NodeMsg definition flattening it up to simply msg variants ([ba3e798](https://github.com/maidsafe/safe_network/commit/ba3e798ae111a0e1ca795fc4f8e19314ef14b15c))
+
+
+### Bug Fixes
+
+* **client:** Restore client mod and get it compiling ([ca25b2f](https://github.com/maidsafe/safe_network/commit/ca25b2ff1a0a5d839d234439e759705a314cc7ae))
+* **node:** generate new msg id for chunk read/store/delete messages from Elders to Adults ([12ac42e](https://github.com/maidsafe/safe_network/commit/12ac42efe0308a9df89d6a7dac3fb8d844a97d3c))
+* **routing:** don't relay incoming EndUser msg when they reached their node proxy ([5c6e085](https://github.com/maidsafe/safe_network/commit/5c6e08562b6ca8ec896019718c3d17d4c2522d06))
+* **serialisation:** adapt serialisation tests and fixes to make them pass ([6fe8b8e](https://github.com/maidsafe/safe_network/commit/6fe8b8e07ef3b25a8b045a05af94ed21d354d6b5))
+
+### [0.7.13](https://github.com/maidsafe/safe_network/compare/v0.7.12...v0.7.13) (2021-07-09)
+
+### [0.7.12](https://github.com/maidsafe/safe_network/compare/v0.7.11...v0.7.12) (2021-07-09)
+
 ### [0.7.11](https://github.com/maidsafe/safe_network/compare/v0.7.10...v0.7.11) (2021-07-08)
 
 

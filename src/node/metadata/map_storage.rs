@@ -60,7 +60,7 @@ impl MapStorage {
     }
 
     /// On receiving data from Elders when promoted.
-    pub async fn update(&mut self, map_data: MapDataExchange) -> Result<()> {
+    pub(super) async fn update(&mut self, map_data: MapDataExchange) -> Result<()> {
         debug!("Updating Map DataStore");
 
         let MapDataExchange(data) = map_data;

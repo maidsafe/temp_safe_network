@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod node_state;
+pub(super) mod node_state;
 pub(crate) mod section_authority_provider;
 mod section_keys;
 mod section_peers;
@@ -14,14 +14,7 @@ mod section_peers;
 #[cfg(test)]
 pub(crate) use self::section_authority_provider::test_utils;
 
-pub use self::{
-    node_state::{
-        NodeStateUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
-    },
-    section_authority_provider::{ElderCandidatesUtils, SectionAuthorityProviderUtils},
-    section_keys::{SectionKeyShare, SectionKeysProvider},
-    section_peers::SectionPeersUtils,
-};
+pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 use crate::messaging::{
     node::{ElderCandidates, KeyedSig, NodeState, Peer, Section, SectionPeers, SectionSigned},
@@ -33,12 +26,16 @@ use crate::routing::{
     peer::PeerUtils,
     ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
 };
+pub(crate) use node_state::NodeStateUtils;
+pub(crate) use section_authority_provider::ElderCandidatesUtils;
+use section_authority_provider::SectionAuthorityProviderUtils;
+pub(super) use section_peers::SectionPeersUtils;
 use secured_linked_list::{error::Error as SecuredLinkedListError, SecuredLinkedList};
 use serde::Serialize;
 use std::{collections::BTreeSet, convert::TryInto, iter, marker::Sized, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
-pub trait SectionUtils {
+pub(super) trait SectionUtils {
     /// Creates a minimal `Section` initially containing only info about our elders
     /// (`section_auth`).
     ///

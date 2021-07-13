@@ -8,17 +8,15 @@
 
 use super::super::Core;
 use crate::messaging::{
-    node::{
-        DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, Proposal, RoutingMsg, Variant,
-    },
-    DstLocation, SectionAuthorityProvider,
+    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, NodeMsg, Proposal},
+    SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::{commands::DkgCommands, DkgFailureSigSetUtils},
     error::{Error, Result},
-    messages::RoutingMsgUtils,
     routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionPeersUtils, SectionUtils},
+    section::{SectionKeyShare, SectionPeersUtils, SectionUtils},
+    SectionAuthorityProviderUtils,
 };
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use std::{collections::BTreeSet, slice};
@@ -126,13 +124,7 @@ impl Core {
     }
 
     pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Result<Command> {
-        let variant = Variant::DkgFailureAgreement(failure_set);
-        let message = RoutingMsg::single_src(
-            &self.node,
-            DstLocation::DirectAndUnrouted,
-            variant,
-            self.section.authority_provider().section_key(),
-        )?;
-        Ok(self.send_message_to_our_elders(message))
+        let node_msg = NodeMsg::DkgFailureAgreement(failure_set);
+        self.send_message_to_our_elders(node_msg)
     }
 }

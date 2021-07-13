@@ -9,25 +9,18 @@
 use std::cmp;
 
 use crate::messaging::{
-    node::{
-        KeyedSig, MembershipState, NodeState, PlainMessage, Proposal, RoutingMsg, SectionSigned,
-        Variant,
-    },
-    DstInfo, DstLocation, SectionAuthorityProvider,
+    node::{KeyedSig, MembershipState, NodeMsg, NodeState, Proposal, SectionSigned},
+    SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::SectionSignedUtils,
     error::Result,
-    messages::RoutingMsgUtils,
     network::NetworkUtils,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{
-        ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils,
-    },
-    Error, Event, MIN_AGE,
+    section::{ElderCandidatesUtils, SectionPeersUtils, SectionUtils},
+    Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
-use secured_linked_list::SecuredLinkedList;
 use xor_name::XorName;
 
 use super::Core;
@@ -40,7 +33,6 @@ impl Core {
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         debug!("handle agreement on {:?}", proposal);
-
         match proposal {
             Proposal::Online {
                 node_state,
@@ -57,27 +49,6 @@ impl Core {
             Proposal::OurElders(section_auth) => {
                 self.handle_our_elders_agreement(section_auth, sig).await
             }
-            Proposal::AccumulateAtSrc { message, .. } => {
-                let dst_name = if let Some(name) = message.dst.name() {
-                    name
-                } else {
-                    error!(
-                        "Not handling AccumulateAtSrc {:?}: No dst_name found",
-                        *message
-                    );
-                    return Err(Error::InvalidDstLocation);
-                };
-                let dst_section_pk = message.dst_key;
-                Ok(vec![self.handle_accumulate_at_src_agreement(
-                    *message,
-                    self.section.chain().clone(),
-                    sig,
-                    DstInfo {
-                        dst: dst_name,
-                        dst_section_pk,
-                    },
-                )?])
-            }
             Proposal::JoinsAllowed(joins_allowed) => {
                 self.joins_allowed = joins_allowed.1;
                 Ok(vec![])
@@ -92,7 +63,6 @@ impl Core {
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
-
         if let Some(old_info) = self
             .section
             .members()
@@ -162,7 +132,6 @@ impl Core {
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
-
         let peer = node_state.peer;
         let age = peer.age();
         let signature = sig.signature.clone();
@@ -201,7 +170,6 @@ impl Core {
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
-
         let equal_or_extension = section_auth.prefix() == *self.section.prefix()
             || section_auth.prefix().is_extension_of(self.section.prefix());
         let section_auth = SectionSigned::new(section_auth, sig.clone());
@@ -224,25 +192,14 @@ impl Core {
                 .map(|peer| (*peer.name(), *peer.addr()))
                 .collect();
             if !sync_recipients.is_empty() {
-                let sync_message = RoutingMsg::single_src(
-                    &self.node,
-                    DstLocation::DirectAndUnrouted,
-                    Variant::Sync {
-                        section: self.section.clone(),
-                        network: self.network.clone(),
-                    },
-                    self.section.authority_provider().section_key(),
-                )?;
-                let len = sync_recipients.len();
-                commands.push(Command::send_message_to_nodes(
-                    sync_recipients,
-                    len,
-                    sync_message,
-                    DstInfo {
-                        dst: XorName::random(),
-                        dst_section_pk: sig.public_key,
-                    },
-                ));
+                let node_msg = NodeMsg::Sync {
+                    section: self.section.clone(),
+                    network: self.network.clone(),
+                };
+                let cmd =
+                    self.send_direct_message_to_nodes(sync_recipients, node_msg, sig.public_key)?;
+
+                commands.push(cmd);
             }
 
             // Send the `OurElder` proposal to all of the to-be-elders so it's aggregated by them.
@@ -287,21 +244,5 @@ impl Core {
         }
 
         self.update_state(snapshot).await
-    }
-
-    fn handle_accumulate_at_src_agreement(
-        &self,
-        message: PlainMessage,
-        section_chain: SecuredLinkedList,
-        sig: KeyedSig,
-        dst_info: DstInfo,
-    ) -> Result<Command> {
-        let message = RoutingMsg::section_src(message, sig, section_chain)?;
-
-        Ok(Command::HandleMessage {
-            message,
-            sender: None,
-            dst_info,
-        })
     }
 }

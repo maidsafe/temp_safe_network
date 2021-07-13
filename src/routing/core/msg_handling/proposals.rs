@@ -7,8 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::node::{Error as AggregatorError, Proposal, SigShare};
-use crate::routing::{dkg::ProposalError, routing_api::command::Command, Error, Result};
+use crate::messaging::node::{Proposal, SigShare};
+use crate::routing::{
+    core::AggregatorError, dkg::ProposalError, routing_api::command::Command, Error, Result,
+};
 
 // Decisions
 impl Core {

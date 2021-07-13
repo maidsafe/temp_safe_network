@@ -9,36 +9,36 @@
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub(crate) mod comm;
 pub(crate) mod command;
 
+pub(super) mod config;
 mod dispatcher;
-mod event_stream;
+pub(super) mod event;
+pub(super) mod event_stream;
 
-pub use self::event_stream::EventStream;
 use self::{
-    comm::{Comm, ConnectionEvent},
     command::Command,
+    config::Config,
     dispatcher::Dispatcher,
+    event::{Elders, Event, NodeElderChange},
+    event_stream::EventStream,
 };
 use crate::messaging::{
-    node::{Peer, RoutingMsg},
-    DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
+    node::{NodeMsg, Peer},
+    DstLocation, EndUser, SectionAuthorityProvider, WireMsg,
 };
-use crate::routing::core::{join_network, Core};
 use crate::routing::{
+    core::{join_network, Comm, ConnectionEvent, Core},
     ed25519,
     error::Result,
-    event::{Elders, Event, NodeElderChange},
-    messages::RoutingMsgUtils,
+    messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
-    Error, TransportConfig, MIN_ADULT_AGE,
+    section::SectionUtils,
+    Error, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
 };
-use bytes::Bytes;
-use ed25519_dalek::{Keypair, PublicKey, Signature, Signer, KEYPAIR_LENGTH};
+use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::{
@@ -47,30 +47,8 @@ use std::{
     net::SocketAddr,
     sync::Arc,
 };
-
 use tokio::{sync::mpsc, task};
 use xor_name::{Prefix, XorName};
-
-/// Routing configuration.
-#[derive(Debug)]
-pub struct Config {
-    /// If true, configures the node to start a new network instead of joining an existing one.
-    pub first: bool,
-    /// The `Keypair` of the node or `None` for randomly generated one.
-    pub keypair: Option<Keypair>,
-    /// Configuration for the underlying network transport.
-    pub transport_config: TransportConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            first: false,
-            keypair: None,
-            transport_config: TransportConfig::default(),
-        }
-    }
-}
 
 /// Interface for sending and receiving messages to and from other nodes, in the role of a full
 /// routing node.
@@ -104,18 +82,22 @@ impl Routing {
         let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
         let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
 
-        let (state, comm, backlog) = if config.first {
+        let (core, backlog) = if config.first {
             // Genesis node having a fix age of 255.
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
             let node_name = ed25519::name(&keypair.public);
 
-            info!("{} Starting a new network as the genesis node.", node_name);
+            info!(
+                "{} Starting a new network as the genesis node (PID: {}).",
+                node_name,
+                std::process::id()
+            );
 
             let comm = Comm::new(config.transport_config, connection_event_tx).await?;
             let node = Node::new(keypair, comm.our_connection_info());
-            let state = Core::first_node(node, event_tx)?;
+            let core = Core::first_node(comm, node, event_tx)?;
 
-            let section = state.section();
+            let section = core.section();
 
             let elders = Elders {
                 prefix: *section.prefix(),
@@ -125,40 +107,44 @@ impl Routing {
                 removed: BTreeSet::new(),
             };
 
-            state
-                .send_event(Event::EldersChanged {
-                    elders,
-                    self_status_change: NodeElderChange::Promoted,
-                })
-                .await;
+            core.send_event(Event::EldersChanged {
+                elders,
+                self_status_change: NodeElderChange::Promoted,
+            })
+            .await;
 
-            (state, comm, vec![])
+            (core, vec![])
         } else {
             info!("{} Bootstrapping a new node.", node_name);
             let (comm, bootstrap_addr) =
                 Comm::bootstrap(config.transport_config, connection_event_tx).await?;
-            let node = Node::new(keypair, comm.our_connection_info());
-            let (node, section, backlog) =
-                join_network(node, &comm, &mut connection_event_rx, bootstrap_addr).await?;
-            let state = Core::new(node, section, None, event_tx);
+            info!(
+                "{} Joining as a new node (PID: {}) from {} to {}",
+                node_name,
+                std::process::id(),
+                comm.our_connection_info(),
+                bootstrap_addr
+            );
+            let joining_node = Node::new(keypair, comm.our_connection_info());
+            let (node, section, backlog) = join_network(
+                joining_node,
+                &comm,
+                &mut connection_event_rx,
+                bootstrap_addr,
+            )
+            .await?;
+            let core = Core::new(comm, node, section, None, event_tx);
 
-            (state, comm, backlog)
+            (core, backlog)
         };
 
-        let dispatcher = Arc::new(Dispatcher::new(state, comm));
+        let dispatcher = Arc::new(Dispatcher::new(core));
         let event_stream = EventStream::new(event_rx);
         info!("{} Bootstrapped!", node_name);
 
         // Process message backlog
-        for (message, sender, dst_info) in backlog {
-            dispatcher
-                .clone()
-                .handle_commands(Command::HandleMessage {
-                    message,
-                    sender: Some(sender),
-                    dst_info,
-                })
-                .await?;
+        for cmd in backlog {
+            dispatcher.clone().handle_commands(cmd).await?;
         }
 
         // Start listening to incoming connections.
@@ -246,8 +232,8 @@ impl Routing {
     }
 
     /// Returns connection info of this node.
-    pub fn our_connection_info(&self) -> SocketAddr {
-        self.dispatcher.comm.our_connection_info()
+    pub async fn our_connection_info(&self) -> SocketAddr {
+        self.dispatcher.core.read().await.our_connection_info()
     }
 
     /// Returns the Section Signed Chain
@@ -343,89 +329,96 @@ impl Routing {
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        let state = self.dispatcher.core.read().await;
-        state.matching_section(name)
+        let core = self.dispatcher.core.read().await;
+        core.matching_section(name)
+    }
+
+    /// Builds a WireMsg signed by this Node
+    pub async fn sign_single_src_msg(
+        &self,
+        node_msg: NodeMsg,
+        dst: DstLocation,
+    ) -> Result<WireMsg> {
+        let src_section_pk = *self.section_chain().await.last_key();
+        WireMsg::single_src(
+            self.dispatcher.core.read().await.node(),
+            dst,
+            node_msg,
+            src_section_pk,
+        )
+    }
+
+    /// Builds a WireMsg signed for accumulateion at destination
+    pub async fn sign_msg_for_dst_accumulation(
+        &self,
+        node_msg: NodeMsg,
+        dst: DstLocation,
+    ) -> Result<WireMsg> {
+        let src = self.name().await;
+        let src_section_pk = *self.section_chain().await.last_key();
+
+        WireMsg::for_dst_accumulation(
+            self.dispatcher
+                .core
+                .read()
+                .await
+                .key_share()
+                .map_err(|err| err)?,
+            src,
+            dst,
+            node_msg,
+            src_section_pk,
+        )
     }
 
     /// Send a message.
-    /// Messages sent here, either section to section or node to node are signed
-    /// and validated upon receipt by routing itself.
-    ///
-    /// `additional_proof_chain_key` is a key to be included in the signed chain attached to the
-    /// message. This is useful when the message contains some data that is signed with a different
-    /// key than the whole message is so that the recipient can verify such key.
-    pub async fn send_message(
-        &self,
-        itinerary: Itinerary,
-        content: MessageType,
-        additional_proof_chain_key: Option<bls::PublicKey>,
-    ) -> Result<()> {
-        if let DstLocation::EndUser(EndUser { socket_id, xorname }) = itinerary.dst {
-            if self.our_prefix().await.matches(&xorname) {
+    /// Messages sent here, either section to section or node to node.
+    pub async fn send_message(&self, mut wire_msg: WireMsg) -> Result<()> {
+        if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
+            if self.our_prefix().await.matches(xorname) {
                 let addr = self
                     .dispatcher
                     .core
                     .read()
                     .await
-                    .get_socket_addr(socket_id)
+                    .get_socket_addr(*socket_id)
                     .copied();
 
                 if let Some(socket_addr) = addr {
+                    // Send a message to a client peer.
+                    // Messages sent to a client are not signed
+                    // or validated as part of the routing library.
                     debug!("Sending client msg to {:?}", socket_addr);
-                    return self
-                        .send_message_to_client(socket_addr, xorname, content)
-                        .await;
+
+                    let recipients = vec![(*xorname, socket_addr)];
+                    wire_msg.set_dst_section_pk(*self.section_chain().await.last_key());
+
+                    let command = Command::SendMessage {
+                        recipients,
+                        delivery_group_size: 1,
+                        wire_msg,
+                    };
+                    return self.dispatcher.clone().handle_commands(command).await;
                 } else {
                     debug!(
                         "Could not find socketaddr corresponding to socket_id {:?}",
                         socket_id
                     );
-                    debug!("Relaying user message instead.. (Command::SendUserMessage)");
+                    debug!("Relaying user message instead.. (Command::RelayMessage)");
                 }
             } else {
-                debug!("Relaying message with sending user message (Command::SendUserMessage)");
+                debug!("Relaying message with sending user message (Command::RelayMessage)");
             }
         }
 
-        let command = Command::SendUserMessage {
-            itinerary,
-            content,
-            additional_proof_chain_key,
-        };
-        self.dispatcher.clone().handle_commands(command).await
-    }
-
-    /// Send a message to a client peer.
-    /// Messages sent to a client are not signed or validated as part of the
-    /// routing library.
-    async fn send_message_to_client(
-        &self,
-        recipient: SocketAddr,
-        user_xorname: XorName,
-        mut message: MessageType,
-    ) -> Result<()> {
-        message.update_dst_info(
-            Some(*self.section_chain().await.last_key()),
-            Some(user_xorname),
-        );
-
-        let command = Command::SendMessage {
-            recipients: vec![(user_xorname, recipient)],
-            delivery_group_size: 1,
-            message,
-        };
+        let command = Command::RelayMessage(wire_msg);
         self.dispatcher.clone().handle_commands(command).await
     }
 
     /// Returns the current BLS public key set if this node has one, or
-    /// `Error::InvalidState` otherwise.
+    /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         self.dispatcher.core.read().await.public_key_set()
-    }
-
-    /// Returns our section signed chain.
-    pub async fn our_history(&self) -> SecuredLinkedList {
-        self.dispatcher.core.read().await.section().chain().clone()
     }
 
     /// Returns our index in the current BLS group if this node is a member of one, or
@@ -437,7 +430,7 @@ impl Routing {
 
 impl Drop for Routing {
     fn drop(&mut self) {
-        self.dispatcher.terminate()
+        futures::executor::block_on(self.dispatcher.terminate());
     }
 }
 
@@ -454,10 +447,6 @@ async fn handle_connection_events(
 ) {
     while let Some(event) = incoming_conns.recv().await {
         match event {
-            ConnectionEvent::Received((src, bytes)) => {
-                trace!("New message ({} bytes) received from: {}", bytes.len(), src);
-                handle_message(dispatcher.clone(), bytes, src).await;
-            }
             ConnectionEvent::Disconnected(addr) => {
                 trace!("Lost connection to {:?}", addr);
                 let _ = dispatcher
@@ -465,160 +454,41 @@ async fn handle_connection_events(
                     .handle_commands(Command::HandleConnectionLost(addr))
                     .await;
             }
-        }
-    }
-}
-
-async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: SocketAddr) {
-    let wire_msg = match WireMsg::from(bytes) {
-        Ok(wire_msg) => wire_msg,
-        Err(error) => {
-            error!("Failed to deserialize message header: {}", error);
-            return;
-        }
-    };
-    let span = {
-        let mut state = dispatcher.core.write().await;
-
-        if !state.add_to_filter(&wire_msg).await {
-            trace!(
-                "not handling message - already handled: {:?}",
-                wire_msg.msg_id()
-            );
-            return;
-        }
-
-        trace_span!("handle_message", name = %state.node().name(), %sender)
-    };
-    let _span_guard = span.enter();
-
-    let message_type = match wire_msg.to_message() {
-        Ok(message_type) => message_type,
-        Err(err) => {
-            error!(
-                "Failed to deserialize message payload ({:?}): {}",
-                wire_msg.msg_id(),
-                err
-            );
-            return;
-        }
-    };
-
-    match message_type {
-        MessageType::SectionInfo { msg, dst_info } => {
-            let command = Command::HandleSectionInfoMsg {
-                sender,
-                message: msg,
-                dst_info,
-            };
-            let _ = task::spawn(dispatcher.handle_commands(command));
-        }
-        MessageType::Routing { msg, dst_info } => {
-            if let Err(err) = msg.check_signature() {
-                error!(
-                    "Discarding message received ({:?}) due to invalid signature: {:?}",
-                    msg.id, err
+            ConnectionEvent::Received((sender, bytes)) => {
+                trace!(
+                    "New message ({} bytes) received from: {}",
+                    bytes.len(),
+                    sender
                 );
-                return;
-            }
-
-            let command = Command::HandleMessage {
-                message: msg,
-                sender: Some(sender),
-                dst_info,
-            };
-            let _ = task::spawn(dispatcher.handle_commands(command));
-        }
-        MessageType::Node {
-            msg: _,
-            dst_info: _,
-            src_section_pk: _,
-        } => unimplemented!(),
-        MessageType::Client { msg, dst_info } => {
-            let end_user = dispatcher
-                .core
-                .read()
-                .await
-                .get_enduser_by_addr(&sender)
-                .copied();
-
-            let end_user = match end_user {
-                Some(end_user) => {
-                    debug!(
-                        "Message from client {}, socket id already exists: {:?}",
-                        sender, end_user
-                    );
-                    end_user
-                }
-                None => {
-                    // this is the first time we receive a message from this client
-                    debug!("First message from client {}, creating a socket id", sender);
-
-                    // TODO: remove the enduser registry and simply encrypt socket addr with
-                    // this node's keypair and use that as the socket id
-                    match dispatcher.core.write().await.try_add(sender) {
-                        Ok(end_user) => end_user,
-                        Err(error) => {
-                            error!(
-                                "Failed to cache client socket address for message {:?}: {:?}",
-                                msg, error
-                            );
-                            return;
-                        }
-                    }
-                }
-            };
-
-            if dispatcher
-                .core
-                .read()
-                .await
-                .section()
-                .prefix()
-                .matches(&dst_info.dst)
-            {
-                let event = Event::ClientMsgReceived {
-                    msg: Box::new(msg),
-                    user: end_user,
-                };
-                dispatcher.send_event(event).await;
-            } else {
-                let cmd = {
-                    let state = dispatcher.core.read().await;
-                    let node = state.node();
-                    let section = state.section();
-
-                    let variant = crate::messaging::node::Variant::ForwardClientMsg {
-                        msg,
-                        user: end_user,
-                    };
-                    let to_relay = match RoutingMsg::single_src(
-                        node,
-                        DstLocation::Section(dst_info.dst),
-                        variant,
-                        section.authority_provider().section_key(),
-                    ) {
-                        Ok(msg) => msg,
-                        Err(error) => {
-                            error!("Failed create routing msg {:?}", error);
-                            return;
-                        }
-                    };
-                    match state.relay_message(&to_relay).await {
-                        Ok(Some(cmd)) => cmd,
-                        Ok(None) => {
-                            error!("Failed to relay msg, no cmd returned.");
-                            return;
-                        }
-                        Err(error) => {
-                            error!("Failed to relay msg {:?}", error);
-                            return;
-                        }
+                let wire_msg = match WireMsg::from(bytes) {
+                    Ok(wire_msg) => wire_msg,
+                    Err(error) => {
+                        error!("Failed to deserialize message header: {}", error);
+                        continue;
                     }
                 };
 
-                let _ = task::spawn(dispatcher.handle_commands(cmd));
+                let span = {
+                    let mut core = dispatcher.core.write().await;
+
+                    if !core.add_to_filter(&wire_msg).await {
+                        trace!(
+                            "not handling message {:?} from {}, already handled",
+                            wire_msg.msg_id(),
+                            sender,
+                        );
+                        continue;
+                    }
+
+                    trace_span!("handle_message", name = %core.node().name(), %sender)
+                };
+                let _span_guard = span.enter();
+
+                let command = Command::HandleMessage { sender, wire_msg };
+                let _ = task::spawn(dispatcher.clone().handle_commands(command));
             }
         }
     }
+
+    error!("Fatal error, the stream for incoming connections has been unexpectedly closed. No new connections or messages can be received from the network from here on.");
 }

@@ -8,98 +8,71 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{Peer, RoutingMsg, Variant},
-    DstInfo, DstLocation,
+    node::{NodeMsg, Peer},
+    NodeMsgAuthority,
 };
 use crate::routing::{
-    messages::{RoutingMsgUtils, SrcAuthorityUtils},
-    peer::PeerUtils,
-    routing_api::command::Command,
-    section::{SectionAuthorityProviderUtils, SectionUtils},
-    Error, Result,
+    messages::NodeMsgAuthorityUtils, peer::PeerUtils, routing_api::command::Command,
+    section::SectionUtils, Error, Result,
 };
+use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;
 
 // Bad msgs
 impl Core {
-    // Handle message whose trust we can't establish because its signed
+    // Handle message whose trust we can't establish because its signature
     // contains only keys we don't know.
     pub(crate) fn handle_untrusted_message(
         &self,
-        sender: Option<SocketAddr>,
-        routing_msg: &RoutingMsg,
-        received_dst_info: DstInfo,
+        sender: SocketAddr,
+        node_msg: NodeMsg,
+        msg_authority: NodeMsgAuthority,
     ) -> Result<Command> {
-        let src_name = routing_msg.src.name();
-        let bounce_dst_key = self.section_key_by_name(&src_name);
-        let dst_info = DstInfo {
-            dst: src_name,
-            dst_section_pk: bounce_dst_key,
-        };
-        let bounce_msg = RoutingMsg::single_src(
-            &self.node,
-            DstLocation::DirectAndUnrouted,
-            Variant::BouncedUntrustedMessage {
-                msg: Box::new(routing_msg.clone()),
-                dst_info: received_dst_info,
-            },
-            self.section.authority_provider().section_key(),
-        )?;
+        let src_name = msg_authority.name();
 
-        let cmd = if let Some(sender) = sender {
-            Command::send_message_to_node((src_name, sender), bounce_msg, dst_info)
-        } else {
-            self.send_message_to_our_elders(bounce_msg)
+        let bounce_dst_section_pk = self.section_key_by_name(&src_name);
+
+        let bounce_node_msg = NodeMsg::BouncedUntrustedMessage {
+            msg: Box::new(node_msg),
+            dst_section_pk: bounce_dst_section_pk,
         };
 
-        Ok(cmd)
+        self.send_direct_message((src_name, sender), bounce_node_msg, bounce_dst_section_pk)
     }
 
     pub(crate) fn handle_bounced_untrusted_message(
         &self,
         sender: Peer,
-        dst_key: bls::PublicKey,
-        mut bounced_msg: RoutingMsg,
+        dst_section_key: BlsPublicKey,
+        bounced_msg: NodeMsg,
     ) -> Result<Command> {
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();
 
-        let resend_msg = match bounced_msg.variant {
-            Variant::Sync { section, network } => {
+        let new_node_msg = match bounced_msg {
+            NodeMsg::Sync { section, network } => {
                 // `Sync` messages are handled specially, because they don't carry a signed chain.
                 // Instead we use the section chain that's part of the included `Section` struct.
                 // Problem is we can't extend that chain as it would invalidate the signature. We
                 // must construct a new message instead.
                 let section = section
-                    .extend_chain(&dst_key, self.section.chain())
+                    .extend_chain(&dst_section_key, self.section.chain())
                     .map_err(|err| {
                         error!("extending section chain failed: {:?}", err);
                         Error::InvalidMessage // TODO: more specific error
                     })?;
 
-                RoutingMsg::single_src(
-                    &self.node,
-                    DstLocation::DirectAndUnrouted,
-                    Variant::Sync { section, network },
-                    self.section.authority_provider().section_key(),
-                )?
+                NodeMsg::Sync { section, network }
             }
-            _ => {
-                bounced_msg
-                    .updated_with_latest_key(self.section.authority_provider().section_key());
-                bounced_msg
-            }
+            bounced_msg => bounced_msg,
         };
 
-        let dst_info = DstInfo {
-            dst: *sender.name(),
-            dst_section_pk: dst_key,
-        };
-        trace!("resending with extended signed");
-        Ok(Command::send_message_to_node(
+        let cmd = self.send_direct_message(
             (*sender.name(), *sender.addr()),
-            resend_msg,
-            dst_info,
-        ))
+            new_node_msg,
+            dst_section_key,
+        )?;
+
+        Ok(cmd)
     }
 }

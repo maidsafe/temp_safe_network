@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod adult_liveness;
-pub mod adult_reader;
+pub(crate) mod adult_reader;
 mod chunk_records;
 mod elder_stores;
 mod map_storage;
@@ -16,10 +16,8 @@ mod sequence_storage;
 
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    client::{
-        ClientMsg, ClientSig, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg, QueryResponse,
-    },
-    Aggregation, DstLocation, EndUser, MessageId,
+    client::{ClientMsg, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg, QueryResponse},
+    ClientSigned, DstLocation, EndUser, MessageId,
 };
 use crate::node::{
     capacity::Capacity,
@@ -46,7 +44,7 @@ use xor_name::XorName;
 /// has been implemented; where the data types are all simply
 /// the structures + their metadata - handled at `Elders` - with
 /// all underlying data being chunks stored at `Adults`.
-pub struct Metadata {
+pub(crate) struct Metadata {
     elder_stores: ElderStores,
 }
 
@@ -69,7 +67,7 @@ impl Metadata {
         Ok(Self { elder_stores })
     }
 
-    pub async fn read(
+    pub(crate) async fn read(
         &self,
         query: DataQuery,
         id: MessageId,
@@ -82,7 +80,7 @@ impl Metadata {
         }
     }
 
-    pub async fn record_adult_read_liveness(
+    pub(crate) async fn record_adult_read_liveness(
         &self,
         correlation_id: MessageId,
         result: QueryResponse,
@@ -94,7 +92,7 @@ impl Metadata {
             .await
     }
 
-    pub async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
+    pub(crate) async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
         self.elder_stores
             .chunk_records()
             .retain_members_only(members)
@@ -102,18 +100,20 @@ impl Metadata {
         Ok(())
     }
 
-    pub async fn write(
+    pub(crate) async fn write(
         &mut self,
         cmd: DataCmd,
         id: MessageId,
-        client_sig: ClientSig,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        self.elder_stores.write(cmd, id, client_sig, origin).await
+        self.elder_stores
+            .write(cmd, id, client_signed, origin)
+            .await
     }
 
     /// Adds a given node to the list of full nodes.
-    pub async fn increase_full_node_count(&self, node_id: PublicKey) {
+    pub(crate) async fn increase_full_node_count(&self, node_id: PublicKey) {
         self.elder_stores
             .chunk_records()
             .increase_full_node_count(node_id)
@@ -121,18 +121,18 @@ impl Metadata {
     }
 
     // When receiving the chunk from remaining holders, we ask new holders to store it.
-    pub async fn republish_chunk(&self, chunk: Chunk) -> Result<NodeDuty> {
+    pub(crate) async fn republish_chunk(&self, chunk: Chunk) -> Result<NodeDuty> {
         self.elder_stores
             .chunk_records()
             .republish_chunk(chunk)
             .await
     }
 
-    pub async fn get_data_exchange_packet(&self, prefix: Prefix) -> Result<DataExchange> {
+    pub(crate) async fn get_data_exchange_packet(&self, prefix: Prefix) -> Result<DataExchange> {
         self.elder_stores.get_data_of(prefix).await
     }
 
-    pub async fn update(&mut self, data: DataExchange) -> Result<()> {
+    pub(crate) async fn update(&mut self, data: DataExchange) -> Result<()> {
         self.elder_stores.update(data).await
     }
 }
@@ -145,30 +145,28 @@ impl Display for Metadata {
 
 fn build_client_query_response(
     response: QueryResponse,
-    msg_id: MessageId,
+    correlation_id: MessageId,
     origin: EndUser,
 ) -> OutgoingMsg {
     OutgoingMsg {
+        id: MessageId::in_response_to(&correlation_id),
         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
-            id: MessageId::in_response_to(&msg_id),
             response,
-            correlation_id: msg_id,
+            correlation_id,
         })),
-        section_source: false, // strictly this is not correct, but we don't expect responses to a response..
         dst: DstLocation::EndUser(origin),
-        aggregation: Aggregation::None,
+        aggregation: false,
     }
 }
 
 fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUser) -> OutgoingMsg {
     OutgoingMsg {
+        id: MessageId::in_response_to(&msg_id),
         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
-            id: MessageId::in_response_to(&msg_id),
             error,
             correlation_id: msg_id,
         })),
-        section_source: false, // strictly this is not correct, but we don't expect responses to an error..
         dst: DstLocation::EndUser(origin),
-        aggregation: Aggregation::None,
+        aggregation: false,
     }
 }

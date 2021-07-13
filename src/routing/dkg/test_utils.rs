@@ -12,7 +12,7 @@ use crate::routing::{Error, Result};
 use serde::Serialize;
 
 // Create signature for the given payload using the given secret key.
-pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<KeyedSig> {
+pub(crate) fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<KeyedSig> {
     let bytes = bincode::serialize(payload).map_err(|_| Error::InvalidPayload)?;
     Ok(KeyedSig {
         public_key: secret_key.public_key(),
@@ -21,7 +21,7 @@ pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<K
 }
 
 // Wrap the given payload in `SectionSigned`
-pub fn section_signed<T: Serialize>(
+pub(crate) fn section_signed<T: Serialize>(
     secret_key: &bls::SecretKey,
     payload: T,
 ) -> Result<SectionSigned<T>> {

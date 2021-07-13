@@ -6,21 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, enduser_registry::SocketId, Core};
+use super::{delivery_group, Comm, Core};
 use crate::messaging::{
-    node::{Network, NodeState, Peer, Proposal, RoutingMsg, Section, Variant},
-    DstInfo, EndUser, Itinerary, MessageId, MessageType, SectionAuthorityProvider, SrcLocation,
-    WireMsg,
+    node::{Network, NodeState, Peer, Proposal, Section},
+    EndUser, MessageId, SectionAuthorityProvider, SocketId, WireMsg,
 };
 use crate::routing::{
     dkg::commands::DkgCommands,
     error::Result,
-    messages::RoutingMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionUtils},
+    section::{NodeStateUtils, SectionKeyShare, SectionUtils},
     Error, Event,
 };
 use secured_linked_list::SecuredLinkedList;
@@ -30,51 +28,79 @@ use xor_name::{Prefix, XorName};
 
 impl Core {
     // Creates `Core` for the first node in the network
-    pub fn first_node(node: Node, event_tx: mpsc::Sender<Event>) -> Result<Self> {
+    pub(crate) fn first_node(
+        comm: Comm,
+        mut node: Node,
+        event_tx: mpsc::Sender<Event>,
+    ) -> Result<Self> {
+        // make sure the Node has the correct local addr as Comm
+        node.addr = comm.our_connection_info();
+
         let (section, section_key_share) = Section::first_node(node.peer())?;
-        Ok(Self::new(node, section, Some(section_key_share), event_tx))
+        Ok(Self::new(
+            comm,
+            node,
+            section,
+            Some(section_key_share),
+            event_tx,
+        ))
     }
 
-    pub fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<&EndUser> {
+    pub(crate) async fn relocated(&self, new_node: Node, new_section: Section) -> Self {
+        Self::new(
+            self.comm.async_clone().await,
+            new_node,
+            new_section,
+            None,
+            self.event_tx.clone(),
+        )
+    }
+
+    pub(crate) fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<&EndUser> {
         self.end_users.get_enduser_by_addr(sender)
     }
 
-    pub fn get_socket_addr(&self, id: SocketId) -> Option<&SocketAddr> {
+    pub(crate) fn get_socket_addr(&self, id: SocketId) -> Option<&SocketAddr> {
         self.end_users.get_socket_addr(id)
     }
 
-    pub fn try_add(&mut self, sender: SocketAddr) -> Result<EndUser> {
+    pub(crate) fn try_add_enduser(&mut self, sender: SocketAddr) -> Result<EndUser> {
         let section_prefix = self.section.prefix();
         self.end_users.try_add(sender, section_prefix)
     }
 
-    pub fn node(&self) -> &Node {
+    pub(crate) fn node(&self) -> &Node {
         &self.node
     }
 
-    pub fn section(&self) -> &Section {
+    pub(crate) fn section(&self) -> &Section {
         &self.section
     }
 
-    pub fn section_chain(&self) -> &SecuredLinkedList {
+    pub(crate) fn section_chain(&self) -> &SecuredLinkedList {
         self.section.chain()
     }
 
-    pub fn network(&self) -> &Network {
+    pub(crate) fn network(&self) -> &Network {
         &self.network
     }
 
     /// Is this node an elder?
-    pub fn is_elder(&self) -> bool {
+    pub(crate) fn is_elder(&self) -> bool {
         self.section.is_elder(&self.node.name())
     }
 
-    pub fn is_not_elder(&self) -> bool {
+    pub(crate) fn is_not_elder(&self) -> bool {
         !self.is_elder()
     }
 
+    /// Returns connection info of this node.
+    pub(crate) fn our_connection_info(&self) -> SocketAddr {
+        self.comm.our_connection_info()
+    }
+
     /// Tries to sign with the secret corresponding to the provided BLS public key
-    pub fn sign_with_section_key_share(
+    pub(crate) fn sign_with_section_key_share(
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
@@ -83,7 +109,7 @@ impl Core {
     }
 
     /// Returns the current BLS public key set
-    pub fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+    pub(crate) fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         Ok(self
             .section_keys_provider
             .key_share()?
@@ -92,7 +118,7 @@ impl Core {
     }
 
     /// Returns the latest known public key of the section with `prefix`.
-    pub fn section_key(&self, prefix: &Prefix) -> Option<bls::PublicKey> {
+    pub(crate) fn section_key(&self, prefix: &Prefix) -> Option<bls::PublicKey> {
         if prefix == self.section.prefix() || prefix.is_extension_of(self.section.prefix()) {
             Some(*self.section.chain().last_key())
         } else {
@@ -110,7 +136,7 @@ impl Core {
     }
 
     /// Returns the info about the section matching the name.
-    pub fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
+    pub(crate) fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         if self.section.prefix().matches(name) {
             Ok(self.section.authority_provider().clone())
         } else {
@@ -120,11 +146,17 @@ impl Core {
 
     /// Returns our index in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
-    pub fn our_index(&self) -> Result<usize> {
+    pub(crate) fn our_index(&self) -> Result<usize> {
         Ok(self.section_keys_provider.key_share()?.index)
     }
 
-    pub async fn send_event(&self, event: Event) {
+    /// Returns our key share in the current BLS group if this node is a member of one, or
+    /// `Error::MissingSecretKeyShare` otherwise.
+    pub(crate) fn key_share(&self) -> Result<&SectionKeyShare> {
+        self.section_keys_provider.key_share()
+    }
+
+    pub(crate) async fn send_event(&self, event: Event) {
         // Note: cloning the sender to avoid mutable access. Should have negligible cost.
         if self.event_tx.clone().send(event).await.is_err() {
             error!("Event receiver has been closed");
@@ -141,32 +173,26 @@ impl Core {
             .into_commands(&self.node, *self.section_chain().last_key())
     }
 
-    pub async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
-        if wire_msg.is_join_request() {
-            info!("Not filtering JoinRequest");
-            return true;
-        }
-        self.msg_filter.add_to_filter(&wire_msg.msg_id()).await
+    pub(crate) async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
+        self.msg_filter.add_to_filter(wire_msg.msg_id()).await
     }
 
     // Send message over the network.
-    pub async fn relay_message(&self, msg: &RoutingMsg) -> Result<Option<Command>> {
+    pub(crate) async fn relay_message(&self, mut wire_msg: WireMsg) -> Result<Option<Command>> {
+        let dst_location = wire_msg.dst_location();
         let (presumed_targets, dg_size) = delivery_group::delivery_targets(
-            &msg.dst,
+            dst_location,
             &self.node.name(),
             &self.section,
             &self.network,
         )?;
-
-        let target_name = msg.dst.name().ok_or(Error::CannotRoute)?;
-        let dst_pk = self.section_key_by_name(&target_name);
 
         let mut targets = vec![];
 
         for peer in presumed_targets {
             if self
                 .msg_filter
-                .filter_outgoing(msg, peer.name())
+                .filter_outgoing(&wire_msg, peer.name())
                 .await
                 .is_new()
             {
@@ -180,102 +206,27 @@ impl Core {
 
         trace!(
             "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
-            msg,
+            wire_msg,
             dg_size,
             targets,
-            msg.section_pk,
+            wire_msg.src_section_pk(),
         );
 
-        let command = Command::send_message_to_nodes(
-            targets,
-            dg_size,
-            msg.clone(),
-            DstInfo {
-                dst: XorName::random(),
-                dst_section_pk: dst_pk,
-            },
-        );
+        let target_name = dst_location.name().ok_or(Error::CannotRoute)?;
+        let dst_pk = self.section_key_by_name(&target_name);
+        wire_msg.set_dst_section_pk(dst_pk);
+
+        let command = Command::SendMessage {
+            recipients: targets,
+            delivery_group_size: dg_size,
+            wire_msg,
+        };
 
         Ok(Some(command))
     }
 
-    pub async fn send_user_message(
-        &self,
-        itinerary: Itinerary,
-        content: MessageType,
-    ) -> Result<Vec<Command>> {
-        let are_we_src = itinerary.src.equals(&self.node.name())
-            || itinerary.src.equals(&self.section().prefix().name());
-        if !are_we_src {
-            error!(
-                "Not sending user message {:?} -> {:?}: we are not the source location",
-                itinerary.src, itinerary.dst
-            );
-            return Err(Error::InvalidSrcLocation);
-        }
-        if matches!(itinerary.src, SrcLocation::EndUser(_)) {
-            return Err(Error::InvalidSrcLocation);
-        }
-        let dst_name = if let Some(name) = itinerary.dst_name() {
-            name
-        } else {
-            trace!(
-                "Not sending user message {:?} -> {:?}: direct dst not supported",
-                itinerary.src,
-                itinerary.dst
-            );
-            return Err(Error::InvalidDstLocation);
-        };
-        let dst_section_pk = self.section_key_by_name(&dst_name);
-
-        // TODO: don't require this serialize or perhaps even variant altogether?
-        let variant = Variant::UserMessage(content.serialize()?.to_vec());
-
-        // If the msg is to be aggregated at dst, we don't vote among our peers, we simply send the
-        // msg as our vote to the dst.
-        let msg = if itinerary.aggregate_at_dst() {
-            RoutingMsg::for_dst_accumulation(
-                self.section_keys_provider.key_share()?,
-                itinerary.src.name(),
-                itinerary.dst,
-                variant,
-                self.section.chain().clone(),
-            )?
-        } else if itinerary.aggregate_at_src() {
-            let proposal = self.create_aggregate_at_src_proposal(itinerary.dst, variant, None)?;
-            return self.propose(proposal);
-        } else {
-            RoutingMsg::single_src(
-                &self.node,
-                itinerary.dst,
-                variant,
-                self.section.authority_provider().section_key(),
-            )?
-        };
-        let mut commands = vec![];
-
-        // TODO: consider removing this, we are getting duplicate msgs by it
-        if itinerary
-            .dst
-            .contains(&self.node.name(), self.section.prefix())
-        {
-            commands.push(Command::HandleMessage {
-                sender: Some(self.node.addr),
-                message: msg.clone(),
-                dst_info: DstInfo {
-                    dst: dst_name,
-                    dst_section_pk,
-                },
-            });
-        }
-
-        commands.extend(self.relay_message(&msg).await?);
-
-        Ok(commands)
-    }
-
     // Setting the JoinsAllowed triggers a round Proposal::SetJoinsAllowed to update the flag.
-    pub fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
+    pub(crate) fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();
         if self.is_elder() && joins_allowed != self.joins_allowed {
             let active_members: Vec<XorName> = self
@@ -301,7 +252,7 @@ impl Core {
         Ok(commands)
     }
 
-    pub async fn make_online_proposal(
+    pub(crate) async fn make_online_proposal(
         &self,
         peer: Peer,
         previous_name: Option<XorName>,

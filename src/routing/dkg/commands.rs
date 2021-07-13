@@ -7,16 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, RoutingMsg, Variant},
-    DstInfo, DstLocation, SectionAuthorityProvider,
+    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, NodeMsg},
+    DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
-    error::Result, messages::RoutingMsgUtils, node::Node, routing_api::command::Command,
+    error::Result, messages::WireMsgUtils, node::Node, routing_api::command::Command,
     section::SectionKeyShare,
 };
+use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use std::{collections::BTreeSet, fmt::Debug, net::SocketAddr, time::Duration};
 use xor_name::XorName;
+
 #[derive(Debug)]
 pub(crate) enum DkgCommand {
     SendMessage {
@@ -42,26 +44,23 @@ pub(crate) enum DkgCommand {
 }
 
 impl DkgCommand {
-    fn into_command(self, node: &Node, key: bls::PublicKey) -> Result<Command> {
+    fn into_command(self, node: &Node, key: BlsPublicKey) -> Result<Command> {
         match self {
             Self::SendMessage {
                 recipients,
                 dkg_key,
                 message,
             } => {
-                let variant = Variant::DkgMessage { dkg_key, message };
-                let message =
-                    RoutingMsg::single_src(node, DstLocation::DirectAndUnrouted, variant, key)?;
+                let node_msg = NodeMsg::DkgMessage { dkg_key, message };
+                let wire_msg =
+                    WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
+                let delivery_group_size = recipients.len();
 
-                Ok(Command::send_message_to_nodes(
-                    recipients.clone(),
-                    recipients.len(),
-                    message,
-                    DstInfo {
-                        dst: XorName::random(),
-                        dst_section_pk: key,
-                    },
-                ))
+                Ok(Command::SendMessage {
+                    recipients,
+                    delivery_group_size,
+                    wire_msg,
+                })
             }
             Self::ScheduleTimeout { duration, token } => {
                 Ok(Command::ScheduleTimeout { duration, token })
@@ -79,23 +78,20 @@ impl DkgCommand {
                 sig,
                 failed_participants,
             } => {
-                let variant = Variant::DkgFailureObservation {
+                let node_msg = NodeMsg::DkgFailureObservation {
                     dkg_key,
                     sig,
                     failed_participants,
                 };
-                let message =
-                    RoutingMsg::single_src(node, DstLocation::DirectAndUnrouted, variant, key)?;
+                let wire_msg =
+                    WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
+                let delivery_group_size = recipients.len();
 
-                Ok(Command::send_message_to_nodes(
-                    recipients.clone(),
-                    recipients.len(),
-                    message,
-                    DstInfo {
-                        dst: XorName::random(),
-                        dst_section_pk: key,
-                    },
-                ))
+                Ok(Command::SendMessage {
+                    recipients,
+                    delivery_group_size,
+                    wire_msg,
+                })
             }
             Self::HandleFailureAgreement(signeds) => Ok(Command::HandleDkgFailure(signeds)),
         }
@@ -103,11 +99,11 @@ impl DkgCommand {
 }
 
 pub(crate) trait DkgCommands {
-    fn into_commands(self, node: &Node, key: bls::PublicKey) -> Result<Vec<Command>>;
+    fn into_commands(self, node: &Node, key: BlsPublicKey) -> Result<Vec<Command>>;
 }
 
 impl DkgCommands for Vec<DkgCommand> {
-    fn into_commands(self, node: &Node, key: bls::PublicKey) -> Result<Vec<Command>> {
+    fn into_commands(self, node: &Node, key: BlsPublicKey) -> Result<Vec<Command>> {
         self.into_iter()
             .map(|command| command.into_command(node, key))
             .collect()
@@ -115,7 +111,7 @@ impl DkgCommands for Vec<DkgCommand> {
 }
 
 impl DkgCommands for Option<DkgCommand> {
-    fn into_commands(self, node: &Node, key: bls::PublicKey) -> Result<Vec<Command>> {
+    fn into_commands(self, node: &Node, key: BlsPublicKey) -> Result<Vec<Command>> {
         self.into_iter()
             .map(|command| command.into_command(node, key))
             .collect()

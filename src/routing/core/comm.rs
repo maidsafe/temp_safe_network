@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::MessageType;
+use crate::messaging::WireMsg;
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -15,14 +15,16 @@ use qp2p::{Endpoint, QuicP2p};
 use std::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
-    sync::RwLock,
 };
-use tokio::{sync::mpsc, task};
+use tokio::{
+    sync::{mpsc, RwLock},
+    task,
+};
 use xor_name::XorName;
 
 // Communication component of the node to interact with other nodes.
 pub(crate) struct Comm {
-    _quic_p2p: QuicP2p,
+    quic_p2p: QuicP2p,
     endpoint: Endpoint,
     // Sender for connection events. Kept here so we can clone it and pass it to the incoming
     // messages handler every time we establish new connection. It's kept in an `Option` so we can
@@ -32,7 +34,7 @@ pub(crate) struct Comm {
 }
 
 impl Comm {
-    pub async fn new(
+    pub(crate) async fn new(
         transport_config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> Result<Self> {
@@ -59,13 +61,21 @@ impl Comm {
         ));
 
         Ok(Self {
-            _quic_p2p: quic_p2p,
+            quic_p2p,
             endpoint,
             event_tx: RwLock::new(Some(event_tx)),
         })
     }
 
-    pub async fn bootstrap(
+    pub(crate) async fn async_clone(&self) -> Self {
+        Self {
+            quic_p2p: self.quic_p2p.clone(),
+            endpoint: self.endpoint.clone(),
+            event_tx: RwLock::new(self.event_tx.read().await.clone()),
+        }
+    }
+
+    pub(crate) async fn bootstrap(
         transport_config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> Result<(Self, SocketAddr)> {
@@ -92,7 +102,7 @@ impl Comm {
 
         Ok((
             Self {
-                _quic_p2p: quic_p2p,
+                quic_p2p,
                 endpoint,
                 event_tx: RwLock::new(Some(event_tx)),
             },
@@ -101,41 +111,42 @@ impl Comm {
     }
 
     // Close all existing connections and stop accepting new ones.
-    pub fn terminate(&self) {
+    pub(crate) async fn terminate(&self) {
         self.endpoint.close();
-        let _ = self
-            .event_tx
-            .write()
-            .unwrap_or_else(|err| err.into_inner())
-            .take();
+        let _ = self.event_tx.write().await.take();
     }
 
-    pub fn our_connection_info(&self) -> SocketAddr {
+    pub(crate) fn our_connection_info(&self) -> SocketAddr {
         self.endpoint.socket_addr()
     }
 
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
-    pub async fn send_on_existing_connection(
+    pub(crate) async fn send_on_existing_connection(
         &self,
-        recipient: (XorName, SocketAddr),
-        mut msg: MessageType,
+        recipients: &[(XorName, SocketAddr)],
+        mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
-        msg.update_dst_info(None, Some(recipient.0));
+        for (name, addr) in recipients {
+            wire_msg.set_dst_xorname(*name);
+            let bytes = wire_msg.serialize()?;
 
-        let bytes = msg.serialize()?;
-        self.endpoint
-            .try_send_message(bytes, &recipient.1)
-            .await
-            .map_err(|err| {
-                error!("Sending to {:?} failed with {}", recipient, err);
-                Error::FailedSend(recipient.1, recipient.0)
-            })?;
+            self.endpoint
+                .try_send_message(bytes, addr)
+                .await
+                .map_err(|err| {
+                    error!(
+                        "Sending to {:?} (name {:?}) failed with {}",
+                        addr, name, err
+                    );
+                    Error::FailedSend(*addr, *name)
+                })?;
+        }
 
         Ok(())
     }
 
     /// Tests whether the peer is reachable.
-    pub async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
+    pub(crate) async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
         let qp2p_config = qp2p::Config {
             local_ip: Some(self.endpoint.local_addr().ip()),
             local_port: Some(0),
@@ -173,11 +184,11 @@ impl Comm {
     /// `SendStatus::MinDeliveryGroupSizeReached` or `SendStatus::MinDeliveryGroupSizeFailed` depending
     /// on if the minimum delivery group size is met or not. The failed recipients are sent along
     /// with the status. It returns a `SendStatus::AllRecipients` if message is sent to all the recipients.
-    pub async fn send(
+    pub(crate) async fn send(
         &self,
         recipients: &[(XorName, SocketAddr)],
         delivery_group_size: usize,
-        mut msg: MessageType,
+        mut wire_msg: WireMsg,
     ) -> Result<SendStatus> {
         trace!(
             "Sending message to {} of {:?}",
@@ -198,25 +209,27 @@ impl Comm {
         if recipients.is_empty() {
             return Err(Error::EmptyRecipientList);
         }
+
         // Use the first Xor address recipient to represent the destination section.
         // So that only one copy of MessageType need to be constructed.
-        msg.update_dst_info(None, Some(recipients[0].0));
+        wire_msg.set_dst_xorname(recipients[0].0);
 
-        let msg_bytes = msg.serialize().map_err(Error::Messaging)?;
+        let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
 
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
         // succeeds or if there are no more recipients to pick.
         let send = |recipient: (XorName, SocketAddr), msg_bytes: Bytes| async move {
             trace!(
-                "Sending message ({} bytes) to {} of {:?}",
+                "Sending message ({} bytes) to {} of delivery group size {}",
                 msg_bytes.len(),
+                recipient.1,
                 delivery_group_size,
-                recipient.1
             );
 
             let result = self
-                .send_to(&recipient.1, msg_bytes)
+                .endpoint
+                .send_message(msg_bytes, &recipient.1)
                 .await
                 .map_err(|err| match err {
                     qp2p::Error::Connection(qp2p::ConnectionError::LocallyClosed) => {
@@ -260,8 +273,8 @@ impl Comm {
         }
 
         trace!(
-            "Sending message {:?} finished to {}/{} recipients (failed: {:?})",
-            msg,
+            "Finished sending message {:?} to {}/{} recipients (failed: {:?})",
+            wire_msg,
             successes,
             delivery_group_size,
             failed_recipients
@@ -276,12 +289,6 @@ impl Comm {
         } else {
             Ok(SendStatus::MinDeliveryGroupSizeFailed(failed_recipients))
         }
-    }
-
-    // Low-level send
-    async fn send_to(&self, recipient: &SocketAddr, msg: Bytes) -> Result<(), qp2p::Error> {
-        trace!("Low level send for msg over qp2p");
-        self.endpoint.send_message(msg, recipient).await
     }
 }
 
@@ -327,7 +334,7 @@ async fn handle_incoming_messages(
 
 /// Returns the status of the send operation.
 #[derive(Debug, Clone)]
-pub enum SendStatus {
+pub(crate) enum SendStatus {
     AllRecipients,
     MinDeliveryGroupSizeReached(Vec<SocketAddr>),
     MinDeliveryGroupSizeFailed(Vec<SocketAddr>),
@@ -336,7 +343,7 @@ pub enum SendStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{section_info::SectionInfoMsg, DstInfo, WireMsg};
+    use crate::messaging::{section_info::SectionInfoMsg, DstLocation, WireMsg};
     use crate::types::PublicKey;
     use anyhow::Result;
     use assert_matches::assert_matches;
@@ -355,7 +362,7 @@ mod tests {
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
 
-        let mut original_message = new_section_info_message();
+        let mut original_message = new_section_info_message()?;
 
         let status = comm
             .send(
@@ -368,12 +375,12 @@ mod tests {
         assert_matches!(status, SendStatus::AllRecipients);
 
         if let Some(bytes) = peer0.rx.recv().await {
-            original_message.update_dst_info(None, Some(peer0._name));
-            assert_eq!(WireMsg::deserialize(bytes)?, original_message.clone());
+            original_message.set_dst_xorname(peer0._name);
+            assert_eq!(WireMsg::from(bytes)?, original_message.clone());
         }
 
         if let Some(bytes) = peer1.rx.recv().await {
-            assert_eq!(WireMsg::deserialize(bytes)?, original_message);
+            assert_eq!(WireMsg::from(bytes)?, original_message);
         }
 
         Ok(())
@@ -387,7 +394,7 @@ mod tests {
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
 
-        let mut original_message = new_section_info_message();
+        let mut original_message = new_section_info_message()?;
         let status = comm
             .send(
                 &[(peer0._name, peer0.addr), (peer1._name, peer1.addr)],
@@ -399,8 +406,8 @@ mod tests {
         assert_matches!(status, SendStatus::AllRecipients);
 
         if let Some(bytes) = peer0.rx.recv().await {
-            original_message.update_dst_info(None, Some(peer0._name));
-            assert_eq!(WireMsg::deserialize(bytes)?, original_message);
+            original_message.set_dst_xorname(peer0._name);
+            assert_eq!(WireMsg::from(bytes)?, original_message);
         }
 
         assert!(time::timeout(TIMEOUT, peer1.rx.recv())
@@ -429,7 +436,7 @@ mod tests {
             .send(
                 &[(XorName::random(), invalid_addr)],
                 1,
-                new_section_info_message(),
+                new_section_info_message()?,
             )
             .await?;
 
@@ -456,7 +463,7 @@ mod tests {
         let invalid_addr = get_invalid_addr().await?;
         let name = XorName::random();
 
-        let mut message = new_section_info_message();
+        let mut message = new_section_info_message()?;
         let _ = comm
             .send(
                 &[(name, invalid_addr), (peer._name, peer.addr)],
@@ -467,8 +474,8 @@ mod tests {
 
         // Using first name of the recipients to represent section_name.
         if let Some(bytes) = peer.rx.recv().await {
-            message.update_dst_info(None, Some(name));
-            assert_eq!(WireMsg::deserialize(bytes)?, message);
+            message.set_dst_xorname(name);
+            assert_eq!(WireMsg::from(bytes)?, message);
         }
         Ok(())
     }
@@ -488,7 +495,7 @@ mod tests {
         let invalid_addr = get_invalid_addr().await?;
         let name = XorName::random();
 
-        let mut message = new_section_info_message();
+        let mut message = new_section_info_message()?;
         let status = comm
             .send(
                 &[(name, invalid_addr), (peer._name, peer.addr)],
@@ -504,8 +511,8 @@ mod tests {
 
         // Using first name of the recipients to represent section_name.
         if let Some(bytes) = peer.rx.recv().await {
-            message.update_dst_info(None, Some(name));
-            assert_eq!(WireMsg::deserialize(bytes)?, message);
+            message.set_dst_xorname(name);
+            assert_eq!(WireMsg::from(bytes)?, message);
         }
         Ok(())
     }
@@ -522,13 +529,12 @@ mod tests {
 
         // Send the first message.
         let key0 = bls::SecretKey::random().public_key();
-        let msg0 = MessageType::SectionInfo {
-            msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key0)),
-            dst_info: DstInfo {
-                dst: name,
-                dst_section_pk: key0,
-            },
+        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key0));
+        let dst_location = DstLocation::Node {
+            name,
+            section_pk: key0,
         };
+        let msg0 = WireMsg::new_section_info_msg(&query, dst_location)?;
         let _ = send_comm
             .send(slice::from_ref(&(name, recv_addr)), 1, msg0.clone())
             .await?;
@@ -538,7 +544,7 @@ mod tests {
         // Receive one message and disconnect from the peer
         {
             if let Some((src, msg)) = time::timeout(TIMEOUT, incoming_msgs.next()).await? {
-                assert_eq!(WireMsg::deserialize(msg)?, msg0);
+                assert_eq!(WireMsg::from(msg)?, msg0);
                 msg0_received = true;
                 recv_endpoint.disconnect_from(&src).await?;
             }
@@ -547,13 +553,12 @@ mod tests {
 
         // Send the second message.
         let key1 = bls::SecretKey::random().public_key();
-        let msg1 = MessageType::SectionInfo {
-            msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key1)),
-            dst_info: DstInfo {
-                dst: name,
-                dst_section_pk: key1,
-            },
+        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key1));
+        let dst_location = DstLocation::Node {
+            name,
+            section_pk: key1,
         };
+        let msg1 = WireMsg::new_section_info_msg(&query, dst_location)?;
         let _ = send_comm
             .send(slice::from_ref(&(name, recv_addr)), 1, msg1.clone())
             .await?;
@@ -561,7 +566,7 @@ mod tests {
         let mut msg1_received = false;
 
         if let Some((_src, msg)) = time::timeout(TIMEOUT, incoming_msgs.next()).await? {
-            assert_eq!(WireMsg::deserialize(msg)?, msg1);
+            assert_eq!(WireMsg::from(msg)?, msg1);
             msg1_received = true;
         }
 
@@ -585,7 +590,7 @@ mod tests {
             .send(
                 slice::from_ref(&(XorName::random(), addr0)),
                 1,
-                new_section_info_message(),
+                new_section_info_message()?,
             )
             .await?;
 
@@ -608,15 +613,16 @@ mod tests {
         }
     }
 
-    fn new_section_info_message() -> MessageType {
+    fn new_section_info_message() -> Result<WireMsg> {
         let random_bls_pk = bls::SecretKey::random().public_key();
-        MessageType::SectionInfo {
-            msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(random_bls_pk)),
-            dst_info: DstInfo {
-                dst: XorName::random(),
-                dst_section_pk: bls::SecretKey::random().public_key(),
-            },
-        }
+        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(random_bls_pk));
+        let dst_location = DstLocation::Node {
+            name: XorName::random(),
+            section_pk: bls::SecretKey::random().public_key(),
+        };
+
+        let wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
+        Ok(wire_msg)
     }
 
     struct Peer {

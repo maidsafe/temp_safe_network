@@ -34,7 +34,6 @@
 //!
 
 use futures::future::join_all;
-use hex_fmt::HexFmt;
 use std::{
     collections::HashSet,
     convert::TryInto,
@@ -196,7 +195,7 @@ async fn start_node(
         .await
         .expect("Failed to instantiate a Node");
 
-    let contact_info = node.our_connection_info();
+    let contact_info = node.our_connection_info().await;
 
     info!(
         "Node #{} connected - name: {}, contact: {}",
@@ -256,14 +255,9 @@ async fn handle_event(index: usize, node: &mut Routing, event: Event) -> bool {
                 index, elders, self_status_change
             );
         }
-        Event::MessageReceived {
-            content, src, dst, ..
-        } => info!(
-            "Node #{} received message - src: {:?}, dst: {:?}, content: {}",
-            index,
-            src,
-            dst,
-            HexFmt(&content)
+        Event::MessageReceived { msg, src, dst, .. } => info!(
+            "Node #{} received message - src: {:?}, dst: {:?}, content: {:?}",
+            index, src, dst, msg
         ),
         Event::RelocationStarted { previous_name } => info!(
             "Node #{} relocation started - previous_name: {}",
@@ -276,15 +270,10 @@ async fn handle_event(index: usize, node: &mut Routing, event: Event) -> bool {
                 index, previous_name, new_name,
             );
         }
-        Event::RestartRequired => {
-            info!("Node #{} requires restart", index);
-            return false;
-        }
         Event::ClientMsgReceived { msg, user, .. } => info!(
             "Node #{} received message from user: {:?}, msg: {:?}",
             index, user, msg
         ),
-        Event::ClientLost(addr) => info!("Node #{} received ClientLost({:?})", index, addr),
         Event::AdultsChanged {
             remaining,
             added,

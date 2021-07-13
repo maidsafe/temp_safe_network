@@ -43,7 +43,7 @@ pub struct RegisterCmd {
     ///
     pub msg_id: crate::messaging::MessageId,
     ///
-    pub client_sig: super::ClientSig,
+    pub client_sig: crate::messaging::ClientSigned,
     ///
     pub origin: crate::messaging::EndUser,
 }
