@@ -21,7 +21,6 @@ use crate::routing::{
     section::{ElderCandidatesUtils, SectionPeersUtils, SectionUtils},
     Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
-use xor_name::XorName;
 
 use super::Core;
 
@@ -34,13 +33,8 @@ impl Core {
     ) -> Result<Vec<Command>> {
         debug!("handle agreement on {:?}", proposal);
         match proposal {
-            Proposal::Online {
-                node_state,
-                previous_name,
-                ..
-            } => {
-                self.handle_online_agreement(node_state, previous_name, sig)
-                    .await
+            Proposal::Online { node_state, .. } => {
+                self.handle_online_agreement(node_state, sig).await
             }
             Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
             Proposal::SectionInfo(section_auth) => {
@@ -59,7 +53,6 @@ impl Core {
     async fn handle_online_agreement(
         &mut self,
         new_info: NodeState,
-        previous_name: Option<XorName>,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
@@ -106,7 +99,7 @@ impl Core {
 
         self.send_event(Event::MemberJoined {
             name: *new_info.value.peer.name(),
-            previous_name,
+            previous_name: new_info.value.previous_name,
             age: new_info.value.peer.age(),
         })
         .await;

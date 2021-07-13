@@ -259,8 +259,7 @@ impl Core {
         dst_key: Option<bls::PublicKey>,
     ) -> Result<Vec<Command>> {
         self.propose(Proposal::Online {
-            node_state: NodeState::joined(peer),
-            previous_name,
+            node_state: NodeState::joined(peer, previous_name),
             dst_key,
         })
     }

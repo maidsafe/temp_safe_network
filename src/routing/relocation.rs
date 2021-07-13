@@ -308,7 +308,7 @@ mod tests {
         let mut section = Section::new(pk, SecuredLinkedList::new(pk), section_auth)?;
 
         for peer in &peers {
-            let info = NodeState::joined(*peer);
+            let info = NodeState::joined(*peer, None);
             let info = section_signed(sk, info)?;
 
             assert!(section.update_member(info));

@@ -209,7 +209,7 @@ mod tests {
         let name = ed25519::gen_name_with_age(MIN_ADULT_AGE);
         let dst_name = section.prefix().substituted_in(name);
         let peer = Peer::new(dst_name, gen_addr());
-        let node_state = NodeState::joined(peer);
+        let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(&sk, node_state)?;
         assert!(section.update_member(node_state));
 
@@ -510,7 +510,7 @@ mod tests {
         let mut section = Section::new(pk, chain, section_auth0)?;
 
         for peer in elders0 {
-            let node_state = NodeState::joined(peer);
+            let node_state = NodeState::joined(peer, None);
             let node_state = section_signed(&sk, node_state)?;
             assert!(section.update_member(node_state));
         }
