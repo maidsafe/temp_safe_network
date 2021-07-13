@@ -12,13 +12,14 @@
 //!
 //! - This module contains types that are common across the messaging API.
 //! - The [`serialisation`] module defines the wire format and message (de)serialization API.
-//! - The [`client`] module defines the messages that clients can send to the network, and their
+//! - The [`data`] module defines the data messages that clients and nodes send, and their
 //!   possible responses.
 //! - The [`node`] module defines the messages that nodes can exchange on the network.
 //! - The [`section_info`] module defines the queries and responses for section information – these
 //!   may be sent by both clients and nodes.
 
-pub mod client;
+/// Data messages that clients and nodes can send.
+pub mod data;
 /// Messages that nodes can exchange on the network.
 pub mod node;
 /// Queries and responses for section information.

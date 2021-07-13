@@ -10,8 +10,10 @@ mod listeners;
 mod messaging;
 
 use crate::client::Error;
-use crate::messaging::client::CmdError;
-use crate::messaging::{client::QueryResponse, MessageId};
+use crate::messaging::{
+    data::{CmdError, QueryResponse},
+    MessageId,
+};
 use crate::types::PublicKey;
 use bls::PublicKeySet;
 use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};

@@ -9,7 +9,7 @@
 use super::{QueryResult, Session};
 use crate::client::Error;
 use crate::messaging::{
-    client::{ChunkRead, DataCmd, DataQuery, QueryResponse},
+    data::{ChunkRead, DataCmd, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
     ClientSigned, MessageId, WireMsg,
 };

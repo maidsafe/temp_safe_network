@@ -11,7 +11,7 @@ use super::{
     sequence_storage::SequenceStorage,
 };
 use crate::messaging::{
-    client::{DataCmd, DataExchange, DataQuery, MapCmd, RegisterCmd, SequenceCmd},
+    data::{DataCmd, DataExchange, DataQuery, MapCmd, RegisterCmd, SequenceCmd},
     ClientSigned, EndUser, MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Error, Result};

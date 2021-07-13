@@ -14,7 +14,7 @@ use crate::types::{
     Map, MapAddress, MapEntries, MapEntryActions, MapKind, MapPermissionSet, MapValue, PublicKey,
 };
 
-use crate::messaging::client::{DataCmd, DataQuery, MapRead, MapWrite, QueryResponse};
+use crate::messaging::data::{DataCmd, DataQuery, MapRead, MapWrite, QueryResponse};
 
 use xor_name::XorName;
 
@@ -357,7 +357,7 @@ impl Client {
 mod tests {
     use super::*;
     use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff};
-    use crate::messaging::client::{CmdError, Error as ErrorMessage};
+    use crate::messaging::data::{CmdError, Error as ErrorMessage};
     use crate::types::{MapAction, MapKind, MapValues};
     use anyhow::{anyhow, bail, Result};
     use std::time::Duration;

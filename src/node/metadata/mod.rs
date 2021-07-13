@@ -16,7 +16,7 @@ mod sequence_storage;
 
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    client::{CmdError, DataCmd, DataExchange, DataMsg, DataQuery, ProcessMsg, QueryResponse},
+    data::{CmdError, DataCmd, DataExchange, DataMsg, DataQuery, ProcessMsg, QueryResponse},
     ClientSigned, DstLocation, EndUser, MessageId,
 };
 use crate::node::{

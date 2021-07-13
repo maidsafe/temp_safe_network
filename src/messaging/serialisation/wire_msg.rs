@@ -8,7 +8,7 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    client::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, DstLocation, Error, MessageId,
+    data::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, DstLocation, Error, MessageId,
     MessageType, MsgKind, NodeMsgAuthority, Result,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -240,7 +240,7 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            client::{ChunkRead, DataMsg, DataQuery, ProcessMsg},
+            data::{ChunkRead, DataMsg, DataQuery, ProcessMsg},
             node::{NodeCmd, NodeMsg, NodeSystemCmd},
             ClientSigned, MessageId, NodeSigned,
         },

@@ -9,7 +9,7 @@
 mod client_msg;
 mod node_msg;
 
-use crate::messaging::{client::DataMsg, SrcLocation};
+use crate::messaging::{data::DataMsg, SrcLocation};
 use crate::node::{network::Network, node_ops::NodeDuty};
 use crate::routing::{Event as RoutingEvent, MessageReceived, NodeElderChange, XorName, MIN_AGE};
 use crate::types::PublicKey;

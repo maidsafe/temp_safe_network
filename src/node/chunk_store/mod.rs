@@ -15,7 +15,7 @@ use crate::node::{
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use crate::{
     messaging::{
-        client::{ChunkRead, ChunkWrite, Error as ErrorMessage},
+        data::{ChunkRead, ChunkWrite, Error as ErrorMessage},
         node::{NodeDataQueryResponse, NodeMsg, NodeQueryResponse},
         DstLocation, MessageId,
     },

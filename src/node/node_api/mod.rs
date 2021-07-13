@@ -14,7 +14,7 @@ mod role;
 mod split;
 
 use crate::dbs::UsedSpace;
-use crate::messaging::client::{DataMsg, ProcessingError};
+use crate::messaging::data::{DataMsg, ProcessingError};
 use crate::node::logging::log_ctx::LogCtx;
 use crate::node::logging::run_system_logger;
 use crate::node::{

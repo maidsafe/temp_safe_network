@@ -15,7 +15,7 @@ use crate::types::{
 };
 use crate::{
     messaging::{
-        client::{
+        data::{
             CmdError, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead, RegisterWrite,
         },
         EndUser, MessageId,

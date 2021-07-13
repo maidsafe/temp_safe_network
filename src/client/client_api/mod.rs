@@ -15,7 +15,7 @@ mod register_apis;
 mod sequence_apis;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
-use crate::messaging::client::{CmdError, DataCmd};
+use crate::messaging::data::{CmdError, DataCmd};
 use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
 use lru::LruCache;
 use rand::rngs::OsRng;

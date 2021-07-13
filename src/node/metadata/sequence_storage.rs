@@ -16,7 +16,7 @@ use crate::types::{
 };
 use crate::{
     messaging::{
-        client::{
+        data::{
             CmdError, QueryResponse, SequenceCmd, SequenceDataExchange, SequenceRead, SequenceWrite,
         },
         EndUser, MessageId,

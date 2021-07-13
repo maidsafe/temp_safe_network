@@ -9,7 +9,7 @@
 use super::Client;
 use crate::client::Error;
 use crate::messaging::{
-    client::{DataCmd, DataMsg, ProcessMsg},
+    data::{DataCmd, DataMsg, ProcessMsg},
     ClientSigned, WireMsg,
 };
 use crate::types::{PublicKey, Signature};
