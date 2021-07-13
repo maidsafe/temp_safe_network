@@ -24,9 +24,25 @@ endif
 	mkdir artifacts
 	sudo apt update -y && sudo apt install -y musl-tools
 	rustup target add x86_64-unknown-linux-musl
-	cargo build --release --target x86_64-unknown-linux-musl --verbose
+	cargo build --release --target x86_64-unknown-linux-musl
 	find target/x86_64-unknown-linux-musl/release \
 		-maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+arm-unknown-linux-musleabi:
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+	cargo install cross
+	cross build --release --target arm-unknown-linux-musleabi
+	find target/arm-unknown-linux-musleabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+armv7-unknown-linux-musleabihf:
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+	cargo install cross
+	cross build --release --target armv7-unknown-linux-musleabihf
+	find target/armv7-unknown-linux-musleabihf/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
 package-version-artifacts-for-deploy:
@@ -34,31 +50,19 @@ package-version-artifacts-for-deploy:
 	rm -rf ${DEPLOY_PATH}
 	mkdir -p ${DEPLOY_PROD_PATH}
 
-	zip -j sn_cli-${SN_CLI_VERSION}-x86_64-unknown-linux-musl.zip \
-		artifacts/prod/x86_64-unknown-linux-musl/release/safe
-	zip -j sn_cli-latest-x86_64-unknown-linux-musl.zip \
-		artifacts/prod/x86_64-unknown-linux-musl/release/safe
-	zip -j sn_cli-${SN_CLI_VERSION}-x86_64-pc-windows-msvc.zip \
-		artifacts/prod/x86_64-pc-windows-msvc/release/safe.exe
-	zip -j sn_cli-latest-x86_64-pc-windows-msvc.zip \
-		artifacts/prod/x86_64-pc-windows-msvc/release/safe.exe
-	zip -j sn_cli-${SN_CLI_VERSION}-x86_64-apple-darwin.zip \
-		artifacts/prod/x86_64-apple-darwin/release/safe
-	zip -j sn_cli-latest-x86_64-apple-darwin.zip \
-		artifacts/prod/x86_64-apple-darwin/release/safe
+	declare -a architectures=( \
+		"x86_64-unknown-linux-musl" \
+		"x86_64-pc-windows-msvc" \
+		"x86_64-apple-darwin" \
+		"arm-unknown-linux-musleabi" \
+		"armv7-unknown-linux-musleabihf")
 
-	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
-		-zcvf sn_cli-${SN_CLI_VERSION}-x86_64-unknown-linux-musl.tar.gz safe
-	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
-		-zcvf sn_cli-latest-x86_64-unknown-linux-musl.tar.gz safe
-	tar -C artifacts/prod/x86_64-pc-windows-msvc/release \
-		-zcvf sn_cli-${SN_CLI_VERSION}-x86_64-pc-windows-msvc.tar.gz safe.exe
-	tar -C artifacts/prod/x86_64-pc-windows-msvc/release \
-		-zcvf sn_cli-latest-x86_64-pc-windows-msvc.tar.gz safe.exe
-	tar -C artifacts/prod/x86_64-apple-darwin/release \
-		-zcvf sn_cli-${SN_CLI_VERSION}-x86_64-apple-darwin.tar.gz safe
-	tar -C artifacts/prod/x86_64-apple-darwin/release \
-		-zcvf sn_cli-latest-x86_64-apple-darwin.tar.gz safe
+	for arch in "$${architectures[@]}" ; do \
+		zip -j sn_cli-${SN_CLI_VERSION}-$$arch.zip artifacts/prod/$$arch/release/safe*; \
+		zip -j sn_cli-latest-$$arch.zip artifacts/prod/$$arch/release/safe*; \
+		(cd artifacts/prod/$$arch/release && tar -zcvf sn_cli-${SN_CLI_VERSION}-$$arch.tar.gz safe*); \
+		(cd artifacts/prod/$$arch/release && tar -zcvf sn_cli-latest-$$arch.tar.gz safe*); \
+	done
 
+	find artifacts -name "*.tar.gz" -exec mv {} ${DEPLOY_PROD_PATH} \;
 	mv *.zip ${DEPLOY_PROD_PATH}
-	mv *.tar.gz ${DEPLOY_PROD_PATH}

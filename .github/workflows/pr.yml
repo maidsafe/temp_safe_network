@@ -7,10 +7,7 @@ name: PR
 on: pull_request
 
 env:
-  # Run all cargo commands with --verbose.
-  CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
-  # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
 jobs:
@@ -153,6 +150,39 @@ jobs:
       run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
 
     - uses: EmbarkStudios/cargo-deny-action@v1
+
+  build_arm:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - shell: bash
+        run: make ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@master
+        with:
+          name: sn_cli-${{ matrix.target }}-prod
+          path: artifacts
 
   test:
     # Stopping this from running at this time as tests are failing
