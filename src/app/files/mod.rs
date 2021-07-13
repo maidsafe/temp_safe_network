@@ -1318,9 +1318,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_create_folder_without_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata"), None, true, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) =
+            retry_loop!(safe.files_container_create(Some("../testdata"), None, true, true, false));
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
@@ -1360,9 +1359,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_create_folder_with_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) =
+            retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
@@ -1854,7 +1852,7 @@ mod tests {
                 assert_eq!(
                 msg,
                 format!(
-                    "The linked content (FilesContainer) is versionable, therefore NRS requires the link to specify a version: \"{}\"",
+                    "The linked content (FilesContainer) is versionable, therefore NRS requires the link to specify a hash: \"{}\"",
                     unversioned_link
                 )
             );
@@ -1907,36 +1905,37 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_sync_update_nrs_versioned_link() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, _, _) = safe
-            .files_container_create(Some("../testdata/"), None, true, true, false)
-            .await?;
+        let (xorurl, _, _) =
+            retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(0));
-        let (nrs_xorurl, _, _) = safe
-            .nrs_map_container_create(&nrsurl, &safe_url.to_string(), false, true, false)
-            .await?;
+        let (nrs_xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
+            &nrsurl,
+            &safe_url.to_string(),
+            false,
+            true,
+            false
+        ));
 
         let _ = retry_loop!(safe.fetch(&nrs_xorurl, None));
 
-        let _ = safe
-            .files_container_sync(
-                "../testdata/subfolder/",
-                &nrsurl,
-                false,
-                false,
-                false,
-                true, // this flag requests the update-nrs
-                false,
-            )
-            .await?;
+        let _ = retry_loop!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &nrsurl,
+            false,
+            false,
+            false,
+            true, // this flag requests the update-nrs
+            false,
+        ));
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(1));
-        let (new_link, _) = safe.parse_and_resolve_url(&nrsurl).await?;
+        let (new_link, _) = retry_loop!(safe.parse_and_resolve_url(&nrsurl));
         assert_eq!(new_link.to_string(), safe_url.to_string());
 
         Ok(())
@@ -1945,26 +1944,23 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_sync_target_path_without_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) =
+            retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("path/when/sync");
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_sync(
-                "../testdata/subfolder",
-                &safe_url.to_string(),
-                true,
-                false,
-                false,
-                false,
-                false,
-            )
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_sync(
+            "../testdata/subfolder",
+            &safe_url.to_string(),
+            true,
+            false,
+            false,
+            false,
+            false,
+        ));
 
         assert_eq!(version, 1);
         assert_eq!(
@@ -2018,26 +2014,23 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_sync_target_path_with_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) =
+            retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("/path/when/sync/");
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_sync(
-                "../testdata/subfolder",
-                &safe_url.to_string(),
-                true,
-                false,
-                false,
-                false,
-                false,
-            )
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_sync(
+            "../testdata/subfolder",
+            &safe_url.to_string(),
+            true,
+            false,
+            false,
+            false,
+            false,
+        ));
 
         assert_eq!(version, 1);
         assert_eq!(
@@ -2091,9 +2084,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_get() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, true, false)
-            .await?;
+        let (xorurl, _, files_map) =
+            retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
 
         let (version, fetched_files_map) = retry_loop!(safe.files_container_get(&xorurl));
 
@@ -2114,24 +2106,21 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_version() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, _, _) = safe
-            .files_container_create(Some("../testdata/"), None, true, true, false)
-            .await?;
+        let (xorurl, _, _) =
+            retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
 
         let (version, _) = retry_loop!(safe.files_container_get(&xorurl));
         assert_eq!(version, 0);
 
-        let (version, _, _) = safe
-            .files_container_sync(
-                "../testdata/subfolder/",
-                &xorurl,
-                true,
-                false,
-                true, // this sets the delete flag,
-                false,
-                false,
-            )
-            .await?;
+        let (version, _, _) = retry_loop!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &xorurl,
+            true,
+            false,
+            true, // this sets the delete flag,
+            false,
+            false,
+        ));
         assert_eq!(version, 1);
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
@@ -2146,13 +2135,12 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_get_with_version() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, _processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, true, false)
-            .await?;
+        let (xorurl, _processed_files, files_map) =
+            retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // let's create a new version of the files container
-        let (_version, _new_processed_files, new_files_map) = safe
+        let (_version, _new_processed_files, new_files_map) = retry_loop!(safe
             .files_container_sync(
                 "../testdata/subfolder/",
                 &xorurl,
@@ -2161,13 +2149,12 @@ mod tests {
                 true, // this sets the delete flag
                 false,
                 false,
-            )
-            .await?;
+            ));
 
         // let's fetch version 0
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(0));
-        let (version, v0_files_map) = safe.files_container_get(&safe_url.to_string()).await?;
+        let (version, v0_files_map) = retry_loop!(safe.files_container_get(&safe_url.to_string()));
 
         assert_eq!(version, 0);
         assert_eq!(files_map, v0_files_map);
@@ -2220,9 +2207,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_create_get_empty_folder() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, _processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, true, false)
-            .await?;
+        let (xorurl, _processed_files, files_map) =
+            retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
 
         let (_, files_map_get) = retry_loop!(safe.files_container_get(&xorurl.to_string()));
 
@@ -2239,42 +2225,46 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_sync_with_nrs_url() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, _, _) = safe
-            .files_container_create(Some("../testdata/test.md"), None, false, true, false)
-            .await?;
+        let (xorurl, _, _) = retry_loop!(safe.files_container_create(
+            Some("../testdata/test.md"),
+            None,
+            false,
+            true,
+            false
+        ));
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(0));
-        let (nrs_xorurl, _, _) = safe
-            .nrs_map_container_create(&nrsurl, &safe_url.to_string(), false, true, false)
-            .await?;
+        let (nrs_xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
+            &nrsurl,
+            &safe_url.to_string(),
+            false,
+            true,
+            false
+        ));
         let _ = retry_loop!(safe.fetch(&nrs_xorurl, None));
 
-        let _ = safe
-            .files_container_sync(
-                "../testdata/subfolder/",
-                &xorurl,
-                false,
-                false,
-                false,
-                false,
-                false,
-            )
-            .await?;
+        let _ = retry_loop!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &xorurl,
+            false,
+            false,
+            false,
+            false,
+            false,
+        ));
 
-        let _ = safe
-            .files_container_sync(
-                "../testdata/",
-                &nrsurl,
-                false,
-                false,
-                false,
-                true, // this flag requests the update-nrs
-                false,
-            )
-            .await?;
+        let _ = retry_loop!(safe.files_container_sync(
+            "../testdata/",
+            &nrsurl,
+            false,
+            false,
+            false,
+            true, // this flag requests the update-nrs
+            false,
+        ));
 
         // now it should look like:
         // safe://<nrs>
@@ -2296,23 +2286,25 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/subfolder/"), None, false, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
+            Some("../testdata/subfolder/"),
+            None,
+            false,
+            true,
+            false
+        ));
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_add(
-                "../testdata/test.md",
-                &format!("{}/new_filename_test.md", xorurl),
-                false,
-                false,
-                false,
-                false,
-            )
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+            "../testdata/test.md",
+            &format!("{}/new_filename_test.md", xorurl),
+            false,
+            false,
+            false,
+            false,
+        ));
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2344,30 +2336,32 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_dry_run() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/subfolder/"), None, false, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
+            Some("../testdata/subfolder/"),
+            None,
+            false,
+            true,
+            false
+        ));
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_add(
-                "../testdata/test.md",
-                &format!("{}/new_filename_test.md", xorurl),
-                false,
-                false,
-                false,
-                true, // dry run
-            )
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+            "../testdata/test.md",
+            &format!("{}/new_filename_test.md", xorurl),
+            false,
+            false,
+            false,
+            true, // dry run
+        ));
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
         // a dry run again should give the exact same results
-        let (version2, new_processed_files2, new_files_map2) = safe
+        let (version2, new_processed_files2, new_files_map2) = retry_loop!(safe
             .files_container_add(
                 "../testdata/test.md",
                 &format!("{}/new_filename_test.md", xorurl),
@@ -2375,8 +2369,7 @@ mod tests {
                 false,
                 false,
                 true, // dry run
-            )
-            .await?;
+            ));
 
         assert_eq!(version, version2);
         assert_eq!(new_processed_files.len(), new_processed_files2.len());
@@ -2400,9 +2393,13 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_dir() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/subfolder/"), None, false, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
+            Some("../testdata/subfolder/"),
+            None,
+            false,
+            true,
+            false
+        ));
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT); // root "/" + 2 files
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
@@ -2431,24 +2428,26 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_existing_name() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/subfolder/"), None, false, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
+            Some("../testdata/subfolder/"),
+            None,
+            false,
+            true,
+            false
+        ));
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // let's try to add a file with same target name and same content, it should fail
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_add(
-                "../testdata/subfolder/sub2.md",
-                &format!("{}/sub2.md", xorurl),
-                false,
-                false,
-                false,
-                false,
-            )
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+            "../testdata/subfolder/sub2.md",
+            &format!("{}/sub2.md", xorurl),
+            false,
+            false,
+            false,
+            false,
+        ));
 
         assert_eq!(version, 0);
         assert_eq!(new_processed_files.len(), 1);
@@ -2460,16 +2459,14 @@ mod tests {
         assert_eq!(files_map, new_files_map);
 
         // let's try to add a file with same target name but with different content, it should still fail
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_add(
-                "../testdata/test.md",
-                &format!("{}/sub2.md", xorurl),
-                false,
-                false,
-                false,
-                false,
-            )
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+            "../testdata/test.md",
+            &format!("{}/sub2.md", xorurl),
+            false,
+            false,
+            false,
+            false,
+        ));
 
         assert_eq!(version, 0);
         assert_eq!(new_processed_files.len(), 1);
@@ -2481,16 +2478,14 @@ mod tests {
         assert_eq!(files_map, new_files_map);
 
         // let's now force it
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_add(
-                "../testdata/test.md",
-                &format!("{}/sub2.md", xorurl),
-                true, //force it
-                false,
-                false,
-                false,
-            )
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+            "../testdata/test.md",
+            &format!("{}/sub2.md", xorurl),
+            true, //force it
+            false,
+            false,
+            false,
+        ));
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2510,9 +2505,13 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_fail_add_or_sync_invalid_path() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/test.md"), None, false, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
+            Some("../testdata/test.md"),
+            None,
+            false,
+            true,
+            false
+        ));
         assert_eq!(processed_files.len(), 1);
         assert_eq!(files_map.len(), 1);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
@@ -2570,27 +2569,29 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_a_url() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/subfolder/"), None, false, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
+            Some("../testdata/subfolder/"),
+            None,
+            false,
+            true,
+            false
+        ));
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let data = b"0123456789";
-        let file_xorurl = safe.files_store_public_blob(data, None, false).await?;
+        let file_xorurl = retry_loop!(safe.files_store_public_blob(data, None, false));
         let new_filename = "/new_filename_test.md";
 
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_add(
-                &file_xorurl,
-                &format!("{}{}", xorurl, new_filename),
-                false,
-                false,
-                false,
-                false,
-            )
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+            &file_xorurl,
+            &format!("{}{}", xorurl, new_filename),
+            false,
+            false,
+            false,
+            false,
+        ));
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2619,17 +2620,15 @@ mod tests {
 
         // let's add another file but with the same name
         let data = b"9876543210";
-        let other_file_xorurl = safe.files_store_public_blob(data, None, false).await?;
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_add(
-                &other_file_xorurl,
-                &format!("{}{}", xorurl, new_filename),
-                true, // force to overwrite it with new link
-                false,
-                false,
-                false,
-            )
-            .await?;
+        let other_file_xorurl = retry_loop!(safe.files_store_public_blob(data, None, false));
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+            &other_file_xorurl,
+            &format!("{}{}", xorurl, new_filename),
+            true, // force to overwrite it with new link
+            false,
+            false,
+            false,
+        ));
 
         assert_eq!(version, 2);
         assert_eq!(new_processed_files.len(), 1);
@@ -2650,9 +2649,13 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_from_raw() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/subfolder/"), None, false, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
+            Some("../testdata/subfolder/"),
+            None,
+            false,
+            true,
+            false
+        ));
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
@@ -2660,15 +2663,14 @@ mod tests {
         let data = b"0123456789";
         let new_filename = "/new_filename_test.md";
 
-        let (version, new_processed_files, new_files_map) = safe
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe
             .files_container_add_from_raw(
                 data,
                 &format!("{}{}", xorurl, new_filename),
                 false,
                 false,
                 false,
-            )
-            .await?;
+            ));
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2682,15 +2684,14 @@ mod tests {
 
         // let's add another file but with the same name
         let data = b"9876543210";
-        let (version, new_processed_files, new_files_map) = safe
+        let (version, new_processed_files, new_files_map) = retry_loop!(safe
             .files_container_add_from_raw(
                 data,
                 &format!("{}{}", xorurl, new_filename),
                 true, // force to overwrite it with new link
                 false,
                 false,
-            )
-            .await?;
+            ));
 
         assert_eq!(version, 2);
         assert_eq!(new_processed_files.len(), 1);
@@ -2706,17 +2707,16 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_remove_path() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, true, false)
-            .await?;
+        let (xorurl, processed_files, files_map) =
+            retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // let's remove a file first
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_remove_path(&format!("{}/test.md", xorurl), false, false, false)
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(
+            safe.files_container_remove_path(&format!("{}/test.md", xorurl), false, false, false)
+        );
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2730,9 +2730,9 @@ mod tests {
         );
 
         // let's remove an entire folder now with recursive flag
-        let (version, new_processed_files, new_files_map) = safe
-            .files_container_remove_path(&format!("{}/subfolder", xorurl), true, false, false)
-            .await?;
+        let (version, new_processed_files, new_files_map) = retry_loop!(
+            safe.files_container_remove_path(&format!("{}/subfolder", xorurl), true, false, false)
+        );
 
         assert_eq!(version, 2);
         assert_eq!(new_processed_files.len(), 2);
