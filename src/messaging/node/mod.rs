@@ -34,7 +34,7 @@ pub use section::{Section, SectionPeers};
 pub use signed::{KeyedSig, SigShare};
 
 use crate::messaging::{
-    client::ClientMsg, ClientSigned, EndUser, MessageId, SectionAuthorityProvider,
+    client::DataMsg, ClientSigned, EndUser, MessageId, SectionAuthorityProvider,
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
@@ -52,9 +52,9 @@ use xor_name::XorName;
 /// Message sent over the among nodes
 pub enum NodeMsg {
     /// Forward a client msg
-    ForwardClientMsg {
+    ForwardDataMsg {
         /// The msg
-        msg: ClientMsg,
+        msg: DataMsg,
         /// The origin
         user: EndUser,
         /// Signature provided by the client
@@ -178,7 +178,7 @@ pub enum NodeMsg {
 impl Debug for NodeMsg {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Self::ForwardClientMsg { .. } => f.debug_struct("ForwardClientMsg").finish(),
+            Self::ForwardDataMsg { .. } => f.debug_struct("ForwardDataMsg").finish(),
             Self::SectionKnowledge { .. } => f.debug_struct("SectionKnowledge").finish(),
             Self::Sync { section, network } => f
                 .debug_struct("Sync")

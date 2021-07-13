@@ -8,7 +8,7 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    client::{ClientMsg, ProcessMsg, ProcessingError},
+    client::{DataMsg, ProcessMsg, ProcessingError},
     ClientSigned, EndUser, MessageId, SrcLocation,
 };
 use crate::node::{
@@ -20,12 +20,12 @@ use tracing::warn;
 
 pub(super) fn map_client_msg(
     msg_id: MessageId,
-    msg: ClientMsg,
+    msg: DataMsg,
     client_signed: ClientSigned,
     user: EndUser,
 ) -> Mapping {
     match &msg {
-        ClientMsg::Process(process_msg) => {
+        DataMsg::Process(process_msg) => {
             // Signature has already been validated by the routing layer
             let op = map_client_process_msg(msg_id, process_msg.clone(), user, client_signed);
 
@@ -36,9 +36,9 @@ pub(super) fn map_client_msg(
 
             Mapping { op, ctx }
         }
-        ClientMsg::ProcessingError(error) => {
+        DataMsg::ProcessingError(error) => {
             warn!(
-                "A node should never receive a ClientMsg::ProcessingError {:?}",
+                "A node should never receive a DataMsg::ProcessingError {:?}",
                 error
             );
 
@@ -47,9 +47,9 @@ pub(super) fn map_client_msg(
                 ctx: None,
             }
         }
-        ClientMsg::SupportingInfo(msg) => {
+        DataMsg::SupportingInfo(msg) => {
             warn!(
-                "A node should never receive a ClientMsg::SupportingInfo {:?}",
+                "A node should never receive a DataMsg::SupportingInfo {:?}",
                 msg
             );
 
@@ -90,7 +90,7 @@ fn map_client_process_msg(
 
             NodeDuty::Send(OutgoingMsg {
                 id,
-                msg: MsgType::Client(ClientMsg::ProcessingError(ProcessingError {
+                msg: MsgType::Client(DataMsg::ProcessingError(ProcessingError {
                     reason: Some(error_data),
                     source_message: Some(process_msg),
                 })),

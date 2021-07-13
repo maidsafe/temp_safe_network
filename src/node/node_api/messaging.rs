@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    client::ClientMsg, node::NodeMsg, ClientSigned, DstLocation, MessageId, MsgKind, WireMsg,
+    client::DataMsg, node::NodeMsg, ClientSigned, DstLocation, MessageId, MsgKind, WireMsg,
 };
 use crate::node::{
     network::Network,
@@ -57,7 +57,7 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
     // FIXME: define which signature/authority this message should really carry,
     // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
     // Giving a random sig temporarily
-    let (msg_kind, payload) = random_client_signature(&ClientMsg::ProcessingError(msg.msg))?;
+    let (msg_kind, payload) = random_client_signature(&DataMsg::ProcessingError(msg.msg))?;
 
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, msg.dst)?;
 
@@ -73,7 +73,7 @@ pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network)
     // FIXME: define which signature/authority this message should really carry,
     // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
     // Giving a random sig temporarily
-    let (msg_kind, payload) = random_client_signature(&ClientMsg::SupportingInfo(msg.msg))?;
+    let (msg_kind, payload) = random_client_signature(&DataMsg::SupportingInfo(msg.msg))?;
 
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, msg.dst)?;
 
@@ -139,13 +139,13 @@ pub(crate) async fn send_to_nodes(
     Ok(())
 }
 
-fn random_client_signature(client_msg: &ClientMsg) -> Result<(MsgKind, Bytes)> {
+fn random_client_signature(client_msg: &DataMsg) -> Result<(MsgKind, Bytes)> {
     let mut rng = OsRng;
     let keypair = Keypair::new_ed25519(&mut rng);
     let payload = WireMsg::serialize_msg_payload(client_msg)?;
     let signature = keypair.sign(&payload);
 
-    let msg_kind = MsgKind::ClientMsg(ClientSigned {
+    let msg_kind = MsgKind::DataMsg(ClientSigned {
         public_key: keypair.public_key(),
         signature,
     });

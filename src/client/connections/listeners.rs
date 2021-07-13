@@ -9,7 +9,7 @@
 use super::Session;
 use crate::client::Error;
 use crate::messaging::{
-    client::{ClientMsg, CmdError, ProcessMsg},
+    client::{CmdError, DataMsg, ProcessMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
@@ -65,8 +65,8 @@ impl Session {
                 }
                 MessageType::Client { msg_id, msg, .. } => {
                     match msg {
-                        ClientMsg::Process(msg) => self.handle_client_msg(msg_id, msg, src).await,
-                        ClientMsg::ProcessingError(error) => {
+                        DataMsg::Process(msg) => self.handle_client_msg(msg_id, msg, src).await,
+                        DataMsg::ProcessingError(error) => {
                             warn!("Processing error received. {:?}", error);
                             // TODO: Handle lazy message errors
                         }
@@ -188,7 +188,7 @@ impl Session {
 
     // Handle messages intended for client consumption (re: queries + commands)
     async fn handle_client_msg(&self, msg_id: MessageId, msg: ProcessMsg, src: SocketAddr) {
-        debug!("ClientMsg with id {:?} received from {:?}", msg_id, src);
+        debug!("DataMsg with id {:?} received from {:?}", msg_id, src);
         let queries = self.pending_queries.clone();
         let error_sender = self.incoming_err_sender.clone();
 

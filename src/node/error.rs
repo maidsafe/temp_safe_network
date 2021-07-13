@@ -126,7 +126,7 @@ pub enum Error {
     Bincode(#[from] bincode::Error),
     /// Network message error.
     #[error("Client message error:: {0}")]
-    ClientMsg(#[from] crate::messaging::client::Error),
+    DataMsg(#[from] crate::messaging::client::Error),
     /// Network processing error message.
     #[error("Procesing error:: {0:?}")]
     ProcessingError(crate::messaging::client::ProcessingError),

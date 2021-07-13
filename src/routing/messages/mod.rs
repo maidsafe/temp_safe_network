@@ -29,7 +29,7 @@ pub(crate) trait WireMsgUtils {
     /// Verify this message is properly signed.
     fn check_signature(&self) -> Result<()>;
 
-    /// Return 'true' if the message kind is MsgKind::ClientMsg or MsgKind::SectionInfoMsg
+    /// Return 'true' if the message kind is MsgKind::DataMsg or MsgKind::SectionInfoMsg
     fn is_client_msg_kind(&self) -> bool;
 
     /// Creates a signed message where signature is assumed valid.
@@ -62,7 +62,7 @@ impl WireMsgUtils for WireMsg {
     fn check_signature(&self) -> Result<()> {
         match self.msg_kind() {
             MsgKind::SectionInfoMsg => {}
-            MsgKind::ClientMsg(ClientSigned {
+            MsgKind::DataMsg(ClientSigned {
                 public_key,
                 signature,
             }) => {
@@ -117,11 +117,11 @@ impl WireMsgUtils for WireMsg {
         Ok(())
     }
 
-    /// Return 'true' if the message kind is MsgKind::ClientMsg or MsgKind::SectionInfoMsg
+    /// Return 'true' if the message kind is MsgKind::DataMsg or MsgKind::SectionInfoMsg
     fn is_client_msg_kind(&self) -> bool {
         matches!(
             self.msg_kind(),
-            MsgKind::ClientMsg(_) | MsgKind::SectionInfoMsg
+            MsgKind::DataMsg(_) | MsgKind::SectionInfoMsg
         )
     }
 

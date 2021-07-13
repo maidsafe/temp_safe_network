@@ -205,7 +205,7 @@ impl Core {
         let src_name = msg_authority.name();
 
         match node_msg {
-            NodeMsg::ForwardClientMsg {
+            NodeMsg::ForwardDataMsg {
                 msg,
                 user,
                 client_signed,

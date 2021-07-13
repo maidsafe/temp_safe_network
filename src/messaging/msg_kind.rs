@@ -31,11 +31,11 @@ pub enum MsgKind {
     /// read-only, and section information is public across the network.
     SectionInfoMsg,
 
-    /// A message from a client, with their authority.
+    /// A data message, with their authority.
     ///
     /// Client authority is needed to access private data, such as reading or writing a private
     /// file.
-    ClientMsg(ClientSigned),
+    DataMsg(ClientSigned),
 
     /// A message from a Node with its own independent authority.
     ///
@@ -100,12 +100,12 @@ impl Debug for MsgKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SectionInfoMsg => write!(f, "SectionInfoMsg"),
-            Self::ClientMsg(ClientSigned {
+            Self::DataMsg(ClientSigned {
                 public_key,
                 signature,
             }) => write!(
                 f,
-                "ClientMsg {{ public_key: {:?}, signature: {:?} }}",
+                "DataMsg {{ public_key: {:?}, signature: {:?} }}",
                 public_key, signature
             ),
             Self::NodeSignedMsg(NodeSigned {
