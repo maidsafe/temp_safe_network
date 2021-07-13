@@ -16,22 +16,41 @@ use std::fmt::{self, Debug};
 use xor_name::XorName;
 
 /// Source authority of a message.
-/// Src of message and authority to send it. Authority is validated by the signature.
-/// Messages do not need to sign this field as it is all verifiable (i.e. if the sig validates
-/// agains the pub key and we know the pub key then we are good. If the proof is not recognised we
-/// ask for a longer chain that can be recognised).
+///
+/// Source of message and authority to send it. Authority is validated by the signature.
+/// Messages do not need to sign this field as it is all verifiable (i.e. if the signature validates
+/// against the public key and we know the public key then we are good. If the proof is not
+/// recognised we can ask for a longer chain that can be recognised).
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgKind {
-    /// SectionInfoMsg wich doesn't contain any msg authority
+    /// A section information message, which doesn't have any message authority.
+    ///
+    /// Section information messages can be sent by any network peer (client or node), without any
+    /// need for them to prove their authority. This is because section information messages are
+    /// read-only, and section information is public across the network.
     SectionInfoMsg,
-    /// ClietnMsg with authority provided by a client
+
+    /// A message from a client, with their authority.
+    ///
+    /// Client authority is needed to access private data, such as reading or writing a private
+    /// file.
     ClientMsg(ClientSigned),
-    /// NodeMsg with authority of a single peer.
+
+    /// A message from a Node with its own independent authority.
+    ///
+    /// Node authority is needed when nodes send messages directly to other nodes.
+    // FIXME: is the above true? What does is the recieving node validating against?
     NodeSignedMsg(NodeSigned),
-    /// NodeMsg with authority of a single peer that uses it's BLS Keyshare to sign the message.
+
+    /// A message from an Elder node with its share of the section authority.
+    ///
+    /// Section share authority is needed for messages related to section administration, such as
+    /// DKG and relocation.
     NodeBlsShareSignedMsg(BlsShareSigned),
-    /// NodeMsg with authority of a whole section.
+
+    /// A message from an Elder node with authority of its whole section.
+    // FIXME: find an example.
     SectionSignedMsg(SectionSigned),
 }
 
@@ -51,7 +70,7 @@ pub struct NodeSigned {
     pub section_pk: BlsPublicKey,
     /// Public key of the source peer.
     pub public_key: EdPublicKey,
-    /// ed-25519 signature of the message corresponding to the public key of the source peer.
+    /// Ed25519 signature of the message corresponding to the public key of the source peer.
     pub signature: EdSignature,
 }
 
@@ -60,9 +79,9 @@ pub struct NodeSigned {
 pub struct BlsShareSigned {
     /// Section key of the source.
     pub section_pk: BlsPublicKey,
-    /// Name in the source section
+    /// Name in the source section.
     pub src_name: XorName,
-    /// Proof Share signed by the peer's BLS KeyShare
+    /// Proof Share signed by the peer's BLS KeyShare.
     pub sig_share: SigShare,
 }
 
