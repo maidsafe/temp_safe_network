@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.17](https://github.com/maidsafe/safe_network/compare/v0.7.16...v0.7.17) (2021-07-13)
+
+
+### Features
+
+* avoid sybil attack via relocation ([3c1d641](https://github.com/maidsafe/safe_network/commit/3c1d641e46508829ecf2e1e1abb127ecdd2150dc))
+
 ### [0.7.16](https://github.com/maidsafe/safe_network/compare/v0.7.15...v0.7.16) (2021-07-13)
 
 
