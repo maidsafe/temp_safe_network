@@ -44,10 +44,13 @@ impl Core {
         sender: SocketAddr,
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
-        // Check if the message is for us
+        // Make sure the message is for us, unless it's a client msg
+        // in which case we'll handle/forward it after signature check.
         let dst_location = wire_msg.dst_location();
         let msg_id = wire_msg.msg_id();
-        if !dst_location.contains(&self.node.name(), self.section.prefix()) {
+        if !wire_msg.is_client_msg_kind()
+            && !dst_location.contains(&self.node.name(), self.section.prefix())
+        {
             // Message is not for us
             info!("Relay message {} closer to the destination", msg_id);
             if let Some(cmds) = self.relay_message(wire_msg).await? {
@@ -100,8 +103,15 @@ impl Core {
                 msg,
                 dst_location,
             } => {
-                self.handle_end_user_message(sender, msg_id, client_signed, msg, dst_location)
-                    .await
+                self.handle_end_user_message(
+                    sender,
+                    msg_id,
+                    client_signed,
+                    msg,
+                    dst_location,
+                    payload,
+                )
+                .await
             }
         }
     }
@@ -205,7 +215,7 @@ impl Core {
                     return Ok(vec![]);
                 }
 
-                self.handle_forwarded_message(msg_id, msg, user, client_signed)
+                self.handle_client_msg_received(msg_id, msg, user, client_signed)
                     .await
             }
             NodeMsg::SectionKnowledge {

@@ -127,8 +127,9 @@ impl Session {
 
         let msg_id = MessageId::new();
         debug!(
-            "Sending command w/id {:?}, to {} Elders",
+            "Sending command w/id {:?}, from {}, to {} Elders",
             msg_id,
+            endpoint.socket_addr(),
             elders.len()
         );
 
@@ -246,8 +247,12 @@ impl Session {
         }
 
         debug!(
-            "Sending query message {:?}, to the {} Elders closest to data name: {:?}",
-            query, elders_len, elders
+            "Sending query message {:?}, msg_id: {}, from {}, to the {} Elders closest to data name: {:?}",
+            query,
+            msg_id,
+            endpoint.socket_addr(),
+            elders_len,
+            elders
         );
 
         // We send the same message to all Elders concurrently
@@ -437,15 +442,23 @@ impl Session {
         let random_section_pk = bls::SecretKey::random().public_key();
 
         let msg_id = MessageId::new();
-        let payload = WireMsg::serialize_msg_payload(&SectionInfoMsg::GetSectionQuery(client_pk))?;
+        let query = SectionInfoMsg::GetSectionQuery(client_pk);
+        let payload = WireMsg::serialize_msg_payload(&query)?;
         let msg_kind = MsgKind::SectionInfoMsg;
         let dst_location = DstLocation::Section {
             name: dst_section_name,
             section_pk: random_section_pk,
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
-
         let msg_bytes = wire_msg.serialize()?;
+
+        debug!(
+            "Sending query message {:?}, msg_id {}, from {}, to bootstrapped node {} ",
+            query,
+            msg_id,
+            self.endpoint()?.socket_addr(),
+            bootstrapped_peer
+        );
 
         self.endpoint()?
             .send_message(msg_bytes, bootstrapped_peer)

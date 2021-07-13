@@ -16,6 +16,7 @@ use crate::node::{
 };
 use crate::routing::XorName;
 use crate::types::Keypair;
+use bytes::Bytes;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
 use tracing::{error, trace};
@@ -26,11 +27,10 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
 
     let wire_msg = match msg.msg {
         MsgType::Client(client_msg) => {
-            let payload = WireMsg::serialize_msg_payload(&client_msg)?;
             // FIXME: define which signature/authority this message should really carry,
-            // perhaps it needs to carry Node signature. Giving a random sig temporarily
-            let client_signed = random_client_signature();
-            let msg_kind = MsgKind::ClientMsg(client_signed);
+            // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
+            // Giving a random sig temporarily
+            let (msg_kind, payload) = random_client_signature(&client_msg)?;
             WireMsg::new_msg(msg.id, payload, msg_kind, msg.dst)?
         }
         MsgType::Node(node_msg) => {
@@ -54,11 +54,10 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
 
 pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Result<()> {
     trace!("Sending error msg: {:?}", msg);
-    let payload = WireMsg::serialize_msg_payload(&ClientMsg::ProcessingError(msg.msg))?;
     // FIXME: define which signature/authority this message should really carry,
-    // perhaps it needs to carry Node signature. Giving a random sig temporarily
-    let client_signed = random_client_signature();
-    let msg_kind = MsgKind::ClientMsg(client_signed);
+    // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
+    // Giving a random sig temporarily
+    let (msg_kind, payload) = random_client_signature(&ClientMsg::ProcessingError(msg.msg))?;
 
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, msg.dst)?;
 
@@ -71,11 +70,10 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
 // TODO: Refactor over support/error
 pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network) -> Result<()> {
     trace!("Sending support msg: {:?}", msg);
-    let payload = WireMsg::serialize_msg_payload(&ClientMsg::SupportingInfo(msg.msg))?;
     // FIXME: define which signature/authority this message should really carry,
-    // perhaps it needs to carry Node signature. Giving a random sig temporarily
-    let client_signed = random_client_signature();
-    let msg_kind = MsgKind::ClientMsg(client_signed);
+    // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
+    // Giving a random sig temporarily
+    let (msg_kind, payload) = random_client_signature(&ClientMsg::SupportingInfo(msg.msg))?;
 
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, msg.dst)?;
 
@@ -141,13 +139,16 @@ pub(crate) async fn send_to_nodes(
     Ok(())
 }
 
-fn random_client_signature() -> ClientSigned {
+fn random_client_signature(client_msg: &ClientMsg) -> Result<(MsgKind, Bytes)> {
     let mut rng = OsRng;
     let keypair = Keypair::new_ed25519(&mut rng);
-    let signature = keypair.sign(b"FIXME");
+    let payload = WireMsg::serialize_msg_payload(client_msg)?;
+    let signature = keypair.sign(&payload);
 
-    ClientSigned {
+    let msg_kind = MsgKind::ClientMsg(ClientSigned {
         public_key: keypair.public_key(),
         signature,
-    }
+    });
+
+    Ok((msg_kind, payload))
 }

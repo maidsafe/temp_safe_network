@@ -8,7 +8,8 @@
 
 use super::Core;
 use crate::messaging::{
-    client::ClientMsg, node::NodeMsg, ClientSigned, DstLocation, EndUser, MessageId, WireMsg,
+    client::ClientMsg, node::NodeMsg, ClientSigned, DstLocation, EndUser, MessageId, MsgKind,
+    WireMsg,
 };
 use crate::routing::{
     error::Result,
@@ -16,10 +17,11 @@ use crate::routing::{
     routing_api::{command::Command, Event},
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
+use bytes::Bytes;
 use std::net::SocketAddr;
 
 impl Core {
-    pub(crate) async fn handle_forwarded_message(
+    pub(crate) async fn handle_client_msg_received(
         &mut self,
         msg_id: MessageId,
         msg: ClientMsg,
@@ -44,7 +46,35 @@ impl Core {
         client_signed: ClientSigned,
         msg: ClientMsg,
         dst_location: DstLocation,
+        payload: Bytes,
     ) -> Result<Vec<Command>> {
+        let is_in_destination = match dst_location.name() {
+            Some(dst_name) => {
+                let is_in_destination = self.section().prefix().matches(&dst_name);
+                if is_in_destination {
+                    if let DstLocation::EndUser(EndUser { socket_id, xorname }) = dst_location {
+                        if let Some(addr) = self.get_socket_addr(socket_id) {
+                            let wire_msg = WireMsg::new_msg(
+                                msg_id,
+                                payload,
+                                MsgKind::ClientMsg(client_signed),
+                                dst_location,
+                            )?;
+
+                            return Ok(vec![Command::SendMessage {
+                                recipients: vec![(xorname, *addr)],
+                                delivery_group_size: 1,
+                                wire_msg,
+                            }]);
+                        }
+                    }
+                }
+
+                is_in_destination
+            }
+            None => true, // it's a DirectAndUnrouted dst
+        };
+
         let user = match self.get_enduser_by_addr(&sender) {
             Some(end_user) => {
                 debug!(
@@ -75,15 +105,10 @@ impl Core {
             }
         };
 
-        let is_in_destination = match dst_location.name() {
-            Some(dst_name) => self.section().prefix().matches(&dst_name),
-            None => true, // it's a DirectAndUnrouted dst
-        };
-
         if is_in_destination {
             // We send this message to be handled by the upper Node layer
             // through the public event stream API
-            self.handle_forwarded_message(msg_id, msg, user, client_signed)
+            self.handle_client_msg_received(msg_id, msg, user, client_signed)
                 .await
         } else {
             // Let's relay the client message then
@@ -99,7 +124,10 @@ impl Core {
                 node_msg,
                 self.section.authority_provider().section_key(),
             ) {
-                Ok(msg) => msg,
+                Ok(mut wire_msg) => {
+                    wire_msg.set_msg_id(msg_id);
+                    wire_msg
+                }
                 Err(err) => {
                     error!("Failed create node msg {:?}", err);
                     return Ok(vec![]);
