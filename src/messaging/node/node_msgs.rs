@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    client::{
+    data::{
         ChunkRead, ChunkWrite, CmdError, DataCmd as NodeDataCmd, DataExchange,
         DataQuery as NodeDataQuery, Error, Result,
     },

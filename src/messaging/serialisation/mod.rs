@@ -11,7 +11,7 @@ mod wire_msg_header;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    client::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, BlsShareSigned, ClientSigned,
+    data::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, BlsShareSigned, ClientSigned,
     DstLocation, MessageId, NodeSigned, SectionSigned,
 };
 use std::fmt::Debug;

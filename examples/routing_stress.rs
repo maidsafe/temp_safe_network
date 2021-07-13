@@ -36,7 +36,7 @@ use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
 
 use safe_network::messaging::{
-    client::Error::FailedToWriteFile, node::NodeMsg, DstLocation, MessageId,
+    data::Error::FailedToWriteFile, node::NodeMsg, DstLocation, MessageId,
 };
 use safe_network::routing::{
     Cache, Config, Event as RoutingEvent, NodeElderChange, Routing, TransportConfig,

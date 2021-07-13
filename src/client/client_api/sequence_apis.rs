@@ -8,7 +8,7 @@
 
 use super::Client;
 use crate::client::Error;
-use crate::messaging::client::{DataCmd, DataQuery, QueryResponse, SequenceRead, SequenceWrite};
+use crate::messaging::data::{DataCmd, DataQuery, QueryResponse, SequenceRead, SequenceWrite};
 use crate::types::{
     PublicKey, Sequence, SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex,
     SequencePermissions, SequencePrivatePermissions, SequencePrivatePolicy,
@@ -375,7 +375,7 @@ impl Client {
 mod tests {
     use super::*;
     use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff};
-    use crate::messaging::client::Error as ErrorMessage;
+    use crate::messaging::data::Error as ErrorMessage;
     use crate::types::{Error as DtError, SequenceAction, SequencePrivatePermissions};
     use anyhow::{anyhow, bail, Result};
     use tokio::time::Duration;

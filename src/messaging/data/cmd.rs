@@ -7,11 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    chunk::{ChunkRead, ChunkWrite},
-    map::{MapRead, MapWrite},
-    register::{RegisterRead, RegisterWrite},
-    sequence::{SequenceRead, SequenceWrite},
-    CmdError, Error, QueryResponse,
+    chunk::ChunkWrite, map::MapWrite, register::RegisterWrite, sequence::SequenceWrite, CmdError,
+    Error,
 };
 use crate::types::PublicKey;
 use xor_name::XorName;
@@ -77,58 +74,6 @@ impl DataCmd {
             Self::Map(write) => write.owner(),
             Self::Sequence(write) => write.owner(),
             Self::Register(write) => write.owner(),
-        }
-    }
-}
-
-/// Data queries - retrieving data and inspecting their structure.
-///
-/// See the [`types`] module documentation for more details of the types supported by the Safe
-/// Network, and their semantics.
-///
-/// [`types`]: crate::types
-#[allow(clippy::large_enum_variant)]
-#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
-pub enum DataQuery {
-    /// [`Chunk`] read operation.
-    ///
-    /// [`Chunk`]: crate::types::Chunk
-    Blob(ChunkRead),
-    /// [`Map`] read operation.
-    ///
-    /// [`Map`]: crate::types::Map
-    Map(MapRead),
-    /// [`Sequence`] read operation.
-    ///
-    /// [`Sequence`]: crate::types::Sequence
-    Sequence(SequenceRead),
-    /// [`Register`] read operation.
-    ///
-    /// [`Register`]: crate::types::register::Register
-    Register(RegisterRead),
-}
-
-impl DataQuery {
-    /// Creates a Response containing an error, with the Response variant corresponding to the
-    /// Request variant.
-    pub fn error(&self, error: Error) -> QueryResponse {
-        use DataQuery::*;
-        match self {
-            Blob(q) => q.error(error),
-            Map(q) => q.error(error),
-            Sequence(q) => q.error(error),
-            Register(q) => q.error(error),
-        }
-    }
-
-    /// Returns the address of the destination for `request`.
-    pub fn dst_address(&self) -> XorName {
-        use DataQuery::*;
-        match self {
-            Blob(q) => q.dst_address(),
-            Map(q) => q.dst_address(),
-            Sequence(q) => q.dst_address(),
-            Register(q) => q.dst_address(),
         }
     }
 }

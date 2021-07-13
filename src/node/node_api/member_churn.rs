@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::role::{ElderRole, Role};
-use crate::messaging::client::DataExchange;
+use crate::messaging::data::DataExchange;
 use crate::node::{
     capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter},
     metadata::{adult_reader::AdultReader, Metadata},

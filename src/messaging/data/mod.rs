@@ -11,24 +11,24 @@
 //! See [`ClientMsg`] for message definitions.
 
 mod chunk;
-mod data;
+mod cmd;
 mod data_exchange;
-mod duty; // FIXME: this appears to be unused
 mod errors;
 mod map;
+mod query;
 mod register;
 mod sequence;
 
 pub use self::{
     chunk::{ChunkRead, ChunkWrite},
-    data::{DataCmd, DataQuery},
+    cmd::DataCmd,
     data_exchange::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
         RegisterDataExchange, SequenceDataExchange,
     },
-    duty::{AdultDuties, Duty, NodeDuties},
     errors::{Error, Result},
     map::{MapCmd, MapRead, MapWrite},
+    query::DataQuery,
     register::{RegisterCmd, RegisterRead, RegisterWrite},
     sequence::{SequenceCmd, SequenceRead, SequenceWrite},
 };

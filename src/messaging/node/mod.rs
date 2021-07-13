@@ -33,9 +33,7 @@ pub use section::Peer;
 pub use section::{Section, SectionPeers};
 pub use signed::{KeyedSig, SigShare};
 
-use crate::messaging::{
-    client::DataMsg, ClientSigned, EndUser, MessageId, SectionAuthorityProvider,
-};
+use crate::messaging::{data::DataMsg, ClientSigned, EndUser, MessageId, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use itertools::Itertools;
@@ -169,7 +167,7 @@ pub enum NodeMsg {
     NodeMsgError {
         /// The error.
         // TODO: return node::Error instead
-        error: crate::messaging::client::Error,
+        error: crate::messaging::data::Error,
         /// ID of causing cmd.
         correlation_id: MessageId,
     },

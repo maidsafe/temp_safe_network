@@ -15,7 +15,7 @@ use crate::types::{
 };
 use crate::{
     messaging::{
-        client::{CmdError, MapCmd, MapDataExchange, MapRead, MapWrite, QueryResponse},
+        data::{CmdError, MapCmd, MapDataExchange, MapRead, MapWrite, QueryResponse},
         EndUser, MessageId,
     },
     types::DataAddress,

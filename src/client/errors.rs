@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use crate::messaging::client::Error as ErrorMessage;
+pub use crate::messaging::data::Error as ErrorMessage;
 use crate::messaging::{
-    client::{CmdError, QueryResponse},
+    data::{CmdError, QueryResponse},
     Error as MessagingError, MessageId,
 };
 use crate::types::Error as DtError;

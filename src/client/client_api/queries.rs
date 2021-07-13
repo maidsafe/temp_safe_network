@@ -9,7 +9,7 @@
 use super::Client;
 use crate::client::{connections::QueryResult, errors::Error};
 use crate::messaging::{
-    client::{DataMsg, DataQuery, ProcessMsg},
+    data::{DataMsg, DataQuery, ProcessMsg},
     ClientSigned, WireMsg,
 };
 use crate::types::{PublicKey, Signature};

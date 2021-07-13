@@ -1517,7 +1517,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     };
 
     let node_msg = NodeMsg::NodeMsgError {
-        error: crate::messaging::client::Error::FailedToWriteFile,
+        error: crate::messaging::data::Error::FailedToWriteFile,
         correlation_id: MessageId::new(),
     };
     let wire_msg = WireMsg::single_src(&node, dst_location, node_msg.clone(), section_pk)?;

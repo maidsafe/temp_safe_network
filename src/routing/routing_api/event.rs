@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    client::DataMsg,
+    data::DataMsg,
     node::{NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse},
     ClientSigned, DstLocation, EndUser, MessageId, SrcLocation,
 };
@@ -249,7 +249,7 @@ pub enum MessageReceived {
     NodeMsgError {
         /// The error.
         // TODO: return node::Error instead
-        error: crate::messaging::client::Error,
+        error: crate::messaging::data::Error,
         /// ID of causing cmd.
         correlation_id: MessageId,
     },

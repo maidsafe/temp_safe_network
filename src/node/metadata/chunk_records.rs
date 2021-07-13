@@ -8,7 +8,7 @@
 
 use crate::btree_set;
 use crate::messaging::{
-    client::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, QueryResponse},
+    data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     ClientSigned, EndUser, MessageId,
 };
@@ -165,7 +165,7 @@ impl ChunkRecords {
             if (!response.is_success() && self.capacity.is_full(&src).await)
                 || (matches!(
                     response,
-                    QueryResponse::GetChunk(Err(crate::messaging::client::Error::DataNotFound(_)))
+                    QueryResponse::GetChunk(Err(crate::messaging::data::Error::DataNotFound(_)))
                 ))
             {
                 info!("REMOVED CORRELATION ID: {}", correlation_id);

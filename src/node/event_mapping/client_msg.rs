@@ -8,7 +8,7 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    client::{DataMsg, ProcessMsg, ProcessingError},
+    data::{DataMsg, ProcessMsg, ProcessingError},
     ClientSigned, EndUser, MessageId, SrcLocation,
 };
 use crate::node::{

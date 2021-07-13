@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::dbs;
-use crate::messaging::{client::Error as ErrorMessage, MessageId, WireMsg};
+use crate::messaging::{data::Error as ErrorMessage, MessageId, WireMsg};
 use crate::routing::Prefix;
 use crate::types::{DataAddress, Error as DtError, PublicKey};
 use std::io;
@@ -126,10 +126,10 @@ pub enum Error {
     Bincode(#[from] bincode::Error),
     /// Network message error.
     #[error("Client message error:: {0}")]
-    DataMsg(#[from] crate::messaging::client::Error),
+    DataMsg(#[from] crate::messaging::data::Error),
     /// Network processing error message.
     #[error("Procesing error:: {0:?}")]
-    ProcessingError(crate::messaging::client::ProcessingError),
+    ProcessingError(crate::messaging::data::ProcessingError),
     /// Network message error.
     #[error("Network message error:: {0}")]
     Message(#[from] crate::messaging::Error),

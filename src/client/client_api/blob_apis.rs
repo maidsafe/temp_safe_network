@@ -11,7 +11,7 @@ use super::{
     Client,
 };
 use crate::client::Error;
-use crate::messaging::client::{ChunkRead, ChunkWrite, DataCmd, DataQuery, QueryResponse};
+use crate::messaging::data::{ChunkRead, ChunkWrite, DataCmd, DataQuery, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
 use bincode::{deserialize, serialize};
 use self_encryption::{DataMap, SelfEncryptor};

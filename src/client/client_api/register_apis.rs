@@ -8,7 +8,7 @@
 
 use super::Client;
 use crate::client::Error;
-use crate::messaging::client::{DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite};
+use crate::messaging::data::{DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite};
 use crate::types::{
     register::{
         Address, Entry, EntryHash, Permissions, Policy, PrivatePermissions, PrivatePolicy,
@@ -229,7 +229,7 @@ mod tests {
         utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff},
         Error,
     };
-    use crate::messaging::client::Error as ErrorMessage;
+    use crate::messaging::data::Error as ErrorMessage;
     use crate::retry_loop_for_pattern;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
