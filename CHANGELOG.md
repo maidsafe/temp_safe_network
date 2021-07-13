@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.16](https://github.com/maidsafe/safe_network/compare/v0.7.15...v0.7.16) (2021-07-13)
+
+
+### Bug Fixes
+
+* **types/register:** rename parents to children ([e7469e0](https://github.com/maidsafe/safe_network/commit/e7469e0a440cd085315a96d972cdf1bfbe5b02fd))
+
 ### [0.7.15](https://github.com/maidsafe/safe_network/compare/v0.7.14...v0.7.15) (2021-07-13)
 
 
