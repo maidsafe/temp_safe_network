@@ -222,6 +222,7 @@ mod tests {
         Ok(())
     }
 
+    #[ignore = "Depends on setting the right env var"]
     #[tokio::test]
     async fn test_sequence_append_concurrently_from_second_client() -> Result<()> {
         let mut client1 = new_safe_instance().await?;
