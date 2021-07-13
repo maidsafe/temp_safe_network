@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.15](https://github.com/maidsafe/safe_network/compare/v0.7.14...v0.7.15) (2021-07-13)
+
+
+### Bug Fixes
+
+* **routing:** Enable `unreachable_pub` lints ([9468aa9](https://github.com/maidsafe/safe_network/commit/9468aa9ba09da2a121c1c0f93eaebc21f5b91edf))
+
 ### [0.7.14](https://github.com/maidsafe/safe_network/compare/v0.7.13...v0.7.14) (2021-07-13)
 
 
