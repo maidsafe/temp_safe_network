@@ -15,51 +15,74 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use xor_name::XorName;
 
-/// Register reading queries
+/// [`Register`] read operations.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum RegisterRead {
-    /// Get Register from the network.
+    /// Retrieve the [`Register`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetRegister`] response.
+    ///
+    /// [`GetRegister`]: QueryResponse::GetRegister
     Get(Address),
-    /// Read last entry, or entries if there are branches, from the Register.
+    /// Retrieve the current entries from the [`Register`] at the given address.
+    ///
+    /// Multiple entries occur on concurrent writes. This should eventually lead to a
+    /// [`ReadRegister`] response.
+    ///
+    /// [`ReadRegister`]: QueryResponse::ReadRegister
     Read(Address),
-    /// List current policy
+    /// Retrieve the policy of the [`Register`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetRegisterPolicy`] response.
+    ///
+    /// [`GetRegisterPolicy`]: QueryResponse::GetRegisterPolicy
     GetPolicy(Address),
-    /// Get current permissions for a specified user(s).
+    /// Retrieve the permissions of a given user for the [`Register`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetRegisterUserPermissions`] response.
+    ///
+    /// [`GetRegisterUserPermissions`]: QueryResponse::GetRegisterUserPermissions
     GetUserPermissions {
         /// Register address.
         address: Address,
         /// User to get permissions for.
         user: User,
     },
-    /// Get current owner.
+    /// Retrieve the owner of the [`Register`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetRegisterOwner`] response.
+    ///
+    /// [`GetRegisterOwner`]: QueryResponse::GetRegisterOwner
     GetOwner(Address),
 }
 
-///
+/// A [`Register`] write operation.
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct RegisterCmd {
-    ///
+    /// The operation to perform.
     pub write: RegisterWrite,
-    ///
+    /// The ID of the message from which the operation originated, used to send error responses.
     pub msg_id: crate::messaging::MessageId,
+    /// A signature carrying authority to perform the operation.
     ///
+    /// This will be verified against the register's owner and permissions.
     pub client_sig: crate::messaging::ClientSigned,
-    ///
+    /// The origin of the request, used to send error responses.
     pub origin: crate::messaging::EndUser,
 }
 
-/// Register writing commands
+/// [`Register`] write operations.
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum RegisterWrite {
-    /// Create a new Register on the network.
+    /// Create a new [`Register`] on the network.
     New(Register),
-    /// Edit the Register (insert/remove entry).
+    /// Edit a [`Register`].
     Edit(RegisterOp<Entry>),
-    /// Delete a private Register.
+    /// Delete a private [`Register`].
     ///
-    /// This operation MUST return an error if applied to public Register. Only the current
-    /// owner(s) can perform this action.
+    /// This operation will result in an error if applied to a public register. Only private
+    /// registers can be deleted, and only by their current owner(s).
     Delete(Address),
 }
 

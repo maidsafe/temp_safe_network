@@ -15,34 +15,94 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use xor_name::XorName;
 
-/// TODO: docs
+/// [`Sequence`] read operations.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum SequenceRead {
-    /// Get Sequence from the network.
+    /// Retrieve the [`Sequence`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetSequence`] response.
+    ///
+    /// Note that alternative sequence queries may be more efficient and convenient if you do not
+    /// need the full value of the sequence.
+    ///
+    /// [`GetSequence`]: QueryResponse::GetSequence
     Get(Address),
-    /// Get a range of entries from an Sequence object on the network.
+    /// Retrieve a range of entries from the [`Sequence`] at the given address.
+    ///
+    /// This should eventially lead to a [`GetSequenceRange`] response.
+    ///
+    /// [`GetSequenceRange`]: QueryResponse::GetSequenceRange
     GetRange {
         /// Sequence address.
         address: Address,
         /// Range of entries to fetch.
         ///
         /// For example, get 10 last entries:
-        /// range: (Index::FromEnd(10), Index::FromEnd(0))
+        ///
+        /// ```no_run
+        /// # #[allow(warnings)] {
+        /// # use safe_network::messaging::client::SequenceRead::*;
+        /// # use safe_network::types::{SequenceAddress, SequenceIndex};
+        /// # let address: SequenceAddress = todo!();
+        /// GetRange {
+        ///     address,
+        ///     range: (SequenceIndex::FromEnd(10), SequenceIndex::FromEnd(0)),
+        /// }
+        /// # };
+        /// ```
         ///
         /// Get all entries:
-        /// range: (Index::FromStart(0), Index::FromEnd(0))
+        ///
+        /// ```no_run
+        /// # #[allow(warnings)] {
+        /// # use safe_network::messaging::client::SequenceRead::*;
+        /// # use safe_network::types::{SequenceAddress, SequenceIndex};
+        /// # let address: SequenceAddress = todo!();
+        /// GetRange {
+        ///     address,
+        ///     range: (SequenceIndex::FromStart(0), SequenceIndex::FromEnd(0)),
+        /// }
+        /// # };
+        /// ```
         ///
         /// Get first 5 entries:
-        /// range: (Index::FromStart(0), Index::FromStart(5))
+        ///
+        /// ```no_run
+        /// # #[allow(warnings)] {
+        /// # use safe_network::messaging::client::SequenceRead::*;
+        /// # use safe_network::types::{SequenceAddress, SequenceIndex};
+        /// # let address: SequenceAddress = todo!();
+        /// GetRange {
+        ///     address,
+        ///     range: (SequenceIndex::FromStart(0), SequenceIndex::FromStart(5)),
+        /// }
+        /// # };
+        /// ```
         range: (Index, Index),
     },
-    /// Get last entry from the Sequence.
+    /// Retrieve the last entry from the [`Sequence`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetSequenceLastEntry`] response.
+    ///
+    /// [`GetSequenceLastEntry`]: QueryResponse::GetSequenceLastEntry
     GetLastEntry(Address),
-    /// List current policy
+    /// Retrieve the permissions for the public [`Sequence`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetSequencePublicPolicy`] response.
+    ///
+    /// [`GetSequencePublicPolicy`]: QueryResponse::GetSequencePublicPolicy
     GetPublicPolicy(Address),
-    /// List current policy
+    /// Retrieve the permissions for the private [`Sequence`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetSequencePrivatePolicy`] response.
+    ///
+    /// [`GetSequencePrivatePolicy`]: QueryResponse::GetSequencePrivatePolicy
     GetPrivatePolicy(Address),
-    /// Get current permissions for a specified user(s).
+    /// Retrieve the permissions of the given user for the [`Sequence`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetSequenceUserPermissions`] response.
+    ///
+    /// [`GetSequenceUserPermissions`]: QueryResponse::GetSequenceUserPermissions
     GetUserPermissions {
         /// Sequence address.
         address: Address,
@@ -51,31 +111,33 @@ pub enum SequenceRead {
     },
 }
 
-///
+/// A [`Sequence`] write operation.
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct SequenceCmd {
-    ///
+    /// The operation to perform.
     pub write: SequenceWrite,
-    ///
+    /// The ID of the message from which the operation originated, used to send error responses.
     pub msg_id: crate::messaging::MessageId,
+    /// A signature carrying authority to perform the operation.
     ///
+    /// This will be verified against the sequence's owner and permissions.
     pub client_sig: crate::messaging::ClientSigned,
-    ///
+    /// The origin of the request, used to send error responses.
     pub origin: crate::messaging::EndUser,
 }
 
-/// TODO: docs
+/// [`Sequence`] write operations.
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SequenceWrite {
-    /// Create a new Sequence on the network.
+    /// Create a new [`Sequence`] on the network.
     New(Sequence),
-    /// Edit the Sequence (insert/remove entry).
+    /// Edit a [`Sequence]`.
     Edit(SequenceOp<Entry>),
-    /// Delete a private Sequence.
+    /// Delete a private [`Sequence`].
     ///
-    /// This operation MUST return an error if applied to public Sequence. Only the current
-    /// owner(s) can perform this action.
+    /// This operation will result in an error if applied to a public sequence. Only private
+    /// sequences can be deleted, and only by their current owner(s).
     Delete(Address),
 }
 

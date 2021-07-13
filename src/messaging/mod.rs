@@ -18,7 +18,6 @@
 //! - The [`section_info`] module defines the queries and responses for section information – these
 //!   may be sent by both clients and nodes.
 
-/// Messages to/from the client
 pub mod client;
 /// Messages that nodes can exchange on the network.
 pub mod node;

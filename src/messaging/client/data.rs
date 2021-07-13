@@ -18,23 +18,37 @@ use xor_name::XorName;
 
 use serde::{Deserialize, Serialize};
 
-/// Data command operations. Creating, updating or removing data
+/// Data commands - creating, updating, or removing data.
+///
+/// See the [`types`] module documentation for more details of the types supported by the Safe
+/// Network, and their semantics.
+///
+/// [`types`]: crate::types
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum DataCmd {
-    /// Blob write operation
+    /// [`Chunk`] write operation.
+    ///
+    /// [`Chunk`]: crate::types::Chunk
+    // FIXME: Rename `Blob` -> `Chunk`
     Blob(ChunkWrite),
-    /// Map write operation
+    /// [`Map`] write operation.
+    ///
+    /// [`Map`]: crate::types::Map
     Map(MapWrite),
-    /// Sequence write operation
+    /// [`Sequence`] write operation.
+    ///
+    /// [`Sequence`]: crate::types::Sequence
     Sequence(SequenceWrite),
-    /// Register write operation
+    /// [`Register`] write operation.
+    ///
+    /// [`Register`]: crate::types::register::Register
     Register(RegisterWrite),
 }
 
 impl DataCmd {
     /// Creates a Response containing an error, with the Response variant corresponding to the
-    /// cuest variant.
+    /// command variant.
     pub fn error(&self, error: Error) -> CmdError {
         use DataCmd::*;
         match self {
@@ -45,7 +59,7 @@ impl DataCmd {
         }
     }
 
-    /// Returns the address of the destination for `cuest`.
+    /// Returns the address of the destination for command.
     pub fn dst_address(&self) -> XorName {
         use DataCmd::*;
         match self {
@@ -67,17 +81,30 @@ impl DataCmd {
     }
 }
 
-/// TODO: docs
+/// Data queries - retrieving data and inspecting their structure.
+///
+/// See the [`types`] module documentation for more details of the types supported by the Safe
+/// Network, and their semantics.
+///
+/// [`types`]: crate::types
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum DataQuery {
-    /// TODO: docs
+    /// [`Chunk`] read operation.
+    ///
+    /// [`Chunk`]: crate::types::Chunk
     Blob(ChunkRead),
-    /// TODO: docs
+    /// [`Map`] read operation.
+    ///
+    /// [`Map`]: crate::types::Map
     Map(MapRead),
-    /// TODO: docs
+    /// [`Sequence`] read operation.
+    ///
+    /// [`Sequence`]: crate::types::Sequence
     Sequence(SequenceRead),
-    /// TODO: docs
+    /// [`Register`] read operation.
+    ///
+    /// [`Register`]: crate::types::register::Register
     Register(RegisterRead),
 }
 

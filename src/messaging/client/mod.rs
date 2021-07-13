@@ -6,10 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+//! Messages that clients can send to the network, and their possible responses.
+//!
+//! See [`ClientMsg`] for message definitions.
+
 mod chunk;
 mod data;
 mod data_exchange;
-mod duty;
+mod duty; // FIXME: this appears to be unused
 mod errors;
 mod map;
 mod register;
@@ -42,61 +46,79 @@ use std::{
     convert::TryFrom,
 };
 
-/// Client Message
+/// Messages that a client can send to the network, and their possible responses.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ClientMsg {
-    /// Process message.
+    /// Messages that a client can send to the network, and their possible responses.
     Process(ProcessMsg),
 
-    /// Processing error.
+    /// A response indicating that the recipient was unable to process a client's message.
     ProcessingError(ProcessingError),
 
-    /// Supporting information.
+    /// A response indicating that the recipient was unable to process a client's message due to out
+    /// of date information.
+    // FIXME: this cannot be constructed due to empty enum in `SupportingInfo`, so it is not being
+    // used.
     SupportingInfo(SupportingInfo),
 }
 
-/// Our response to a processing error. Anti entropy in that it updates the erroring node
-/// with any relevant information, and includes the original message, which should hereafter
-/// be actionable
-// #[allow(clippy::large_enum_variant)]
+/// A response indicating that the recipient was unable to process a client's message due to out
+/// of date information.
+///
+/// This could be returned when a client sends an otherwise valid message containing outdated
+/// information. The response includes up to date information that can be used to re-send the
+/// request such that it should now be valid.
+// FIXME: updates the erroring **node**? Is this not a client message? Is it something that clients
+// would send?
+// FIXME: this cannot be constructed due to empty `SupportingInfoFor` enum field.
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct SupportingInfo {
-    /// Supporting information for the source_message process
+    /// Supporting information for the `source_message`.
     pub info: SupportingInfoFor,
-    /// The original message that triggered the error this update should be correcting
+    /// The original message that triggered the error this update should correct.
     pub source_message: ProcessMsg,
-    /// Correlates to a ProcessingError
+    /// Correlates to a `ProcessingError`.
     pub correlation_id: MessageId,
 }
 
 /// Various types of supporting information that can be received and acted upon by a node.
+// FIXME: this cannot be constructed as it is empty.
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SupportingInfoFor {}
 
-/// Our LazyMesssage error. Recipient was unable to process this message for some reason.
-/// The original message should be returned in full, and context can optionally be added via
-/// reason.
+/// A response indicating that the recipient was unable to process a client's message.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProcessingError {
-    /// Optional reason for the error. This should help the receiving node handle the error
+    /// Optional reason for the error.
+    ///
+    /// This can be used to handle the error.
     pub reason: Option<Error>,
-    /// Message that triggered this error
+    /// Message that triggered this error.
+    ///
+    /// This could be used to retry the message if the error could be handled.
     pub source_message: Option<ProcessMsg>,
 }
 
-///
+/// Messages that a client can send to the network, and their possible responses.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ProcessMsg {
-    /// A Cmd is leads to a write / change of state.
-    /// We expect them to be successful, and only return a msg
-    /// if something went wrong.
+    /// Messages that lead to mutation.
+    ///
+    /// There will be no response to these messages on success, only if something went wrong. Due to
+    /// the eventually consistent nature of the network, it may be necessary to continually retry
+    /// operations that depend on the effects of mutations.
     Cmd(DataCmd),
-    /// Queries is a read-only operation.
+    /// A read-only operation.
+    ///
+    /// Senders should eventually receive either a corresponding [`QueryResponse`] or an error in
+    /// reply.
+    /// [`QueryResponse`]: Self::QueryResponse
     Query(DataQuery),
     /// An Event is a fact about something that happened.
+    // FIXME: this is never constructed, so could perhaps be removed.
     Event {
         /// Request.
         event: Event,
@@ -105,89 +127,101 @@ pub enum ProcessMsg {
     },
     /// The response to a query, containing the query result.
     QueryResponse {
-        /// QueryResponse.
+        /// The result of the query.
         response: QueryResponse,
-        /// ID of causing query.
+        /// ID of the query message.
         correlation_id: MessageId,
     },
-    /// Cmd error.
+    /// An error response to a [`Cmd`].
+    ///
+    /// [`Cmd`]: Self::Cmd
     CmdError {
         /// The error.
         error: CmdError,
-        /// ID of causing cmd.
+        /// ID of causing [`Cmd`] message.
+        ///
+        /// [`Cmd`]: Self::Cmd
         correlation_id: MessageId,
     },
 }
 
+/// An error response to a [`Cmd`].
 ///
+/// [`Cmd`]: ProcessMsg::Cmd
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum CmdError {
-    ///
+    /// An error response to a [`DataCmd`].
+    // FIXME: `Cmd` is not an enum, so should this be?
     Data(Error), // DataError enum for better differentiation?
 }
 
-/// Events from the network that
-/// are pushed to the client.
+/// Events from the network that are pushed to the client.
+// FIXME: this cannot be constructed as it is empty.
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Event {}
 
-/// Query responses from the network.
+/// The response to a query, containing the query result.
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum QueryResponse {
     //
     // ===== Chunk =====
     //
-    /// Get Chunk.
+    /// Response to [`ChunkRead::Get`].
     GetChunk(Result<Chunk>),
     //
     // ===== Map =====
     //
-    /// Get Map.
+    /// Response to [`MapRead::Get`].
     GetMap(Result<Map>),
-    /// Get Map shell.
+    /// Response to [`MapRead::GetShell`].
+    ///
+    /// Note that the contained [`Map`] if `Ok` will have all its metadata fields set, but not the
+    /// data itself (e.g. the contained map will be empty, even if the actual map on the network is
+    /// not). See [`MapRead::Get`], [`MapRead::GetValue`], [`MapRead::ListEntries`],
+    /// [`MapRead::ListKeys`], or [`MapRead::ListValues`] for queries that return data in the map.
     GetMapShell(Result<Map>),
-    /// Get Map version.
+    /// Response to [`MapRead::GetVersion`].
     GetMapVersion(Result<u64>),
-    /// List all Map entries (key-value pairs).
+    /// Response to [`MapRead::ListEntries`].
     ListMapEntries(Result<MapEntries>),
-    /// List all Map keys.
+    /// Response to [`MapRead::ListKeys`].
     ListMapKeys(Result<BTreeSet<Vec<u8>>>),
-    /// List all Map values.
+    /// Response to [`MapRead::ListValues`].
     ListMapValues(Result<MapValues>),
-    /// Get Map permissions for a user.
+    /// Response to [`MapRead::ListUserPermissions`]
     ListMapUserPermissions(Result<MapPermissionSet>),
-    /// List all Map permissions.
+    /// Response to [`MapRead::ListPermissions`].
     ListMapPermissions(Result<BTreeMap<PublicKey, MapPermissionSet>>),
-    /// Get Map value.
+    /// Response to [`MapRead::GetValue`].
     GetMapValue(Result<MapValue>),
     //
     // ===== Sequence Data =====
     //
-    /// Get Sequence.
+    /// Response to [`SequenceRead::Get`].
     GetSequence(Result<Sequence>),
-    /// Get Sequence entries from a range.
+    /// Response to [`SequenceRead::GetRange`].
     GetSequenceRange(Result<SequenceEntries>),
-    /// Get Sequence last entry.
+    /// Response to [`SequenceRead::GetLastEntry`].
     GetSequenceLastEntry(Result<(u64, SequenceEntry)>),
-    /// Get public Sequence permissions for a user.
+    /// Response to [`SequenceRead::GetPublicPolicy`].
     GetSequencePublicPolicy(Result<SequencePublicPolicy>),
-    /// Get private Sequence permissions for a user.
+    /// Response to [`SequenceRead::GetPrivatePolicy`].
     GetSequencePrivatePolicy(Result<SequencePrivatePolicy>),
-    /// Get Sequence permissions for a user.
+    /// Response to [`SequenceRead::GetUserPermissions`].
     GetSequenceUserPermissions(Result<SequencePermissions>),
     //
     // ===== Register Data =====
     //
-    /// Get Register.
+    /// Response to [`RegisterRead::Get`].
     GetRegister(Result<Register>),
-    /// Get Register owners.
+    /// Response to [`RegisterRead::GetOwner`].
     GetRegisterOwner(Result<PublicKey>),
-    /// Read Register.
+    /// Response to [`RegisterRead::Read`].
     ReadRegister(Result<BTreeSet<(EntryHash, Entry)>>),
-    /// Get public Register permissions for a user.
+    /// Response to [`RegisterRead::GetPolicy`].
     GetRegisterPolicy(Result<Policy>),
-    /// Get Register permissions for a user.
+    /// Response to [`RegisterRead::GetUserPermissions`].
     GetRegisterUserPermissions(Result<Permissions>),
 }
 
@@ -221,8 +255,8 @@ impl QueryResponse {
     }
 }
 
-/// Error type for an attempted conversion from `QueryResponse` to a type implementing
-/// `TryFrom<Response>`.
+/// Error type for an attempted conversion from a [`QueryResponse`] variant to an expected wrapped
+/// value.
 #[derive(Debug, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum TryFromError {

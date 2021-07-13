@@ -11,20 +11,26 @@ use crate::types::{Chunk, ChunkAddress, PublicKey};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-/// TODO: docs
+/// [`Chunk`] read operations.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum ChunkRead {
-    /// TODO: docs
+    /// Retrieve a [`Chunk`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetChunk`] response.
+    ///
+    /// [`GetChunk`]: QueryResponse::GetChunk
     Get(ChunkAddress),
 }
 
-/// TODO: docs
+/// [`Chunk`] write operations.
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum ChunkWrite {
-    /// TODO: docs
+    /// Create a new [`Chunk`] on the network.
     New(Chunk),
-    /// TODO: docs
+    /// Delete a [`PrivateChunk`] from the network.
+    ///
+    /// [`PrivateChunk`]: crate::types::PrivateChunk
     DeletePrivate(ChunkAddress),
 }
 
