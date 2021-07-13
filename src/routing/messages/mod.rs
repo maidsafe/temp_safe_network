@@ -29,6 +29,9 @@ pub trait WireMsgUtils {
     /// Verify this message is properly signed.
     fn check_signature(&self) -> Result<()>;
 
+    /// Return 'true' if the message kind is MsgKind::ClientMsg or MsgKind::SectionInfoMsg
+    fn is_client_msg_kind(&self) -> bool;
+
     /// Creates a signed message where signature is assumed valid.
     fn new_signed(
         payload: Bytes,
@@ -112,6 +115,14 @@ impl WireMsgUtils for WireMsg {
         }
 
         Ok(())
+    }
+
+    /// Return 'true' if the message kind is MsgKind::ClientMsg or MsgKind::SectionInfoMsg
+    fn is_client_msg_kind(&self) -> bool {
+        matches!(
+            self.msg_kind(),
+            MsgKind::ClientMsg(_) | MsgKind::SectionInfoMsg
+        )
     }
 
     /// Creates a signed message where signature is assumed valid.
