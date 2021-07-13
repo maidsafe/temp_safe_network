@@ -32,20 +32,20 @@ pub struct HolderMetadata {
 /// Aggregate of chunk, map, and sequence data exchanges.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataExchange {
-    ///
+    /// Chunk data exchange.
     pub chunk_data: ChunkDataExchange,
-    ///
+    /// Map data exchange.
     pub map_data: MapDataExchange,
-    ///
+    /// Register data exchange.
     pub reg_data: RegisterDataExchange,
-    ///
+    /// Sequence data exchange.
     pub seq_data: SequenceDataExchange,
 }
 
 /// Chunk data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChunkDataExchange {
-    /// Full Adults register
+    /// Full adults register.
     pub full_adults: BTreeSet<XorName>,
 }
 
@@ -53,7 +53,7 @@ pub struct ChunkDataExchange {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MapDataExchange(pub BTreeMap<XorName, Vec<MapCmd>>);
 
-/// Map data exchange.
+/// Register data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RegisterDataExchange(pub BTreeMap<XorName, Vec<RegisterCmd>>);
 
