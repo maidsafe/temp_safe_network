@@ -64,6 +64,7 @@ testing = [ "safe_network/testing" ]
 default = [ "testing", "authenticator", "authd_client", "app" ]
 
 [dev-dependencies]
+dirs-next = "2.0.0"
 anyhow = "1.0.38"
 proptest = "~0.10"
 tracing-subscriber = "~0.2"

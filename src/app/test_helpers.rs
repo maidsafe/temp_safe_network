@@ -8,7 +8,7 @@
 // Software.
 
 use crate::Safe;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
 use safe_network::types::Keypair;
 use std::{collections::HashSet, env::var, fs, net::SocketAddr, sync::Once};
@@ -21,6 +21,9 @@ const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
 // Environment variable which can be set with the bootstrapping contacts
 // to be used for all sn_api tests
 const TEST_BOOTSTRAPPING_PEERS: &str = "TEST_BOOTSTRAPPING_PEERS";
+
+// Default file in home directory where bootstrapping contacts are usually found
+const DEFAULT_PEER_FILE_IN_HOME: &str = ".safe/node/node_connection_info.config";
 
 static INIT: Once = Once::new();
 
@@ -64,7 +67,15 @@ pub fn random_nrs_name() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(15).collect()
 }
 
-fn read_default_peers_from_file(default_peer_file: &str) -> Result<HashSet<SocketAddr>> {
+fn read_default_peers_from_file() -> Result<HashSet<SocketAddr>> {
+    let default_peer_file = match dirs_next::home_dir() {
+        None => bail!("Failed to obtain local home directory where to read {} from"),
+        Some(mut paths) => {
+            paths.push(DEFAULT_PEER_FILE_IN_HOME);
+            paths.display().to_string()
+        }
+    };
+
     let raw_json = fs::read_to_string(&default_peer_file).with_context(|| {
         format!(
             "Failed to read bootstraping contacts list from file: {}",
@@ -92,9 +103,7 @@ fn get_bootstrap_contacts() -> Result<HashSet<SocketAddr>> {
         })?,
         Err(_) => {
             // read default peers from the file we normally use for peers
-            let default_peer_file =
-                format!("{}/.safe/node/node_connection_info.config", var("HOME")?);
-            read_default_peers_from_file(&default_peer_file)?
+            read_default_peers_from_file()?
         }
     };
 
