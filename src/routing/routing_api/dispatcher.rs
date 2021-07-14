@@ -37,6 +37,13 @@ pub(super) struct Dispatcher {
     cancel_timer_rx: watch::Receiver<bool>,
 }
 
+impl Drop for Dispatcher {
+    fn drop(&mut self) {
+        // Cancel all scheduled timers including any future ones.
+        let _ = self.cancel_timer_tx.send(true);
+    }
+}
+
 impl Dispatcher {
     pub(super) fn new(core: Core) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
@@ -45,13 +52,6 @@ impl Dispatcher {
             cancel_timer_tx,
             cancel_timer_rx,
         }
-    }
-
-    // Terminate this routing instance - cancel all scheduled timers including any future ones,
-    // close all network connections and stop accepting new connections.
-    pub(super) async fn terminate(&self) {
-        let _ = self.cancel_timer_tx.send(true);
-        self.core.read().await.comm.terminate().await;
     }
 
     /// Handles the given command and transitively any new commands that are produced during its
@@ -261,29 +261,7 @@ impl Dispatcher {
                 }
                 .map_err(|e: Error| e)?
             }
-            MsgKind::DataMsg(_) => {
-                // TODO: send them all together without cloning WireMsg
-                // by having the send_on_existing_connection to return SendStatus
-                for (name, addr) in recipients {
-                    if self
-                        .core
-                        .read()
-                        .await
-                        .comm
-                        .send_on_existing_connection(&[(*name, *addr)], wire_msg.clone())
-                        .await
-                        .is_err()
-                    {
-                        trace!(
-                            "Lost connection to client {:?} when sending message {:?}",
-                            addr,
-                            wire_msg
-                        );
-                    }
-                }
-                vec![]
-            }
-            MsgKind::SectionInfoMsg => {
+            MsgKind::DataMsg(_) | MsgKind::SectionInfoMsg => {
                 let _ = self
                     .core
                     .read()

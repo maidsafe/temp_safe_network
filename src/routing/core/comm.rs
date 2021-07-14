@@ -12,21 +12,21 @@ use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
 use qp2p::{Endpoint, QuicP2p};
 use std::net::SocketAddr;
-use tokio::{
-    sync::{mpsc, RwLock},
-    task,
-};
+use tokio::{sync::mpsc, task};
 use xor_name::XorName;
 
 // Communication component of the node to interact with other nodes.
+#[derive(Clone)]
 pub(crate) struct Comm {
     quic_p2p: QuicP2p,
     endpoint: Endpoint,
-    // Sender for connection events. Kept here so we can clone it and pass it to the incoming
-    // messages handler every time we establish new connection. It's kept in an `Option` so we can
-    // take it out and drop it on `terminate` which together with all the incoming message handlers
-    // terminating closes the corresponding receiver.
-    event_tx: RwLock<Option<mpsc::Sender<ConnectionEvent>>>,
+}
+
+impl Drop for Comm {
+    fn drop(&mut self) {
+        // Close all existing connections and stop accepting new ones.
+        self.endpoint.close();
+    }
 }
 
 impl Comm {
@@ -56,19 +56,7 @@ impl Comm {
             event_tx.clone(),
         ));
 
-        Ok(Self {
-            quic_p2p,
-            endpoint,
-            event_tx: RwLock::new(Some(event_tx)),
-        })
-    }
-
-    pub(crate) async fn async_clone(&self) -> Self {
-        Self {
-            quic_p2p: self.quic_p2p.clone(),
-            endpoint: self.endpoint.clone(),
-            event_tx: RwLock::new(self.event_tx.read().await.clone()),
-        }
+        Ok(Self { quic_p2p, endpoint })
     }
 
     pub(crate) async fn bootstrap(
@@ -96,20 +84,7 @@ impl Comm {
             event_tx.clone(),
         ));
 
-        Ok((
-            Self {
-                quic_p2p,
-                endpoint,
-                event_tx: RwLock::new(Some(event_tx)),
-            },
-            bootstrap_addr,
-        ))
-    }
-
-    // Close all existing connections and stop accepting new ones.
-    pub(crate) async fn terminate(&self) {
-        self.endpoint.close();
-        let _ = self.event_tx.write().await.take();
+        Ok((Self { quic_p2p, endpoint }, bootstrap_addr))
     }
 
     pub(crate) fn our_connection_info(&self) -> SocketAddr {
@@ -131,8 +106,11 @@ impl Comm {
                 .await
                 .map_err(|err| {
                     error!(
-                        "Sending to {:?} (name {:?}) failed with {}",
-                        addr, name, err
+                        "Sending message (msg_id: {}) to {:?} (name {:?}) failed with {}",
+                        wire_msg.msg_id(),
+                        addr,
+                        name,
+                        err
                     );
                     Error::FailedSend(*addr, *name)
                 })?;
@@ -285,12 +263,6 @@ impl Comm {
         } else {
             Ok(SendStatus::MinDeliveryGroupSizeFailed(failed_recipients))
         }
-    }
-}
-
-impl Drop for Comm {
-    fn drop(&mut self) {
-        self.endpoint.close()
     }
 }
 
