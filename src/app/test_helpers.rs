@@ -9,8 +9,9 @@
 
 use crate::Safe;
 use anyhow::{Context, Result};
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use std::{collections::HashSet, env::var, net::SocketAddr, sync::Once};
+use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
+use safe_network::types::Keypair;
+use std::{collections::HashSet, env::var, fs, net::SocketAddr, sync::Once};
 use tracing_subscriber::{fmt, EnvFilter};
 
 // Environment variable which can be set with the auth credentials
@@ -47,13 +48,16 @@ pub async fn new_safe_instance() -> Result<Safe> {
                     TEST_AUTH_CREDENTIALS
                 )
             })?;
-            Some(keypair)
+            keypair
         }
-        Err(_) => None,
+        Err(_) => {
+            let mut rng = OsRng;
+            Keypair::new_ed25519(&mut rng)
+        }
     };
 
     let bootstrap_contacts = get_bootstrap_contacts()?;
-    safe.connect(credentials, None, Some(bootstrap_contacts))
+    safe.connect(Some(credentials), None, Some(bootstrap_contacts))
         .await?;
     Ok(safe)
 }
@@ -61,6 +65,24 @@ pub async fn new_safe_instance() -> Result<Safe> {
 // Create a random NRS name
 pub fn random_nrs_name() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(15).collect()
+}
+
+fn read_default_peers_from_file(default_peer_file: &str) -> Result<HashSet<SocketAddr>> {
+    let raw_json = fs::read_to_string(&default_peer_file).with_context(|| {
+        format!(
+            "Failed to read bootstraping contacts list from file: {}",
+            &default_peer_file
+        )
+    })?;
+    let urls: Vec<String> = serde_json::from_str(&raw_json).with_context(|| {
+        format!(
+            "Failed to parse bootstraping contacts list from file: {}",
+            &default_peer_file
+        )
+    })?;
+    let sockaddrs: Result<HashSet<SocketAddr>, std::net::AddrParseError> =
+        urls.iter().map(|u| u.parse()).collect();
+    Ok(sockaddrs?)
 }
 
 fn get_bootstrap_contacts() -> Result<HashSet<SocketAddr>> {
@@ -72,9 +94,10 @@ fn get_bootstrap_contacts() -> Result<HashSet<SocketAddr>> {
             )
         })?,
         Err(_) => {
-            // we default to this address as that's what we
-            // normally use in local test network as the genesis node address
-            vec!["127.0.0.1:12000".parse()?].into_iter().collect()
+            // read default peers from the file we normally use for peers
+            let default_peer_file =
+                format!("{}/.safe/node/node_connection_info.config", var("HOME")?);
+            read_default_peers_from_file(&default_peer_file)?
         }
     };
 
