@@ -75,7 +75,7 @@ impl ElderStores {
     ) -> Result<NodeDuty> {
         info!("Writing Data");
         match cmd {
-            DataCmd::Blob(write) => {
+            DataCmd::Chunk(write) => {
                 info!("Writing Blob");
                 self.chunk_records
                     .write(write, msg_id, client_sig, origin)
