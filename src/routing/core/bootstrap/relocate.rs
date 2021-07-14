@@ -260,7 +260,6 @@ impl JoiningAsRelocated {
 
         let cmd = Command::SendMessage {
             recipients: recipients.to_vec(),
-            delivery_group_size: recipients.len(),
             wire_msg,
         };
 

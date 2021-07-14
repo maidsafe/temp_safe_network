@@ -391,7 +391,6 @@ impl Routing {
 
                     let command = Command::SendMessage {
                         recipients,
-                        delivery_group_size: 1,
                         wire_msg,
                     };
                     return self.dispatcher.clone().handle_commands(command).await;

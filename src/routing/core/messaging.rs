@@ -318,12 +318,10 @@ impl Core {
         }
 
         if !others.is_empty() {
-            let count = others.len();
             let dst_section_pk = self.section_key_by_name(&others[0].0);
             wire_msg.set_dst_section_pk(dst_section_pk);
             commands.push(Command::SendMessage {
                 recipients: others,
-                delivery_group_size: count,
                 wire_msg: wire_msg.clone(),
             });
         }
@@ -356,7 +354,6 @@ impl Core {
 
         Ok(Command::SendMessage {
             recipients: vec![recipient],
-            delivery_group_size: 1,
             wire_msg,
         })
     }
@@ -373,11 +370,9 @@ impl Core {
             node_msg,
             self.section.authority_provider().section_key(),
         )?;
-        let delivery_group_size = recipients.len();
 
         Ok(Command::SendMessage {
             recipients,
-            delivery_group_size,
             wire_msg,
         })
     }

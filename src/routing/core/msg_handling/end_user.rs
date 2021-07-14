@@ -60,7 +60,6 @@ impl Core {
 
                             return Ok(vec![Command::SendMessage {
                                 recipients: vec![(xorname, *addr)],
-                                delivery_group_size: 1,
                                 wire_msg,
                             }]);
                         }

@@ -43,8 +43,13 @@ pub(crate) enum Command {
     },
     /// Handle a DKG failure that was observed by a majority of the DKG participants.
     HandleDkgFailure(DkgFailureSigSet),
-    /// Send a message to `delivery_group_size` peers out of the given `recipients`.
+    /// Send a message to the given `recipients`.
     SendMessage {
+        recipients: Vec<(XorName, SocketAddr)>,
+        wire_msg: WireMsg,
+    },
+    /// Send a message to `delivery_group_size` peers out of the given `recipients`.
+    SendMessageDeliveryGroup {
         recipients: Vec<(XorName, SocketAddr)>,
         delivery_group_size: usize,
         wire_msg: WireMsg,

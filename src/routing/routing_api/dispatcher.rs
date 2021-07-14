@@ -135,7 +135,13 @@ impl Dispatcher {
                 .handle_dkg_failure(signeds)
                 .map(|command| vec![command]),
             Command::SendMessage {
-                // send to network from routing layer
+                recipients,
+                wire_msg,
+            } => {
+                self.send_message(&recipients, recipients.len(), wire_msg)
+                    .await
+            }
+            Command::SendMessageDeliveryGroup {
                 recipients,
                 delivery_group_size,
                 wire_msg,
