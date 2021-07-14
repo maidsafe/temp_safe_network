@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.32.0](https://github.com/maidsafe/sn_api/compare/v0.31.0...v0.32.0) (2021-07-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* transfers removed
+
+### Features
+
+* remove transfers code ([a56688b](https://github.com/maidsafe/sn_api/commit/a56688b5987385f0d8a3ab884294648d20edb1bc))
+
+
+### Bug Fixes
+
+* **doctest:** doctests compile again, but don't run ([31e249e](https://github.com/maidsafe/sn_api/commit/31e249e6b3fbcf0b694edb344dc046042d0712c0))
+* **safe_client:** update sn_api to reflect changes to map api in sn ([26f60a1](https://github.com/maidsafe/sn_api/commit/26f60a1a5cf21110a2848a6e3abdff696d74781c))
+* **tests:** add retry loops to flaky tests ([f0bb293](https://github.com/maidsafe/sn_api/commit/f0bb293d046f7ce6d502db3d12ccce6fe0b91fae))
+* **tests:** ignore test depending on env var; make api tests portable ([dfe573e](https://github.com/maidsafe/sn_api/commit/dfe573e39cb69d48d2dde3ede1355bd3e4455036))
+* minor cleanup ([d8ed8d7](https://github.com/maidsafe/sn_api/commit/d8ed8d759ef5750f298ab305151e613063903546))
+
 ## [0.31.0](https://github.com/maidsafe/sn_api/compare/v0.30.0...v0.31.0) (2021-06-29)
 
 
