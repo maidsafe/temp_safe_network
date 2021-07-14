@@ -11,7 +11,6 @@ use super::cli;
 use crate::{
     operations::auth_daemon::*,
     subcommands::{
-        auth::{auth_commander, AuthSubCommands},
         SubCommands,
     },
 };
@@ -36,54 +35,6 @@ pub fn shell_run() -> Result<()> {
         writeln!(io, "Pass '--help' flag to any top level command for a complete list of supported subcommands and arguments")?;
         Ok(())
     });
-    shell.new_command(
-        "auth",
-        "Authorise the Safe CLI and interact with a remote Authenticator daemon",
-        0,
-        |io, (safe, sn_authd_client), args| {
-            // Let's create an args array to mimic the one we'd receive commands were passed from outside shell
-            let mut mimic_cli_args = vec!["safe", "auth"];
-            mimic_cli_args.extend(args.iter());
-
-            // We can now pass this args array to the CLI structopt parser
-            match cli::CmdArgs::from_iter_safe(mimic_cli_args) {
-                Ok(cmd_args) => {
-                    match cmd_args.cmd {
-                        Some(SubCommands::Auth { cmd }) => {
-                            if let Some(AuthSubCommands::Subscribe { notifs_endpoint }) = cmd {
-                                match task::block_on(authd_subscribe(sn_authd_client, notifs_endpoint, &prompt_to_allow_auth)) {
-                                    Ok(()) => {
-                                        writeln!(io, "Keep this shell session open to receive the notifications")?;
-                                        Ok(())
-                                    },
-                                    Err(err) => {
-                                        writeln!(io, "{}", err)?;
-                                        Ok(())
-                                    }
-                                }
-                            } else {
-                                match task::block_on(auth_commander(cmd, cmd_args.endpoint, safe)) {
-                                    Ok(()) => Ok(()),
-                                    Err(err) => {
-                                        writeln!(io, "{}", err)?;
-                                        Ok(())
-                                    }
-                                }
-                            }
-                        },
-                        _other => {
-                            writeln!(io, "Unexpected error. Command not valid")?;
-                            Ok(())
-                        }
-                    }
-                },
-                Err(err) => {
-                    writeln!(io, "{}", err)?;
-                    Ok(())
-                }
-            }
-        },
-    );
     shell.new_command(
         "cat",
         "Read data on the Safe Network",
@@ -155,12 +106,6 @@ pub fn shell_run() -> Result<()> {
         "Commands to manage Safe Network Nodes",
         0,
         |io, (safe, _sn_authd_client), args| call_cli("node", args, safe, io),
-    );
-    shell.new_command(
-        "wallet",
-        "Manage wallets on the Safe Network",
-        0,
-        |io, (safe, _sn_authd_client), args| call_cli("wallet", args, safe, io),
     );
     shell.new_command(
         "xorurl",

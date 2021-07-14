@@ -11,10 +11,10 @@ use crate::{
     operations::safe_net::connect,
     shell,
     subcommands::{
-        auth::auth_commander, cat::cat_commander, config::config_commander, dog::dog_commander,
+        cat::cat_commander, config::config_commander, dog::dog_commander,
         files::files_commander, keys::key_commander, networks::networks_commander,
         node::node_commander, nrs::nrs_commander, seq::seq_commander, setup::setup_commander,
-        update::update_commander, wallet::wallet_commander, xorurl::xorurl_commander, OutputFmt,
+        update::update_commander,  xorurl::xorurl_commander, OutputFmt,
         SubCommands,
     },
 };
@@ -110,7 +110,6 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
             follow_links,
         }) => xorurl_commander(cmd, location, recursive, follow_links, output_fmt, safe).await,
         Some(SubCommands::Node { cmd }) => node_commander(cmd).await,
-        Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, safe).await,
         Some(other) => {
             // We treat these commands separatelly since we use the credentials if they are
             // available to connect to the network with them (unless dry-run was set),
@@ -124,7 +123,6 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
                 SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, safe).await,
                 SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
                 SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
-                SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, safe).await,
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, args.dry, safe).await,
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, safe).await,
                 SubCommands::Seq(cmd) => seq_commander(cmd, output_fmt, safe).await,

@@ -59,9 +59,9 @@ xor_name = "1"
   optional = true
 
   [dependencies.sn_api]
-  version = "~0.31"
+  version = "~0.32"
   default-features = false
-  features = [ "app", "authd_client", "simulated-payouts" ]
+  features = [ "app", "authd_client", "testing" ]
 
   [dependencies.tokio]
   version = "1.6.0"
@@ -80,8 +80,8 @@ xor_name = "1"
   optional = true
 
 [features]
-default = [ "simulated-payouts", "self-update" ]
-simulated-payouts = [ "sn_api/simulated-payouts" ]
+default = [ "testing", "self-update" ]
+testing = [ "sn_api/testing" ]
 self-update = [ "reqwest", "self_update" ]
 
 [dev-dependencies]

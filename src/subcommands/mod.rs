@@ -7,7 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-pub mod auth;
 pub mod cat;
 pub mod config;
 pub mod dog;
@@ -22,7 +21,6 @@ pub mod safe_id;
 pub mod seq;
 pub mod setup;
 pub mod update;
-pub mod wallet;
 pub mod xorurl;
 
 use structopt::{clap::AppSettings, StructOpt};
@@ -77,17 +75,6 @@ pub enum SubCommands {
         cmd: Option<networks::NetworksSubCommands>,
     },
     #[structopt(
-        name = "auth",
-        no_version,
-        global_settings(&[AppSettings::DisableVersion]),
-    )]
-    /// Authorise the SAFE CLI and interact with a remote Authenticator daemon
-    Auth {
-        /// subcommands
-        #[structopt(subcommand)]
-        cmd: Option<auth::AuthSubCommands>,
-    },
-    #[structopt(
         name = "cat",
         no_version,
         global_settings(&[AppSettings::DisableVersion]),
@@ -129,18 +116,6 @@ pub enum SubCommands {
     )]
     /// Manage keys on the SAFE Network
     Keys(keys::KeysSubCommands),
-    #[structopt(
-        name = "wallet",
-        no_version,
-        global_settings(&[AppSettings::DisableVersion]),
-    )]
-    /// Manage wallets on the SAFE Network
-    Wallet(wallet::WalletSubCommands),
-    #[structopt(
-        name = "xorurl",
-        no_version,
-        global_settings(&[AppSettings::DisableVersion]),
-    )]
     /// Obtain the XOR-URL of data without uploading it to the network, or decode XOR-URLs
     Xorurl {
         /// subcommands

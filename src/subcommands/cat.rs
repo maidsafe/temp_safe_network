@@ -72,21 +72,6 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
                     .context("Failed to print out the content of the file")?;
             }
         }
-        SafeData::Wallet { balances, .. } => {
-            // Render Wallet
-            if OutputFmt::Pretty == output_fmt {
-                println!("Spendable balances of Wallet at \"{}\":", url);
-                let mut table = Table::new();
-                table.add_row(row![bFg->"Default", bFg->"Friendly Name", bFg->"SafeKey URL"]);
-                balances.iter().for_each(|(name, (default, balance))| {
-                    let def = if *default { "*" } else { "" };
-                    table.add_row(row![def, name, balance.xorurl]);
-                });
-                table.printstd();
-            } else {
-                println!("{}", serialise_output(&(url, balances), output_fmt));
-            }
-        }
         SafeData::NrsMapContainer {
             public_name,
             version,

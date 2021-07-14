@@ -100,24 +100,6 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                         media_type.clone().unwrap_or_else(|| "Unknown".to_string())
                     );
                 }
-                SafeData::Wallet {
-                    xorurl,
-                    xorname,
-                    type_tag,
-                    data_type,
-                    resolved_from,
-                    ..
-                } => {
-                    println!("Resolved from: {}", resolved_from);
-                    println!("= Wallet =");
-                    println!("XOR-URL: {}", xorurl);
-                    println!("Type tag: {}", type_tag);
-                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: {}", data_type);
-                    let mut safeurl = SafeUrl::from_url(xorurl)?;
-                    safeurl.set_content_type(SafeContentType::Raw)?;
-                    println!("Native data XOR-URL: {}", safeurl.to_string());
-                }
                 SafeData::SafeKey {
                     xorurl,
                     xorname,
