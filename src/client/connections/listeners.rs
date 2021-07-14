@@ -217,14 +217,6 @@ impl Session {
                         trace!("No channel found for {:?}", correlation_id);
                     }
                 }
-                ProcessMsg::Event {
-                    event,
-                    correlation_id,
-                    ..
-                } => {
-                    debug!("Event received to be processed: {:?}", correlation_id);
-                    trace!("Event received is: {:?}", event);
-                }
                 ProcessMsg::CmdError {
                     error,
                     correlation_id,

@@ -87,14 +87,6 @@ pub enum ProcessMsg {
     /// reply.
     /// [`QueryResponse`]: Self::QueryResponse
     Query(DataQuery),
-    /// An Event is a fact about something that happened.
-    // FIXME: this is never constructed, so could perhaps be removed.
-    Event {
-        /// Request.
-        event: Event,
-        /// ID of causing cmd.
-        correlation_id: MessageId,
-    },
     /// The response to a query, containing the query result.
     QueryResponse {
         /// The result of the query.
@@ -124,11 +116,6 @@ pub enum CmdError {
     // FIXME: `Cmd` is not an enum, so should this be?
     Data(Error), // DataError enum for better differentiation?
 }
-
-/// Events from the network that are pushed to the client.
-// FIXME: this cannot be constructed as it is empty.
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum Event {}
 
 /// The response to a query, containing the query result.
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
