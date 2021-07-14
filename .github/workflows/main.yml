@@ -13,8 +13,6 @@ on:
       - main
 
 env:
-  # Run all cargo commands with --verbose.
-  CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
 
 jobs:
@@ -65,7 +63,7 @@ jobs:
 
   build_linux:
     if: github.repository_owner == 'maidsafe'
-    name: Build_Linux
+    name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -104,6 +102,40 @@ jobs:
           name: sn_node-${{ matrix.target }}-prod
           path: artifacts
 
+  build_arm:
+    if: github.repository_owner == 'maidsafe'
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - shell: bash
+        run: make ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@master
+        with:
+          name: sn_node-${{ matrix.target }}-prod
+          path: artifacts
+
   # Deploy to GH Release and S3 if we're on a `chore(release):` commit
   deploy:
     if: |
@@ -111,7 +143,7 @@ jobs:
       startsWith(github.event.head_commit.message, 'chore(release):')
     name: Deploy
     runs-on: ubuntu-latest
-    needs: [build_win_mac, build_linux]
+    needs: [build_win_mac, build_linux, build_arm]
     env:
       AWS_ACCESS_KEY_ID: AKIAVVODCRMSJ5MV63VB
       AWS_SECRET_ACCESS_KEY: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
@@ -132,6 +164,14 @@ jobs:
         with:
           name: sn_node-x86_64-apple-darwin-prod
           path: artifacts/prod/x86_64-apple-darwin/release
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_node-arm-unknown-linux-musleabi-prod
+          path: artifacts/prod/arm-unknown-linux-musleabi/release
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_node-armv7-unknown-linux-musleabihf-prod
+          path: artifacts/prod/armv7-unknown-linux-musleabihf/release
 
       # Get information for the release.
       - shell: bash
@@ -162,7 +202,7 @@ jobs:
       # Upload all the release archives to S3
       - name: Upload archives to S3
         run: aws s3 sync deploy/prod s3://sn-node --acl public-read
-      
+
       # Create the release and attach the generated description
       - name: Create GitHub Release
         id: create_release
@@ -218,6 +258,20 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-x86_64-apple-darwin.tar.gz
           asset_name: sn_node-${{ steps.versioning.outputs.version }}-x86_64-apple-darwin.tar.gz
+          asset_content_type: application/zip
+
+      - uses: actions/upload-release-asset@v1.0.1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-arm-unknown-linux-musleabi.tar.gz
+          asset_name: sn_node-${{ steps.versioning.outputs.version }}-arm-unknown-linux-musleabi.tar.gz
+          asset_content_type: application/zip
+
+      - uses: actions/upload-release-asset@v1.0.1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-armv7-unknown-linux-musleabihf.tar.gz
+          asset_name: sn_node-${{ steps.versioning.outputs.version }}-armv7-unknown-linux-musleabihf.tar.gz
           asset_content_type: application/zip
 
   # Publish if we're on a `chore(release):` commit
