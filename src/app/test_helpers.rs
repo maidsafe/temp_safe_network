@@ -69,7 +69,10 @@ pub fn random_nrs_name() -> String {
 
 fn read_default_peers_from_file() -> Result<HashSet<SocketAddr>> {
     let default_peer_file = match dirs_next::home_dir() {
-        None => bail!("Failed to obtain local home directory where to read {} from"),
+        None => bail!(
+            "Failed to obtain local home directory where to read {} from",
+            DEFAULT_PEER_FILE_IN_HOME
+        ),
         Some(mut paths) => {
             paths.push(DEFAULT_PEER_FILE_IN_HOME);
             paths.display().to_string()
