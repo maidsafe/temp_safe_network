@@ -423,12 +423,6 @@ impl Routing {
     }
 }
 
-impl Drop for Routing {
-    fn drop(&mut self) {
-        futures::executor::block_on(self.dispatcher.terminate());
-    }
-}
-
 // Listen for incoming connection events and handle them.
 async fn handle_connection_events(
     dispatcher: Arc<Dispatcher>,

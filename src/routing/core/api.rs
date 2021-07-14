@@ -48,7 +48,7 @@ impl Core {
 
     pub(crate) async fn relocated(&self, new_node: Node, new_section: Section) -> Self {
         Self::new(
-            self.comm.async_clone().await,
+            self.comm.clone(),
             new_node,
             new_section,
             None,
