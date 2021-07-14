@@ -8,7 +8,7 @@
 
 use super::{
     interaction::push_state,
-    messaging::{send, send_error, send_support, send_to_nodes},
+    messaging::{send, send_error, send_to_nodes},
     role::{AdultRole, ElderRole, Role},
 };
 use crate::messaging::MessageId;
@@ -275,14 +275,6 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     send_error(msg, &network_api).await?;
-                    Ok(NodeTask::None)
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::SendSupport(msg) => {
-                let network_api = self.network_api.clone();
-                let handle = tokio::spawn(async move {
-                    send_support(msg, &network_api).await?;
                     Ok(NodeTask::None)
                 });
                 Ok(NodeTask::Thread(handle))

@@ -9,7 +9,7 @@
 use crate::messaging::{
     data::{
         ChunkRead, ChunkWrite, DataCmd, DataExchange, DataMsg, DataQuery, ProcessingError,
-        QueryResponse, SupportingInfo,
+        QueryResponse,
     },
     node::NodeMsg,
     ClientSigned, DstLocation, EndUser, MessageId, SrcLocation,
@@ -125,9 +125,6 @@ pub enum NodeDuty {
     /// Send a lazy error as a result of a specific message.
     /// The aim here is for the sender to respond with any missing state
     SendError(OutgoingLazyError),
-    /// Send supporting info for a given processing error.
-    /// This should be any missing state required to proceed at the erring node.
-    SendSupport(OutgoingSupportingInfo),
     /// Send the same request to each individual node.
     SendToNodes {
         msg_id: MessageId,
@@ -190,11 +187,5 @@ pub enum MsgType {
 #[derive(Debug, Clone)]
 pub struct OutgoingLazyError {
     pub msg: ProcessingError,
-    pub dst: DstLocation,
-}
-
-#[derive(Debug, Clone)]
-pub struct OutgoingSupportingInfo {
-    pub msg: SupportingInfo,
     pub dst: DstLocation,
 }
