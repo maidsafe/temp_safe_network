@@ -17,7 +17,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 // to be used for all sn_api tests
 const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
 
-// Environment variable which can be set with the bootstraping contacts
+// Environment variable which can be set with the bootstrapping contacts
 // to be used for all sn_api tests
 const TEST_BOOTSTRAPPING_PEERS: &str = "TEST_BOOTSTRAPPING_PEERS";
 

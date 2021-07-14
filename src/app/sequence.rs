@@ -16,11 +16,12 @@ impl Safe {
     /// Create a Public Sequence on the network
     ///
     /// ## Example
-    /// ```
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data = b"First in the sequence";
     ///     let xorurl = safe.sequence_create(data, None, 20_000, false).await.unwrap();
     ///     let received_data = safe.sequence_get(&xorurl).await.unwrap();
@@ -53,11 +54,12 @@ impl Safe {
     /// Get data from a Public Sequence on the network
     ///
     /// ## Example
-    /// ```
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data = b"First in the sequence";
     ///     let xorurl = safe.sequence_create(data, None, 20_000, false).await.unwrap();
     ///     let received_data = safe.sequence_get(&xorurl).await.unwrap();
@@ -116,11 +118,12 @@ impl Safe {
     /// Append data to a Public Sequence on the network
     ///
     /// ## Example
-    /// ```
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data1 = b"First in the sequence";
     ///     let xorurl = safe.sequence_create(data1, None, 20_000, false).await.unwrap();
     ///     let data2 = b"Second in the sequence";

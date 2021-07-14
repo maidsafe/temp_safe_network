@@ -40,11 +40,12 @@ impl Safe {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    ///     safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    ///     safe.connect(None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, true, false).await.unwrap();
     ///     assert!(xorurl.contains("safe://"))
     /// # });
@@ -118,11 +119,12 @@ impl Safe {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, true, false).await.unwrap();
     ///     let (version, files_map) = safe.files_container_get(&xorurl).await.unwrap();
     ///     println!("FilesContainer fetched is at version: {}", version);
@@ -191,11 +193,12 @@ impl Safe {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false, false).await.unwrap();
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_sync("../testdata", &xorurl, true, true, false, false, false).await.unwrap();
     ///     println!("FilesContainer synced up is at version: {}", version);
@@ -284,11 +287,12 @@ impl Safe {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, true, false).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_add("../testdata/test.md", &new_file_name, false, false, true, false).await.unwrap();
@@ -353,11 +357,12 @@ impl Safe {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, true, false).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_add_from_raw(b"0123456789", &new_file_name, false, false, false).await.unwrap();
@@ -402,11 +407,12 @@ impl Safe {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let (xorurl, processed_files, files_map) = safe.files_container_create(Some("../testdata/"), None, true, true, false).await.unwrap();
     ///     let remote_file_path = format!("{}/test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_remove_path(&remote_file_path, false, false, false).await.unwrap();
@@ -521,11 +527,12 @@ impl Safe {
     /// Put data blobs onto the network.
     ///
     /// ## Example
-    /// ```
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data = b"Something super good";
     ///     let xorurl = safe.files_store_public_blob(data, Some("text/plain"), false).await.unwrap();
     ///     let received_data = safe.files_get_public_blob(&xorurl, None).await.unwrap();
@@ -564,11 +571,12 @@ impl Safe {
     /// Get blob from the network.
     ///
     /// ## Example
-    /// ```
+    /// ```no_run
     /// # use sn_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data = b"Something super good";
     ///     let xorurl = safe.files_store_public_blob(data, None, false).await.unwrap();
     ///     let received_data = safe.files_get_public_blob(&xorurl, None).await.unwrap();

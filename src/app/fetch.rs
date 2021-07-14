@@ -136,12 +136,13 @@ impl Safe {
     /// ## Examples
     ///
     /// ### Fetch FilesContainer relative path file
-    /// ```rust
+    /// ```no_run
     /// # use sn_api::{Safe, fetch::SafeData};
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let (xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false, false).await.unwrap();
     ///
     ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
@@ -178,12 +179,13 @@ impl Safe {
     /// ## Examples
     ///
     /// ### Inspect FilesContainer relative path file
-    /// ```rust
+    /// ```no_run
     /// # use sn_api::{Safe, fetch::SafeData};
     /// # use std::collections::BTreeMap;
-    /// # let mut safe = Safe::default();
-    /// # async_std::task::block_on(async {
-    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   let mut safe = Safe::default();
+    /// #   safe.connect(None, None, None).await.unwrap();
     ///     let (container_xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false, false).await.unwrap();
     ///
     ///     let inspected_content = safe.inspect( &format!( "{}/test.md", &container_xorurl.replace("?v=0", "") ) ).await.unwrap();
