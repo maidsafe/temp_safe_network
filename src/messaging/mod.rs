@@ -27,6 +27,8 @@ pub mod section_info;
 /// The wire format and message (de)serialization API.
 pub mod serialisation;
 
+// Message authority - keys and signatures.
+mod authority;
 // Error types definitions
 mod errors;
 // Source and destination structs for messages
@@ -39,10 +41,11 @@ mod msg_kind;
 mod sap;
 
 pub use self::{
+    authority::{BlsShareSigned, ClientSigned, NodeSigned, SectionSigned},
     errors::{Error, Result},
     location::{DstLocation, EndUser, SocketId, SrcLocation},
     msg_id::{MessageId, MESSAGE_ID_LEN},
-    msg_kind::{BlsShareSigned, ClientSigned, MsgKind, NodeSigned, SectionSigned},
+    msg_kind::MsgKind,
     sap::SectionAuthorityProvider,
     serialisation::{MessageType, NodeMsgAuthority, WireMsg},
 };
