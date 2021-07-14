@@ -41,15 +41,12 @@ pub async fn new_safe_instance() -> Result<Safe> {
     init_logger();
     let mut safe = Safe::default();
     let credentials = match var(TEST_AUTH_CREDENTIALS) {
-        Ok(val) => {
-            let keypair = serde_json::from_str(&val).with_context(|| {
-                format!(
-                    "Failed to parse credentials read from {} env var",
-                    TEST_AUTH_CREDENTIALS
-                )
-            })?;
-            keypair
-        }
+        Ok(val) => serde_json::from_str(&val).with_context(|| {
+            format!(
+                "Failed to parse credentials read from {} env var",
+                TEST_AUTH_CREDENTIALS
+            )
+        })?,
         Err(_) => {
             let mut rng = OsRng;
             Keypair::new_ed25519(&mut rng)
