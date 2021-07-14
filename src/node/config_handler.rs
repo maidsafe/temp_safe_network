@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#![allow(trivial_numeric_casts)] // FIXME
-                                 // beep
 use crate::node::{Error, Result};
 use crate::routing::TransportConfig as NetworkConfig;
 use serde::{Deserialize, Serialize};
@@ -49,7 +47,7 @@ pub struct Config {
     /// Verbose output. `-v` is equivalent to logging with `warn`, `-vv` to `info`, `-vvv` to
     /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
     #[structopt(short, long, parse(from_occurrences))]
-    pub verbose: u64,
+    pub verbose: u8,
     /// dump shell completions for: [bash, fish, zsh, powershell, elvish]
     #[structopt(long)]
     pub completions: Option<String>,
@@ -455,7 +453,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 504;
+    let expected_size = 496;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }
