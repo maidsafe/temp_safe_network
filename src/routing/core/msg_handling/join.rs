@@ -249,7 +249,7 @@ impl Core {
         if age != peer.age() {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - relocation age ({}) doesn't match peer's age ({}).",
-                peer, age,peer.age(),
+                peer, age, peer.age(),
             );
             return Ok(vec![]);
         }
@@ -277,6 +277,14 @@ impl Core {
 
         let previous_name = Some(details.pub_id);
         let dst_key = Some(details.dst_key);
+
+        if self.section.members().is_relocated(&details.pub_id) {
+            debug!(
+                "Ignoring JoinAsRelocatedRequest from {} - original node {:?} already relocated to us.",
+                peer, previous_name
+            );
+            return Ok(vec![]);
+        }
 
         Ok(vec![Command::ProposeOnline {
             peer,

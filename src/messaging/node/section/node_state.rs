@@ -17,6 +17,8 @@ pub struct NodeState {
     pub peer: Peer,
     /// Current state of the peer
     pub state: MembershipState,
+    /// To avoid sybil attack via relocation, a relocated node's original name will be recorded.
+    pub previous_name: Option<XorName>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]

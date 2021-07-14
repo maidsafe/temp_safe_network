@@ -15,12 +15,23 @@ use xor_name::XorName;
 
 use serde::{Deserialize, Serialize};
 
-/// TODO: docs
+/// [`Map`] read operation.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum MapRead {
-    /// Get Map.
+    /// Retrieve the [`Map`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetMap`] response.
+    ///
+    /// Note that alternative map queries may be more efficient and convenient if you do not need
+    /// the full value of the map.
+    ///
+    /// [`GetMap`]: QueryResponse::GetMap
     Get(Address),
-    /// Get Map value.
+    /// Retrieve the value at a given key from the [`Map`] at the given address.
+    ///
+    /// This should eventially lead to a [`GetMapValue`] response.
+    ///
+    /// [`GetMapValue`]: QueryResponse::GetMapValue
     GetValue {
         /// Map address.
         address: Address,
@@ -28,19 +39,48 @@ pub enum MapRead {
         #[serde(with = "serde_bytes")]
         key: Vec<u8>,
     },
-    /// Get Map shell.
+    /// Retrieve the 'shell' of the [`Map`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetMapShell`] response. The [`Map`] contained in the
+    /// response will have all its metadata fields set, but not the data itself.
+    ///
+    /// [`GetMapShell`]: QueryResponse::GetMapShell
     GetShell(Address),
-    /// Get Map version.
+    /// Retrieve the version of the [`Map`] at the given address.
+    ///
+    /// This should eventually lead to a [`GetMapVersion`] response.
+    ///
+    /// [`GetMapVersion`]: QueryResponse::GetMapVersion
     GetVersion(Address),
-    /// List Map entries.
+    /// Retrieve the data in the [`Map`] at the given address.
+    ///
+    /// This should eventually lead to a [`ListMapEntries`] response.
+    ///
+    /// [`ListMapEntries`]: QueryResponse::ListMapEntries
     ListEntries(Address),
-    /// List Map keys.
+    /// Retrieve the list of keys in the [`Map`] at the given address.
+    ///
+    /// This should eventually lead to a [`ListMapKeys`] response.
+    ///
+    /// [`ListMapKeys`]: QueryResponse::ListMapKeys
     ListKeys(Address),
-    /// List Map values.
+    /// Retrieve the list of values in the [`Map`] at the given address.
+    ///
+    /// This should eventually lead to a [`ListMapValues`] response.
+    ///
+    /// [`ListMapValues`]: QueryResponse::ListMapValues
     ListValues(Address),
-    /// List Map permissions.
+    /// Retrieve the permissions for the [`Map`] at the given address.
+    ///
+    /// This should eventually lead to a [`ListMapPermissions`] response.
+    ///
+    /// [`ListMapPermissions`]: QueryResponse::ListMapPermissions
     ListPermissions(Address),
-    /// Get Map permissions for a user.
+    /// Retrieve the permissions of a given user for the [`Map`] at the given address.
+    ///
+    /// This should eventually lead to a [`ListMapUserPermissions`] response.
+    ///
+    /// [`ListMapUserPermissions`]: QueryResponse::ListMapUserPermissions
     ListUserPermissions {
         /// Map address.
         address: Address,
@@ -49,35 +89,41 @@ pub enum MapRead {
     },
 }
 
-///
+/// A [`Map`] write operation.
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct MapCmd {
-    ///
+    /// The operation to perform.
     pub write: MapWrite,
-    ///
+    /// The ID of the message from which the operation originated, used to send error responses.
     pub msg_id: crate::messaging::MessageId,
+    /// A signature carrying authority to perform the operation.
     ///
+    /// This will be verified against the map's owner and permissions.
     pub client_sig: crate::messaging::ClientSigned,
-    ///
+    /// The origin of the request, used to send error responses.
     pub origin: crate::messaging::EndUser,
 }
 
-/// TODO: docs
+/// [`Map`] write operations.
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum MapWrite {
-    /// Create new Map.
+    /// Create a new [`Map`] on the network.
     New(Map),
-    /// Delete instance.
+    /// Delete the [`Map`] at the given address.
+    ///
+    /// Maps can only be deleted by their owners.
     Delete(Address),
-    /// Edit entries.
+    /// Edit the entries of the [`Map`]'s at the given address.
+    ///
+    /// The requester must have the necessary permissions for the operation to succeed.
     Edit {
         /// Map address.
         address: Address,
         /// Changes to apply.
         changes: Changes,
     },
-    /// Delete user permissions.
+    /// Delete a given user's permissions from the [`Map`] at the given address.
     DelUserPermissions {
         /// Map address.
         address: Address,
@@ -86,7 +132,7 @@ pub enum MapWrite {
         /// Version to delete.
         version: u64,
     },
-    /// Set user permissions.
+    /// Set a given user's permissions for the [`Map`] at the given address.
     SetUserPermissions {
         /// Map address.
         address: Address,

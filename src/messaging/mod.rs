@@ -6,13 +6,24 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-/// Messages to/from the client
+//! The Safe Network messaging interface.
+//!
+//! This modules defines the messages that can be handled by the Safe Network. In particular:
+//!
+//! - This module contains types that are common across the messaging API.
+//! - The [`serialisation`] module defines the wire format and message (de)serialization API.
+//! - The [`client`] module defines the messages that clients can send to the network, and their
+//!   possible responses.
+//! - The [`node`] module defines the messages that nodes can exchange on the network.
+//! - The [`section_info`] module defines the queries and responses for section information – these
+//!   may be sent by both clients and nodes.
+
 pub mod client;
-/// Node to node messages
+/// Messages that nodes can exchange on the network.
 pub mod node;
-/// Queries and responses for section info
+/// Queries and responses for section information.
 pub mod section_info;
-/// Functionality for serialising and deserialising messages
+/// The wire format and message (de)serialization API.
 pub mod serialisation;
 
 // Error types definitions

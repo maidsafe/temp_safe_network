@@ -152,7 +152,7 @@ impl SectionUtils for Section {
         )?;
 
         for peer in section.section_auth.value.peers() {
-            let node_state = NodeState::joined(peer);
+            let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
             let _ = section.members.update(SectionSigned {
                 value: node_state,
