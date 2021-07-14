@@ -55,37 +55,7 @@ pub enum DataMsg {
 
     /// A response indicating that the recipient was unable to process a client's message.
     ProcessingError(ProcessingError),
-
-    /// A response indicating that the recipient was unable to process a client's message due to out
-    /// of date information.
-    // FIXME: this cannot be constructed due to empty enum in `SupportingInfo`, so it is not being
-    // used.
-    SupportingInfo(SupportingInfo),
 }
-
-/// A response indicating that the recipient was unable to process a client's message due to out
-/// of date information.
-///
-/// This could be returned when a client sends an otherwise valid message containing outdated
-/// information. The response includes up to date information that can be used to re-send the
-/// request such that it should now be valid.
-// FIXME: updates the erroring **node**? Is this not a client message? Is it something that clients
-// would send?
-// FIXME: this cannot be constructed due to empty `SupportingInfoFor` enum field.
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct SupportingInfo {
-    /// Supporting information for the `source_message`.
-    pub info: SupportingInfoFor,
-    /// The original message that triggered the error this update should correct.
-    pub source_message: ProcessMsg,
-    /// Correlates to a `ProcessingError`.
-    pub correlation_id: MessageId,
-}
-
-/// Various types of supporting information that can be received and acted upon by a node.
-// FIXME: this cannot be constructed as it is empty.
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum SupportingInfoFor {}
 
 /// A response indicating that the recipient was unable to process a client's message.
 #[allow(clippy::large_enum_variant)]

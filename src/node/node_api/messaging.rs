@@ -11,7 +11,7 @@ use crate::messaging::{
 };
 use crate::node::{
     network::Network,
-    node_ops::{MsgType, OutgoingLazyError, OutgoingMsg, OutgoingSupportingInfo},
+    node_ops::{MsgType, OutgoingLazyError, OutgoingMsg},
     Error, Result,
 };
 use crate::routing::XorName;
@@ -58,22 +58,6 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
     // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
     // Giving a random sig temporarily
     let (msg_kind, payload) = random_client_signature(&DataMsg::ProcessingError(msg.msg))?;
-
-    let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, msg.dst)?;
-
-    network
-        .send_message(wire_msg)
-        .await
-        .map_err(|err| err.into())
-}
-
-// TODO: Refactor over support/error
-pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network) -> Result<()> {
-    trace!("Sending support msg: {:?}", msg);
-    // FIXME: define which signature/authority this message should really carry,
-    // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
-    // Giving a random sig temporarily
-    let (msg_kind, payload) = random_client_signature(&DataMsg::SupportingInfo(msg.msg))?;
 
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, msg.dst)?;
 

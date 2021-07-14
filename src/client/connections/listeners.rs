@@ -70,7 +70,6 @@ impl Session {
                             warn!("Processing error received. {:?}", error);
                             // TODO: Handle lazy message errors
                         }
-                        msg => warn!("SupportingInfo received: {:?}", msg),
                     }
                 }
                 msg_type => {

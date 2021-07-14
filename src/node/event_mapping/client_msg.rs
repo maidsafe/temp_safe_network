@@ -47,17 +47,6 @@ pub(super) fn map_client_msg(
                 ctx: None,
             }
         }
-        DataMsg::SupportingInfo(msg) => {
-            warn!(
-                "A node should never receive a DataMsg::SupportingInfo {:?}",
-                msg
-            );
-
-            Mapping {
-                op: NodeDuty::NoOp,
-                ctx: None,
-            }
-        }
     }
 }
 
