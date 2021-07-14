@@ -66,7 +66,6 @@ impl Core {
                 match WireMsg::new_section_info_msg(&response, dst_location) {
                     Ok(wire_msg) => vec![Command::SendMessage {
                         recipients: vec![(name, sender)],
-                        delivery_group_size: 1,
                         wire_msg,
                     }],
                     Err(err) => {

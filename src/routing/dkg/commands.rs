@@ -54,11 +54,9 @@ impl DkgCommand {
                 let node_msg = NodeMsg::DkgMessage { dkg_key, message };
                 let wire_msg =
                     WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
-                let delivery_group_size = recipients.len();
 
                 Ok(Command::SendMessage {
                     recipients,
-                    delivery_group_size,
                     wire_msg,
                 })
             }
@@ -85,11 +83,9 @@ impl DkgCommand {
                 };
                 let wire_msg =
                     WireMsg::single_src(node, DstLocation::DirectAndUnrouted(key), node_msg, key)?;
-                let delivery_group_size = recipients.len();
 
                 Ok(Command::SendMessage {
                     recipients,
-                    delivery_group_size,
                     wire_msg,
                 })
             }

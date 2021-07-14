@@ -216,7 +216,7 @@ impl Core {
         let dst_pk = self.section_key_by_name(&target_name);
         wire_msg.set_dst_section_pk(dst_pk);
 
-        let command = Command::SendMessage {
+        let command = Command::SendMessageDeliveryGroup {
             recipients: targets,
             delivery_group_size: dg_size,
             wire_msg,

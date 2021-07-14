@@ -1525,7 +1525,6 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let commands = dispatcher
         .handle_command(Command::SendMessage {
             recipients: vec![(node.name(), node.addr)],
-            delivery_group_size: 1,
             wire_msg,
         })
         .await?;

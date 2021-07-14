@@ -309,7 +309,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures::future;
     use qp2p::Config;
-    use std::{net::Ipv4Addr, slice, time::Duration};
+    use std::{net::Ipv4Addr, time::Duration};
     use tokio::{net::UdpSocket, sync::mpsc, time};
 
     const TIMEOUT: Duration = Duration::from_secs(1);
@@ -496,7 +496,7 @@ mod tests {
         };
         let msg0 = WireMsg::new_section_info_msg(&query, dst_location)?;
         let _ = send_comm
-            .send(slice::from_ref(&(name, recv_addr)), 1, msg0.clone())
+            .send(&[(name, recv_addr)], 1, msg0.clone())
             .await?;
 
         let mut msg0_received = false;
@@ -520,7 +520,7 @@ mod tests {
         };
         let msg1 = WireMsg::new_section_info_msg(&query, dst_location)?;
         let _ = send_comm
-            .send(slice::from_ref(&(name, recv_addr)), 1, msg1.clone())
+            .send(&[(name, recv_addr)], 1, msg1.clone())
             .await?;
 
         let mut msg1_received = false;
@@ -548,7 +548,7 @@ mod tests {
         // Send a message to establish the connection
         let _ = comm1
             .send(
-                slice::from_ref(&(XorName::random(), addr0)),
+                &[(XorName::random(), addr0)],
                 1,
                 new_section_info_message()?,
             )
