@@ -150,7 +150,7 @@ impl Client {
         &self,
         address: ChunkAddress,
     ) -> Result<(), Error> {
-        let cmd = DataCmd::Blob(ChunkWrite::DeletePrivate(address));
+        let cmd = DataCmd::Chunk(ChunkWrite::DeletePrivate(address));
         self.pay_and_send_data_command(cmd).await?;
 
         Ok(())
@@ -163,7 +163,7 @@ impl Client {
         if !chunk.validate_size() {
             return Err(Error::NetworkDataError(crate::types::Error::ExceededSize));
         }
-        let cmd = DataCmd::Blob(ChunkWrite::New(chunk));
+        let cmd = DataCmd::Chunk(ChunkWrite::New(chunk));
         self.pay_and_send_data_command(cmd).await?;
         Ok(())
     }

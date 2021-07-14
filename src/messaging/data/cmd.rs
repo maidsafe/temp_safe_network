@@ -27,8 +27,7 @@ pub enum DataCmd {
     /// [`Chunk`] write operation.
     ///
     /// [`Chunk`]: crate::types::Chunk
-    // FIXME: Rename `Blob` -> `Chunk`
-    Blob(ChunkWrite),
+    Chunk(ChunkWrite),
     /// [`Map`] write operation.
     ///
     /// [`Map`]: crate::types::Map
@@ -49,7 +48,7 @@ impl DataCmd {
     pub fn error(&self, error: Error) -> CmdError {
         use DataCmd::*;
         match self {
-            Blob(c) => c.error(error),
+            Chunk(c) => c.error(error),
             Map(c) => c.error(error),
             Sequence(c) => c.error(error),
             Register(c) => c.error(error),
@@ -60,7 +59,7 @@ impl DataCmd {
     pub fn dst_address(&self) -> XorName {
         use DataCmd::*;
         match self {
-            Blob(c) => c.dst_address(),
+            Chunk(c) => c.dst_address(),
             Map(c) => c.dst_address(),
             Sequence(c) => c.dst_address(),
             Register(c) => c.dst_address(),
@@ -70,7 +69,7 @@ impl DataCmd {
     /// Returns the owner of the data.
     pub fn owner(&self) -> Option<PublicKey> {
         match self {
-            Self::Blob(write) => write.owner(),
+            Self::Chunk(write) => write.owner(),
             Self::Map(write) => write.owner(),
             Self::Sequence(write) => write.owner(),
             Self::Register(write) => write.owner(),
