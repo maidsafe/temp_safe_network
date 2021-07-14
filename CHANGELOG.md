@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.32.1](https://github.com/maidsafe/sn_api/compare/v0.32.0...v0.32.1) (2021-07-14)
+
+
+### Features
+
+* default to read url file instead of hardcoded url ([71ec47f](https://github.com/maidsafe/sn_api/commit/71ec47f296b521b6eb2adebc41011c22db47da7b))
+
+
+### Bug Fixes
+
+* clippy and sn version to build ([c9ecc31](https://github.com/maidsafe/sn_api/commit/c9ecc316e05ea21d59e98478f0e1393be4410441))
+* const path and use dirs_next home ([82d4128](https://github.com/maidsafe/sn_api/commit/82d4128416af4ebb3e897a791f4b416f3b73d90c))
+* fmt string how did this even compile ([fdcd717](https://github.com/maidsafe/sn_api/commit/fdcd717614baf5b7a42bc19ba0c5d9b8c0c9fa2b))
+
 ## [0.32.0](https://github.com/maidsafe/sn_api/compare/v0.31.0...v0.32.0) (2021-07-14)
 
 
