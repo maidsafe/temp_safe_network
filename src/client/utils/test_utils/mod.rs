@@ -108,7 +108,7 @@ macro_rules! retry_loop {
                 Ok(val) => break val,
                 Err(_) if retries > 0 => {
                     retries -= 1;
-                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
                 }
                 Err(e) => anyhow::bail!("Failed after {} retries: {:?}", $n, e),
             }
