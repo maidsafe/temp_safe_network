@@ -60,7 +60,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf]
+        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf, aarch64-unknown-linux-musl]
     steps:
       - uses: actions/checkout@v2
       # test for changes. (dont use baked in GHA pr/paths filter as then job wont run and we can't require itz)
