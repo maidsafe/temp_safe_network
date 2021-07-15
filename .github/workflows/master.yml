@@ -106,7 +106,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf]
+        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf, aarch64-unknown-linux-musl]
     steps:
       - uses: actions/checkout@v2
 
@@ -167,6 +167,10 @@ jobs:
         with:
           name: sn_cli-armv7-unknown-linux-musleabihf-prod
           path: artifacts/prod/armv7-unknown-linux-musleabihf/release
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_cli-aarch64-unknown-linux-musl-prod
+          path: artifacts/prod/aarch64-unknown-linux-musl/release
 
       # Get information for the release.
       - shell: bash
@@ -281,4 +285,11 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.version }}-armv7-unknown-linux-musleabihf.tar.gz
           asset_name: sn_cli-${{ steps.versioning.outputs.version }}-armv7-unknown-linux-musleabihf.tar.gz
+          asset_content_type: application/zip
+
+      - uses: actions/upload-release-asset@v1.0.1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.version }}-aarch64-unknown-linux-musl.tar.gz
+          asset_name: sn_cli-${{ steps.versioning.outputs.version }}-aarch64-unknown-linux-musl.tar.gz
           asset_content_type: application/zip

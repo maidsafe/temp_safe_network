@@ -44,6 +44,14 @@ armv7-unknown-linux-musleabihf:
 	cross build --release --target armv7-unknown-linux-musleabihf
 	find target/armv7-unknown-linux-musleabihf/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
+aarch64-unknown-linux-musl:
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+	cargo install cross
+	cross build --release --target aarch64-unknown-linux-musl
+	find target/aarch64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
 .ONESHELL:
 package-version-artifacts-for-deploy:
 	rm -f *.zip *.tar.gz
@@ -55,7 +63,8 @@ package-version-artifacts-for-deploy:
 		"x86_64-pc-windows-msvc" \
 		"x86_64-apple-darwin" \
 		"arm-unknown-linux-musleabi" \
-		"armv7-unknown-linux-musleabihf")
+		"armv7-unknown-linux-musleabihf" \
+		"aarch64-unknown-linux-musl")
 
 	for arch in "$${architectures[@]}" ; do \
 		zip -j sn_cli-${SN_CLI_VERSION}-$$arch.zip artifacts/prod/$$arch/release/safe*; \
