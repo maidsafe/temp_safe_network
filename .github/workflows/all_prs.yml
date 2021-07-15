@@ -69,6 +69,33 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Build launch local network
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --features=always-joinable
+      
+      - run: ./target/release/launch_network
+        if: matrix.os != 'windows-latest'
+        env:
+          RUST_LOG: "safe_network=trace"
+
+      # TODO: windows with split section network has been failing w/ SO.
+      # when we have that sorted we can reenable the full networks
+      - run: ./target/release/launch_network
+        if: matrix.os == 'windows-latest'
+        env:
+          RUST_LOG: "safe_network=trace"
+          NODE_COUNT: 11
+
+      - name: extra wait for CI split
+        run: sleep 220
+
+      - name: Have we had a section split?
+        if: matrix.os != 'windows-latest'
+        run: ./scripts/has_split.sh
+
+
       # Check if the code is formatted correctly.
       - name: Bench
         run: cargo bench
