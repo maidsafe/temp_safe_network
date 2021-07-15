@@ -1,4 +1,7 @@
-use super::node::{KeyedSig, SigShare};
+use super::{
+    node::{KeyedSig, SigShare},
+    Error, Result,
+};
 use crate::types::{PublicKey, Signature};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey as EdPublicKey, Signature as EdSignature};
@@ -11,6 +14,77 @@ pub struct ClientSigned {
     pub public_key: PublicKey,
     /// Client signature.
     pub signature: Signature,
+}
+
+impl ClientSigned {
+    /// Verify that the pair of `public_key` created `signature` over `payload`.
+    ///
+    /// The returned `Ok` variant represents a proof that the owner of `public_key` indeed signed
+    /// `payload`, and so bears their authority. Note however that it may still be necessary to
+    /// confirm that `public_key` is who you expect!
+    pub fn verify(self, payload: &impl AsRef<[u8]>) -> Result<ClientAuthority> {
+        ClientAuthority::verify(self.public_key, self.signature, payload)
+    }
+}
+
+/// A [`ClientAuthority`] can be converted back to a [`ClientSigned`], losing the 'proof' of validity.
+impl From<ClientAuthority> for ClientSigned {
+    fn from(signed: ClientAuthority) -> Self {
+        Self {
+            public_key: signed.public_key,
+            signature: signed.signature,
+        }
+    }
+}
+
+/// Verified authority of a client.
+///
+/// Values of this type constitute a proof that the signature is valid for a particular payload.
+/// This is made possible by performing verification in all possible constructors of the type.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClientAuthority {
+    public_key: PublicKey,
+    signature: Signature,
+}
+
+impl ClientAuthority {
+    /// Verify that `payload` has client's authority.
+    ///
+    /// This verifies that the owner of `public_key` (e.g. the holder of the corresponding private
+    /// key) created the `signature` by signing the `payload` with theor private key. When this is
+    /// true, we say the payload has client authority.
+    pub fn verify(
+        public_key: PublicKey,
+        signature: Signature,
+        payload: &impl AsRef<[u8]>,
+    ) -> Result<Self> {
+        public_key
+            .verify(&signature, payload)
+            .map_err(|_| Error::InvalidSignature)?;
+        Ok(Self {
+            public_key,
+            signature,
+        })
+    }
+
+    /// Get the signer's public key.
+    pub fn public_key(&self) -> &PublicKey {
+        &self.public_key
+    }
+
+    /// Create a [`ClientSigned`] from this authority by cloning the fields.
+    ///
+    /// Since [`ClientAuthority`] cannot be serialized, it's sometimes necessary to convert back to
+    /// an unverified signature. Prefer [`ClientSigned::from`][1] if you don't need to retain the
+    /// `ClientAuthority`, as this won't clone the fields.
+    ///
+    /// [1]: ClientSigned#impl-From<ClientAuthority>
+    pub fn to_signed(&self) -> ClientSigned {
+        ClientSigned {
+            public_key: self.public_key,
+            signature: self.signature.clone(),
+        }
+    }
 }
 
 /// Authority of a single peer.
