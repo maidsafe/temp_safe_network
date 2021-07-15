@@ -110,15 +110,9 @@ pub async fn key_commander(
 
             Ok(())
         }
-        KeysSubCommands::Create {
-            for_cli,
-            ..
-        } => {
-
-
-            let (xorurl, key_pair) =
-                create_new_key(safe).await?;
-            print_new_key_output(output_fmt, xorurl, Some(&key_pair), );
+        KeysSubCommands::Create { for_cli, .. } => {
+            let (xorurl, key_pair) = create_new_key(safe).await?;
+            print_new_key_output(output_fmt, xorurl, Some(&key_pair));
 
             if for_cli {
                 println!("Setting new SafeKey to be used by CLI...");
@@ -143,13 +137,7 @@ pub async fn key_commander(
     }
 }
 
-
-
-pub fn print_new_key_output(
-    output_fmt: OutputFmt,
-    xorurl: String,
-    key_pair: Option<&Keypair>,
-) {
+pub fn print_new_key_output(output_fmt: OutputFmt, xorurl: String, key_pair: Option<&Keypair>) {
     if OutputFmt::Pretty == output_fmt {
         println!("New SafeKey created: \"{}\"", xorurl);
 
@@ -190,31 +178,24 @@ pub fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String)> {
     Ok((pk_hex, sk_hex))
 }
 
-
-
 #[cfg(feature = "testing")]
-pub async fn create_new_key(
-    safe: &mut Safe,
-) -> Result<(String, Keypair)> {
+pub async fn create_new_key(safe: &mut Safe) -> Result<(String, Keypair)> {
+    // '--pay-with' is either a Wallet XOR-URL, or a secret key
+    let key_pair = safe.generate_random_ed_keypair();
 
-        // '--pay-with' is either a Wallet XOR-URL, or a secret key
-        let key_pair =  safe.generate_random_ed_keypair();
+    let xorname = XorName::from(key_pair.public_key());
+    let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
+    // // TODO: support Wallet XOR-URL, we now support only secret key
+    // // If the --pay-with is not provided the API will use the application's default wallet/sk
+    // let (xorurl, key_pair) = match pay_with {
+    //     Some(payee) => {
+    //         safe.keys_create_and_preload_from_sk_string(&payee, &amount)
+    //             .await?
+    //     }
+    //     None => {
+    //         debug!("Missing the '--pay-with' argument, using app's wallet for funds");
+    //     }
+    // };
 
-
-        let xorname = XorName::from(key_pair.public_key());
-        let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
-        // // TODO: support Wallet XOR-URL, we now support only secret key
-        // // If the --pay-with is not provided the API will use the application's default wallet/sk
-        // let (xorurl, key_pair) = match pay_with {
-        //     Some(payee) => {
-        //         safe.keys_create_and_preload_from_sk_string(&payee, &amount)
-        //             .await?
-        //     }
-        //     None => {
-        //         debug!("Missing the '--pay-with' argument, using app's wallet for funds");
-        //     }
-        // };
-
-        Ok((xorurl, key_pair))
-
+    Ok((xorurl, key_pair))
 }

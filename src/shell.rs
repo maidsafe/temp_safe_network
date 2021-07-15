@@ -8,12 +8,7 @@
 // Software.
 
 use super::cli;
-use crate::{
-    operations::auth_daemon::*,
-    subcommands::{
-        SubCommands,
-    },
-};
+use crate::{operations::auth_daemon::*, subcommands::SubCommands};
 use anyhow::Result;
 use async_std::task;
 use shrust::{Shell, ShellIO};

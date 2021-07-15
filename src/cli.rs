@@ -11,11 +11,10 @@ use crate::{
     operations::safe_net::connect,
     shell,
     subcommands::{
-        cat::cat_commander, config::config_commander, dog::dog_commander,
-        files::files_commander, keys::key_commander, networks::networks_commander,
-        node::node_commander, nrs::nrs_commander, seq::seq_commander, setup::setup_commander,
-        update::update_commander,  xorurl::xorurl_commander, OutputFmt,
-        SubCommands,
+        cat::cat_commander, config::config_commander, dog::dog_commander, files::files_commander,
+        keys::key_commander, networks::networks_commander, node::node_commander,
+        nrs::nrs_commander, seq::seq_commander, setup::setup_commander, update::update_commander,
+        xorurl::xorurl_commander, OutputFmt, SubCommands,
     },
 };
 use anyhow::{anyhow, Result};
