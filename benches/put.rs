@@ -9,7 +9,7 @@
 use anyhow::Result;
 use criterion::{criterion_group, criterion_main, Criterion};
 use safe_network::client::utils::generate_random_vector;
-use safe_network::client::utils::test_utils::read_network_conn_info;
+use safe_network::client::utils::test_utils::{read_network_conn_info, run_w_backoff_delayed};
 use safe_network::client::{Client, Error, DEFAULT_QUERY_TIMEOUT};
 use tokio::runtime::Runtime;
 
@@ -22,9 +22,10 @@ async fn put_kbs(amount: usize) -> Result<(), Error> {
     let address = client.store_public_blob(&data).await?;
 
     // let's make sure the public chunk is stored
-    let received_data = client.read_blob(address, None, None).await?;
+  let received_data =
+    run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
 
-    assert_eq!(received_data, data);
+  assert_eq!(received_data, data);
 
     Ok(())
 }
