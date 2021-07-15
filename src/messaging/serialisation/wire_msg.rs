@@ -132,7 +132,7 @@ impl WireMsg {
 
                 Ok(MessageType::Client {
                     msg_id: self.header.msg_envelope.msg_id,
-                    client_signed,
+                    client_auth: client_signed.verify(&self.payload)?,
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })
@@ -414,8 +414,9 @@ mod tests {
             public_key: src_client_keypair.public_key(),
             signature: src_client_keypair.sign(&payload),
         };
+        let client_auth = client_signed.clone().verify(&payload).unwrap();
 
-        let msg_kind = MsgKind::DataMsg(client_signed.clone());
+        let msg_kind = MsgKind::DataMsg(client_signed);
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
@@ -433,7 +434,7 @@ mod tests {
             deserialized.into_message()?,
             MessageType::Client {
                 msg_id: wire_msg.msg_id(),
-                client_signed,
+                client_auth,
                 dst_location,
                 msg: client_msg,
             }
