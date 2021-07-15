@@ -8,13 +8,11 @@
 // Software.
 
 use super::cli;
-use crate::{operations::auth_daemon::*, subcommands::SubCommands};
 use anyhow::Result;
 use async_std::task;
 use shrust::{Shell, ShellIO};
-use sn_api::{AuthReq, Safe, SafeAuthdClient};
-use std::io::{stdout, Write};
-use structopt::StructOpt;
+use sn_api::{Safe, SafeAuthdClient};
+use std::io::Write;
 
 pub fn shell_run() -> Result<()> {
     let safe = Safe::default();
@@ -142,14 +140,15 @@ fn call_cli(
     }
 }
 
-fn prompt_to_allow_auth(auth_req: AuthReq) -> Option<bool> {
-    println!();
-    println!("A new application authorisation request was received:");
-    let req_id = auth_req.req_id;
-    pretty_print_auth_reqs(vec![auth_req], None);
+// #[allow(dead_code)]
+// fn prompt_to_allow_auth(auth_req: AuthReq) -> Option<bool> {
+//     println!();
+//     println!("A new application authorisation request was received:");
+//     let req_id = auth_req.req_id;
+//     pretty_print_auth_reqs(vec![auth_req], None);
 
-    println!("You can use 'auth allow'/'auth deny' commands to allow/deny the request respectively, e.g.: auth allow {}", req_id);
-    println!("Press Enter to continue");
-    let _ = stdout().flush();
-    None
-}
+//     println!("You can use 'auth allow'/'auth deny' commands to allow/deny the request respectively, e.g.: auth allow {}", req_id);
+//     println!("Press Enter to continue");
+//     let _ = stdout().flush();
+//     None
+// }

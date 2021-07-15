@@ -8,7 +8,7 @@
 // Software.
 
 pub mod auth_and_connect;
-pub mod auth_daemon;
+// pub mod auth_daemon;
 pub mod config;
 mod helpers;
 pub mod node;

@@ -7,26 +7,16 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    helpers::{get_from_arg_or_stdin, get_secret_key, serialise_output},
-    OutputFmt,
-};
-use crate::operations::{
-    auth_and_connect::{create_credentials_file, read_credentials},
-    safe_net::connect,
-};
+use super::{helpers::serialise_output, OutputFmt};
+use crate::operations::auth_and_connect::{create_credentials_file, read_credentials};
 use anyhow::{anyhow, bail, Context, Result};
 use hex::encode;
-use log::{debug, warn};
 use sn_api::{
     fetch::{SafeData, SafeUrl},
-    sk_to_hex, Keypair, PublicKey, Safe, SecretKey, XorName,
+    sk_to_hex, Keypair, PublicKey, Safe, XorName,
 };
 use std::io::Write;
 use structopt::StructOpt;
-
-const PRELOAD_DEFAULT_AMOUNT: &str = "0.000000001";
-const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
 
 #[derive(StructOpt, Debug)]
 pub enum KeysSubCommands {

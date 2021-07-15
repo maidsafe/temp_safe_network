@@ -20,6 +20,7 @@ use std::{
 
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 
+#[allow(dead_code)]
 pub async fn authorise_cli(endpoint: Option<String>, is_self_authing: bool) -> Result<()> {
     let (mut file, file_path) = create_credentials_file()?;
     println!("Authorising CLI application...");
@@ -128,6 +129,7 @@ pub fn read_credentials() -> Result<(PathBuf, Option<Keypair>)> {
     Ok((file_path, keypair))
 }
 
+#[allow(dead_code)]
 pub fn clear_credentials() -> Result<()> {
     let (_, file_path) = create_credentials_file().context("Failed to clear credentials")?;
 

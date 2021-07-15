@@ -13,14 +13,11 @@ extern crate duct;
 use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use sn_api::{
-    fetch::{SafeContentType, SafeDataType},
-    sk_to_hex, Keypair,
-};
+use sn_api::fetch::{SafeContentType, SafeDataType};
 use sn_cmd_test_utilities::util::{
-    create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
-    parse_files_container_output, parse_files_put_or_sync_output, safe_cmd_stderr, safe_cmd_stdout,
-    safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
+    create_preload_and_get_keys, get_random_nrs_string, parse_files_container_output,
+    parse_files_put_or_sync_output, safe_cmd_stderr, safe_cmd_stdout, safeurl_from,
+    test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
 
@@ -258,56 +255,6 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     cmd.args(&vec!["cat", &invalid_version_nrsurl])
         .assert()
         .failure();
-    Ok(())
-}
-
-#[test]
-fn calling_safe_cat_wallet_xorurl() -> Result<()> {
-    let wallet_create = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "wallet",
-        "create",
-        "--test-coins",
-        "--json"
-    )
-    .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
-    let (wallet_xorurl, key_xorurl, key_pair): (String, String, Option<Keypair>) =
-        serde_json::from_str(&wallet_create)
-            .map_err(|_| anyhow!("Failed to parse output of `safe wallet create`"))?;
-
-    let (key_pk_xor, sk) = create_preload_and_get_keys("7")?;
-    let _wallet_insert_result = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "wallet",
-        "insert",
-        &wallet_xorurl,
-        "--keyurl",
-        &key_pk_xor,
-        "--sk",
-        &sk,
-    )
-    .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
-
-    let key_pair = key_pair.ok_or_else(|| anyhow!("Could not fetch Keypair".to_string()))?;
-    let secret_key = key_pair.secret_key().map_err(|e| anyhow!(e.to_string()))?;
-
-    let wallet_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &wallet_xorurl, "--json")
-        .read()
-        .map_err(|e| anyhow!(e.to_string()))?;
-    let (xorurl, balances) = parse_cat_wallet_output(&wallet_cat);
-
-    assert_eq!(wallet_xorurl, xorurl);
-    assert_eq!(balances.len(), 2);
-
-    assert!(balances[&key_xorurl].0);
-    assert_eq!(balances[&key_xorurl].1.xorurl, key_xorurl);
-    assert_eq!(balances[&key_xorurl].1.sk, sk_to_hex(secret_key));
-
-    assert!(!balances[&key_pk_xor].0);
-    assert_eq!(balances[&key_pk_xor].1.xorurl, key_pk_xor);
-    assert_eq!(balances[&key_pk_xor].1.sk, sk);
     Ok(())
 }
 

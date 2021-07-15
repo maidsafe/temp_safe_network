@@ -14,7 +14,7 @@ pub mod util {
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use sn_api::{
-        fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, Keypair, SafeUrl,
+        fetch::SafeData, files::ProcessedFiles, Keypair, SafeUrl,
     };
     use std::{collections::BTreeMap, env, fs, path::Path, process};
     use tiny_keccak::{Hasher, Sha3};
@@ -317,10 +317,6 @@ pub mod util {
 
     pub fn parse_wallet_create_output(output: &str) -> (String, String, Option<Keypair>) {
         serde_json::from_str(&output).expect("Failed to parse output of `safe wallet create`")
-    }
-
-    pub fn parse_cat_wallet_output(output: &str) -> (String, WalletSpendableBalances) {
-        serde_json::from_str(output).expect("Failed to parse output of `safe cat wallet`")
     }
 
     pub fn parse_xorurl_output(output: &str) -> Vec<(String, String)> {

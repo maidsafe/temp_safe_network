@@ -23,6 +23,7 @@ use std::panic::set_hook;
 #[macro_use]
 extern crate prettytable;
 
+#[allow(dead_code)]
 const APP_ID: &str = "net.maidsafe.cli";
 #[allow(dead_code)]
 const APP_NAME: &str = "Safe CLI";
