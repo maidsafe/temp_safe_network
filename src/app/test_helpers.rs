@@ -75,25 +75,25 @@ fn read_default_peers_from_file() -> Result<HashSet<SocketAddr>> {
         ),
         Some(mut paths) => {
             paths.push(DEFAULT_PEER_FILE_IN_HOME);
-            paths.display().to_string()
+            paths
         }
     };
 
     let raw_json = fs::read_to_string(&default_peer_file).with_context(|| {
         format!(
-            "Failed to read bootstraping contacts list from file: {}",
+            "Failed to read bootstraping contacts list from file: {:?}",
             &default_peer_file
         )
     })?;
-    let urls: Vec<String> = serde_json::from_str(&raw_json).with_context(|| {
+
+    let sockaddrs: HashSet<SocketAddr> = serde_json::from_str(&raw_json).with_context(|| {
         format!(
-            "Failed to parse bootstraping contacts list from file: {}",
+            "Failed to parse bootstraping contacts list from file: {:?}",
             &default_peer_file
         )
     })?;
-    let sockaddrs: Result<HashSet<SocketAddr>, std::net::AddrParseError> =
-        urls.iter().map(|u| u.parse()).collect();
-    Ok(sockaddrs?)
+
+    Ok(sockaddrs)
 }
 
 fn get_bootstrap_contacts() -> Result<HashSet<SocketAddr>> {
