@@ -29,6 +29,13 @@ pub enum Error {
     #[error("Failed to parse: {0}")]
     FailedToParse(String),
 
+    /// Signature verification failed.
+    ///
+    /// Wherever possible, signatures are verified when deserialising messages. This error is
+    /// returned when deserialisation succeeded but the signature was invalid.
+    #[error("Invalid signature")]
+    InvalidSignature,
+
     /// Message read was built with an unsupported version.
     #[error("Unsupported messaging protocol version: {0}")]
     UnsupportedVersion(u16),
