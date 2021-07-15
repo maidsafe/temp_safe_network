@@ -7,10 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::btree_set;
+use crate::messaging::ClientSigned;
 use crate::messaging::{
-    data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, QueryResponse},
+    data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, DataCmd, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
-    ClientSigned, EndUser, MessageId,
+    ClientAuthority, EndUser, MessageId,
 };
 use crate::node::{
     capacity::{Capacity, CHUNK_COPY_COUNT},
@@ -76,10 +77,13 @@ impl ChunkRecords {
         client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
+        // TODO: move earlier
+        let client_auth = super::verify_op(client_signed, DataCmd::Chunk(write.clone()))?;
+
         use ChunkWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, client_signed, origin).await,
-            DeletePrivate(address) => self.delete(address, client_signed, origin).await,
+            New(data) => self.store(data, msg_id, client_auth, origin).await,
+            DeletePrivate(address) => self.delete(address, client_auth, origin).await,
         }
     }
 
@@ -108,10 +112,10 @@ impl ChunkRecords {
         &self,
         chunk: Chunk,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_auth: ClientAuthority,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        if let Err(error) = validate_chunk_owner(&chunk, &client_signed.public_key) {
+        if let Err(error) = validate_chunk_owner(&chunk, client_auth.public_key()) {
             return self.send_error(error, msg_id, origin).await;
         }
 
@@ -133,7 +137,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::New(chunk),
-                client_signed,
+                client_signed: client_auth.into(),
                 origin,
             }),
             targets: target_holders,
@@ -215,7 +219,7 @@ impl ChunkRecords {
     async fn delete(
         &self,
         address: ChunkAddress,
-        client_signed: ClientSigned,
+        client_auth: ClientAuthority,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.capacity.get_chunk_holder_adults(address.name()).await;
@@ -224,7 +228,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::DeletePrivate(address),
-                client_signed,
+                client_signed: client_auth.into(),
                 origin,
             }),
             targets,

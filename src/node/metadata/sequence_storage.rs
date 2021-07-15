@@ -17,9 +17,10 @@ use crate::types::{
 use crate::{
     messaging::{
         data::{
-            CmdError, QueryResponse, SequenceCmd, SequenceDataExchange, SequenceRead, SequenceWrite,
+            CmdError, DataCmd, QueryResponse, SequenceCmd, SequenceDataExchange, SequenceRead,
+            SequenceWrite,
         },
-        EndUser, MessageId,
+        ClientAuthority, EndUser, MessageId,
     },
     types::DataAddress,
 };
@@ -71,7 +72,9 @@ impl SequenceStorage {
         // todo: make outer loop parallel
         for (_, history) in data {
             for op in history {
-                let _ = self.apply(op).await?;
+                let client_auth =
+                    super::verify_op(op.client_sig.clone(), DataCmd::Sequence(op.write.clone()))?;
+                let _ = self.apply(op, client_auth).await?;
             }
         }
         Ok(())
@@ -85,12 +88,15 @@ impl SequenceStorage {
         origin: EndUser,
         op: SequenceCmd,
     ) -> Result<NodeDuty> {
-        let write_result = self.apply(op).await;
+        // TODO: verify earlier
+        let client_auth =
+            super::verify_op(op.client_sig.clone(), DataCmd::Sequence(op.write.clone()))?;
+        let write_result = self.apply(op, client_auth).await;
         self.ok_or_error(write_result, msg_id, origin).await
     }
 
-    async fn apply(&mut self, op: SequenceCmd) -> Result<()> {
-        let SequenceCmd { write, client_sig } = op.clone();
+    async fn apply(&mut self, op: SequenceCmd, client_auth: ClientAuthority) -> Result<()> {
+        let SequenceCmd { write, .. } = op.clone();
 
         let address = *write.address();
         let key = to_id(&address)?;
@@ -118,9 +124,10 @@ impl SequenceStorage {
                         // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
                         // sequence.check_permission(action, Some(client_sig.public_key))?;
 
-                        let policy = sequence.private_policy(Some(client_sig.public_key))?;
-                        if client_sig.public_key != policy.owner {
-                            Err(Error::InvalidOwner(client_sig.public_key))
+                        let client_pk = *client_auth.public_key();
+                        let policy = sequence.private_policy(Some(client_pk))?;
+                        if client_pk != policy.owner {
+                            Err(Error::InvalidOwner(client_pk))
                         } else {
                             info!("Deleting Sequence");
                             store.as_deletable().delete().await.map_err(Error::from)
@@ -142,7 +149,7 @@ impl SequenceStorage {
                 };
 
                 info!("Editing Sequence");
-                sequence.check_permissions(Action::Append, Some(client_sig.public_key))?;
+                sequence.check_permissions(Action::Append, Some(*client_auth.public_key()))?;
                 let result = sequence.apply_op(reg_op).map_err(Error::NetworkData);
 
                 if result.is_ok() {

@@ -16,7 +16,7 @@ mod sequence_storage;
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataExchange, DataMsg, DataQuery, ProcessMsg, QueryResponse},
-    ClientSigned, DstLocation, EndUser, MessageId,
+    ClientAuthority, ClientSigned, DstLocation, EndUser, MessageId, WireMsg,
 };
 use crate::node::{
     capacity::Capacity,
@@ -161,4 +161,11 @@ fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUs
         dst: DstLocation::EndUser(origin),
         aggregation: false,
     }
+}
+
+// TODO: verify earlier so that this isn't needed
+fn verify_op(client_signed: ClientSigned, cmd: DataCmd) -> Result<ClientAuthority> {
+    let message = DataMsg::Process(ProcessMsg::Cmd(cmd));
+    let payload = WireMsg::serialize_msg_payload(&message)?;
+    Ok(client_signed.verify(&payload)?)
 }
