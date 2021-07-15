@@ -10,7 +10,8 @@ use crate::client::Error;
 use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, net::SocketAddr, path::Path};
-use tokio::fs::{self};
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::io::{self};
 use tracing::{debug, warn};
 
@@ -53,7 +54,10 @@ impl Config {
 
 async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
     debug!("Reading config file '{}' ...", filepath.display());
-    let contents = fs::read(filepath).await?;
+    let mut file = File::open(filepath).await?;
+
+    let mut contents = vec![];
+    let _ = file.read_to_end(&mut contents).await?;
 
     serde_json::from_slice(&contents).map_err(|err| {
         warn!(
