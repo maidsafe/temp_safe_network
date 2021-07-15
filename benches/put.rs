@@ -22,10 +22,9 @@ async fn put_kbs(amount: usize) -> Result<(), Error> {
     let address = client.store_public_blob(&data).await?;
 
     // let's make sure the public chunk is stored
-  let received_data =
-    run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
+    let received_data = run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
 
-  assert_eq!(received_data, data);
+    assert_eq!(received_data, data);
 
     Ok(())
 }
