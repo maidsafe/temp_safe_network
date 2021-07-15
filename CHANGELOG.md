@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.32.2](https://github.com/maidsafe/sn_api/compare/v0.32.1...v0.32.2) (2021-07-15)
+
+
+### Bug Fixes
+
+* improve retry_loop with max iter ([3f42ad0](https://github.com/maidsafe/sn_api/commit/3f42ad0f394f8ec97f97918372c805cd04864893))
+
 ### [0.32.1](https://github.com/maidsafe/sn_api/compare/v0.32.0...v0.32.1) (2021-07-14)
 
 
