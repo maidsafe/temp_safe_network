@@ -12,7 +12,7 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::{commands::DkgCommands, DkgFailureSigSetUtils},
+    dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
     routing_api::command::Command,
     section::{SectionKeyShare, SectionPeersUtils, SectionUtils},
@@ -29,9 +29,12 @@ impl Core {
         elder_candidates: ElderCandidates,
     ) -> Result<Vec<Command>> {
         trace!("Received DkgStart for {:?}", elder_candidates);
-        self.dkg_voter
-            .start(&self.node.keypair, dkg_key, elder_candidates)
-            .into_commands(&self.node, *self.section_chain().last_key())
+        self.dkg_voter.start(
+            &self.node,
+            dkg_key,
+            elder_candidates,
+            *self.section_chain().last_key(),
+        )
     }
 
     pub(crate) fn handle_dkg_message(
@@ -42,9 +45,12 @@ impl Core {
     ) -> Result<Vec<Command>> {
         trace!("handle DKG message {:?} from {}", message, sender);
 
-        self.dkg_voter
-            .process_message(&self.node.keypair, &dkg_key, message)
-            .into_commands(&self.node, *self.section_chain().last_key())
+        self.dkg_voter.process_message(
+            &self.node,
+            &dkg_key,
+            message,
+            *self.section_chain().last_key(),
+        )
     }
 
     pub(crate) fn handle_dkg_failure_observation(
@@ -53,9 +59,13 @@ impl Core {
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
     ) -> Result<Vec<Command>> {
-        self.dkg_voter
+        match self
+            .dkg_voter
             .process_failure(&dkg_key, failed_participants, signed)
-            .into_commands(&self.node, *self.section_chain().last_key())
+        {
+            None => Ok(vec![]),
+            Some(cmd) => Ok(vec![cmd]),
+        }
     }
 
     pub(crate) fn handle_dkg_failure_agreement(

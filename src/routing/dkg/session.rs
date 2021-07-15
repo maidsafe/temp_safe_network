@@ -7,19 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates},
-    SectionAuthorityProvider,
+    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, NodeMsg},
+    DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
-    dkg::{
-        commands::DkgCommand,
-        dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
-    },
-    ed25519::{self, Keypair},
-    routing_api::command,
+    dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
+    ed25519,
+    error::Result,
+    messages::WireMsgUtils,
+    node::Node,
+    routing_api::command::{next_timer_token, Command},
     section::SectionKeyShare,
     SectionAuthorityProviderUtils,
 };
+use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use itertools::Itertools;
 use std::{
@@ -52,12 +53,14 @@ impl Session {
     pub(crate) fn timer_token(&self) -> u64 {
         self.timer_token
     }
+
     pub(crate) fn process_message(
         &mut self,
+        node: &Node,
         dkg_key: &DkgKey,
-        keypair: &Keypair,
         message: DkgMessage,
-    ) -> Vec<DkgCommand> {
+        section_pk: BlsPublicKey,
+    ) -> Result<Vec<Command>> {
         trace!("process DKG message {:?}", message);
         let responses = self
             .key_gen
@@ -65,19 +68,17 @@ impl Session {
             .unwrap_or_default();
 
         // Only a valid DkgMessage, which results in some responses, shall reset the ticker.
-        let reset_timer = if responses.is_empty() {
-            None
-        } else {
-            Some(self.reset_timer())
-        };
+        let add_reset_timer = !responses.is_empty();
 
-        let mut commands: Vec<_> = responses
-            .into_iter()
-            .flat_map(|response| self.broadcast(dkg_key, keypair, response))
-            .chain(reset_timer)
-            .collect();
-        commands.extend(self.check(dkg_key, keypair));
-        commands
+        let mut commands = vec![];
+        for response in responses.into_iter() {
+            commands.extend(self.broadcast(node, dkg_key, response, section_pk)?);
+        }
+        if add_reset_timer {
+            commands.push(self.reset_timer());
+        }
+        commands.extend(self.check(node, dkg_key, section_pk)?);
+        Ok(commands)
     }
 
     fn recipients(&self) -> Vec<(XorName, SocketAddr)> {
@@ -92,68 +93,85 @@ impl Session {
 
     pub(crate) fn broadcast(
         &mut self,
+        node: &Node,
         dkg_key: &DkgKey,
-        keypair: &Keypair,
         message: DkgMessage,
-    ) -> Vec<DkgCommand> {
+        section_pk: BlsPublicKey,
+    ) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
         let recipients = self.recipients();
         if !recipients.is_empty() {
             trace!("broadcasting DKG message {:?} to {:?}", message, recipients);
-            commands.push(DkgCommand::SendMessage {
-                recipients,
+            let node_msg = NodeMsg::DkgMessage {
                 dkg_key: *dkg_key,
                 message: message.clone(),
+            };
+            let wire_msg = WireMsg::single_src(
+                node,
+                DstLocation::DirectAndUnrouted(section_pk),
+                node_msg,
+                section_pk,
+            )?;
+
+            commands.push(Command::SendMessage {
+                recipients,
+                wire_msg,
             });
         }
 
-        commands.extend(self.process_message(dkg_key, keypair, message));
-        commands
+        commands.extend(self.process_message(node, dkg_key, message, section_pk)?);
+        Ok(commands)
     }
 
     pub(crate) fn handle_timeout(
         &mut self,
+        node: &Node,
         dkg_key: &DkgKey,
-        keypair: &Keypair,
-    ) -> Vec<DkgCommand> {
+        section_pk: BlsPublicKey,
+    ) -> Result<Vec<Command>> {
         if self.complete {
-            return vec![];
+            return Ok(vec![]);
         }
 
         trace!("DKG for {:?} progressing", self.elder_candidates);
 
         match self.key_gen.timed_phase_transition(&mut rand::thread_rng()) {
             Ok(messages) => {
-                let mut commands: Vec<_> = messages
-                    .into_iter()
-                    .flat_map(|message| self.broadcast(dkg_key, keypair, message))
-                    .collect();
+                let mut commands = vec![];
+                for message in messages.into_iter() {
+                    commands.extend(self.broadcast(node, dkg_key, message, section_pk)?);
+                }
                 commands.push(self.reset_timer());
-                commands.extend(self.check(dkg_key, keypair));
-                commands
+                commands.extend(self.check(node, dkg_key, section_pk)?);
+                Ok(commands)
             }
             Err(error) => {
                 trace!("DKG for {:?} failed: {}", self.elder_candidates, error);
-                self.report_failure(dkg_key, BTreeSet::new(), keypair)
+                self.report_failure(node, dkg_key, BTreeSet::new(), section_pk)
             }
         }
     }
 
     // Check whether a key generator is finalized to give a DKG outcome.
-    fn check(&mut self, dkg_key: &DkgKey, keypair: &Keypair) -> Vec<DkgCommand> {
+    fn check(
+        &mut self,
+        node: &Node,
+        dkg_key: &DkgKey,
+        section_pk: BlsPublicKey,
+    ) -> Result<Vec<Command>> {
         if self.complete {
-            return vec![];
+            return Ok(vec![]);
         }
 
         if !self.key_gen.is_finalized() {
-            return vec![];
+            return Ok(vec![]);
         }
 
         let (participants, outcome) = if let Some(tuple) = self.key_gen.generate_keys() {
             tuple
         } else {
-            return vec![];
+            return Ok(vec![]);
         };
 
         // Less than 100% participation
@@ -177,7 +195,7 @@ impl Session {
                 })
                 .collect();
 
-            return self.report_failure(dkg_key, failed_participants, keypair);
+            return self.report_failure(node, dkg_key, failed_participants, section_pk);
         }
 
         // Corrupted DKG outcome. This can happen when a DKG session is restarted using the same set
@@ -193,7 +211,7 @@ impl Session {
                 "DKG for {:?} failed: corrupted outcome",
                 self.elder_candidates
             );
-            return self.report_failure(dkg_key, BTreeSet::new(), keypair);
+            return self.report_failure(node, dkg_key, BTreeSet::new(), section_pk);
         }
 
         trace!(
@@ -214,33 +232,49 @@ impl Session {
             secret_key_share: outcome.secret_key_share,
         };
 
-        vec![DkgCommand::HandleOutcome {
+        Ok(vec![Command::HandleDkgOutcome {
             section_auth,
             outcome,
-        }]
+        }])
     }
 
     fn report_failure(
         &mut self,
+        node: &Node,
         dkg_key: &DkgKey,
         failed_participants: BTreeSet<XorName>,
-        keypair: &Keypair,
-    ) -> Vec<DkgCommand> {
-        let sig = DkgFailureSig::new(keypair, &failed_participants, dkg_key);
+        section_pk: BlsPublicKey,
+    ) -> Result<Vec<Command>> {
+        let sig = DkgFailureSig::new(&node.keypair, &failed_participants, dkg_key);
 
         if !self.failures.insert(sig, &failed_participants) {
-            return vec![];
+            return Ok(vec![]);
         }
 
-        self.check_failure_agreement()
+        let cmds = self
+            .check_failure_agreement()
             .into_iter()
-            .chain(iter::once(DkgCommand::SendFailureObservation {
-                recipients: self.recipients(),
-                dkg_key: *dkg_key,
-                sig,
-                failed_participants,
+            .chain(iter::once({
+                let node_msg = NodeMsg::DkgFailureObservation {
+                    dkg_key: *dkg_key,
+                    sig,
+                    failed_participants,
+                };
+                let wire_msg = WireMsg::single_src(
+                    node,
+                    DstLocation::DirectAndUnrouted(section_pk),
+                    node_msg,
+                    section_pk,
+                )?;
+
+                Command::SendMessage {
+                    recipients: self.recipients(),
+                    wire_msg,
+                }
             }))
-            .collect()
+            .collect();
+
+        Ok(cmds)
     }
 
     pub(crate) fn process_failure(
@@ -248,7 +282,7 @@ impl Session {
         dkg_key: &DkgKey,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
-    ) -> Option<DkgCommand> {
+    ) -> Option<Command> {
         if !self
             .elder_candidates
             .elders
@@ -268,21 +302,19 @@ impl Session {
         self.check_failure_agreement()
     }
 
-    fn check_failure_agreement(&mut self) -> Option<DkgCommand> {
+    fn check_failure_agreement(&mut self) -> Option<Command> {
         if self.failures.has_agreement(&self.elder_candidates) {
             self.complete = true;
 
-            Some(DkgCommand::HandleFailureAgreement(mem::take(
-                &mut self.failures,
-            )))
+            Some(Command::HandleDkgFailure(mem::take(&mut self.failures)))
         } else {
             None
         }
     }
 
-    fn reset_timer(&mut self) -> DkgCommand {
-        self.timer_token = command::next_timer_token();
-        DkgCommand::ScheduleTimeout {
+    fn reset_timer(&mut self) -> Command {
+        self.timer_token = next_timer_token();
+        Command::ScheduleTimeout {
             duration: DKG_PROGRESS_INTERVAL,
             token: self.timer_token,
         }
@@ -330,11 +362,13 @@ impl Backlog {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messaging::MessageType;
     use crate::routing::{
         dkg::voter::DkgVoter, dkg::DkgKeyUtils, ed25519, node::test_utils::arbitrary_unique_nodes,
         node::Node, section::section_authority_provider::ElderCandidatesUtils,
         section::test_utils::gen_addr, ELDER_SIZE, MIN_ADULT_AGE,
     };
+    use anyhow::{bail, Context, Result};
     use assert_matches::assert_matches;
     use proptest::prelude::*;
     use rand::{rngs::SmallRng, SeedableRng};
@@ -342,10 +376,11 @@ mod tests {
     use xor_name::Prefix;
 
     #[test]
-    fn single_participant() {
+    fn single_participant() -> Result<()> {
         // If there is only one participant, the DKG should complete immediately.
 
         let mut voter = DkgVoter::default();
+        let section_pk = bls::SecretKey::random().public_key();
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -354,8 +389,10 @@ mod tests {
         let elder_candidates = ElderCandidates::new(iter::once(node.peer()), Prefix::default());
         let dkg_key = DkgKey::new(&elder_candidates, 0);
 
-        let commands = voter.start(&node.keypair, dkg_key, elder_candidates);
-        assert_matches!(&commands[..], &[DkgCommand::HandleOutcome { .. }]);
+        let commands = voter.start(&node, dkg_key, elder_candidates, section_pk)?;
+        assert_matches!(&commands[..], &[Command::HandleDkgOutcome { .. }]);
+
+        Ok(())
     }
 
     proptest! {
@@ -364,13 +401,14 @@ mod tests {
         // NOTE: `seed` is for seeding the rng that randomizes the message order.
         #[test]
         fn proptest_full_participation(nodes in arbitrary_elder_nodes(), seed in any::<u64>()) {
-            proptest_full_participation_impl(nodes, seed)
+            prop_assert!(proptest_full_participation_impl(nodes, seed).is_ok());
         }
     }
 
-    fn proptest_full_participation_impl(nodes: Vec<Node>, seed: u64) {
+    fn proptest_full_participation_impl(nodes: Vec<Node>, seed: u64) -> Result<()> {
         // Rng used to randomize the message order.
         let mut rng = SmallRng::seed_from_u64(seed);
+        let section_pk = bls::SecretKey::random().public_key();
         let mut messages = Vec::new();
 
         let elder_candidates =
@@ -386,10 +424,10 @@ mod tests {
             let commands =
                 actor
                     .voter
-                    .start(&actor.node.keypair, dkg_key, elder_candidates.clone());
+                    .start(&actor.node, dkg_key, elder_candidates.clone(), section_pk)?;
 
             for command in commands {
-                messages.extend(actor.handle(command, &dkg_key))
+                messages.extend(actor.handle(command, &dkg_key)?)
             }
         }
 
@@ -401,8 +439,8 @@ mod tests {
                 .count()
             {
                 0 => {}
-                1 => return,
-                _ => panic!("inconsistent DKG outcomes"),
+                1 => return Ok(()),
+                _ => bail!("Inconsistent DKG outcomes"),
             }
 
             // NOTE: this panics if `messages` is empty, but that's OK because it would mean
@@ -410,13 +448,14 @@ mod tests {
             let index = rng.gen_range(0, messages.len());
             let (addr, message) = messages.swap_remove(index);
 
-            let actor = actors.get_mut(&addr).expect("unknown message recipient");
-            let commands = actor
-                .voter
-                .process_message(&actor.node.keypair, &dkg_key, message);
+            let actor = actors.get_mut(&addr).context("Unknown message recipient")?;
+            let commands =
+                actor
+                    .voter
+                    .process_message(&actor.node, &dkg_key, message, section_pk)?;
 
             for command in commands {
-                messages.extend(actor.handle(command, &dkg_key))
+                messages.extend(actor.handle(command, &dkg_key)?)
             }
         }
     }
@@ -438,30 +477,33 @@ mod tests {
 
         fn handle(
             &mut self,
-            command: DkgCommand,
+            command: Command,
             expected_dkg_key: &DkgKey,
-        ) -> Vec<(SocketAddr, DkgMessage)> {
+        ) -> Result<Vec<(SocketAddr, DkgMessage)>> {
             match command {
-                DkgCommand::SendMessage {
+                Command::SendMessage {
                     recipients,
-                    dkg_key,
-                    message,
-                    ..
-                } => {
-                    assert_eq!(dkg_key, *expected_dkg_key);
-                    recipients
-                        .into_iter()
-                        .map(|addr| (addr.1, message.clone()))
-                        .collect()
-                }
-                DkgCommand::HandleOutcome { outcome, .. } => {
+                    wire_msg,
+                } => match wire_msg.into_message()? {
+                    MessageType::Node {
+                        msg: NodeMsg::DkgMessage { dkg_key, message },
+                        ..
+                    } => {
+                        assert_eq!(dkg_key, *expected_dkg_key);
+                        Ok(recipients
+                            .into_iter()
+                            .map(|addr| (addr.1, message.clone()))
+                            .collect())
+                    }
+                    other_message => bail!("Unexpected message: {:?}", other_message),
+                },
+                Command::HandleDkgOutcome { outcome, .. } => {
                     self.outcome = Some(outcome.public_key_set.public_key());
-                    vec![]
+                    Ok(vec![])
                 }
-                DkgCommand::ScheduleTimeout { .. } => vec![],
-                DkgCommand::SendFailureObservation { .. }
-                | DkgCommand::HandleFailureAgreement { .. } => {
-                    panic!("unexpected command: {:?}", command)
+                Command::ScheduleTimeout { .. } => Ok(vec![]),
+                other_command => {
+                    bail!("Unexpected command: {:?}", other_command)
                 }
             }
         }

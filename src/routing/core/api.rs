@@ -12,7 +12,6 @@ use crate::messaging::{
     EndUser, MessageId, SectionAuthorityProvider, SocketId, WireMsg,
 };
 use crate::routing::{
-    dkg::commands::DkgCommands,
     error::Result,
     network::NetworkUtils,
     node::Node,
@@ -169,8 +168,7 @@ impl Core {
 
     pub(crate) fn handle_timeout(&mut self, token: u64) -> Result<Vec<Command>> {
         self.dkg_voter
-            .handle_timeout(&self.node.keypair, token)
-            .into_commands(&self.node, *self.section_chain().last_key())
+            .handle_timeout(&self.node, token, *self.section_chain().last_key())
     }
 
     pub(crate) async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
