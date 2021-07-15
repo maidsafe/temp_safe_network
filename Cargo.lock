@@ -724,19 +724,6 @@ dependencies = [
 
 [[package]]
 name = "crdts"
-version = "6.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de3662f88000c93f9c208d361ffc828c3a061369122f0d2e7805abbee4ce7a4c"
-dependencies = [
- "num",
- "quickcheck",
- "rand 0.7.3",
- "serde",
- "tiny-keccak 2.0.2",
-]
-
-[[package]]
-name = "crdts"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "956308b472c0958e72a02842f7ccd1407ad2695b18e1ba170463e9936aca4039"
@@ -1093,15 +1080,6 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
-]
-
-[[package]]
-name = "envy"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f47e0157f2cb54f5ae1bd371b30a2ae4311e1c028f575cd4e81de7353215965"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -3120,16 +3098,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rpassword"
-version = "5.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc936cf8a7ea60c58f030fd36a612a48f440610214dc54bc36431f9ea0c3efb"
-dependencies = [
- "libc",
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "rust-argon2"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3209,7 +3177,7 @@ dependencies = [
  "blsttc",
  "bytes 1.0.1",
  "cookie-factory",
- "crdts 7.0.0",
+ "crdts",
  "custom_debug",
  "dashmap",
  "dirs-next 2.0.0",
@@ -3615,7 +3583,6 @@ dependencies = [
  "duct",
  "ed25519-dalek",
  "env_logger 0.8.4",
- "envy",
  "hex 0.4.3",
  "human-panic",
  "indicatif 0.14.0",
@@ -3630,7 +3597,6 @@ dependencies = [
  "rand 0.7.3",
  "relative-path",
  "reqwest 0.11.4",
- "rpassword",
  "self_update 0.23.0",
  "serde",
  "serde_json",
@@ -3638,7 +3604,6 @@ dependencies = [
  "shrust",
  "sn_api",
  "sn_cmd_test_utilities",
- "sn_data_types",
  "sn_launch_tool 0.3.1",
  "structopt",
  "tokio 1.8.1",
@@ -3659,27 +3624,6 @@ dependencies = [
  "sn_api",
  "tiny-keccak 2.0.2",
  "walkdir",
-]
-
-[[package]]
-name = "sn_data_types"
-version = "0.18.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ab19392d2deda5cf309806b068f69d2e8040f848be6e640d81d3444048971fe"
-dependencies = [
- "bincode",
- "crdts 6.3.3",
- "ed25519-dalek",
- "hex 0.3.2",
- "multibase 0.8.0",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "serde",
- "signature",
- "thiserror",
- "threshold_crypto",
- "tiny-keccak 2.0.2",
- "xor_name",
 ]
 
 [[package]]
@@ -3796,9 +3740,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.19.1"
+version = "0.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a68b8aff80646f09ec11e59b56091a5278ee527d5baeca938f1a5dbd9a15a859"
+checksum = "9e7de153d0438a648bb71e06e300e54fc641685e96af96d49b843f43172d341c"
 dependencies = [
  "cfg-if 1.0.0",
  "core-foundation-sys",
@@ -3922,26 +3866,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d050e60b33d41c19108b32cea32164033a9013fe3b46cbd4457559bfbf77afaa"
 dependencies = [
  "num_cpus",
-]
-
-[[package]]
-name = "threshold_crypto"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f708705bce37e765c37a95a8e0221a327c880d5a5a148d522552e8daa85787a"
-dependencies = [
- "byteorder",
- "failure",
- "ff",
- "group",
- "hex_fmt",
- "log",
- "pairing",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "serde",
- "tiny-keccak 2.0.2",
- "zeroize",
 ]
 
 [[package]]
