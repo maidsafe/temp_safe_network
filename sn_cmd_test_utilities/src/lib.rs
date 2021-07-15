@@ -13,9 +13,7 @@ pub mod util {
     use duct::cmd;
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use sn_api::{
-        fetch::SafeData, files::ProcessedFiles, Keypair, SafeUrl,
-    };
+    use sn_api::{fetch::SafeData, files::ProcessedFiles, Keypair, SafeUrl};
     use std::{collections::BTreeMap, env, fs, path::Path, process};
     use tiny_keccak::{Hasher, Sha3};
     use walkdir::{DirEntry, WalkDir};
