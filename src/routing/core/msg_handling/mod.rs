@@ -99,14 +99,14 @@ impl Core {
             }
             MessageType::Client {
                 msg_id,
-                client_signed,
+                client_auth,
                 msg,
                 dst_location,
             } => {
                 self.handle_end_user_message(
                     sender,
                     msg_id,
-                    client_signed,
+                    client_auth,
                     msg,
                     dst_location,
                     payload,
@@ -215,7 +215,13 @@ impl Core {
                     return Ok(vec![]);
                 }
 
-                self.handle_client_msg_received(msg_id, msg, user, client_signed)
+                // Check the client authority is valid
+                // TODO: preserve the source bytes so we don't need to serialize again here, or else
+                // verify earlier.
+                let payload = WireMsg::serialize_msg_payload(&msg)?;
+                let client_auth = client_signed.verify(&payload)?;
+
+                self.handle_client_msg_received(msg_id, msg, user, client_auth)
                     .await
             }
             NodeMsg::SectionKnowledge {

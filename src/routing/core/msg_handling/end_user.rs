@@ -8,7 +8,8 @@
 
 use super::Core;
 use crate::messaging::{
-    data::DataMsg, node::NodeMsg, ClientSigned, DstLocation, EndUser, MessageId, MsgKind, WireMsg,
+    data::DataMsg, node::NodeMsg, ClientAuthority, DstLocation, EndUser, MessageId, MsgKind,
+    WireMsg,
 };
 use crate::routing::{
     error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
@@ -23,13 +24,13 @@ impl Core {
         msg_id: MessageId,
         msg: DataMsg,
         user: EndUser,
-        client_signed: ClientSigned,
+        client_auth: ClientAuthority,
     ) -> Result<Vec<Command>> {
         self.send_event(Event::DataMsgReceived {
             msg_id,
             msg: Box::new(msg),
             user,
-            client_signed,
+            client_signed: client_auth.into(),
         })
         .await;
 
@@ -40,7 +41,7 @@ impl Core {
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_auth: ClientAuthority,
         msg: DataMsg,
         dst_location: DstLocation,
         payload: Bytes,
@@ -54,7 +55,7 @@ impl Core {
                             let wire_msg = WireMsg::new_msg(
                                 msg_id,
                                 payload,
-                                MsgKind::DataMsg(client_signed),
+                                MsgKind::DataMsg(client_auth.into()),
                                 dst_location,
                             )?;
 
@@ -104,14 +105,14 @@ impl Core {
         if is_in_destination {
             // We send this message to be handled by the upper Node layer
             // through the public event stream API
-            self.handle_client_msg_received(msg_id, msg, user, client_signed)
+            self.handle_client_msg_received(msg_id, msg, user, client_auth)
                 .await
         } else {
             // Let's relay the client message then
             let node_msg = NodeMsg::ForwardDataMsg {
                 msg,
                 user,
-                client_signed,
+                client_signed: client_auth.into(),
             };
 
             let wire_msg = match WireMsg::single_src(
