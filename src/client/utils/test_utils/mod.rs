@@ -101,14 +101,23 @@ pub fn read_network_conn_info() -> AnyhowResult<HashSet<SocketAddr>> {
 #[macro_export]
 /// Helper for tests to retry an operation awaiting for a successful response result
 macro_rules! retry_loop {
-    ($async_func:expr) => {
+    ($n:literal, $async_func:expr) => {{
+        let mut retries = $n;
         loop {
             match $async_func.await {
                 Ok(val) => break val,
-                Err(_) => tokio::time::sleep(std::time::Duration::from_millis(2000)).await,
+                Err(_) if retries > 0 => {
+                    retries -= 1;
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                }
+                Err(e) => anyhow::bail!("Failed after {} retries: {:?}", $n, e),
             }
         }
-    };
+    }};
+    // Defaults to 10 retries if n is not provided
+    ($async_func:expr) => {{
+        retry_loop!(10, $async_func)
+    }};
 }
 
 #[cfg(test)]
