@@ -12,11 +12,11 @@ mod nrs_map;
 pub use nrs_map::{DefaultRdf, NrsMap};
 
 use crate::{
-    register::EntryHash,
     app::{
         consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
         Safe,
     },
+    register::EntryHash,
     Error, Result, SafeUrl, XorUrl,
 };
 use log::{debug, info, warn};
@@ -49,7 +49,8 @@ impl Safe {
 
         // Obtain the resolution chain without resolving the URL's path
         let mut resolution_chain = self
-            .retrieve_from_url(        // TODO take a look at safe url code where its used, ask gab
+            .retrieve_from_url(
+                // TODO take a look at safe url code where its used, ask gab
                 &safe_url.to_string(),
                 false,
                 None,
@@ -104,7 +105,10 @@ impl Safe {
                 .iter()
                 .map(|(hash, _)| hash.to_owned())
                 .collect();
-            let entry = (name.as_bytes().to_owned(), nrs_map_xorurl.as_bytes().to_owned());
+            let entry = (
+                name.as_bytes().to_owned(),
+                nrs_map_xorurl.as_bytes().to_owned(),
+            );
             self.multimap_insert(&xorurl, entry, old_values).await?;
 
             // TODO rm old impl below kept as a reference
@@ -171,16 +175,18 @@ impl Safe {
                 let nrs_map_xorurl = self.mm_store_nrs_map(&nrs_map).await?;
 
                 // Create a new multimap
-                let xorurl = self.multimap_create(
-                    Some(nrs_xorname),
-                    NRS_MAP_TYPE_TAG,
-                    false
-                ).await?;
+                let xorurl = self
+                    .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
+                    .await?;
 
                 // Store the NRS map in the multimap
-                let entry = (name.as_bytes().to_owned(), nrs_map_xorurl.as_bytes().to_owned());
-                let _ = self.multimap_insert(&xorurl, entry, BTreeSet::new()
-                ).await?;
+                let entry = (
+                    name.as_bytes().to_owned(),
+                    nrs_map_xorurl.as_bytes().to_owned(),
+                );
+                let _ = self
+                    .multimap_insert(&xorurl, entry, BTreeSet::new())
+                    .await?;
 
                 // TODO rm old impl below kept as a reference
                 // // Store the NrsMapContainer in a Public Sequence, putting the
@@ -278,12 +284,17 @@ impl Safe {
 
         // TODO: versions should be managed with EntryHash instead of u64
         // since this requires to upgrade the safe_url API, we kept is as is for now
-        let placeholder_version:u64 = 0;
+        let placeholder_version: u64 = 0;
         // TODO: manage multiple resolutions currently only returns the 1st one
         // fetch multimap latest values
         let data = match self.fetch_multimap_values(&safe_url).await?.iter().next() {
-            Some((_version_hash, (_name, nrs_map_xorurl_bytes))) => Ok((placeholder_version, nrs_map_xorurl_bytes.to_owned())),
-            None => Err(Error::EmptyContent(format!("Empty Sequence found at XoR name {}", safe_url.xorname()))),
+            Some((_version_hash, (_name, nrs_map_xorurl_bytes))) => {
+                Ok((placeholder_version, nrs_map_xorurl_bytes.to_owned()))
+            }
+            None => Err(Error::EmptyContent(format!(
+                "Empty Sequence found at XoR name {}",
+                safe_url.xorname()
+            ))),
         };
 
         // TODO rm old impl below kept as a reference
@@ -420,8 +431,13 @@ mod tests {
 
         let nrs_xorname = Safe::mm_parse_url(&site_name)?.xorname();
 
-        let (xor_url, _, nrs_map) = retry_loop!(safe
-            .mm_nrs_map_container_create(&site_name, "safe://linked-from-site_name?v=0", true, false, false));
+        let (xor_url, _, nrs_map) = retry_loop!(safe.mm_nrs_map_container_create(
+            &site_name,
+            "safe://linked-from-site_name?v=0",
+            true,
+            false,
+            false
+        ));
 
         assert_eq!(nrs_map.sub_names_map.len(), 0);
         assert_eq!(
@@ -458,9 +474,13 @@ mod tests {
             .await?;
         let link_v0 = format!("{}?v=0", link);
 
-        let (xorurl, _, nrs_map) = retry_loop!(safe
-            .mm_nrs_map_container_create(&format!("b.{}", site_name), &link_v0, true, false, false)
-        );
+        let (xorurl, _, nrs_map) = retry_loop!(safe.mm_nrs_map_container_create(
+            &format!("b.{}", site_name),
+            &link_v0,
+            true,
+            false,
+            false
+        ));
 
         info!("[TESTS] Created mm nrs container at {}", &xorurl);
 
@@ -470,9 +490,13 @@ mod tests {
 
         // add subname and set it as the new default too
         let link_v1 = format!("{}?v=1", link);
-        let (version, _, _, updated_nrs_map) = retry_loop!(safe
-            .mm_nrs_map_container_add(&format!("a.b.{}", site_name), &link_v1, true, false, false)
-        );
+        let (version, _, _, updated_nrs_map) = retry_loop!(safe.mm_nrs_map_container_add(
+            &format!("a.b.{}", site_name),
+            &link_v1,
+            true,
+            false,
+            false
+        ));
 
         info!("[TESTS] added to mm nrs container at {}", &xorurl);
 
@@ -562,7 +586,13 @@ mod tests {
         let link_v0 = format!("{}?v=0", link);
 
         let (xorurl, _, nrs_map) = safe
-            .mm_nrs_map_container_create(&format!("a.b.{}", site_name), &link_v0, true, false, false)
+            .mm_nrs_map_container_create(
+                &format!("a.b.{}", site_name),
+                &link_v0,
+                true,
+                false,
+                false,
+            )
             .await?;
         assert_eq!(nrs_map.sub_names_map.len(), 1);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
@@ -598,7 +628,13 @@ mod tests {
         let link_v0 = format!("{}?v=0", link);
 
         let (xorurl, _, nrs_map) = safe
-            .mm_nrs_map_container_create(&format!("a.b.{}", site_name), &link_v0, true, false, false)
+            .mm_nrs_map_container_create(
+                &format!("a.b.{}", site_name),
+                &link_v0,
+                true,
+                false,
+                false,
+            )
             .await?;
         assert_eq!(nrs_map.sub_names_map.len(), 1);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
