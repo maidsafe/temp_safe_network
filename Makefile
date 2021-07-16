@@ -44,53 +44,54 @@ armv7-unknown-linux-musleabihf:
 	cross build --release --target armv7-unknown-linux-musleabihf
 	find target/armv7-unknown-linux-musleabihf/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
+aarch64-unknown-linux-musl:
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+	cargo install cross
+	cross build --release --target aarch64-unknown-linux-musl
+	find target/aarch64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+.ONESHELL:
+build-artifacts-for-deploy:
+	# This target is just for debugging the packaging process.
+	# Given the zipped artifacts retrieved from Github, it creates the
+	# directory structure that's expected by the packaging target.
+	declare -a architectures=( \
+		"x86_64-unknown-linux-musl" \
+		"x86_64-pc-windows-msvc" \
+		"x86_64-apple-darwin" \
+		"arm-unknown-linux-musleabi" \
+		"armv7-unknown-linux-musleabihf" \
+		"aarch64-unknown-linux-musl")
+	cd artifacts
+	for arch in "$${architectures[@]}" ; do \
+		mkdir -p prod/$$arch/release; \
+		unzip sn_node-$$arch-prod.zip -d prod/$$arch/release; \
+		rm sn_node-$$arch-prod.zip
+	done
+
 .ONESHELL:
 package-version-artifacts-for-deploy:
 	rm -f *.zip *.tar.gz
 	rm -rf ${DEPLOY_PATH}
 	mkdir -p ${DEPLOY_PROD_PATH}
 
-	zip -j sn_node-${SN_NODE_VERSION}-x86_64-unknown-linux-musl.zip \
-		artifacts/prod/x86_64-unknown-linux-musl/release/sn_node
-	zip -j sn_node-latest-x86_64-unknown-linux-musl.zip \
-		artifacts/prod/x86_64-unknown-linux-musl/release/sn_node
-	zip -j sn_node-${SN_NODE_VERSION}-x86_64-pc-windows-msvc.zip \
-		artifacts/prod/x86_64-pc-windows-msvc/release/sn_node.exe
-	zip -j sn_node-latest-x86_64-pc-windows-msvc.zip \
-		artifacts/prod/x86_64-pc-windows-msvc/release/sn_node.exe
-	zip -j sn_node-${SN_NODE_VERSION}-x86_64-apple-darwin.zip \
-		artifacts/prod/x86_64-apple-darwin/release/sn_node
-	zip -j sn_node-latest-x86_64-apple-darwin.zip \
-		artifacts/prod/x86_64-apple-darwin/release/sn_node
-	zip -j sn_node-${SN_NODE_VERSION}-arm-unknown-linux-musleabi.zip \
-		artifacts/prod/arm-unknown-linux-musleabi/release/sn_node
-	zip -j sn_node-latest-arm-unknown-linux-musleabi.zip \
-		artifacts/prod/arm-unknown-linux-musleabi/release/sn_node
-	zip -j sn_node-${SN_NODE_VERSION}-armv7-unknown-linux-musleabihf.zip \
-		artifacts/prod/armv7-unknown-linux-musleabihf/release/sn_node
-	zip -j sn_node-latest-armv7-unknown-linux-musleabihf.zip \
-		artifacts/prod/armv7-unknown-linux-musleabihf/release/sn_node
+	declare -a architectures=( \
+		"x86_64-unknown-linux-musl" \
+		"x86_64-pc-windows-msvc" \
+		"x86_64-apple-darwin" \
+		"arm-unknown-linux-musleabi" \
+		"armv7-unknown-linux-musleabihf" \
+		"aarch64-unknown-linux-musl")
 
-	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
-		-zcvf sn_node-${SN_NODE_VERSION}-x86_64-unknown-linux-musl.tar.gz sn_node
-	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
-		-zcvf sn_node-latest-x86_64-unknown-linux-musl.tar.gz sn_node
-	tar -C artifacts/prod/x86_64-pc-windows-msvc/release \
-		-zcvf sn_node-${SN_NODE_VERSION}-x86_64-pc-windows-msvc.tar.gz sn_node.exe
-	tar -C artifacts/prod/x86_64-pc-windows-msvc/release \
-		-zcvf sn_node-latest-x86_64-pc-windows-msvc.tar.gz sn_node.exe
-	tar -C artifacts/prod/x86_64-apple-darwin/release \
-		-zcvf sn_node-${SN_NODE_VERSION}-x86_64-apple-darwin.tar.gz sn_node
-	tar -C artifacts/prod/x86_64-apple-darwin/release \
-		-zcvf sn_node-latest-x86_64-apple-darwin.tar.gz sn_node
-	tar -C artifacts/prod/arm-unknown-linux-musleabi/release \
-		-zcvf sn_node-${SN_NODE_VERSION}-arm-unknown-linux-musleabi.tar.gz sn_node
-	tar -C artifacts/prod/arm-unknown-linux-musleabi/release \
-		-zcvf sn_node-latest-arm-unknown-linux-musleabi.tar.gz sn_node
-	tar -C artifacts/prod/armv7-unknown-linux-musleabihf/release \
-		-zcvf sn_node-${SN_NODE_VERSION}-armv7-unknown-linux-musleabihf.tar.gz sn_node
-	tar -C artifacts/prod/armv7-unknown-linux-musleabihf/release \
-		-zcvf sn_node-latest-armv7-unknown-linux-musleabihf.tar.gz sn_node
+	for arch in "$${architectures[@]}" ; do \
+		if [[ $$arch == *"windows"* ]]; then bin_name="sn_node.exe"; else bin_name="sn_node"; fi; \
+		zip -j sn_node-${SN_NODE_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
+		zip -j sn_node-latest-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
+		tar -C artifacts/prod/$$arch/release -zcvf sn_node-${SN_NODE_VERSION}-$$arch.tar.gz $$bin_name; \
+		tar -C artifacts/prod/$$arch/release -zcvf sn_node-latest-$$arch.tar.gz $$bin_name; \
+	done
 
-	mv *.zip ${DEPLOY_PROD_PATH}
 	mv *.tar.gz ${DEPLOY_PROD_PATH}
+	mv *.zip ${DEPLOY_PROD_PATH}

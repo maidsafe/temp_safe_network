@@ -109,7 +109,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf]
+        target: [arm-unknown-linux-musleabi, armv7-unknown-linux-musleabihf, aarch64-unknown-linux-musl]
     steps:
       - uses: actions/checkout@v2
 
@@ -172,6 +172,10 @@ jobs:
         with:
           name: sn_node-armv7-unknown-linux-musleabihf-prod
           path: artifacts/prod/armv7-unknown-linux-musleabihf/release
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_node-aarch64-unknown-linux-musl-prod
+          path: artifacts/prod/aarch64-unknown-linux-musl/release
 
       # Get information for the release.
       - shell: bash
@@ -238,6 +242,27 @@ jobs:
           asset_name: sn_node-${{ steps.versioning.outputs.version }}-x86_64-apple-darwin.zip
           asset_content_type: application/zip
 
+      - uses: actions/upload-release-asset@v1.0.1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-arm-unknown-linux-musleabi.zip
+          asset_name: sn_node-${{ steps.versioning.outputs.version }}-arm-unknown-linux-musleabi.zip
+          asset_content_type: application/zip
+
+      - uses: actions/upload-release-asset@v1.0.1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-armv7-unknown-linux-musleabihf.zip
+          asset_name: sn_node-${{ steps.versioning.outputs.version }}-armv7-unknown-linux-musleabihf.zip
+          asset_content_type: application/zip
+
+      - uses: actions/upload-release-asset@v1.0.1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-aarch64-unknown-linux-musl.zip
+          asset_name: sn_node-${{ steps.versioning.outputs.version }}-aarch64-unknown-linux-musl.zip
+          asset_content_type: application/zip
+
       # Upload tar files
       - uses: actions/upload-release-asset@v1.0.1
         with:
@@ -272,6 +297,13 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-armv7-unknown-linux-musleabihf.tar.gz
           asset_name: sn_node-${{ steps.versioning.outputs.version }}-armv7-unknown-linux-musleabihf.tar.gz
+          asset_content_type: application/zip
+
+      - uses: actions/upload-release-asset@v1.0.1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-aarch64-unknown-linux-musl.tar.gz
+          asset_name: sn_node-${{ steps.versioning.outputs.version }}-aarch64-unknown-linux-musl.tar.gz
           asset_content_type: application/zip
 
   # Publish if we're on a `chore(release):` commit
