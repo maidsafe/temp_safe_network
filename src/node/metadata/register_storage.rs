@@ -116,15 +116,17 @@ impl RegisterStorage {
         &self,
         msg_id: MessageId,
         origin: EndUser,
-        op: RegisterCmd,
+        write: RegisterWrite,
+        client_auth: ClientAuthority,
     ) -> Result<NodeDuty> {
         let required_space = std::mem::size_of::<RegisterCmd>() as u64;
         if !self.used_space.can_consume(required_space).await {
             return Err(Error::Database(crate::dbs::Error::NotEnoughSpace));
         }
-        // TODO: verify earlier
-        let client_auth =
-            super::verify_op(op.client_sig.clone(), DataCmd::Register(op.write.clone()))?;
+        let op = RegisterCmd {
+            write,
+            client_sig: client_auth.to_signed(),
+        };
         let write_result = self.apply(op, client_auth).await;
         self.ok_or_error(write_result, msg_id, origin).await
     }

@@ -11,7 +11,7 @@ use super::{
     sequence_storage::SequenceStorage,
 };
 use crate::messaging::{
-    data::{DataCmd, DataExchange, DataQuery, RegisterCmd, SequenceCmd},
+    data::{DataCmd, DataExchange, DataQuery},
     ClientAuthority, EndUser, MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Error, Result};
@@ -80,27 +80,13 @@ impl ElderStores {
             DataCmd::Sequence(write) => {
                 info!("Writing Sequence");
                 self.sequence_storage
-                    .write(
-                        msg_id,
-                        origin,
-                        SequenceCmd {
-                            write,
-                            client_sig: client_auth.into(),
-                        },
-                    )
+                    .write(msg_id, origin, write, client_auth)
                     .await
             }
             DataCmd::Register(write) => {
                 info!("Writing Register");
                 self.register_storage
-                    .write(
-                        msg_id,
-                        origin,
-                        RegisterCmd {
-                            write,
-                            client_sig: client_auth.into(),
-                        },
-                    )
+                    .write(msg_id, origin, write, client_auth)
                     .await
             }
         }

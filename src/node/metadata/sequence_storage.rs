@@ -86,11 +86,13 @@ impl SequenceStorage {
         &mut self,
         msg_id: MessageId,
         origin: EndUser,
-        op: SequenceCmd,
+        write: SequenceWrite,
+        client_auth: ClientAuthority,
     ) -> Result<NodeDuty> {
-        // TODO: verify earlier
-        let client_auth =
-            super::verify_op(op.client_sig.clone(), DataCmd::Sequence(op.write.clone()))?;
+        let op = SequenceCmd {
+            write,
+            client_sig: client_auth.to_signed(),
+        };
         let write_result = self.apply(op, client_auth).await;
         self.ok_or_error(write_result, msg_id, origin).await
     }
