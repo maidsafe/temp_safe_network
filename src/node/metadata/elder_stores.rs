@@ -84,34 +84,19 @@ impl ElderStores {
             DataCmd::Map(write) => {
                 info!("Writing Map");
                 self.map_storage
-                    .write(MapCmd {
-                        write,
-                        msg_id,
-                        client_sig,
-                        origin,
-                    })
+                    .write(msg_id, origin, MapCmd { write, client_sig })
                     .await
             }
             DataCmd::Sequence(write) => {
                 info!("Writing Sequence");
                 self.sequence_storage
-                    .write(SequenceCmd {
-                        write,
-                        msg_id,
-                        client_sig,
-                        origin,
-                    })
+                    .write(msg_id, origin, SequenceCmd { write, client_sig })
                     .await
             }
             DataCmd::Register(write) => {
                 info!("Writing Register");
                 self.register_storage
-                    .write(RegisterCmd {
-                        write,
-                        msg_id,
-                        client_sig,
-                        origin,
-                    })
+                    .write(msg_id, origin, RegisterCmd { write, client_sig })
                     .await
             }
         }

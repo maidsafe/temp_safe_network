@@ -76,9 +76,12 @@ impl MapStorage {
 
     /// --- Writing ---
 
-    pub(super) async fn write(&mut self, op: MapCmd) -> Result<NodeDuty> {
-        let msg_id = op.msg_id;
-        let origin = op.origin;
+    pub(super) async fn write(
+        &mut self,
+        msg_id: MessageId,
+        origin: EndUser,
+        op: MapCmd,
+    ) -> Result<NodeDuty> {
         let write_result = self.apply(op).await;
         self.ok_or_error(write_result, msg_id, origin).await
     }

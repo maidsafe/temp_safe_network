@@ -94,14 +94,10 @@ pub enum MapRead {
 pub struct MapCmd {
     /// The operation to perform.
     pub write: MapWrite,
-    /// The ID of the message from which the operation originated, used to send error responses.
-    pub msg_id: crate::messaging::MessageId,
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the map's owner and permissions.
     pub client_sig: crate::messaging::ClientSigned,
-    /// The origin of the request, used to send error responses.
-    pub origin: crate::messaging::EndUser,
 }
 
 /// [`Map`] write operations.
