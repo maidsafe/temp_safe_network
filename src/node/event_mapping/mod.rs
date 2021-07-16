@@ -49,9 +49,9 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
         RoutingEvent::DataMsgReceived {
             msg_id,
             msg,
-            client_signed,
+            client_auth,
             user,
-        } => map_client_msg(msg_id, *msg, client_signed, user),
+        } => map_client_msg(msg_id, *msg, client_auth, user),
         RoutingEvent::SectionSplit {
             elders,
             sibling_elders,
