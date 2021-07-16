@@ -79,20 +79,18 @@ impl SequenceStorage {
 
     /// --- Writing ---
 
-    pub(super) async fn write(&mut self, op: SequenceCmd) -> Result<NodeDuty> {
-        let msg_id = op.msg_id;
-        let origin = op.origin;
+    pub(super) async fn write(
+        &mut self,
+        msg_id: MessageId,
+        origin: EndUser,
+        op: SequenceCmd,
+    ) -> Result<NodeDuty> {
         let write_result = self.apply(op).await;
         self.ok_or_error(write_result, msg_id, origin).await
     }
 
     async fn apply(&mut self, op: SequenceCmd) -> Result<()> {
-        let SequenceCmd {
-            write,
-            msg_id,
-            client_sig,
-            ..
-        } = op.clone();
+        let SequenceCmd { write, client_sig } = op.clone();
 
         let address = *write.address();
         let key = to_id(&address)?;
@@ -112,8 +110,7 @@ impl SequenceStorage {
                 let result = match self.store.get(&key) {
                     Some((sequence, store)) => {
                         if sequence.address().is_public() {
-                            return Err(Error::InvalidMessage(
-                                msg_id,
+                            return Err(Error::InvalidOperation(
                                 "Cannot delete public Sequence".to_string(),
                             ));
                         }

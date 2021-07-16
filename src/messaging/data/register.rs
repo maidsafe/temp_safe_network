@@ -60,14 +60,10 @@ pub enum RegisterRead {
 pub struct RegisterCmd {
     /// The operation to perform.
     pub write: RegisterWrite,
-    /// The ID of the message from which the operation originated, used to send error responses.
-    pub msg_id: crate::messaging::MessageId,
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
     pub client_sig: crate::messaging::ClientSigned,
-    /// The origin of the request, used to send error responses.
-    pub origin: crate::messaging::EndUser,
 }
 
 /// [`Register`] write operations.

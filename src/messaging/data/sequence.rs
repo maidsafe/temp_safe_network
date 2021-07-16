@@ -115,14 +115,10 @@ pub enum SequenceRead {
 pub struct SequenceCmd {
     /// The operation to perform.
     pub write: SequenceWrite,
-    /// The ID of the message from which the operation originated, used to send error responses.
-    pub msg_id: crate::messaging::MessageId,
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the sequence's owner and permissions.
     pub client_sig: crate::messaging::ClientSigned,
-    /// The origin of the request, used to send error responses.
-    pub origin: crate::messaging::EndUser,
 }
 
 /// [`Sequence`] write operations.

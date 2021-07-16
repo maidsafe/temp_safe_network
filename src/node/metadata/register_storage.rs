@@ -109,23 +109,23 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(super) async fn write(&self, op: RegisterCmd) -> Result<NodeDuty> {
+    pub(super) async fn write(
+        &self,
+        msg_id: MessageId,
+        origin: EndUser,
+        op: RegisterCmd,
+    ) -> Result<NodeDuty> {
         let required_space = std::mem::size_of::<RegisterCmd>() as u64;
         if !self.used_space.can_consume(required_space).await {
             return Err(Error::Database(crate::dbs::Error::NotEnoughSpace));
         }
-        let msg_id = op.msg_id;
-        let origin = op.origin;
         let write_result = self.apply(op).await;
         self.ok_or_error(write_result, msg_id, origin).await
     }
 
     async fn apply(&self, op: RegisterCmd) -> Result<()> {
         let RegisterCmd {
-            write,
-            msg_id,
-            client_sig,
-            ..
+            write, client_sig, ..
         } = op.clone();
 
         let address = *write.address();
@@ -158,8 +158,7 @@ impl RegisterStorage {
                         let (_, cache) = entry.pair_mut();
                         if let Some(entry) = cache {
                             if entry.state.address().is_public() {
-                                return Err(Error::InvalidMessage(
-                                    msg_id,
+                                return Err(Error::InvalidOperation(
                                     "Cannot delete public Register".to_string(),
                                 ));
                             }
