@@ -213,14 +213,14 @@ impl Node {
             NodeDuty::WriteChunk {
                 write,
                 msg_id,
-                client_signed,
+                client_auth,
             } => {
                 let adult = self.as_adult().await?;
                 let handle = tokio::spawn(async move {
                     let mut ops = vec![
                         adult
                             .chunks
-                            .write(&write, msg_id, client_signed.public_key)
+                            .write(&write, msg_id, *client_auth.public_key())
                             .await?,
                     ];
                     ops.extend(adult.chunks.check_storage().await?);
@@ -307,7 +307,7 @@ impl Node {
             NodeDuty::ProcessRead {
                 query,
                 msg_id,
-                client_signed,
+                client_auth,
                 origin,
             } => {
                 let elder = self.as_elder().await?;
@@ -318,7 +318,7 @@ impl Node {
                             .meta_data
                             .write()
                             .await
-                            .read(query, msg_id, client_signed.public_key, origin)
+                            .read(query, msg_id, *client_auth.public_key(), origin)
                             .await?,
                     ];
                     Ok(NodeTask::from(duties))
@@ -329,7 +329,7 @@ impl Node {
                 cmd,
                 msg_id,
                 origin,
-                client_signed,
+                client_auth,
             } => {
                 let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
@@ -338,7 +338,7 @@ impl Node {
                             .meta_data
                             .write()
                             .await
-                            .write(cmd, msg_id, client_signed, origin)
+                            .write(cmd, msg_id, client_auth, origin)
                             .await?,
                     ]))
                 });

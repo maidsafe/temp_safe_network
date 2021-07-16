@@ -12,7 +12,7 @@ use super::{
 };
 use crate::messaging::{
     data::{DataCmd, DataExchange, DataQuery, RegisterCmd, SequenceCmd},
-    ClientSigned, EndUser, MessageId,
+    ClientAuthority, EndUser, MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Error, Result};
 use crate::routing::Prefix;
@@ -66,7 +66,7 @@ impl ElderStores {
         &mut self,
         cmd: DataCmd,
         msg_id: MessageId,
-        client_sig: ClientSigned,
+        client_auth: ClientAuthority,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         info!("Writing Data");
@@ -74,19 +74,33 @@ impl ElderStores {
             DataCmd::Chunk(write) => {
                 info!("Writing Blob");
                 self.chunk_records
-                    .write(write, msg_id, client_sig, origin)
+                    .write(write, msg_id, client_auth, origin)
                     .await
             }
             DataCmd::Sequence(write) => {
                 info!("Writing Sequence");
                 self.sequence_storage
-                    .write(msg_id, origin, SequenceCmd { write, client_sig })
+                    .write(
+                        msg_id,
+                        origin,
+                        SequenceCmd {
+                            write,
+                            client_sig: client_auth.into(),
+                        },
+                    )
                     .await
             }
             DataCmd::Register(write) => {
                 info!("Writing Register");
                 self.register_storage
-                    .write(msg_id, origin, RegisterCmd { write, client_sig })
+                    .write(
+                        msg_id,
+                        origin,
+                        RegisterCmd {
+                            write,
+                            client_sig: client_auth.into(),
+                        },
+                    )
                     .await
             }
         }

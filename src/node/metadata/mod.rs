@@ -96,12 +96,10 @@ impl Metadata {
         &mut self,
         cmd: DataCmd,
         id: MessageId,
-        client_signed: ClientSigned,
+        client_auth: ClientAuthority,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        self.elder_stores
-            .write(cmd, id, client_signed, origin)
-            .await
+        self.elder_stores.write(cmd, id, client_auth, origin).await
     }
 
     /// Adds a given node to the list of full nodes.

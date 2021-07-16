@@ -7,9 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::btree_set;
-use crate::messaging::ClientSigned;
 use crate::messaging::{
-    data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, DataCmd, QueryResponse},
+    data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     ClientAuthority, EndUser, MessageId,
 };
@@ -74,12 +73,9 @@ impl ChunkRecords {
         &self,
         write: ChunkWrite,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_auth: ClientAuthority,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        // TODO: move earlier
-        let client_auth = super::verify_op(client_signed, DataCmd::Chunk(write.clone()))?;
-
         use ChunkWrite::*;
         match write {
             New(data) => self.store(data, msg_id, client_auth, origin).await,

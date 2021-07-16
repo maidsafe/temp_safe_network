@@ -8,12 +8,12 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    data::QueryResponse,
+    data::{DataCmd, DataMsg, ProcessMsg, QueryResponse},
     node::{
         NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeSystemCmd,
         NodeSystemQuery,
     },
-    DstLocation, MessageId, SrcLocation,
+    ClientAuthority, ClientSigned, DstLocation, MessageId, SrcLocation, WireMsg,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -79,26 +79,39 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
         MessageReceived::NodeQuery(NodeQuery::Metadata {
             query,
             client_signed,
-            origin,
+            origin: query_origin,
         }) => {
-            // FIXME: ******** validate client signature!!!! *********
-            NodeDuty::ProcessRead {
-                query,
+            match verify_data_authority(
                 msg_id,
-                client_signed,
                 origin,
+                client_signed,
+                ProcessMsg::Query(query.clone()),
+            ) {
+                Ok(client_auth) => NodeDuty::ProcessRead {
+                    query,
+                    msg_id,
+                    client_auth,
+                    origin: query_origin,
+                },
+                Err(duty) => duty,
             }
         }
         MessageReceived::NodeCmd(NodeCmd::Metadata {
             cmd,
             client_signed,
-            origin,
-        }) => NodeDuty::ProcessWrite {
-            cmd,
-            msg_id,
-            client_signed,
-            origin,
-        },
+            origin: cmd_origin,
+        }) => {
+            match verify_data_authority(msg_id, origin, client_signed, ProcessMsg::Cmd(cmd.clone()))
+            {
+                Ok(client_auth) => NodeDuty::ProcessWrite {
+                    cmd,
+                    msg_id,
+                    client_auth,
+                    origin: cmd_origin,
+                },
+                Err(duty) => duty,
+            }
+        }
         //
         // ------ Adult ------
         MessageReceived::NodeQuery(NodeQuery::Chunks { query, .. }) => NodeDuty::ReadChunk {
@@ -107,11 +120,21 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
         },
         MessageReceived::NodeCmd(NodeCmd::Chunks {
             cmd, client_signed, ..
-        }) => NodeDuty::WriteChunk {
-            write: cmd,
-            msg_id,
-            client_signed,
-        },
+        }) => {
+            match verify_data_authority(
+                msg_id,
+                origin,
+                client_signed,
+                ProcessMsg::Cmd(DataCmd::Chunk(cmd.clone())),
+            ) {
+                Ok(client_auth) => NodeDuty::WriteChunk {
+                    write: cmd,
+                    msg_id,
+                    client_auth,
+                },
+                Err(duty) => duty,
+            }
+        }
         // this cmd is accumulated, thus has authority
         MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk))) => {
             NodeDuty::ReplicateChunk { chunk, msg_id }
@@ -137,21 +160,34 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
             correlation_id,
             src: origin.name(),
         },
-        _ => {
-            let error = convert_to_error_message(Error::InvalidMessage(
-                msg_id,
-                format!("Invalid dst: {:?}", msg),
-            ));
-
-            NodeDuty::Send(OutgoingMsg {
-                id: MessageId::in_response_to(&msg_id),
-                msg: MsgType::Node(NodeMsg::NodeMsgError {
-                    error,
-                    correlation_id: msg_id,
-                }),
-                dst: origin.to_dst(),
-                aggregation: true,
-            })
-        }
+        _ => send_error(
+            msg_id,
+            origin,
+            Error::InvalidMessage(msg_id, format!("Invalid dst: {:?}", msg)),
+            true,
+        ),
     }
+}
+
+fn verify_data_authority(
+    msg_id: MessageId,
+    origin: SrcLocation,
+    client_signed: ClientSigned,
+    msg: ProcessMsg,
+) -> Result<ClientAuthority, NodeDuty> {
+    WireMsg::serialize_msg_payload(&DataMsg::Process(msg))
+        .and_then(|payload| client_signed.verify(&payload))
+        .map_err(|error| send_error(msg_id, origin, Error::Message(error), false))
+}
+
+fn send_error(msg_id: MessageId, origin: SrcLocation, error: Error, aggregation: bool) -> NodeDuty {
+    NodeDuty::Send(OutgoingMsg {
+        id: MessageId::in_response_to(&msg_id),
+        msg: MsgType::Node(NodeMsg::NodeMsgError {
+            error: convert_to_error_message(error),
+            correlation_id: msg_id,
+        }),
+        dst: origin.to_dst(),
+        aggregation,
+    })
 }

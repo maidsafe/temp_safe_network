@@ -30,7 +30,7 @@ impl Core {
             msg_id,
             msg: Box::new(msg),
             user,
-            client_signed: client_auth.into(),
+            client_auth,
         })
         .await;
 

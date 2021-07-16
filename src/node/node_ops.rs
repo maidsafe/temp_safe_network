@@ -12,7 +12,7 @@ use crate::messaging::{
         QueryResponse,
     },
     node::NodeMsg,
-    ClientSigned, DstLocation, EndUser, MessageId, SrcLocation,
+    ClientAuthority, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use crate::routing::Prefix;
 use crate::types::{Chunk, PublicKey};
@@ -46,7 +46,7 @@ pub enum NodeDuty {
     WriteChunk {
         msg_id: MessageId,
         write: ChunkWrite,
-        client_signed: ClientSigned,
+        client_auth: ClientAuthority,
     },
     ProcessRepublish {
         msg_id: MessageId,
@@ -136,14 +136,14 @@ pub enum NodeDuty {
     ProcessRead {
         msg_id: MessageId,
         query: DataQuery,
-        client_signed: ClientSigned,
+        client_auth: ClientAuthority,
         origin: EndUser,
     },
     /// Process write of data
     ProcessWrite {
         msg_id: MessageId,
         cmd: DataCmd,
-        client_signed: ClientSigned,
+        client_auth: ClientAuthority,
         origin: EndUser,
     },
     /// Receive a chunk that is being replicated.
