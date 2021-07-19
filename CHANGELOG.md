@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.8.0](https://github.com/maidsafe/safe_network/compare/v0.7.29...v0.8.0) (2021-07-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messaging:** The `*Write` structs contain the information needed to replay a cmd, the
+`write` op itself, and the `client_sig` authorising it. They also
+contained message info, the `msg_id` and `origin` of the message that
+contained the op.
+
+The message info is used in the initial call to `store.write` to
+construct `CmdError` replies for the origin. It was largely unused in
+the replication logic, except to add the message ID to some logged
+errors (specifically when trying to delete a public register or
+sequence). It therefore makes sense to remove these fields from the
+replicated ops.
+
+* **messaging:** Remove message info from data write ops ([c4c73b5](https://github.com/maidsafe/safe_network/commit/c4c73b594fb334515d7ec99c8ef309e9c73fcd36))
+
 ### [0.7.29](https://github.com/maidsafe/safe_network/compare/v0.7.28...v0.7.29) (2021-07-16)
 
 
