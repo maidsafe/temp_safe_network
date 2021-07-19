@@ -36,8 +36,7 @@ pub struct SignatureShare {
 #[allow(clippy::large_enum_variant)]
 pub enum Signature {
     /// Ed25519 signature.
-    #[debug(with = "Self::fmt_ed25519")]
-    Ed25519(ed25519_dalek::Signature),
+    Ed25519(#[debug(with = "Self::fmt_ed25519")] ed25519_dalek::Signature),
     /// BLS signature.
     Bls(bls::Signature),
     /// BLS signature share.
