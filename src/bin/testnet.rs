@@ -33,8 +33,8 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
+use structopt::StructOpt;
 use tokio::fs::{create_dir_all, remove_dir_all};
-
 use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
 
@@ -47,7 +47,15 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "2";
 const RUST_LOG: &str = "RUST_LOG";
-const NODE_COUNT: &str = "60";
+const NODE_COUNT: &str = "33";
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "testnet")]
+struct Cmd {
+    /// IP used to launch the nodes with.
+    #[structopt(long = "add")]
+    add_nodes_to_existing_network: bool,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -107,6 +115,9 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
 
 /// Uses SNLT to create a local network of nodes
 pub async fn run_network() -> Result<(), String> {
+    let args = Cmd::from_args();
+    let adding_nodes = args.add_nodes_to_existing_network;
+
     info!("Starting local network");
     let node_path = Some(PathBuf::from("./target/release"));
     let node_path = get_node_bin_path(node_path)?;
@@ -128,8 +139,6 @@ pub async fn run_network() -> Result<(), String> {
     let arg_node_log_dir = node_log_dir.display().to_string();
     info!("Storing nodes' generated data at {}", arg_node_log_dir);
 
-    let node_count = std::env::var("NODE_COUNT").unwrap_or_else(|_| NODE_COUNT.to_string());
-
     // Let's create an args array to pass to the network launcher tool
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool",
@@ -141,9 +150,11 @@ pub async fn run_network() -> Result<(), String> {
         "--interval",
         &INTERVAL,
         "--local",
-        "--num-nodes",
-        &node_count,
     ];
+
+    if adding_nodes {
+        sn_launch_tool_args.push("--add")
+    }
 
     // If RUST_LOG was set we pass it down to the launch tool
     // so it's set for each of the nodes logs as well.
@@ -156,7 +167,9 @@ pub async fn run_network() -> Result<(), String> {
     let interval_as_int = &INTERVAL
         .parse::<u64>()
         .map_err(|_| String::from("Error parsing Interval argument"))?;
-    let node_count_as_int = &NODE_COUNT
+
+    let node_count = std::env::var("NODE_COUNT").unwrap_or_else(|_| NODE_COUNT.to_string());
+    let node_count_as_int = node_count
         .parse::<u64>()
         .map_err(|_| String::from("Error parsing Node Count argument"))?;
 
