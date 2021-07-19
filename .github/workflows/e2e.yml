@@ -71,14 +71,14 @@ jobs:
           command: build
           args: --release --features=always-joinable
       
-      - run: ./target/release/launch_network
+      - run: ./target/release/testnet
         if: matrix.os != 'windows-latest'
         env:
           RUST_LOG: "safe_network=trace"
 
       # TODO: windows with split section network has been failing w/ SO.
       # when we have that sorted we can reenable the full networks
-      - run: ./target/release/launch_network
+      - run: ./target/release/testnet
         if: matrix.os == 'windows-latest'
         env:
           RUST_LOG: "safe_network=trace"
