@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.9.0](https://github.com/maidsafe/safe_network/compare/v0.8.0...v0.9.0) (2021-07-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* renames launch_network bin -> testnet
+
+- Adds ability to pass `--add` flag to testnet bin to add nodes to the
+existing network.
+
+New log dirs will be created and node count starts atop the current node
+count
+
+### Features
+
+* enable adding nodes to already existing local network ([aad817e](https://github.com/maidsafe/safe_network/commit/aad817e9136ac096cc28bc453a44fe5243ec08b4))
+
 ## [0.8.0](https://github.com/maidsafe/safe_network/compare/v0.7.29...v0.8.0) (2021-07-19)
 
 
