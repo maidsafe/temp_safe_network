@@ -54,7 +54,7 @@ pub enum NodeSystemCmd {
         /// Section to which the message needs to be sent to. (NB: this is the section of the node id).
         section: XorName,
     },
-    /// Replicate a given chunk at an Adult
+    /// Replicate a given chunk at an Adult (sent from elders on receipt of RepublishChunk)
     ReplicateChunk(Chunk),
     /// Tells the Elders to re-publish a chunk in the data section
     RepublishChunk(Chunk),
