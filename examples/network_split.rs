@@ -148,7 +148,7 @@ pub async fn run_split() -> Result<()> {
     let mut all_data_put = vec![];
 
     let files_to_put: i32 = 12;
-    for i in 0..files_to_put {
+    for _i in 0..files_to_put {
         let (address, hash) = put_data().await?;
         all_data_put.push((address, hash));
     }
@@ -197,7 +197,7 @@ pub async fn run_split() -> Result<()> {
 }
 
 async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
-    /// Now we PUT data.
+    // Now we PUT data.
     println!("Reading network bootstrap information...");
     let bootstrap_contacts =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
