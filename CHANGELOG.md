@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.10.0](https://github.com/maidsafe/safe_network/compare/v0.9.1...v0.10.0) (2021-07-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **types:** Map data type and msg types are removed.
+
+* **types:** removing Map data type ([15c36e2](https://github.com/maidsafe/safe_network/commit/15c36e2a41fdeaf15a4082219351be73ba558502))
+
 ### [0.9.1](https://github.com/maidsafe/safe_network/compare/v0.9.0...v0.9.1) (2021-07-19)
 
 ## [0.9.0](https://github.com/maidsafe/safe_network/compare/v0.8.0...v0.9.0) (2021-07-19)
