@@ -18,6 +18,7 @@ use super::super::utils;
 use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
 use std::{
+    convert::TryInto,
     fmt,
     hash::{Hash, Hasher},
 };
@@ -36,7 +37,12 @@ pub struct SignatureShare {
 #[allow(clippy::large_enum_variant)]
 pub enum Signature {
     /// Ed25519 signature.
-    Ed25519(#[debug(with = "Self::fmt_ed25519")] ed25519_dalek::Signature),
+    Ed25519(
+        #[debug(with = "Self::fmt_ed25519")]
+        #[serde(deserialize_with = "Signature::deserialize_ed25519")]
+        #[serde(serialize_with = "Signature::serialize_ed25519")]
+        ed25519_dalek::Signature,
+    ),
     /// BLS signature.
     Bls(bls::Signature),
     /// BLS signature share.
@@ -66,6 +72,34 @@ impl Signature {
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
         write!(f, "Signature({:0.10})", HexFmt(sig))
+    }
+
+    // ed25519::Signature has an inefficient encoding, so we override to force a byte array encoding
+    pub(crate) fn deserialize_ed25519<'de, D>(
+        deserializer: D,
+    ) -> Result<ed25519_dalek::Signature, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bytes: Vec<u8> = serde_bytes::deserialize(deserializer)?;
+        let bytes_len = bytes.len();
+
+        let bytes = bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::invalid_length(bytes_len, &"a 64-byte array"))?;
+
+        Ok(ed25519_dalek::Signature::new(bytes))
+    }
+
+    // ed25519::Signature has an inefficient encoding, so we override to force a byte array encoding
+    pub(crate) fn serialize_ed25519<S>(
+        signature: &ed25519_dalek::Signature,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serde_bytes::serialize(signature.as_ref(), serializer)
     }
 }
 
@@ -98,5 +132,46 @@ impl From<(usize, bls::SignatureShare)> for Signature {
 impl Hash for Signature {
     fn hash<H: Hasher>(&self, state: &mut H) {
         utils::serialise(&self).hash(state)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Signature;
+
+    #[test]
+    fn ed25519_rmp_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        let signature = gen_ed25519();
+        let serialized = rmp_serde::to_vec(&signature)?;
+
+        assert_eq!(
+            rmp_serde::from_read::<_, Signature>(&serialized[..])?,
+            signature
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn ed25519_rmp_fmt() -> Result<(), Box<dyn std::error::Error>> {
+        let signature = gen_ed25519();
+        let serialized = rmp_serde::to_vec(&signature)?;
+
+        assert_eq!(serialized.len(), 68);
+        assert_eq!(serialized[0], 0x81); // fixmap of length 1
+        assert_eq!(serialized[1], 0x00); // variant index
+        assert_eq!(serialized[2], 0xc4); // bin 8 bytearray
+        assert_eq!(serialized[3], 64); // bytearray length
+        assert_eq!(&serialized[4..], signature.into_ed().unwrap().as_ref());
+
+        Ok(())
+    }
+
+    fn gen_ed25519() -> Signature {
+        use rand::Rng;
+
+        let mut bytes = [0u8; ed25519_dalek::SIGNATURE_LENGTH];
+        rand::thread_rng().fill(&mut bytes);
+        Signature::Ed25519(ed25519_dalek::Signature::new(bytes))
     }
 }
