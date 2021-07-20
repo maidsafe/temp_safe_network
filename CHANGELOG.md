@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.33.0](https://github.com/maidsafe/sn_cli/compare/v0.32.1...v0.33.0) (2021-07-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* sn dep breaking change update
+
+### Features
+
+* update safe_network dep to 0.9.x ([1624381](https://github.com/maidsafe/sn_cli/commit/1624381bc630ab8409d76e53d38d32474e265fca))
+
 ### [0.32.1](https://github.com/maidsafe/sn_cli/compare/v0.32.0...v0.32.1) (2021-07-16)
 
 
