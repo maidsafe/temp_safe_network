@@ -10,7 +10,6 @@ env:
   RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
-  NODE_COUNT: "43" # this should be a split section
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
 
@@ -75,6 +74,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         env:
           RUST_LOG: "safe_network=trace"
+          NODE_COUNT: "43" # this should be a split section
 
       # TODO: windows with split section network has been failing w/ SO.
       # when we have that sorted we can reenable the full networks
@@ -117,7 +117,8 @@ jobs:
         run: timeout 15m cargo run --release  --features=always-joinable --example client_blob
       
       - name: Kill the current network (next test doesnt need it)
-        run: pkill -f sn_node
+        run: killall sn_node
+        shell: bash
 
       - name: Remove node dir and logs fo next test
         run: rm -rf ~/.safe/node
