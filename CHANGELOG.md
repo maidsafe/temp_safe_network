@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.33.0](https://github.com/maidsafe/sn_api/compare/v0.32.4...v0.33.0) (2021-07-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* removing Map APIs.
+
+* upgrading safe_network to v0.10.0 ([195eeb1](https://github.com/maidsafe/sn_api/commit/195eeb12ed93eb6ee67651689197625db751743c))
+
 ### [0.32.4](https://github.com/maidsafe/sn_api/compare/v0.32.3...v0.32.4) (2021-07-20)
 
 ### [0.32.3](https://github.com/maidsafe/sn_api/compare/v0.32.2...v0.32.3) (2021-07-16)
