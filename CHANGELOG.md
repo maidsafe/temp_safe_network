@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.1](https://github.com/maidsafe/sn_cli/compare/v0.33.0...v0.33.1) (2021-07-20)
+
+
+### Features
+
+* retry on cat failure to take advantage of local cache ([683905f](https://github.com/maidsafe/sn_cli/commit/683905fc9b7b1e522cce3d2208876ec07e528d7b))
+
 ## [0.33.0](https://github.com/maidsafe/sn_cli/compare/v0.32.1...v0.33.0) (2021-07-20)
 
 
