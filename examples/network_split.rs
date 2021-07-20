@@ -23,10 +23,7 @@ use tiny_keccak::{Hasher, Sha3};
 
 use anyhow::{anyhow, Context, Result};
 use safe_network::{
-    client::{
-        utils::generate_random_vector, utils::test_utils::read_network_conn_info, Client,
-        DEFAULT_QUERY_TIMEOUT,
-    },
+    client::{utils::generate_random_vector, utils::test_utils::read_network_conn_info, Client},
     types::ChunkAddress,
     url::{SafeContentType, SafeUrl, DEFAULT_XORURL_BASE},
 };
@@ -41,6 +38,7 @@ const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "2";
 const RUST_LOG: &str = "RUST_LOG";
 
+const QUERY_TIMEOUT: u64 = 60;
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
@@ -176,7 +174,7 @@ pub async fn run_split() -> Result<()> {
     let bootstrap_contacts =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
-    let client = Client::new(None, None, Some(bootstrap_contacts), DEFAULT_QUERY_TIMEOUT).await?;
+    let client = Client::new(None, None, Some(bootstrap_contacts), QUERY_TIMEOUT).await?;
 
     for (address, hash) in all_data_put {
         println!("...fetching Blob at address {:?} ...", address);
@@ -203,7 +201,7 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_contacts);
-    let client = Client::new(None, None, Some(bootstrap_contacts), DEFAULT_QUERY_TIMEOUT).await?;
+    let client = Client::new(None, None, Some(bootstrap_contacts), QUERY_TIMEOUT).await?;
 
     let raw_data = generate_random_vector::<u8>(1024 * 1024);
 
