@@ -356,7 +356,7 @@ impl Node {
                         let elder = self.as_elder().await?;
                         let handle = tokio::spawn(async move {
                             Ok(NodeTask::from(vec![
-                                elder.meta_data.read().await.republish_chunk(chunk).await?,
+                                elder.meta_data.republish_chunk(chunk).await?,
                             ]))
                         });
                         Ok(NodeTask::Thread(handle))
