@@ -16,7 +16,7 @@ use crate::node::{
     chunk_store::ChunkStore,
     event_mapping::MsgContext,
     node_ops::{NodeDuties, NodeDuty},
-    Node, Result,
+    Error, Node, Result,
 };
 use crate::routing::ELDER_SIZE;
 use std::sync::Arc;
@@ -363,15 +363,28 @@ impl Node {
                 });
                 Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::ReplicateChunk { chunk, .. } => {
-                let adult = self.as_adult().await?;
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        adult.chunks.store_for_replication(chunk).await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
+            NodeDuty::ReplicateChunk { chunk, .. } => match self.as_adult().await {
+                Ok(adult) => {
+                    let handle = tokio::spawn(async move {
+                        Ok(NodeTask::from(vec![
+                            adult.chunks.store_for_replication(chunk).await?,
+                        ]))
+                    });
+                    Ok(NodeTask::Thread(handle))
+                }
+                Err(error) => match error {
+                    Error::NotAnAdult => {
+                        let elder = self.as_elder().await?;
+                        let handle = tokio::spawn(async move {
+                            Ok(NodeTask::from(vec![
+                                elder.meta_data.read().await.republish_chunk(chunk).await?,
+                            ]))
+                        });
+                        Ok(NodeTask::Thread(handle))
+                    }
+                    some_other_error => Err(some_other_error),
+                },
+            },
             NodeDuty::NoOp => Ok(NodeTask::None),
         }
     }

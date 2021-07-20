@@ -51,7 +51,7 @@ impl AdultRole {
             .into_iter()
             .map(|(data, targets)| NodeDuty::SendToNodes {
                 msg_id: MessageId::new(),
-                msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::RepublishChunk(data))),
+                msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(data))),
                 targets,
                 aggregation: false,
             })

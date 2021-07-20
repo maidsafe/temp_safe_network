@@ -139,7 +139,7 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
         MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk))) => {
             NodeDuty::ReplicateChunk { chunk, msg_id }
         }
-        /// Send a message to a section telling them to initiate replication of this chunk
+        // Send a message to a section telling them to initiate replication of this chunk
         MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk))) => {
             NodeDuty::ProcessRepublish { chunk, msg_id }
         }
