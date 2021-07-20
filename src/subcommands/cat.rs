@@ -12,11 +12,14 @@ use super::{
     OutputFmt,
 };
 use anyhow::{Context, Result};
-use log::debug;
+use log::{debug, trace};
 use prettytable::Table;
 use sn_api::{fetch::SafeData, Safe};
 use std::io::{self, Write};
 use structopt::StructOpt;
+use tokio::time::{sleep, Duration};
+
+const MAX_RETRY_ATTEMPTS: usize = 5;
 
 #[derive(StructOpt, Debug)]
 pub struct CatCommands {
@@ -31,7 +34,20 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running cat for: {:?}", &url);
 
-    let content = safe.fetch(&url, None).await?;
+    let mut attempts = 0;
+
+    let mut content = safe.fetch(&url, None).await;
+
+    while content.is_err() && attempts < MAX_RETRY_ATTEMPTS {
+        trace!("cat attempt #{:?}", attempts);
+        sleep(Duration::from_secs(1)).await;
+        content = safe.fetch(&url, None).await;
+
+        attempts += 1;
+    }
+
+    let content = content?;
+
     match &content {
         SafeData::FilesContainer {
             version, files_map, ..

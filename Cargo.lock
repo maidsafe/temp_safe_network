@@ -3489,7 +3489,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.32.1"
+version = "0.33.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
