@@ -41,19 +41,12 @@ pub(crate) fn delivery_targets(
     section: &Section,
     network: &Network,
 ) -> Result<(Vec<Peer>, usize)> {
-    if !section.is_elder(our_name) {
-        // We are not Elder - return all the elders of our section, so the message can be properly
-        // relayed through them.
-        let targets: Vec<_> = section.authority_provider().peers().collect();
-        let dg_size = targets.len();
-        return Ok((targets, dg_size));
-    }
+    // Adult now having the knowledge of other adults within the own section.
+    // Functions of `section_candidates` and `candidates` only take section elder into account.
 
-    let (best_section, dg_size) = match dst {
-        DstLocation::Section { name, .. } => section_candidates(name, our_name, section, network)?,
-        DstLocation::EndUser(user) => {
-            section_candidates(&user.xorname, our_name, section, network)?
-        }
+    match dst {
+        DstLocation::Section { name, .. } => section_candidates(name, our_name, section, network),
+        DstLocation::EndUser(user) => section_candidates(&user.xorname, our_name, section, network),
         DstLocation::Node { name, .. } => {
             if name == our_name {
                 return Ok((Vec::new(), 0));
@@ -62,12 +55,18 @@ pub(crate) fn delivery_targets(
                 return Ok((vec![node], 1));
             }
 
-            candidates(name, our_name, section, network)?
+            if !section.is_elder(our_name) {
+                // We are not Elder - return all the elders of our section,
+                // so the message can be properly relayed through them.
+                let targets: Vec<_> = section.authority_provider().peers().collect();
+                let dg_size = targets.len();
+                Ok((targets, dg_size))
+            } else {
+                candidates(name, our_name, section, network)
+            }
         }
-        DstLocation::DirectAndUnrouted(_) => return Err(Error::CannotRoute),
-    };
-
-    Ok((best_section, dg_size))
+        DstLocation::DirectAndUnrouted(_) => Err(Error::CannotRoute),
+    }
 }
 
 fn section_candidates(
