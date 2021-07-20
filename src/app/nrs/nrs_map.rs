@@ -32,7 +32,7 @@ pub enum SubNameRdf {
 impl SubNameRdf {
     fn get(&self, key: &str) -> Option<String> {
         match self {
-            SubNameRdf::SubName { .. } => Some(self.get(key)?),
+            SubNameRdf::SubName { .. } => Some(self.get(&key)?),
             _ => None,
         }
     }
@@ -82,7 +82,7 @@ impl NrsMap {
 
         let mut nrs_map = self;
         let dereferenced_link: String;
-        let sub_names_str = sub_names_vec_to_str(sub_names);
+        let sub_names_str = sub_names_vec_to_str(&sub_names);
         let mut link = if sub_names.is_empty() {
             match &self.default {
                 DefaultRdf::OtherRdf(def_data) => {
@@ -190,7 +190,7 @@ impl NrsMap {
         let sub_names = parse_nrs_name(name)?;
 
         // let's walk the NRS Map tree to find the sub name we need to remove
-        let (updated_nrs_map, removed_link) = remove_nrs_sub_tree(self, sub_names)?;
+        let (updated_nrs_map, removed_link) = remove_nrs_sub_tree(&self, sub_names)?;
         self.sub_names_map = updated_nrs_map.sub_names_map;
         self.default = updated_nrs_map.default;
 
@@ -211,7 +211,7 @@ impl NrsMap {
 
         // Update NRS Map with new names
         let sub_names: Vec<String> = parse_nrs_name(name)?;
-        let updated_nrs_map = setup_nrs_tree(self, sub_names.clone(), link)?;
+        let updated_nrs_map = setup_nrs_tree(&self, sub_names.clone(), link)?;
         self.sub_names_map = updated_nrs_map.sub_names_map;
 
         // Set (top level) default if was requested
@@ -253,7 +253,7 @@ impl NrsMap {
 
     pub fn get_map_summary(&self) -> BTreeMap<String, BTreeMap<String, String>> {
         let mut nrs_map_summary = BTreeMap::new();
-        gen_nrs_map_summary(self, "", &mut nrs_map_summary);
+        gen_nrs_map_summary(&self, "", &mut nrs_map_summary);
         nrs_map_summary
     }
 }
@@ -289,7 +289,7 @@ fn sub_names_vec_to_str(sub_names: &[SubName]) -> String {
 
 fn parse_nrs_name(name: &str) -> Result<Vec<String>> {
     // santize to a simple string
-    let sanitized_name = str::replace(name, "safe://", "");
+    let sanitized_name = str::replace(&name, "safe://", "");
 
     let mut sub_names: Vec<String> = sanitized_name.split('.').map(String::from).collect();
     // get the TLD
@@ -312,8 +312,8 @@ pub(crate) fn validate_nrs_link(link: &str) -> Result<()> {
                 "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: \"{}\"",
                 content_type, link
             )));
-        } else if data_type == SafeDataType::PublicSequence
-            || data_type == SafeDataType::PrivateSequence
+        } else if data_type == SafeDataType::PublicRegister
+            || data_type == SafeDataType::PrivateRegister
         {
             return Err(Error::InvalidInput(format!(
                 "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: \"{}\"",
@@ -442,7 +442,7 @@ fn gen_nrs_map_summary(
         let str = format!("{}.{}", subname, sub_names_str);
         match subname_rdf {
             SubNameRdf::SubName(nrs_sub_map) => {
-                gen_nrs_map_summary(nrs_sub_map, &str, nrs_map_summary);
+                gen_nrs_map_summary(&nrs_sub_map, &str, nrs_map_summary);
             }
             SubNameRdf::Definition(def_data) => {
                 nrs_map_summary.insert(str, def_data.clone());
