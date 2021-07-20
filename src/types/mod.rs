@@ -17,7 +17,6 @@ pub mod utils;
 mod chunk;
 mod errors;
 mod keys;
-mod map;
 mod section;
 mod sequence;
 mod token;
@@ -33,11 +32,6 @@ pub use keys::{
     public_key::PublicKey,
     secret_key::SecretKey,
     signature::{Signature, SignatureShare},
-};
-pub use map::{
-    Action as MapAction, Address as MapAddress, Entries as MapEntries,
-    EntryAction as MapEntryAction, EntryActions as MapEntryActions, Kind as MapKind, Map,
-    PermissionSet as MapPermissionSet, Value as MapValue, Values as MapValues,
 };
 pub use register::Address as RegisterAddress;
 pub use section::SectionElders;
@@ -64,8 +58,6 @@ use xor_name::XorName;
 pub enum Data {
     /// Chunk.
     Chunk(Chunk),
-    /// Map.
-    Map(Map),
     /// Sequence.
     Sequence(Sequence),
     /// Register.
@@ -77,8 +69,6 @@ pub enum Data {
 pub enum DataAddress {
     /// Chunk Address
     Chunk(ChunkAddress),
-    /// Map Address
-    Map(MapAddress),
     /// Sequence Address
     Sequence(SequenceAddress),
     /// Register Address
@@ -90,7 +80,6 @@ impl Data {
     pub fn is_public(&self) -> bool {
         match *self {
             Self::Chunk(ref chunk) => chunk.is_public(),
-            Self::Map(_) => false,
             Self::Sequence(ref sequence) => sequence.is_public(),
             Self::Register(ref register) => register.is_public(),
         }
@@ -105,12 +94,6 @@ impl Data {
 impl From<Chunk> for Data {
     fn from(chunk: Chunk) -> Self {
         Self::Chunk(chunk)
-    }
-}
-
-impl From<Map> for Data {
-    fn from(data: Map) -> Self {
-        Self::Map(data)
     }
 }
 

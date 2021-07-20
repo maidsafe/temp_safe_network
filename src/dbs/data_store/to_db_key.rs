@@ -7,9 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{super::encoding::deserialise, Error, Result};
-use crate::types::{
-    register::Address, utils, ChunkAddress, Keypair, MapAddress, PublicKey, SequenceAddress,
-};
+use crate::types::{register::Address, utils, ChunkAddress, Keypair, PublicKey, SequenceAddress};
 use serde::{de::DeserializeOwned, Serialize};
 use xor_name::XorName;
 
@@ -31,7 +29,6 @@ impl ToDbKey for SequenceAddress {}
 impl ToDbKey for Address {}
 impl ToDbKey for Keypair {}
 impl ToDbKey for ChunkAddress {}
-impl ToDbKey for MapAddress {}
 impl ToDbKey for PublicKey {}
 impl ToDbKey for XorName {}
 

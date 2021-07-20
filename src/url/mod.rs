@@ -166,10 +166,6 @@ pub enum SafeDataType {
     PublicSequence = 0x05,
     #[allow(missing_docs)]
     PrivateSequence = 0x06,
-    #[allow(missing_docs)]
-    SeqMap = 0x07,
-    #[allow(missing_docs)]
-    UnseqMap = 0x08,
 }
 
 impl std::fmt::Display for SafeDataType {
@@ -189,8 +185,6 @@ impl SafeDataType {
             4 => Ok(Self::PrivateRegister),
             5 => Ok(Self::PublicSequence),
             6 => Ok(Self::PrivateSequence),
-            7 => Ok(Self::SeqMap),
-            8 => Ok(Self::UnseqMap),
             _ => Err(Error::InvalidInput("Invalid SafeDataType code".to_string())),
         }
     }
@@ -523,8 +517,6 @@ impl SafeUrl {
             4 => SafeDataType::PrivateRegister,
             5 => SafeDataType::PublicSequence,
             6 => SafeDataType::PrivateSequence,
-            7 => SafeDataType::SeqMap,
-            8 => SafeDataType::UnseqMap,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
                     "Invalid SAFE data type encoded in the XOR-URL string: {}",
@@ -1039,28 +1031,6 @@ impl SafeUrl {
             None,
             0,
             SafeDataType::PublicBlob,
-            content_type,
-            None,
-            None,
-            None,
-            None,
-            None,
-            base,
-        )
-    }
-
-    /// A non-member Map encoder function for convenience
-    pub fn encode_mutable_data(
-        xor_name: XorName,
-        type_tag: u64,
-        content_type: SafeContentType,
-        base: XorUrlBase,
-    ) -> Result<String> {
-        SafeUrl::encode(
-            xor_name,
-            None,
-            type_tag,
-            SafeDataType::SeqMap,
             content_type,
             None,
             None,

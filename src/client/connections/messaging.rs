@@ -372,12 +372,8 @@ impl Session {
                 // Saving error, but not returning until we have more responses in
                 // (note, this will overwrite prior errors, so we'll just return whicever was last received)
                 (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
-                | (response @ Some(QueryResponse::GetMap(Err(_))), None)
                 | (response @ Some(QueryResponse::GetRegister(Err(_))), None)
                 | (response @ Some(QueryResponse::GetSequence(Err(_))), None)
-                | (response @ Some(QueryResponse::GetMapShell(Err(_))), None)
-                | (response @ Some(QueryResponse::GetMapValue(Err(_))), None)
-                | (response @ Some(QueryResponse::GetMapVersion(Err(_))), None)
                 | (response @ Some(QueryResponse::GetRegisterPolicy(Err(_))), None)
                 | (response @ Some(QueryResponse::GetRegisterOwner(Err(_))), None)
                 | (response @ Some(QueryResponse::GetRegisterUserPermissions(Err(_))), None)

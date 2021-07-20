@@ -6,15 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Messages that clients can send to the network, and their possible responses.
-//!
-//! See [`ClientMsg`] for message definitions.
+//! Data messages and their possible responses.
 
 mod chunk;
 mod cmd;
 mod data_exchange;
 mod errors;
-mod map;
 mod query;
 mod register;
 mod sequence;
@@ -23,11 +20,10 @@ pub use self::{
     chunk::{ChunkRead, ChunkWrite},
     cmd::DataCmd,
     data_exchange::{
-        ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
-        RegisterDataExchange, SequenceDataExchange,
+        ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, RegisterDataExchange,
+        SequenceDataExchange,
     },
     errors::{Error, Result},
-    map::{MapCmd, MapRead, MapWrite},
     query::DataQuery,
     register::{RegisterCmd, RegisterRead, RegisterWrite},
     sequence::{SequenceCmd, SequenceRead, SequenceWrite},
@@ -36,15 +32,11 @@ pub use self::{
 use crate::messaging::MessageId;
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
-    Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey, Sequence,
-    SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
-    SequencePublicPolicy,
+    Chunk, PublicKey, Sequence, SequenceEntries, SequenceEntry, SequencePermissions,
+    SequencePrivatePolicy, SequencePublicPolicy,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    convert::TryFrom,
-};
+use std::{collections::BTreeSet, convert::TryFrom};
 
 /// Messages that a client can send to the network, and their possible responses.
 #[allow(clippy::large_enum_variant)]
@@ -127,32 +119,6 @@ pub enum QueryResponse {
     /// Response to [`ChunkRead::Get`].
     GetChunk(Result<Chunk>),
     //
-    // ===== Map =====
-    //
-    /// Response to [`MapRead::Get`].
-    GetMap(Result<Map>),
-    /// Response to [`MapRead::GetShell`].
-    ///
-    /// Note that the contained [`Map`] if `Ok` will have all its metadata fields set, but not the
-    /// data itself (e.g. the contained map will be empty, even if the actual map on the network is
-    /// not). See [`MapRead::Get`], [`MapRead::GetValue`], [`MapRead::ListEntries`],
-    /// [`MapRead::ListKeys`], or [`MapRead::ListValues`] for queries that return data in the map.
-    GetMapShell(Result<Map>),
-    /// Response to [`MapRead::GetVersion`].
-    GetMapVersion(Result<u64>),
-    /// Response to [`MapRead::ListEntries`].
-    ListMapEntries(Result<MapEntries>),
-    /// Response to [`MapRead::ListKeys`].
-    ListMapKeys(Result<BTreeSet<Vec<u8>>>),
-    /// Response to [`MapRead::ListValues`].
-    ListMapValues(Result<MapValues>),
-    /// Response to [`MapRead::ListUserPermissions`]
-    ListMapUserPermissions(Result<MapPermissionSet>),
-    /// Response to [`MapRead::ListPermissions`].
-    ListMapPermissions(Result<BTreeMap<PublicKey, MapPermissionSet>>),
-    /// Response to [`MapRead::GetValue`].
-    GetMapValue(Result<MapValue>),
-    //
     // ===== Sequence Data =====
     //
     /// Response to [`SequenceRead::Get`].
@@ -188,15 +154,6 @@ impl QueryResponse {
         use QueryResponse::*;
         match self {
             GetChunk(result) => result.is_ok(),
-            GetMap(result) => result.is_ok(),
-            GetMapShell(result) => result.is_ok(),
-            GetMapVersion(result) => result.is_ok(),
-            ListMapEntries(result) => result.is_ok(),
-            ListMapKeys(result) => result.is_ok(),
-            ListMapValues(result) => result.is_ok(),
-            ListMapUserPermissions(result) => result.is_ok(),
-            ListMapPermissions(result) => result.is_ok(),
-            GetMapValue(result) => result.is_ok(),
             GetSequence(result) => result.is_ok(),
             GetSequenceRange(result) => result.is_ok(),
             GetSequenceLastEntry(result) => result.is_ok(),
@@ -241,14 +198,6 @@ macro_rules! try_from {
 }
 
 try_from!(Chunk, GetChunk);
-try_from!(Map, GetMap, GetMapShell);
-try_from!(u64, GetMapVersion);
-try_from!(MapEntries, ListMapEntries);
-try_from!(BTreeSet<Vec<u8>>, ListMapKeys);
-try_from!(MapValues, ListMapValues);
-try_from!(MapPermissionSet, ListMapUserPermissions);
-try_from!(BTreeMap<PublicKey, MapPermissionSet>, ListMapPermissions);
-try_from!(MapValue, GetMapValue);
 try_from!(Sequence, GetSequence);
 try_from!(SequenceEntries, GetSequenceRange);
 try_from!((u64, SequenceEntry), GetSequenceLastEntry);
@@ -264,7 +213,7 @@ try_from!(Permissions, GetRegisterUserPermissions);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ChunkAddress, DataAddress, Keypair, MapKind, MapValue, PrivateChunk};
+    use crate::types::{ChunkAddress, DataAddress, Keypair, PrivateChunk};
     use anyhow::{anyhow, Result};
     use std::convert::{TryFrom, TryInto};
     use xor_name::XorName;
@@ -351,36 +300,9 @@ mod tests {
         );
         assert_eq!(
             Err(TryFromError::Response(e.clone())),
-            Chunk::try_from(GetChunk(Err(e.clone())))
+            Chunk::try_from(GetChunk(Err(e)))
         );
 
-        let mut data = BTreeMap::new();
-        let _ = data.insert(
-            vec![1],
-            MapValue {
-                pointer: XorName::random(),
-                version: 0,
-            },
-        );
-
-        let m_data = Map::new_with_data(
-            *i_data.name(),
-            1,
-            data,
-            BTreeMap::new(),
-            owner,
-            MapKind::Private,
-        );
-        assert_eq!(
-            m_data,
-            GetMap(Ok(m_data.clone()))
-                .try_into()
-                .map_err(|_| anyhow!("Mismatched types".to_string()))?
-        );
-        assert_eq!(
-            Err(TryFromError::Response(e.clone())),
-            Map::try_from(GetMap(Err(e)))
-        );
         Ok(())
     }
 }
