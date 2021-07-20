@@ -15,7 +15,7 @@ use hmac::Hmac;
 use rand::rngs::StdRng;
 use rand_core::SeedableRng;
 use safe_network::client::client_api::Client;
-use safe_network::types::{Keypair, MapAddress};
+use safe_network::types::{Keypair, RegisterAddress};
 use sha3::Sha3_256;
 use std::{
     collections::HashSet,
@@ -96,7 +96,7 @@ pub struct SafeAuthenticator {
     // We keep the client instantiated with the derived keypair, along
     // with the address of the Map which holds its Safe on the network.
     #[allow(dead_code)]
-    safe: Option<(Client, MapAddress)>,
+    safe: Option<(Client, RegisterAddress)>,
     #[allow(dead_code)]
     config_path: Option<PathBuf>,
     #[allow(dead_code)]

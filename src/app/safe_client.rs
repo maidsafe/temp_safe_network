@@ -11,11 +11,10 @@ use super::fetch::Range;
 use crate::{ipc::BootstrapConfig, Error, Result};
 use hex::encode;
 use log::{debug, info};
-use safe_network::client::{Client, Error as ClientError, ErrorMessage};
+use safe_network::client::{Client, Error as ClientError};
 use safe_network::types::{
     register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
-    ChunkAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
-    MapKind, MapPermissionSet, MapValue, SequenceAddress, SequencePrivatePermissions,
+    ChunkAddress, Error as SafeNdError, Keypair, SequenceAddress, SequencePrivatePermissions,
     SequencePublicPermissions, SequenceUser,
 };
 use std::{
@@ -140,157 +139,6 @@ impl SafeAppClient {
         );
 
         Ok(data)
-    }
-
-    // === Map operations ===
-    #[allow(dead_code)]
-    pub async fn store_map(
-        &self,
-        name: Option<XorName>,
-        tag: u64,
-        kind: MapKind,
-        _data: Option<String>,
-        _permissions: Option<String>,
-    ) -> Result<XorName> {
-        let xorname = name.unwrap_or_else(rand::random);
-
-        // The Map's owner will be the client's public key
-        let client = self.get_safe_client()?;
-        let owner = client.public_key();
-
-        let permission_set = MapPermissionSet::new()
-            .allow(MapAction::Read)
-            .allow(MapAction::Insert)
-            .allow(MapAction::Update)
-            .allow(MapAction::Delete)
-            .allow(MapAction::ManagePermissions);
-
-        let mut permission_map = BTreeMap::new();
-        let app_pk = client.public_key();
-        permission_map.insert(app_pk, permission_set);
-
-        client
-            .store_map(
-                xorname,
-                tag,
-                owner,
-                kind,
-                Some(BTreeMap::new()),
-                Some(permission_map),
-            )
-            .await
-            .map_err(|err| Error::NetDataError(format!("Failed to store Map: {}", err)))?;
-
-        Ok(xorname)
-    }
-
-    #[allow(dead_code)]
-    pub async fn get_map(&self, address: MapAddress) -> Result<Map> {
-        let client = self.get_safe_client()?;
-
-        client
-            .get_map(address)
-            .await
-            .map_err(|e| Error::NetDataError(format!("Failed to get Map: {:?}", e)))
-    }
-
-    #[allow(dead_code)]
-    pub async fn map_insert(
-        &self,
-        address: MapAddress,
-        key: Vec<u8>,
-        pointer: XorName,
-    ) -> Result<()> {
-        let entry_actions = MapEntryActions::new();
-        let entry_actions = entry_actions.insert(key, pointer, 0);
-        self.edit_map_entries(address, entry_actions, "Failed to insert to Map")
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn map_get_value(&self, address: MapAddress, key: Vec<u8>) -> Result<MapValue> {
-        let client = self.get_safe_client()?;
-
-        client
-            .get_map_value(address, key)
-            .await
-            .map_err(|err| match err {
-                ClientError::ErrorMessage {
-                    source: ErrorMessage::AccessDenied(_),
-                    ..
-                }
-                | ClientError::NetworkDataError(SafeNdError::AccessDenied(_)) => {
-                    Error::AccessDenied("Failed to retrieve a key".to_string())
-                }
-                // FIXME: we need to match the appropriate error
-                // to map it to our Error::ContentNotFound
-                /*ClientError::NetworkDataError(??) => {
-                    Error::ContentNotFound(format!("Map not found at address: {:?}", address))
-                }*/
-                ClientError::NetworkDataError(SafeNdError::NoSuchEntry) => Error::EntryNotFound(
-                    format!("Entry not found in Map found at address: {:?}", address),
-                ),
-                err => Error::NetDataError(format!("Failed to retrieve a key. {:?}", err)),
-            })
-    }
-
-    #[allow(dead_code)]
-    pub async fn list_map_entries(
-        &self,
-        address: MapAddress,
-    ) -> Result<BTreeMap<Vec<u8>, MapValue>> {
-        let client = self.get_safe_client()?;
-        client
-            .list_map_entries(address)
-            .await
-            .map_err(|err| match err {
-                ClientError::NetworkDataError(SafeNdError::AccessDenied(_pk)) => {
-                    Error::AccessDenied(format!("Failed to get Map at: {:?}", address))
-                }
-                // FIXME: we need to match the appropriate error
-                // to map it to our Error::ContentNotFound
-                /*ClientError::NetworkDataError(??) => {
-                    Error::ContentNotFound(format!("Map not found at address: {:?}", address))
-                }*/
-                ClientError::NetworkDataError(SafeNdError::NoSuchEntry) => Error::EntryNotFound(
-                    format!("Entry not found in Map found at address: {:?}", address),
-                ),
-                err => Error::NetDataError(format!("Failed to get Map. {:?}", err)),
-            })
-    }
-
-    async fn edit_map_entries(
-        &self,
-        address: MapAddress,
-        entry_actions: MapEntryActions,
-        error_msg: &str,
-    ) -> Result<()> {
-        let client = self.get_safe_client()?;
-        let message = error_msg.to_string();
-        client
-            .edit_map_entries(address, entry_actions)
-            .await
-            .map_err(|err| {
-                if let ClientError::NetworkDataError(SafeNdError::InvalidEntryActions(_)) = err {
-                    Error::EntryExists(format!("{}: {}", message, err))
-                } else {
-                    Error::NetDataError(format!("{}: {}", message, err))
-                }
-            })
-    }
-
-    #[allow(dead_code)]
-    pub async fn update_map(
-        &self,
-        address: MapAddress,
-        key: Vec<u8>,
-        pointer: XorName,
-        version: u64,
-    ) -> Result<()> {
-        let entry_actions = MapEntryActions::new();
-        let entry_actions = entry_actions.update(key, pointer, version);
-        self.edit_map_entries(address, entry_actions, "Failed to update map")
-            .await
     }
 
     // === Sequence data operations ===
