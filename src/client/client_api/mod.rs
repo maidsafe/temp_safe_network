@@ -9,7 +9,6 @@
 mod blob_apis;
 mod blob_storage;
 mod commands;
-mod map_apis;
 mod queries;
 mod register_apis;
 mod sequence_apis;
@@ -23,9 +22,10 @@ use std::{
     path::Path,
     {collections::HashSet, net::SocketAddr, sync::Arc},
 };
-use tokio::sync::mpsc::Receiver;
-use tokio::sync::RwLock;
-use tokio::time::Duration;
+use tokio::{
+    sync::{mpsc::Receiver, RwLock},
+    time::Duration,
+};
 use tracing::{debug, info, trace};
 
 // Number of attempts to make when trying to bootstrap to the network

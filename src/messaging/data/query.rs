@@ -7,8 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    chunk::ChunkRead, map::MapRead, register::RegisterRead, sequence::SequenceRead, Error,
-    QueryResponse,
+    chunk::ChunkRead, register::RegisterRead, sequence::SequenceRead, Error, QueryResponse,
 };
 use xor_name::XorName;
 
@@ -27,10 +26,6 @@ pub enum DataQuery {
     ///
     /// [`Chunk`]: crate::types::Chunk
     Blob(ChunkRead),
-    /// [`Map`] read operation.
-    ///
-    /// [`Map`]: crate::types::Map
-    Map(MapRead),
     /// [`Sequence`] read operation.
     ///
     /// [`Sequence`]: crate::types::Sequence
@@ -48,7 +43,6 @@ impl DataQuery {
         use DataQuery::*;
         match self {
             Blob(q) => q.error(error),
-            Map(q) => q.error(error),
             Sequence(q) => q.error(error),
             Register(q) => q.error(error),
         }
@@ -59,7 +53,6 @@ impl DataQuery {
         use DataQuery::*;
         match self {
             Blob(q) => q.dst_address(),
-            Map(q) => q.dst_address(),
             Sequence(q) => q.dst_address(),
             Register(q) => q.dst_address(),
         }

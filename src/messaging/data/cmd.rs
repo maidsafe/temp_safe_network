@@ -6,10 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    chunk::ChunkWrite, map::MapWrite, register::RegisterWrite, sequence::SequenceWrite, CmdError,
-    Error,
-};
+use super::{chunk::ChunkWrite, register::RegisterWrite, sequence::SequenceWrite, CmdError, Error};
 use crate::types::PublicKey;
 use xor_name::XorName;
 
@@ -28,10 +25,6 @@ pub enum DataCmd {
     ///
     /// [`Chunk`]: crate::types::Chunk
     Chunk(ChunkWrite),
-    /// [`Map`] write operation.
-    ///
-    /// [`Map`]: crate::types::Map
-    Map(MapWrite),
     /// [`Sequence`] write operation.
     ///
     /// [`Sequence`]: crate::types::Sequence
@@ -49,7 +42,6 @@ impl DataCmd {
         use DataCmd::*;
         match self {
             Chunk(c) => c.error(error),
-            Map(c) => c.error(error),
             Sequence(c) => c.error(error),
             Register(c) => c.error(error),
         }
@@ -60,7 +52,6 @@ impl DataCmd {
         use DataCmd::*;
         match self {
             Chunk(c) => c.dst_address(),
-            Map(c) => c.dst_address(),
             Sequence(c) => c.dst_address(),
             Register(c) => c.dst_address(),
         }
@@ -70,7 +61,6 @@ impl DataCmd {
     pub fn owner(&self) -> Option<PublicKey> {
         match self {
             Self::Chunk(write) => write.owner(),
-            Self::Map(write) => write.owner(),
             Self::Sequence(write) => write.owner(),
             Self::Register(write) => write.owner(),
         }

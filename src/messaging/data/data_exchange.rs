@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{MapCmd, RegisterCmd, SequenceCmd};
+use super::{RegisterCmd, SequenceCmd};
 use crate::types::{ChunkAddress, PublicKey};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -34,8 +34,6 @@ pub struct HolderMetadata {
 pub struct DataExchange {
     /// Chunk data exchange.
     pub chunk_data: ChunkDataExchange,
-    /// Map data exchange.
-    pub map_data: MapDataExchange,
     /// Register data exchange.
     pub reg_data: RegisterDataExchange,
     /// Sequence data exchange.
@@ -48,10 +46,6 @@ pub struct ChunkDataExchange {
     /// Full adults register.
     pub full_adults: BTreeSet<XorName>,
 }
-
-/// Map data exchange.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MapDataExchange(pub BTreeMap<XorName, Vec<MapCmd>>);
 
 /// Register data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

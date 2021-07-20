@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    chunk_records::ChunkRecords, map_storage::MapStorage, register_storage::RegisterStorage,
+    chunk_records::ChunkRecords, register_storage::RegisterStorage,
     sequence_storage::SequenceStorage,
 };
 use crate::messaging::{
-    data::{DataCmd, DataExchange, DataQuery, MapCmd, RegisterCmd, SequenceCmd},
+    data::{DataCmd, DataExchange, DataQuery, RegisterCmd, SequenceCmd},
     ClientSigned, EndUser, MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Error, Result};
@@ -23,7 +23,6 @@ use tracing::info;
 /// that are only managed at Elders.
 pub(super) struct ElderStores {
     chunk_records: ChunkRecords,
-    map_storage: MapStorage,
     sequence_storage: SequenceStorage,
     register_storage: RegisterStorage,
 }
@@ -31,13 +30,11 @@ pub(super) struct ElderStores {
 impl ElderStores {
     pub(super) fn new(
         chunk_records: ChunkRecords,
-        map_storage: MapStorage,
         sequence_storage: SequenceStorage,
         register_storage: RegisterStorage,
     ) -> Self {
         Self {
             chunk_records,
-            map_storage,
             sequence_storage,
             register_storage,
         }
@@ -52,7 +49,6 @@ impl ElderStores {
     ) -> Result<NodeDuty> {
         match &query {
             DataQuery::Blob(read) => self.chunk_records.read(read, msg_id, origin).await,
-            DataQuery::Map(read) => self.map_storage.read(read, msg_id, requester, origin).await,
             DataQuery::Sequence(read) => {
                 self.sequence_storage
                     .read(read, msg_id, requester, origin)
@@ -81,12 +77,6 @@ impl ElderStores {
                     .write(write, msg_id, client_sig, origin)
                     .await
             }
-            DataCmd::Map(write) => {
-                info!("Writing Map");
-                self.map_storage
-                    .write(msg_id, origin, MapCmd { write, client_sig })
-                    .await
-            }
             DataCmd::Sequence(write) => {
                 info!("Writing Sequence");
                 self.sequence_storage
@@ -110,13 +100,11 @@ impl ElderStores {
     pub(super) async fn get_data_of(&self, prefix: Prefix) -> Result<DataExchange> {
         // Prepare chunk_records, map and sequence data
         let chunk_data = self.chunk_records.get_data_of(prefix).await;
-        let map_data = self.map_storage.get_data_of(prefix).await?;
         let reg_data = self.register_storage.get_data_of(prefix).await?;
         let seq_data = self.sequence_storage.get_data_of(prefix).await?;
 
         Ok(DataExchange {
             chunk_data,
-            map_data,
             reg_data,
             seq_data,
         })
@@ -124,7 +112,6 @@ impl ElderStores {
 
     pub(super) async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
         // todo: all this can be done in parallel
-        self.map_storage.update(data.map_data).await?;
         self.register_storage.update(data.reg_data).await?;
         self.sequence_storage.update(data.seq_data).await?;
         self.chunk_records.update(data.chunk_data).await;
