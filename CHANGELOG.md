@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.11.0](https://github.com/maidsafe/safe_network/compare/v0.10.1...v0.11.0) (2021-07-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **types:** Although the API doesn't change, signatures are
+serialized in messages, so this break the message format.
+
+* **types:** More compact ed25519 signature serialisation ([66e4166](https://github.com/maidsafe/safe_network/commit/66e4166859d86f2dcd7f726f395a7ef4d1be7300))
+
 ### [0.10.1](https://github.com/maidsafe/safe_network/compare/v0.10.0...v0.10.1) (2021-07-20)
 
 ## [0.10.0](https://github.com/maidsafe/safe_network/compare/v0.9.1...v0.10.0) (2021-07-20)
