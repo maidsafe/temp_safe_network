@@ -25,6 +25,7 @@ path = "src/bin/testnet.rs"
 
 [features]
 default = [ "testing" ]
+client = ["qp2p/no-igd"]
 testing = [ ]
 chaos = [ ]
 always-joinable = [ ]
