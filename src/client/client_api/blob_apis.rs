@@ -348,21 +348,20 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use super::{Chunk, ChunkAddress, Client, DataMap, DataMapLevel};
+    use super::{ChunkAddress, Client, DataMap, DataMapLevel};
     use crate::client::client_api::blob_storage::BlobStorage;
     use crate::client::utils::{
         generate_random_vector,
         test_utils::{create_test_client, run_w_backoff_delayed},
     };
     use crate::retry_err_loop;
-    use crate::types::{PrivateChunk, PublicChunk};
     use anyhow::{anyhow, bail, Result};
     use bincode::deserialize;
     use futures::future::join_all;
     use self_encryption::{SelfEncryptionError, Storage};
     use tokio::time::{Duration, Instant};
 
-    const BLOB_TEST_QUERY_TIMEOUT: u64 = 20;
+    const BLOB_TEST_QUERY_TIMEOUT: u64 = 60;
 
     // Test storing and getting public Blob.
     #[tokio::test]
@@ -688,13 +687,6 @@ mod tests {
         let raw_data = generate_random_vector(size);
 
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-
-        // generate address without storing to the network (public and unencrypted)
-        let chunk = if public {
-            Chunk::Public(PublicChunk::new(raw_data.clone()))
-        } else {
-            Chunk::Private(PrivateChunk::new(raw_data.clone(), client.public_key()))
-        };
 
         let address = if public {
             client.store_public_blob(&raw_data).await?
