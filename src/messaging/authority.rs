@@ -97,8 +97,7 @@ pub struct NodeSigned {
     pub public_key: EdPublicKey,
     /// Ed25519 signature of the message corresponding to the public key of the source peer.
     #[debug(with = "Signature::fmt_ed25519")]
-    #[serde(deserialize_with = "Signature::deserialize_ed25519")]
-    #[serde(serialize_with = "Signature::serialize_ed25519")]
+    #[serde(with = "serde_bytes")]
     pub signature: EdSignature,
 }
 
