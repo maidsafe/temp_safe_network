@@ -124,8 +124,7 @@ impl WireMsgUtils for WireMsg {
         )
     }
 
-    /// Creates a signed message where signature is assumed valid.
-    // TODO: update to "known to be valid" once all `NodeMsgAuthority` variants have authority
+    /// Creates a signed message where signature is known to be valid.
     fn new_signed(
         payload: Bytes,
         node_msg_authority: NodeMsgAuthority,
@@ -142,9 +141,9 @@ impl WireMsgUtils for WireMsg {
                     .unwrap_or_default(),
                 MsgKind::NodeBlsShareSignedMsg(bls_share_auth.into_inner()),
             ),
-            NodeMsgAuthority::Section(section_signed) => (
-                MessageId::from_content(&section_signed.sig.signature).unwrap_or_default(),
-                MsgKind::SectionSignedMsg(section_signed),
+            NodeMsgAuthority::Section(section_auth) => (
+                MessageId::from_content(&section_auth.sig.signature).unwrap_or_default(),
+                MsgKind::SectionSignedMsg(section_auth.into_inner()),
             ),
         };
 

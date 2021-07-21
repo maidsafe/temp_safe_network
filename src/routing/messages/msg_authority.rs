@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{node::Peer, NodeMsgAuthority, SectionSigned, SrcLocation};
+use crate::messaging::{node::Peer, NodeMsgAuthority, SrcLocation};
 use crate::routing::{
     ed25519::{self},
     error::{Error, Result},
@@ -40,13 +40,9 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
                 name: bls_share_auth.src_name,
                 section_pk: bls_share_auth.section_pk,
             },
-            NodeMsgAuthority::Section(SectionSigned {
-                src_name,
-                section_pk,
-                ..
-            }) => SrcLocation::Section {
-                name: *src_name,
-                section_pk: *section_pk,
+            NodeMsgAuthority::Section(section_auth) => SrcLocation::Section {
+                name: section_auth.src_name,
+                section_pk: section_auth.section_pk,
             },
         }
     }
@@ -55,7 +51,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
         match self {
             NodeMsgAuthority::Node(node_auth) => ed25519::name(&node_auth.public_key),
             NodeMsgAuthority::BlsShare(bls_share_auth) => bls_share_auth.src_name,
-            NodeMsgAuthority::Section(SectionSigned { src_name, .. }) => *src_name,
+            NodeMsgAuthority::Section(section_auth) => section_auth.src_name,
         }
     }
 
@@ -74,14 +70,11 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
     // Verify if the section key of the NodeMsgAuthority can be trusted
     // based on a set of known keys.
     fn verify_src_section_key(&self, known_keys: &[BlsPublicKey]) -> bool {
-        match &self {
-            NodeMsgAuthority::Node(_) => true,
-            NodeMsgAuthority::BlsShare(bls_share_auth) => known_keys
-                .iter()
-                .any(|key| key == &bls_share_auth.section_pk),
-            NodeMsgAuthority::Section(SectionSigned { section_pk, .. }) => {
-                known_keys.iter().any(|key| key == section_pk)
-            }
-        }
+        let section_pk = match &self {
+            NodeMsgAuthority::Node(_) => return true,
+            NodeMsgAuthority::BlsShare(bls_share_auth) => &bls_share_auth.section_pk,
+            NodeMsgAuthority::Section(section_auth) => &section_auth.section_pk,
+        };
+        known_keys.iter().any(|key| key == section_pk)
     }
 }

@@ -16,7 +16,7 @@ use crate::messaging::{
         ResourceProofResponse, Section, SectionSigned,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DstLocation, MessageId, MessageType, MsgKind, NodeSigned, SectionAuthorityProvider,
+    Authority, DstLocation, MessageId, MessageType, MsgKind, NodeSigned, SectionAuthorityProvider,
     SectionSigned as MsgKindSectionSigned, WireMsg,
 };
 use crate::routing::{
@@ -347,7 +347,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let relocate_node_msg = NodeMsg::Relocate(relocate_details);
     let payload = WireMsg::serialize_msg_payload(&relocate_node_msg)?;
-    let signature = sk_set.secret_key().sign(payload);
+    let signature = sk_set.secret_key().sign(&payload);
     let section_signed = MsgKindSectionSigned {
         section_pk: section_key,
         src_name: node_name,
@@ -356,10 +356,11 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
             signature,
         },
     };
+    let section_auth = Authority::verify(section_signed.clone(), &payload).unwrap();
 
     let relocate_payload = RelocatePayload::new(
         relocate_node_msg,
-        section_signed,
+        section_auth,
         &relocated_node.name(),
         &relocated_node_old_keypair,
     );

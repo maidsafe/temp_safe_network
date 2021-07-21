@@ -180,7 +180,10 @@ impl WireMsg {
 
                 Ok(MessageType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
-                    msg_authority: NodeMsgAuthority::Section(section_signed),
+                    msg_authority: NodeMsgAuthority::Section(Authority::verify(
+                        section_signed,
+                        &self.payload,
+                    )?),
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })

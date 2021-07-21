@@ -13,7 +13,7 @@ use crate::messaging::{
         Network, NodeMsg, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise,
         Section,
     },
-    SectionSigned,
+    Authority, SectionSigned,
 };
 use crate::routing::{
     core::JoiningAsRelocated,
@@ -100,7 +100,7 @@ impl RelocateDetailsUtils for RelocateDetails {
 pub(super) trait RelocatePayloadUtils {
     fn new(
         details: NodeMsg,
-        section_signed: SectionSigned,
+        section_auth: Authority<SectionSigned>,
         new_name: &XorName,
         old_keypair: &Keypair,
     ) -> Self;
@@ -113,7 +113,7 @@ pub(super) trait RelocatePayloadUtils {
 impl RelocatePayloadUtils for RelocatePayload {
     fn new(
         details: NodeMsg,
-        section_signed: SectionSigned,
+        section_auth: Authority<SectionSigned>,
         new_name: &XorName,
         old_keypair: &Keypair,
     ) -> Self {
@@ -121,7 +121,7 @@ impl RelocatePayloadUtils for RelocatePayload {
 
         Self {
             details,
-            section_signed,
+            section_signed: section_auth.into_inner(),
             signature_of_new_name_with_old_key,
         }
     }

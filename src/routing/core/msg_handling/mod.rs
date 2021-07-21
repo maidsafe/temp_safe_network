@@ -159,7 +159,7 @@ impl Core {
             );
 
             // We assume to be aggregated if it contains a BLS Share sig as authority.
-            match self.aggregate_message_and_stop(&msg_id, &mut msg_authority, payload) {
+            match self.aggregate_message_and_stop(&mut msg_authority, payload) {
                 Ok(false) => {
                     commands.extend(
                         self.handle_verified_node_message(
@@ -465,52 +465,27 @@ impl Core {
     // current message shall not be processed any further.
     fn aggregate_message_and_stop(
         &mut self,
-        msg_id: &MessageId,
         msg_authority: &mut NodeMsgAuthority,
         payload: Bytes,
     ) -> Result<bool> {
-        let (section_pk, src_name, sig_share) =
-            if let NodeMsgAuthority::BlsShare(bls_share_auth) = msg_authority {
-                (
-                    &bls_share_auth.section_pk,
-                    &bls_share_auth.src_name,
-                    &bls_share_auth.sig_share,
-                )
-            } else {
-                // not a msg to aggregate signatures with,
-                // return wihout modifying msg_authority
-                return Ok(false);
-            };
+        let bls_share_auth = if let NodeMsgAuthority::BlsShare(bls_share_auth) = msg_authority {
+            bls_share_auth
+        } else {
+            return Ok(false);
+        };
 
-        match self.message_aggregator.add(&payload, sig_share.clone()) {
-            Ok(sig) => {
-                if sig_share.public_key_set.public_key() != sig.public_key {
-                    error!(
-                        "Signed public key doesn't match signed share public key in msg with id: {}",
-                        msg_id
-                    );
-                    return Err(Error::InvalidMessage);
-                }
-
-                if &sig.public_key != section_pk {
-                    error!(
-                        "Signed public key doesn't match the section PK in msg with id {}: {:?}",
-                        msg_id, section_pk
-                    );
-                    return Err(Error::InvalidMessage);
-                }
-
-                *msg_authority = NodeMsgAuthority::Section(SectionSigned {
-                    section_pk: *section_pk,
-                    src_name: *src_name,
-                    sig,
-                });
-
+        match SectionSigned::try_authorize(
+            &mut self.message_aggregator,
+            bls_share_auth.clone().into_inner(),
+            &payload,
+        ) {
+            Ok(section_auth) => {
+                *msg_authority = NodeMsgAuthority::Section(section_auth);
                 Ok(false)
             }
             Err(AggregatorError::NotEnoughShares) => Ok(true),
             Err(err) => {
-                error!("Error accumulating message at dst: {:?}", err);
+                error!("Error accumulating message at dst: {}", err);
                 Err(Error::InvalidSignatureShare)
             }
         }
