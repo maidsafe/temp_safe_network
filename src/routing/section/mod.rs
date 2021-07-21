@@ -8,7 +8,7 @@
 
 pub(super) mod node_state;
 pub(crate) mod section_authority_provider;
-mod section_keys;
+pub(super) mod section_keys;
 mod section_peers;
 
 #[cfg(test)]

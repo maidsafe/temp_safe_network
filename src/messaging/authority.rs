@@ -2,7 +2,10 @@ use super::{
     node::{KeyedSig, SigShare},
     Error, Result,
 };
-use crate::types::{PublicKey, Signature};
+use crate::{
+    routing::SectionKeyShare,
+    types::{PublicKey, Signature},
+};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{
     Keypair as EdKeypair, PublicKey as EdPublicKey, Signature as EdSignature, Signer as _,
@@ -130,6 +133,26 @@ pub struct BlsShareSigned {
     pub sig_share: SigShare,
 }
 
+impl BlsShareSigned {
+    /// Construct verified authority of a single node's share of section authority.
+    pub(crate) fn authorize(
+        section_pk: BlsPublicKey,
+        src_name: XorName,
+        key_share: &SectionKeyShare,
+        payload: impl AsRef<[u8]>,
+    ) -> Authority<Self> {
+        Authority(BlsShareSigned {
+            section_pk,
+            src_name,
+            sig_share: SigShare {
+                public_key_set: key_share.public_key_set.clone(),
+                index: key_share.index,
+                signature_share: key_share.secret_key_share.sign(payload),
+            },
+        })
+    }
+}
+
 /// Authority of a whole section.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct SectionSigned {
@@ -193,6 +216,22 @@ impl VerifyAuthority for NodeSigned {
     }
 }
 impl sealed::Sealed for NodeSigned {}
+
+impl VerifyAuthority for BlsShareSigned {
+    fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
+        // Signed chain is required for accumulation at destination.
+        if self.sig_share.public_key_set.public_key() != self.section_pk {
+            return Err(Error::InvalidSignature);
+        }
+
+        if !self.sig_share.verify(payload.as_ref()) {
+            return Err(Error::InvalidSignature);
+        }
+
+        Ok(self)
+    }
+}
+impl sealed::Sealed for BlsShareSigned {}
 
 mod sealed {
     #[allow(missing_docs, unreachable_pub)]

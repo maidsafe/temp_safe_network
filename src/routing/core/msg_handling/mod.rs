@@ -21,7 +21,7 @@ mod sync;
 use super::Core;
 use crate::messaging::{
     node::{NodeMsg, Proposal},
-    BlsShareSigned, DstLocation, MessageId, MessageType, NodeMsgAuthority, SectionSigned, WireMsg,
+    DstLocation, MessageId, MessageType, NodeMsgAuthority, SectionSigned, WireMsg,
 };
 use crate::routing::{
     core::AggregatorError,
@@ -470,13 +470,12 @@ impl Core {
         payload: Bytes,
     ) -> Result<bool> {
         let (section_pk, src_name, sig_share) =
-            if let NodeMsgAuthority::BlsShare(BlsShareSigned {
-                section_pk,
-                src_name,
-                sig_share,
-            }) = msg_authority
-            {
-                (section_pk, src_name, sig_share)
+            if let NodeMsgAuthority::BlsShare(bls_share_auth) = msg_authority {
+                (
+                    &bls_share_auth.section_pk,
+                    &bls_share_auth.src_name,
+                    &bls_share_auth.sig_share,
+                )
             } else {
                 // not a msg to aggregate signatures with,
                 // return wihout modifying msg_authority
