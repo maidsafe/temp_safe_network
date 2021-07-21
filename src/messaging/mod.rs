@@ -41,7 +41,10 @@ mod msg_kind;
 mod sap;
 
 pub use self::{
-    authority::{BlsShareSigned, DataAuthority, DataSigned, NodeSigned, SectionSigned},
+    authority::{
+        Authority, BlsShareSigned, DataAuthority, DataSigned, NodeSigned, SectionSigned,
+        VerifyAuthority,
+    },
     errors::{Error, Result},
     location::{DstLocation, EndUser, SocketId, SrcLocation},
     msg_id::{MessageId, MESSAGE_ID_LEN},

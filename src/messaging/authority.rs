@@ -4,7 +4,10 @@ use super::{
 };
 use crate::types::{PublicKey, Signature};
 use bls::PublicKey as BlsPublicKey;
-use ed25519_dalek::{PublicKey as EdPublicKey, Signature as EdSignature};
+use ed25519_dalek::{
+    Keypair as EdKeypair, PublicKey as EdPublicKey, Signature as EdSignature, Signer as _,
+    Verifier as _,
+};
 use xor_name::XorName;
 
 /// Authority of a network peer.
@@ -101,6 +104,21 @@ pub struct NodeSigned {
     pub signature: EdSignature,
 }
 
+impl NodeSigned {
+    /// Construct verified node authority by signing a payload.
+    pub(crate) fn authorize(
+        section_pk: BlsPublicKey,
+        keypair: &EdKeypair,
+        payload: impl AsRef<[u8]>,
+    ) -> Authority<Self> {
+        Authority(NodeSigned {
+            section_pk,
+            public_key: keypair.public,
+            signature: keypair.sign(payload.as_ref()),
+        })
+    }
+}
+
 /// Authority of a single peer that uses it's BLS Keyshare to sign the message.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct BlsShareSigned {
@@ -121,4 +139,62 @@ pub struct SectionSigned {
     pub src_name: XorName,
     /// BLS proof of the message corresponding to the source section.
     pub sig: KeyedSig,
+}
+
+/// Verified authority.
+///
+/// Values of this type constitute a proof that the signature is valid for a particular payload.
+/// This is made possible by performing verification in all possible constructors of the type.
+///
+/// Validation is defined by the [`VerifyAuthority`] impl for `T`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Authority<T>(T);
+
+impl<T: VerifyAuthority> Authority<T> {
+    /// Verify the authority of `inner`.
+    ///
+    /// This is the only way to construct an instance of [`Authority`] from a `T`. Since it's
+    /// implemented to call [`VerifyAuthority::verify_authority`] an instance of `Authority<T>` is
+    /// guaranteed to be valid with respect to that trait's impl.
+    pub fn verify(inner: T, payload: impl AsRef<[u8]>) -> Result<Self> {
+        inner.verify_authority(payload).map(Self)
+    }
+
+    /// Drop the proof of validity and return the wrapped value.
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
+impl<T> core::ops::Deref for Authority<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// Verify authority.
+///
+/// This trait drives the verification logic used by [`Authority`].
+///
+/// **Note:** this trait is 'sealed', and as such cannot be implemented outside of this crate.
+pub trait VerifyAuthority: Sized + sealed::Sealed {
+    /// Verify that we represent authority for `payload`.
+    fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self>;
+}
+
+impl VerifyAuthority for NodeSigned {
+    fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
+        self.public_key
+            .verify(payload.as_ref(), &self.signature)
+            .map_err(|_| Error::InvalidSignature)?;
+        Ok(self)
+    }
+}
+impl sealed::Sealed for NodeSigned {}
+
+mod sealed {
+    #[allow(missing_docs, unreachable_pub)]
+    pub trait Sealed {}
 }
