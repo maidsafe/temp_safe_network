@@ -25,7 +25,6 @@
 // ############################################################################
 pub use self::error::AggregatorError;
 pub use self::error::ProposalError;
-pub(crate) use self::section::section_keys::SectionKeyShare;
 pub use self::{
     cache::Cache,
     error::{Error, Result},
@@ -41,6 +40,7 @@ pub use self::{
         section_authority_provider::SectionAuthorityProviderUtils,
     },
 };
+pub(crate) use self::{core::SignatureAggregator, section::section_keys::SectionKeyShare};
 pub use qp2p::{Config as TransportConfig, SendStream};
 
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update

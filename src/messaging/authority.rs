@@ -3,7 +3,7 @@ use super::{
     Error, Result,
 };
 use crate::{
-    routing::SectionKeyShare,
+    routing::{AggregatorError, SectionKeyShare, SignatureAggregator},
     types::{PublicKey, Signature},
 };
 use bls::PublicKey as BlsPublicKey;
@@ -164,6 +164,31 @@ pub struct SectionSigned {
     pub sig: KeyedSig,
 }
 
+impl SectionSigned {
+    /// Try to construct verified section authority by aggregating a new share.
+    pub(crate) fn try_authorize(
+        aggregator: &mut SignatureAggregator,
+        share: BlsShareSigned,
+        payload: impl AsRef<[u8]>,
+    ) -> Result<Authority<Self>, AggregatorError> {
+        let sig = aggregator.add(payload.as_ref(), share.sig_share.clone())?;
+
+        if share.sig_share.public_key_set.public_key() != sig.public_key {
+            return Err(AggregatorError::InvalidShare);
+        }
+
+        if sig.public_key != share.section_pk {
+            return Err(AggregatorError::InvalidShare);
+        }
+
+        Ok(Authority(SectionSigned {
+            section_pk: share.section_pk,
+            src_name: share.src_name,
+            sig,
+        }))
+    }
+}
+
 /// Verified authority.
 ///
 /// Values of this type constitute a proof that the signature is valid for a particular payload.
@@ -232,6 +257,17 @@ impl VerifyAuthority for BlsShareSigned {
     }
 }
 impl sealed::Sealed for BlsShareSigned {}
+
+impl VerifyAuthority for SectionSigned {
+    fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
+        if !self.section_pk.verify(&self.sig.signature, payload) {
+            return Err(Error::InvalidSignature);
+        }
+
+        Ok(self)
+    }
+}
+impl sealed::Sealed for SectionSigned {}
 
 mod sealed {
     #[allow(missing_docs, unreachable_pub)]

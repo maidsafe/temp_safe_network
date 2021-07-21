@@ -11,7 +11,7 @@ use crate::messaging::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, RelocateDetails, RelocatePayload,
         Section,
     },
-    DstLocation, SectionAuthorityProvider, SectionSigned, WireMsg,
+    Authority, DstLocation, SectionAuthorityProvider, SectionSigned, WireMsg,
 };
 use crate::routing::{
     dkg::SectionSignedUtils,
@@ -37,7 +37,7 @@ pub(crate) struct JoiningAsRelocated {
     dst_section_key: BlsPublicKey,
     relocate_details: RelocateDetails,
     node_msg: NodeMsg,
-    node_msg_sig: SectionSigned,
+    node_msg_auth: Authority<SectionSigned>,
     // Avoid sending more than one request to the same peer.
     used_recipients: HashSet<SocketAddr>,
     relocate_payload: Option<RelocatePayload>,
@@ -49,7 +49,7 @@ impl JoiningAsRelocated {
         genesis_key: BlsPublicKey,
         relocate_details: RelocateDetails,
         node_msg: NodeMsg,
-        section_signed: SectionSigned,
+        section_auth: Authority<SectionSigned>,
     ) -> Result<Self> {
         let dst_section_key = relocate_details.dst_key;
 
@@ -59,7 +59,7 @@ impl JoiningAsRelocated {
             dst_section_key,
             relocate_details,
             node_msg,
-            node_msg_sig: section_signed,
+            node_msg_auth: section_auth,
             used_recipients: HashSet::<SocketAddr>::new(),
             relocate_payload: None,
         })
@@ -231,7 +231,7 @@ impl JoiningAsRelocated {
         let new_name = XorName::from(PublicKey::from(new_keypair.public));
         self.relocate_payload = Some(RelocatePayload::new(
             self.node_msg.clone(),
-            self.node_msg_sig.clone(),
+            self.node_msg_auth.clone(),
             &new_name,
             &self.node.keypair,
         ));

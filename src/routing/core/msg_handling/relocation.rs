@@ -9,7 +9,7 @@
 use super::Core;
 use crate::messaging::{
     node::{NodeMsg, Peer, Proposal, RelocateDetails, RelocatePromise},
-    SectionSigned,
+    Authority, SectionSigned,
 };
 use crate::routing::{
     core::bootstrap::JoiningAsRelocated,
@@ -93,7 +93,7 @@ impl Core {
         &mut self,
         relocate_details: RelocateDetails,
         node_msg: NodeMsg,
-        section_signed: SectionSigned,
+        section_auth: Authority<SectionSigned>,
     ) -> Result<Option<Command>> {
         if relocate_details.pub_id != self.node.name() {
             // This `Relocate` message is not for us - it's most likely a duplicate of a previous
@@ -129,7 +129,7 @@ impl Core {
             genesis_key,
             relocate_details,
             node_msg,
-            section_signed,
+            section_auth,
         )?;
 
         let cmd = joining_as_relocated.start(bootstrap_addrs)?;
