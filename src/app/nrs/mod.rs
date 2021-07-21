@@ -95,35 +95,26 @@ impl Safe {
         let link = nrs_map.update(name, link, default, hard_link)?;
         let mut processed_entries = ProcessedEntries::new();
         processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
-
         debug!("The new NRS Map: {:?}", nrs_map);
-        if !dry_run {
-            let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
-            let old_values: BTreeSet<EntryHash> = self
-                .fetch_multimap_values(&safe_url)
-                .await?
-                .iter()
-                .map(|(hash, _)| hash.to_owned())
-                .collect();
-            let entry = (
-                name.as_bytes().to_owned(),
-                nrs_map_xorurl.as_bytes().to_owned(),
-            );
-            self.multimap_insert(&xorurl, entry, old_values).await?;
 
-            // TODO rm old impl below kept as a reference
-            // Append new version of the NrsMap in the Public Sequence (NRS Map Container)
-            // self.safe_client
-            //     .append_to_sequence(
-            //         nrs_map_xorurl.as_bytes(),
-            //         safe_url.xorname(),
-            //         safe_url.type_tag(),
-            //         false,
-            //     )
-            //     .await?;
+        if dry_run {
+            return Ok((0, xorurl, processed_entries, nrs_map));
         }
 
-        Ok((version + 1, xorurl, processed_entries, nrs_map))
+        let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
+        let old_values: BTreeSet<EntryHash> = self
+            .fetch_multimap_values(&safe_url)
+            .await?
+            .iter()
+            .map(|(hash, _)| hash.to_owned())
+            .collect();
+        let entry = (
+            name.as_bytes().to_owned(),
+            nrs_map_xorurl.as_bytes().to_owned(),
+        );
+        let entry_hash = self.multimap_insert(&xorurl, entry, old_values).await?;
+
+        Ok((version, xorurl, processed_entries, nrs_map))
     }
 
     /// # Create a NrsMapContainer.
@@ -154,65 +145,43 @@ impl Safe {
         info!("Creating an NRS map");
         let (_, nrs_url) = validate_nrs_name(name)?;
         if self.nrs_map_container_get(&nrs_url).await.is_ok() {
-            Err(Error::ContentError(
+            return Err(Error::ContentError(
                 "NRS name already exists. Please use 'nrs add' command to add sub names to it"
                     .to_string(),
-            ))
-        } else {
-            let mut nrs_map = NrsMap::default();
-            let link = nrs_map.update(&name, link, default, hard_link)?;
-            let mut processed_entries = ProcessedEntries::new();
-            processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
-
-            debug!("The new NRS Map: {:?}", nrs_map);
-            if dry_run {
-                Ok(("".to_string(), processed_entries, nrs_map))
-            } else {
-                let nrs_xorname = SafeUrl::from_nrsurl(&nrs_url)?.xorname();
-                debug!("XorName for \"{:?}\" is \"{:?}\"", &nrs_url, &nrs_xorname);
-
-                // Store the serialised NrsMap in a Public Blob
-                let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
-
-                // Create a new multimap
-                let xorurl = self
-                    .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
-                    .await?;
-
-                // Store the NRS map in the multimap
-                let entry = (
-                    name.as_bytes().to_owned(),
-                    nrs_map_xorurl.as_bytes().to_owned(),
-                );
-                let _ = self
-                    .multimap_insert(&xorurl, entry, BTreeSet::new())
-                    .await?;
-
-                // TODO rm old impl below kept as a reference
-                // // Store the NrsMapContainer in a Public Sequence, putting the
-                // // serialised NrsMap XOR-URL as the first entry value
-                // let xorname = self
-                //     .safe_client
-                //     .store_sequence(
-                //         nrs_map_xorurl.as_bytes(),
-                //         Some(nrs_xorname),
-                //         NRS_MAP_TYPE_TAG,
-                //         None,
-                //         false,
-                //     )
-                //     .await?;
-                //
-                // let xorurl = SafeUrl::encode_sequence_data(
-                //     xorname,
-                //     NRS_MAP_TYPE_TAG,
-                //     SafeContentType::NrsMapContainer,
-                //     self.xorurl_base,
-                //     false,
-                // )?;
-
-                Ok((xorurl, processed_entries, nrs_map))
-            }
+            ));
         }
+
+        let mut nrs_map = NrsMap::default();
+        let link = nrs_map.update(&name, link, default, hard_link)?;
+        let mut processed_entries = ProcessedEntries::new();
+        processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
+        debug!("The new NRS Map: {:?}", nrs_map);
+
+        if dry_run {
+            return Ok(("".to_string(), processed_entries, nrs_map));
+        }
+
+        let nrs_xorname = SafeUrl::from_nrsurl(&nrs_url)?.xorname();
+        debug!("XorName for \"{:?}\" is \"{:?}\"", &nrs_url, &nrs_xorname);
+
+        // Store the serialised NrsMap in a Public Blob
+        let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
+
+        // Create a new multimap
+        let xorurl = self
+            .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
+            .await?;
+
+        // Store the NRS map in the multimap
+        let entry = (
+            name.as_bytes().to_owned(),
+            nrs_map_xorurl.as_bytes().to_owned(),
+        );
+        let _ = self
+            .multimap_insert(&xorurl, entry, BTreeSet::new())
+            .await?;
+
+        Ok((xorurl, processed_entries, nrs_map))
     }
 
     pub async fn nrs_map_container_remove(
@@ -234,29 +203,29 @@ impl Safe {
             (CONTENT_DELETED_SIGN.to_string(), removed_link),
         );
 
-        debug!("Removing from multimap");
-        if !dry_run {
-            let old_values: BTreeSet<EntryHash> = self
-                .fetch_multimap_values(&safe_url)
-                .await?
-                .iter()
-                .map(|(hash, _)| hash.to_owned())
-                .collect();
-            self.multimap_remove(&xorurl, old_values).await?;
-
-            // TODO rm old impl below kept as a reference
-            // let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
-            // self.safe_client
-            //     .append_to_sequence(
-            //         nrs_map_xorurl.as_bytes(),
-            //         safe_url.xorname(),
-            //         safe_url.type_tag(),
-            //         false,
-            //     )
-            //     .await?;
+        if dry_run {
+            return Ok((version, xorurl, processed_entries, nrs_map));
         }
 
-        Ok((version + 1, xorurl, processed_entries, nrs_map))
+        debug!("Removing from multimap");
+        let old_values: BTreeSet<EntryHash> = self
+            .fetch_multimap_values(&safe_url)
+            .await?
+            .iter()
+            .map(|(hash, _)| hash.to_owned())
+            .collect();
+
+        // TODO use remove
+        // self.multimap_remove(&xorurl, old_values).await?;
+        // tmp retro-compatible workaround with insert
+        let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
+        let entry = (
+            name.as_bytes().to_owned(),
+            nrs_map_xorurl.as_bytes().to_owned(),
+        );
+        let entry_hash = self.multimap_insert(&xorurl, entry, old_values).await?;
+
+        Ok((version, xorurl, processed_entries, nrs_map))
     }
 
     /// # Fetch an existing NrsMapContainer.
@@ -296,35 +265,6 @@ impl Safe {
                 safe_url.xorname()
             ))),
         };
-
-        // TODO rm old impl below kept as a reference
-        // Check if the URL specified a specific version of the content or simply the latest available
-        // let data = match safe_url.content_version() {
-        //     None => {
-        //         self.safe_client
-        //             .sequence_get_last_entry(safe_url.xorname(), NRS_MAP_TYPE_TAG, false)
-        //             .await
-        //     }
-        //     Some(content_version) => {
-        //         let serialised_nrs_map = self
-        //             .safe_client
-        //             .sequence_get_entry(
-        //                 safe_url.xorname(),
-        //                 NRS_MAP_TYPE_TAG,
-        //                 content_version,
-        //                 false,
-        //             )
-        //             .await
-        //             .map_err(|_| {
-        //                 Error::VersionNotFound(format!(
-        //                     "Version '{}' is invalid for NRS Map Container found at \"{}\"",
-        //                     content_version, url,
-        //                 ))
-        //             })?;
-        //
-        //         Ok((content_version, serialised_nrs_map))
-        //     }
-        // };
 
         match data {
             Ok((version, nrs_map_xorurl_bytes)) => {
