@@ -3229,9 +3229,8 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "502f26626811e30581f6cb80ee588ccc709f8e490d14a4363f4b16f5d24cd7e2"
+version = "0.27.0"
+source = "git+https://github.com/jacderida/self_update.git?branch=github_download_json_parsing#dca30efd757eb35d333f4424a3c33083bdf3796d"
 dependencies = [
  "either",
  "flate2",
@@ -3489,7 +3488,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.33.0"
+version = "0.33.2"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -3516,7 +3515,7 @@ dependencies = [
  "rand 0.7.3",
  "relative-path",
  "reqwest 0.11.4",
- "self_update 0.23.0",
+ "self_update 0.27.0",
  "serde",
  "serde_json",
  "serde_yaml",

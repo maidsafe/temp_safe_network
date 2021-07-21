@@ -8,7 +8,7 @@
 // Software.
 
 #[cfg(feature = "self-update")]
-use super::helpers::download_from_s3_and_install_bin;
+use super::helpers::download_and_install_github_release_asset;
 use anyhow::{anyhow, bail, Context, Result};
 use log::debug;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -105,7 +105,7 @@ pub fn node_install(_vault_path: Option<PathBuf>) -> Result<()> {
 pub fn node_install(node_path: Option<PathBuf>) -> Result<()> {
     let target_path = get_node_bin_path(node_path)?;
     let _ =
-        download_from_s3_and_install_bin(target_path, "sn-node", "sn_node", SN_NODE_EXECUTABLE)?;
+        download_and_install_github_release_asset(target_path, SN_NODE_EXECUTABLE, "safe_network")?;
     Ok(())
 }
 

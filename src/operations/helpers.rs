@@ -17,23 +17,27 @@ use std::{
     path::PathBuf,
 };
 
-pub fn download_from_s3_and_install_bin(
+pub fn download_and_install_github_release_asset(
     target_path: PathBuf,
-    bucket: &str,
-    asset_prefix: &str,
     exec_file_name: &str,
+    repo_name: &str,
 ) -> Result<String> {
     let target = get_target();
-    let available_releases = self_update::backends::s3::Update::configure()
-        .bucket_name(bucket)
+    let updater = self_update::backends::github::Update::configure()
+        .repo_owner("maidsafe")
+        .repo_name(&repo_name)
         .target(&target)
-        .asset_prefix(asset_prefix)
-        .region("eu-west-2")
-        .bin_name("")
-        .current_version("")
+        .bin_name(&exec_file_name)
+        .current_version(env!("CARGO_PKG_VERSION"))
         .build()
-        .context("Error when preparing to fetch the list of releases")?;
-    download_and_install_bin(target_path, &target, available_releases, exec_file_name)
+        .context(format!(
+            "Error fetching list of releases for maidsafe/{} repository",
+            repo_name
+        ))?;
+    let release = updater
+        .get_latest_release()
+        .context("Failed to find a release available to install")?;
+    download_and_install_bin(target_path, &target, release, exec_file_name)
 }
 
 // Private helpers
@@ -52,19 +56,15 @@ fn get_target() -> String {
 fn download_and_install_bin(
     target_path: PathBuf,
     target: &str,
-    available_releases: Box<dyn self_update::update::ReleaseUpdate>,
+    release: self_update::update::Release,
     exec_file_name: &str,
 ) -> Result<String> {
-    let latest_release = available_releases
-        .get_latest_release()
-        .context("Failed to find a release available to install")?;
-
     println!(
         "Latest release found: {} v{}",
-        latest_release.name, latest_release.version
+        release.name, release.version
     );
     // get the corresponding asset from the release
-    let asset = latest_release.asset_for(&target).ok_or_else(|| {
+    let asset = release.asset_for(&target).ok_or_else(|| {
         anyhow!(
             "No asset found in latest release for the target platform {}",
             target
