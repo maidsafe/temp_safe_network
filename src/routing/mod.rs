@@ -25,6 +25,7 @@
 // ############################################################################
 pub use self::error::AggregatorError;
 pub use self::error::ProposalError;
+pub(crate) use self::section::section_keys::SectionKeyShare;
 pub use self::{
     cache::Cache,
     error::{Error, Result},

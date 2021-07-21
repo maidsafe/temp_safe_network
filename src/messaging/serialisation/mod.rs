@@ -61,7 +61,7 @@ pub enum NodeMsgAuthority {
     /// Authority of a single peer.
     Node(Authority<NodeSigned>),
     /// Authority of a single peer that uses it's BLS Keyshare to sign the message.
-    BlsShare(BlsShareSigned),
+    BlsShare(Authority<BlsShareSigned>),
     /// Authority of a whole section.
     Section(SectionSigned),
 }

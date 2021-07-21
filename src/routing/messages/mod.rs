@@ -10,9 +10,8 @@ mod msg_authority;
 
 pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
-    node::{NodeMsg, SigShare},
-    BlsShareSigned, DataSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority, NodeSigned,
-    SectionSigned, WireMsg,
+    node::NodeMsg, BlsShareSigned, DataSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority,
+    NodeSigned, SectionSigned, WireMsg,
 };
 use crate::routing::{
     ed25519::Verifier,
@@ -138,10 +137,10 @@ impl WireMsgUtils for WireMsg {
                 MessageId::from_content(&node_auth.signature).unwrap_or_default(),
                 MsgKind::NodeSignedMsg(node_auth.into_inner()),
             ),
-            NodeMsgAuthority::BlsShare(bls_share_signed) => (
-                MessageId::from_content(&bls_share_signed.sig_share.signature_share.0)
+            NodeMsgAuthority::BlsShare(bls_share_auth) => (
+                MessageId::from_content(&bls_share_auth.sig_share.signature_share.0)
                     .unwrap_or_default(),
-                MsgKind::NodeBlsShareSignedMsg(bls_share_signed),
+                MsgKind::NodeBlsShareSignedMsg(bls_share_auth.into_inner()),
             ),
             NodeMsgAuthority::Section(section_signed) => (
                 MessageId::from_content(&section_signed.sig.signature).unwrap_or_default(),
@@ -165,18 +164,12 @@ impl WireMsgUtils for WireMsg {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let signature_share = key_share.secret_key_share.sign(&msg_payload);
-        let sig_share = SigShare {
-            public_key_set: key_share.public_key_set.clone(),
-            index: key_share.index,
-            signature_share,
-        };
-
-        let msg_authority = NodeMsgAuthority::BlsShare(BlsShareSigned {
+        let msg_authority = NodeMsgAuthority::BlsShare(BlsShareSigned::authorize(
+            src_section_pk,
             src_name,
-            sig_share,
-            section_pk: src_section_pk,
-        });
+            key_share,
+            &msg_payload,
+        ));
 
         Self::new_signed(msg_payload, msg_authority, dst)
     }

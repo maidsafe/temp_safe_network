@@ -162,7 +162,10 @@ impl WireMsg {
 
                 Ok(MessageType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
-                    msg_authority: NodeMsgAuthority::BlsShare(bls_share_signed),
+                    msg_authority: NodeMsgAuthority::BlsShare(Authority::verify(
+                        bls_share_signed,
+                        &self.payload,
+                    )?),
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })
