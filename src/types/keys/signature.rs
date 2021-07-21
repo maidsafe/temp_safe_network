@@ -18,7 +18,6 @@ use super::super::utils;
 use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::TryInto,
     fmt,
     hash::{Hash, Hasher},
 };
@@ -39,8 +38,7 @@ pub enum Signature {
     /// Ed25519 signature.
     Ed25519(
         #[debug(with = "Self::fmt_ed25519")]
-        #[serde(deserialize_with = "Signature::deserialize_ed25519")]
-        #[serde(serialize_with = "Signature::serialize_ed25519")]
+        #[serde(with = "serde_bytes")]
         ed25519_dalek::Signature,
     ),
     /// BLS signature.
@@ -72,34 +70,6 @@ impl Signature {
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
         write!(f, "Signature({:0.10})", HexFmt(sig))
-    }
-
-    // ed25519::Signature has an inefficient encoding, so we override to force a byte array encoding
-    pub(crate) fn deserialize_ed25519<'de, D>(
-        deserializer: D,
-    ) -> Result<ed25519_dalek::Signature, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let bytes: Vec<u8> = serde_bytes::deserialize(deserializer)?;
-        let bytes_len = bytes.len();
-
-        let bytes = bytes
-            .try_into()
-            .map_err(|_| serde::de::Error::invalid_length(bytes_len, &"a 64-byte array"))?;
-
-        Ok(ed25519_dalek::Signature::new(bytes))
-    }
-
-    // ed25519::Signature has an inefficient encoding, so we override to force a byte array encoding
-    pub(crate) fn serialize_ed25519<S>(
-        signature: &ed25519_dalek::Signature,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serde_bytes::serialize(signature.as_ref(), serializer)
     }
 }
 
