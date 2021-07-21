@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    node::Peer, BlsShareSigned, NodeMsgAuthority, NodeSigned, SectionSigned, SrcLocation,
-};
+use crate::messaging::{node::Peer, BlsShareSigned, NodeMsgAuthority, SectionSigned, SrcLocation};
 use crate::routing::{
     ed25519::{self},
     error::{Error, Result},
@@ -34,13 +32,9 @@ pub(crate) trait NodeMsgAuthorityUtils {
 impl NodeMsgAuthorityUtils for NodeMsgAuthority {
     fn src_location(&self) -> SrcLocation {
         match self {
-            NodeMsgAuthority::Node(NodeSigned {
-                public_key,
-                section_pk,
-                ..
-            }) => SrcLocation::Node {
-                name: ed25519::name(public_key),
-                section_pk: *section_pk,
+            NodeMsgAuthority::Node(node_auth) => SrcLocation::Node {
+                name: ed25519::name(&node_auth.public_key),
+                section_pk: node_auth.section_pk,
             },
             NodeMsgAuthority::BlsShare(BlsShareSigned {
                 src_name,
@@ -63,7 +57,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
 
     fn name(&self) -> XorName {
         match self {
-            NodeMsgAuthority::Node(NodeSigned { public_key, .. }) => ed25519::name(public_key),
+            NodeMsgAuthority::Node(node_auth) => ed25519::name(&node_auth.public_key),
             NodeMsgAuthority::BlsShare(BlsShareSigned { src_name, .. }) => *src_name,
             NodeMsgAuthority::Section(SectionSigned { src_name, .. }) => *src_name,
         }
@@ -72,8 +66,8 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
     // If this location is `Node`, returns the corresponding `Peer` with `addr`. Otherwise error.
     fn peer(&self, addr: SocketAddr) -> Result<Peer> {
         match self {
-            NodeMsgAuthority::Node(NodeSigned { public_key, .. }) => {
-                Ok(Peer::new(ed25519::name(public_key), addr))
+            NodeMsgAuthority::Node(node_auth) => {
+                Ok(Peer::new(ed25519::name(&node_auth.public_key), addr))
             }
             NodeMsgAuthority::Section(_) | NodeMsgAuthority::BlsShare(_) => {
                 Err(Error::InvalidSrcLocation)

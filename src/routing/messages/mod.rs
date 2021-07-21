@@ -15,7 +15,7 @@ use crate::messaging::{
     SectionSigned, WireMsg,
 };
 use crate::routing::{
-    ed25519::{self, Verifier},
+    ed25519::Verifier,
     error::{Error, Result},
     node::Node,
     section::SectionKeyShare,
@@ -126,6 +126,7 @@ impl WireMsgUtils for WireMsg {
     }
 
     /// Creates a signed message where signature is assumed valid.
+    // TODO: update to "known to be valid" once all `NodeMsgAuthority` variants have authority
     fn new_signed(
         payload: Bytes,
         node_msg_authority: NodeMsgAuthority,
@@ -133,9 +134,9 @@ impl WireMsgUtils for WireMsg {
     ) -> Result<WireMsg, Error> {
         // Create message id from msg authority signature
         let (id, msg_kind) = match node_msg_authority {
-            NodeMsgAuthority::Node(node_signed) => (
-                MessageId::from_content(&node_signed.signature).unwrap_or_default(),
-                MsgKind::NodeSignedMsg(node_signed),
+            NodeMsgAuthority::Node(node_auth) => (
+                MessageId::from_content(&node_auth.signature).unwrap_or_default(),
+                MsgKind::NodeSignedMsg(node_auth.into_inner()),
             ),
             NodeMsgAuthority::BlsShare(bls_share_signed) => (
                 MessageId::from_content(&bls_share_signed.sig_share.signature_share.0)
@@ -190,12 +191,11 @@ impl WireMsgUtils for WireMsg {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let signature = ed25519::sign(&msg_payload, &node.keypair);
-        let msg_authority = NodeMsgAuthority::Node(NodeSigned {
-            public_key: node.keypair.public,
-            section_pk: src_section_pk,
-            signature,
-        });
+        let msg_authority = NodeMsgAuthority::Node(NodeSigned::authorize(
+            src_section_pk,
+            &node.keypair,
+            &msg_payload,
+        ));
 
         WireMsg::new_signed(msg_payload, msg_authority, dst)
     }

@@ -8,8 +8,8 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, DstLocation, Error, MessageId,
-    MessageType, MsgKind, NodeMsgAuthority, Result,
+    data::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, Authority, DstLocation, Error,
+    MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -144,7 +144,10 @@ impl WireMsg {
 
                 Ok(MessageType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
-                    msg_authority: NodeMsgAuthority::Node(node_signed),
+                    msg_authority: NodeMsgAuthority::Node(Authority::verify(
+                        node_signed,
+                        &self.payload,
+                    )?),
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })
@@ -248,7 +251,6 @@ mod tests {
     };
     use anyhow::Result;
     use bls::SecretKey;
-    use ed25519_dalek::Signer;
     use rand::rngs::OsRng;
     use xor_name::XorName;
 
@@ -358,13 +360,9 @@ mod tests {
         });
 
         let payload = WireMsg::serialize_msg_payload(&node_msg)?;
-        let node_signed = NodeSigned {
-            section_pk: src_section_pk,
-            public_key: src_node_keypair.public,
-            signature: src_node_keypair.sign(&payload),
-        };
+        let node_auth = NodeSigned::authorize(src_section_pk, &src_node_keypair, &payload);
 
-        let msg_kind = MsgKind::NodeSignedMsg(node_signed.clone());
+        let msg_kind = MsgKind::NodeSignedMsg(node_auth.clone().into_inner());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
@@ -382,7 +380,7 @@ mod tests {
             deserialized.into_message()?,
             MessageType::Node {
                 msg_id: wire_msg.msg_id(),
-                msg_authority: NodeMsgAuthority::Node(node_signed),
+                msg_authority: NodeMsgAuthority::Node(node_auth),
                 dst_location,
                 msg: node_msg,
             }

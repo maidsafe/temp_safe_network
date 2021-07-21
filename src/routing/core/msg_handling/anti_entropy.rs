@@ -300,12 +300,11 @@ mod tests {
             let msg_payload = WireMsg::serialize_msg_payload(&node_msg)
                 .context("Failed to create a test NodeMsg")?;
 
-            let signature = ed25519::sign(&msg_payload, &sender.keypair);
-            let node_msg_authority = NodeMsgAuthority::Node(NodeSigned {
-                public_key: sender.keypair.public,
+            let node_msg_authority = NodeMsgAuthority::Node(NodeSigned::authorize(
                 section_pk,
-                signature,
-            });
+                &sender.keypair,
+                &msg_payload,
+            ));
 
             Ok((node_msg, node_msg_authority))
         }
