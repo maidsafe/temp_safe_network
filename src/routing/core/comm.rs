@@ -162,7 +162,7 @@ impl Comm {
         &self,
         recipients: &[(XorName, SocketAddr)],
         delivery_group_size: usize,
-        mut wire_msg: WireMsg,
+        wire_msg: WireMsg,
     ) -> Result<SendStatus> {
         trace!(
             "Sending message to {} of {:?}",
@@ -183,10 +183,6 @@ impl Comm {
         if recipients.is_empty() {
             return Err(Error::EmptyRecipientList);
         }
-
-        // Use the first Xor address recipient to represent the destination section.
-        // So that only one copy of MessageType need to be constructed.
-        wire_msg.set_dst_xorname(recipients[0].0);
 
         let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
 
@@ -322,7 +318,7 @@ mod tests {
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
 
-        let mut original_message = new_section_info_message()?;
+        let original_message = new_section_info_message()?;
 
         let status = comm
             .send(
@@ -335,7 +331,6 @@ mod tests {
         assert_matches!(status, SendStatus::AllRecipients);
 
         if let Some(bytes) = peer0.rx.recv().await {
-            original_message.set_dst_xorname(peer0._name);
             assert_eq!(WireMsg::from(bytes)?, original_message.clone());
         }
 
@@ -354,7 +349,7 @@ mod tests {
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
 
-        let mut original_message = new_section_info_message()?;
+        let original_message = new_section_info_message()?;
         let status = comm
             .send(
                 &[(peer0._name, peer0.addr), (peer1._name, peer1.addr)],
@@ -366,7 +361,6 @@ mod tests {
         assert_matches!(status, SendStatus::AllRecipients);
 
         if let Some(bytes) = peer0.rx.recv().await {
-            original_message.set_dst_xorname(peer0._name);
             assert_eq!(WireMsg::from(bytes)?, original_message);
         }
 
@@ -423,7 +417,7 @@ mod tests {
         let invalid_addr = get_invalid_addr().await?;
         let name = XorName::random();
 
-        let mut message = new_section_info_message()?;
+        let message = new_section_info_message()?;
         let _ = comm
             .send(
                 &[(name, invalid_addr), (peer._name, peer.addr)],
@@ -432,9 +426,7 @@ mod tests {
             )
             .await?;
 
-        // Using first name of the recipients to represent section_name.
         if let Some(bytes) = peer.rx.recv().await {
-            message.set_dst_xorname(name);
             assert_eq!(WireMsg::from(bytes)?, message);
         }
         Ok(())
@@ -455,7 +447,7 @@ mod tests {
         let invalid_addr = get_invalid_addr().await?;
         let name = XorName::random();
 
-        let mut message = new_section_info_message()?;
+        let message = new_section_info_message()?;
         let status = comm
             .send(
                 &[(name, invalid_addr), (peer._name, peer.addr)],
@@ -469,9 +461,7 @@ mod tests {
             SendStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_addr]
         );
 
-        // Using first name of the recipients to represent section_name.
         if let Some(bytes) = peer.rx.recv().await {
-            message.set_dst_xorname(name);
             assert_eq!(WireMsg::from(bytes)?, message);
         }
         Ok(())
