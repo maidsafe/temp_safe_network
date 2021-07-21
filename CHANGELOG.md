@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.12.0](https://github.com/maidsafe/safe_network/compare/v0.11.0...v0.12.0) (2021-07-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messaging:** The `MessageType::Client` variant's `client_signed`
+field has been removed, and replaced with `client_auth`.
+
+### Features
+
+* **messaging:** Add a `ClientAuthority` 'proof' struct ([df1f2bf](https://github.com/maidsafe/safe_network/commit/df1f2bf24aab5b36a470353d19335affdc98ffc0))
+
+
+### Bug Fixes
+
+* **node:** Ensure storage write op authority is verified ([7137bfb](https://github.com/maidsafe/safe_network/commit/7137bfbc888af14624ee26a13e2d48d43a8c4c00))
+* **node:** Stores always verify client authority ([dcf80be](https://github.com/maidsafe/safe_network/commit/dcf80be46f1c3258eedbbdd478314a6bac63fff7))
+
+
+* **messaging:** Use `ClientAuthority` in `MessageType` ([2c2376b](https://github.com/maidsafe/safe_network/commit/2c2376b44ff5e18b4b30a54aec6a45478cbb38fa))
+
 ## [0.11.0](https://github.com/maidsafe/safe_network/compare/v0.10.1...v0.11.0) (2021-07-21)
 
 
