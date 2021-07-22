@@ -29,7 +29,6 @@ client = ["qp2p/no-igd"]
 testing = [ ]
 chaos = [ ]
 always-joinable = [ ]
-client = [ "qp2p/no-igd"]
 
 [dependencies]
 base64 = "~0.10.1"
