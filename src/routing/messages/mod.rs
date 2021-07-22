@@ -10,11 +10,10 @@ mod msg_authority;
 
 pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
-    node::NodeMsg, BlsShareSigned, DataSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority,
-    NodeSigned, SectionSigned, WireMsg,
+    node::NodeMsg, BlsShareSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority, NodeSigned,
+    WireMsg,
 };
 use crate::routing::{
-    ed25519::Verifier,
     error::{Error, Result},
     node::Node,
     section::SectionKeyShare,
@@ -25,9 +24,6 @@ use xor_name::XorName;
 
 // Utilities for WireMsg.
 pub(crate) trait WireMsgUtils {
-    /// Verify this message is properly signed.
-    fn check_signature(&self) -> Result<()>;
-
     /// Return 'true' if the message kind is MsgKind::DataMsg or MsgKind::SectionInfoMsg
     fn is_client_msg_kind(&self) -> bool;
 
@@ -57,65 +53,6 @@ pub(crate) trait WireMsgUtils {
 }
 
 impl WireMsgUtils for WireMsg {
-    /// Verify this message is properly signed.
-    fn check_signature(&self) -> Result<()> {
-        match self.msg_kind() {
-            MsgKind::SectionInfoMsg => {}
-            MsgKind::DataMsg(DataSigned {
-                public_key,
-                signature,
-            }) => {
-                if public_key.verify(signature, &self.payload).is_err() {
-                    error!("Failed signature: {:?}", self);
-                    return Err(Error::FailedSignature);
-                }
-            }
-            MsgKind::NodeSignedMsg(NodeSigned {
-                public_key,
-                signature,
-                ..
-            }) => {
-                if public_key.verify(&self.payload, signature).is_err() {
-                    error!("Failed signature: {:?}", self);
-                    return Err(Error::FailedSignature);
-                }
-            }
-            MsgKind::NodeBlsShareSignedMsg(BlsShareSigned {
-                sig_share,
-                section_pk,
-                ..
-            }) => {
-                // Signed chain is required for accumulation at destination.
-                if sig_share.public_key_set.public_key() != *section_pk {
-                    error!(
-                        "Signed share public key doesn't match signed chain last key: {:?}",
-                        self
-                    );
-                    return Err(Error::InvalidMessage);
-                }
-
-                if !sig_share.verify(&self.payload) {
-                    error!("Failed signature: {:?}", self);
-                    return Err(Error::FailedSignature);
-                }
-            }
-            MsgKind::SectionSignedMsg(SectionSigned {
-                sig, section_pk, ..
-            }) => {
-                // Signed chain is required for section-src messages.
-                if !section_pk.verify(&sig.signature, &self.payload) {
-                    error!(
-                        "Failed signature: {:?} (Section PK: {:?})",
-                        self, section_pk
-                    );
-                    return Err(Error::FailedSignature);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Return 'true' if the message kind is MsgKind::DataMsg or MsgKind::SectionInfoMsg
     fn is_client_msg_kind(&self) -> bool {
         matches!(
