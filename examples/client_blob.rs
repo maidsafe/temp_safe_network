@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     println!("Reading network bootstrap information...");
-    let bootstrap_contacts = read_network_conn_info()?;
+    let bootstrap_contacts = read_network_conn_info().await?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_contacts);
     let client = Client::new(None, None, Some(bootstrap_contacts), DEFAULT_QUERY_TIMEOUT).await?;

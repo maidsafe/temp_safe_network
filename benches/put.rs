@@ -15,7 +15,7 @@ use tokio::runtime::Runtime;
 
 /// This bench requires a network already set up
 async fn put_kbs(amount: usize) -> Result<(), Error> {
-    let contact_info = read_network_conn_info().unwrap();
+    let contact_info = read_network_conn_info().await.unwrap();
     let size = 1024 * amount;
     let data = generate_random_vector(size);
     let client = Client::new(None, None, Some(contact_info), DEFAULT_QUERY_TIMEOUT).await?;
