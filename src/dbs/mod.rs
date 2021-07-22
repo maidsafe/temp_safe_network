@@ -24,7 +24,7 @@ use pickledb::{PickleDb, PickleDbDumpPolicy};
 use std::path::Path;
 use tokio::fs;
 ///
-pub(crate) async fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
+pub(crate) async fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
     db_name: N,
 ) -> Result<PickleDb> {
@@ -33,7 +33,7 @@ pub(crate) async fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
         Ok(db) => Ok(db),
         Err(_) => {
             fs::create_dir_all(db_dir).await?;
-            let mut db = PickleDb::new_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
+            let mut db = PickleDb::new_bin(db_path.clone(), PickleDbDumpPolicy::PeriodicDump(tokio::time::Duration::from_secs(5)));
 
             // dump is needed to actually write the db to disk.
             db.dump()?;

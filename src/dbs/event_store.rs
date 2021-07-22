@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{new_auto_dump_db, Error, Result, ToDbKey};
+use super::{new_db, Error, Result, ToDbKey};
 use pickledb::PickleDb;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -47,7 +47,7 @@ where
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         let db_path = db_dir.join(db_name.clone());
         Ok(Self {
-            db: new_auto_dump_db(db_dir, db_name).await?,
+            db: new_db(db_dir, db_name).await?,
             db_path,
             _phantom: PhantomData::default(),
         })
