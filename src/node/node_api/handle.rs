@@ -87,6 +87,12 @@ impl Node {
                 removed,
                 remaining,
             } => {
+                if self.network_api.is_elder().await {
+                    trace!("Nothing to do on AdultsChanged, we are an Elder");
+                    // we're an elder so nothing to do here.
+                    return Ok(NodeTask::None)
+                }
+
                 let our_name = self.our_name().await;
                 let adult_role = self.as_adult().await?;
                 let handle = tokio::spawn(async move {
