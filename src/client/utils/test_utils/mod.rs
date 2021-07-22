@@ -14,14 +14,14 @@ use crate::types::Keypair;
 use anyhow::{anyhow, Context, Result as AnyhowResult};
 use dirs_next::home_dir;
 use std::path::Path;
-use std::{collections::HashSet, fs::File, io::BufReader, net::SocketAddr};
+use std::{collections::HashSet, net::SocketAddr};
 #[cfg(test)]
 pub use test_client::{create_test_client, create_test_client_with, init_logger};
 
 use exponential_backoff::Backoff;
 use std::future::Future;
 use std::time::Duration;
-
+use tokio::fs;
 ///
 pub type ClientResult<T> = Result<T, Error>;
 
@@ -76,18 +76,18 @@ pub fn gen_ed_keypair() -> Keypair {
 }
 
 /// Read local network bootstrapping/connection information
-pub fn read_network_conn_info() -> AnyhowResult<HashSet<SocketAddr>> {
+pub async fn read_network_conn_info() -> AnyhowResult<HashSet<SocketAddr>> {
     let user_dir = home_dir().ok_or_else(|| anyhow!("Could not fetch home directory"))?;
     let conn_info_path = user_dir.join(Path::new(GENESIS_CONN_INFO_FILEPATH));
 
-    let file = File::open(&conn_info_path).with_context(|| {
+    let file = fs::read(&conn_info_path).await.with_context(|| {
         format!(
             "Failed to open node connection information file at '{}'",
             conn_info_path.display(),
         )
     })?;
-    let reader = BufReader::new(file);
-    let contacts: HashSet<SocketAddr> = serde_json::from_reader(reader).with_context(|| {
+
+    let contacts: HashSet<SocketAddr> = serde_json::from_slice(&file).with_context(|| {
         format!(
             "Failed to parse content of node connection information file at '{}'",
             conn_info_path.display(),

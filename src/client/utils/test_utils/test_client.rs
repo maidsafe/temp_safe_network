@@ -41,7 +41,7 @@ pub async fn create_test_client_with(
 ) -> Result<Client> {
     init_logger();
     let timeout = timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
-    let contact_info = read_network_conn_info()?;
+    let contact_info = read_network_conn_info().await?;
     let client = Client::new(optional_keypair.clone(), None, Some(contact_info), timeout).await?;
 
     Ok(client)
