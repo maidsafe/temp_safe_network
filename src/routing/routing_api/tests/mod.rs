@@ -1627,8 +1627,6 @@ async fn handle_elders_update() -> Result<()> {
             _ => continue,
         };
 
-        assert!(wire_msg.check_signature().is_ok());
-
         let (section, msg_authority) = match wire_msg.into_message() {
             Ok(MessageType::Node {
                 msg: NodeMsg::Sync { section, .. },

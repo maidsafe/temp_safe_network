@@ -60,15 +60,6 @@ impl Core {
             }
         }
 
-        // Now check the signature of the msg authority is valid
-        if let Err(err) = wire_msg.check_signature() {
-            error!(
-                "Discarding message received ({:?}) due to invalid signature: {:?}",
-                msg_id, err
-            );
-            return Ok(vec![]);
-        }
-
         // We can now deserialize the payload of the incoming message
         let payload = wire_msg.payload.clone();
         let message_type = match wire_msg.into_message() {
