@@ -19,7 +19,7 @@ use crate::{
             CmdError, DataCmd, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead,
             RegisterWrite,
         },
-        DataAuthority, EndUser, MessageId,
+        Authority, DataSigned, EndUser, MessageId,
     },
     types::DataAddress,
 };
@@ -112,7 +112,7 @@ impl RegisterStorage {
         msg_id: MessageId,
         origin: EndUser,
         write: RegisterWrite,
-        data_auth: DataAuthority,
+        data_auth: Authority<DataSigned>,
     ) -> Result<NodeDuty> {
         let required_space = std::mem::size_of::<RegisterCmd>() as u64;
         if !self.used_space.can_consume(required_space).await {
@@ -120,13 +120,13 @@ impl RegisterStorage {
         }
         let op = RegisterCmd {
             write,
-            client_sig: data_auth.to_signed(),
+            client_sig: data_auth.clone().into_inner(),
         };
         let write_result = self.apply(op, data_auth).await;
         self.ok_or_error(write_result, msg_id, origin).await
     }
 
-    async fn apply(&self, op: RegisterCmd, data_auth: DataAuthority) -> Result<()> {
+    async fn apply(&self, op: RegisterCmd, data_auth: Authority<DataSigned>) -> Result<()> {
         let RegisterCmd { write, .. } = op.clone();
 
         let address = *write.address();
@@ -162,8 +162,8 @@ impl RegisterStorage {
                             }
                             // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
                             // register.check_permission(action, Some(client_sig.public_key))?;
-                            if data_auth.public_key() != &entry.state.owner() {
-                                Err(Error::InvalidOwner(*data_auth.public_key()))
+                            if data_auth.public_key != entry.state.owner() {
+                                Err(Error::InvalidOwner(data_auth.public_key))
                             } else {
                                 info!("Deleting Register");
                                 let _ = self.db.drop_tree(key)?;
@@ -225,7 +225,7 @@ impl RegisterStorage {
                 info!("Editing Register");
                 entry
                     .state
-                    .check_permissions(Action::Write, Some(*data_auth.public_key()))?;
+                    .check_permissions(Action::Write, Some(data_auth.public_key))?;
                 let result = entry.state.apply_op(reg_op).map_err(Error::NetworkData);
 
                 if result.is_ok() {

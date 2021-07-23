@@ -16,7 +16,7 @@ use crate::dbs::UsedSpace;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataExchange, DataMsg, DataQuery, ProcessMsg, QueryResponse},
     node::NodeMsg,
-    DataAuthority, DataSigned, DstLocation, EndUser, MessageId, WireMsg,
+    Authority, DataSigned, DstLocation, EndUser, MessageId, WireMsg,
 };
 
 use crate::node::{
@@ -99,7 +99,7 @@ impl Metadata {
         &mut self,
         cmd: DataCmd,
         id: MessageId,
-        data_auth: DataAuthority,
+        data_auth: Authority<DataSigned>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         self.elder_stores.write(cmd, id, data_auth, origin).await
@@ -201,8 +201,8 @@ fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUs
 }
 
 // TODO: verify earlier so that this isn't needed
-fn verify_op(data_signed: DataSigned, cmd: DataCmd) -> Result<DataAuthority> {
+fn verify_op(data_signed: DataSigned, cmd: DataCmd) -> Result<Authority<DataSigned>> {
     let message = DataMsg::Process(ProcessMsg::Cmd(cmd));
     let payload = WireMsg::serialize_msg_payload(&message)?;
-    Ok(data_signed.verify(&payload)?)
+    Ok(Authority::verify(data_signed, &payload)?)
 }

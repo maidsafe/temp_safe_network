@@ -21,7 +21,7 @@ mod sync;
 use super::Core;
 use crate::messaging::{
     node::{NodeMsg, Proposal},
-    DstLocation, MessageId, MessageType, NodeMsgAuthority, SectionSigned, WireMsg,
+    Authority, DstLocation, MessageId, MessageType, NodeMsgAuthority, SectionSigned, WireMsg,
 };
 use crate::routing::{
     core::AggregatorError,
@@ -203,7 +203,7 @@ impl Core {
                 // TODO: preserve the source bytes so we don't need to serialize again here, or else
                 // verify earlier.
                 let payload = WireMsg::serialize_msg_payload(&msg)?;
-                let data_auth = data_signed.verify(&payload)?;
+                let data_auth = Authority::verify(data_signed, &payload)?;
 
                 self.handle_client_msg_received(msg_id, msg, user, data_auth)
                     .await

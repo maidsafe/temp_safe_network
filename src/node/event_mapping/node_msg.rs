@@ -10,7 +10,7 @@ use super::{Mapping, MsgContext};
 use crate::messaging::{
     data::{DataCmd, DataMsg, ProcessMsg, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeQueryResponse},
-    DataAuthority, DataSigned, DstLocation, MessageId, SrcLocation, WireMsg,
+    Authority, DataSigned, DstLocation, MessageId, SrcLocation, WireMsg,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -167,9 +167,9 @@ fn verify_data_authority(
     origin: SrcLocation,
     data_signed: DataSigned,
     msg: ProcessMsg,
-) -> Result<DataAuthority, NodeDuty> {
+) -> Result<Authority<DataSigned>, NodeDuty> {
     WireMsg::serialize_msg_payload(&DataMsg::Process(msg))
-        .and_then(|payload| data_signed.verify(&payload))
+        .and_then(|payload| Authority::verify(data_signed, &payload))
         .map_err(|error| send_error(msg_id, origin, Error::Message(error), false))
 }
 

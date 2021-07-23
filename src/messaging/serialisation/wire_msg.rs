@@ -132,7 +132,7 @@ impl WireMsg {
 
                 Ok(MessageType::Client {
                     msg_id: self.header.msg_envelope.msg_id,
-                    data_auth: data_signed.verify(&self.payload)?,
+                    data_auth: Authority::verify(data_signed, &self.payload)?,
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })
@@ -251,7 +251,7 @@ mod tests {
         messaging::{
             data::{ChunkRead, DataMsg, DataQuery, ProcessMsg},
             node::{NodeCmd, NodeMsg},
-            DataSigned, MessageId, NodeSigned,
+            Authority, DataSigned, MessageId, NodeSigned,
         },
         types::{ChunkAddress, Keypair},
     };
@@ -418,7 +418,7 @@ mod tests {
             public_key: src_client_keypair.public_key(),
             signature: src_client_keypair.sign(&payload),
         };
-        let data_auth = data_signed.clone().verify(&payload).unwrap();
+        let data_auth = Authority::verify(data_signed.clone(), &payload).unwrap();
 
         let msg_kind = MsgKind::DataMsg(data_signed);
 
