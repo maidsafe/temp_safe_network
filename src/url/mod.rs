@@ -11,6 +11,7 @@
 
 mod errors;
 mod url_parts;
+mod version_hash;
 mod xorurl_media_types;
 
 use crate::types::register;
@@ -21,6 +22,7 @@ use std::fmt;
 use tracing::{info, trace, warn};
 use url::Url;
 use url_parts::NativeUrlParts;
+pub use version_hash::VersionHash;
 use xor_name::{XorName, XOR_NAME_LEN};
 use xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
 
@@ -235,15 +237,15 @@ pub struct NativeUrl {
     sub_names: String,          // "a.b" in "a.b.name"
     sub_names_vec: Vec<String>, // vec!["a", "b"] in "a.b.name"
     type_tag: u64,
-    scope: Scope,                   // See Scope
-    data_type: DataType,            // See DataType
-    content_type: ContentType,      // See ContentType
-    content_type_u16: u16,          // validated u16 id of content_type
-    path: String,                   // path, no separator, percent-encoded
-    query_string: String,           // query-string, no separator, url-encoded
-    fragment: String,               // fragment, no separator
-    content_version: Option<u64>,   // convenience for ?v=<version
-    native_url_type: NativeUrlType, // nrsurl or xorurl
+    scope: Scope,                         // See Scope
+    data_type: DataType,                  // See DataType
+    content_type: ContentType,            // See ContentType
+    content_type_u16: u16,                // validated u16 id of content_type
+    path: String,                         // path, no separator, percent-encoded
+    query_string: String,                 // query-string, no separator, url-encoded
+    fragment: String,                     // fragment, no separator
+    content_version: Option<VersionHash>, // convenience for ?v=<version
+    native_url_type: NativeUrlType,       // nrsurl or xorurl
 }
 
 /// This implementation performs semi-rigorous validation,
@@ -291,7 +293,7 @@ impl NativeUrl {
         sub_names: Option<Vec<String>>,
         query_string: Option<&str>,
         fragment: Option<&str>,
-        content_version: Option<u64>,
+        content_version: Option<VersionHash>,
     ) -> Result<Self> {
         let content_type_u16 = content_type.value()?;
 
@@ -679,7 +681,7 @@ impl NativeUrl {
     /// gets content version
     ///
     /// This is a shortcut method for getting the "?v=" query param.
-    pub fn content_version(&self) -> Option<u64> {
+    pub fn content_version(&self) -> Option<VersionHash> {
         self.content_version
     }
 
@@ -690,7 +692,7 @@ impl NativeUrl {
     /// # Arguments
     ///
     /// * `version` - u64 representing value of ?v=<val>
-    pub fn set_content_version(&mut self, version: Option<u64>) {
+    pub fn set_content_version(&mut self, version: Option<VersionHash>) {
         // Convert Option<u64> to Option<&str>
         let version_string: String;
         let v_option = match version {
@@ -993,7 +995,7 @@ impl NativeUrl {
         sub_names: Option<Vec<String>>,
         query_string: Option<&str>,
         fragment: Option<&str>,
-        content_version: Option<u64>,
+        content_version: Option<VersionHash>,
         base: XorUrlBase,
     ) -> Result<String> {
         let native_url = NativeUrl::new(
@@ -1117,9 +1119,9 @@ impl NativeUrl {
     // Use ::set_content_version() or ::set_query_key() instead.
     fn set_content_version_internal(&mut self, version_option: Option<&str>) -> Result<()> {
         if let Some(version_str) = version_option {
-            let version = version_str.parse::<u64>().map_err(|_e| {
+            let version = version_str.parse::<VersionHash>().map_err(|_e| {
                 let msg = format!(
-                    "{} param could not be parsed as u64. invalid: '{}'",
+                    "{} param could not be parsed as VersionHash. invalid: '{}'",
                     URL_VERSION_QUERY_NAME, version_str
                 );
                 Error::InvalidInput(msg)
