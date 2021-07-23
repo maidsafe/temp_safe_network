@@ -7,16 +7,16 @@ use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey as EdPublicKey, Signature as EdSignature};
 use xor_name::XorName;
 
-/// Authority of a client
+/// Authority of a network peer.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct ClientSigned {
-    /// Client public key.
+pub struct DataSigned {
+    /// Peer's public key.
     pub public_key: PublicKey,
-    /// Client signature.
+    /// Peer's signature.
     pub signature: Signature,
 }
 
-impl ClientSigned {
+impl DataSigned {
     /// Verify that the pair of `public_key` created `signature` over `payload`.
     ///
     /// The returned `Ok` variant represents a proof that the owner of `public_key` indeed signed
@@ -27,8 +27,8 @@ impl ClientSigned {
     }
 }
 
-/// A [`ClientAuthority`] can be converted back to a [`ClientSigned`], losing the 'proof' of validity.
-impl From<ClientAuthority> for ClientSigned {
+/// A [`ClientAuthority`] can be converted back to a [`DataSigned`], losing the 'proof' of validity.
+impl From<ClientAuthority> for DataSigned {
     fn from(signed: ClientAuthority) -> Self {
         Self {
             public_key: signed.public_key,
@@ -72,15 +72,15 @@ impl ClientAuthority {
         &self.public_key
     }
 
-    /// Create a [`ClientSigned`] from this authority by cloning the fields.
+    /// Create a [`DataSigned`] from this authority by cloning the fields.
     ///
     /// Since [`ClientAuthority`] cannot be serialized, it's sometimes necessary to convert back to
-    /// an unverified signature. Prefer [`ClientSigned::from`][1] if you don't need to retain the
+    /// an unverified signature. Prefer [`DataSigned::from`][1] if you don't need to retain the
     /// `ClientAuthority`, as this won't clone the fields.
     ///
-    /// [1]: ClientSigned#impl-From<ClientAuthority>
-    pub fn to_signed(&self) -> ClientSigned {
-        ClientSigned {
+    /// [1]: DataSigned#impl-From<ClientAuthority>
+    pub fn to_signed(&self) -> DataSigned {
+        DataSigned {
             public_key: self.public_key,
             signature: self.signature.clone(),
         }

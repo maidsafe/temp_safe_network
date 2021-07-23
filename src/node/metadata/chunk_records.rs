@@ -133,7 +133,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::New(chunk),
-                client_signed: client_auth.into(),
+                data_signed: client_auth.into(),
                 origin,
             }),
             targets: target_holders,
@@ -224,7 +224,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::DeletePrivate(address),
-                client_signed: client_auth.into(),
+                data_signed: client_auth.into(),
                 origin,
             }),
             targets,

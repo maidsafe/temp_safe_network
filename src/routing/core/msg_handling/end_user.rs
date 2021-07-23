@@ -112,7 +112,7 @@ impl Core {
             let node_msg = NodeMsg::ForwardDataMsg {
                 msg,
                 user,
-                client_signed: client_auth.into(),
+                data_signed: client_auth.into(),
             };
 
             let wire_msg = match WireMsg::single_src(

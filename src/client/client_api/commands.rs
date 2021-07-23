@@ -10,7 +10,7 @@ use super::Client;
 use crate::client::Error;
 use crate::messaging::{
     data::{DataCmd, DataMsg, ProcessMsg},
-    ClientSigned, WireMsg,
+    DataSigned, WireMsg,
 };
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
@@ -28,13 +28,13 @@ impl Client {
         signature: Signature,
     ) -> Result<(), Error> {
         debug!("Sending DataCmd: {:?}", cmd);
-        let client_signed = ClientSigned {
+        let data_signed = DataSigned {
             public_key: client_pk,
             signature,
         };
 
         self.session
-            .send_cmd(cmd, client_signed, serialised_cmd)
+            .send_cmd(cmd, data_signed, serialised_cmd)
             .await
     }
 

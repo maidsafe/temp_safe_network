@@ -118,7 +118,7 @@ pub struct SequenceCmd {
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the sequence's owner and permissions.
-    pub client_sig: crate::messaging::ClientSigned,
+    pub client_sig: crate::messaging::DataSigned,
 }
 
 /// [`Sequence`] write operations.

@@ -33,7 +33,7 @@ pub use section::Peer;
 pub use section::{Section, SectionPeers};
 pub use signed::{KeyedSig, SigShare};
 
-use crate::messaging::{data::DataMsg, ClientSigned, EndUser, MessageId, SectionAuthorityProvider};
+use crate::messaging::{data::DataMsg, DataSigned, EndUser, MessageId, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use itertools::Itertools;
@@ -46,14 +46,14 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
 pub enum NodeMsg {
-    /// Forward a client msg
+    /// Forward a data message.
     ForwardDataMsg {
         /// The msg
         msg: DataMsg,
         /// The origin
         user: EndUser,
-        /// Signature provided by the client
-        client_signed: ClientSigned,
+        /// Signature provided by the requester.
+        data_signed: DataSigned,
     },
     /// Inform other sections about our section or vice-versa.
     SectionKnowledge {

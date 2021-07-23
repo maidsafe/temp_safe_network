@@ -10,7 +10,7 @@ use super::Client;
 use crate::client::{connections::QueryResult, errors::Error};
 use crate::messaging::{
     data::{DataMsg, DataQuery, ProcessMsg},
-    ClientSigned, WireMsg,
+    DataSigned, WireMsg,
 };
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
@@ -28,13 +28,13 @@ impl Client {
         signature: Signature,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
-        let client_signed = ClientSigned {
+        let data_signed = DataSigned {
             public_key: client_pk,
             signature,
         };
 
         self.session
-            .send_query(query, client_signed, serialised_query)
+            .send_query(query, data_signed, serialised_query)
             .await
     }
 

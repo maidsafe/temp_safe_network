@@ -11,7 +11,7 @@ use crate::messaging::{
         ChunkRead, ChunkWrite, CmdError, DataCmd as NodeDataCmd, DataExchange,
         DataQuery as NodeDataQuery, Error, Result,
     },
-    ClientSigned, EndUser,
+    DataSigned, EndUser,
 };
 use crate::types::{Chunk, ChunkAddress, PublicKey, SectionElders, Signature};
 use serde::{Deserialize, Serialize};
@@ -25,8 +25,8 @@ pub enum NodeCmd {
     Metadata {
         /// The contianed command
         cmd: NodeDataCmd,
-        /// Client pk and signature
-        client_signed: ClientSigned,
+        /// Requester pk and signature
+        data_signed: DataSigned,
         /// Message source
         origin: EndUser,
     },
@@ -34,8 +34,8 @@ pub enum NodeCmd {
     Chunks {
         /// The contianed command
         cmd: ChunkWrite,
-        /// Client pk and signature
-        client_signed: ClientSigned,
+        /// Requester pk and signature
+        data_signed: DataSigned,
         /// Message source
         origin: EndUser,
     },
@@ -94,7 +94,7 @@ pub enum NodeQuery {
         /// The actual query message
         query: NodeDataQuery,
         /// Client signature
-        client_signed: ClientSigned,
+        data_signed: DataSigned,
         /// The user that has initiated this query
         origin: EndUser,
     },

@@ -11,7 +11,7 @@ mod msg_authority;
 pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
     node::{NodeMsg, SigShare},
-    BlsShareSigned, ClientSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority, NodeSigned,
+    BlsShareSigned, DataSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority, NodeSigned,
     SectionSigned, WireMsg,
 };
 use crate::routing::{
@@ -62,7 +62,7 @@ impl WireMsgUtils for WireMsg {
     fn check_signature(&self) -> Result<()> {
         match self.msg_kind() {
             MsgKind::SectionInfoMsg => {}
-            MsgKind::DataMsg(ClientSigned {
+            MsgKind::DataMsg(DataSigned {
                 public_key,
                 signature,
             }) => {
