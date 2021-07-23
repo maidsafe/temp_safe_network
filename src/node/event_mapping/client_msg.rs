@@ -9,7 +9,7 @@
 use super::{Mapping, MsgContext};
 use crate::messaging::{
     data::{DataMsg, ProcessMsg, ProcessingError},
-    ClientAuthority, EndUser, MessageId, SrcLocation,
+    DataAuthority, EndUser, MessageId, SrcLocation,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -21,13 +21,13 @@ use tracing::warn;
 pub(super) fn map_client_msg(
     msg_id: MessageId,
     msg: DataMsg,
-    client_auth: ClientAuthority,
+    data_auth: DataAuthority,
     user: EndUser,
 ) -> Mapping {
     match &msg {
         DataMsg::Process(process_msg) => {
             // Signature has already been validated by the routing layer
-            let op = map_client_process_msg(msg_id, process_msg.clone(), user, client_auth);
+            let op = map_client_process_msg(msg_id, process_msg.clone(), user, data_auth);
 
             let ctx = Some(MsgContext::Client {
                 msg,
@@ -54,19 +54,19 @@ fn map_client_process_msg(
     msg_id: MessageId,
     process_msg: ProcessMsg,
     origin: EndUser,
-    client_auth: ClientAuthority,
+    data_auth: DataAuthority,
 ) -> NodeDuty {
     match process_msg {
         ProcessMsg::Query(query) => NodeDuty::ProcessRead {
             query,
             msg_id,
-            client_auth,
+            data_auth,
             origin,
         },
         ProcessMsg::Cmd(cmd) => NodeDuty::ProcessWrite {
             cmd,
             msg_id,
-            client_auth,
+            data_auth,
             origin,
         },
         _ => {

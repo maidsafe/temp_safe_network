@@ -9,7 +9,7 @@
 use crate::messaging::{
     data::DataMsg,
     node::{NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse},
-    ClientAuthority, DstLocation, EndUser, MessageId, SrcLocation,
+    DataAuthority, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Keypair;
@@ -110,14 +110,14 @@ pub enum Event {
         #[debug(skip)]
         new_keypair: Arc<Keypair>,
     },
-    /// Received a message from a client node.
+    /// Received a message from a peer.
     DataMsgReceived {
         /// The message ID
         msg_id: MessageId,
         /// The content of the message.
         msg: Box<DataMsg>,
-        /// Client authority
-        client_auth: ClientAuthority,
+        /// Data authority
+        data_auth: DataAuthority,
         /// The end user that sent the message.
         /// Its xorname is derived from the client public key,
         /// and the socket_id maps against the actual socketaddr

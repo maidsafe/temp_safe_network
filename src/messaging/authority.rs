@@ -22,14 +22,14 @@ impl DataSigned {
     /// The returned `Ok` variant represents a proof that the owner of `public_key` indeed signed
     /// `payload`, and so bears their authority. Note however that it may still be necessary to
     /// confirm that `public_key` is who you expect!
-    pub fn verify(self, payload: &impl AsRef<[u8]>) -> Result<ClientAuthority> {
-        ClientAuthority::verify(self.public_key, self.signature, payload)
+    pub fn verify(self, payload: &impl AsRef<[u8]>) -> Result<DataAuthority> {
+        DataAuthority::verify(self.public_key, self.signature, payload)
     }
 }
 
-/// A [`ClientAuthority`] can be converted back to a [`DataSigned`], losing the 'proof' of validity.
-impl From<ClientAuthority> for DataSigned {
-    fn from(signed: ClientAuthority) -> Self {
+/// A [`DataAuthority`] can be converted back to a [`DataSigned`], losing the 'proof' of validity.
+impl From<DataAuthority> for DataSigned {
+    fn from(signed: DataAuthority) -> Self {
         Self {
             public_key: signed.public_key,
             signature: signed.signature,
@@ -37,22 +37,22 @@ impl From<ClientAuthority> for DataSigned {
     }
 }
 
-/// Verified authority of a client.
+/// Verified authority of a network peer.
 ///
 /// Values of this type constitute a proof that the signature is valid for a particular payload.
 /// This is made possible by performing verification in all possible constructors of the type.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ClientAuthority {
+pub struct DataAuthority {
     public_key: PublicKey,
     signature: Signature,
 }
 
-impl ClientAuthority {
-    /// Verify that `payload` has client's authority.
+impl DataAuthority {
+    /// Verify that `payload` has requester's authority.
     ///
     /// This verifies that the owner of `public_key` (e.g. the holder of the corresponding private
     /// key) created the `signature` by signing the `payload` with theor private key. When this is
-    /// true, we say the payload has client authority.
+    /// true, we say the payload has data authority.
     pub fn verify(
         public_key: PublicKey,
         signature: Signature,
@@ -74,11 +74,11 @@ impl ClientAuthority {
 
     /// Create a [`DataSigned`] from this authority by cloning the fields.
     ///
-    /// Since [`ClientAuthority`] cannot be serialized, it's sometimes necessary to convert back to
+    /// Since [`DataAuthority`] cannot be serialized, it's sometimes necessary to convert back to
     /// an unverified signature. Prefer [`DataSigned::from`][1] if you don't need to retain the
-    /// `ClientAuthority`, as this won't clone the fields.
+    /// `DataAuthority`, as this won't clone the fields.
     ///
-    /// [1]: DataSigned#impl-From<ClientAuthority>
+    /// [1]: DataSigned#impl-From<DataAuthority>
     pub fn to_signed(&self) -> DataSigned {
         DataSigned {
             public_key: self.public_key,

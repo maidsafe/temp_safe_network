@@ -13,7 +13,7 @@ use crate::messaging::{
         NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeSystemCmd,
         NodeSystemQuery,
     },
-    ClientAuthority, DataSigned, DstLocation, MessageId, SrcLocation, WireMsg,
+    DataAuthority, DataSigned, DstLocation, MessageId, SrcLocation, WireMsg,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -87,10 +87,10 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
                 data_signed,
                 ProcessMsg::Query(query.clone()),
             ) {
-                Ok(client_auth) => NodeDuty::ProcessRead {
+                Ok(data_auth) => NodeDuty::ProcessRead {
                     query,
                     msg_id,
-                    client_auth,
+                    data_auth,
                     origin: query_origin,
                 },
                 Err(duty) => duty,
@@ -102,10 +102,10 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
             origin: cmd_origin,
         }) => {
             match verify_data_authority(msg_id, origin, data_signed, ProcessMsg::Cmd(cmd.clone())) {
-                Ok(client_auth) => NodeDuty::ProcessWrite {
+                Ok(data_auth) => NodeDuty::ProcessWrite {
                     cmd,
                     msg_id,
-                    client_auth,
+                    data_auth,
                     origin: cmd_origin,
                 },
                 Err(duty) => duty,
@@ -126,10 +126,10 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
                 data_signed,
                 ProcessMsg::Cmd(DataCmd::Chunk(cmd.clone())),
             ) {
-                Ok(client_auth) => NodeDuty::WriteChunk {
+                Ok(data_auth) => NodeDuty::WriteChunk {
                     write: cmd,
                     msg_id,
-                    client_auth,
+                    data_auth,
                 },
                 Err(duty) => duty,
             }
@@ -173,7 +173,7 @@ fn verify_data_authority(
     origin: SrcLocation,
     data_signed: DataSigned,
     msg: ProcessMsg,
-) -> Result<ClientAuthority, NodeDuty> {
+) -> Result<DataAuthority, NodeDuty> {
     WireMsg::serialize_msg_payload(&DataMsg::Process(msg))
         .and_then(|payload| data_signed.verify(&payload))
         .map_err(|error| send_error(msg_id, origin, Error::Message(error), false))
