@@ -8,7 +8,8 @@
 
 use super::Core;
 use crate::messaging::{
-    data::DataMsg, node::NodeMsg, DataAuthority, DstLocation, EndUser, MessageId, MsgKind, WireMsg,
+    data::DataMsg, node::NodeMsg, Authority, DataSigned, DstLocation, EndUser, MessageId, MsgKind,
+    WireMsg,
 };
 use crate::routing::{
     error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
@@ -23,7 +24,7 @@ impl Core {
         msg_id: MessageId,
         msg: DataMsg,
         user: EndUser,
-        data_auth: DataAuthority,
+        data_auth: Authority<DataSigned>,
     ) -> Result<Vec<Command>> {
         self.send_event(Event::DataMsgReceived {
             msg_id,
@@ -40,7 +41,7 @@ impl Core {
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,
-        data_auth: DataAuthority,
+        data_auth: Authority<DataSigned>,
         msg: DataMsg,
         dst_location: DstLocation,
         payload: Bytes,
@@ -54,7 +55,7 @@ impl Core {
                             let wire_msg = WireMsg::new_msg(
                                 msg_id,
                                 payload,
-                                MsgKind::DataMsg(data_auth.into()),
+                                MsgKind::DataMsg(data_auth.into_inner()),
                                 dst_location,
                             )?;
 
@@ -111,7 +112,7 @@ impl Core {
             let node_msg = NodeMsg::ForwardDataMsg {
                 msg,
                 user,
-                data_signed: data_auth.into(),
+                data_signed: data_auth.into_inner(),
             };
 
             let wire_msg = match WireMsg::single_src(

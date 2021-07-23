@@ -10,7 +10,7 @@ use crate::btree_set;
 use crate::messaging::{
     data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery},
-    DataAuthority, EndUser, MessageId,
+    Authority, DataSigned, EndUser, MessageId,
 };
 use crate::node::{
     capacity::{Capacity, CHUNK_COPY_COUNT},
@@ -75,7 +75,7 @@ impl ChunkRecords {
         &self,
         write: ChunkWrite,
         msg_id: MessageId,
-        data_auth: DataAuthority,
+        data_auth: Authority<DataSigned>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         use ChunkWrite::*;
@@ -110,10 +110,10 @@ impl ChunkRecords {
         &self,
         chunk: Chunk,
         msg_id: MessageId,
-        data_auth: DataAuthority,
+        data_auth: Authority<DataSigned>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        if let Err(error) = validate_chunk_owner(&chunk, data_auth.public_key()) {
+        if let Err(error) = validate_chunk_owner(&chunk, &data_auth.public_key) {
             return self.send_error(error, msg_id, origin).await;
         }
 
@@ -135,7 +135,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::New(chunk),
-                data_signed: data_auth.into(),
+                data_signed: data_auth.into_inner(),
                 origin,
             }),
             targets: target_holders,
@@ -247,7 +247,7 @@ impl ChunkRecords {
     async fn delete(
         &self,
         address: ChunkAddress,
-        data_auth: DataAuthority,
+        data_auth: Authority<DataSigned>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.capacity.get_chunk_holder_adults(address.name()).await;
@@ -256,7 +256,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::DeletePrivate(address),
-                data_signed: data_auth.into(),
+                data_signed: data_auth.into_inner(),
                 origin,
             }),
             targets,

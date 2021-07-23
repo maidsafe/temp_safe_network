@@ -9,7 +9,7 @@
 use super::{Mapping, MsgContext};
 use crate::messaging::{
     data::{DataMsg, ProcessMsg, ProcessingError},
-    DataAuthority, DstLocation, EndUser, MessageId, SrcLocation,
+    Authority, DataSigned, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -21,7 +21,7 @@ use tracing::warn;
 pub(super) fn map_client_msg(
     msg_id: MessageId,
     msg: DataMsg,
-    data_auth: DataAuthority,
+    data_auth: Authority<DataSigned>,
     user: EndUser,
 ) -> Mapping {
     match &msg {
@@ -54,7 +54,7 @@ fn map_client_process_msg(
     msg_id: MessageId,
     process_msg: ProcessMsg,
     origin: EndUser,
-    data_auth: DataAuthority,
+    data_auth: Authority<DataSigned>,
 ) -> NodeDuty {
     match process_msg {
         ProcessMsg::Query(query) => NodeDuty::ProcessRead {

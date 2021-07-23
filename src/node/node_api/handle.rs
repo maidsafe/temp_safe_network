@@ -210,7 +210,7 @@ impl Node {
                     let mut ops = vec![
                         adult
                             .chunks
-                            .write(&write, msg_id, *data_auth.public_key())
+                            .write(&write, msg_id, data_auth.public_key)
                             .await?,
                     ];
                     ops.extend(adult.chunks.check_storage().await?);
@@ -308,7 +308,7 @@ impl Node {
                             .meta_data
                             .write()
                             .await
-                            .read(query, msg_id, *data_auth.public_key(), origin)
+                            .read(query, msg_id, data_auth.public_key, origin)
                             .await?,
                     ];
                     Ok(NodeTask::from(duties))
