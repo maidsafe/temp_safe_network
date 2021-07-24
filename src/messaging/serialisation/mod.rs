@@ -11,7 +11,7 @@ mod wire_msg_header;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    data::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, BlsShareSigned, ClientAuthority,
+    data::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, BlsShareSigned, DataAuthority,
     DstLocation, MessageId, NodeSigned, SectionSigned,
 };
 
@@ -34,8 +34,8 @@ pub enum MessageType {
     Client {
         /// Message ID
         msg_id: MessageId,
-        /// Client authority over this message
-        client_auth: ClientAuthority,
+        /// Requester's authority over this message
+        data_auth: DataAuthority,
         /// Message destination location
         dst_location: DstLocation,
         /// the message

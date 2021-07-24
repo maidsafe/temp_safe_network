@@ -125,14 +125,14 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::DataMsg(client_signed) => {
+            MsgKind::DataMsg(data_signed) => {
                 let msg: DataMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!("Client message payload as Msgpack: {}", err))
+                    Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
                 Ok(MessageType::Client {
                     msg_id: self.header.msg_envelope.msg_id,
-                    client_auth: client_signed.verify(&self.payload)?,
+                    data_auth: data_signed.verify(&self.payload)?,
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })
@@ -242,7 +242,7 @@ mod tests {
         messaging::{
             data::{ChunkRead, DataMsg, DataQuery, ProcessMsg},
             node::{NodeCmd, NodeMsg, NodeSystemCmd},
-            ClientSigned, MessageId, NodeSigned,
+            DataSigned, MessageId, NodeSigned,
         },
         types::{ChunkAddress, Keypair},
     };
@@ -410,13 +410,13 @@ mod tests {
         ))));
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
-        let client_signed = ClientSigned {
+        let data_signed = DataSigned {
             public_key: src_client_keypair.public_key(),
             signature: src_client_keypair.sign(&payload),
         };
-        let client_auth = client_signed.clone().verify(&payload).unwrap();
+        let data_auth = data_signed.clone().verify(&payload).unwrap();
 
-        let msg_kind = MsgKind::DataMsg(client_signed);
+        let msg_kind = MsgKind::DataMsg(data_signed);
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
@@ -434,7 +434,7 @@ mod tests {
             deserialized.into_message()?,
             MessageType::Client {
                 msg_id: wire_msg.msg_id(),
-                client_auth,
+                data_auth,
                 dst_location,
                 msg: client_msg,
             }

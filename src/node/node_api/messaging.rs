@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::DataMsg, node::NodeMsg, ClientSigned, DstLocation, MessageId, MsgKind, WireMsg,
+    data::DataMsg, node::NodeMsg, DataSigned, DstLocation, MessageId, MsgKind, WireMsg,
 };
 use crate::node::{
     network::Network,
@@ -129,7 +129,7 @@ fn random_client_signature(client_msg: &DataMsg) -> Result<(MsgKind, Bytes)> {
     let payload = WireMsg::serialize_msg_payload(client_msg)?;
     let signature = keypair.sign(&payload);
 
-    let msg_kind = MsgKind::DataMsg(ClientSigned {
+    let msg_kind = MsgKind::DataMsg(DataSigned {
         public_key: keypair.public_key(),
         signature,
     });
