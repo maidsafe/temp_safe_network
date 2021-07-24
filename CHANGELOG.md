@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.13.0](https://github.com/maidsafe/safe_network/compare/v0.12.2...v0.13.0) (2021-07-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messaging:** Rename `ClientAuthority` -> `DataAuthority`
+* **messaging:** Rename `ClientSigned` -> `DataSigned`
+
+* **messaging:** Rename `ClientAuthority` -> `DataAuthority` ([015817e](https://github.com/maidsafe/safe_network/commit/015817edb6b79bce7e124be2c772d5ac6054950a))
+* **messaging:** Rename `ClientSigned` -> `DataSigned` ([e25a287](https://github.com/maidsafe/safe_network/commit/e25a2878ac2817771fbf918cc64672da34f51e4b))
+
 ### [0.12.2](https://github.com/maidsafe/safe_network/compare/v0.12.1...v0.12.2) (2021-07-22)
 
 
