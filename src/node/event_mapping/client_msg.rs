@@ -9,7 +9,7 @@
 use super::{Mapping, MsgContext};
 use crate::messaging::{
     data::{DataMsg, ProcessMsg, ProcessingError},
-    DataAuthority, EndUser, MessageId, SrcLocation,
+    DataAuthority, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -69,6 +69,21 @@ fn map_client_process_msg(
             data_auth,
             origin,
         },
+        ProcessMsg::QueryResponse {
+            response,
+            correlation_id,
+        } => {
+            let outgoing_msg = OutgoingMsg {
+                id: MessageId::in_response_to(&correlation_id),
+                msg: MsgType::Client(DataMsg::Process(ProcessMsg::QueryResponse {
+                    response,
+                    correlation_id,
+                })),
+                dst: DstLocation::EndUser(origin),
+                aggregation: false,
+            };
+            NodeDuty::Send(outgoing_msg)
+        }
         _ => {
             let error_data = convert_to_error_message(Error::InvalidMessage(
                 msg_id,

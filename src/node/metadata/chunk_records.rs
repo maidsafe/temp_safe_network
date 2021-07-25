@@ -22,6 +22,7 @@ use crate::routing::Prefix;
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use tracing::{info, warn};
 
+use bls::PublicKey as BlsPublicKey;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -30,6 +31,7 @@ use xor_name::XorName;
 
 use super::{
     adult_liveness::AdultLiveness, build_client_error_response, build_client_query_response,
+    build_forward_query_response,
 };
 
 /// Operations over the data type Blob.
@@ -147,6 +149,8 @@ impl ChunkRecords {
         correlation_id: MessageId,
         response: QueryResponse,
         src: XorName,
+        our_prefix: Prefix,
+        section_pk: BlsPublicKey,
     ) -> Result<NodeDuties> {
         if !matches!(response, QueryResponse::GetChunk(_)) {
             return Err(Error::Logic(format!(
@@ -172,11 +176,23 @@ impl ChunkRecords {
                 // We've already responded already with a success or the returned error is `DataNotFound`
                 // so do nothing
             } else {
-                duties.push(NodeDuty::Send(build_client_query_response(
-                    response,
-                    origin_msg_id,
-                    end_user,
-                )));
+                info!("REMOVED CORRELATION ID: {}", correlation_id);
+                // If in same section, i.e. we are the ClientElders, then send response directly.
+                // Otherwise, i.e. we are the DataElders, forwarding using ForwardDataMsg.
+                if our_prefix.matches(&end_user.xorname) {
+                    duties.push(NodeDuty::Send(build_client_query_response(
+                        response,
+                        origin_msg_id,
+                        end_user,
+                    )));
+                } else {
+                    duties.push(NodeDuty::Send(build_forward_query_response(
+                        response,
+                        origin_msg_id,
+                        end_user,
+                        section_pk,
+                    )?));
+                }
             }
         } else if response.is_success() {
             info!(

@@ -350,14 +350,23 @@ impl Node {
                 correlation_id,
                 src,
             } => {
+                let our_prefix = self.network_api.our_prefix().await;
+                let our_section_pk = self.network_api.our_section_public_key().await;
                 let elder = self.as_elder().await?;
+
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(
                         elder
                             .meta_data
                             .write()
                             .await
-                            .record_adult_read_liveness(correlation_id, response, src)
+                            .record_adult_read_liveness(
+                                correlation_id,
+                                response,
+                                src,
+                                our_prefix,
+                                our_section_pk,
+                            )
                             .await?,
                     ))
                 });
