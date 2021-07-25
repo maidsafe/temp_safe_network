@@ -6,10 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    chunk_records::ChunkRecords, register_storage::RegisterStorage,
-    sequence_storage::SequenceStorage,
-};
+use super::{chunk_records::ChunkRecords, register_storage::RegisterStorage};
 use crate::messaging::{
     data::{DataCmd, DataExchange, DataQuery},
     DataAuthority, EndUser, MessageId,
@@ -23,19 +20,13 @@ use tracing::info;
 /// that are only managed at Elders.
 pub(super) struct ElderStores {
     chunk_records: ChunkRecords,
-    sequence_storage: SequenceStorage,
     register_storage: RegisterStorage,
 }
 
 impl ElderStores {
-    pub(super) fn new(
-        chunk_records: ChunkRecords,
-        sequence_storage: SequenceStorage,
-        register_storage: RegisterStorage,
-    ) -> Self {
+    pub(super) fn new(chunk_records: ChunkRecords, register_storage: RegisterStorage) -> Self {
         Self {
             chunk_records,
-            sequence_storage,
             register_storage,
         }
     }
@@ -49,11 +40,6 @@ impl ElderStores {
     ) -> Result<NodeDuty> {
         match &query {
             DataQuery::Blob(read) => self.chunk_records.read(read, msg_id, origin).await,
-            DataQuery::Sequence(read) => {
-                self.sequence_storage
-                    .read(read, msg_id, requester, origin)
-                    .await
-            }
             DataQuery::Register(read) => {
                 self.register_storage
                     .read(read, msg_id, requester, origin)
@@ -77,12 +63,6 @@ impl ElderStores {
                     .write(write, msg_id, data_auth, origin)
                     .await
             }
-            DataCmd::Sequence(write) => {
-                info!("Writing Sequence");
-                self.sequence_storage
-                    .write(msg_id, origin, write, data_auth)
-                    .await
-            }
             DataCmd::Register(write) => {
                 info!("Writing Register");
                 self.register_storage
@@ -101,19 +81,16 @@ impl ElderStores {
         // Prepare chunk_records, map and sequence data
         let chunk_data = self.chunk_records.get_data_of(prefix).await;
         let reg_data = self.register_storage.get_data_of(prefix).await?;
-        let seq_data = self.sequence_storage.get_data_of(prefix).await?;
 
         Ok(DataExchange {
             chunk_data,
             reg_data,
-            seq_data,
         })
     }
 
     pub(super) async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
         // todo: all this can be done in parallel
         self.register_storage.update(data.reg_data).await?;
-        self.sequence_storage.update(data.seq_data).await?;
         self.chunk_records.update(data.chunk_data).await;
         Ok(())
     }

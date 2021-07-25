@@ -14,26 +14,22 @@ mod data_exchange;
 mod errors;
 mod query;
 mod register;
-mod sequence;
 
 pub use self::{
     chunk::{ChunkRead, ChunkWrite},
     cmd::DataCmd,
     data_exchange::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, RegisterDataExchange,
-        SequenceDataExchange,
     },
     errors::{Error, Result},
     query::DataQuery,
     register::{RegisterCmd, RegisterRead, RegisterWrite},
-    sequence::{SequenceCmd, SequenceRead, SequenceWrite},
 };
 
 use crate::messaging::MessageId;
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
-    Chunk, PublicKey, Sequence, SequenceEntries, SequenceEntry, SequencePermissions,
-    SequencePrivatePolicy, SequencePublicPolicy,
+    Chunk, PublicKey,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, convert::TryFrom};
@@ -119,21 +115,6 @@ pub enum QueryResponse {
     /// Response to [`ChunkRead::Get`].
     GetChunk(Result<Chunk>),
     //
-    // ===== Sequence Data =====
-    //
-    /// Response to [`SequenceRead::Get`].
-    GetSequence(Result<Sequence>),
-    /// Response to [`SequenceRead::GetRange`].
-    GetSequenceRange(Result<SequenceEntries>),
-    /// Response to [`SequenceRead::GetLastEntry`].
-    GetSequenceLastEntry(Result<(u64, SequenceEntry)>),
-    /// Response to [`SequenceRead::GetPublicPolicy`].
-    GetSequencePublicPolicy(Result<SequencePublicPolicy>),
-    /// Response to [`SequenceRead::GetPrivatePolicy`].
-    GetSequencePrivatePolicy(Result<SequencePrivatePolicy>),
-    /// Response to [`SequenceRead::GetUserPermissions`].
-    GetSequenceUserPermissions(Result<SequencePermissions>),
-    //
     // ===== Register Data =====
     //
     /// Response to [`RegisterRead::Get`].
@@ -154,12 +135,6 @@ impl QueryResponse {
         use QueryResponse::*;
         match self {
             GetChunk(result) => result.is_ok(),
-            GetSequence(result) => result.is_ok(),
-            GetSequenceRange(result) => result.is_ok(),
-            GetSequenceLastEntry(result) => result.is_ok(),
-            GetSequencePublicPolicy(result) => result.is_ok(),
-            GetSequencePrivatePolicy(result) => result.is_ok(),
-            GetSequenceUserPermissions(result) => result.is_ok(),
             GetRegister(result) => result.is_ok(),
             GetRegisterOwner(result) => result.is_ok(),
             ReadRegister(result) => result.is_ok(),
@@ -198,12 +173,6 @@ macro_rules! try_from {
 }
 
 try_from!(Chunk, GetChunk);
-try_from!(Sequence, GetSequence);
-try_from!(SequenceEntries, GetSequenceRange);
-try_from!((u64, SequenceEntry), GetSequenceLastEntry);
-try_from!(SequencePublicPolicy, GetSequencePublicPolicy);
-try_from!(SequencePrivatePolicy, GetSequencePrivatePolicy);
-try_from!(SequencePermissions, GetSequenceUserPermissions);
 try_from!(Register, GetRegister);
 try_from!(PublicKey, GetRegisterOwner);
 try_from!(BTreeSet<(EntryHash, Entry)>, ReadRegister);
@@ -238,8 +207,8 @@ mod tests {
     #[test]
     fn debug_format_functional() -> Result<()> {
         if let Some(key) = gen_keys().first() {
-            let errored_response = QueryResponse::GetSequence(Err(Error::AccessDenied(*key)));
-            assert!(format!("{:?}", errored_response).contains("GetSequence(Err(AccessDenied("));
+            let errored_response = QueryResponse::GetRegister(Err(Error::AccessDenied(*key)));
+            assert!(format!("{:?}", errored_response).contains("GetRegister(Err(AccessDenied("));
             Ok(())
         } else {
             Err(anyhow!("Could not generate public key"))

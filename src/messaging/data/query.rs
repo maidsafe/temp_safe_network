@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    chunk::ChunkRead, register::RegisterRead, sequence::SequenceRead, Error, QueryResponse,
-};
+use super::{chunk::ChunkRead, register::RegisterRead, Error, QueryResponse};
 use xor_name::XorName;
 
 use serde::{Deserialize, Serialize};
@@ -26,10 +24,6 @@ pub enum DataQuery {
     ///
     /// [`Chunk`]: crate::types::Chunk
     Blob(ChunkRead),
-    /// [`Sequence`] read operation.
-    ///
-    /// [`Sequence`]: crate::types::Sequence
-    Sequence(SequenceRead),
     /// [`Register`] read operation.
     ///
     /// [`Register`]: crate::types::register::Register
@@ -43,7 +37,6 @@ impl DataQuery {
         use DataQuery::*;
         match self {
             Blob(q) => q.error(error),
-            Sequence(q) => q.error(error),
             Register(q) => q.error(error),
         }
     }
@@ -53,7 +46,6 @@ impl DataQuery {
         use DataQuery::*;
         match self {
             Blob(q) => q.dst_address(),
-            Sequence(q) => q.dst_address(),
             Register(q) => q.dst_address(),
         }
     }

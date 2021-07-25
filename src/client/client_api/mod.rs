@@ -11,7 +11,6 @@ mod blob_storage;
 mod commands;
 mod queries;
 mod register_apis;
-mod sequence_apis;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
 use crate::messaging::data::{CmdError, DataCmd};

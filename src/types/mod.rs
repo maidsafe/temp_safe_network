@@ -18,7 +18,6 @@ mod chunk;
 mod errors;
 mod keys;
 mod section;
-mod sequence;
 mod token;
 
 pub use chunk::{
@@ -35,17 +34,6 @@ pub use keys::{
 };
 pub use register::Address as RegisterAddress;
 pub use section::SectionElders;
-pub use sequence::{
-    metadata::{
-        Action as SequenceAction, Address as SequenceAddress, Entries as SequenceEntries,
-        Entry as SequenceEntry, Index as SequenceIndex, Kind as SequenceKind,
-        Permissions as SequencePermissions, Policy as SequencePolicy,
-        PrivatePermissions as SequencePrivatePermissions, PrivatePolicy as SequencePrivatePolicy,
-        PublicPermissions as SequencePublicPermissions, PublicPolicy as SequencePublicPolicy,
-        User as SequenceUser,
-    },
-    Data as Sequence, DataOp as SequenceOp, PrivateSeqData, PublicSeqData,
-};
 pub use token::Token;
 
 use register::Register;
@@ -58,8 +46,6 @@ use xor_name::XorName;
 pub enum Data {
     /// Chunk.
     Chunk(Chunk),
-    /// Sequence.
-    Sequence(Sequence),
     /// Register.
     Register(Register),
 }
@@ -69,8 +55,6 @@ pub enum Data {
 pub enum DataAddress {
     /// Chunk Address
     Chunk(ChunkAddress),
-    /// Sequence Address
-    Sequence(SequenceAddress),
     /// Register Address
     Register(RegisterAddress),
 }
@@ -80,7 +64,6 @@ impl Data {
     pub fn is_public(&self) -> bool {
         match *self {
             Self::Chunk(ref chunk) => chunk.is_public(),
-            Self::Sequence(ref sequence) => sequence.is_public(),
             Self::Register(ref register) => register.is_public(),
         }
     }
@@ -94,12 +77,6 @@ impl Data {
 impl From<Chunk> for Data {
     fn from(chunk: Chunk) -> Self {
         Self::Chunk(chunk)
-    }
-}
-
-impl From<Sequence> for Data {
-    fn from(data: Sequence) -> Self {
-        Self::Sequence(data)
     }
 }
 
