@@ -373,14 +373,9 @@ impl Session {
                 // (note, this will overwrite prior errors, so we'll just return whicever was last received)
                 (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
                 | (response @ Some(QueryResponse::GetRegister(Err(_))), None)
-                | (response @ Some(QueryResponse::GetSequence(Err(_))), None)
                 | (response @ Some(QueryResponse::GetRegisterPolicy(Err(_))), None)
                 | (response @ Some(QueryResponse::GetRegisterOwner(Err(_))), None)
-                | (response @ Some(QueryResponse::GetRegisterUserPermissions(Err(_))), None)
-                | (response @ Some(QueryResponse::GetSequenceLastEntry(Err(_))), None)
-                | (response @ Some(QueryResponse::GetSequencePrivatePolicy(Err(_))), None)
-                | (response @ Some(QueryResponse::GetSequencePublicPolicy(Err(_))), None)
-                | (response @ Some(QueryResponse::GetSequenceRange(Err(_))), None) => {
+                | (response @ Some(QueryResponse::GetRegisterUserPermissions(Err(_))), None) => {
                     debug!("QueryResponse error received (but may be overridden by a non-error reponse from another elder): {:#?}", &response);
                     error_response = response;
                     responses_discarded += 1;

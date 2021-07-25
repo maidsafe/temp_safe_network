@@ -11,7 +11,6 @@ pub(crate) mod adult_reader;
 mod chunk_records;
 mod elder_stores;
 mod register_storage;
-mod sequence_storage;
 
 use crate::dbs::UsedSpace;
 use crate::messaging::{
@@ -28,7 +27,6 @@ use crate::types::{Chunk, PublicKey};
 use chunk_records::ChunkRecords;
 use elder_stores::ElderStores;
 use register_storage::RegisterStorage;
-use sequence_storage::SequenceStorage;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -53,9 +51,8 @@ impl Metadata {
         capacity: Capacity,
     ) -> Result<Self> {
         let chunk_records = ChunkRecords::new(capacity);
-        let sequence_storage = SequenceStorage::new(path, used_space.max_capacity()); // to be removed so we don't care to implement this
         let register_storage = RegisterStorage::new(path, used_space);
-        let elder_stores = ElderStores::new(chunk_records, sequence_storage, register_storage);
+        let elder_stores = ElderStores::new(chunk_records, register_storage);
         Ok(Self { elder_stores })
     }
 

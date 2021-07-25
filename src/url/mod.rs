@@ -24,7 +24,7 @@ use url_parts::SafeUrlParts;
 use xor_name::{XorName, XOR_NAME_LEN};
 use xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
 
-/// Type tag to use for the NrsMapContainer stored on Sequence
+/// Type tag to use for the NrsMapContainer stored on Register
 pub const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
 /// Default base encoding used for XOR URLs
@@ -162,10 +162,6 @@ pub enum SafeDataType {
     PublicRegister = 0x03,
     #[allow(missing_docs)]
     PrivateRegister = 0x04,
-    #[allow(missing_docs)]
-    PublicSequence = 0x05,
-    #[allow(missing_docs)]
-    PrivateSequence = 0x06,
 }
 
 impl std::fmt::Display for SafeDataType {
@@ -183,8 +179,6 @@ impl SafeDataType {
             2 => Ok(Self::PrivateBlob),
             3 => Ok(Self::PublicRegister),
             4 => Ok(Self::PrivateRegister),
-            5 => Ok(Self::PublicSequence),
-            6 => Ok(Self::PrivateSequence),
             _ => Err(Error::InvalidInput("Invalid SafeDataType code".to_string())),
         }
     }
@@ -435,7 +429,7 @@ impl SafeUrl {
             hashed_name,
             Some(&parts.public_name),
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublicSequence,
+            SafeDataType::PublicRegister,
             SafeContentType::NrsMapContainer,
             Some(&parts.path),
             Some(parts.sub_names_vec),
@@ -515,8 +509,6 @@ impl SafeUrl {
             2 => SafeDataType::PrivateBlob,
             3 => SafeDataType::PublicRegister,
             4 => SafeDataType::PrivateRegister,
-            5 => SafeDataType::PublicSequence,
-            6 => SafeDataType::PrivateSequence,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
                     "Invalid SAFE data type encoded in the XOR-URL string: {}",
@@ -1041,33 +1033,6 @@ impl SafeUrl {
         )
     }
 
-    /// A non-member Sequence data URL encoder function for convenience
-    pub fn encode_sequence_data(
-        xor_name: XorName,
-        type_tag: u64,
-        content_type: SafeContentType,
-        base: XorUrlBase,
-        is_private: bool,
-    ) -> Result<String> {
-        SafeUrl::encode(
-            xor_name,
-            None,
-            type_tag,
-            if is_private {
-                SafeDataType::PrivateSequence
-            } else {
-                SafeDataType::PublicSequence
-            },
-            content_type,
-            None,
-            None,
-            None,
-            None,
-            None,
-            base,
-        )
-    }
-
     /// A non-member Register data URL encoder function for convenience
     pub fn encode_register(
         xor_name: XorName,
@@ -1278,7 +1243,7 @@ mod tests {
             xor_name,
             None,
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublicSequence,
+            SafeDataType::PublicRegister,
             SafeContentType::MediaType("garbage/trash".to_string()),
             None,
             None,
@@ -1293,7 +1258,7 @@ mod tests {
             xor_name,
             Some(""), // passing empty string as nrs name
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublicSequence,
+            SafeDataType::PublicRegister,
             SafeContentType::NrsMapContainer,
             None,
             None,
@@ -1308,7 +1273,7 @@ mod tests {
             xor_name,
             Some("a.b.c"), // passing nrs name not matching xor_name.
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublicSequence,
+            SafeDataType::PublicRegister,
             SafeContentType::NrsMapContainer,
             None,
             None,
@@ -1323,7 +1288,7 @@ mod tests {
             xor_name,
             Some("a..b.c"), // passing empty sub-name in nrs name
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublicSequence,
+            SafeDataType::PublicRegister,
             SafeContentType::NrsMapContainer,
             None,
             None,
@@ -1338,7 +1303,7 @@ mod tests {
             xor_name,
             None, // not NRS
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublicSequence,
+            SafeDataType::PublicRegister,
             SafeContentType::NrsMapContainer,
             None,
             Some(vec!["a".to_string(), "".to_string(), "b".to_string()]),
@@ -1385,14 +1350,14 @@ mod tests {
     #[test]
     fn test_safeurl_base64_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_sequence_data(
+        let xorurl = SafeUrl::encode_register(
             xor_name,
             4_584_545,
             SafeContentType::FilesContainer,
             XorUrlBase::Base64,
             false,
         )?;
-        let base64_xorurl = "safe://mAQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
+        let base64_xorurl = "safe://mAQACAzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
         assert_eq!(xorurl, base64_xorurl);
         let safeurl = SafeUrl::from_url(&base64_xorurl)?;
         assert_eq!(base64_xorurl, safeurl.to_base(XorUrlBase::Base64));
@@ -1400,7 +1365,7 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, safeurl.encoding_version());
         assert_eq!(xor_name, safeurl.xorname());
         assert_eq!(4_584_545, safeurl.type_tag());
-        assert_eq!(SafeDataType::PublicSequence, safeurl.data_type());
+        assert_eq!(SafeDataType::PublicRegister, safeurl.data_type());
         assert_eq!(SafeContentType::FilesContainer, safeurl.content_type());
         Ok(())
     }
@@ -1454,7 +1419,7 @@ mod tests {
     fn test_safeurl_decoding_with_path() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let xorurl = SafeUrl::encode_sequence_data(
+        let xorurl = SafeUrl::encode_register(
             xor_name,
             type_tag,
             SafeContentType::Wallet,
@@ -1472,7 +1437,7 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, safeurl_with_path.encoding_version());
         assert_eq!(xor_name, safeurl_with_path.xorname());
         assert_eq!(type_tag, safeurl_with_path.type_tag());
-        assert_eq!(SafeDataType::PublicSequence, safeurl_with_path.data_type());
+        assert_eq!(SafeDataType::PublicRegister, safeurl_with_path.data_type());
         assert_eq!(SafeContentType::Wallet, safeurl_with_path.content_type());
         Ok(())
     }
@@ -1740,7 +1705,7 @@ mod tests {
     fn test_safeurl_to_string() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
         let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hyryygbmk9cke7k99tyhp941od8q375wxgaqeyiag8za1jnpzbw9pb61sccn7a/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hyryygy5k9cke7k99tyhp941od8q375wxgaqeyiag8za1jnpzbw9pb61sccn7a/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
 
         let nrs = SafeUrl::from_url(nrsurl)?;
         let xor = SafeUrl::from_url(xorurl)?;
