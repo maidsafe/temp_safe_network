@@ -15,17 +15,21 @@ mod register_storage;
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataExchange, DataMsg, DataQuery, ProcessMsg, QueryResponse},
+    node::NodeMsg,
     DataAuthority, DataSigned, DstLocation, EndUser, MessageId, WireMsg,
 };
+
 use crate::node::{
     capacity::Capacity,
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use crate::routing::Prefix;
-use crate::types::{Chunk, PublicKey};
+use crate::types::{Chunk, Keypair, PublicKey};
+use bls::PublicKey as BlsPublicKey;
 use chunk_records::ChunkRecords;
 use elder_stores::ElderStores;
+use rand::rngs::OsRng;
 use register_storage::RegisterStorage;
 use std::{
     collections::BTreeSet,
@@ -74,10 +78,12 @@ impl Metadata {
         correlation_id: MessageId,
         result: QueryResponse,
         src: XorName,
+        our_prefix: Prefix,
+        section_pk: BlsPublicKey,
     ) -> Result<NodeDuties> {
         self.elder_stores
             .chunk_records()
-            .record_adult_read_liveness(correlation_id, result, src)
+            .record_adult_read_liveness(correlation_id, result, src, our_prefix, section_pk)
             .await
     }
 
@@ -144,6 +150,44 @@ fn build_client_query_response(
         dst: DstLocation::EndUser(origin),
         aggregation: false,
     }
+}
+
+fn build_forward_query_response(
+    response: QueryResponse,
+    correlation_id: MessageId,
+    origin: EndUser,
+    section_pk: BlsPublicKey,
+) -> Result<OutgoingMsg> {
+    let msg = DataMsg::Process(ProcessMsg::QueryResponse {
+        response,
+        correlation_id,
+    });
+
+    let mut rng = OsRng;
+    let keypair = Keypair::new_ed25519(&mut rng);
+    let payload = WireMsg::serialize_msg_payload(&msg)?;
+    let signature = keypair.sign(&payload);
+
+    let data_signed = DataSigned {
+        public_key: keypair.public_key(),
+        signature,
+    };
+
+    Ok(OutgoingMsg {
+        id: MessageId::in_response_to(&correlation_id),
+        msg: MsgType::Node(NodeMsg::ForwardDataMsg {
+            msg,
+            user: origin,
+            data_signed,
+        }),
+        // TODO: Here shall use the section_pk of the target section.
+        //       But the one passed in is a the section_pk of own section.
+        dst: DstLocation::Section {
+            name: origin.xorname,
+            section_pk,
+        },
+        aggregation: false,
+    })
 }
 
 fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUser) -> OutgoingMsg {
