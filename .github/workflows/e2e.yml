@@ -117,7 +117,13 @@ jobs:
         run: timeout 15m cargo run --release  --features=always-joinable,client --example client_blob
       
       - name: Kill the current network (next test doesnt need it)
+        if: matrix.os != 'windows-latest'
         run: killall sn_node
+        shell: bash
+
+      - name: Kill the current network (next test doesnt need it)
+        if: matrix.os == 'windows-latest'
+        run: taskkill /F /IM sn_node.exe
         shell: bash
 
       - name: Remove node dir and logs fo next test
