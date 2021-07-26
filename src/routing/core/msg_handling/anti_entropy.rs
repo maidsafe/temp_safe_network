@@ -8,23 +8,55 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{KeyedSig, NodeMsg},
+    node::{KeyedSig, NodeMsg, SectionAuth},
     DstLocation, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
-    error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
-    SectionAuthorityProviderUtils,
+    error::Result, messages::WireMsgUtils, network::NetworkUtils, routing_api::command::Command,
+    section::SectionUtils, SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use std::{cmp::Ordering, net::SocketAddr};
+use xor_name::XorName;
 
 impl Core {
-    pub(crate) async fn handle_anti_entropy_bounced_msg(
+    pub(crate) async fn handle_anti_entropy_retry_msg(
+        &mut self,
+        section_auth: SectionAuthorityProvider,
+        section_signed: KeyedSig,
+        proof_chain: SecuredLinkedList,
+        bounced_msg: Box<NodeMsg>,
+        sender: SocketAddr,
+        src_name: XorName,
+    ) -> Result<Vec<Command>> {
+        let dst_section_pk = section_auth.public_key_set.public_key();
+
+        let section_signed = SectionAuth {
+            value: section_auth,
+            sig: section_signed,
+        };
+
+        if self.network.update_remote_section_sap(
+            section_signed,
+            &proof_chain,
+            self.section.chain(),
+        ) {
+            let cmd = self.send_direct_message((src_name, sender), *bounced_msg, dst_section_pk)?;
+            Ok(vec![cmd])
+        } else {
+            // FIXME: `update_remote_section_sap` may return false if we've just updated remote SAP due to
+            // another concurrent bounced msg, so we should still resend this message.
+            // We need to check if bounced_msg dest section pk is diff from the received new SAP pk.
+            warn!("Failed to update remote section information upon receiving Anti-Entropy bounced msg: {:?}", bounced_msg);
+            Ok(vec![])
+        }
+    }
+
+    pub(crate) async fn handle_anti_entropy_redirect_msg(
         &self,
         _section_auth: SectionAuthorityProvider,
         _section_signed: KeyedSig,
-        _proof_chain: SecuredLinkedList,
         _bounced_msg: Box<NodeMsg>,
         _sender: SocketAddr,
     ) -> Result<Vec<Command>> {
@@ -44,16 +76,19 @@ impl Core {
             return Ok(None);
         }
 
-        // For the case of receiving a JoinRequest not matching our prefix,
-        // we just let the JoinRequest handler to deal with it later on.
-        if let NodeMsg::JoinRequest(_) = node_msg {
-            return Ok(None);
+        // For the case of receiving a join request not matching our prefix,
+        // we just let the join request handler to deal with it later on.
+        // TODO: consider changing the join and "join as relocated" flows to
+        // make use of AntiEntropy retry/redirect responses.
+        match node_msg {
+            NodeMsg::JoinRequest(_) | NodeMsg::JoinAsRelocatedRequest(_) => return Ok(None),
+            _ => {}
         }
 
         match dst_location.section_pk() {
             None => Ok(None),
             Some(dst_section_pk) => {
-                self.check_dest_information(node_msg, src_location, &dst_section_pk, sender)
+                self.check_dest_section_pk(node_msg, src_location, &dst_section_pk, sender)
                     .await
             }
         }
@@ -61,39 +96,44 @@ impl Core {
 
     // If entropy is found, determine the msg to send in order to
     // bring the sender's knowledge about us up to date.
-    pub(crate) async fn check_dest_information(
+    pub(crate) async fn check_dest_section_pk(
         &self,
         node_msg: &NodeMsg,
         src_location: &SrcLocation,
         dst_section_pk: &BlsPublicKey,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
-        if let Ordering::Less = self
+        if self
             .section
             .chain()
             .cmp_by_position(dst_section_pk, self.section.chain().last_key())
+            == Ordering::Less
         {
             info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
-            let proof_chain = if let Ok(chain) = self
+            let proof_chain = match self
                 .section
                 .chain()
                 .get_proof_chain_to_current(dst_section_pk)
             {
-                chain
-            } else {
-                trace!(
-                    "Cannot find section_key {:?} within the chain",
-                    dst_section_pk
-                );
-
-                self.section.chain().clone()
+                Ok(chain) => chain,
+                Err(_) => {
+                    trace!(
+                        "Cannot find dst_section_pk {:?} sent by {} in our chain",
+                        dst_section_pk,
+                        sender
+                    );
+                    // TODO: don't we actually need to get up to date info from
+                    // other Elders in our section as it may be a section key we are not
+                    // aware of yet? once we acquire new key/s attempt AE check again?
+                    self.section.chain().clone()
+                }
             };
 
             let section_signed_auth = self.section.section_signed_authority_provider().clone();
             let section_auth = section_signed_auth.value;
             let section_signed = section_signed_auth.sig;
 
-            let knowledge_node_msg = NodeMsg::AntiEntropyRetry {
+            let ae_retry_node_msg = NodeMsg::AntiEntropyRetry {
                 section_auth,
                 section_signed,
                 proof_chain,
@@ -102,7 +142,7 @@ impl Core {
             let wire_msg = WireMsg::single_src(
                 &self.node,
                 src_location.to_dst(),
-                knowledge_node_msg,
+                ae_retry_node_msg,
                 self.section.authority_provider().section_key(),
             )?;
 
@@ -148,7 +188,7 @@ mod tests {
 
         let command = env
             .core
-            .check_dest_information(&node_msg, &src_location, &dst_section_pk, sender)
+            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, sender)
             .await?;
 
         assert!(command.is_none());
@@ -167,12 +207,23 @@ mod tests {
             env.create_message(env.core.section().prefix(), our_new_pk)?;
         let sender = env.core.node().addr;
 
-        let msg_to_send = env
+        let command = env
             .core
-            .check_dest_information(&node_msg, &src_location, &our_new_pk, sender)
+            .check_dest_section_pk(&node_msg, &src_location, &our_new_pk, sender)
             .await?;
 
-        assert!(msg_to_send.is_none());
+        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
+            wire_msg
+                .into_message()
+                .context("failed to deserialised anti-entropy message")?
+        });
+
+        assert_matches!(msg_type, MessageType::Node{ msg, .. } => {
+            assert_matches!(msg, NodeMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+                assert_eq!(section_auth, env.core.section().authority_provider());
+                assert_eq!(proof_chain, env.core.section_chain());
+            });
+        });
 
         Ok(())
     }
@@ -188,7 +239,7 @@ mod tests {
         let dst_section_pk = *env.core.section_chain().root_key();
         let command = env
             .core
-            .check_dest_information(&node_msg, &src_location, &dst_section_pk, sender)
+            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, sender)
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
@@ -219,7 +270,7 @@ mod tests {
 
         let command = env
             .core
-            .check_dest_information(&node_msg, &src_location, &dst_section_pk, sender)
+            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, sender)
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {

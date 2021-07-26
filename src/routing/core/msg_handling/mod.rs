@@ -193,20 +193,29 @@ impl Core {
                 proof_chain,
                 bounced_msg,
             } => {
-                self.handle_anti_entropy_bounced_msg(
+                self.handle_anti_entropy_retry_msg(
                     section_auth,
                     section_signed,
                     proof_chain,
                     bounced_msg,
                     sender,
+                    src_name,
                 )
                 .await
             }
             NodeMsg::AntiEntropyRedirect {
-                section_auth: _,
-                section_signed: _,
-                bounced_msg: _,
-            } => Ok(vec![]),
+                section_auth,
+                section_signed,
+                bounced_msg,
+            } => {
+                self.handle_anti_entropy_redirect_msg(
+                    section_auth,
+                    section_signed,
+                    bounced_msg,
+                    sender,
+                )
+                .await
+            }
             NodeMsg::ForwardServiceMsg { msg, user, auth } => {
                 // If elder, always handle Forward
                 if self.is_not_elder() {
