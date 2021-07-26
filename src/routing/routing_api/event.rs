@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     data::DataMsg,
-    node::{NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse},
+    node::{NodeCmd, NodeQuery, NodeQueryResponse},
     DataAuthority, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -139,20 +139,6 @@ pub enum Event {
 pub enum MessageReceived {
     /// Cmds only sent a among Nodes in the network.
     NodeCmd(NodeCmd),
-    /// An error of a NodeCmd.
-    NodeCmdError {
-        /// The error.
-        error: NodeCmdError,
-        /// ID of causing cmd.
-        correlation_id: MessageId,
-    },
-    /// Events only sent among Nodes in the network.
-    NodeEvent {
-        /// Request.
-        event: NodeEvent,
-        /// ID of causing cmd.
-        correlation_id: MessageId,
-    },
     /// Queries is a read-only operation.
     NodeQuery(NodeQuery),
     /// The response to a query, containing the query result.

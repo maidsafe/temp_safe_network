@@ -415,38 +415,6 @@ impl Core {
                 .await;
                 Ok(vec![])
             }
-            NodeMsg::NodeCmdError {
-                error,
-                correlation_id,
-            } => {
-                self.send_event(Event::MessageReceived {
-                    msg_id,
-                    src: msg_authority.src_location(),
-                    dst: dst_location,
-                    msg: Box::new(MessageReceived::NodeCmdError {
-                        error,
-                        correlation_id,
-                    }),
-                })
-                .await;
-                Ok(vec![])
-            }
-            NodeMsg::NodeEvent {
-                event,
-                correlation_id,
-            } => {
-                self.send_event(Event::MessageReceived {
-                    msg_id,
-                    src: msg_authority.src_location(),
-                    dst: dst_location,
-                    msg: Box::new(MessageReceived::NodeEvent {
-                        event,
-                        correlation_id,
-                    }),
-                })
-                .await;
-                Ok(vec![])
-            }
             NodeMsg::NodeQuery(node_query) => {
                 self.send_event(Event::MessageReceived {
                     msg_id,

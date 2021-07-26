@@ -7,13 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{
-        ChunkRead, ChunkWrite, CmdError, DataCmd as NodeDataCmd, DataExchange,
-        DataQuery as NodeDataQuery, Error, Result,
-    },
+    data::{ChunkRead, ChunkWrite, DataCmd, DataExchange, DataQuery, Result},
     DataSigned, EndUser,
 };
-use crate::types::{Chunk, ChunkAddress, PublicKey, Signature};
+use crate::types::{Chunk, PublicKey};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -24,7 +21,7 @@ pub enum NodeCmd {
     /// Metadata is handled by Elders
     Metadata {
         /// The contianed command
-        cmd: NodeDataCmd,
+        cmd: DataCmd,
         /// Requester pk and signature
         data_signed: DataSigned,
         /// Message source
@@ -66,33 +63,13 @@ pub enum NodeSystemCmd {
     },
 }
 
-// -------------- Node Events --------------
-
-///
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeEvent {
-    /// Replication completed event, emitted by a node, received by elders.
-    ReplicationCompleted {
-        ///
-        chunk: ChunkAddress,
-        /// The Elder's accumulated signature
-        /// over the chunk address. This is sent back
-        /// to them so that any uninformed Elder knows
-        /// that this is all good.
-        proof: Signature,
-    },
-    /// Adults ack read/write of chunks as to convey responsivity.
-    ChunkWriteHandled(Result<(), CmdError>),
-}
-
 /// Query originating at a node
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQuery {
     /// Metadata is handled by Elders
     Metadata {
         /// The actual query message
-        query: NodeDataQuery,
+        query: DataQuery,
         /// Client signature
         data_signed: DataSigned,
         /// The user that has initiated this query
@@ -113,24 +90,4 @@ pub enum NodeQuery {
 pub enum NodeQueryResponse {
     /// Elder to Adult Get.
     GetChunk(Result<Chunk>),
-}
-
-///
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeCmdError {
-    ///
-    Data(NodeDataError),
-}
-
-///
-#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeDataError {
-    ///
-    ChunkReplication {
-        ///
-        head_address: ChunkAddress,
-        ///
-        error: Error,
-    },
 }

@@ -20,9 +20,7 @@ pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionSi
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use network::{Network, OtherSection};
-pub use node_msgs::{
-    NodeCmd, NodeCmdError, NodeDataError, NodeEvent, NodeQuery, NodeQueryResponse, NodeSystemCmd,
-};
+pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse, NodeSystemCmd};
 pub use prefix_map::PrefixMap;
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::ElderCandidates;
@@ -138,20 +136,6 @@ pub enum NodeMsg {
     },
     /// Cmds only sent internally in the network.
     NodeCmd(NodeCmd),
-    /// An error of a NodeCmd.
-    NodeCmdError {
-        /// The error.
-        error: NodeCmdError,
-        /// ID of causing cmd.
-        correlation_id: MessageId,
-    },
-    /// Events only sent internally in the network.
-    NodeEvent {
-        /// Request.
-        event: NodeEvent,
-        /// ID of causing cmd.
-        correlation_id: MessageId,
-    },
     /// Queries is a read-only operation.
     NodeQuery(NodeQuery),
     /// The response to a query, containing the query result.
