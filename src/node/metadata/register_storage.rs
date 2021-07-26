@@ -169,7 +169,7 @@ impl RegisterStorage {
                                 let _ = self.db.drop_tree(key)?;
                                 Ok(())
                             }
-                        } else if let Ok(_) = self.load_store(key) {
+                        } else if self.load_store(key).is_ok() {
                             info!("Deleting Register");
                             let _ = self.db.drop_tree(key)?;
                             Ok(())
