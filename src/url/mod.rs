@@ -1421,7 +1421,7 @@ mod tests {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
         let subdirs = "/dir1/dir2";
-        let content_version = 5;
+        let content_version = VersionHash::default();
         let query_string = "k1=v1&k2=v2";
         let query_string_v = format!("{}&v={}", query_string, content_version);
         let fragment = "myfragment";
@@ -1436,7 +1436,7 @@ mod tests {
             Some(vec!["subname".to_string()]),
             Some(query_string),
             Some(fragment),
-            Some(5),
+            Some(content_version),
             XorUrlBase::Base32z,
         )?;
         let native_url = NativeUrl::from_url(&xorurl)?;
@@ -1635,20 +1635,21 @@ mod tests {
         assert_eq!(x.to_string(), "safe://myname?name=&age=25");
 
         // Test setting content version via ?v=61342
-        x.set_query_key(URL_VERSION_QUERY_NAME, Some("61342"))?;
+        let version_hash = VersionHash::default();
+        x.set_query_key(URL_VERSION_QUERY_NAME, Some(&version_hash.to_string()))?;
         assert_eq!(
             x.query_key_last(URL_VERSION_QUERY_NAME),
-            Some("61342".to_string())
+            Some(version_hash.to_string())
         );
-        assert_eq!(x.content_version(), Some(61342));
+        assert_eq!(x.content_version(), Some(version_hash));
 
         // Test unsetting content version via ?v=None
         x.set_query_key(URL_VERSION_QUERY_NAME, None)?;
         assert_eq!(x.query_key_last(URL_VERSION_QUERY_NAME), None);
         assert_eq!(x.content_version(), None);
 
-        // Test parse error for version via ?v=non-integer
-        let result = x.set_query_key(URL_VERSION_QUERY_NAME, Some("non-integer"));
+        // Test parse error for version via ?v=non-hash
+        let result = x.set_query_key(URL_VERSION_QUERY_NAME, Some("non-hash"));
         assert!(result.is_err());
 
         Ok(())
@@ -1656,7 +1657,7 @@ mod tests {
 
     #[test]
     fn test_native_url_set_sub_names() -> Result<()> {
-        let mut x = NativeUrl::from_url("safe://sub1.sub2.myname?v=5")?;
+        let mut x = NativeUrl::from_url("safe://sub1.sub2.myname")?;
         assert_eq!(x.sub_names(), "sub1.sub2");
         assert_eq!(x.sub_names_vec(), ["sub1", "sub2"]);
 
@@ -1664,7 +1665,7 @@ mod tests {
         assert_eq!(x.sub_names(), "s1.s2.s3");
         assert_eq!(x.sub_names_vec(), ["s1", "s2", "s3"]);
 
-        assert_eq!(x.to_string(), "safe://s1.s2.s3.myname?v=5");
+        assert_eq!(x.to_string(), "safe://s1.s2.s3.myname");
         Ok(())
     }
 
@@ -1672,15 +1673,19 @@ mod tests {
     fn test_native_url_set_content_version() -> Result<()> {
         let mut x = NativeUrl::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
 
-        x.set_content_version(Some(234));
+        let version_hash = VersionHash::default();
+        x.set_content_version(Some(version_hash));
         assert_eq!(
             x.query_key_first(URL_VERSION_QUERY_NAME),
-            Some("234".to_string())
+            Some(version_hash.to_string())
         );
-        assert_eq!(x.content_version(), Some(234));
+        assert_eq!(x.content_version(), Some(version_hash));
         assert_eq!(
             x.to_string(),
-            "safe://myname?name=John+Doe&name=Jane+Doe&v=234"
+            format!(
+                "safe://myname?name=John+Doe&name=Jane+Doe&v={}",
+                version_hash
+            )
         );
 
         x.set_content_version(None);
@@ -1696,8 +1701,8 @@ mod tests {
         // Make sure we can read percent-encoded paths, and set them as well.
         // Here we verify that url::Url has the same path encoding behavior
         // as our implementation...for better or worse.
-        let mut x = NativeUrl::from_url("safe://domain/path/to/my%20file.txt?v=1")?;
-        let mut u = Url::parse("safe://domain/path/to/my%20file.txt?v=1").map_err(|e| {
+        let mut x = NativeUrl::from_url("safe://domain/path/to/my%20file.txt")?;
+        let mut u = Url::parse("safe://domain/path/to/my%20file.txt").map_err(|e| {
             Error::InvalidInput(format!(
                 "Unexpectedly failed to parse with third-party Url::parse: {}",
                 e
@@ -1722,14 +1727,14 @@ mod tests {
         u.set_path("no-leading-slash");
         assert_eq!(x.path(), "/no-leading-slash");
         assert_eq!(x.path(), u.path());
-        assert_eq!(x.to_string(), "safe://domain/no-leading-slash?v=1");
+        assert_eq!(x.to_string(), "safe://domain/no-leading-slash");
         assert_eq!(x.to_string(), u.to_string());
 
         x.set_path("");
         u.set_path("");
         assert_eq!(x.path(), ""); // no slash if path is empty.
         assert_eq!(x.path(), u.path());
-        assert_eq!(x.to_string(), "safe://domain?v=1");
+        assert_eq!(x.to_string(), "safe://domain");
         assert_eq!(x.to_string(), u.to_string());
 
         // TODO: url::Url preserves the missing slash, and allows path to
@@ -1738,8 +1743,8 @@ mod tests {
         u.set_path("/");
         assert_eq!(x.path(), "");
         assert_eq!(u.path(), "/"); // slash removed if path otherwise empty.
-        assert_eq!(x.to_string(), "safe://domain?v=1"); // note that slash in path omitted.
-        assert_eq!(u.to_string(), "safe://domain/?v=1");
+        assert_eq!(x.to_string(), "safe://domain"); // note that slash in path omitted.
+        assert_eq!(u.to_string(), "safe://domain/");
 
         Ok(())
     }
@@ -1747,8 +1752,8 @@ mod tests {
     #[test]
     fn test_native_url_to_string() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
-        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hyryygyynpm7tjdim96rdtz9kkyc758zqth5b3ynzya69njrjshgu7w84k3tomzy/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
+        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hyryygyynpm7tjdim96rdtz9kkyc758zqth5b3ynzya69njrjshgu7w84k3tomzy/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
 
         let nrs = NativeUrl::from_url(nrsurl)?;
         let xor = NativeUrl::from_url(xorurl)?;
@@ -1768,8 +1773,8 @@ mod tests {
     #[test]
     fn test_native_url_parts() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
-        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
+        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
 
         let nrs = NativeUrl::from_url(nrsurl)?;
         let xor = NativeUrl::from_url(xorurl)?;
@@ -1803,11 +1808,11 @@ mod tests {
 
         assert_eq!(
             nrs.query_string(),
-            "this=that&this=other&color=blue&v=5&name=John+Doe"
+            "this=that&this=other&color=blue&name=John+Doe"
         );
         assert_eq!(
             xor.query_string(),
-            "this=that&this=other&color=blue&v=5&name=John+Doe"
+            "this=that&this=other&color=blue&name=John+Doe"
         );
 
         assert_eq!(nrs.fragment(), "somefragment");
@@ -1894,7 +1899,7 @@ mod tests {
 
     #[test]
     fn test_native_url_validate() -> Result<()> {
-        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
+        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
         let trailing_slash = "safe://my.domain/";
         let double_q = "safe://my.domain/??foo=bar";
 
