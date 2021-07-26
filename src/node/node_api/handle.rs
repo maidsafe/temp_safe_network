@@ -151,16 +151,6 @@ impl Node {
                 }
                 Ok(NodeTask::None)
             }
-            // a remote section asks for the replicas of their wallet
-            NodeDuty::GetSectionElders { msg_id, origin } => {
-                let network = self.network_api.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(
-                        Self::get_section_elders(&network, msg_id, origin).await?,
-                    ))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
             NodeDuty::ProcessLostMember { name, .. } => {
                 info!("Member Lost: {:?}", name);
                 let elder = self.as_elder().await?;

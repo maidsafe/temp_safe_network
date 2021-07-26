@@ -295,8 +295,8 @@ impl Routing {
             .collect()
     }
 
-    /// Returns the info about our section or `None` if we are not joined yet.
-    pub async fn our_section(&self) -> SectionAuthorityProvider {
+    /// Returns our section's authority provider.
+    pub async fn our_section_auth(&self) -> SectionAuthorityProvider {
         self.dispatcher
             .core
             .read()

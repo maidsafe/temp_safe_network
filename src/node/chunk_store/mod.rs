@@ -16,7 +16,7 @@ use crate::types::{Chunk, ChunkAddress, PublicKey};
 use crate::{
     messaging::{
         data::{ChunkRead, ChunkWrite, Error as ErrorMessage},
-        node::{NodeDataQueryResponse, NodeMsg, NodeQueryResponse},
+        node::{NodeMsg, NodeQueryResponse},
         DstLocation, MessageId,
     },
     node::Error,
@@ -96,7 +96,7 @@ impl ChunkStore {
         NodeDuty::Send(OutgoingMsg {
             id: MessageId::in_response_to(&msg_id),
             msg: MsgType::Node(NodeMsg::NodeQueryResponse {
-                response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
+                response: NodeQueryResponse::GetChunk(result),
                 correlation_id: msg_id,
             }),
             dst: DstLocation::Section {

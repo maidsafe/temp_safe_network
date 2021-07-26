@@ -76,7 +76,11 @@ impl Network {
 
     /// Returns our section's public key.
     pub(crate) async fn our_section_public_key(&self) -> BlsPublicKey {
-        self.routing.our_section().await.public_key_set.public_key()
+        self.routing
+            .our_section_auth()
+            .await
+            .public_key_set
+            .public_key()
     }
 
     pub(crate) async fn our_public_key_set(&self) -> Result<PublicKeySet> {
