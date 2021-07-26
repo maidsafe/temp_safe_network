@@ -12,7 +12,7 @@ use crate::messaging::{
         QueryResponse,
     },
     node::NodeMsg,
-    DataAuthority, DstLocation, EndUser, MessageId, SrcLocation,
+    DataAuthority, DstLocation, EndUser, MessageId,
 };
 use crate::routing::Prefix;
 use crate::types::{Chunk, PublicKey};
@@ -58,11 +58,6 @@ pub enum NodeDuty {
         response: QueryResponse,
         correlation_id: MessageId,
         src: XorName,
-    },
-    /// Get section elders.
-    GetSectionElders {
-        msg_id: MessageId,
-        origin: SrcLocation,
     },
     Genesis,
     EldersChanged {

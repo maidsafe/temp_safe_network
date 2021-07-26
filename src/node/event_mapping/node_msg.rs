@@ -9,10 +9,7 @@
 use super::{Mapping, MsgContext};
 use crate::messaging::{
     data::{DataCmd, DataMsg, ProcessMsg, QueryResponse},
-    node::{
-        NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeSystemCmd,
-        NodeSystemQuery,
-    },
+    node::{NodeCmd, NodeMsg, NodeQuery, NodeQueryResponse, NodeSystemCmd},
     DataAuthority, DataSigned, DstLocation, MessageId, SrcLocation, WireMsg,
 };
 use crate::node::{
@@ -141,10 +138,6 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
         MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk))) => {
             NodeDuty::ProcessRepublish { chunk, msg_id }
         }
-        // Aggregated by us, for security
-        MessageReceived::NodeQuery(NodeQuery::System(NodeSystemQuery::GetSectionElders)) => {
-            NodeDuty::GetSectionElders { msg_id, origin }
-        }
         //
         // ------ system cmd ------
         MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::StorageFull {
@@ -152,7 +145,7 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
         })) => NodeDuty::IncrementFullNodeCount { node_id },
         // --- Adult Operation response ---
         MessageReceived::NodeQueryResponse {
-            response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(res)),
+            response: NodeQueryResponse::GetChunk(res),
             correlation_id,
         } => NodeDuty::RecordAdultReadLiveness {
             response: QueryResponse::GetChunk(res),

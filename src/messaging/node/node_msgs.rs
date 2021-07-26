@@ -13,7 +13,7 @@ use crate::messaging::{
     },
     DataSigned, EndUser,
 };
-use crate::types::{Chunk, ChunkAddress, PublicKey, SectionElders, Signature};
+use crate::types::{Chunk, ChunkAddress, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -105,45 +105,12 @@ pub enum NodeQuery {
         /// The user that has initiated this query
         origin: EndUser,
     },
-    /// Related to the running of a node
-    System(NodeSystemQuery),
-}
-
-///
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeSystemQuery {
-    /// On Elder change, all Elders need to query
-    /// network for the new wallet's replicas' public key set
-    GetSectionElders,
-    /// Acquire the chunk from current holders for replication.
-    /// providing the address of the chunk to be replicated.
-    GetChunk(ChunkAddress),
-}
-
-///
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeSystemQueryResponse {
-    /// On Elder change, all Elders need to query
-    /// network for the new wallet's replicas' public key set
-    GetSectionElders(SectionElders),
-    /// Respond elders with the requested chunk for replication
-    GetChunk(Chunk),
 }
 
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQueryResponse {
-    ///
-    Data(NodeDataQueryResponse),
-    ///
-    System(NodeSystemQueryResponse),
-}
-
-///
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeDataQueryResponse {
     /// Elder to Adult Get.
     GetChunk(Result<Chunk>),
 }

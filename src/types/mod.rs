@@ -17,7 +17,6 @@ pub mod utils;
 mod chunk;
 mod errors;
 mod keys;
-mod section;
 mod token;
 
 pub use chunk::{
@@ -33,7 +32,6 @@ pub use keys::{
     signature::{Signature, SignatureShare},
 };
 pub use register::Address as RegisterAddress;
-pub use section::SectionElders;
 pub use token::Token;
 
 use register::Register;

@@ -7,47 +7,21 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{NodeCmd, NodeMsg, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse},
-    DstLocation, MessageId, SrcLocation,
+    node::{NodeCmd, NodeMsg, NodeSystemCmd},
+    DstLocation, MessageId,
 };
 use crate::node::{
     network::Network,
-    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Node, Result,
 };
 use crate::routing::{Prefix, XorName};
-use crate::types::{PublicKey, SectionElders};
+use crate::types::PublicKey;
 use std::collections::BTreeSet;
 
 use super::role::ElderRole;
 
 impl Node {
-    /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
-    #[allow(clippy::eval_order_dependence)]
-    pub(crate) async fn get_section_elders(
-        network_api: &Network,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    ) -> Result<NodeDuties> {
-        let elders = SectionElders {
-            prefix: network_api.our_prefix().await,
-            names: network_api.our_elder_names().await,
-            key_set: network_api.our_public_key_set().await?,
-        };
-        Ok(vec![NodeDuty::Send(OutgoingMsg {
-            id: MessageId::in_response_to(&msg_id),
-            msg: MsgType::Node(NodeMsg::NodeQueryResponse {
-                response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(
-                    elders,
-                )),
-                correlation_id: msg_id,
-            }),
-            dst: origin.to_dst(), // this will be a section
-            aggregation: true,
-        })])
-    }
-
-    ///
     pub(crate) async fn notify_section_of_our_storage(network_api: &Network) -> Result<NodeDuty> {
         let node_id = PublicKey::from(network_api.public_key().await);
         let section_pk = network_api.our_public_key_set().await?.public_key();
