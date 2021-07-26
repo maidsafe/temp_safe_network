@@ -146,7 +146,11 @@ pub enum SubCommands {
         global_settings(&[AppSettings::DisableVersion]),
     )]
     /// Update the application to the latest available version
-    Update {},
+    Update {
+        /// Remove prompt to confirm the update.
+        #[structopt(short = "y", long = "no-confirm")]
+        no_confirm: bool,
+    },
     #[structopt(
         name = "node",
         no_version,

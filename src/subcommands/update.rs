@@ -21,7 +21,7 @@ pub fn update_commander() -> Result<(), Box<dyn Error>> {
 }
 
 #[cfg(feature = "self-update")]
-pub fn update_commander() -> Result<(), Box<dyn Error>> {
+pub fn update_commander(no_confirm: bool) -> Result<(), Box<dyn Error>> {
     let target = self_update::get_target();
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
@@ -45,6 +45,7 @@ pub fn update_commander() -> Result<(), Box<dyn Error>> {
             .repo_name(REPO_NAME)
             .target(&target)
             .bin_name(&bin_name)
+            .no_confirm(no_confirm)
             .show_download_progress(true)
             .current_version(env!("CARGO_PKG_VERSION"))
             .build()?

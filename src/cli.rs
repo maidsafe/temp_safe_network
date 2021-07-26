@@ -91,11 +91,14 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
     let result = match args.cmd {
         Some(SubCommands::Config { cmd }) => config_commander(cmd).await,
         Some(SubCommands::Networks { cmd }) => networks_commander(cmd).await,
-        Some(SubCommands::Update {}) => {
+        Some(SubCommands::Update { no_confirm }) => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
-            let handler = std::thread::spawn(|| {
-                update_commander().map_err(|err| anyhow!("Error performing update: {}", err))
+            // The use of the move keyword is required for the closure to take ownership of
+            // the no_confirm flag.
+            let handler = std::thread::spawn(move || {
+                update_commander(no_confirm)
+                    .map_err(|err| anyhow!("Error performing update: {}", err))
             });
             handler
                 .join()
