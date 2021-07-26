@@ -15,7 +15,7 @@ use sled::{Db, Tree};
 use xor_name::XorName;
 
 /// Disk storage for Registers.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct RegisterOpStore {
     tree: Tree,
     db_name: String,

@@ -17,6 +17,7 @@ use crate::dbs::UsedSpace;
 use crate::messaging::data::{DataMsg, ProcessingError};
 use crate::node::logging::log_ctx::LogCtx;
 use crate::node::logging::run_system_logger;
+use crate::node::metadata::RegisterStorage;
 use crate::node::{
     chunk_store::ChunkStore,
     error::convert_to_error_message,
@@ -70,6 +71,8 @@ pub struct Node {
     network_api: Network,
     node_info: NodeInfo,
     used_space: UsedSpace,
+    // We instantiate this even if adult. It just won't be used, but makes it easier keep once storage instance going on.
+    register_store: RegisterStorage,
     role: Arc<RwLock<Role>>,
 }
 
@@ -104,6 +107,8 @@ impl Node {
 
         let used_space = UsedSpace::new(config.max_capacity());
 
+        let register_store = RegisterStorage::new(node_info.path(), used_space.clone())?;
+
         let node = Self {
             role: Arc::new(RwLock::new(Role::Adult(AdultRole {
                 chunks: Arc::new(
@@ -112,6 +117,7 @@ impl Node {
             }))),
             node_info,
             used_space,
+            register_store,
             network_api: network_api.clone(),
         };
 

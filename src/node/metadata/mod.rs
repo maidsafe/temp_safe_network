@@ -12,7 +12,6 @@ mod chunk_records;
 mod elder_stores;
 mod register_storage;
 
-use crate::dbs::UsedSpace;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataExchange, DataMsg, DataQuery, ProcessMsg, QueryResponse},
     node::NodeMsg,
@@ -31,11 +30,10 @@ use bls::PublicKey as BlsPublicKey;
 use chunk_records::ChunkRecords;
 use elder_stores::ElderStores;
 use rand::rngs::OsRng;
-use register_storage::RegisterStorage;
+pub(crate) use register_storage::RegisterStorage;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
-    path::Path,
 };
 use xor_name::XorName;
 
@@ -50,13 +48,8 @@ pub(crate) struct Metadata {
 }
 
 impl Metadata {
-    pub(crate) async fn new(
-        path: &Path,
-        used_space: UsedSpace,
-        capacity: Capacity,
-    ) -> Result<Self> {
+    pub(crate) async fn new(capacity: Capacity, register_storage: RegisterStorage) -> Result<Self> {
         let chunk_records = ChunkRecords::new(capacity);
-        let register_storage = RegisterStorage::new(path, used_space)?;
         let elder_stores = ElderStores::new(chunk_records, register_storage);
         Ok(Self { elder_stores })
     }

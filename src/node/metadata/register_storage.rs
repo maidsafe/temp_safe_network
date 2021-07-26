@@ -36,22 +36,22 @@ use xor_name::{Prefix, XorName};
 const DATABASE_NAME: &str = "register.db";
 
 /// Operations over the data type Register.
-#[derive(Clone)]
-pub(super) struct RegisterStorage {
+#[derive(Clone, Debug)]
+pub(crate) struct RegisterStorage {
     path: PathBuf,
     used_space: UsedSpace,
     registers: DashMap<XorName, Option<StateEntry>>,
     db: Db,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct StateEntry {
     state: Register,
     store: RegisterOpStore,
 }
 
 impl RegisterStorage {
-    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         used_space.add_dir(path);
         let db_dir = path.join("db").join(DATABASE_NAME.to_string());
 
