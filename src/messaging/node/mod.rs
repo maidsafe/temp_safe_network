@@ -43,6 +43,31 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
 pub enum NodeMsg {
+    /// Message sent to a peer when a message with outdated section
+    /// information was received, attaching the bounced message so
+    /// the peer can resend it with up to date destination information.
+    AntiEntropyRetry {
+        /// Current `SectionAuthorityProvider` of the sender's section.
+        section_auth: SectionAuthorityProvider,
+        /// Sender's section signature over the `SectionAuthorityProvider`.
+        section_signed: KeyedSig,
+        /// Sender's section chain truncated from the dest section key found in the `bounced_msg`.
+        proof_chain: SecuredLinkedList,
+        /// Message bounced due to outdated destination section information.
+        bounced_msg: Box<NodeMsg>,
+    },
+    /// Message sent to a peer when a message needs to be sent to a different
+    /// and/or closest section, attaching the bounced message so the peer can
+    /// resend it to the correct section with up to date destination information.
+    AntiEntropyRedirect {
+        /// Current `SectionAuthorityProvider` of a closest section.
+        section_auth: SectionAuthorityProvider,
+        /// Section signature over the `SectionAuthorityProvider` of the closest
+        /// section the bounced message shall be resent to.
+        section_signed: KeyedSig,
+        /// Message bounced that shall be resent by the peer.
+        bounced_msg: Box<NodeMsg>,
+    },
     /// Forward a data message.
     ForwardServiceMsg {
         /// The msg
@@ -126,14 +151,6 @@ pub enum NodeMsg {
     /// Message that notifies a section to test
     /// the connectivity to a node
     StartConnectivityTest(XorName),
-    /// Message sent by a node to indicate it received a message from a node which was ahead in knowledge.
-    /// A reply is expected with a `SectionKnowledge` message.
-    SectionKnowledgeQuery {
-        /// Last known key by our node, used to get any newer keys
-        last_known_key: Option<BlsPublicKey>,
-        /// Routing message
-        msg: Box<NodeMsg>,
-    },
     /// Cmds only sent internally in the network.
     NodeCmd(NodeCmd),
     /// Queries is a read-only operation.

@@ -135,46 +135,42 @@ impl Core {
         );
 
         // Let's check for entropy before we proceed further
-        let (ae_command, shall_be_handled) = self
-            .check_for_entropy(&node_msg, &msg_authority, &dst_location, sender)
-            .await?;
-
-        let mut commands = vec![];
-
-        if let Some(cmd) = ae_command {
-            commands.push(cmd);
+        if let Some(ae_command) = self
+            .check_for_entropy(
+                &node_msg,
+                &msg_authority.src_location(),
+                &dst_location,
+                sender,
+            )
+            .await?
+        {
+            return Ok(vec![ae_command]);
         }
 
-        if shall_be_handled {
-            trace!(
-                "Entropy check passed. Handling verified node msg {}",
-                msg_id
-            );
+        trace!(
+            "Entropy check passed. Handling verified node msg {}",
+            msg_id
+        );
 
-            // We assume to be aggregated if it contains a BLS Share sig as authority.
-            match self.aggregate_message_and_stop(&mut msg_authority, payload) {
-                Ok(false) => {
-                    commands.extend(
-                        self.handle_verified_node_message(
-                            sender,
-                            msg_id,
-                            msg_authority,
-                            dst_location,
-                            node_msg,
-                            &known_keys,
-                        )
-                        .await?,
-                    );
-                }
-                Err(Error::InvalidSignatureShare) => {
-                    let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
-                    commands.push(cmd);
-                }
-                Ok(true) | Err(_) => {}
+        // We assume to be aggregated if it contains a BLS Share sig as authority.
+        match self.aggregate_message_and_stop(&mut msg_authority, payload) {
+            Ok(false) => {
+                self.handle_verified_node_message(
+                    sender,
+                    msg_id,
+                    msg_authority,
+                    dst_location,
+                    node_msg,
+                    &known_keys,
+                )
+                .await
             }
+            Err(Error::InvalidSignatureShare) => {
+                let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
+                Ok(vec![cmd])
+            }
+            Ok(true) | Err(_) => Ok(vec![]),
         }
-
-        Ok(commands)
     }
 
     // Hanlder for node messages which have successfully
@@ -191,6 +187,26 @@ impl Core {
         let src_name = msg_authority.name();
 
         match node_msg {
+            NodeMsg::AntiEntropyRetry {
+                section_auth,
+                section_signed,
+                proof_chain,
+                bounced_msg,
+            } => {
+                self.handle_anti_entropy_bounced_msg(
+                    section_auth,
+                    section_signed,
+                    proof_chain,
+                    bounced_msg,
+                    sender,
+                )
+                .await
+            }
+            NodeMsg::AntiEntropyRedirect {
+                section_auth: _,
+                section_signed: _,
+                bounced_msg: _,
+            } => Ok(vec![]),
             NodeMsg::ForwardServiceMsg { msg, user, auth } => {
                 // If elder, always handle Forward
                 if self.is_not_elder() {
@@ -293,15 +309,6 @@ impl Core {
                 dst_section_pk,
                 *bounced_msg,
             )?]),
-            NodeMsg::SectionKnowledgeQuery {
-                last_known_key,
-                msg: returned_msg,
-            } => Ok(vec![self.handle_section_knowledge_query(
-                last_known_key,
-                returned_msg,
-                sender,
-                src_name,
-            )?]),
             NodeMsg::DkgStart {
                 dkg_key,
                 elder_candidates,
@@ -333,8 +340,9 @@ impl Core {
                         if section_auth.prefix == *self.section.prefix()
                             || section_auth.prefix.is_extension_of(self.section.prefix())
                         {
-                            // This `SectionInfo` is proposed by the DKG participants and is signed by the new
-                            // key created by the DKG so we don't know it yet. We only require the src_name of the
+                            // This `SectionInfo` is proposed by the DKG participants and
+                            // it's signed by the new key created by the DKG so we don't
+                            // know it yet. We only require the src_name of the
                             // proposal to be one of the DKG participants.
                             if !section_auth.contains_elder(&src_name) {
                                 return Ok(vec![]);

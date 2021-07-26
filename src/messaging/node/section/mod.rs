@@ -29,13 +29,13 @@ use xor_name::XorName;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// All information about a section
 pub struct Section {
-    /// network genesis key
+    /// Network genesis key
     pub genesis_key: BlsPublicKey,
     /// The secured linked list of previous section keys
     pub chain: SecuredLinkedList,
     /// Signed section authority
     pub section_auth: SectionAuth<SectionAuthorityProvider>,
-    /// memebers of the section
+    /// Members of the section
     pub members: SectionPeers,
 }
 

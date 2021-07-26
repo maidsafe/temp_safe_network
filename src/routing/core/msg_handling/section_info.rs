@@ -94,33 +94,6 @@ impl Core {
         }
     }
 
-    pub(crate) fn handle_section_knowledge_query(
-        &self,
-        given_key: Option<bls::PublicKey>,
-        returned_msg: Box<NodeMsg>,
-        sender: SocketAddr,
-        src_name: XorName,
-    ) -> Result<Command> {
-        let chain = self.section.chain();
-        let given_key = if let Some(key) = given_key {
-            key
-        } else {
-            *self.section_chain().root_key()
-        };
-        let truncated_chain = chain.get_proof_chain_to_current(&given_key)?;
-        let section_auth = self.section.section_signed_authority_provider();
-
-        let node_msg = NodeMsg::SectionKnowledge {
-            src_info: (section_auth.clone(), truncated_chain),
-            msg: Some(returned_msg),
-        };
-        let dst_section_key = self.section_key_by_name(&src_name);
-
-        let cmd = self.send_direct_message((src_name, sender), node_msg, dst_section_key)?;
-
-        Ok(cmd)
-    }
-
     pub(crate) fn handle_section_knowledge_msg(
         &mut self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,

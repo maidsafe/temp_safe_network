@@ -1113,7 +1113,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
     // Create the bounced message, indicating the last key the peer knows is `pk0`
     let bounced_wire_msg = WireMsg::single_src(
         &other_node,
-        DstLocation::DirectAndUnrouted(pk0),
+        DstLocation::DirectAndUnrouted(pk1),
         NodeMsg::BouncedUntrustedMessage {
             msg: Box::new(original_node_msg.clone()),
             dst_section_pk: pk0,
@@ -1218,7 +1218,7 @@ async fn handle_sync() -> Result<()> {
     // Create the `Sync` message containing the new `Section`.
     let wire_msg = WireMsg::single_src(
         &old_node,
-        DstLocation::DirectAndUnrouted(*new_section.chain().last_key()),
+        DstLocation::DirectAndUnrouted(pk1),
         NodeMsg::Sync {
             section: new_section.clone(),
             network: Network::new(),
@@ -1884,7 +1884,7 @@ fn create_node(age: u8, prefix: Option<Prefix>) -> Node {
     )
 }
 
-async fn create_comm() -> Result<Comm> {
+pub(crate) async fn create_comm() -> Result<Comm> {
     let (tx, _rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     Ok(Comm::new(
         qp2p::Config {

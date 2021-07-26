@@ -8,280 +8,268 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{JoinResponse, NodeMsg, Section},
-    DstLocation, NodeMsgAuthority, WireMsg,
+    node::{KeyedSig, NodeMsg},
+    DstLocation, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
-    error::Result,
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network::NetworkUtils,
-    node::Node,
-    routing_api::command::Command,
-    section::SectionUtils,
+    error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
     SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
+use secured_linked_list::SecuredLinkedList;
 use std::{cmp::Ordering, net::SocketAddr};
 
 impl Core {
+    pub(crate) async fn handle_anti_entropy_bounced_msg(
+        &self,
+        _section_auth: SectionAuthorityProvider,
+        _section_signed: KeyedSig,
+        _proof_chain: SecuredLinkedList,
+        _bounced_msg: Box<NodeMsg>,
+        _sender: SocketAddr,
+    ) -> Result<Vec<Command>> {
+        unimplemented!();
+    }
+
     pub(crate) async fn check_for_entropy(
         &self,
         node_msg: &NodeMsg,
-        msg_authority: &NodeMsgAuthority,
+        src_location: &SrcLocation,
         dst_location: &DstLocation,
         sender: SocketAddr,
-    ) -> Result<(Option<Command>, bool)> {
+    ) -> Result<Option<Command>> {
+        // Adult nodes don't need to carry out entropy checking,
+        // however the message shall always be handled.
         if self.is_not_elder() {
-            // Adult nodes do need to carry out entropy checking,
-            // however the message shall always be handled.
-            return Ok((None, true));
+            return Ok(None);
         }
 
-        let (command, shall_be_handled) = match dst_location.section_pk() {
-            None => return Ok((None, true)),
-            Some(section_pk) => {
-                match process(
-                    &self.node,
-                    &self.section,
-                    node_msg,
-                    msg_authority,
-                    section_pk,
-                )? {
-                    (Some(msg_to_send), shall_be_handled) => {
-                        let command = self.relay_message(msg_to_send).await?;
-                        (Some(command), shall_be_handled)
-                    }
-                    (None, shall_be_handled) => (None, shall_be_handled),
-                }
+        // For the case of receiving a JoinRequest not matching our prefix,
+        // we just let the JoinRequest handler to deal with it later on.
+        if let NodeMsg::JoinRequest(_) = node_msg {
+            return Ok(None);
+        }
+
+        match dst_location.section_pk() {
+            None => Ok(None),
+            Some(dst_section_pk) => {
+                self.check_dest_information(node_msg, src_location, &dst_section_pk, sender)
+                    .await
             }
-        };
+        }
+    }
 
-        if shall_be_handled || command.is_some() {
-            Ok((command, shall_be_handled))
-        } else {
-            // For the case of receiving a JoinRequest not matching our prefix.
-            let sender_name = msg_authority.name();
-            let section_auth = self
-                .network
-                .closest(&sender_name)
-                .unwrap_or_else(|| self.section.authority_provider());
+    // If entropy is found, determine the msg to send in order to
+    // bring the sender's knowledge about us up to date.
+    pub(crate) async fn check_dest_information(
+        &self,
+        node_msg: &NodeMsg,
+        src_location: &SrcLocation,
+        dst_section_pk: &BlsPublicKey,
+        sender: SocketAddr,
+    ) -> Result<Option<Command>> {
+        if let Ordering::Less = self
+            .section
+            .chain()
+            .cmp_by_position(dst_section_pk, self.section.chain().last_key())
+        {
+            info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
+            let proof_chain = if let Ok(chain) = self
+                .section
+                .chain()
+                .get_proof_chain_to_current(dst_section_pk)
+            {
+                chain
+            } else {
+                trace!(
+                    "Cannot find section_key {:?} within the chain",
+                    dst_section_pk
+                );
 
-            let node_msg =
-                NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(section_auth.clone())));
+                self.section.chain().clone()
+            };
 
-            trace!("Sending {:?} to {}", node_msg, sender_name);
-            let cmd = self.send_direct_message(
-                (sender_name, sender),
-                node_msg,
-                section_auth.section_key(),
+            let section_signed_auth = self.section.section_signed_authority_provider().clone();
+            let section_auth = section_signed_auth.value;
+            let section_signed = section_signed_auth.sig;
+
+            let knowledge_node_msg = NodeMsg::AntiEntropyRetry {
+                section_auth,
+                section_signed,
+                proof_chain,
+                bounced_msg: Box::new(node_msg.clone()),
+            };
+            let wire_msg = WireMsg::single_src(
+                &self.node,
+                src_location.to_dst(),
+                knowledge_node_msg,
+                self.section.authority_provider().section_key(),
             )?;
 
-            Ok((Some(cmd), false))
+            Ok(Some(Command::SendMessage {
+                recipients: vec![(src_location.name(), sender)],
+                wire_msg,
+            }))
+        } else {
+            Ok(None)
         }
     }
-}
-
-// On reception of an incoming message, determine the msg to send in order to
-// bring our's and the sender's knowledge about each other up to date. Returns a tuple of
-// `NodeMsg` and `bool`. The boolean signals if the incoming message shall still be processed.
-// If entropy is found, we do not process the incoming message by returning `false`.
-fn process(
-    node: &Node,
-    section: &Section,
-    node_msg: &NodeMsg,
-    msg_authority: &NodeMsgAuthority,
-    dst_section_pk: BlsPublicKey,
-) -> Result<(Option<WireMsg>, bool)> {
-    let src_name = msg_authority.name();
-
-    if section.prefix().matches(&src_name) {
-        // This message is from our section. We update our members via the `Sync` message which is
-        // done elsewhere.
-        return Ok((None, true));
-    }
-
-    let dst = msg_authority.src_location().to_dst();
-
-    if let Ordering::Less = section
-        .chain()
-        .cmp_by_position(&dst_section_pk, section.chain().last_key())
-    {
-        info!("Anti-Entropy: Source's knowledge of our key is outdated, send them an update.");
-        let chain = if let Ok(chain) = section.chain().get_proof_chain_to_current(&dst_section_pk) {
-            chain
-        } else {
-            trace!(
-                "Cannot find section_key {:?} within the chain",
-                dst_section_pk
-            );
-            // In case a new node is trying to bootstrap from us, not being its matching section.
-            // Reply with no msg and with false flag to send back a JoinResponse::Redirect.
-            if let NodeMsg::JoinRequest(_) = node_msg {
-                return Ok((None, false));
-            }
-            section.chain().clone()
-        };
-
-        let section_auth = section.section_signed_authority_provider();
-        let node_msg = NodeMsg::SectionKnowledge {
-            src_info: (section_auth.clone(), chain),
-            msg: Some(Box::new(node_msg.clone())),
-        };
-        let msg = WireMsg::single_src(
-            node,
-            dst,
-            node_msg,
-            section.authority_provider().section_key(),
-        )?;
-
-        return Ok((Some(msg), false));
-    }
-
-    Ok((None, true))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{MessageType, NodeAuth};
+    use crate::messaging::{node::Section, MessageType};
     use crate::routing::{
+        create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
+        node::Node,
+        routing_api::tests::create_comm,
         section::test_utils::{gen_addr, gen_section_authority_provider},
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
-    use eyre::{eyre, Context, Result};
+    use eyre::{Context, Result};
     use secured_linked_list::SecuredLinkedList;
+    use tokio::sync::mpsc;
     use xor_name::Prefix;
 
-    #[test]
-    fn everything_up_to_date() -> Result<()> {
-        let env = Env::new(1)?;
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ae_everything_up_to_date() -> Result<()> {
+        let env = Env::new(1).await?;
 
-        let (node_msg, node_msg_auth) = env.create_message(
-            &env.their_prefix,
-            env.section.authority_provider().section_key(),
+        let (node_msg, src_location) = env.create_message(
+            env.core.section().prefix(),
+            *env.core.section_chain().last_key(),
         )?;
+        let sender = env.core.node().addr;
+        let dst_section_pk = *env.core.section_chain().last_key();
 
-        let dst_section_pk = *env.section.chain().last_key();
-        let (msg_to_send, _) = process(
-            &env.node,
-            &env.section,
-            &node_msg,
-            &node_msg_auth,
-            dst_section_pk,
-        )?;
-        assert_eq!(msg_to_send, None);
+        let command = env
+            .core
+            .check_dest_information(&node_msg, &src_location, &dst_section_pk, sender)
+            .await?;
+
+        assert!(command.is_none());
 
         Ok(())
     }
 
-    #[test]
-    fn new_src_key_from_our_section() -> Result<()> {
-        let env = Env::new(1)?;
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ae_newer_dst_key_of_our_section() -> Result<()> {
+        let env = Env::new(1).await?;
 
         let our_new_sk = bls::SecretKey::random();
         let our_new_pk = our_new_sk.public_key();
 
-        let (node_msg, node_msg_auth) = env.create_message(
-            env.section.prefix(),
-            env.section.authority_provider().section_key(),
-        )?;
+        let (node_msg, src_location) =
+            env.create_message(env.core.section().prefix(), our_new_pk)?;
+        let sender = env.core.node().addr;
 
-        let (msg_to_send, _) = process(
-            &env.node,
-            &env.section,
-            &node_msg,
-            &node_msg_auth,
-            our_new_pk,
-        )?;
+        let msg_to_send = env
+            .core
+            .check_dest_information(&node_msg, &src_location, &our_new_pk, sender)
+            .await?;
 
-        assert_eq!(msg_to_send, None);
+        assert!(msg_to_send.is_none());
 
         Ok(())
     }
 
-    #[test]
-    fn outdated_dst_key_from_other_section() -> Result<()> {
-        let env = Env::new(2)?;
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ae_redirect_to_other_section() -> Result<()> {
+        let env = Env::new(2).await?;
 
-        let (node_msg, node_msg_auth) = env.create_message(
-            &env.their_prefix,
-            env.section.authority_provider().section_key(),
-        )?;
+        let (node_msg, src_location) =
+            env.create_message(&env.their_prefix, *env.core.section_chain().last_key())?;
+        let sender = env.core.node().addr;
 
-        let dst_section_pk = *env.section.chain().root_key();
-        let (msg_to_send, _) = process(
-            &env.node,
-            &env.section,
-            &node_msg,
-            &node_msg_auth,
-            dst_section_pk,
-        )?;
+        let dst_section_pk = *env.core.section_chain().root_key();
+        let command = env
+            .core
+            .check_dest_information(&node_msg, &src_location, &dst_section_pk, sender)
+            .await?;
 
-        let wire_msg = msg_to_send.ok_or_else(|| eyre!("expected an anti-entropy message"))?;
-        let msg_type = wire_msg
-            .into_message()
-            .context("failed to deserialised anti-entropy message")?;
+        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
+            wire_msg
+                .into_message()
+                .context("failed to deserialised anti-entropy message")?
+        });
 
-        assert_matches!(msg_type, MessageType::Node{msg,..} => {
-            assert_matches!(msg, NodeMsg::SectionKnowledge { ref src_info, .. } => {
-                assert_eq!(src_info.0.value, *env.section.authority_provider());
-                assert_eq!(src_info.1, *env.section.chain());
+        assert_matches!(msg_type, MessageType::Node{ msg, .. } => {
+            assert_matches!(msg, NodeMsg::AntiEntropyRedirect { ref section_auth, .. } => {
+                assert_eq!(section_auth, env.core.section().authority_provider());
             });
         });
 
         Ok(())
     }
 
-    #[test]
-    fn outdated_dst_key_from_our_section() -> Result<()> {
-        let env = Env::new(2)?;
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
+        let env = Env::new(2).await?;
 
-        let (node_msg, node_msg_auth) = env.create_message(
-            env.section.prefix(),
-            env.section.authority_provider().section_key(),
+        let (node_msg, src_location) = env.create_message(
+            env.core.section().prefix(),
+            *env.core.section_chain().last_key(),
         )?;
+        let sender = env.core.node().addr;
+        let dst_section_pk = *env.core.section_chain().root_key();
 
-        let dst_section_pk = *env.section.chain().root_key();
-        let (msg_to_send, _) = process(
-            &env.node,
-            &env.section,
-            &node_msg,
-            &node_msg_auth,
-            dst_section_pk,
-        )?;
+        let command = env
+            .core
+            .check_dest_information(&node_msg, &src_location, &dst_section_pk, sender)
+            .await?;
 
-        assert_eq!(msg_to_send, None);
+        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
+            wire_msg
+                .into_message()
+                .context("failed to deserialised anti-entropy message")?
+        });
+
+        assert_matches!(msg_type, MessageType::Node{ msg, .. } => {
+            assert_matches!(msg, NodeMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+                assert_eq!(section_auth, env.core.section().authority_provider());
+                assert_eq!(proof_chain, env.core.section_chain());
+            });
+        });
 
         Ok(())
     }
 
     struct Env {
-        node: Node,
-        section: Section,
+        core: Core,
         their_prefix: Prefix,
     }
 
     impl Env {
-        fn new(chain_len: usize) -> Result<Self> {
+        async fn new(chain_len: usize) -> Result<Self> {
             let prefix0 = Prefix::default().pushed(false);
             let prefix1 = Prefix::default().pushed(true);
 
             let (chain, our_sk) =
                 create_chain(chain_len).context("failed to create section chain")?;
 
-            let (section_auth0, mut nodes, _) = gen_section_authority_provider(prefix0, ELDER_SIZE);
+            let (section_auth, mut nodes, _) = gen_section_authority_provider(prefix0, ELDER_SIZE);
             let node = nodes.remove(0);
 
-            let section_auth0 = section_signed(&our_sk, section_auth0)?;
-            let section = Section::new(*chain.root_key(), chain, section_auth0)
+            let signed_section_auth = section_signed(&our_sk, section_auth)?;
+            let section = Section::new(*chain.root_key(), chain, signed_section_auth)
                 .context("failed to create section")?;
 
+            let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
+            let tmp_core = Core::first_node(
+                create_comm().await?,
+                node.clone(),
+                mpsc::channel(1).0,
+                used_space,
+                root_storage_dir,
+            )?;
+            let core = tmp_core.relocated(node, section).await?;
+
             Ok(Self {
-                node,
-                section,
+                core,
                 their_prefix: prefix1,
             })
         }
@@ -289,24 +277,21 @@ mod tests {
         fn create_message(
             &self,
             src_section_prefix: &Prefix,
-            section_pk: BlsPublicKey,
-        ) -> Result<(NodeMsg, NodeMsgAuthority)> {
+            src_section_pk: BlsPublicKey,
+        ) -> Result<(NodeMsg, SrcLocation)> {
             let sender = Node::new(
                 ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );
 
             let node_msg = NodeMsg::StartConnectivityTest(XorName::random());
-            let msg_payload = WireMsg::serialize_msg_payload(&node_msg)
-                .context("Failed to create a test NodeMsg")?;
 
-            let node_msg_authority = NodeMsgAuthority::Node(NodeAuth::authorize(
-                section_pk,
-                &sender.keypair,
-                &msg_payload,
-            ));
+            let src_location = SrcLocation::Node {
+                name: sender.name(),
+                section_pk: src_section_pk,
+            };
 
-            Ok((node_msg, node_msg_authority))
+            Ok((node_msg, src_location))
         }
     }
 
