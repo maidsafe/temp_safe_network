@@ -52,7 +52,7 @@ impl RegisterCmdEventStore {
     /// add a new register cmd
     pub(crate) fn append(&mut self, event: RegisterCmd) -> Result<()> {
         let key = &self.tree.len().to_string();
-        if let Some(_) = self.tree.get(key)? {
+        if self.tree.get(key)?.is_some() {
             return Err(Error::InvalidOperation(format!(
                 "Key exists: {}. Event: {:?}",
                 key, event
@@ -101,9 +101,9 @@ mod test {
         let register_name: XorName = rand::random();
         let register_tag = 43_000u64;
 
-        let mut perms = BTreeMap::default();
+        let mut permissions = BTreeMap::default();
         let user_perms = PublicPermissions::new(true);
-        let _ = perms.insert(User::Key(pk), user_perms);
+        let _ = permissions.insert(User::Key(pk), user_perms);
 
         let replica1 = Register::new_public(
             pk,
@@ -111,7 +111,7 @@ mod test {
             register_tag,
             Some(PublicPolicy {
                 owner: pk,
-                permissions: perms.clone(),
+                permissions,
             }),
         );
 
