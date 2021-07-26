@@ -22,9 +22,8 @@ pub fn download_from_s3_and_install_bin(
     bucket: &str,
     asset_prefix: &str,
     exec_file_name: &str,
-    target_platform: Option<&str>,
 ) -> Result<String> {
-    let target = target_platform.unwrap_or_else(|| self_update::get_target());
+    let target = get_target();
     let available_releases = self_update::backends::s3::Update::configure()
         .bucket_name(bucket)
         .target(&target)
@@ -34,11 +33,21 @@ pub fn download_from_s3_and_install_bin(
         .current_version("")
         .build()
         .context("Error when preparing to fetch the list of releases")?;
-
-    download_and_install_bin(target_path, target, available_releases, exec_file_name)
+    download_and_install_bin(target_path, &target, available_releases, exec_file_name)
 }
 
 // Private helpers
+
+fn get_target() -> String {
+    let target = self_update::get_target();
+    if target.contains("linux") {
+        // For now, all of our Linux builds are using musl, so we can make this
+        // assumption. We would need to update this code if we changed that.
+        target.replace("gnu", "musl")
+    } else {
+        target.to_string()
+    }
+}
 
 fn download_and_install_bin(
     target_path: PathBuf,

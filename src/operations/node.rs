@@ -104,17 +104,8 @@ pub fn node_install(_vault_path: Option<PathBuf>) -> Result<()> {
 #[cfg(feature = "self-update")]
 pub fn node_install(node_path: Option<PathBuf>) -> Result<()> {
     let target_path = get_node_bin_path(node_path)?;
-    let _ = download_from_s3_and_install_bin(
-        target_path,
-        "sn-node",
-        "sn_node",
-        SN_NODE_EXECUTABLE,
-        if cfg!(target_os = "linux") {
-            Some("x86_64-unknown-linux-musl")
-        } else {
-            None
-        },
-    )?;
+    let _ =
+        download_from_s3_and_install_bin(target_path, "sn-node", "sn_node", SN_NODE_EXECUTABLE)?;
     Ok(())
 }
 
