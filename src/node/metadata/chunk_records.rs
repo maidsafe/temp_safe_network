@@ -196,7 +196,11 @@ impl ChunkRecords {
                     let section_pk = if let Some(section_pk) = section_pk_option {
                         section_pk
                     } else {
-                        network.our_section_public_key().await
+                        error!(
+                            "Cannot get EndUser({:?})'s section's section key.",
+                            end_user.xorname
+                        );
+                        return Err(Error::NoSectionPublicKey);
                     };
                     duties.push(NodeDuty::Send(build_forward_query_response(
                         response,
