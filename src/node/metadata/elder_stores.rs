@@ -63,11 +63,9 @@ impl ElderStores {
                     .write(write, msg_id, data_auth, origin)
                     .await
             }
-            DataCmd::Register(write) => {
-                info!("Writing Register");
-                self.register_storage
-                    .write(msg_id, origin, write, data_auth)
-                    .await
+            DataCmd::Register(_write) => {
+                // This has been moved to routing/core/msg_handling
+                unimplemented!("Not writing Register in node duty flow anymore");
             }
         }
     }
@@ -90,7 +88,7 @@ impl ElderStores {
 
     pub(super) async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
         // todo: all this can be done in parallel
-        self.register_storage.update(data.reg_data).await?;
+        self.register_storage.update(data.reg_data)?;
         self.chunk_records.update(data.chunk_data).await;
         Ok(())
     }

@@ -72,6 +72,7 @@ pub struct Node {
     node_info: NodeInfo,
     used_space: UsedSpace,
     // We instantiate this even if adult. It just won't be used, but makes it easier keep once storage instance going on.
+    // TODO: remove this from node once routing event loop is handling all our events
     register_store: RegisterStorage,
     role: Arc<RwLock<Role>>,
 }
@@ -93,21 +94,19 @@ impl Node {
             }
         };
 
+        let node_info = NodeInfo {
+            root_dir: root_dir_buf.clone(),
+            reward_key,
+        };
+        let used_space = UsedSpace::new(config.max_capacity());
+        let register_store = RegisterStorage::new(node_info.path(), used_space.clone())?;
+
         let (network_api, network_events) = tokio::time::timeout(
             Duration::from_secs(JOINING_TIMEOUT),
-            Network::new(root_dir, config),
+            Network::new(root_dir_buf.as_path(), config, register_store.clone()),
         )
         .await
         .map_err(|_| Error::JoinTimeout)??;
-
-        let node_info = NodeInfo {
-            root_dir: root_dir_buf,
-            reward_key,
-        };
-
-        let used_space = UsedSpace::new(config.max_capacity());
-
-        let register_store = RegisterStorage::new(node_info.path(), used_space.clone())?;
 
         let node = Self {
             role: Arc::new(RwLock::new(Role::Adult(AdultRole {

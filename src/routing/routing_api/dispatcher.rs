@@ -9,7 +9,7 @@
 use super::{Command, Event};
 use crate::messaging::{
     node::{NodeMsg, Section},
-    DstLocation, MsgKind, WireMsg,
+    DstLocation, EndUser, MsgKind, WireMsg,
 };
 use crate::routing::{
     core::{Core, SendStatus},
@@ -108,6 +108,18 @@ impl Dispatcher {
                     .handle_message(sender, wire_msg)
                     .await
             }
+            Command::HandleDataMessage {
+                msg_id,
+                user,
+                msg,
+                data_auth,
+            } => {
+                self.core
+                    .read()
+                    .await
+                    .handle_data_msg_received(msg_id, msg, user, data_auth)
+                    .await
+            }
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
             Command::HandleAgreement { proposal, sig } => {
                 self.core
@@ -149,6 +161,7 @@ impl Dispatcher {
                 self.send_message(&recipients, delivery_group_size, wire_msg)
                     .await
             }
+            Command::ParseAndSendWireMsg(wire_msg) => self.send_wire_message(wire_msg).await,
             Command::RelayMessage(wire_msg) => {
                 if let Some(cmd) = self.core.write().await.relay_message(wire_msg).await? {
                     Ok(vec![cmd])
@@ -281,6 +294,44 @@ impl Dispatcher {
         };
 
         Ok(cmds)
+    }
+
+    /// Send a message.
+    /// Messages sent here, either section to section or node to node.
+    pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
+        if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
+            if self.core.read().await.section().prefix().matches(xorname) {
+                let addr = self.core.read().await.get_socket_addr(*socket_id).copied();
+
+                if let Some(socket_addr) = addr {
+                    // Send a message to a client peer.
+                    // Messages sent to a client are not signed
+                    // or validated as part of the routing library.
+                    debug!("Sending client msg to {:?}", socket_addr);
+
+                    let recipients = vec![(*xorname, socket_addr)];
+                    wire_msg.set_dst_section_pk(
+                        *self.core.read().await.section_chain().clone().last_key(),
+                    );
+
+                    let command = Command::SendMessage {
+                        recipients,
+                        wire_msg,
+                    };
+                    return Ok(vec![command]);
+                } else {
+                    debug!(
+                        "Could not find socketaddr corresponding to socket_id {:?}",
+                        socket_id
+                    );
+                    debug!("Relaying user message instead.. (Command::RelayMessage)");
+                }
+            } else {
+                debug!("Relaying message with sending user message (Command::RelayMessage)");
+            }
+        }
+
+        Ok(vec![Command::RelayMessage(wire_msg)])
     }
 
     async fn handle_schedule_timeout(&self, duration: Duration, token: u64) -> Option<Command> {

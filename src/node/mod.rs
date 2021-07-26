@@ -21,6 +21,8 @@ mod network;
 mod node_api;
 mod node_ops;
 
+/// Storage interface for register data type
+pub(crate) use metadata::RegisterStorage;
 /// Docs
 pub mod state_db;
 

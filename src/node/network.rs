@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{node::NodeMsg, DstLocation, WireMsg};
+use crate::node::RegisterStorage;
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
@@ -27,13 +28,17 @@ pub(crate) struct Network {
 
 #[allow(missing_docs)]
 impl Network {
-    pub(crate) async fn new(root_dir: &Path, config: &NodeConfig) -> Result<(Self, EventStream)> {
+    pub(crate) async fn new(
+        root_dir: &Path,
+        config: &NodeConfig,
+        register_store: RegisterStorage,
+    ) -> Result<(Self, EventStream)> {
         let routing_config = RoutingConfig {
             first: config.is_first(),
             transport_config: config.network_config().clone(),
             keypair: None,
         };
-        let (routing, event_stream) = RoutingNode::new(routing_config).await?;
+        let (routing, event_stream) = RoutingNode::new(routing_config, register_store).await?;
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
         store_network_keypair(root_dir, routing.keypair_as_bytes().await).await?;

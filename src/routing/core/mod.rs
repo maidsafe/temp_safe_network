@@ -18,6 +18,7 @@ mod msg_handling;
 mod signature_aggregator;
 mod split_barrier;
 
+use crate::node::RegisterStorage;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub use signature_aggregator::Error as AggregatorError;
@@ -70,6 +71,7 @@ pub(crate) struct Core {
     joins_allowed: bool,
     resource_proof: ResourceProof,
     end_users: EndUserRegistry,
+    register_storage: RegisterStorage,
 }
 
 impl Core {
@@ -80,6 +82,7 @@ impl Core {
         section: Section,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
+        register_storage: RegisterStorage,
     ) -> Self {
         let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share);
 
@@ -102,6 +105,7 @@ impl Core {
             joins_allowed: true,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             end_users: EndUserRegistry::new(),
+            register_storage,
         }
     }
 

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{build_client_error_response, build_client_query_response};
+use super::build_client_query_response;
 use crate::dbs::{RegisterOpStore, UsedSpace};
 use crate::node::{error::convert_to_error_message, node_ops::NodeDuty, Error, Result};
 use crate::types::{
@@ -16,8 +16,7 @@ use crate::types::{
 use crate::{
     messaging::{
         data::{
-            CmdError, DataCmd, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead,
-            RegisterWrite,
+            DataCmd, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead, RegisterWrite,
         },
         Authority, DataSigned, EndUser, MessageId,
     },
@@ -29,18 +28,20 @@ use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tracing::info;
 use xor_name::{Prefix, XorName};
 
-const DATABASE_NAME: &str = "register.db";
+const DATABASE_NAME: &str = "register";
 
 /// Operations over the data type Register.
+// TODO: dont expose this
 #[derive(Clone, Debug)]
-pub(crate) struct RegisterStorage {
+pub struct RegisterStorage {
     path: PathBuf,
     used_space: UsedSpace,
-    registers: DashMap<XorName, Option<StateEntry>>,
+    registers: Arc<DashMap<XorName, Option<StateEntry>>>,
     db: Db,
 }
 
@@ -63,7 +64,7 @@ impl RegisterStorage {
         Ok(Self {
             path: path.to_path_buf(),
             used_space,
-            registers: DashMap::new(),
+            registers: Arc::new(DashMap::new()),
             db,
         })
     }
@@ -92,7 +93,7 @@ impl RegisterStorage {
     }
 
     /// On receiving data from Elders when promoted.
-    pub(super) async fn update(&self, reg_data: RegisterDataExchange) -> Result<()> {
+    pub(super) fn update(&self, reg_data: RegisterDataExchange) -> Result<()> {
         debug!("Updating Register store");
 
         let RegisterDataExchange(data) = reg_data;
@@ -102,7 +103,7 @@ impl RegisterStorage {
             for op in history {
                 let data_auth =
                     super::verify_op(op.client_sig.clone(), DataCmd::Register(op.write.clone()))?;
-                let _ = self.apply(op, data_auth).await?;
+                let _ = self.apply(op, data_auth)?;
             }
         }
 
@@ -111,13 +112,11 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(super) async fn write(
+    pub(crate) async fn write(
         &self,
-        msg_id: MessageId,
-        origin: EndUser,
         write: RegisterWrite,
         data_auth: Authority<DataSigned>,
-    ) -> Result<NodeDuty> {
+    ) -> Result<()> {
         let required_space = std::mem::size_of::<RegisterCmd>() as u64;
         if !self.used_space.can_consume(required_space).await {
             return Err(Error::Database(crate::dbs::Error::NotEnoughSpace));
@@ -126,11 +125,10 @@ impl RegisterStorage {
             write,
             client_sig: data_auth.clone().into_inner(),
         };
-        let write_result = self.apply(op, data_auth).await;
-        self.ok_or_error(write_result, msg_id, origin).await
+        self.apply(op, data_auth)
     }
 
-    async fn apply(&self, op: RegisterCmd, data_auth: Authority<DataSigned>) -> Result<()> {
+    fn apply(&self, op: RegisterCmd, data_auth: Authority<DataSigned>) -> Result<()> {
         let RegisterCmd { write, .. } = op.clone();
 
         let address = *write.address();
@@ -142,17 +140,19 @@ impl RegisterStorage {
                 if self.registers.contains_key(&key) {
                     return Err(Error::DataExists);
                 }
+                trace!("Creating new register");
                 let mut store = self.load_store(key)?;
                 let _ = store.append(op)?;
                 let _ = self
                     .registers
                     .insert(key, Some(StateEntry { state: map, store }));
+
                 Ok(())
             }
             Delete(_) => {
                 let result = match self.registers.get_mut(&key) {
                     None => {
-                        info!("Attempting to delete register if it exists");
+                        trace!("Attempting to delete register if it exists");
                         let _ = self.db.drop_tree(key)?;
                         Ok(())
                     }
@@ -214,9 +214,9 @@ impl RegisterStorage {
 
                 if result.is_ok() {
                     entry.store.append(op)?;
-                    info!("Editing Register SUCCESSFUL!");
+                    trace!("Editing Register success!");
                 } else {
-                    info!("Editing Register FAILED!");
+                    trace!("Editing Register failed!");
                 }
 
                 result
@@ -233,6 +233,7 @@ impl RegisterStorage {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
+        trace!("Reading register {:?}", read.dst_address());
         use RegisterRead::*;
         match read {
             Get(address) => self.get(*address, msg_id, requester, origin).await,
@@ -281,9 +282,11 @@ impl RegisterStorage {
             .registers
             .get(&to_reg_key(address)?)
             .ok_or_else(|| Error::NoSuchData(DataAddress::Register(*address)))?;
+
         let StateEntry { state, .. } = cache
             .as_ref()
             .ok_or_else(|| Error::NoSuchData(DataAddress::Register(*address)))?;
+
         state
             .check_permissions(action, Some(requester))
             .map_err(Error::from)?;
@@ -382,27 +385,6 @@ impl RegisterStorage {
 
         Ok(NodeDuty::Send(build_client_query_response(
             QueryResponse::GetRegisterPolicy(result),
-            msg_id,
-            origin,
-        )))
-    }
-
-    async fn ok_or_error<T>(
-        &self,
-        result: Result<T>,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        let error = match result {
-            Ok(_) => return Ok(NodeDuty::NoOp),
-            Err(error) => {
-                info!("Error on writing Register! {:?}", error);
-                convert_to_error_message(error)
-            }
-        };
-
-        Ok(NodeDuty::Send(build_client_error_response(
-            CmdError::Data(error),
             msg_id,
             origin,
         )))

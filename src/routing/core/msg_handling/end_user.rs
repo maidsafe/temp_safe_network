@@ -8,8 +8,9 @@
 
 use super::Core;
 use crate::messaging::{
-    data::DataMsg, node::NodeMsg, Authority, DataSigned, DstLocation, EndUser, MessageId, MsgKind,
-    WireMsg,
+    data::{CmdError, DataCmd, DataMsg, Error as ErrorMessage, ProcessMsg},
+    node::NodeMsg,
+    Authority, DataSigned, DstLocation, EndUser, MessageId, MsgKind, WireMsg,
 };
 use crate::routing::{
     error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
@@ -19,22 +20,49 @@ use bytes::Bytes;
 use std::net::SocketAddr;
 
 impl Core {
-    pub(crate) async fn handle_client_msg_received(
-        &mut self,
+    pub(crate) async fn handle_data_msg_received(
+        &self,
         msg_id: MessageId,
         msg: DataMsg,
         user: EndUser,
         data_auth: Authority<DataSigned>,
     ) -> Result<Vec<Command>> {
-        self.send_event(Event::DataMsgReceived {
-            msg_id,
-            msg: Box::new(msg),
-            user,
-            data_auth,
-        })
-        .await;
+        if let DataMsg::Process(ProcessMsg::Cmd(DataCmd::Register(register_cmd))) = msg {
+            match self.register_storage.write(register_cmd, data_auth).await {
+                Ok(_) => Ok(vec![]),
+                Err(error) => {
+                    info!("Error on writing Register! {:?}", error);
+                    let sending_error = ErrorMessage::InvalidOperation(error.to_string());
 
-        Ok(vec![])
+                    let the_error_msg = DataMsg::Process(ProcessMsg::CmdError {
+                        error: CmdError::Data(sending_error),
+                        correlation_id: msg_id,
+                    });
+
+                    let dst = DstLocation::EndUser(user);
+
+                    // FIXME: define which signature/authority this message should really carry,
+                    // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
+                    // Giving a random sig temporarily
+                    let (msg_kind, payload) = Self::random_client_signature(&the_error_msg)?;
+                    let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst)?;
+
+                    let command = Command::ParseAndSendWireMsg(wire_msg);
+
+                    Ok(vec![command])
+                }
+            }
+        } else {
+            self.send_event(Event::DataMsgReceived {
+                msg_id,
+                msg: Box::new(msg),
+                user,
+                data_auth,
+            })
+            .await;
+
+            Ok(vec![])
+        }
     }
 
     pub(crate) async fn handle_end_user_message(
@@ -105,8 +133,14 @@ impl Core {
         if is_in_destination {
             // We send this message to be handled by the upper Node layer
             // through the public event stream API
-            self.handle_client_msg_received(msg_id, msg, user, data_auth)
-                .await
+
+            // This is returned as a command to be handled via spawning
+            Ok(vec![Command::HandleDataMessage {
+                msg_id,
+                msg,
+                user,
+                data_auth,
+            }])
         } else {
             // Let's relay the client message then
             let node_msg = NodeMsg::ForwardDataMsg {

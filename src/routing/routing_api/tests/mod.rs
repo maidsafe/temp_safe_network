@@ -9,6 +9,7 @@
 #![allow(dead_code, unused_imports)]
 
 use super::{Comm, Command, Core, Dispatcher};
+use crate::dbs::UsedSpace;
 use crate::messaging::{
     node::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Network,
@@ -19,6 +20,8 @@ use crate::messaging::{
     Authority, DstLocation, MessageId, MessageType, MsgKind, NodeSigned, SectionAuthorityProvider,
     SectionSigned as MsgKindSectionSigned, WireMsg,
 };
+use crate::node::RegisterStorage;
+
 use crate::routing::{
     core::{ConnectionEvent, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     dkg::{
@@ -39,18 +42,21 @@ use crate::routing::{
     MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use assert_matches::assert_matches;
 use ed25519_dalek::Signer;
 use rand::rngs::OsRng;
+use rand::{distributions::Alphanumeric, Rng}; // 0.8
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
+use std::path::Path;
 use std::{
     collections::{BTreeSet, HashSet},
     iter,
     net::Ipv4Addr,
     ops::Deref,
 };
+use tempfile::tempdir;
 use tokio::{
     sync::mpsc,
     time::{timeout, Duration},
@@ -58,6 +64,7 @@ use tokio::{
 use xor_name::{Prefix, XorName};
 
 static TEST_EVENT_CHANNEL_SIZE: usize = 20;
+const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
 
 #[tokio::test]
 async fn receive_matching_get_section_request_as_elder() -> Result<()> {
@@ -67,6 +74,7 @@ async fn receive_matching_get_section_request_as_elder() -> Result<()> {
         create_comm().await?,
         node,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     )?;
     let node_section_pk = *core.section().chain().last_key();
     let section_auth = core.section().authority_provider().clone();
@@ -130,6 +138,7 @@ async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
         section,
         None,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     );
     let node_section_pk = *core.section().chain().last_key();
     let dispatcher = Dispatcher::new(core);
@@ -193,6 +202,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         create_comm().await?,
         node,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     )?;
     let dispatcher = Dispatcher::new(core);
 
@@ -246,6 +256,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         create_comm().await?,
         node,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     )?;
     let dispatcher = Dispatcher::new(core);
 
@@ -310,6 +321,20 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     Ok(())
 }
 
+fn create_test_register_store() -> Result<RegisterStorage> {
+    let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
+    let tmp_dir = tempdir()?;
+
+    let register: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(7)
+        .map(char::from)
+        .collect();
+    let storage_dir = tmp_dir.into_path().join(Path::new(&register));
+    RegisterStorage::new(&storage_dir, used_space.clone())
+        .context("Failed to create register storage")
+}
+
 #[tokio::test]
 async fn receive_join_request_from_relocated_node() -> Result<()> {
     let (section_auth, mut nodes) = create_section_auth();
@@ -327,6 +352,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -416,6 +442,7 @@ async fn aggregate_proposals() -> Result<()> {
         section.clone(),
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -495,6 +522,7 @@ async fn handle_agreement_on_online() -> Result<()> {
         section,
         Some(section_key_share),
         event_tx,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -552,6 +580,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -714,6 +743,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         section,
         Some(section_key_share),
         event_tx,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(state);
 
@@ -776,6 +806,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         section,
         Some(section_key_share),
         event_tx,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -830,6 +861,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         section,
         Some(section_key_share),
         event_tx,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -936,6 +968,7 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
         section.clone(),
         None,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -1061,6 +1094,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         section.clone(),
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -1140,6 +1174,7 @@ async fn handle_sync() -> Result<()> {
         old_section,
         Some(section_key_share),
         event_tx,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -1230,7 +1265,14 @@ async fn handle_untrusted_sync() -> Result<()> {
 
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = create_node(MIN_ADULT_AGE, None);
-    let core = Core::new(create_comm().await?, node, old_section, None, event_tx);
+    let core = Core::new(
+        create_comm().await?,
+        node,
+        old_section,
+        None,
+        event_tx,
+        create_test_register_store()?,
+    );
     let dispatcher = Dispatcher::new(core);
 
     let sender = create_node(MIN_ADULT_AGE, None);
@@ -1316,6 +1358,7 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
         section_full.clone(),
         Some(section_key_share),
         event_tx,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -1407,6 +1450,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -1501,7 +1545,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         comm_tx,
     )
     .await?;
-    let core = Core::first_node(comm, node, event_tx)?;
+    let core = Core::first_node(comm, node, event_tx, create_test_register_store()?)?;
     let node = core.node().clone();
     let section_pk = *core.section_chain().last_key();
     let dispatcher = Dispatcher::new(core);
@@ -1608,6 +1652,7 @@ async fn handle_elders_update() -> Result<()> {
         section0.clone(),
         Some(section_key_share),
         event_tx,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 
@@ -1713,6 +1758,7 @@ async fn handle_demote_during_split() -> Result<()> {
         section,
         Some(section_key_share),
         event_tx,
+        create_test_register_store()?,
     );
     let dispatcher = Dispatcher::new(core);
 

@@ -11,6 +11,7 @@ use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, Section},
     EndUser, MessageId, SectionAuthorityProvider, SocketId, WireMsg,
 };
+use crate::node::RegisterStorage;
 use crate::routing::{
     error::Result,
     network::NetworkUtils,
@@ -31,6 +32,7 @@ impl Core {
         comm: Comm,
         mut node: Node,
         event_tx: mpsc::Sender<Event>,
+        register_storage: RegisterStorage,
     ) -> Result<Self> {
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
@@ -42,6 +44,7 @@ impl Core {
             section,
             Some(section_key_share),
             event_tx,
+            register_storage,
         ))
     }
 
@@ -52,6 +55,7 @@ impl Core {
             new_section,
             None,
             self.event_tx.clone(),
+            self.register_storage.clone(),
         )
     }
 
