@@ -21,6 +21,7 @@ use crate::messaging::{
 
 use crate::node::{
     capacity::Capacity,
+    network::Network,
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     Error, Result,
 };
@@ -78,12 +79,11 @@ impl Metadata {
         correlation_id: MessageId,
         result: QueryResponse,
         src: XorName,
-        our_prefix: Prefix,
-        section_pk: BlsPublicKey,
+        network: &Network,
     ) -> Result<NodeDuties> {
         self.elder_stores
             .chunk_records()
-            .record_adult_read_liveness(correlation_id, result, src, our_prefix, section_pk)
+            .record_adult_read_liveness(correlation_id, result, src, network)
             .await
     }
 
@@ -180,8 +180,6 @@ fn build_forward_query_response(
             user: origin,
             data_signed,
         }),
-        // TODO: Here shall use the section_pk of the target section.
-        //       But the one passed in is a the section_pk of own section.
         dst: DstLocation::Section {
             name: origin.xorname,
             section_pk,

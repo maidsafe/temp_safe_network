@@ -350,8 +350,7 @@ impl Node {
                 correlation_id,
                 src,
             } => {
-                let our_prefix = self.network_api.our_prefix().await;
-                let our_section_pk = self.network_api.our_section_public_key().await;
+                let network_api = self.network_api.clone();
                 let elder = self.as_elder().await?;
 
                 let handle = tokio::spawn(async move {
@@ -360,13 +359,7 @@ impl Node {
                             .meta_data
                             .write()
                             .await
-                            .record_adult_read_liveness(
-                                correlation_id,
-                                response,
-                                src,
-                                our_prefix,
-                                our_section_pk,
-                            )
+                            .record_adult_read_liveness(correlation_id, response, src, &network_api)
                             .await?,
                     ))
                 });

@@ -15,6 +15,7 @@ use crate::messaging::{
 use crate::node::{
     capacity::{Capacity, CHUNK_COPY_COUNT},
     error::convert_to_error_message,
+    network::Network,
     node_ops::{NodeDuties, NodeDuty},
     Error, Result,
 };
@@ -22,7 +23,6 @@ use crate::routing::Prefix;
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use tracing::{info, warn};
 
-use bls::PublicKey as BlsPublicKey;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -149,8 +149,7 @@ impl ChunkRecords {
         correlation_id: MessageId,
         response: QueryResponse,
         src: XorName,
-        our_prefix: Prefix,
-        section_pk: BlsPublicKey,
+        network: &Network,
     ) -> Result<NodeDuties> {
         if !matches!(response, QueryResponse::GetChunk(_)) {
             return Err(Error::Logic(format!(
@@ -177,6 +176,7 @@ impl ChunkRecords {
                 // so do nothing
             } else {
                 info!("REMOVED CORRELATION ID: {}", correlation_id);
+                let our_prefix = network.our_prefix().await;
                 // If in same section, i.e. we are the ClientElders, then send response directly.
                 // Otherwise, i.e. we are the DataElders, forwarding using ForwardDataMsg.
                 if our_prefix.matches(&end_user.xorname) {
@@ -186,6 +186,18 @@ impl ChunkRecords {
                         end_user,
                     )));
                 } else {
+                    let section_pk_option = if let Ok(section_pk) =
+                        network.get_section_pk_by_name(&end_user.xorname).await
+                    {
+                        section_pk.bls()
+                    } else {
+                        None
+                    };
+                    let section_pk = if let Some(section_pk) = section_pk_option {
+                        section_pk
+                    } else {
+                        network.our_section_public_key().await
+                    };
                     duties.push(NodeDuty::Send(build_forward_query_response(
                         response,
                         origin_msg_id,
