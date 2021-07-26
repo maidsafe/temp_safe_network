@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{NodeCmd, NodeMsg, NodeSystemCmd},
+    node::{NodeCmd, NodeMsg},
     DstLocation, MessageId,
 };
 use crate::node::{
@@ -28,12 +28,10 @@ impl Node {
 
         Ok(NodeDuty::Send(OutgoingMsg {
             id: MessageId::new(),
-            msg: MsgType::Node(NodeMsg::NodeCmd(NodeCmd::System(
-                NodeSystemCmd::StorageFull {
-                    section: node_id.into(),
-                    node_id,
-                },
-            ))),
+            msg: MsgType::Node(NodeMsg::NodeCmd(NodeCmd::StorageFull {
+                section: node_id.into(),
+                node_id,
+            })),
             dst: DstLocation::Section {
                 name: node_id.into(),
                 section_pk,
@@ -60,9 +58,7 @@ pub(crate) async fn push_state(
 
     Ok(NodeDuty::SendToNodes {
         msg_id,
-        msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
-            metadata,
-        })),
+        msg: NodeMsg::NodeCmd(NodeCmd::ReceiveExistingData { metadata }),
         targets: peers,
         aggregation: false,
     })

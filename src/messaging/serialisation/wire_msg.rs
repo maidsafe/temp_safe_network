@@ -241,7 +241,7 @@ mod tests {
     use crate::{
         messaging::{
             data::{ChunkRead, DataMsg, DataQuery, ProcessMsg},
-            node::{NodeCmd, NodeMsg, NodeSystemCmd},
+            node::{NodeCmd, NodeMsg},
             DataSigned, MessageId, NodeSigned,
         },
         types::{ChunkAddress, Keypair},
@@ -352,10 +352,10 @@ mod tests {
         let msg_id = MessageId::new();
         let pk = crate::types::PublicKey::Bls(dst_section_pk);
 
-        let node_msg = NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::StorageFull {
+        let node_msg = NodeMsg::NodeCmd(NodeCmd::StorageFull {
             node_id: pk,
             section: pk.into(),
-        }));
+        });
 
         let payload = WireMsg::serialize_msg_payload(&node_msg)?;
         let node_signed = NodeSigned {

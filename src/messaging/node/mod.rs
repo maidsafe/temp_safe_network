@@ -20,7 +20,7 @@ pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionSi
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use network::{Network, OtherSection};
-pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse, NodeSystemCmd};
+pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
 pub use prefix_map::PrefixMap;
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::ElderCandidates;
