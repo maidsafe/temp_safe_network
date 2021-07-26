@@ -14,7 +14,7 @@ use crate::{
 use sled::{Db, Tree};
 use xor_name::XorName;
 
-/// Disk storage for transfers.
+/// Disk storage for Registers.
 #[derive(Clone)]
 pub(crate) struct RegisterCmdEventStore {
     tree: Tree,
