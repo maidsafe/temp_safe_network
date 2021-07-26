@@ -10,7 +10,7 @@
 use super::{
     files::{FileItem, FileMeta, FilesMap, RealPath},
     multimap::MultimapKeyValues,
-    nrs::NrsMap,
+    nrs::{NrsMap, VersionHash},
     register::{Entry, EntryHash},
     Safe, XorName,
 };
@@ -36,7 +36,7 @@ pub enum SafeData {
         xorurl: String,
         xorname: XorName,
         type_tag: u64,
-        version: u64,
+        version: VersionHash,
         files_map: FilesMap,
         data_type: SafeDataType,
         resolved_from: String,
@@ -54,7 +54,7 @@ pub enum SafeData {
         xorurl: String,
         xorname: XorName,
         type_tag: u64,
-        version: u64,
+        version: VersionHash,
         nrs_map: NrsMap,
         data_type: SafeDataType,
         resolved_from: String,
@@ -64,22 +64,6 @@ pub enum SafeData {
         xorname: XorName,
         type_tag: u64,
         data: MultimapKeyValues,
-        resolved_from: String,
-    },
-    PublicSequence {
-        xorurl: String,
-        xorname: XorName,
-        type_tag: u64,
-        version: u64,
-        data: Vec<u8>,
-        resolved_from: String,
-    },
-    PrivateSequence {
-        xorurl: String,
-        xorname: XorName,
-        type_tag: u64,
-        version: u64,
-        data: Vec<u8>,
         resolved_from: String,
     },
     PublicRegister {
@@ -107,8 +91,6 @@ impl SafeData {
             | PublicBlob { xorurl, .. }
             | NrsMapContainer { xorurl, .. }
             | Multimap { xorurl, .. }
-            | PublicSequence { xorurl, .. }
-            | PrivateSequence { xorurl, .. }
             | PublicRegister { xorurl, .. }
             | PrivateRegister { xorurl, .. } => xorurl.clone(),
         }
@@ -122,8 +104,6 @@ impl SafeData {
             | PublicBlob { resolved_from, .. }
             | NrsMapContainer { resolved_from, .. }
             | Multimap { resolved_from, .. }
-            | PrivateSequence { resolved_from, .. }
-            | PublicSequence { resolved_from, .. }
             | PublicRegister { resolved_from, .. }
             | PrivateRegister { resolved_from, .. } => resolved_from.clone(),
         }
@@ -445,38 +425,6 @@ impl Safe {
                         self.retrieve_blob(&the_xor, retrieve_data, None, &metadata, range)
                             .await
                     }
-                    SafeDataType::PublicSequence => {
-                        // TODO: fetch only if 'retrieve_data' is set,
-                        // although we need the version regardless
-                        let (version, data) = self.fetch_sequence(&the_xor).await?;
-                        debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
-                        let safe_data = SafeData::PublicSequence {
-                            xorurl,
-                            xorname: the_xor.xorname(),
-                            type_tag: the_xor.type_tag(),
-                            version,
-                            data: if retrieve_data { data } else { vec![] },
-                            resolved_from: url.to_string(),
-                        };
-
-                        Ok((safe_data, None))
-                    }
-                    SafeDataType::PrivateSequence => {
-                        // TODO: fetch only if 'retrieve_data' is set,
-                        // although we need the version regardless
-                        let (version, data) = self.fetch_sequence(&the_xor).await?;
-                        debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
-                        let safe_data = SafeData::PrivateSequence {
-                            xorurl,
-                            xorname: the_xor.xorname(),
-                            type_tag: the_xor.type_tag(),
-                            version,
-                            data: if retrieve_data { data } else { vec![] },
-                            resolved_from: url.to_string(),
-                        };
-
-                        Ok((safe_data, None))
-                    }
                     SafeDataType::PublicRegister => {
                         let data = if retrieve_data {
                             // TODO: use the content hash in the URL to grab a single element if it exists
@@ -642,7 +590,7 @@ mod tests {
                     type_tag: 1_100,
                     version: 0,
                     files_map,
-                    data_type: SafeDataType::PublicSequence,
+                    data_type: SafeDataType::PublicRegister,
                     resolved_from: xorurl.clone(),
                 }
         );
@@ -674,7 +622,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(0));
+        safe_url.set_content_version(Some(VersionHash::default()));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
             .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
             .await?;
@@ -700,7 +648,7 @@ mod tests {
                 assert_eq!(*xorname, safe_url.xorname());
                 assert_eq!(*type_tag, 1_100);
                 assert_eq!(*version, 0);
-                assert_eq!(*data_type, SafeDataType::PublicSequence);
+                assert_eq!(*data_type, SafeDataType::PublicRegister);
                 assert_eq!(*files_map, the_files_map);
 
                 // let's also compare it with the result from inspecting the URL
@@ -724,7 +672,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(0));
+        safe_url.set_content_version(Some(VersionHash::default()));
         let files_container_url = safe_url.to_string();
         let _ = safe
             .nrs_map_container_create(&site_name, &files_container_url, true, true, false)
@@ -837,7 +785,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(0));
+        safe_url.set_content_version(Some(VersionHash::default()));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
             .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
             .await?;
@@ -882,42 +830,6 @@ mod tests {
                 content
             ))
         }
-    }
-
-    #[tokio::test]
-    async fn test_fetch_public_sequence() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let data = b"Something super immutable";
-        let xorurl = safe.sequence_create(data, None, 25_000, false).await?;
-
-        let safe_url = SafeUrl::from_url(&xorurl)?;
-        let content = retry_loop!(safe.fetch(&xorurl, None));
-        assert!(
-            content
-                == SafeData::PublicSequence {
-                    xorurl: xorurl.clone(),
-                    xorname: safe_url.xorname(),
-                    type_tag: safe_url.type_tag(),
-                    version: 0,
-                    data: data.to_vec(),
-                    resolved_from: xorurl.clone(),
-                }
-        );
-
-        // let's also compare it with the result from inspecting the URL
-        let inspected_url = safe.inspect(&xorurl).await?;
-        assert!(
-            inspected_url[0]
-                == SafeData::PublicSequence {
-                    xorurl: xorurl.clone(),
-                    xorname: safe_url.xorname(),
-                    type_tag: safe_url.type_tag(),
-                    version: 0,
-                    data: vec![],
-                    resolved_from: xorurl,
-                }
-        );
-        Ok(())
     }
 
     #[tokio::test]

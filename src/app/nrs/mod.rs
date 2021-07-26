@@ -10,6 +10,7 @@
 mod nrs_map;
 
 pub use nrs_map::{DefaultRdf, NrsMap};
+pub use safe_network::url::VersionHash;
 
 use crate::{
     app::{
@@ -84,7 +85,7 @@ impl Safe {
         default: bool,
         hard_link: bool,
         dry_run: bool,
-    ) -> Result<(u64, XorUrl, ProcessedEntries, NrsMap)> {
+    ) -> Result<(VersionHash, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Adding to NRS map...");
         // GET current NRS map from name's TLD
         let (safe_url, _) = validate_nrs_name(name)?;
@@ -98,7 +99,7 @@ impl Safe {
         debug!("The new NRS Map: {:?}", nrs_map);
 
         if dry_run {
-            return Ok((0, xorurl, processed_entries, nrs_map));
+            return Ok((version, xorurl, processed_entries, nrs_map));
         }
 
         let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
@@ -112,9 +113,10 @@ impl Safe {
             name.as_bytes().to_owned(),
             nrs_map_xorurl.as_bytes().to_owned(),
         );
-        let entry_hash = self.multimap_insert(&xorurl, entry, old_values).await?;
+        let entry_hash = &self.multimap_insert(&xorurl, entry, old_values).await?;
+        let new_version:VersionHash = entry_hash.into();
 
-        Ok((version, xorurl, processed_entries, nrs_map))
+        Ok((new_version, xorurl, processed_entries, nrs_map))
     }
 
     /// # Create a NrsMapContainer.
@@ -188,7 +190,7 @@ impl Safe {
         &self,
         name: &str,
         dry_run: bool,
-    ) -> Result<(u64, XorUrl, ProcessedEntries, NrsMap)> {
+    ) -> Result<(VersionHash, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Removing from NRS map...");
         // GET current NRS map from &name TLD
         let (safe_url, _) = validate_nrs_name(name)?;
@@ -223,9 +225,10 @@ impl Safe {
             name.as_bytes().to_owned(),
             nrs_map_xorurl.as_bytes().to_owned(),
         );
-        let entry_hash = self.multimap_insert(&xorurl, entry, old_values).await?;
+        let entry_hash = &self.multimap_insert(&xorurl, entry, old_values).await?;
+        let new_version:VersionHash = entry_hash.into();
 
-        Ok((version, xorurl, processed_entries, nrs_map))
+        Ok((new_version, xorurl, processed_entries, nrs_map))
     }
 
     /// # Fetch an existing NrsMapContainer.
@@ -247,18 +250,15 @@ impl Safe {
     ///     assert_eq!(nrs_map_container.get_default_link().unwrap(), file_xorurl);
     /// # });
     /// ```
-    pub async fn nrs_map_container_get(&self, url: &str) -> Result<(u64, NrsMap)> {
+    pub async fn nrs_map_container_get(&self, url: &str) -> Result<(VersionHash, NrsMap)> {
         debug!("Getting latest resolvable map container from: {:?}", url);
         let safe_url = Safe::parse_url(url)?;
 
-        // TODO: versions should be managed with EntryHash instead of u64
-        // since this requires to upgrade the safe_url API, we kept is as is for now
-        let placeholder_version: u64 = 0;
-        // TODO: manage multiple resolutions currently only returns the 1st one
         // fetch multimap latest values
+        // TODO: manage multiple resolutions currently only returns the 1st one
         let data = match self.fetch_multimap_values(&safe_url).await?.iter().next() {
-            Some((_version_hash, (_name, nrs_map_xorurl_bytes))) => {
-                Ok((placeholder_version, nrs_map_xorurl_bytes.to_owned()))
+            Some((register_entry_hash, (_name, nrs_map_xorurl_bytes))) => {
+                Ok((register_entry_hash.into(), nrs_map_xorurl_bytes.to_owned()))
             }
             None => Err(Error::EmptyContent(format!(
                 "Empty Register found at XoR name {}",
@@ -295,7 +295,7 @@ impl Safe {
             }
             Err(Error::EmptyContent(_)) => {
                 warn!("Nrs container found at {:?} was empty", &url);
-                Ok((0, NrsMap::default()))
+                Ok((VersionHash::default(), NrsMap::default()))
             }
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
                 ERROR_MSG_NO_NRS_MAP_FOUND.to_string(),
@@ -533,12 +533,12 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let link_v1 = format!("{}?v=1", link);
-        let _ = retry_loop!(safe
+        let (version, _, _, _) = retry_loop!(safe
             .nrs_map_container_add(&format!("a2.b.{}", site_name), &link_v1, true, false, false)
         );
 
         // TODO use hash for version, this is a placeholder
-        let _ = retry_loop_for_pattern!(safe.nrs_map_container_get(&xorurl), Ok((version, _)) if *version == 0)?;
+        let _ = retry_loop_for_pattern!(safe.nrs_map_container_get(&xorurl), Ok((version, _)) if *version == *version)?;
 
         // remove subname
         let (version, _, _, updated_nrs_map) = retry_loop!(safe

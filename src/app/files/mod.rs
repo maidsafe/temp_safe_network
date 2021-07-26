@@ -13,6 +13,8 @@ mod metadata;
 mod realpath;
 
 use crate::{
+    app::nrs::VersionHash,
+    register::EntryHash,
     app::consts::*, fetch::Range, Error, Result, Safe, SafeContentType, SafeDataType, SafeUrl,
     XorUrl,
 };
@@ -20,7 +22,8 @@ use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{fs, path::Path};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) use metadata::FileMeta;
 pub(crate) use realpath::RealPath;
@@ -30,7 +33,7 @@ pub use files_map::{FileItem, FilesMap, GetAttr};
 // List of files uploaded with details if they were added, updated or deleted from FilesContainer
 pub type ProcessedFiles = BTreeMap<String, (String, String)>;
 
-// Type tag to use for the FilesContainer stored on Sequence
+// Type tag to use for the FilesContainer stored on Multimap
 const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
 
 const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
@@ -67,7 +70,7 @@ impl Safe {
                 let mut processed_files =
                     file_system_dir_walk(self, path, recursive, follow_links, dry_run).await?;
 
-                // The FilesContainer is stored on a Sequence
+                // The FilesContainer is stored on a Multimap
                 // and the link to the serialised FilesMap as the entry's value
                 // TODO: use RDF format
                 let files_map = files_map_create(
@@ -90,26 +93,40 @@ impl Safe {
             // Store the serialised FilesMap in a Public Blob
             let files_map_xorurl = self.store_files_map(&files_map).await?;
 
-            // Store the FilesContainer in a Public Sequence, putting the
-            // serialised FilesMap XOR-URL as the first entry value
-            let xorname = self
-                .safe_client
-                .store_sequence(
-                    files_map_xorurl.as_bytes(),
-                    None,
-                    FILES_CONTAINER_TYPE_TAG,
-                    None,
-                    false,
-                )
+            // Create a new multimap
+            let mm_url = self
+                .multimap_create(None, FILES_CONTAINER_TYPE_TAG, false)
                 .await?;
 
-            SafeUrl::encode_sequence_data(
-                xorname,
-                FILES_CONTAINER_TYPE_TAG,
-                SafeContentType::FilesContainer,
-                self.xorurl_base,
-                false,
-            )?
+            // Store the serialised FilesMap XOR-URL as the first entry value in the multimap
+            let entry = (
+                "".as_bytes().to_owned(),
+                files_map_xorurl.as_bytes().to_owned(),
+            );
+            let _ = self
+                .multimap_insert(&mm_url, entry, BTreeSet::new())
+                .await?;
+
+            mm_url
+
+            // let xorname = self
+            //     .safe_client
+            //     .store_sequence(
+            //         files_map_xorurl.as_bytes(),
+            //         None,
+            //         FILES_CONTAINER_TYPE_TAG,
+            //         None,
+            //         false,
+            //     )
+            //     .await?;
+            //
+            // SafeUrl::encode_sequence_data(
+            //     xorname,
+            //     FILES_CONTAINER_TYPE_TAG,
+            //     SafeContentType::FilesContainer,
+            //     self.xorurl_base,
+            //     false,
+            // )?
         };
 
         Ok((xorurl, processed_files, files_map))
@@ -131,7 +148,7 @@ impl Safe {
     ///     println!("FilesMap of fetched version is: {:?}", files_map);
     /// # });
     /// ```
-    pub async fn files_container_get(&mut self, url: &str) -> Result<(u64, FilesMap)> {
+    pub async fn files_container_get(&mut self, url: &str) -> Result<(VersionHash, FilesMap)> {
         debug!("Getting files container from: {:?}", url);
         let (safe_url, _) = self.parse_and_resolve_url(url).await?;
 
@@ -142,9 +159,23 @@ impl Safe {
     pub(crate) async fn fetch_files_container(
         &self,
         safe_url: &SafeUrl,
-    ) -> Result<(u64, FilesMap)> {
+    ) -> Result<(VersionHash, FilesMap)> {
         // Check if the URL specifies a specific version of the content or simply the latest available
-        match self.fetch_sequence(safe_url).await {
+
+        // match self.fetch_sequence(safe_url).await {
+
+        // TODO: manage multiple resolutions currently only returns the 1st one
+        let data = match self.fetch_multimap_values(&safe_url).await?.iter().next() {
+            Some((register_entry_hash, (_name, serialised_files_map))) => {
+                Ok((register_entry_hash.into(), serialised_files_map.to_owned()))
+            }
+            None => Err(Error::EmptyContent(format!(
+                "Empty Register found at XoR name {}",
+                safe_url.xorname()
+            ))),
+        };
+
+        match data {
             Ok((version, serialised_files_map)) => {
                 debug!("Files map retrieved.... v{:?}", &version);
                 // TODO: use RDF format and deserialise it
@@ -172,15 +203,15 @@ impl Safe {
             }
             Err(Error::EmptyContent(_)) => {
                 warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
-                Ok((0, FilesMap::default()))
+                Ok((VersionHash::default(), FilesMap::default()))
             }
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
                 ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string(),
             )),
             Err(Error::VersionNotFound(_)) => Err(Error::VersionNotFound(format!(
                 "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                safe_url.content_version().unwrap_or(0),
-                safe_url,
+                safe_url.content_version().unwrap_or(VersionHash::default()),
+                safe_url
             ))),
             Err(err) => Err(Error::NetDataError(format!(
                 "Failed to get current version: {}",
@@ -216,7 +247,7 @@ impl Safe {
         delete: bool,
         update_nrs: bool,
         dry_run: bool,
-    ) -> Result<(u64, ProcessedFiles, FilesMap)> {
+    ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
         if delete && !recursive {
             return Err(Error::InvalidInput(
                 "'delete' is not allowed if 'recursive' is not set".to_string(),
@@ -244,7 +275,7 @@ impl Safe {
         // the version from it so we can fetch latest version of it for sync-ing
         safe_url.set_content_version(None);
 
-        let (current_version, current_files_map): (u64, FilesMap) =
+        let (current_version, current_files_map): (VersionHash, FilesMap) =
             self.fetch_files_container(&safe_url).await?;
 
         // Let's generate the list of local files paths, without uploading any new file yet
@@ -309,7 +340,7 @@ impl Safe {
         update_nrs: bool,
         follow_links: bool,
         dry_run: bool,
-    ) -> Result<(u64, ProcessedFiles, FilesMap)> {
+    ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, source_file, url, update_nrs).await?;
 
@@ -378,7 +409,7 @@ impl Safe {
         force: bool,
         update_nrs: bool,
         dry_run: bool,
-    ) -> Result<(u64, ProcessedFiles, FilesMap)> {
+    ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, "", url, update_nrs).await?;
 
@@ -427,7 +458,7 @@ impl Safe {
         recursive: bool,
         update_nrs: bool,
         dry_run: bool,
-    ) -> Result<(u64, ProcessedFiles, FilesMap)> {
+    ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
         let safe_url = Safe::parse_url(url)?;
         if safe_url.content_version().is_some() {
             return Err(Error::InvalidInput(format!(
@@ -456,7 +487,7 @@ impl Safe {
         // the version from it so we can fetch latest version of it
         safe_url.set_content_version(None);
 
-        let (current_version, files_map): (u64, FilesMap) =
+        let (current_version, files_map): (VersionHash, FilesMap) =
             self.fetch_files_container(&safe_url).await?;
 
         let (processed_files, new_files_map, success_count) =
@@ -483,29 +514,40 @@ impl Safe {
     async fn append_version_to_files_container(
         &mut self,
         success_count: u64,
-        current_version: u64,
+        current_version: VersionHash,
         new_files_map: &FilesMap,
         url: &str,
         mut safe_url: SafeUrl,
         dry_run: bool,
         update_nrs: bool,
-    ) -> Result<u64> {
+    ) -> Result<VersionHash> {
         let version = if success_count == 0 {
             current_version
         } else if dry_run {
-            current_version + 1
+            current_version
         } else {
             // The FilesContainer is updated by adding an entry containing the link to
             // the Blob with the serialised new version of the FilesMap.
             let files_map_xorurl = self.store_files_map(new_files_map).await?;
 
-            let xorname = safe_url.xorname();
-            let type_tag = safe_url.type_tag();
-            self.safe_client
-                .append_to_sequence(files_map_xorurl.as_bytes(), xorname, type_tag, false)
-                .await?;
+            let old_values: BTreeSet<EntryHash> = self
+                .fetch_multimap_values(&safe_url)
+                .await?
+                .iter()
+                .map(|(hash, _)| hash.to_owned())
+                .collect();
+            let entry = (
+                "".as_bytes().to_owned(),
+                files_map_xorurl.as_bytes().to_owned(),
+            );
+            let entry_hash = &self.multimap_insert(&safe_url.to_string(), entry, old_values).await?;
+            let new_version:VersionHash = entry_hash.into();
 
-            let new_version = current_version + 1;
+            // self.safe_client
+            //     .append_to_sequence(files_map_xorurl.as_bytes(), xorname, type_tag, false)
+            //     .await?;
+            //
+            // let new_version = current_version + 1;
 
             if update_nrs {
                 // We need to update the link in the NRS container as well,
@@ -602,7 +644,7 @@ impl Safe {
 
     // Private helper to serialise a FilesMap and store it in a Public Blob
     async fn store_files_map(&mut self, files_map: &FilesMap) -> Result<String> {
-        // The FilesMapContainer is a Sequence where each NRS Map version is
+        // The FilesMapContainer is a Multimap where each NRS Map version is
         // an entry containing the XOR-URL of the Blob that contains the serialised NrsMap.
         // TODO: use RDF format
         let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
@@ -627,7 +669,7 @@ async fn validate_files_add_params(
     source_file: &str,
     url: &str,
     update_nrs: bool,
-) -> Result<(SafeUrl, u64, FilesMap)> {
+) -> Result<(SafeUrl, VersionHash, FilesMap)> {
     let safe_url = Safe::parse_url(url)?;
     if safe_url.content_version().is_some() {
         return Err(Error::InvalidInput(format!(
@@ -649,7 +691,7 @@ async fn validate_files_add_params(
     // the version from it so we can fetch latest version of it for sync-ing
     safe_url.set_content_version(None);
 
-    let (current_version, current_files_map): (u64, FilesMap) =
+    let (current_version, current_files_map): (VersionHash, FilesMap) =
         safe.fetch_files_container(&safe_url).await?;
 
     let dest_path = safe_url.path().to_string();
@@ -1920,7 +1962,7 @@ mod tests {
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(0));
+        safe_url.set_content_version(Some(VersionHash::default()));
         let (nrs_xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
             &nrsurl,
             &safe_url.to_string(),
@@ -2161,7 +2203,7 @@ mod tests {
 
         // let's fetch version 0
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(0));
+        safe_url.set_content_version(Some(VersionHash::default()));
         let (version, v0_files_map) = retry_loop!(safe.files_container_get(&safe_url.to_string()));
 
         assert_eq!(version, 0);
@@ -2244,7 +2286,7 @@ mod tests {
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(0));
+        safe_url.set_content_version(Some(VersionHash::default()));
         let (nrs_xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
             &nrsurl,
             &safe_url.to_string(),

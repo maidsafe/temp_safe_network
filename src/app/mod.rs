@@ -12,7 +12,6 @@ mod consts;
 mod helpers;
 mod keys;
 mod safe_client;
-mod sequence;
 #[cfg(test)]
 mod test_helpers;
 

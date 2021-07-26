@@ -8,7 +8,6 @@ function run_api_tests() {
 
     cargo test --release test_register_ -- --test-threads=1
     cargo test --release test_multimap_ -- --test-threads=1
-    cargo test --release test_sequence_ -- --test-threads=1
     cargo test --release test_fetch_ -- --test-threads=1
     cargo test --release test_keys_ -- --test-threads=1
     cargo test --release test_safeurl_ -- --test-threads=1

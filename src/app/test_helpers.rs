@@ -116,7 +116,7 @@ fn get_bootstrap_contacts() -> Result<HashSet<SocketAddr>> {
 #[macro_export]
 macro_rules! retry_loop {
     ($n:literal, $async_func:expr) => {{
-        let mut retries = $n;
+        let mut retries: u64 = $n;
         loop {
             match $async_func.await {
                 Ok(val) => break val,
