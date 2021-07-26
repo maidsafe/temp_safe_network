@@ -51,7 +51,7 @@ impl Metadata {
         capacity: Capacity,
     ) -> Result<Self> {
         let chunk_records = ChunkRecords::new(capacity);
-        let register_storage = RegisterStorage::new(path, used_space);
+        let register_storage = RegisterStorage::new(path, used_space)?;
         let elder_stores = ElderStores::new(chunk_records, register_storage);
         Ok(Self { elder_stores })
     }

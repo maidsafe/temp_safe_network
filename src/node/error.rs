@@ -163,6 +163,12 @@ pub enum Error {
     /// Failed to send message to connection.
     #[error("Failed to send message to connection: {{0.0}}")]
     UnableToSend(WireMsg),
+    /// Sled Failed to create the database
+    #[error("Could not create the register database")]
+    UnableToCreateRegisterDb,
+    /// Sled error.
+    #[error("Sled error:: {0}")]
+    Sled(#[from] sled::Error),
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
