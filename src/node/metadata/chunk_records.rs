@@ -9,7 +9,7 @@
 use crate::btree_set;
 use crate::messaging::{
     data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, QueryResponse},
-    node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
+    node::{NodeCmd, NodeMsg, NodeQuery},
     DataAuthority, EndUser, MessageId,
 };
 use crate::node::{
@@ -277,7 +277,7 @@ impl ChunkRecords {
 
         Ok(NodeDuty::SendToNodes {
             msg_id,
-            msg: NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk))),
+            msg: NodeMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk)),
             targets: target_holders,
             aggregation: false,
         })

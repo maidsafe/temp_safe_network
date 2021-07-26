@@ -9,7 +9,7 @@
 use super::{Mapping, MsgContext};
 use crate::messaging::{
     data::{DataCmd, DataMsg, ProcessMsg, QueryResponse},
-    node::{NodeCmd, NodeMsg, NodeQuery, NodeQueryResponse, NodeSystemCmd},
+    node::{NodeCmd, NodeMsg, NodeQuery, NodeQueryResponse},
     DataAuthority, DataSigned, DstLocation, MessageId, SrcLocation, WireMsg,
 };
 use crate::node::{
@@ -69,9 +69,9 @@ pub(super) fn map_node_msg(
 fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) -> NodeDuty {
     match msg {
         // Churn synch
-        MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
-            metadata,
-        })) => NodeDuty::SynchState { metadata },
+        MessageReceived::NodeCmd(NodeCmd::ReceiveExistingData { metadata }) => {
+            NodeDuty::SynchState { metadata }
+        }
         // ------ metadata ------
         MessageReceived::NodeQuery(NodeQuery::Metadata {
             query,
@@ -132,17 +132,17 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
             }
         }
         // this cmd is accumulated, thus has authority
-        MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk))) => {
+        MessageReceived::NodeCmd(NodeCmd::ReplicateChunk(chunk)) => {
             NodeDuty::ReplicateChunk { chunk, msg_id }
         }
-        MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk))) => {
+        MessageReceived::NodeCmd(NodeCmd::RepublishChunk(chunk)) => {
             NodeDuty::ProcessRepublish { chunk, msg_id }
         }
         //
         // ------ system cmd ------
-        MessageReceived::NodeCmd(NodeCmd::System(NodeSystemCmd::StorageFull {
-            node_id, ..
-        })) => NodeDuty::IncrementFullNodeCount { node_id },
+        MessageReceived::NodeCmd(NodeCmd::StorageFull { node_id, .. }) => {
+            NodeDuty::IncrementFullNodeCount { node_id }
+        }
         // --- Adult Operation response ---
         MessageReceived::NodeQueryResponse {
             response: NodeQueryResponse::GetChunk(res),

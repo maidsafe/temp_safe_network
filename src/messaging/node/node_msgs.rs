@@ -14,7 +14,7 @@ use crate::types::{Chunk, PublicKey};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-///
+/// Command message sent among nodes
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeCmd {
@@ -36,14 +36,6 @@ pub enum NodeCmd {
         /// Message source
         origin: EndUser,
     },
-    /// Cmds related to the running of a node.
-    System(NodeSystemCmd),
-}
-
-/// Cmds related to the running of a node.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeSystemCmd {
     /// Notify Elders on nearing max capacity
     StorageFull {
         /// Node Id
