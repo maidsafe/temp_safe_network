@@ -38,7 +38,7 @@ const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "2";
 const RUST_LOG: &str = "RUST_LOG";
 
-const QUERY_TIMEOUT: u64 = 60;
+const QUERY_TIMEOUT: u64 = 120;
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
