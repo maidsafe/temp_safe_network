@@ -9,7 +9,7 @@
 mod data_store;
 mod encoding;
 mod errors;
-mod register_cmd_store;
+mod register_cmd_event_store;
 
 use data_store::to_db_key::ToDbKey;
 pub(crate) use data_store::{
@@ -19,4 +19,4 @@ pub(crate) use data_store::{
 };
 pub(crate) use errors::Error;
 use errors::Result;
-pub(crate) use register_cmd_store::RegisterCmdStore;
+pub(crate) use register_cmd_event_store::RegisterCmdEventStore;

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
-use crate::dbs::{RegisterCmdStore, UsedSpace};
+use crate::dbs::{RegisterCmdEventStore, UsedSpace};
 use crate::node::{error::convert_to_error_message, node_ops::NodeDuty, Error, Result};
 use crate::types::{
     register::{Action, Address, Register, User},
@@ -24,6 +24,7 @@ use crate::{
     types::DataAddress,
 };
 use dashmap::DashMap;
+use sled::Db;
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
@@ -32,28 +33,39 @@ use std::{
 use tracing::info;
 use xor_name::{Prefix, XorName};
 
+const DATABASE_NAME: &str = "register.db";
+
 /// Operations over the data type Register.
 #[derive(Clone)]
 pub(super) struct RegisterStorage {
     path: PathBuf,
     used_space: UsedSpace,
     registers: DashMap<XorName, Option<StateEntry>>,
+    db: Db,
 }
 
 #[derive(Clone)]
 struct StateEntry {
     state: Register,
-    db: RegisterCmdStore,
+    store: RegisterCmdEventStore,
 }
 
 impl RegisterStorage {
-    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Self {
+    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         used_space.add_dir(path);
-        Self {
+        let db_dir = path.join("db").join(DATABASE_NAME.to_string());
+
+        let db = sled::open(db_dir).map_err(|error| {
+            trace!("Sled Error: {:?}", error);
+            Error::UnableToCreateRegisterDb
+        })?;
+
+        Ok(Self {
             path: path.to_path_buf(),
             used_space,
             registers: DashMap::new(),
-        }
+            db,
+        })
     }
 
     /// --- Synching ---
@@ -66,7 +78,7 @@ impl RegisterStorage {
             let (key, cache) = entry.pair();
             if let Some(entry) = cache {
                 if prefix.matches(entry.state.name()) {
-                    let _ = the_data.insert(*key, entry.db.get_all()?);
+                    let _ = the_data.insert(*key, entry.store.get_all()?);
                 }
             } else {
             }
@@ -89,25 +101,6 @@ impl RegisterStorage {
                 let _ = self.apply(op, data_auth).await?;
             }
         }
-
-        // let instance = Arc::new(self);
-
-        // let handles = data.iter().map(|(_, history)| {
-        //     let store = instance.clone();
-        //     tokio::task::spawn(async {
-        //         for op in history {
-        //             let _ = store.apply(*op).await?;
-        //             //let _ = self.apply(*op).await?;
-        //         }
-        //         Ok::<_, Error>(())
-        //     })
-        // });
-
-        // join_all(handles)
-        //     .await
-        //     .iter()
-        //     .flatten()
-        //     .for_each(|e| error!("{:?}", e));
 
         Ok(())
     }
@@ -145,22 +138,19 @@ impl RegisterStorage {
                 if self.registers.contains_key(&key) {
                     return Err(Error::DataExists);
                 }
-                let mut db = load_db(key, self.path.as_path()).await?;
-                let _ = db.append(op)?;
+                let mut store = self.load_store(key)?;
+                let _ = store.append(op)?;
                 let _ = self
                     .registers
-                    .insert(key, Some(StateEntry { state: map, db }));
+                    .insert(key, Some(StateEntry { state: map, store }));
                 Ok(())
             }
             Delete(_) => {
                 let result = match self.registers.get_mut(&key) {
                     None => {
-                        if let Ok(db) = load_db(key, self.path.as_path()).await {
-                            info!("Deleting Register");
-                            db.as_deletable().delete().await.map_err(Error::from)
-                        } else {
-                            Ok(())
-                        }
+                        info!("Attempting to delete register if it exists");
+                        let _ = self.db.drop_tree(key)?;
+                        Ok(())
                     }
                     Some(mut entry) => {
                         let (_, cache) = entry.pair_mut();
@@ -176,11 +166,13 @@ impl RegisterStorage {
                                 Err(Error::InvalidOwner(*data_auth.public_key()))
                             } else {
                                 info!("Deleting Register");
-                                entry.db.as_deletable().delete().await.map_err(Error::from)
+                                let _ = self.db.drop_tree(key)?;
+                                Ok(())
                             }
-                        } else if let Ok(db) = load_db(key, self.path.as_path()).await {
+                        } else if let Ok(_) = self.load_store(key) {
                             info!("Deleting Register");
-                            db.as_deletable().delete().await.map_err(Error::from)
+                            let _ = self.db.drop_tree(key)?;
+                            Ok(())
                         } else {
                             Ok(())
                         }
@@ -202,10 +194,10 @@ impl RegisterStorage {
                     cached_entry
                 } else {
                     // read from disk
-                    let db = load_db(key, self.path.as_path()).await?;
+                    let store = self.load_store(key)?;
                     let mut reg = None;
                     // apply all ops
-                    for op in db.get_all()? {
+                    for op in store.get_all()? {
                         // first op shall be New
                         if let New(register) = op.write {
                             reg = Some(register);
@@ -219,7 +211,7 @@ impl RegisterStorage {
                     let new_entry = reg
                         .take()
                         .ok_or(Error::NoSuchData(DataAddress::Register(address)))
-                        .map(|state| StateEntry { state, db })?;
+                        .map(|state| StateEntry { state, store })?;
 
                     let _ = cache.replace(new_entry);
 
@@ -237,7 +229,7 @@ impl RegisterStorage {
                 let result = entry.state.apply_op(reg_op).map_err(Error::NetworkData);
 
                 if result.is_ok() {
-                    entry.db.append(op)?;
+                    entry.store.append(op)?;
                     info!("Editing Register SUCCESSFUL!");
                 } else {
                     info!("Editing Register FAILED!");
@@ -431,19 +423,17 @@ impl RegisterStorage {
             origin,
         )))
     }
+
+    /// Load a register cmd event store
+    fn load_store(&self, id: XorName) -> Result<RegisterCmdEventStore> {
+        RegisterCmdEventStore::new(id, self.db.clone()).map_err(Error::from)
+    }
 }
 
 fn to_id(address: &Address) -> Result<XorName> {
     Ok(XorName::from_content(&[address
         .encode_to_zbase32()?
         .as_bytes()]))
-}
-
-async fn load_db(id: XorName, path: &Path) -> Result<RegisterCmdStore> {
-    let db_dir = path.join("db").join("register".to_string());
-    RegisterCmdStore::new(id, db_dir.as_path())
-        .await
-        .map_err(Error::from)
 }
 
 impl Display for RegisterStorage {

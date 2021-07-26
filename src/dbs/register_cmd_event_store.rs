@@ -11,51 +11,26 @@ use crate::{
     messaging::data::RegisterCmd,
     types::utils::{deserialise, serialise},
 };
-use sled::Db;
-use std::path::{Path, PathBuf};
-use tokio::fs;
+use sled::{Db, Tree};
 use xor_name::XorName;
-
-const DB_EXTENSION: &str = ".db";
 
 /// Disk storage for transfers.
 #[derive(Clone)]
-pub(crate) struct RegisterCmdStore {
-    db: Db,
-    db_path: PathBuf,
+pub(crate) struct RegisterCmdEventStore {
+    tree: Tree,
+    db_name: String,
 }
 
-pub(crate) struct DeletableStore {
-    db_path: PathBuf,
-}
-
-impl DeletableStore {
-    pub(crate) async fn delete(&self) -> Result<()> {
-        fs::remove_file(self.db_path.as_path())
-            .await
-            .map_err(Error::Io)
-    }
-}
-
-impl RegisterCmdStore {
-    pub(crate) async fn new(id: XorName, db_dir: &Path) -> Result<Self> {
-        let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
-        let db_path = db_dir.join(db_name.clone());
-        Ok(Self {
-            db: sled::open(db_path.clone())?,
-            db_path,
-        })
-    }
-
-    pub(crate) fn as_deletable(&self) -> DeletableStore {
-        DeletableStore {
-            db_path: self.db_path.clone(),
-        }
+impl RegisterCmdEventStore {
+    pub(crate) fn new(id: XorName, db: Db) -> Result<Self> {
+        let db_name = id.to_db_key()?;
+        let tree = db.open_tree(&db_name)?;
+        Ok(Self { tree, db_name })
     }
 
     /// Get all events stored in db
     pub(crate) fn get_all(&self) -> Result<Vec<RegisterCmd>> {
-        let iter = self.db.iter();
+        let iter = self.tree.iter();
 
         let mut events = vec![];
         for (_, res) in iter.enumerate() {
@@ -76,8 +51,8 @@ impl RegisterCmdStore {
 
     /// add a new register cmd
     pub(crate) fn append(&mut self, event: RegisterCmd) -> Result<()> {
-        let key = &self.db.len().to_string();
-        if let Some(_) = self.db.get(key)? {
+        let key = &self.tree.len().to_string();
+        if let Some(_) = self.tree.get(key)? {
             return Err(Error::InvalidOperation(format!(
                 "Key exists: {}. Event: {:?}",
                 key, event
@@ -85,7 +60,7 @@ impl RegisterCmdStore {
         }
 
         let event = serialise(&event)?;
-        let _ = self.db.insert(key, event).map_err(Error::Sled)?;
+        let _ = self.tree.insert(key, event).map_err(Error::Sled)?;
 
         Ok(())
     }
@@ -93,11 +68,12 @@ impl RegisterCmdStore {
 
 #[cfg(test)]
 mod test {
-    use super::RegisterCmdStore;
+    use super::RegisterCmdEventStore;
     use crate::messaging::data::{RegisterCmd, RegisterWrite};
     use crate::messaging::DataSigned;
     use crate::node::Result;
 
+    use crate::node::Error;
     use crate::types::{
         register::{PublicPermissions, PublicPolicy, Register, User},
         Keypair,
@@ -112,9 +88,12 @@ mod test {
     async fn history_of_register() -> Result<()> {
         let id = xor_name::XorName::random();
         let tmp_dir = tempdir()?;
-        let db_dir = tmp_dir.into_path().join(Path::new(&"Token".to_string()));
-
-        let mut store = RegisterCmdStore::new(id, db_dir.as_path()).await?;
+        let db_dir = tmp_dir.into_path().join(Path::new(&"db".to_string()));
+        let db = sled::open(db_dir).map_err(|error| {
+            trace!("Sled Error: {:?}", error);
+            Error::UnableToCreateRegisterDb
+        })?;
+        let mut store = RegisterCmdEventStore::new(id, db)?;
 
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
         let pk = authority_keypair1.public_key();
