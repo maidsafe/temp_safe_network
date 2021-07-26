@@ -19,6 +19,7 @@ use xor_name::XorName;
 const DB_EXTENSION: &str = ".db";
 
 /// Disk storage for transfers.
+#[derive(Clone)]
 pub(crate) struct RegisterCmdStore {
     db: Db,
     db_path: PathBuf,

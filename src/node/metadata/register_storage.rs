@@ -33,12 +33,14 @@ use tracing::info;
 use xor_name::{Prefix, XorName};
 
 /// Operations over the data type Register.
+#[derive(Clone)]
 pub(super) struct RegisterStorage {
     path: PathBuf,
     used_space: UsedSpace,
     registers: DashMap<XorName, Option<StateEntry>>,
 }
 
+#[derive(Clone)]
 struct StateEntry {
     state: Register,
     db: RegisterCmdStore,
