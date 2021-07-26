@@ -150,6 +150,7 @@ impl Node {
         self.network_api.our_prefix().await
     }
 
+    // TODO: remove this, and be processed, calling from routing code directly
     async fn process_routing_event(
         network_events: Arc<Mutex<EventStream>>,
         network_api: Network,

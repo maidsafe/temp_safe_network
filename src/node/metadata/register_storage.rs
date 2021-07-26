@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
-use crate::dbs::{EventStore, UsedSpace};
+use crate::dbs::{RegisterCmdStore, UsedSpace};
 use crate::node::{error::convert_to_error_message, node_ops::NodeDuty, Error, Result};
 use crate::types::{
     register::{Action, Address, Register, User},
@@ -41,7 +41,7 @@ pub(super) struct RegisterStorage {
 
 struct StateEntry {
     state: Register,
-    db: EventStore<RegisterCmd>,
+    db: RegisterCmdStore,
 }
 
 impl RegisterStorage {
@@ -64,7 +64,7 @@ impl RegisterStorage {
             let (key, cache) = entry.pair();
             if let Some(entry) = cache {
                 if prefix.matches(entry.state.name()) {
-                    let _ = the_data.insert(*key, entry.db.get_all());
+                    let _ = the_data.insert(*key, entry.db.get_all()?);
                 }
             } else {
             }
@@ -203,7 +203,7 @@ impl RegisterStorage {
                     let db = load_db(key, self.path.as_path()).await?;
                     let mut reg = None;
                     // apply all ops
-                    for op in db.get_all() {
+                    for op in db.get_all()? {
                         // first op shall be New
                         if let New(register) = op.write {
                             reg = Some(register);
@@ -437,9 +437,9 @@ fn to_id(address: &Address) -> Result<XorName> {
         .as_bytes()]))
 }
 
-async fn load_db(id: XorName, path: &Path) -> Result<EventStore<RegisterCmd>> {
+async fn load_db(id: XorName, path: &Path) -> Result<RegisterCmdStore> {
     let db_dir = path.join("db").join("register".to_string());
-    EventStore::new(id, db_dir.as_path())
+    RegisterCmdStore::new(id, db_dir.as_path())
         .await
         .map_err(Error::from)
 }
