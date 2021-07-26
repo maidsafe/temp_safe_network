@@ -13,7 +13,7 @@ use xor_name::XorName;
 
 pub(crate) trait ToDbKey: Serialize {
     /// The encoded string representation of an identifier, used as a key in the context of a
-    /// PickleDB <key,value> store.
+    /// Db <key,value> store.
     fn to_db_key(&self) -> Result<String> {
         let serialised = utils::serialise(&self)?;
         Ok(hex::encode(&serialised))

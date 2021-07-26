@@ -38,9 +38,9 @@ pub enum Error {
     /// Bincode error.
     #[error("Bincode error:: {0}")]
     Bincode(#[from] bincode::Error),
-    /// PickleDb error.
-    #[error("PickleDb error:: {0}")]
-    PickleDb(#[from] pickledb::error::Error),
+    ///Db key parse error.
+    #[error("Could not parse key:: {0:?}")]
+    CouldNotParseDbKey(Vec<u8>),
     /// Sled error.
     #[error("Sled error:: {0}")]
     Sled(#[from] sled::Error),
