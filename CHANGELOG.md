@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.14.2](https://github.com/maidsafe/safe_network/compare/v0.14.1...v0.14.2) (2021-07-26)
+
+
+### Bug Fixes
+
+* error out when failed to fetch section_key of ClientElders ([2969d75](https://github.com/maidsafe/safe_network/commit/2969d75d60356e392e374598ee6797e4342a8046))
+* foward DataMsg for fetching chunk across sections ([daf09b0](https://github.com/maidsafe/safe_network/commit/daf09b0ee4d75135b1948ef4b33ef76a5787b507))
+* populate with target section_pk ([4599421](https://github.com/maidsafe/safe_network/commit/45994213e5b981fed11dd95073636537d936cc5f))
+* retain the roginal dst_location ([c970270](https://github.com/maidsafe/safe_network/commit/c970270d441364a26c7051fceb31e9371dcfbe0b))
+
 ### [0.14.1](https://github.com/maidsafe/safe_network/compare/v0.14.0...v0.14.1) (2021-07-26)
 
 ## [0.14.0](https://github.com/maidsafe/safe_network/compare/v0.13.0...v0.14.0) (2021-07-26)
