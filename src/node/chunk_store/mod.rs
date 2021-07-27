@@ -179,6 +179,10 @@ impl ChunkStore {
 
     /// Stores a chunk that Elders sent to it for replication.
     pub(crate) async fn store_for_replication(&self, chunk: Chunk) -> Result<NodeDuty> {
+        trace!(
+            "Trying to store for replication of chunk: {:?}",
+            chunk.address()
+        );
         if self.store.has(chunk.address()).await? {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",

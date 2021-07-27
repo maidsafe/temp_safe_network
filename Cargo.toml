@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "safe_network"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.15.0"
+version = "0.15.1"
 
 [profile.release]
 incremental = true
@@ -25,10 +25,10 @@ path = "src/bin/testnet.rs"
 
 [features]
 default = [ "testing" ]
+client = ["qp2p/no-igd"]
 testing = [ ]
 chaos = [ ]
 always-joinable = [ ]
-client = [ "qp2p/no-igd"]
 
 [dependencies]
 base64 = "~0.10.1"
