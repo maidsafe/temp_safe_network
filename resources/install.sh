@@ -15,7 +15,7 @@ sn_cli_install_dir() {
 }
 
 sn_cli_latest_version() {
-  curl -s "https://api.github.com/repos/maidsafe/sn_api/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/'
+  curl -s "https://api.github.com/repos/maidsafe/sn_cli/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/'
 }
 
 sn_cli_download() {
@@ -98,10 +98,14 @@ sn_cli_profile_is_bash_or_zsh() {
 }
 
 sn_cli_install() {
+  arch="x86_64"
   platform="unknown-linux-musl"
   sn_cli_exec="safe"
   uname_output=$(uname -a)
   case $uname_output in
+      *aarch64*)
+          arch="aarch64"
+          ;;
       Linux*)
           ;;
       Darwin*)
@@ -116,7 +120,7 @@ sn_cli_install() {
           exit 1
   esac
 
-  cli_package="sn_cli-$(sn_cli_latest_version)-x86_64-$platform.tar.gz"
+  cli_package="sn_cli-$(sn_cli_latest_version)-$arch-$platform.tar.gz"
   cli_package_url="https://sn-api.s3.eu-west-2.amazonaws.com/$cli_package"
   tmp_dir=$(mktemp -d)
   tmp_dir_package=$tmp_dir/$cli_package
