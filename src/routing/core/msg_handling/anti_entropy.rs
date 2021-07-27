@@ -49,7 +49,7 @@ impl Core {
                 )? {
                     (Some(msg_to_send), shall_be_handled) => {
                         let command = self.relay_message(msg_to_send).await?;
-                        (command, shall_be_handled)
+                        (Some(command), shall_be_handled)
                     }
                     (None, shall_be_handled) => (None, shall_be_handled),
                 }

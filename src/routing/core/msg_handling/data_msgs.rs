@@ -239,10 +239,7 @@ impl Core {
             };
 
             match self.relay_message(wire_msg).await {
-                Ok(Some(cmd)) => return Ok(vec![cmd]),
-                Ok(None) => {
-                    error!("Failed to relay msg, no cmd returned.");
-                }
+                Ok(cmd) => return Ok(vec![cmd]),
                 Err(err) => {
                     error!("Failed to relay msg {:?}", err);
                 }

@@ -58,11 +58,8 @@ impl Core {
         {
             // Message is not for us
             info!("Relay message {} closer to the destination", msg_id);
-            if let Some(cmds) = self.relay_message(wire_msg).await? {
-                return Ok(vec![cmds]);
-            } else {
-                return Ok(vec![]);
-            }
+            let cmd = self.relay_message(wire_msg).await?;
+            return Ok(vec![cmd]);
         }
 
         // We can now deserialize the payload of the incoming message

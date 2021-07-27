@@ -12,7 +12,6 @@ mod comm;
 mod connectivity;
 mod delivery_group;
 mod enduser_registry;
-mod message_filter;
 mod messaging;
 mod msg_handling;
 mod signature_aggregator;
@@ -26,9 +25,7 @@ pub use signature_aggregator::Error as AggregatorError;
 pub(crate) use signature_aggregator::SignatureAggregator;
 use std::path::PathBuf;
 
-use self::{
-    enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
-};
+use self::{enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
 use crate::messaging::{
     node::{Network, NodeMsg, Proposal, Section},
     MessageId,
@@ -67,7 +64,6 @@ pub(crate) struct Core {
     // Voter for Dkg
     dkg_voter: DkgVoter,
     relocate_state: Option<RelocateState>,
-    msg_filter: MessageFilter,
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: bool,
     resource_proof: ResourceProof,
@@ -106,7 +102,6 @@ impl Core {
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
-            msg_filter: MessageFilter::new(),
             event_tx,
             joins_allowed: true,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
@@ -142,8 +137,6 @@ impl Core {
         }
 
         if new.last_key != old.last_key {
-            self.msg_filter.reset().await;
-
             if new.is_elder {
                 info!(
                     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
