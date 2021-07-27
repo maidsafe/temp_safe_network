@@ -1,6 +1,6 @@
 [package]
 name = "sn_cli"
-version = "0.33.2"
+version = "0.33.3"
 description = "Safe CLI"
 authors = [
   "bochaco <gabrielviganotti@gmail.com>",
@@ -67,7 +67,7 @@ xor_name = "1"
 
   [dependencies.self_update]
   git = "https://github.com/jacderida/self_update.git"
-  branch = "github_download_json_parsing" 
+  branch = "github_download_json_parsing"
   default-features = false
   features = [
   "rustls",

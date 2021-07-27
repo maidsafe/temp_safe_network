@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.3](https://github.com/maidsafe/sn_cli/compare/v0.33.2...v0.33.3) (2021-07-27)
+
+
+### Features
+
+* **update:** Flag Argument to Remove User Input ([fba67bb](https://github.com/maidsafe/sn_cli/commit/fba67bbb56b77c2868d3a4ce7c794a248860cc82))
+
 ### [0.33.2](https://github.com/maidsafe/sn_cli/compare/v0.33.1...v0.33.2) (2021-07-26)
 
 ### [0.33.1](https://github.com/maidsafe/sn_cli/compare/v0.33.0...v0.33.1) (2021-07-20)
