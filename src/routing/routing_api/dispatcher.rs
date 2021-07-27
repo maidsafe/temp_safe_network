@@ -168,7 +168,7 @@ impl Dispatcher {
             }
             Command::ParseAndSendWireMsg(wire_msg) => self.send_wire_message(wire_msg).await,
             Command::RelayMessage(wire_msg) => {
-                if let Some(cmd) = self.core.write().await.relay_message(wire_msg).await? {
+                if let Some(cmd) = self.core.read().await.relay_message(wire_msg).await? {
                     Ok(vec![cmd])
                 } else {
                     Ok(vec![])

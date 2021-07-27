@@ -161,32 +161,15 @@ impl Core {
             .handle_timeout(&self.node, token, *self.section_chain().last_key())
     }
 
-    pub(crate) async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
-        self.msg_filter.add_to_filter(wire_msg.msg_id()).await
-    }
-
     // Send message over the network.
     pub(crate) async fn relay_message(&self, mut wire_msg: WireMsg) -> Result<Option<Command>> {
         let dst_location = wire_msg.dst_location();
-        let (presumed_targets, dg_size) = delivery_group::delivery_targets(
+        let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
             &self.node.name(),
             &self.section,
             &self.network,
         )?;
-
-        let mut targets = vec![];
-
-        for peer in presumed_targets {
-            if self
-                .msg_filter
-                .filter_outgoing(&wire_msg, peer.name())
-                .await
-                .is_new()
-            {
-                let _ = targets.push((*peer.name(), *peer.addr()));
-            }
-        }
 
         if targets.is_empty() {
             return Ok(None);
@@ -205,7 +188,10 @@ impl Core {
         wire_msg.set_dst_section_pk(dst_pk);
 
         let command = Command::SendMessageDeliveryGroup {
-            recipients: targets,
+            recipients: targets
+                .into_iter()
+                .map(|peer| (peer.name, peer.addr))
+                .collect(),
             delivery_group_size: dg_size,
             wire_msg,
         };
