@@ -18,7 +18,7 @@ mod signed;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
-pub use network::{Network, OtherSection};
+pub use network::Network;
 pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::ElderCandidates;
@@ -171,7 +171,7 @@ fn fmt_sync_network(network: &Network, f: &mut fmt::Formatter) -> fmt::Result {
                 network
                     .sections
                     .iter()
-                    .map(|info| info.section_auth.value.prefix)
+                    .map(|section_auth| section_auth.value.prefix)
                     .format(", ")
             ),
         )
