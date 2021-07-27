@@ -37,8 +37,8 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "2";
 const RUST_LOG: &str = "RUST_LOG";
-const ADDITIONAL_NODES_TO_SPLIT: u64 = 44;
-const QUERY_TIMEOUT: u64 = 120;
+const ADDITIONAL_NODES_TO_SPLIT: u64 = 30;
+const QUERY_TIMEOUT: u64 = 30;
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
@@ -172,7 +172,7 @@ pub async fn run_split() -> Result<()> {
 
     // relative to the cargo run command's cwd
     let path = std::fs::canonicalize("./scripts/has_split.sh")?;
-    let res = Command::new(path).output()?;
+    let _ = Command::new(path).output()?;
 
     // now we read the data
     let bootstrap_contacts =
@@ -182,7 +182,17 @@ pub async fn run_split() -> Result<()> {
 
     for (address, hash) in all_data_put {
         println!("...fetching Blob at address {:?} ...", address);
-        let data = client.read_blob(address, None, None).await?;
+        let mut data = client.read_blob(address, None, None).await;
+
+        let mut attempts = 0;
+        while data.is_err() && attempts < 10 {
+            attempts += 1;
+            // do some retries to ensure we're not just timing out by chance
+            sleep(Duration::from_secs(1)).await;
+            data = client.read_blob(address, None, None).await;
+        }
+
+        let data = data?;
         println!("Blob read from {:?}:", address);
 
         let mut hasher = Sha3::v256();
