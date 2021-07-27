@@ -168,11 +168,8 @@ impl Dispatcher {
             }
             Command::ParseAndSendWireMsg(wire_msg) => self.send_wire_message(wire_msg).await,
             Command::RelayMessage(wire_msg) => {
-                if let Some(cmd) = self.core.write().await.relay_message(wire_msg).await? {
-                    Ok(vec![cmd])
-                } else {
-                    Ok(vec![])
-                }
+                let cmd = self.core.write().await.relay_message(wire_msg).await?;
+                Ok(vec![cmd])
             }
             Command::ScheduleTimeout { duration, token } => Ok(self
                 .handle_schedule_timeout(duration, token)
