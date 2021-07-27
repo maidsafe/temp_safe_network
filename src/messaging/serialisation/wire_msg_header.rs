@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{DstLocation, Error, MessageId, MsgKind, Result};
+use bincode::config::{Options, WithOtherEndian, WithOtherTrailing};
 use bytes::Bytes;
-use cookie_factory::{bytes::be_u16, combinator::slice, gen, gen_simple};
+use cookie_factory::{combinator::slice, gen_simple};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, mem::size_of};
 
@@ -38,13 +39,30 @@ pub struct MsgEnvelope {
     pub dst_location: DstLocation,
 }
 
-// Bytes index and size in the header for the 'version' field
-const HDR_VERSION_BYTES_LEN: usize = size_of::<u16>();
+// Maximum header size. If header ends up larger, serialization will fail.
+const HDR_CONTENT_MAX_SIZE: usize = u16::MAX as usize;
 
-// Bytes length in the header for the 'header_size' field
-const HDR_SIZE_BYTES_START: usize = HDR_VERSION_BYTES_LEN;
-const HDR_SIZE_BYTES_LEN: usize = size_of::<u16>();
-const HDR_SIZE_BYTES_END: usize = HDR_SIZE_BYTES_START + HDR_SIZE_BYTES_LEN;
+lazy_static::lazy_static! {
+    static ref BINCODE_OPTS: WithOtherEndian<
+        WithOtherTrailing<bincode::DefaultOptions, bincode::config::AllowTrailing>,
+        bincode::config::BigEndian,
+    > = {
+        use bincode::Options;
+        bincode::DefaultOptions::new()
+            .allow_trailing_bytes()
+            .with_big_endian()
+    };
+
+    static ref HDR_MAX_SIZE: u16 = {
+        BINCODE_OPTS
+            .serialized_size(&u16::MAX)
+            .expect("serialize u16 should be infallible") as u16
+            + BINCODE_OPTS
+                .serialized_size(&HDR_CONTENT_MAX_SIZE)
+                .expect("serialize usize should be infallible") as u16
+            + size_of::<MsgEnvelope>() as u16
+    };
+}
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
@@ -65,50 +83,44 @@ impl WireMsgHeader {
     // correspond to the message payload. The caller shall then take care of
     // deserializing the payload using the information provided in the `WireMsgHeader`.
     pub fn from(mut bytes: Bytes) -> Result<(Self, Bytes)> {
-        // Let's make sure there is a minimum number of bytes to parse the version.
-        let length = bytes.len();
-        if length < HDR_VERSION_BYTES_LEN {
-            return Err(Error::FailedToParse(format!(
-                "not enough bytes received ({}) to even read the wire message version field",
-                length
-            )));
-        }
+        let mut reader = bytes.as_ref();
 
-        // Let's read the serialization protocol version bytes
-        let mut version_bytes = [0; HDR_VERSION_BYTES_LEN];
-        version_bytes[0..].copy_from_slice(&bytes[0..HDR_VERSION_BYTES_LEN]);
-        let version = u16::from_be_bytes(version_bytes);
+        // Parse the version
+        let version: u16 = BINCODE_OPTS.deserialize_from(&mut reader).map_err(|err| {
+            Error::FailedToParse(format!(
+                "failed to deserialize version from header: {}",
+                err
+            ))
+        })?;
         // Make sure we support this version
         if version != MESSAGING_PROTO_VERSION {
             return Err(Error::UnsupportedVersion(version));
         }
 
-        // Let's make sure there is a minimum number of bytes to parse the header size.
-        let length = bytes.len();
-        if length < HDR_SIZE_BYTES_END {
-            return Err(Error::FailedToParse(format!(
-                "not enough bytes received ({}) to even read the wire message size",
-                length
-            )));
-        }
-
-        // ...now let's read the bytes which gives us the header size
-        let mut header_size_bytes = [0; HDR_SIZE_BYTES_LEN];
-        header_size_bytes[0..].copy_from_slice(&bytes[HDR_SIZE_BYTES_START..HDR_SIZE_BYTES_END]);
-        let header_size = u16::from_be_bytes(header_size_bytes);
-
-        // We check that at least we have the minimum number of bytes
-        // for the header of any kind of message to be deserialised.
-        if length < Self::serialized_size(header_size).into() {
+        // Parse the header size
+        let header_size: usize = BINCODE_OPTS.deserialize_from(&mut reader).map_err(|err| {
+            Error::FailedToParse(format!(
+                "failed to deserialize header size from header: {}",
+                err
+            ))
+        })?;
+        // Check that we have enough bytes for the rest of the header to be deserialised.
+        if reader.len() < header_size {
             return Err(Error::FailedToParse(format!(
                 "not enough bytes received ({}) to deserialize wire message header",
-                length
+                bytes.len()
+            )));
+        }
+        // Check that the header's not too large
+        if header_size > HDR_CONTENT_MAX_SIZE {
+            return Err(Error::FailedToParse(format!(
+                "header too large to deserialize: {}",
+                header_size
             )));
         }
 
         // ...finally, we read the message envelope bytes
-        let msg_envelope_bytes =
-            &bytes[HDR_SIZE_BYTES_END..Self::serialized_size(header_size).into()];
+        let msg_envelope_bytes = &reader[..header_size];
         let msg_envelope: MsgEnvelope =
             rmp_serde::from_slice(msg_envelope_bytes).map_err(|err| {
                 Error::FailedToParse(format!(
@@ -124,12 +136,13 @@ impl WireMsgHeader {
         };
 
         // Get a slice for the payload bytes, i.e. the bytes after the header bytes
-        let payload_bytes = bytes.split_off(Self::serialized_size(header_size).into());
+        let serialized_size = bytes.len() - reader.len() + header_size;
+        let payload_bytes = bytes.split_off(serialized_size);
 
         Ok((header, payload_bytes))
     }
 
-    pub fn write<'a>(&self, buffer: &'a mut [u8]) -> Result<(&'a mut [u8], u16)> {
+    pub fn write<'a>(&self, mut buffer: &'a mut [u8]) -> Result<(&'a mut [u8], u16)> {
         // first serialise the msg envelope so we can figure out the total header size
         let msg_envelope_vec = rmp_serde::to_vec_named(&self.msg_envelope).map_err(|err| {
             Error::Serialisation(format!(
@@ -137,47 +150,51 @@ impl WireMsgHeader {
                 err
             ))
         })?;
+        if msg_envelope_vec.len() > HDR_CONTENT_MAX_SIZE {
+            return Err(Error::Serialisation(format!(
+                "header too large to serialise: {}",
+                msg_envelope_vec.len()
+            )));
+        }
 
-        // real header size based on the length of serialised msg envelope (only field atm)
-        let header_size = msg_envelope_vec.len() as u16;
+        let buffer_len = buffer.len();
 
-        // Let's write the serialisation protocol version bytes first
-        let (buf_at_size, _) = gen(be_u16(self.version), buffer).map_err(|err| {
-            Error::Serialisation(format!(
-                "version field couldn't be serialized into the header: {}",
-                err
-            ))
-        })?;
-
-        // Now let's write the header size
-        let (buf_at_msg_envelope, _) = gen(be_u16(header_size), buf_at_size).map_err(|err| {
-            Error::Serialisation(format!(
-                "header size value couldn't be serialized into the header: {}",
-                err
-            ))
-        })?;
-
-        // ...now write the message envelope
-        let buf_at_payload =
-            gen_simple(slice(&msg_envelope_vec), buf_at_msg_envelope).map_err(|err| {
+        // serialize the version
+        BINCODE_OPTS
+            .serialize_into(&mut buffer, &self.version)
+            .map_err(|err| {
                 Error::Serialisation(format!(
-                    "message envelope couldn't be serialized into the header: {}",
+                    "version field couldn't be serialized into the header: {}",
                     err
                 ))
             })?;
 
-        Ok((buf_at_payload, Self::serialized_size(header_size)))
+        // serialize the header size
+        BINCODE_OPTS
+            .serialize_into(&mut buffer, &msg_envelope_vec.len())
+            .map_err(|err| {
+                Error::Serialisation(format!(
+                    "header size value couldn't be serialized into the header: {}",
+                    err
+                ))
+            })?;
+
+        // ...now write the message envelope
+        let buf_at_payload = gen_simple(slice(&msg_envelope_vec), buffer).map_err(|err| {
+            Error::Serialisation(format!(
+                "message envelope couldn't be serialized into the header: {}",
+                err
+            ))
+        })?;
+
+        let serialized_size = u16::try_from(buffer_len - buf_at_payload.len()).unwrap();
+        Ok((buf_at_payload, serialized_size))
     }
 
     // Maximum size in bytes a WireMsgHeader can occupied when serialized.
     // this may be innaccurate since we use `size_of` which may not match the serialized form
     pub fn max_size() -> u16 {
-        Self::serialized_size(u16::try_from(size_of::<MsgEnvelope>()).unwrap())
-    }
-
-    // Exact size of header section when serialized, based on a serialized header contents size
-    fn serialized_size(header_size: u16) -> u16 {
-        u16::try_from(HDR_SIZE_BYTES_LEN + HDR_VERSION_BYTES_LEN).unwrap() + header_size
+        *HDR_MAX_SIZE
     }
 }
 
@@ -186,7 +203,7 @@ mod tests {
     use super::{MsgEnvelope, WireMsgHeader, MESSAGING_PROTO_VERSION};
     use crate::messaging::{DstLocation, EndUser, MessageId, MsgKind};
     use bytes::Bytes;
-    use std::{convert::TryFrom, mem::size_of};
+    use std::convert::TryFrom;
     use xor_name::XorName;
 
     #[test]
@@ -204,11 +221,11 @@ mod tests {
         };
         let serialized_envelope = rmp_serde::to_vec_named(&header.msg_envelope).unwrap();
 
-        let expected_size =
-            u16::try_from(size_of::<u16>() * 2 + serialized_envelope.len()).unwrap();
-        let mut expected = Vec::new();
-        expected.extend(MESSAGING_PROTO_VERSION.to_be_bytes());
-        expected.extend((serialized_envelope.len() as u16).to_be_bytes());
+        let expected_size = u16::try_from(2 + serialized_envelope.len()).unwrap();
+        let mut expected = vec![
+            MESSAGING_PROTO_VERSION as u8,
+            serialized_envelope.len() as u8,
+        ];
         expected.extend(&serialized_envelope);
 
         let mut actual = vec![0; WireMsgHeader::max_size().into()];
