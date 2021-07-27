@@ -235,7 +235,18 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
     sleep(Duration::from_secs(delay)).await;
 
     println!("...fetching Blob from the network now...");
-    let _ = client.read_blob(address, None, None).await?;
+    let mut data = client.read_blob(address, None, None).await;
+
+    let mut attempts = 0;
+    while data.is_err() && attempts < 10 {
+        attempts += 1;
+        // do some retries to ensure we're not just timing out by chance
+        sleep(Duration::from_secs(1)).await;
+        data = client.read_blob(address, None, None).await;
+    }
+
+    let _data = data?;
+
     println!("Blob successfully read from {:?}:", address);
 
     Ok((address, output))
