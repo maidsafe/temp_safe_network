@@ -48,9 +48,6 @@ struct HeaderSkeleton<'buf> {
     header_bytes: &'buf [u8],
 }
 
-// Maximum header size. If header ends up larger, serialization will fail.
-const HDR_CONTENT_MAX_SIZE: usize = u16::MAX as usize;
-
 lazy_static::lazy_static! {
     static ref BINCODE_OPTS: WithOtherEndian<
         WithOtherTrailing<bincode::DefaultOptions, bincode::config::AllowTrailing>,
@@ -67,7 +64,7 @@ lazy_static::lazy_static! {
             .serialized_size(&u16::MAX)
             .expect("serialize u16 should be infallible") as u16
             + BINCODE_OPTS
-                .serialized_size(&HDR_CONTENT_MAX_SIZE)
+                .serialized_size(&usize::MAX)
                 .expect("serialize usize should be infallible") as u16
             + size_of::<MsgEnvelope>() as u16
     };
@@ -102,14 +99,6 @@ impl WireMsgHeader {
             return Err(Error::UnsupportedVersion(skeleton.version));
         }
 
-        // Check that the header's not too large
-        if skeleton.header_bytes.len() > HDR_CONTENT_MAX_SIZE {
-            return Err(Error::FailedToParse(format!(
-                "header too large to deserialize: {}",
-                skeleton.header_bytes.len()
-            )));
-        }
-
         // ...finally, we read the message envelope bytes
         let msg_envelope: MsgEnvelope =
             rmp_serde::from_slice(skeleton.header_bytes).map_err(|err| {
@@ -142,13 +131,6 @@ impl WireMsgHeader {
                 err
             ))
         })?;
-
-        if msg_envelope_vec.len() > HDR_CONTENT_MAX_SIZE {
-            return Err(Error::Serialisation(format!(
-                "header too large to serialise: {}",
-                msg_envelope_vec.len()
-            )));
-        }
 
         let buffer_len = buffer.len();
 
