@@ -168,3 +168,43 @@ impl WireMsgHeader {
         (HDR_SIZE_BYTES_LEN + HDR_VERSION_BYTES_LEN + size_of::<MsgEnvelope>()) as u16
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{MsgEnvelope, WireMsgHeader, MESSAGING_PROTO_VERSION};
+    use crate::messaging::{DstLocation, EndUser, MessageId, MsgKind};
+    use bytes::Bytes;
+    use std::{convert::TryFrom, mem::size_of};
+    use xor_name::XorName;
+
+    #[test]
+    fn serialization() {
+        let header = WireMsgHeader {
+            version: MESSAGING_PROTO_VERSION,
+            msg_envelope: MsgEnvelope {
+                msg_id: MessageId::new(),
+                msg_kind: MsgKind::SectionInfoMsg,
+                dst_location: DstLocation::EndUser(EndUser {
+                    xorname: XorName::random(),
+                    socket_id: XorName::random(),
+                }),
+            },
+        };
+        let serialized_envelope = rmp_serde::to_vec_named(&header.msg_envelope).unwrap();
+
+        let expected_size =
+            u16::try_from(size_of::<u16>() * 2 + serialized_envelope.len()).unwrap();
+        let mut expected = Vec::new();
+        expected.extend(expected_size.to_be_bytes());
+        expected.extend(MESSAGING_PROTO_VERSION.to_be_bytes());
+        expected.extend(&serialized_envelope);
+
+        let mut actual = vec![0; WireMsgHeader::max_size().into()];
+        let (_, header_size) = header.write(&mut actual).unwrap();
+
+        assert_eq!(header_size, expected_size);
+        assert_eq!(&actual[..header_size.into()], &expected);
+
+        assert_eq!(WireMsgHeader::from(Bytes::from(actual)).unwrap().0, header);
+    }
+}
