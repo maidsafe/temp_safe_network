@@ -123,8 +123,7 @@ jobs:
 
       - name: Kill the current network (next test doesnt need it)
         if: matrix.os == 'windows-latest'
-        run: taskkill /F /IM sn_node.exe
-        shell: bash
+        run: taskkill /IM sn_node.exe /F
 
       - name: Remove node dir and logs fo next test
         run: rm -rf ~/.safe/node
