@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.15.0](https://github.com/maidsafe/safe_network/compare/v0.14.3...v0.15.0) (2021-07-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messaging:** breaking change in the NodeCmd message type.
+
+* **messaging:** flattening up the NodeCmd message type ([252e68b](https://github.com/maidsafe/safe_network/commit/252e68b7fbabfb77baf72c206289dfb8760b54a9))
+
 ### [0.14.3](https://github.com/maidsafe/safe_network/compare/v0.14.2...v0.14.3) (2021-07-26)
 
 ### [0.14.2](https://github.com/maidsafe/safe_network/compare/v0.14.1...v0.14.2) (2021-07-26)
