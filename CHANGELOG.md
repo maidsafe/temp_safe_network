@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.17.0](https://github.com/maidsafe/safe_network/compare/v0.16.0...v0.17.0) (2021-07-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* `PrefixMap` has moved from `messaging::node` to
+`types`. Additionally, `PrefixMap` and `messaging::node::Network` no
+longer implement `Hash`.
+
+* Move `PrefixMap` to `types` and simplify impls ([197df52](https://github.com/maidsafe/safe_network/commit/197df52c9af7cb1a92d95073ac9e7ac12e52f6fa))
+
 ## [0.16.0](https://github.com/maidsafe/safe_network/compare/v0.15.1...v0.16.0) (2021-07-27)
 
 
