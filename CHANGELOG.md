@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.15.1](https://github.com/maidsafe/safe_network/compare/v0.15.0...v0.15.1) (2021-07-27)
+
+
+### Features
+
+* add client feature flag to avoid igd ([3a1c7df](https://github.com/maidsafe/safe_network/commit/3a1c7dfa364d5f8bc52f2eb5d4193371b1c2f4da))
+* elders receiving replicate (post split) now forward to their adults ([b456d4b](https://github.com/maidsafe/safe_network/commit/b456d4b36552fb3f9eb7378fd935591f748a6cd5))
+
+
+### Bug Fixes
+
+* ci windows taskill ([952b1c8](https://github.com/maidsafe/safe_network/commit/952b1c87bbe425d9d439d614b33d1f0995ca9d54))
+* retry during initial setup ([d0d92a0](https://github.com/maidsafe/safe_network/commit/d0d92a0a71f8794c61196e6b82e61fe2242eff7d))
+
 ## [0.15.0](https://github.com/maidsafe/safe_network/compare/v0.14.3...v0.15.0) (2021-07-27)
 
 
