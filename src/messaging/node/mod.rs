@@ -11,7 +11,6 @@ mod join;
 mod join_as_relocated;
 mod network;
 mod node_msgs;
-mod prefix_map;
 mod relocation;
 mod section;
 mod signed;
@@ -21,7 +20,6 @@ pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResp
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use network::{Network, OtherSection};
 pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
-pub use prefix_map::PrefixMap;
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::ElderCandidates;
 pub use section::MembershipState;

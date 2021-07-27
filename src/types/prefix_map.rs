@@ -6,14 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+//! Container that acts as a map whose keys are prefixes.
+
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
     cmp::Ordering,
     collections::{btree_set, BTreeSet},
-    fmt::{self, Debug, Formatter},
-    hash::{Hash, Hasher},
-    iter::FromIterator,
 };
 use xor_name::{Prefix, XorName};
 
@@ -30,8 +29,9 @@ use xor_name::{Prefix, XorName};
 /// 3. It provides some additional lookup API for convenience (`get_equal_or_ancestor`,
 ///    `get_matching`, ...)
 ///
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[allow(missing_debug_implementations)]
+#[serde(transparent)]
 pub struct PrefixMap<T>(BTreeSet<Entry<T>>)
 where
     T: Borrow<Prefix>;
@@ -134,56 +134,14 @@ where
     }
 }
 
+// We have to impl this manually since the derive would require T: Default, which is not necessary.
+// See rust-lang/rust#26925
 impl<T> Default for PrefixMap<T>
 where
     T: Borrow<Prefix>,
 {
     fn default() -> Self {
         Self(Default::default())
-    }
-}
-
-impl<T> Debug for PrefixMap<T>
-where
-    T: Borrow<Prefix> + Debug,
-{
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl<T> FromIterator<T> for PrefixMap<T>
-where
-    T: Borrow<Prefix>,
-{
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        iter.into_iter().fold(Self::new(), |mut map, entry| {
-            let _ = map.insert(entry);
-            map
-        })
-    }
-}
-
-#[allow(missing_debug_implementations)]
-pub struct IntoIter<T>(btree_set::IntoIter<Entry<T>>);
-
-impl<T> Iterator for IntoIter<T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|entry| entry.0)
-    }
-}
-
-impl<T> IntoIterator for PrefixMap<T>
-where
-    T: Borrow<Prefix>,
-{
-    type Item = T;
-    type IntoIter = IntoIter<T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        IntoIter(self.0.into_iter())
     }
 }
 
@@ -203,17 +161,6 @@ where
     }
 }
 
-impl<T> Hash for PrefixMap<T>
-where
-    T: Borrow<Prefix> + Hash,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for entry in &self.0 {
-            entry.0.hash(state)
-        }
-    }
-}
-
 impl<T> Eq for PrefixMap<T> where T: Borrow<Prefix> + Eq {}
 
 impl<T> From<PrefixMap<T>> for BTreeSet<T>
@@ -225,8 +172,35 @@ where
     }
 }
 
+impl<T> IntoIterator for PrefixMap<T>
+where
+    T: Borrow<Prefix>,
+{
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter(self.0.into_iter())
+    }
+}
+
+/// An owning iterator over the values of a [`PrefixMap`].
+///
+/// This struct is created by [`PrefixMap::into_iter`].
+#[derive(Debug)]
+pub struct IntoIter<T>(btree_set::IntoIter<Entry<T>>);
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|entry| entry.0)
+    }
+}
+
 // Wrapper for entries of `PrefixMap` which implements Eq, Ord by delegating them to the prefix.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
 struct Entry<T>(T);
 
 impl<T> Entry<T>
@@ -273,12 +247,6 @@ where
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-impl<T: Debug> Debug for Entry<T> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        self.0.fmt(f)
     }
 }
 
@@ -406,6 +374,20 @@ mod tests {
             map.get_matching(&prefix("10").substituted_in(rng.gen())),
             Some(&(prefix("10"), 10))
         );
+    }
+
+    #[test]
+    fn serialize_transparent() {
+        let mut map = PrefixMap::new();
+        let _ = map.insert((prefix("0"), 0));
+        let _ = map.insert((prefix("1"), 1));
+        let _ = map.insert((prefix("10"), 10));
+
+        let set: BTreeSet<_> = map.clone().into_iter().collect();
+        let serialized_set = rmp_serde::to_vec(&set).unwrap();
+
+        assert_eq!(rmp_serde::to_vec(&map).unwrap(), serialized_set);
+        let _ = rmp_serde::from_read::<_, PrefixMap<(Prefix, i32)>>(&*serialized_set).unwrap();
     }
 
     fn prefix(s: &str) -> Prefix {

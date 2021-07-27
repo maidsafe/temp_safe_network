@@ -6,14 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::SectionSigned, prefix_map::PrefixMap, signed::KeyedSig};
-use crate::messaging::SectionAuthorityProvider;
+use super::{agreement::SectionSigned, signed::KeyedSig};
+use crate::{messaging::SectionAuthorityProvider, types::PrefixMap};
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use xor_name::Prefix;
 
 /// Container for storing information about other sections in the network.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Network {
     /// Other sections: maps section prefixes to their latest signed section authority providers.
     pub sections: PrefixMap<OtherSection>,

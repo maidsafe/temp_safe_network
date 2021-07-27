@@ -18,9 +18,10 @@ use crate::routing::{
 };
 
 use crate::messaging::{
-    node::{Network, OtherSection, Peer, PrefixMap, SectionSigned},
+    node::{Network, OtherSection, Peer, SectionSigned},
     SectionAuthorityProvider,
 };
+use crate::types::PrefixMap;
 use secured_linked_list::SecuredLinkedList;
 use std::iter;
 use xor_name::{Prefix, XorName};

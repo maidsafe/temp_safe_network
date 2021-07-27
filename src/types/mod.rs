@@ -17,6 +17,7 @@ pub mod utils;
 mod chunk;
 mod errors;
 mod keys;
+pub mod prefix_map;
 mod token;
 
 pub use chunk::{
@@ -31,6 +32,7 @@ pub use keys::{
     secret_key::SecretKey,
     signature::{Signature, SignatureShare},
 };
+pub use prefix_map::PrefixMap;
 pub use register::Address as RegisterAddress;
 pub use token::Token;
 
