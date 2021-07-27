@@ -137,10 +137,7 @@ impl Core {
         section_chain: SecuredLinkedList,
     ) {
         let prefix = section_auth.value.prefix;
-        if self
-            .network
-            .update_section(section_auth, None, &section_chain)
-        {
+        if self.network.update_section(section_auth, &section_chain) {
             info!("Neighbour section knowledge updated: {:?}", prefix);
         } else {
             warn!("Neighbour section update failed");

@@ -206,7 +206,7 @@ impl Core {
 
             let _ = self
                 .network
-                .update_section(section_auth, None, self.section.chain());
+                .update_section(section_auth, self.section.chain());
         }
 
         Ok(commands)
@@ -230,9 +230,9 @@ impl Core {
             if section_auth.value.prefix.matches(&self.node.name()) {
                 let _ = self.section.update_elders(section_auth, key_sig);
             } else {
-                let _ =
-                    self.network
-                        .update_section(section_auth, Some(key_sig), self.section.chain());
+                let _ = self
+                    .network
+                    .update_section(section_auth, self.section.chain());
             }
         }
 

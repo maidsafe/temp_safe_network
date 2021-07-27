@@ -6,32 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::SectionAuth, signed::KeyedSig};
+use super::agreement::SectionAuth;
 use crate::{messaging::SectionAuthorityProvider, types::PrefixMap};
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
-use xor_name::Prefix;
 
 /// Container for storing information about other sections in the network.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Network {
     /// Other sections: maps section prefixes to their latest signed section authority providers.
-    pub sections: PrefixMap<OtherSection>,
-}
-
-/// Information on our sibling section
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
-pub struct OtherSection {
-    /// Section authority so we know this info was valid
-    pub section_auth: SectionAuth<SectionAuthorityProvider>,
-    /// If this is signed by our section, then `key_sig` is `None`. If this is signed by our
-    /// sibling section, then `key_sig` contains the proof of the signing key itself signed by our
-    /// section.
-    pub key_sig: Option<KeyedSig>,
-}
-
-impl Borrow<Prefix> for OtherSection {
-    fn borrow(&self) -> &Prefix {
-        &self.section_auth.value.prefix
-    }
+    pub sections: PrefixMap<SectionAuth<SectionAuthorityProvider>>,
 }

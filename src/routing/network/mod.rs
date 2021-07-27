@@ -10,13 +10,11 @@ mod stats;
 
 use self::stats::NetworkStats;
 use crate::routing::{
-    dkg::{verify_sig, KeyedSig, SectionAuthUtils},
-    peer::PeerUtils,
-    Error, Result, SectionAuthorityProviderUtils,
+    dkg::SectionAuthUtils, peer::PeerUtils, Error, Result, SectionAuthorityProviderUtils,
 };
 
 use crate::messaging::{
-    node::{Network, OtherSection, Peer, SectionAuth},
+    node::{Network, Peer, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::types::PrefixMap;
@@ -57,8 +55,7 @@ pub(super) trait NetworkUtils {
     /// needed in that case.
     fn update_section(
         &mut self,
-        section_auth: SectionAuth<SectionAuthorityProvider>,
-        key_sig: Option<KeyedSig>,
+        signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         section_chain: &SecuredLinkedList,
     ) -> bool;
 
@@ -98,14 +95,14 @@ impl NetworkUtils for Network {
 
     /// Returns iterator over all known sections.
     fn all(&self) -> Box<dyn Iterator<Item = &SectionAuthorityProvider> + '_> {
-        Box::new(self.sections.iter().map(|info| &info.section_auth.value))
+        Box::new(self.sections.iter().map(|section_auth| &section_auth.value))
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
     fn get(&self, prefix: &Prefix) -> Option<&SectionAuthorityProvider> {
         self.sections
             .get(prefix)
-            .map(|info| &info.section_auth.value)
+            .map(|section_auth| &section_auth.value)
     }
 
     /// Returns all elders from all known sections.
@@ -117,7 +114,6 @@ impl NetworkUtils for Network {
     fn get_elder(&self, name: &XorName) -> Option<Peer> {
         self.sections
             .get_matching(name)?
-            .section_auth
             .value
             .get_addr(name)
             .map(|addr| {
@@ -151,15 +147,9 @@ impl NetworkUtils for Network {
     /// needed in that case.
     fn update_section(
         &mut self,
-        section_auth: SectionAuth<SectionAuthorityProvider>,
-        key_sig: Option<KeyedSig>,
+        signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         section_chain: &SecuredLinkedList,
     ) -> bool {
-        let info = OtherSection {
-            section_auth: section_auth.clone(),
-            key_sig,
-        };
-
         // With the change of AE, the voting of OtherSection is removed, which means the info of
         // remote section is no longer being signed by own section.
         // As this passed in section_chain is just our own chain during sync, which in a high chance
@@ -172,19 +162,22 @@ impl NetworkUtils for Network {
         //
         // Note this is just a temp resolvement. It's still being discussed whether shall bring back
         // the re-vote to improve the security.
-
-        if !info.verify(section_chain)
-            && (!info.self_verify() || self.sections.get(&section_auth.value.prefix).is_some())
+        if !signed_section_auth.verify(section_chain)
+            && (!signed_section_auth.self_verify()
+                || self
+                    .sections
+                    .get(&signed_section_auth.value.prefix)
+                    .is_some())
         {
             trace!(
                 "Failed to update remove section knowledge {:?}",
-                section_auth.value
+                signed_section_auth.value
             );
             return false;
         }
 
-        if let Some(old) = self.sections.insert(info) {
-            if old.section_auth == section_auth {
+        if let Some(old_section_auth) = self.sections.insert(signed_section_auth.clone()) {
+            if old_section_auth == signed_section_auth {
                 return false;
             }
         }
@@ -194,12 +187,11 @@ impl NetworkUtils for Network {
 
     /// Returns the known section keys.
     fn keys(&self) -> Box<dyn Iterator<Item = (Prefix, bls::PublicKey)> + '_> {
-        Box::new(self.sections.iter().map(|entry| {
-            (
-                entry.section_auth.value.prefix,
-                entry.section_auth.value.section_key(),
-            )
-        }))
+        Box::new(
+            self.sections
+                .iter()
+                .map(|section_auth| (section_auth.value.prefix, section_auth.value.section_key())),
+        )
     }
 
     /// Returns the latest known key for the prefix that matches `name`.
@@ -207,7 +199,7 @@ impl NetworkUtils for Network {
         self.sections
             .get_matching(name)
             .ok_or(Error::NoMatchingSection)
-            .map(|entry| entry.section_auth.value.section_key())
+            .map(|section_auth| section_auth.value.section_key())
     }
 
     /// Returns the latest known key for a section with `prefix`.
@@ -215,7 +207,7 @@ impl NetworkUtils for Network {
     fn key_by_prefix(&self, prefix: &Prefix) -> Option<bls::PublicKey> {
         self.sections
             .get_equal_or_ancestor(prefix)
-            .map(|entry| entry.section_auth.value.section_key())
+            .map(|section_auth| section_auth.value.section_key())
     }
 
     /// Returns the section_auth and the latest known key for the prefix that matches `name`,
@@ -224,7 +216,7 @@ impl NetworkUtils for Network {
         self.sections
             .get_matching(name)
             .ok_or(Error::NoMatchingSection)
-            .map(|value| value.section_auth.value.clone())
+            .map(|section_auth| section_auth.value.clone())
     }
 
     /// Returns network statistics.
@@ -247,7 +239,7 @@ impl NetworkUtils for Network {
         let known_prefixes = iter::once(&our.prefix).chain(
             self.sections
                 .iter()
-                .map(|info| &info.section_auth.value.prefix),
+                .map(|section_auth| &section_auth.value.prefix),
         );
         let is_exact = Prefix::default().is_covered_by(known_prefixes.clone());
 
@@ -261,28 +253,6 @@ impl NetworkUtils for Network {
         let total = known as f64 / network_fraction;
 
         (known as u64, total.ceil() as u64, is_exact)
-    }
-}
-
-pub(super) trait OtherSectionUtils {
-    fn verify(&self, section_chain: &SecuredLinkedList) -> bool;
-
-    fn self_verify(&self) -> bool;
-}
-
-impl OtherSectionUtils for OtherSection {
-    fn verify(&self, section_chain: &SecuredLinkedList) -> bool {
-        if let Some(key_sig) = &self.key_sig {
-            section_chain.has_key(&key_sig.public_key)
-                && verify_sig(key_sig, &self.section_auth.sig.public_key)
-                && self.section_auth.self_verify()
-        } else {
-            self.section_auth.verify(section_chain)
-        }
-    }
-
-    fn self_verify(&self) -> bool {
-        self.section_auth.self_verify()
     }
 }
 
@@ -303,8 +273,8 @@ mod tests {
 
         // Create map containing sections (00), (01) and (10)
         let mut map = Network::new();
-        let _ = map.update_section(gen_section_auth(&sk, p01)?, None, &chain);
-        let _ = map.update_section(gen_section_auth(&sk, p10)?, None, &chain);
+        let _ = map.update_section(gen_section_auth(&sk, p01)?, &chain);
+        let _ = map.update_section(gen_section_auth(&sk, p10)?, &chain);
 
         let mut rng = rand::thread_rng();
         let n01 = p01.substituted_in(rng.gen());
