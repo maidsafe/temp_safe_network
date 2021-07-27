@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.16.0](https://github.com/maidsafe/safe_network/compare/v0.15.1...v0.16.0) (2021-07-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messaging:** The `DataAuthority` type is dead. Long live the
+`Authority<DataSigned>` type.
+* **messaging:** Some public types that contained `SectionSigned` now
+contain `Authority<SectionSigned>`. Usage may require unwrapping the
+value with `into_inner`, or using the new getters to read fields.
+* **messaging:** Some public types that contained `BlsShareSigned` now
+contain `Authority<BlsShareSigned>`. Usage may require unwrapping the
+value with `into_inner`, or using the new getters to read fields.
+* **messaging:** Some public types that contained `NodeSigned` now
+contain `Authority<NodeSigned>`. Usage may require unwrapping the value
+with `into_inner`.
+
+* **messaging:** Add an `Authority` 'proof' struct ([d27c844](https://github.com/maidsafe/safe_network/commit/d27c844a119e41cc666891a55d11d1c51aca4d57))
+* **messaging:** Replace `DataAuthority` with `Authority<DataSigned>` ([131dfc6](https://github.com/maidsafe/safe_network/commit/131dfc60a51143f1eedc620d99b076bbbf8e0a5a))
+* **messaging:** Use `Authority<BlsShareSigned>` ([f4513ae](https://github.com/maidsafe/safe_network/commit/f4513aedaf13e199b3958b50734f60bd8de1433c))
+* **messaging:** Use `Authority<SectionSigned>` ([05a1347](https://github.com/maidsafe/safe_network/commit/05a13471b24584fa00e165581f8c371a7488fac0))
+
 ### [0.15.1](https://github.com/maidsafe/safe_network/compare/v0.15.0...v0.15.1) (2021-07-27)
 
 
