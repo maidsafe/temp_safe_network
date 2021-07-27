@@ -70,11 +70,6 @@ impl Routing {
     /// lost in transit during bootstrapping, or other reasons. It's the responsibility of the
     /// caller to handle this case, for example by using a timeout.
     pub async fn new(config: Config) -> Result<(Self, EventStream)> {
-        let keypair = config.keypair.unwrap_or_else(|| {
-            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE)
-        });
-        let node_name = ed25519::name(&keypair.public);
-
         let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
         let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
 
@@ -108,10 +103,16 @@ impl Routing {
                 self_status_change: NodeElderChange::Promoted,
             })
             .await;
+            info!("{} Genesis node started!", node_name);
 
             (core, vec![])
         } else {
+            let keypair = config.keypair.unwrap_or_else(|| {
+                ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE)
+            });
+            let node_name = ed25519::name(&keypair.public);
             info!("{} Bootstrapping a new node.", node_name);
+
             let (comm, bootstrap_addr) =
                 Comm::bootstrap(config.transport_config, connection_event_tx).await?;
             info!(
@@ -130,13 +131,13 @@ impl Routing {
             )
             .await?;
             let core = Core::new(comm, node, section, None, event_tx);
+            info!("{} Joined the network!", core.node().name());
 
             (core, backlog)
         };
 
         let dispatcher = Arc::new(Dispatcher::new(core));
         let event_stream = EventStream::new(event_rx);
-        info!("{} Bootstrapped!", node_name);
 
         // Process message backlog
         for cmd in backlog {
