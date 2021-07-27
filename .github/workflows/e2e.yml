@@ -48,11 +48,9 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get -y install ripgrep
       
-      # TODO: windows with split section network has been failing w/ SO.
-      # when we have that sorted we can reenable this
-      # - name: windows isntall ripgrep
-      #   if: matrix.os == 'windows-latest'
-      #   run: choco install ripgrep
+      - name: windows isntall ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
 
       # Cache.
       - name: Cargo cache registry, index and build
@@ -124,6 +122,7 @@ jobs:
       - name: Kill the current network (next test doesnt need it)
         if: matrix.os == 'windows-latest'
         run: taskkill /IM sn_node.exe /F
+        shell: cmd
 
       - name: Remove node dir and logs fo next test
         run: rm -rf ~/.safe/node
