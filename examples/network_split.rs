@@ -37,7 +37,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "2";
 const RUST_LOG: &str = "RUST_LOG";
-
+const ADDITIONAL_NODES_TO_SPLIT: u64 = 44;
 const QUERY_TIMEOUT: u64 = 120;
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -152,8 +152,8 @@ pub async fn run_split() -> Result<()> {
     }
 
     // add more nodes
-    let additional_node_count = 33;
-    let additional_node_count_str = &additional_node_count.to_string();
+    let additional_node_count = ADDITIONAL_NODES_TO_SPLIT;
+    let additional_node_count_str = &ADDITIONAL_NODES_TO_SPLIT.to_string();
 
     sn_launch_tool_args.push("--add");
     sn_launch_tool_args.push("-n");
@@ -169,6 +169,10 @@ pub async fn run_split() -> Result<()> {
     let interval_duration = Duration::from_secs(interval_as_int * additional_node_count);
 
     sleep(interval_duration).await;
+
+    // relative to the cargo run command's cwd
+    let path = std::fs::canonicalize("./scripts/has_split.sh")?;
+    let res = Command::new(path).output()?;
 
     // now we read the data
     let bootstrap_contacts =
