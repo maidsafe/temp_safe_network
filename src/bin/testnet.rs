@@ -52,7 +52,7 @@ const NODE_COUNT: &str = "33";
 #[derive(Debug, StructOpt)]
 #[structopt(name = "testnet")]
 struct Cmd {
-    /// IP used to launch the nodes with.
+    /// All nodes will be joining existing testnet, none will be started as a genesis node.
     #[structopt(long = "add")]
     add_nodes_to_existing_network: bool,
 }
