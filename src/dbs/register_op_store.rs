@@ -16,12 +16,12 @@ use xor_name::XorName;
 
 /// Disk storage for Registers.
 #[derive(Clone)]
-pub(crate) struct RegisterCmdEventStore {
+pub(crate) struct RegisterOpStore {
     tree: Tree,
     db_name: String,
 }
 
-impl RegisterCmdEventStore {
+impl RegisterOpStore {
     pub(crate) fn new(id: XorName, db: Db) -> Result<Self> {
         let db_name = id.to_db_key()?;
         let tree = db.open_tree(&db_name)?;
@@ -68,7 +68,7 @@ impl RegisterCmdEventStore {
 
 #[cfg(test)]
 mod test {
-    use super::RegisterCmdEventStore;
+    use super::RegisterOpStore;
     use crate::messaging::data::{RegisterCmd, RegisterWrite};
     use crate::messaging::DataSigned;
     use crate::node::Result;
@@ -93,7 +93,7 @@ mod test {
             trace!("Sled Error: {:?}", error);
             Error::UnableToCreateRegisterDb
         })?;
-        let mut store = RegisterCmdEventStore::new(id, db)?;
+        let mut store = RegisterOpStore::new(id, db)?;
 
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
         let pk = authority_keypair1.public_key();

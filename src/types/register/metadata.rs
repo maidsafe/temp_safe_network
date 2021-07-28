@@ -26,14 +26,14 @@ pub type Entry = Vec<u8>;
 /// Address of a Register.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub enum Address {
-    /// Public sequence namespace.
+    /// Public namespace.
     Public {
         /// Name.
         name: XorName,
         /// Tag.
         tag: u64,
     },
-    /// Private sequence namespace.
+    /// Private namespace.
     Private {
         /// Name.
         name: XorName,
