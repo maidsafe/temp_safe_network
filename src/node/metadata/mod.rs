@@ -30,7 +30,7 @@ use bls::PublicKey as BlsPublicKey;
 use chunk_records::ChunkRecords;
 use elder_stores::ElderStores;
 use rand::rngs::OsRng;
-pub(crate) use register_storage::RegisterStorage;
+pub use register_storage::RegisterStorage;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},

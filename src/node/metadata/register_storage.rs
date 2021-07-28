@@ -52,7 +52,8 @@ struct StateEntry {
 }
 
 impl RegisterStorage {
-    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    /// Create new RegisterStorage
+    pub fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         used_space.add_dir(path);
         let db_dir = path.join("db").join(DATABASE_NAME.to_string());
 

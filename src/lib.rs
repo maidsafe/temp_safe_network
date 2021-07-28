@@ -43,6 +43,9 @@ extern crate tracing;
 
 pub mod client;
 mod dbs;
+
+pub use dbs::UsedSpace;
+
 pub mod messaging;
 pub mod node;
 pub mod routing;

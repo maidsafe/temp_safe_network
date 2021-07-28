@@ -15,14 +15,16 @@ use std::sync::Arc;
 use tokio::fs;
 
 #[derive(Clone, Debug)]
-pub(crate) struct UsedSpace {
+/// Tracking used space in supplied dirs, and providing checks to ensure max capacity isn't exceeded
+pub struct UsedSpace {
     /// the maximum (inclusive) allocated space for storage
     max_capacity: u64,
     dirs: Arc<DashSet<PathBuf>>,
 }
 
 impl UsedSpace {
-    pub(crate) fn new(max_capacity: u64) -> Self {
+    /// Create new UsedSpace tracker
+    pub fn new(max_capacity: u64) -> Self {
         Self {
             max_capacity,
             dirs: Arc::new(DashSet::new()),

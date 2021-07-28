@@ -21,8 +21,10 @@ mod network;
 mod node_api;
 mod node_ops;
 
+/// TODO: make these intrnal only once routing/node are collapsed
 /// Storage interface for register data type
-pub(crate) use metadata::RegisterStorage;
+pub use metadata::RegisterStorage;
+
 /// Docs
 pub mod state_db;
 

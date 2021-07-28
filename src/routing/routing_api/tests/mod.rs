@@ -331,8 +331,7 @@ fn create_test_register_store() -> Result<RegisterStorage> {
         .map(char::from)
         .collect();
     let storage_dir = tmp_dir.into_path().join(Path::new(&register));
-    RegisterStorage::new(&storage_dir, used_space.clone())
-        .context("Failed to create register storage")
+    RegisterStorage::new(&storage_dir, used_space).context("Failed to create register storage")
 }
 
 #[tokio::test]

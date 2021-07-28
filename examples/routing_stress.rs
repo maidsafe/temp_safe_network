@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use anyhow::{anyhow, format_err, Error, Result};
+use anyhow::{anyhow, format_err, Context, Error, Result};
 use bls::PublicKey;
 use futures::{
     future,
@@ -15,9 +15,11 @@ use futures::{
 };
 use itertools::Itertools;
 use rand::{
-    distributions::{Distribution, WeightedIndex},
+    distributions::{Alphanumeric, Distribution, WeightedIndex},
     Rng,
 };
+use std::path::Path;
+
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -26,6 +28,7 @@ use std::{
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
+use tempfile::tempdir;
 use tokio::{
     sync::mpsc::{self, Sender},
     task, time,
@@ -35,12 +38,18 @@ use tracing_subscriber::EnvFilter;
 use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
 
+use safe_network::node::RegisterStorage;
+use safe_network::UsedSpace;
+
 use safe_network::messaging::{
     data::Error::FailedToWriteFile, node::NodeMsg, DstLocation, MessageId,
 };
 use safe_network::routing::{
     Cache, Config, Event as RoutingEvent, NodeElderChange, Routing, TransportConfig,
 };
+
+// max sotrage capacity
+const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
 
 // Minimal delay between two consecutive prints of the network status.
 const MIN_PRINT_DELAY: Duration = Duration::from_millis(500);
@@ -629,7 +638,20 @@ impl Network {
 }
 
 async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) {
-    let (node, mut events) = match Routing::new(config).await {
+    let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
+    let tmp_dir = tempdir().unwrap();
+
+    let register: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(7)
+        .map(char::from)
+        .collect();
+    let storage_dir = tmp_dir.into_path().join(Path::new(&register));
+    let storage = RegisterStorage::new(&storage_dir, used_space)
+        .context("Failed to create register storage")
+        .unwrap();
+
+    let (node, mut events) = match Routing::new(config, storage).await {
         Ok(output) => output,
         Err(error) => {
             let _ = event_tx
