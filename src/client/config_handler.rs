@@ -48,8 +48,6 @@ impl Config {
             qp2p.hard_coded_contacts = contacts;
         }
 
-        qp2p.retry_interval = 100;
-
         Self { qp2p }
     }
 }
