@@ -31,8 +31,8 @@ type Digest256 = [u8; 32];
 /// separately. This avoids mixing signature shares created from different curves which would
 /// otherwise lead to invalid signature to be produced even though all the shares are valid.
 ///
-#[allow(missing_debug_implementations)]
-pub(crate) struct SignatureAggregator {
+#[derive(Debug)]
+pub struct SignatureAggregator {
     map: HashMap<Digest256, State>,
     expiration: Duration,
 }
@@ -116,6 +116,7 @@ pub enum Error {
     Combine(#[from] bls::error::Error),
 }
 
+#[derive(Debug)]
 struct State {
     shares: HashMap<usize, bls::SignatureShare>,
     modified: Instant,

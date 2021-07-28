@@ -26,6 +26,8 @@ pub mod node;
 pub mod section_info;
 /// The wire format and message (de)serialization API.
 pub mod serialisation;
+/// BLS Signature aggregator
+pub mod signature_aggregator;
 
 // Message authority - keys and signatures.
 mod authority;

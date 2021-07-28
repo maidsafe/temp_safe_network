@@ -18,7 +18,6 @@ mod liveness_tracking;
 mod messaging;
 mod msg_handling;
 mod register_storage;
-mod signature_aggregator;
 mod split_barrier;
 
 use crate::dbs::UsedSpace;
@@ -39,6 +38,9 @@ use self::split_barrier::SplitBarrier;
 use crate::messaging::{
     node::{Proposal, Section},
     MessageId,
+    node::{Network, NodeMsg, Proposal, Section, SectionAuth},
+    signature_aggregator::SignatureAggregator,
+    MessageId, MessageId, SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},

@@ -3,7 +3,8 @@ use super::{
     Error, Result,
 };
 use crate::{
-    routing::{AggregatorError, SectionKeyShare, SignatureAggregator},
+    messaging::signature_aggregator::{Error as AggregatorError, SignatureAggregator},
+    routing::SectionKeyShare,
     types::{PublicKey, Signature},
 };
 use bls::PublicKey as BlsPublicKey;

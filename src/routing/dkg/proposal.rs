@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{KeyedSig, SigShare};
-use crate::messaging::node::Proposal;
-use crate::routing::{
-    core::{AggregatorError, SignatureAggregator},
-    error::Result,
+use crate::messaging::{
+    node::Proposal,
+    signature_aggregator::{Error as AggregatorError, SignatureAggregator},
 };
+use crate::routing::error::Result;
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 

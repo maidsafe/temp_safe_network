@@ -6,24 +6,31 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod listeners;
-mod messaging;
-
-use crate::client::Error;
-use crate::messaging::data::{CmdError, OperationId, QueryResponse};
-use crate::types::PublicKey;
-use bls::PublicKeySet;
-use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, HashMap},
     net::SocketAddr,
     sync::Arc,
 };
+
+use bls::PublicKeySet;
+use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::{debug, trace};
 use xor_name::{Prefix, XorName};
+
+use crate::client::Error;
+use crate::messaging::{
+    data::{CmdError, QueryResponse},
+    node::SigShare,
+    signature_aggregator::{Error as AggregatorError, SignatureAggregator},
+    MessageId, SectionAuthorityProvider,
+};
+use crate::types::{PrefixMap, PublicKey};
+
+mod listeners;
+mod messaging;
 
 type QueryResponseSender = Sender<QueryResponse>;
 
@@ -37,21 +44,24 @@ pub(crate) struct QueryResult {
 
 #[derive(Clone, Debug)]
 pub(super) struct Session {
+    client_pk: PublicKey,
     pub(super) section_key_set: Arc<RwLock<Option<PublicKeySet>>>,
     qp2p: QuicP2p<XorName>,
     pending_queries: PendingQueryResponses,
     incoming_err_sender: Arc<Sender<CmdError>>,
     endpoint: Option<Endpoint<XorName>>,
-    /// elders we've managed to connect to
-    connected_elders: Arc<RwLock<BTreeMap<SocketAddr, XorName>>>,
+    /// Elders of our section
+    our_section: Arc<RwLock<BTreeMap<XorName, SocketAddr>>>,
     /// all elders we know about from SectionInfo messages
-    all_known_elders: Arc<RwLock<BTreeMap<SocketAddr, XorName>>>,
+    network: PrefixMap<SectionAuthorityProvider>,
     section_prefix: Arc<RwLock<Option<Prefix>>>,
     is_connecting_to_new_elders: bool,
+    aggregator: Arc<SignatureAggregator>,
 }
 
 impl Session {
     pub(super) fn new(
+        client_pk: PublicKey,
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
     ) -> Result<Self, Error> {
@@ -60,21 +70,23 @@ impl Session {
         let qp2p =
             qp2p::QuicP2p::<XorName>::with_config(Some(qp2p_config), Default::default(), true)?;
         Ok(Self {
+            client_pk,
             qp2p,
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
             endpoint: None,
             section_key_set: Arc::new(RwLock::new(None)),
-            connected_elders: Arc::new(RwLock::new(Default::default())),
-            all_known_elders: Arc::new(RwLock::new(Default::default())),
+            our_section: Arc::new(RwLock::new(Default::default())),
+            network: PrefixMap::new(),
             section_prefix: Arc::new(RwLock::new(None)),
             is_connecting_to_new_elders: false,
+            aggregator: Arc::new(SignatureAggregator::new()),
         })
     }
 
     /// Get the elders count of our section elders as provided by SectionInfo
     pub(super) async fn known_elders_count(&self) -> usize {
-        self.all_known_elders.read().await.len()
+        self.our_section.read().await.len()
     }
 
     pub(super) fn endpoint(&self) -> Result<&Endpoint<XorName>, Error> {
@@ -96,6 +108,26 @@ impl Session {
                 trace!("self.section_key_set.borrow() was None");
                 Err(Error::NotBootstrapped)
             }
+        }
+    }
+
+    pub fn aggregate_incoming_message(
+        &mut self,
+        bytes: Vec<u8>,
+        sig_share: SigShare,
+    ) -> Result<Option<Vec<u8>>, Error> {
+        match self.aggregator.add(&bytes, sig_share) {
+            Ok(key_sig) => {
+                if key_sig.public_key.verify(&key_sig.signature, &bytes) {
+                    Ok(Some(bytes))
+                } else {
+                    Err(Error::Aggregation(
+                        "Failed to verify aggregated signature".to_string(),
+                    ))
+                }
+            }
+            Err(AggregatorError::NotEnoughShares) => Ok(None),
+            Err(e) => Err(Error::Aggregation(e.to_string())),
         }
     }
 }
