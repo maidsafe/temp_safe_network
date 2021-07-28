@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
-use crate::dbs::{RegisterCmdEventStore, UsedSpace};
+use crate::dbs::{RegisterOpStore, UsedSpace};
 use crate::node::{error::convert_to_error_message, node_ops::NodeDuty, Error, Result};
 use crate::types::{
     register::{Action, Address, Register, User},
@@ -47,7 +47,7 @@ pub(super) struct RegisterStorage {
 #[derive(Clone)]
 struct StateEntry {
     state: Register,
-    store: RegisterCmdEventStore,
+    store: RegisterOpStore,
 }
 
 impl RegisterStorage {
@@ -81,6 +81,10 @@ impl RegisterStorage {
                     let _ = the_data.insert(*key, entry.store.get_all()?);
                 }
             } else {
+                let entry = self.load_state(*key)?;
+                if prefix.matches(entry.state.name()) {
+                    let _ = the_data.insert(*key, entry.store.get_all()?);
+                }
             }
         }
 
@@ -130,7 +134,7 @@ impl RegisterStorage {
         let RegisterCmd { write, .. } = op.clone();
 
         let address = *write.address();
-        let key = to_id(&address)?;
+        let key = to_reg_key(&address)?;
 
         use RegisterWrite::*;
         match write {
@@ -193,28 +197,8 @@ impl RegisterStorage {
                 let entry = if let Some(cached_entry) = cache.as_mut() {
                     cached_entry
                 } else {
-                    // read from disk
-                    let store = self.load_store(key)?;
-                    let mut reg = None;
-                    // apply all ops
-                    for op in store.get_all()? {
-                        // first op shall be New
-                        if let New(register) = op.write {
-                            reg = Some(register);
-                        } else if let Some(register) = &mut reg {
-                            if let Edit(reg_op) = op.write {
-                                register.apply_op(reg_op).map_err(Error::NetworkData)?;
-                            }
-                        }
-                    }
-
-                    let new_entry = reg
-                        .take()
-                        .ok_or(Error::NoSuchData(DataAddress::Register(address)))
-                        .map(|state| StateEntry { state, store })?;
-
-                    let _ = cache.replace(new_entry);
-
+                    let fresh_entry = self.load_state(key)?;
+                    let _ = cache.replace(fresh_entry);
                     if let Some(entry) = cache.as_mut() {
                         entry
                     } else {
@@ -295,7 +279,7 @@ impl RegisterStorage {
     ) -> Result<Register> {
         let cache = self
             .registers
-            .get(&to_id(address)?)
+            .get(&to_reg_key(address)?)
             .ok_or_else(|| Error::NoSuchData(DataAddress::Register(*address)))?;
         let StateEntry { state, .. } = cache
             .as_ref()
@@ -424,13 +408,39 @@ impl RegisterStorage {
         )))
     }
 
-    /// Load a register cmd event store
-    fn load_store(&self, id: XorName) -> Result<RegisterCmdEventStore> {
-        RegisterCmdEventStore::new(id, self.db.clone()).map_err(Error::from)
+    /// Load a register op store
+    fn load_store(&self, id: XorName) -> Result<RegisterOpStore> {
+        RegisterOpStore::new(id, self.db.clone()).map_err(Error::from)
+    }
+
+    fn load_state(&self, key: XorName) -> Result<StateEntry> {
+        // read from disk
+        let store = self.load_store(key)?;
+        let mut reg = None;
+        // apply all ops
+        use RegisterWrite::*;
+        for op in store.get_all()? {
+            // first op shall be New
+            if let New(register) = op.write {
+                reg = Some(register);
+            } else if let Some(register) = &mut reg {
+                if let Edit(reg_op) = op.write {
+                    register.apply_op(reg_op).map_err(Error::NetworkData)?;
+                }
+            }
+        }
+
+        reg.take()
+            .ok_or_else(|| {
+                Error::Logic("A store was found, but its contents were invalid.".to_string())
+            })
+            .map(|state| StateEntry { state, store })
     }
 }
 
-fn to_id(address: &Address) -> Result<XorName> {
+/// This also encodes the Public | Private scope,
+/// as well as the tag of the Address.
+fn to_reg_key(address: &Address) -> Result<XorName> {
     Ok(XorName::from_content(&[address
         .encode_to_zbase32()?
         .as_bytes()]))
