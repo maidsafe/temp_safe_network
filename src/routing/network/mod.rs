@@ -150,6 +150,15 @@ impl NetworkUtils for Network {
         // TODO: Let's make sure the proof chain can be trusted,
         // i.e. check each key is signed by its parent/predecesor key.
 
+        // Check the SAP's key is the last key of the proof chain
+        if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
+            trace!(
+                "Failed to update remote section knowledge, SAP's key ({:?}) doesn't match proof chain last key ({:?})",
+                 signed_section_auth.value.public_key_set.public_key(), proof_chain.last_key()
+            );
+            return false;
+        }
+
         // We currently don't keep the complete chain of remote sections (TODO??),
         // **but** the SAPs of remote sections we keep were already verified by us
         // as trusted before we store them in our local records.
