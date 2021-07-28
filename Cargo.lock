@@ -132,6 +132,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
+name = "backoff"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fe17f59a06fe8b87a6fc8bf53bb70b3aba76d7685f432487a68cd5552853625"
+dependencies = [
+ "futures-core",
+ "getrandom 0.2.3",
+ "instant",
+ "pin-project",
+ "rand 0.8.4",
+ "tokio 1.8.1",
+]
+
+[[package]]
 name = "base-x"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1904,10 +1918,11 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.12.10"
+version = "0.12.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4e2008b6a297b430e8f11cbec001b875afc4d829a9ec0eac3e2666725241583"
+checksum = "768bfcd6d3eef1f4ef9716f321f13edd5bb3eac9cb1efee31f07444a4f29ec49"
 dependencies = [
+ "backoff",
  "base64 0.12.3",
  "bincode",
  "bytes 1.0.1",
