@@ -19,7 +19,6 @@ mod liveness_tracking;
 mod messaging;
 mod msg_handling;
 mod register_storage;
-mod signature_aggregator;
 mod split_barrier;
 
 use crate::dbs::UsedSpace;
@@ -30,16 +29,14 @@ pub(crate) use register_storage::RegisterStorage;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 use capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter};
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
-pub use signature_aggregator::Error as AggregatorError;
-pub(crate) use signature_aggregator::SignatureAggregator;
-use std::path::PathBuf;
 
 pub(crate) use chunk_store::ChunkStore;
 
 use self::{enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
 use crate::messaging::{
-    node::{Network, Proposal, Section},
-    MessageId,
+    node::{Network, NodeMsg, Proposal, Section, SectionAuth},
+    signature_aggregator::SignatureAggregator,
+    MessageId, MessageId, SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},

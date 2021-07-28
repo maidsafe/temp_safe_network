@@ -27,7 +27,6 @@ use crate::messaging::{
 };
 use crate::routing::messages::WireMsgUtils;
 use crate::routing::{
-    core::AggregatorError,
     error::{Error, Result},
     messages::NodeMsgAuthorityUtils,
     network::NetworkUtils,

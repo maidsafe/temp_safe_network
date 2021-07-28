@@ -7,10 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::node::{Proposal, SigShare};
-use crate::routing::{
-    core::AggregatorError, dkg::ProposalError, routing_api::command::Command, Error, Result,
+use crate::messaging::{
+    node::{Proposal, SigShare},
+    signature_aggregator::Error as AggregatorError,
 };
+use crate::routing::{dkg::ProposalError, routing_api::command::Command, Error, Result};
 
 // Decisions
 impl Core {
@@ -24,7 +25,7 @@ impl Core {
             Ok((proposal, sig)) => Ok(vec![Command::HandleAgreement { proposal, sig }]),
             Err(ProposalError::Aggregation(AggregatorError::NotEnoughShares)) => Ok(vec![]),
             Err(error) => {
-                error!("Failed to add proposal: {}", error);
+                error!("Failed to add proposal: {:?}", error);
                 Err(Error::InvalidSignatureShare)
             }
         }

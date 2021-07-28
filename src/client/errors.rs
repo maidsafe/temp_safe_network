@@ -24,6 +24,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Signature Aggregation Error
+    #[error("Error on aggregating signatures from network")]
+    Aggregation(String),
     /// Asymmetric Key Decryption Failed.
     #[error("Asymmetric key decryption failure")]
     AsymmetricDecipherFailure,

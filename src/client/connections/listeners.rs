@@ -6,7 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Session;
+use std::{collections::BTreeSet, net::SocketAddr};
+
+use qp2p::IncomingMessages;
+use tracing::{debug, error, info, trace, warn};
+use xor_name::XorName;
+
 use crate::client::Error;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
@@ -14,26 +19,21 @@ use crate::messaging::{
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
 use crate::types::PublicKey;
-use qp2p::IncomingMessages;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-};
-use tracing::{debug, error, info, trace, warn};
+
+use super::Session;
 
 impl Session {
     // Listen for incoming messages on a connection
     pub(crate) async fn spawn_message_listener_thread(
         &self,
         mut incoming_messages: IncomingMessages,
-        client_pk: PublicKey,
     ) {
         debug!("Listening for incoming messages");
         let mut session = self.clone();
         let _ = tokio::spawn(async move {
             loop {
                 match session
-                    .process_incoming_message(&mut incoming_messages, client_pk)
+                    .process_incoming_message(&mut incoming_messages)
                     .await
                 {
                     Ok(true) => (),
@@ -52,14 +52,14 @@ impl Session {
     pub(crate) async fn process_incoming_message(
         &mut self,
         incoming_messages: &mut IncomingMessages,
-        client_pk: PublicKey,
     ) -> Result<bool, Error> {
         if let Some((src, message)) = incoming_messages.next().await {
             let message_type = WireMsg::deserialize(message)?;
             trace!("Incoming message from {:?}", &src);
             match message_type {
                 MessageType::SectionInfo { msg, .. } => {
-                    if let Err(error) = self.handle_section_info_msg(msg, src, client_pk).await {
+                    if let Err(error) = self.handle_section_info_msg(msg, src, self.client_pk).await
+                    {
                         error!("Error handling network info message: {:?}", error);
                     }
                 }
@@ -93,23 +93,27 @@ impl Session {
                 self.update_session_info(info).await
             }
             SectionInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(sap)) => {
-                trace!("GetSectionResponse::Redirect, reboostrapping with provided peers");
-                // Disconnect from peer that sent us the redirect, connect to the new elders provided and
-                // request the section info again.
-                self.disconnect_from_peers(vec![src]).await?;
-                let endpoint = self.endpoint()?.clone();
-                let new_elders_addrs: Vec<SocketAddr> =
-                    sap.elders.iter().map(|(_, addr)| *addr).collect();
-                self.qp2p
-                    .update_bootstrap_contacts(new_elders_addrs.as_slice());
-                let boostrapped_peer = self
-                    .qp2p
-                    .rebootstrap(&endpoint, new_elders_addrs.as_slice())
-                    .await?;
-                self.send_get_section_query(client_pk, &boostrapped_peer)
-                    .await?;
+                trace!("GetSectionResponse::Redirect, re-bootstrapping with provided peers");
+                if self.is_connecting_to_new_elders {
+                    // Disconnect from peer that sent us the redirect, connect to the new elders provided and
+                    // request the section info again.
+                    self.disconnect_from_peers(vec![src]).await?;
+                    let endpoint = self.endpoint()?.clone();
+                    let new_elders_addrs: Vec<SocketAddr> =
+                        sap.elders.iter().map(|(_, addr)| *addr).collect();
+                    self.qp2p
+                        .update_bootstrap_contacts(new_elders_addrs.as_slice());
+                    let boostrapped_peer = self
+                        .qp2p
+                        .rebootstrap(&endpoint, new_elders_addrs.as_slice())
+                        .await?;
+                    self.send_get_section_query(XorName::from(client_pk), &boostrapped_peer)
+                        .await?;
 
-                Ok(())
+                    Ok(())
+                } else {
+                    self.update_session_info(sap).await
+                }
             }
             SectionInfoMsg::GetSectionQuery { .. } => Err(Error::UnexpectedMessageOnJoin(format!(
                 "bootstrapping failed since an invalid response ({:?}) was received",
@@ -120,52 +124,34 @@ impl Session {
 
     // Apply updated info to a network session, and trigger connections
     async fn update_session_info(&mut self, sap: &SectionAuthorityProvider) -> Result<(), Error> {
-        let original_known_elders = self.all_known_elders.read().await.clone();
+        self.network.insert(sap.clone());
 
-        // Change this once sn_messaging is updated
-        let received_elders = sap
-            .elders
-            .iter()
-            .map(|(name, addr)| (*addr, *name))
-            .collect::<BTreeMap<_, _>>();
-
-        // Obtain the addresses of the Elders
-        trace!(
-            "Updating session info! Received elders: ({:?})",
-            received_elders
-        );
-
-        {
+        if sap.prefix.matches(&XorName::from(self.client_pk)) {
             // Update session key set
             let mut keyset = self.section_key_set.write().await;
             if *keyset == Some(sap.public_key_set.clone()) {
                 trace!("We have previously received the key set already.");
                 return Ok(());
             }
+
             *keyset = Some(sap.public_key_set.clone());
-        }
+            {
+                // update section prefix
+                let mut prefix = self.section_prefix.write().await;
+                *prefix = Some(sap.prefix);
+            }
 
-        {
-            // update section prefix
-            let mut prefix = self.section_prefix.write().await;
-            *prefix = Some(sap.prefix);
-        }
-
-        {
-            // Update session elders
-            let mut session_elders = self.all_known_elders.write().await;
-            *session_elders = received_elders.clone();
-        }
-
-        if original_known_elders != received_elders {
             debug!("Connecting to new set of Elders: {:?}", received_elders);
-            let new_elder_addresses = received_elders.keys().cloned().collect::<BTreeSet<_>>();
+            let new_elder_addresses = received_elders.values().cloned().collect::<BTreeSet<_>>();
             let updated_contacts = new_elder_addresses.iter().cloned().collect::<Vec<_>>();
-            let old_elders = original_known_elders
-                .iter()
-                .filter_map(|(peer_addr, _)| {
-                    if !new_elder_addresses.contains(peer_addr) {
-                        Some(*peer_addr)
+            let old_elders = self
+                .our_section
+                .read()
+                .await
+                .values()
+                .filter_map(|addr| {
+                    if !new_elder_addresses.contains(addr) {
+                        Some(*addr)
                     } else {
                         None
                     }
@@ -183,6 +169,7 @@ impl Session {
     async fn handle_client_msg(&self, msg_id: MessageId, msg: ServiceMsg, src: SocketAddr) {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = self.pending_queries.clone();
+        let inquiry_queries = self.pending_inquiries.clone();
         let error_sender = self.incoming_err_sender.clone();
 
         let _ = tokio::spawn(async move {
@@ -222,7 +209,7 @@ impl Session {
                     let _ = error_sender.send(error.clone()).await;
 
                     match error {
-                        CmdError::Data(_data_error) => {
+                        CmdError::Data(_error) | CmdError::Payment(PaymentError(_error)) => {
                             // do nothing just yet
                         }
                     }

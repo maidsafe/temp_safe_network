@@ -6,24 +6,28 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{QueryResult, Session};
+use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
+
+use bytes::Bytes;
+use futures::{future::join_all, stream::FuturesUnordered};
+use itertools::Itertools;
+use tokio::{sync::mpsc::channel, task::JoinHandle, time::timeout};
+use tracing::{debug, error, info, trace, warn};
+use xor_name::XorName;
+
 use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
-    MessageId, ServiceAuth, WireMsg,
+    signature_aggregator::Error as AggregatorError,
+    DataSigned, MessageId, SectionAuthorityProvider, ServiceAuth, WireMsg,
 };
 use crate::messaging::{DstLocation, MsgKind};
-use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
-use bytes::Bytes;
-use futures::{future::join_all, stream::FuturesUnordered};
-use itertools::Itertools;
+use crate::types::{Chunk, PrivateChunk, PublicChunk};
 use rand::prelude::SliceRandom;
 use rand::rngs::OsRng;
-use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
-use tokio::{sync::mpsc::channel, task::JoinHandle, time::timeout};
-use tracing::{debug, error, trace, warn};
-use xor_name::XorName;
+
+use super::{QueryResult, Session};
 
 // Number of attemps when retrying to send a message to a node
 const NUMBER_OF_RETRIES: usize = 3;
@@ -32,10 +36,10 @@ const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
 impl Session {
     /// Bootstrap to the network maintaining connections to several nodes.
-    pub(crate) async fn bootstrap(&mut self, client_pk: PublicKey) -> Result<(), Error> {
+    pub(crate) async fn bootstrap(&mut self) -> Result<(), Error> {
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
-            client_pk
+            self.client_pk
         );
 
         let (endpoint, _, mut incoming_messages, _disconnections, mut bootstrapped_peer) =
@@ -59,7 +63,7 @@ impl Session {
             // has responded with a SectionInfo Message
             if let Ok(Ok(true)) = timeout(
                 Duration::from_secs(30),
-                self.process_incoming_message(&mut incoming_messages, client_pk),
+                self.process_incoming_message(&mut incoming_messages),
             )
             .await
             {
@@ -77,12 +81,11 @@ impl Session {
             }
         }
 
-        self.spawn_message_listener_thread(incoming_messages, client_pk)
-            .await;
+        self.spawn_message_listener_thread(incoming_messages).await;
 
         debug!(
             "Successfully obtained the list of Elders to send all messages to: {:?}",
-            self.connected_elders.read().await.keys()
+            self.our_section.read().await.values()
         );
 
         Ok(())
@@ -98,8 +101,8 @@ impl Session {
     ) -> Result<(), Error> {
         let endpoint = self.endpoint()?.clone();
 
-        let mut elders = self
-            .connected_elders
+        let elders = self
+            .our_section
             .read()
             .await
             .keys()
@@ -203,17 +206,18 @@ impl Session {
 
         let data_name = query.dst_name();
 
+        let msg_bytes = wire_msg.serialize()?;
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest
         // connected Elders to the data we are querying
         let elders: Vec<SocketAddr> = self
-            .connected_elders
+            .our_section
             .read()
             .await
             .clone()
             .into_iter()
-            .sorted_by(|(_, lhs_name), (_, rhs_name)| data_name.cmp_distance(lhs_name, rhs_name))
+            .sorted_by(|(lhs_name, _), (rhs_name, _)| data_name.cmp_distance(lhs_name, rhs_name))
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-            .map(|(addr, _)| addr)
+            .map(|(_, addr)| addr)
             .collect();
 
         let elders_len = elders.len();
@@ -422,7 +426,7 @@ impl Session {
     // Get section info from the peer we have bootstrapped with.
     pub(crate) async fn send_get_section_query(
         &self,
-        client_pk: PublicKey,
+        name: XorName,
         bootstrapped_peer: &SocketAddr,
     ) -> Result<(), Error> {
         if self.is_connecting_to_new_elders {
@@ -436,13 +440,8 @@ impl Session {
             bootstrapped_peer
         );
 
-        let dst_section_name = XorName::from(client_pk);
-
-        // FIXME: we don't know our section PK. We must supply a pk for now we do a random one...
-        let random_section_pk = bls::SecretKey::random().public_key();
-
         let msg_id = MessageId::new();
-        let query = SectionInfoMsg::GetSectionQuery(client_pk);
+        let query = SectionInfoMsg::GetSectionQuery(name);
         let payload = WireMsg::serialize_msg_payload(&query)?;
         let msg_kind = MsgKind::SectionInfoMsg;
         let dst_location = DstLocation::Section {
@@ -476,25 +475,41 @@ impl Session {
         Ok(())
     }
 
-    // Connect to a set of Elders nodes which will be
-    // the receipients of our messages on the network.
-    pub(crate) async fn connect_to_elders(&mut self) -> Result<(), Error> {
-        // TODO: remove this function completely
+    pub async fn get_section_for(&self, name: XorName) -> Result<(), Error> {
+        let query = SectionInfoMsg::GetSectionQuery(name);
+        let payload = WireMsg::serialize_msg_payload(&query)?;
+        let msg_kind = MsgKind::SectionInfoMsg;
+        let dst_location = DstLocation::Section {
+            name: dst_section_name,
+            section_pk: random_section_pk,
+        };
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let msg_bytes = wire_msg.serialize()?;
 
+        for addr in self.our_section.read().await.values() {
+            let msg_bytes = msg_bytes.clone();
+            self.endpoint?.send_message(msg_bytes, addr).await?;
+        }
+
+        Ok(())
+    }
+
+    // Connect to a set of Elders nodes which will be
+    // the recipients of our messages on the network.
+    pub(crate) async fn connect_to_elders(&mut self) -> Result<(), Error> {
         self.is_connecting_to_new_elders = true;
 
         if self.known_elders_count().await == 0 {
             // this is not necessarily an error in case we didn't get elder info back yet
-            warn!("Not attempted to connect, insufficient elders yet known");
+            warn!("Insufficient Elders");
         }
 
-        let new_elders = self.all_known_elders.read().await.clone();
-        let peers_len = new_elders.len();
-
-        trace!("We now know our {} Elders.", peers_len);
         {
-            let mut session_elders = self.connected_elders.write().await;
-            *session_elders = new_elders;
+            let mut session_elders = self.our_section.write().await;
+            trace!("Connecting to {} of our Elders.", session_elders.len());
+            for (_, addr) in session_elders.iter() {
+                self.endpoint?.connect_to(addr).await?
+            }
         }
 
         self.is_connecting_to_new_elders = false;

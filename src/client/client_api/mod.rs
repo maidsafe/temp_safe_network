@@ -73,15 +73,15 @@ impl Client {
         // Incoming error notifiers
         let (err_sender, err_receiver) = tokio::sync::mpsc::channel::<CmdError>(10);
 
-        // Create the session with the network
-        let mut session = Session::new(config.qp2p, err_sender)?;
-
         let client_pk = keypair.public_key();
+
+        // Create the session with the network
+        let mut session = Session::new(client_pk, qp2p_config, err_sender)?;
 
         // Bootstrap to the network, connecting to the section responsible
         // for our client public key
         debug!("Bootstrapping to the network...");
-        attempt_bootstrap(&mut session, client_pk).await?;
+        attempt_bootstrap(&mut session).await?;
 
         let client = Self {
             keypair,
@@ -130,10 +130,10 @@ impl Client {
 
 /// Utility function that bootstraps a client to the network. If there is a failure then it retries.
 /// After a maximum of three attempts if the boostrap process still fails, then an error is returned.
-async fn attempt_bootstrap(session: &mut Session, client_pk: PublicKey) -> Result<(), Error> {
+async fn attempt_bootstrap(session: &mut Session) -> Result<(), Error> {
     let mut attempts: u8 = 0;
     loop {
-        match session.bootstrap(client_pk).await {
+        match session.bootstrap().await {
             Ok(()) => return Ok(()),
             Err(err) => {
                 attempts += 1;
