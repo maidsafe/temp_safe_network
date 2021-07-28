@@ -203,10 +203,13 @@ impl Core {
             );
         } else {
             // Other section
-
-            let _ = self
-                .network
-                .update_section(section_auth, self.section.chain());
+            // FIXME: we shouln't be receiving or updating a SAP for
+            // a remote section here, that would be done with a AE msg response ???.
+            let _ = self.network.update_remote_section_sap(
+                section_auth,
+                self.section.chain(),
+                self.section.chain(),
+            );
         }
 
         Ok(commands)
@@ -230,9 +233,13 @@ impl Core {
             if section_auth.value.prefix.matches(&self.node.name()) {
                 let _ = self.section.update_elders(section_auth, key_sig);
             } else {
-                let _ = self
-                    .network
-                    .update_section(section_auth, self.section.chain());
+                // FIXME: we shouln't be receiving or updating a SAP for
+                // a remote section here, that would be done with a AE msg response ???.
+                let _ = self.network.update_remote_section_sap(
+                    section_auth,
+                    self.section.chain(),
+                    self.section.chain(),
+                );
             }
         }
 

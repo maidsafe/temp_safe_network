@@ -134,13 +134,16 @@ impl Core {
     pub(crate) fn update_section_knowledge(
         &mut self,
         section_auth: SectionAuth<SectionAuthorityProvider>,
-        section_chain: SecuredLinkedList,
+        proof_chain: SecuredLinkedList,
     ) {
         let prefix = section_auth.value.prefix;
-        if self.network.update_section(section_auth, &section_chain) {
+        if self
+            .network
+            .update_remote_section_sap(section_auth, &proof_chain, self.section.chain())
+        {
             info!("Neighbour section knowledge updated: {:?}", prefix);
         } else {
-            warn!("Neighbour section update failed");
+            warn!("Neighbour section update failed: {:?}", prefix);
         }
     }
 

@@ -44,19 +44,13 @@ pub(super) trait NetworkUtils {
     /// TODO: return bool indicating whether anything changed.
     fn merge(&mut self, other: Network, section_chain: &SecuredLinkedList);
 
-    /// Update the info about a section.
-    ///
-    /// If this is for our sibling section, then `section_auth` is signed by them and so the signing
-    /// key is not in our `section_chain`. To prove the key is valid, it must be accompanied by an
-    /// additional `key_sig` which signs it using a key that is present in `section_chain`.
-    ///
-    /// If this is for a non-sibling section, then currently we require the info to be signed by our
-    /// section (so we need to accumulate the signature for it first) and so `key_sig` is not
-    /// needed in that case.
-    fn update_section(
+    /// Update our knowledge of a remote section's SAP only
+    /// if it's verifiable with the provided proof chain.
+    fn update_remote_section_sap(
         &mut self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
-        section_chain: &SecuredLinkedList,
+        proof_chain: &SecuredLinkedList,
+        our_section_chain: &SecuredLinkedList,
     ) -> bool;
 
     /// Returns the known section keys.
@@ -136,51 +130,62 @@ impl NetworkUtils for Network {
         }
     }
 
-    /// Update the info about a section.
-    ///
-    /// If this is for our sibling section, then `section_auth` is signed by them and so the signing
-    /// key is not in our `section_chain`. To prove the key is valid, it must be accompanied by an
-    /// additional `key_sig` which signs it using a key that is present in `section_chain`.
-    ///
-    /// If this is for a non-sibling section, then currently we require the info to be signed by our
-    /// section (so we need to accumulate the signature for it first) and so `key_sig` is not
-    /// needed in that case.
-    fn update_section(
+    /// Update our knowledge of a remote section's SAP only
+    /// if it's verifiable with the provided proof chain.
+    fn update_remote_section_sap(
         &mut self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
-        section_chain: &SecuredLinkedList,
+        proof_chain: &SecuredLinkedList,
+        our_section_chain: &SecuredLinkedList,
     ) -> bool {
-        // With the change of AE, the voting of OtherSection is removed, which means the info of
-        // remote section is no longer being signed by own section.
-        // As this passed in section_chain is just our own chain during sync, which in a high chance
-        // won't contain the section_key of a remote section.
-        // So the handling logic is now changed to:
-        //     1, if section_chain validates, update as it is
-        //     2, if chain not validate but the if is self-validated and we don't have such entry,
-        //        we take that entry in.
-        // In case the entry turned out to be an outdated one, it will got updated via AE flow.
-        //
-        // Note this is just a temp resolvement. It's still being discussed whether shall bring back
-        // the re-vote to improve the security.
-        if !signed_section_auth.verify(section_chain)
-            && (!signed_section_auth.self_verify()
-                || self
-                    .sections
-                    .get(&signed_section_auth.value.prefix)
-                    .is_some())
-        {
+        // Check if SAP signature is valid
+        if !signed_section_auth.self_verify() {
             trace!(
-                "Failed to update remove section knowledge {:?}",
+                "Failed to update remote section knowledge, SAP signature invalid: {:?}",
                 signed_section_auth.value
             );
             return false;
         }
 
-        if let Some(old_section_auth) = self.sections.insert(signed_section_auth.clone()) {
-            if old_section_auth == signed_section_auth {
+        // TODO: Let's make sure the proof chain can be trusted,
+        // i.e. check each key is signed by its parent/predecesor key.
+
+        // We currently don't keep the complete chain of remote sections (TODO??),
+        // **but** the SAPs of remote sections we keep were already verified by us
+        // as trusted before we store them in our local records.
+        // Thus, we just need to check our knowledge of the remote section's key
+        // is part of the proof chain received.
+        let is_sap_trusted = match self.sections.get(&signed_section_auth.value.prefix) {
+            Some(sap) if sap == &signed_section_auth => {
+                // It's the same SAP we are already aware of
                 return false;
             }
+            Some(sap) => {
+                // We are then aware of the prefix, let's just verify
+                // the new SAP can be trusted based on the SAP we
+                // aware of and the proof chain provided.
+                proof_chain.has_key(&sap.value.public_key_set.public_key())
+            }
+            None => {
+                // We are not aware of the prefix, let's then verify
+                // it can be trusted based on our own section chain and the
+                // provided proof chain.
+                our_section_chain.check_trust(proof_chain.keys())
+            }
+        };
+
+        if !is_sap_trusted {
+            trace!(
+                "Failed to update remote section knowledge, SAP cannot be trusted: {:?}",
+                signed_section_auth.value
+            );
+            return false;
         }
+
+        // We can now update our knowledge of the remote section's SAP.
+        // Note: we don't expect the the same SAP to be found in our records
+        // for the prefix since we've already checked that above.
+        let _ = self.sections.insert(signed_section_auth);
 
         true
     }
@@ -273,8 +278,8 @@ mod tests {
 
         // Create map containing sections (00), (01) and (10)
         let mut map = Network::new();
-        let _ = map.update_section(gen_section_auth(&sk, p01)?, &chain);
-        let _ = map.update_section(gen_section_auth(&sk, p10)?, &chain);
+        let _ = map.update_remote_section_sap(gen_section_auth(&sk, p01)?, &chain, &chain);
+        let _ = map.update_remote_section_sap(gen_section_auth(&sk, p10)?, &chain, &chain);
 
         let mut rng = rand::thread_rng();
         let n01 = p01.substituted_in(rng.gen());

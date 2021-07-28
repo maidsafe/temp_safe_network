@@ -518,7 +518,7 @@ mod tests {
 
         let (section_auth1, _, _) = gen_section_authority_provider(prefix1, ELDER_SIZE);
         let section_auth1 = section_signed(&sk, section_auth1)?;
-        assert!(network.update_section(section_auth1, section.chain()));
+        assert!(network.update_remote_section_sap(section_auth1, section.chain(), section.chain()));
 
         let our_name = choose_elder_name(section.authority_provider())?;
 
