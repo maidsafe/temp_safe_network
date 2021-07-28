@@ -24,6 +24,7 @@ use crate::node::RegisterStorage;
 
 use crate::routing::{
     core::{ConnectionEvent, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
+    create_test_register_store,
     dkg::{
         test_utils::{prove, section_signed},
         ProposalUtils,
@@ -46,7 +47,7 @@ use anyhow::{anyhow, Context, Result};
 use assert_matches::assert_matches;
 use ed25519_dalek::Signer;
 use rand::rngs::OsRng;
-use rand::{distributions::Alphanumeric, Rng}; // 0.8
+use rand::{distributions::Alphanumeric, Rng};
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use std::path::Path;
@@ -64,7 +65,6 @@ use tokio::{
 use xor_name::{Prefix, XorName};
 
 static TEST_EVENT_CHANNEL_SIZE: usize = 20;
-const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
 
 #[tokio::test]
 async fn receive_matching_get_section_request_as_elder() -> Result<()> {
@@ -319,19 +319,6 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     assert!(test_connectivity);
 
     Ok(())
-}
-
-fn create_test_register_store() -> Result<RegisterStorage> {
-    let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
-    let tmp_dir = tempdir()?;
-
-    let register: String = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(7)
-        .map(char::from)
-        .collect();
-    let storage_dir = tmp_dir.into_path().join(Path::new(&register));
-    RegisterStorage::new(&storage_dir, used_space).context("Failed to create register storage")
 }
 
 #[tokio::test]

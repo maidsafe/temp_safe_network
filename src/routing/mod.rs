@@ -45,6 +45,14 @@ pub use qp2p::{Config as TransportConfig, SendStream};
 
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
+use tempfile::tempdir;
+
+use crate::dbs::UsedSpace;
+use crate::node::RegisterStorage;
+use anyhow::{Context, Result as AnyhowResult};
+use rand::{distributions::Alphanumeric, Rng};
+use std::path::Path;
+
 // ############################################################################
 // Private
 // ############################################################################
@@ -70,6 +78,22 @@ pub const RECOMMENDED_SECTION_SIZE: usize = 2 * ELDER_SIZE;
 
 /// Number of elders per section.
 pub const ELDER_SIZE: usize = 7;
+
+const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
+
+/// Create a register store for routing examples
+pub fn create_test_register_store() -> AnyhowResult<RegisterStorage> {
+    let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
+    let tmp_dir = tempdir()?;
+
+    let register: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(7)
+        .map(char::from)
+        .collect();
+    let storage_dir = tmp_dir.into_path().join(Path::new(&register));
+    RegisterStorage::new(&storage_dir, used_space).context("Failed to create register storage")
+}
 
 /// SuperMajority of a given group (i.e. > 2/3)
 #[inline]

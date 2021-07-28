@@ -210,9 +210,6 @@ impl Core {
                 let payload = WireMsg::serialize_msg_payload(&msg)?;
                 let data_auth = Authority::verify(data_signed, &payload)?;
 
-                // self.handle_data_msg_received(msg_id, msg, user, data_auth)
-                //     .await
-
                 Ok(vec![Command::HandleDataMessage {
                     msg_id,
                     msg,

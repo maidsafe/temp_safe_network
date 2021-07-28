@@ -374,44 +374,6 @@ impl Routing {
             .clone()
             .handle_commands(Command::ParseAndSendWireMsg(wire_msg))
             .await
-        // if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
-        //     if self.our_prefix().await.matches(xorname) {
-        //         let addr = self
-        //             .dispatcher
-        //             .core
-        //             .read()
-        //             .await
-        //             .get_socket_addr(*socket_id)
-        //             .copied();
-
-        //         if let Some(socket_addr) = addr {
-        //             // Send a message to a client peer.
-        //             // Messages sent to a client are not signed
-        //             // or validated as part of the routing library.
-        //             debug!("Sending client msg to {:?}", socket_addr);
-
-        //             let recipients = vec![(*xorname, socket_addr)];
-        //             wire_msg.set_dst_section_pk(*self.section_chain().await.last_key());
-
-        //             let command = Command::SendMessage {
-        //                 recipients,
-        //                 wire_msg,
-        //             };
-        //             return self.dispatcher.clone().handle_commands(command).await;
-        //         } else {
-        //             debug!(
-        //                 "Could not find socketaddr corresponding to socket_id {:?}",
-        //                 socket_id
-        //             );
-        //             debug!("Relaying user message instead.. (Command::RelayMessage)");
-        //         }
-        //     } else {
-        //         debug!("Relaying message with sending user message (Command::RelayMessage)");
-        //     }
-        // }
-
-        // let command = Command::RelayMessage(wire_msg);
-        // self.dispatcher.clone().handle_commands(command).await
     }
 
     /// Returns the current BLS public key set if this node has one, or

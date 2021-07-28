@@ -35,7 +35,6 @@ pub(crate) enum Command {
         user: EndUser,
         data_auth: Authority<DataSigned>,
     },
-    // handle_data_msg_received(msg_id, msg, user, data_auth)
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
     /// Handle lost connection to a peer.
