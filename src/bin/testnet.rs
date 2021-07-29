@@ -148,7 +148,7 @@ pub async fn run_network() -> Result<(), String> {
         "--nodes-dir",
         &arg_node_log_dir,
         "--interval",
-        &INTERVAL,
+        INTERVAL,
         "--local",
     ];
 

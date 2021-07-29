@@ -57,7 +57,7 @@ impl OwnerType {
         match signature {
             Signature::Bls(sig) => {
                 if let OwnerType::Multi(set) = self {
-                    set.public_key().verify(&sig, data)
+                    set.public_key().verify(sig, data)
                 } else {
                     false
                 }
@@ -177,7 +177,7 @@ impl Keypair {
     /// Signs with the underlying keypair.
     pub fn sign(&self, data: &[u8]) -> Signature {
         match self {
-            Self::Ed25519(keypair) => Signature::Ed25519(keypair.sign(&data)),
+            Self::Ed25519(keypair) => Signature::Ed25519(keypair.sign(data)),
             Self::BlsShare(keypair) => Signature::BlsShare(SignatureShare {
                 index: keypair.index,
                 share: keypair.secret.sign(data),

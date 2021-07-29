@@ -421,7 +421,7 @@ impl SafeUrl {
     ///
     /// * `nrsurl` - an nrsurl.
     pub fn from_nrsurl(nrsurl: &str) -> Result<Self> {
-        let parts = SafeUrlParts::parse(&nrsurl, false)?;
+        let parts = SafeUrlParts::parse(nrsurl, false)?;
 
         let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
 
@@ -445,7 +445,7 @@ impl SafeUrl {
     ///
     /// * `xorurl` - an xorurl.
     pub fn from_xorurl(xorurl: &str) -> Result<Self> {
-        let parts = SafeUrlParts::parse(&xorurl, true)?;
+        let parts = SafeUrlParts::parse(xorurl, true)?;
 
         let (_base, xorurl_bytes): (Base, Vec<u8>) = base_decode(&parts.top_name)
             .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
@@ -1140,7 +1140,7 @@ impl SafeUrl {
         // that merge name and path together.
         let parts: Vec<&str> = path.split('/').collect();
         let mut new_parts = Vec::<String>::new();
-        for (count, p) in parts.into_iter().enumerate() {
+        for (count, p) in parts.iter().enumerate() {
             if !p.is_empty() || count > 0 {
                 if percent_encode {
                     new_parts.push(Self::url_percent_encode(p));
@@ -1359,7 +1359,7 @@ mod tests {
         )?;
         let base64_xorurl = "safe://mAQACAzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
         assert_eq!(xorurl, base64_xorurl);
-        let safeurl = SafeUrl::from_url(&base64_xorurl)?;
+        let safeurl = SafeUrl::from_url(base64_xorurl)?;
         assert_eq!(base64_xorurl, safeurl.to_base(XorUrlBase::Base64));
         assert_eq!("", safeurl.path());
         assert_eq!(XOR_URL_VERSION_1, safeurl.encoding_version());

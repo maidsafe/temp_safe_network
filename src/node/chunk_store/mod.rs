@@ -114,9 +114,9 @@ impl ChunkStore {
         requester: PublicKey,
     ) -> Result<NodeDuty> {
         match &write {
-            ChunkWrite::New(data) => self.try_store(&data).await,
+            ChunkWrite::New(data) => self.try_store(data).await,
             ChunkWrite::DeletePrivate(head_address) => {
-                if !self.store.has(&head_address).await? {
+                if !self.store.has(head_address).await? {
                     info!(
                         "{}: Immutable chunk doesn't exist: {:?}",
                         self, head_address
@@ -124,11 +124,11 @@ impl ChunkStore {
                     return Ok(NodeDuty::NoOp);
                 }
 
-                match self.store.get(&head_address).await {
+                match self.store.get(head_address).await {
                     Ok(Chunk::Private(data)) => {
                         if data.owner() == &requester {
                             self.store
-                                .delete(&head_address)
+                                .delete(head_address)
                                 .await
                                 .map_err(|_error| ErrorMessage::FailedToDelete)
                         } else {
@@ -162,7 +162,7 @@ impl ChunkStore {
             );
             return Err(Error::DataExists);
         }
-        self.store.put(&data).await?;
+        self.store.put(data).await?;
 
         Ok(NodeDuty::NoOp)
     }

@@ -247,7 +247,7 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
         .repo_name("safe_network")
-        .with_target(&target)
+        .with_target(target)
         .build()?
         .fetch()?;
 
@@ -262,8 +262,8 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
         let status = self_update::backends::github::Update::configure()
             .repo_owner("maidsafe")
             .repo_name("safe_network")
-            .target(&target)
-            .bin_name(&bin_name)
+            .target(target)
+            .bin_name(bin_name)
             .show_download_progress(true)
             .no_confirm(true)
             .current_version(cargo_crate_version!())

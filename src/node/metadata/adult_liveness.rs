@@ -116,7 +116,7 @@ impl AdultLiveness {
                 *count -= 1;
             }
         }
-        let complete = if let Some(mut op) = self.ops.get_mut(&msg_id) {
+        let complete = if let Some(mut op) = self.ops.get_mut(msg_id) {
             let ReadOperation { targets, .. } = op.value_mut();
             let _ = targets.remove(name);
             targets.is_empty()
@@ -124,7 +124,7 @@ impl AdultLiveness {
             true
         };
         if complete {
-            let _ = self.ops.remove(&msg_id);
+            let _ = self.ops.remove(msg_id);
         }
     }
 
@@ -135,7 +135,7 @@ impl AdultLiveness {
         success: bool,
     ) -> Option<(ChunkAddress, EndUser, MessageId)> {
         self.remove_target(correlation_id, src);
-        let op = self.ops.get_mut(&correlation_id);
+        let op = self.ops.get_mut(correlation_id);
         op.and_then(|mut op| {
             let ReadOperation {
                 head_address,

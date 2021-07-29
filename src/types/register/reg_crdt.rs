@@ -52,7 +52,7 @@ impl Display for RegisterCrdt {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "<{}>", String::from_utf8_lossy(&entry),)?;
+            write!(f, "<{}>", String::from_utf8_lossy(entry),)?;
         }
         write!(f, ")")
     }

@@ -129,7 +129,7 @@ impl CapacityReader {
     pub(super) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.adult_storage_info.full_adults.read().await;
         self.reader
-            .non_full_adults_closest_to(&target, &full_adults, CHUNK_COPY_COUNT)
+            .non_full_adults_closest_to(target, &full_adults, CHUNK_COPY_COUNT)
             .await
     }
 }
