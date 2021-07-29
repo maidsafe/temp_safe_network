@@ -93,9 +93,19 @@ impl Safe {
             let files_map_xorurl = self.store_files_map(&files_map).await?;
 
             // Store the serialised FilesMap XOR-URL as the first entry value in the Register
-            let xor_url = self
-                .register_create(None, FILES_CONTAINER_TYPE_TAG, false)
+            let xorname = self
+                .safe_client
+                .store_register(None, FILES_CONTAINER_TYPE_TAG, None, false)
                 .await?;
+
+            let xor_url = SafeUrl::encode_register(
+                xorname,
+                FILES_CONTAINER_TYPE_TAG,
+                SafeContentType::FilesContainer,
+                self.xorurl_base,
+                false,
+            )?;
+
             let _ = self
                 .write_to_register(&xor_url, files_map_xorurl.as_bytes().to_vec(), Default::default())
                 .await?;
@@ -134,64 +144,62 @@ impl Safe {
         &self,
         safe_url: &SafeUrl,
     ) -> Result<(VersionHash, FilesMap)> {
-        let entries = self.fetch_register_entries(&safe_url).await?;
-
-        // TODO: manage multiple resolutions currently only returns the 1st one
-        if entries.len() > 1 {
-            unimplemented!("Multiple file container entries not managed");
-        }
-
-        let data = match entries.iter().next() {
-            Some((hash, entry)) => Ok((hash.into(), entry.to_owned())),
-            None => Err(Error::EmptyContent(format!(
-                "Empty Register found at XoR name {}",
-                safe_url.xorname()
-            ))),
-        };
-
-        match data {
-            Ok((version, serialised_files_map)) => {
-                debug!("Files map retrieved.... v{:?}", &version);
-                // TODO: use RDF format and deserialise it
-                // We first obtain the FilesMap XOR-URL from the Sequence
-                let files_map_xorurl = SafeUrl::from_url(
-                    &String::from_utf8(serialised_files_map).map_err(|err| {
-                        Error::ContentError(format!(
-                            "Couldn't parse the FilesMap link stored in the FilesContainer: {:?}",
-                            err
-                        ))
-                    })?,
-                )?;
-
-                // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
-                let serialised_files_map = self.fetch_public_blob(&files_map_xorurl, None).await?;
-                let files_map =
-                    serde_json::from_slice(serialised_files_map.as_slice()).map_err(|err| {
-                        Error::ContentError(format!(
-                            "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
-                            err
-                        ))
-                    })?;
-
-                Ok((version, files_map))
-            }
-            Err(Error::EmptyContent(_)) => {
-                warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
-                Ok((VersionHash::default(), FilesMap::default()))
-            }
-            Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
+        // fetch register entries and wrap errors
+        let entries = self.fetch_register_entries(&safe_url).await.map_err(|e| { match e {
+            Error::ContentNotFound(_) => Error::ContentNotFound(
                 ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string(),
-            )),
-            Err(Error::VersionNotFound(_)) => Err(Error::VersionNotFound(format!(
+            ),
+            Error::HashNotFound(_) => Error::VersionNotFound(format!(
                 "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                safe_url.content_version().unwrap_or(VersionHash::default()),
+                match safe_url.content_version() {
+                    Some(v) => v.to_string(),
+                    None => "None".to_owned(),
+                },
                 safe_url
-            ))),
-            Err(err) => Err(Error::NetDataError(format!(
+            )),
+            err => Error::NetDataError(format!(
                 "Failed to get current version: {}",
                 err
-            ))),
+            )),
+        }})?;
+
+        // take the 1st entry (TODO Multiple entries)
+        if entries.len() > 1 {
+            unimplemented!("Multiple file container entries not managed, this happends when 2 clients write concurrently to a file container");
         }
+        let first_entry = entries.iter().next();
+        let (version, curr_serialised_files_map);
+        if let Some((v, m)) = first_entry {
+            version = v.into();
+            curr_serialised_files_map = m.to_owned();
+        } else {
+            warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
+            return Ok((VersionHash::default(), FilesMap::default()))
+        }
+
+        debug!("Files map retrieved.... v{:?}", &version);
+        // TODO: use RDF format and deserialise it
+        // We first obtain the FilesMap XOR-URL from the Sequence
+        let files_map_xorurl = SafeUrl::from_url(
+            &String::from_utf8(curr_serialised_files_map).map_err(|err| {
+                Error::ContentError(format!(
+                    "Couldn't parse the FilesMap link stored in the FilesContainer: {:?}",
+                    err
+                ))
+            })?,
+        )?;
+
+        // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
+        let serialised_files_map = self.fetch_public_blob(&files_map_xorurl, None).await?;
+        let files_map =
+            serde_json::from_slice(serialised_files_map.as_slice()).map_err(|err| {
+                Error::ContentError(format!(
+                    "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
+                    err
+                ))
+            })?;
+
+        Ok((version, files_map))
     }
 
     /// # Sync up local folder with the content on a FilesContainer.

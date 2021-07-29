@@ -56,13 +56,31 @@ impl Safe {
     }
 
     /// Fetch a Register from a SafeUrl without performing any type of URL resolution
+    /// Works with version hashes
+    // e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
     pub(crate) async fn fetch_register_entries(
         &self,
         safeurl: &SafeUrl,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        // TODO: allow to specify the hash with the SafeUrl as well: safeurl.content_hash(),
-        // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
+        // take entry with version hash
+        if let Some(v) = safeurl.content_version() {
+            let hash = v.register_entry_hash();
+            let entry = self.fetch_register_entry(&safeurl, hash).await.map_err(|e| match e {
+                Error::EmptyContent(_) => Error::EmptyContent(format!(
+                    "Register found at \"{}\" was empty",
+                    safeurl
+                )),
+                Error::ContentNotFound(_) => Error::ContentNotFound(
+                    "No Register found at this address".to_string(),
+                ),
+                other => other,
+            })?;
+            let mut set = BTreeSet::new();
+            set.insert((hash, entry));
+            return Ok(set)
+        }
 
+        // else take latest entry
         let address = safeurl.register_address()?;
 
         match self.safe_client.read_register(address).await {
