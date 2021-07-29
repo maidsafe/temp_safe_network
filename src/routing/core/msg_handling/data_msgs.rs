@@ -65,7 +65,7 @@ impl Core {
         }
     }
 
-    pub(crate) async fn handle_end_user_message(
+    pub(crate) async fn handle_data_message(
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,

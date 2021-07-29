@@ -10,7 +10,7 @@ mod agreement;
 mod anti_entropy;
 mod bad_msgs;
 mod dkg;
-mod end_user;
+mod data_msgs;
 mod join;
 mod proposals;
 mod relocation;
@@ -99,7 +99,7 @@ impl Core {
                 msg,
                 dst_location,
             } => {
-                self.handle_end_user_message(sender, msg_id, data_auth, msg, dst_location, payload)
+                self.handle_data_message(sender, msg_id, data_auth, msg, dst_location, payload)
                     .await
             }
         }
