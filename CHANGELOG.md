@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.17.4](https://github.com/maidsafe/safe_network/compare/v0.17.3...v0.17.4) (2021-07-29)
+
+
+### Bug Fixes
+
+* **ci:** win cmd to remove node dir ([067d15c](https://github.com/maidsafe/safe_network/commit/067d15ce47ce56e4149add15eb1642128f740705))
+
 ### [0.17.3](https://github.com/maidsafe/safe_network/compare/v0.17.2...v0.17.3) (2021-07-29)
 
 ### [0.17.2](https://github.com/maidsafe/safe_network/compare/v0.17.1...v0.17.2) (2021-07-29)
