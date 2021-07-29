@@ -13,9 +13,9 @@ use crate::messaging::{
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use cookie_factory::{combinator::slice, gen_simple};
 use custom_debug::Debug;
 use serde::Serialize;
+use std::io::Write;
 use xor_name::XorName;
 
 /// In order to send a message over the wire, it needs to be serialized
@@ -92,10 +92,10 @@ impl WireMsg {
         let max_length = 10 * (WireMsgHeader::max_size() as usize + self.payload.len());
         let mut buffer = vec![0u8; max_length];
 
-        let (buf_at_payload, bytes_written) = self.header.write(&mut buffer)?;
+        let (mut buf_at_payload, bytes_written) = self.header.write(&mut buffer)?;
 
         // ...and finally we write the bytes of the serialized payload to the original buffer
-        let _ = gen_simple(slice(self.payload.clone()), buf_at_payload).map_err(|err| {
+        buf_at_payload.write_all(&self.payload).map_err(|err| {
             Error::Serialisation(format!(
                 "message payload (size {}) couldn't be serialized: {}",
                 self.payload.len(),
