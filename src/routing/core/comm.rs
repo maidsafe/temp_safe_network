@@ -480,7 +480,10 @@ mod tests {
 
         // Send the first message.
         let key0 = bls::SecretKey::random().public_key();
-        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key0));
+        let query = SectionInfoMsg::GetSectionQuery {
+            name: XorName::from(PublicKey::Bls(key0)),
+            is_bootstrapping: true,
+        };
         let dst_location = DstLocation::Node {
             name,
             section_pk: key0,
@@ -504,7 +507,10 @@ mod tests {
 
         // Send the second message.
         let key1 = bls::SecretKey::random().public_key();
-        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key1));
+        let query = SectionInfoMsg::GetSectionQuery {
+            name: XorName::from(PublicKey::Bls(key1)),
+            is_bootstrapping: true,
+        };
         let dst_location = DstLocation::Node {
             name,
             section_pk: key1,
@@ -566,7 +572,10 @@ mod tests {
 
     fn new_section_info_message() -> Result<WireMsg> {
         let random_bls_pk = bls::SecretKey::random().public_key();
-        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(random_bls_pk));
+        let query = SectionInfoMsg::GetSectionQuery {
+            name: XorName::from(PublicKey::Bls(random_bls_pk)),
+            is_bootstrapping: true,
+        };
         let dst_location = DstLocation::Node {
             name: XorName::random(),
             section_pk: bls::SecretKey::random().public_key(),
