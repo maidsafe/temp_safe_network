@@ -13,16 +13,6 @@ version = "0.17.7"
 [profile.release]
 incremental = true
 
-[[bin]]
-name = "sn_node"
-doc = false
-path = "src/bin/sn_node.rs"
-
-[[bin]]
-name = "testnet"
-doc = false
-path = "src/bin/testnet.rs"
-
 [[bench]]
 name = "put"
 harness = false
