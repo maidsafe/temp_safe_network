@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::build_client_query_response;
 use crate::dbs::{RegisterOpStore, UsedSpace};
-use crate::node::{error::convert_to_error_message, node_ops::NodeDuty, Error, Result};
+use crate::node::{error::convert_to_error_message, Error, Result};
 use crate::types::{
     register::{Action, Address, Register, User},
     PublicKey,
@@ -18,7 +17,7 @@ use crate::{
         data::{
             DataCmd, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead, RegisterWrite,
         },
-        Authority, DataSigned, EndUser, MessageId,
+        Authority, DataSigned,
     },
     types::DataAddress,
 };
@@ -230,38 +229,30 @@ impl RegisterStorage {
     pub(crate) fn read(
         &self,
         read: &RegisterRead,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<(QueryResponse, MessageId, EndUser)> {
+        requester_pk: PublicKey,
+    ) -> Result<QueryResponse> {
         trace!("Reading register {:?}", read.dst_address());
         use RegisterRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, requester, origin),
-            Read(address) => self.read_register(*address, msg_id, requester, origin),
-            GetOwner(address) => self.get_owner(*address, msg_id, requester, origin),
+            Get(address) => self.get(*address, requester_pk),
+            Read(address) => self.read_register(*address, requester_pk),
+            GetOwner(address) => self.get_owner(*address, requester_pk),
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, msg_id, requester, origin)
+                self.get_user_permissions(*address, *user, requester_pk)
             }
-            GetPolicy(address) => self.get_policy(*address, msg_id, requester, origin),
+            GetPolicy(address) => self.get_policy(*address, requester_pk),
         }
     }
 
     /// Get entire Register.
-    fn get(
-        &self,
-        address: Address,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<(QueryResponse, MessageId, EndUser)> {
-        let result = match self.get_register(&address, Action::Read, requester) {
+    fn get(&self, address: Address, requester_pk: PublicKey) -> Result<QueryResponse> {
+        let result = match self.get_register(&address, Action::Read, requester_pk) {
             Ok(register) => Ok(register),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok((QueryResponse::GetRegister(result), msg_id, origin))
+        Ok(QueryResponse::GetRegister(result))
     }
 
     /// Get `Register` from the store and check permissions.
@@ -269,7 +260,7 @@ impl RegisterStorage {
         &self,
         address: &Address,
         action: Action,
-        requester: PublicKey,
+        requester_pk: PublicKey,
     ) -> Result<Register> {
         let cache = self
             .registers
@@ -281,61 +272,45 @@ impl RegisterStorage {
             .ok_or_else(|| Error::NoSuchData(DataAddress::Register(*address)))?;
 
         state
-            .check_permissions(action, Some(requester))
+            .check_permissions(action, Some(requester_pk))
             .map_err(Error::from)?;
 
         Ok(state.clone())
     }
 
-    fn read_register(
-        &self,
-        address: Address,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<(QueryResponse, MessageId, EndUser)> {
-        let result = match self.get_register(&address, Action::Read, requester) {
-            Ok(register) => register.read(Some(requester)).map_err(Error::from),
+    fn read_register(&self, address: Address, requester_pk: PublicKey) -> Result<QueryResponse> {
+        let result = match self.get_register(&address, Action::Read, requester_pk) {
+            Ok(register) => register.read(Some(requester_pk)).map_err(Error::from),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(error),
         };
 
-        Ok((
-            QueryResponse::ReadRegister(result.map_err(convert_to_error_message)),
-            msg_id,
-            origin,
+        Ok(QueryResponse::ReadRegister(
+            result.map_err(convert_to_error_message),
         ))
     }
 
-    fn get_owner(
-        &self,
-        address: Address,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<(QueryResponse, MessageId, EndUser)> {
-        let result = match self.get_register(&address, Action::Read, requester) {
+    fn get_owner(&self, address: Address, requester_pk: PublicKey) -> Result<QueryResponse> {
+        let result = match self.get_register(&address, Action::Read, requester_pk) {
             Ok(res) => Ok(res.owner()),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok((QueryResponse::GetRegisterOwner(result), msg_id, origin))
+        Ok(QueryResponse::GetRegisterOwner(result))
     }
 
     fn get_user_permissions(
         &self,
         address: Address,
         user: User,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<(QueryResponse, MessageId, EndUser)> {
+        requester_pk: PublicKey,
+    ) -> Result<QueryResponse> {
         let result = match self
-            .get_register(&address, Action::Read, requester)
+            .get_register(&address, Action::Read, requester_pk)
             .and_then(|register| {
                 register
-                    .permissions(user, Some(requester))
+                    .permissions(user, Some(requester_pk))
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
@@ -343,25 +318,15 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok((
-            QueryResponse::GetRegisterUserPermissions(result),
-            msg_id,
-            origin,
-        ))
+        Ok(QueryResponse::GetRegisterUserPermissions(result))
     }
 
-    fn get_policy(
-        &self,
-        address: Address,
-        msg_id: MessageId,
-        requester: PublicKey,
-        origin: EndUser,
-    ) -> Result<(QueryResponse, MessageId, EndUser)> {
+    fn get_policy(&self, address: Address, requester_pk: PublicKey) -> Result<QueryResponse> {
         let result = match self
-            .get_register(&address, Action::Read, requester)
+            .get_register(&address, Action::Read, requester_pk)
             .and_then(|register| {
                 register
-                    .policy(Some(requester))
+                    .policy(Some(requester_pk))
                     .map(|p| p.clone())
                     .map_err(Error::from)
             }) {
@@ -370,7 +335,7 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok((QueryResponse::GetRegisterPolicy(result), msg_id, origin))
+        Ok(QueryResponse::GetRegisterPolicy(result))
     }
 
     /// Load a register op store

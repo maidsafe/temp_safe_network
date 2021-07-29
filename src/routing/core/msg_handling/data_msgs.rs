@@ -22,7 +22,6 @@ use crate::routing::{
 };
 use bytes::Bytes;
 use std::net::SocketAddr;
-use sysinfo::Process;
 
 impl Core {
     /// Forms a command to send the provided node error out
@@ -75,11 +74,8 @@ impl Core {
         user: EndUser,
         data_auth: Authority<DataSigned>,
     ) -> Result<Vec<Command>> {
-        match self
-            .register_storage
-            .read(&query, msg_id, data_auth.public_key, user)
-        {
-            Ok((response, correlation_id, end_user)) => {
+        match self.register_storage.read(&query, data_auth.public_key) {
+            Ok(response) => {
                 if response.failed_with_data_not_found() {
                     // we don't return data not found errors.
                     return Ok(vec![]);
@@ -87,7 +83,7 @@ impl Core {
 
                 let msg = DataMsg::Process(ProcessMsg::QueryResponse {
                     response,
-                    correlation_id,
+                    correlation_id: msg_id,
                 });
 
                 // FIXME: define which signature/authority this message should really carry,
