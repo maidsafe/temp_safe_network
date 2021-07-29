@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.17.5](https://github.com/maidsafe/safe_network/compare/v0.17.4...v0.17.5) (2021-07-29)
+
+
+### Bug Fixes
+
+* not call rm -rf on windows ([9cbeb22](https://github.com/maidsafe/safe_network/commit/9cbeb22d08fcdd32fef9ebddedaea95d2917b49f))
+* remove the backlog cache for bootstrapping node ([67240d2](https://github.com/maidsafe/safe_network/commit/67240d21375cb1cd29900d38fd4589d646066719))
+
 ### [0.17.4](https://github.com/maidsafe/safe_network/compare/v0.17.3...v0.17.4) (2021-07-29)
 
 
