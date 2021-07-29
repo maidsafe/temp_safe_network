@@ -93,7 +93,7 @@ impl Core {
                 self.handle_node_message(sender, msg_id, msg_authority, dst_location, msg, payload)
                     .await
             }
-            MessageType::Client {
+            MessageType::Data {
                 msg_id,
                 data_auth,
                 msg,

@@ -130,7 +130,7 @@ impl WireMsg {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
-                Ok(MessageType::Client {
+                Ok(MessageType::Data {
                     msg_id: self.header.msg_envelope.msg_id,
                     data_auth: Authority::verify(data_signed, &self.payload)?,
                     dst_location: self.header.msg_envelope.dst_location,
@@ -436,7 +436,7 @@ mod tests {
         // test deserialisation of payload
         assert_eq!(
             deserialized.into_message()?,
-            MessageType::Client {
+            MessageType::Data {
                 msg_id: wire_msg.msg_id(),
                 data_auth,
                 dst_location,

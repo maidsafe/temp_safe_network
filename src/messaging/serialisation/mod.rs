@@ -30,8 +30,8 @@ pub enum MessageType {
         /// the message
         msg: SectionInfoMsg,
     },
-    /// Client message
-    Client {
+    /// Data message
+    Data {
         /// Message ID
         msg_id: MessageId,
         /// Requester's authority over this message

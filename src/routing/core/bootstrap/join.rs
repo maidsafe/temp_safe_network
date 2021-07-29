@@ -317,7 +317,7 @@ impl<'a> Join<'a> {
                                     ..
                                 }) => (*resp, sender, msg_authority.src_location().name()),
                                 Ok(
-                                    MessageType::Client { msg_id, .. }
+                                    MessageType::Data { msg_id, .. }
                                     | MessageType::SectionInfo { msg_id, .. }
                                     | MessageType::Node { msg_id, .. },
                                 ) => {
