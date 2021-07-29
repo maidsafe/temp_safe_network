@@ -130,6 +130,7 @@ jobs:
         shell: cmd
 
       - name: Remove node dir and logs fo next test
+        if: matrix.os != 'windows-latest'
         run: rm -rf ~/.safe/node
 
       - name: Run example of split and chunk check
