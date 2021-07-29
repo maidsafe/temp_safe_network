@@ -48,10 +48,8 @@ pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API upd
 use tempfile::tempdir;
 
 use crate::dbs::UsedSpace;
-use crate::node::RegisterStorage;
-use anyhow::{Context, Result as AnyhowResult};
-use rand::{distributions::Alphanumeric, Rng};
-use std::path::Path;
+use anyhow::Result as AnyhowResult;
+use std::path::{Path, PathBuf};
 
 // ############################################################################
 // Private
@@ -82,17 +80,14 @@ pub const ELDER_SIZE: usize = 7;
 const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
 
 /// Create a register store for routing examples
-pub fn create_test_register_store() -> AnyhowResult<RegisterStorage> {
+pub fn create_test_used_space_and_root_storage() -> AnyhowResult<(UsedSpace, PathBuf)> {
     let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
     let tmp_dir = tempdir()?;
 
-    let register: String = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(7)
-        .map(char::from)
-        .collect();
-    let storage_dir = tmp_dir.into_path().join(Path::new(&register));
-    RegisterStorage::new(&storage_dir, used_space).context("Failed to create register storage")
+    // we only need the path here, the dir will be createdif it doesnt exist (as mpdir will cleanup when dropped below)
+    let storage_dir = tmp_dir.into_path().join(Path::new("/test-space"));
+    
+    Ok((used_space, storage_dir))
 }
 
 /// SuperMajority of a given group (i.e. > 2/3)

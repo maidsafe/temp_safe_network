@@ -8,6 +8,7 @@
 // Software.
 
 use super::{register::Address, PublicKey};
+use crate::messaging::data::Error as ErrorMessage;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -107,4 +108,16 @@ pub enum Error {
 
 pub(crate) fn convert_bincode_error(err: bincode::Error) -> Error {
     Error::Serialisation(err.as_ref().to_string())
+}
+
+/// Convert type errors to messaging::Errors for sending scross the network
+pub fn convert_dt_error_to_error_message(error: Error) -> ErrorMessage {
+    match error {
+        Error::InvalidOperation => {
+            ErrorMessage::InvalidOperation("DtError::InvalidOperation".to_string())
+        }
+        Error::NoSuchEntry => ErrorMessage::NoSuchEntry,
+        Error::AccessDenied(pk) => ErrorMessage::AccessDenied(pk),
+        other => ErrorMessage::InvalidOperation(format!("DtError: {:?}", other)),
+    }
 }

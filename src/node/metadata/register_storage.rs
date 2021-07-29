@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::{RegisterOpStore, UsedSpace};
-use crate::node::{error::convert_to_error_message, Error, Result};
+use crate::dbs::{convert_to_error_message, Error, RegisterOpStore, Result, UsedSpace};
 use crate::types::{
     register::{Action, Address, Register, User},
     PublicKey,
@@ -102,7 +101,12 @@ impl RegisterStorage {
         for (_, history) in data {
             for op in history {
                 let data_auth =
-                    super::verify_op(op.client_sig.clone(), DataCmd::Register(op.write.clone()))?;
+                    super::verify_op(op.client_sig.clone(), DataCmd::Register(op.write.clone()))
+                        .map_err(|_| {
+                            Error::Logic(
+                                "Received register operation signature is invalid".to_string(),
+                            )
+                        })?;
                 let _ = self.apply(op, data_auth)?;
             }
         }
@@ -119,7 +123,7 @@ impl RegisterStorage {
     ) -> Result<()> {
         let required_space = std::mem::size_of::<RegisterCmd>() as u64;
         if !self.used_space.can_consume(required_space).await {
-            return Err(Error::Database(crate::dbs::Error::NotEnoughSpace));
+            return Err(Error::NotEnoughSpace);
         }
         let op = RegisterCmd {
             write,

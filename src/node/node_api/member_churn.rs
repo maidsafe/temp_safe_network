@@ -27,7 +27,7 @@ impl Node {
 
         //
         // start handling metadata
-        let meta_data = Metadata::new(capacity.clone(), self.register_store.clone()).await?;
+        let meta_data = Metadata::new(capacity.clone(), self.network_api.clone()).await?;
 
         *self.role.write().await = Role::Elder(ElderRole::new(meta_data, false));
 

@@ -11,6 +11,7 @@ use crate::messaging::{
     node::{NodeMsg, Section},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
+use crate::node::RegisterStorage;
 use crate::routing::{
     core::{Core, SendStatus},
     error::Result,
@@ -52,6 +53,10 @@ impl Dispatcher {
             cancel_timer_tx,
             cancel_timer_rx,
         }
+    }
+
+    pub(super) async fn get_register_storage(&self) -> RegisterStorage {
+        self.core.read().await.register_storage.clone()
     }
 
     /// Handles the given command and transitively any new commands that are produced during its
@@ -175,7 +180,7 @@ impl Dispatcher {
                 .into_iter()
                 .collect()),
             Command::HandleRelocationComplete { node, section } => {
-                self.handle_relocation_complete(node, section).await;
+                self.handle_relocation_complete(node, section).await?;
                 Ok(vec![])
             }
             Command::SetJoinsAllowed(joins_allowed) => {
@@ -348,17 +353,19 @@ impl Dispatcher {
         }
     }
 
-    async fn handle_relocation_complete(&self, new_node: Node, new_section: Section) {
+    async fn handle_relocation_complete(&self, new_node: Node, new_section: Section) -> Result<()> {
         let previous_name = self.core.read().await.node().name();
         let new_keypair = new_node.keypair.clone();
 
         let mut core = self.core.write().await;
-        *core = core.relocated(new_node, new_section).await;
+        *core = core.relocated(new_node, new_section).await?;
 
         core.send_event(Event::Relocated {
             previous_name,
             new_keypair,
         })
         .await;
+
+        Ok(())
     }
 }

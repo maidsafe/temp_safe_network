@@ -24,7 +24,7 @@ use crate::node::RegisterStorage;
 
 use crate::routing::{
     core::{ConnectionEvent, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
-    create_test_register_store,
+    create_test_used_space_and_root_storage,
     dkg::{
         test_utils::{prove, section_signed},
         ProposalUtils,
@@ -70,11 +70,13 @@ static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 async fn receive_matching_get_section_request_as_elder() -> Result<()> {
     let node = create_node(MIN_ADULT_AGE, None);
     let node_name = node.name();
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::first_node(
         create_comm().await?,
         node,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
+        used_space,
+        root_storage_dir
     )?;
     let node_section_pk = *core.section().chain().last_key();
     let section_auth = core.section().authority_provider().clone();
@@ -132,14 +134,16 @@ async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
 
     let node = create_node(MIN_ADULT_AGE, Some(good_prefix));
     let node_name = node.name();
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         None,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let node_section_pk = *core.section().chain().last_key();
     let dispatcher = Dispatcher::new(core);
 
@@ -198,11 +202,13 @@ async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
 #[tokio::test]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let node = create_node(FIRST_SECTION_MIN_AGE, None);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::first_node(
         create_comm().await?,
         node,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
+        used_space,
+        root_storage_dir
     )?;
     let dispatcher = Dispatcher::new(core);
 
@@ -252,11 +258,13 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 #[tokio::test]
 async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let node = create_node(FIRST_SECTION_MIN_AGE, None);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::first_node(
         create_comm().await?,
         node,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
+        used_space,
+        root_storage_dir
     )?;
     let dispatcher = Dispatcher::new(core);
 
@@ -332,14 +340,16 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
     let node = nodes.remove(0);
     let node_name = node.name();
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     let relocated_node_old_keypair =
@@ -422,14 +432,16 @@ async fn aggregate_proposals() -> Result<()> {
     let sk_set = SecretKeySet::random();
     let pk_set = sk_set.public_keys();
     let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         nodes[0].clone(),
         section.clone(),
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     let new_peer = create_peer(MIN_AGE);
@@ -502,14 +514,16 @@ async fn handle_agreement_on_online() -> Result<()> {
     let sk_set = SecretKeySet::random();
     let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
     let node = nodes.remove(0);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         event_tx,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     let new_peer = create_peer(MIN_AGE);
@@ -560,14 +574,16 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let node = nodes.remove(0);
     let node_name = node.name();
     let section_key_share = create_section_key_share(&sk_set, 0);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     // Handle agreement on Online of a peer that is older than the youngest
@@ -723,14 +739,16 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     // Make a Node
     let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let state = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         event_tx,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(state);
 
     // Simulate peer with the same name is rejoin and verify resulted behaviours.
@@ -786,14 +804,16 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         event_tx,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     let node_state = NodeState {
@@ -839,6 +859,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     // Create our node
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let node = nodes.remove(0);
     let node_name = node.name();
     let core = Core::new(
@@ -847,8 +868,9 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         section,
         Some(section_key_share),
         event_tx,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     // Handle agreement on the Offline proposal
@@ -948,14 +970,16 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
 
     let node = create_node(MIN_ADULT_AGE, None);
     let node_name = node.name();
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section.clone(),
         None,
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     // Create a any message signed by a key not known to the node.
@@ -1074,14 +1098,16 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
     };
 
     // Create our node.
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section.clone(),
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     // Create the bounced message, indicating the last key the peer knows is `pk0`
@@ -1154,14 +1180,16 @@ async fn handle_sync() -> Result<()> {
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let section_key_share = create_section_key_share(&sk1_set, 0);
     let node = nodes.remove(0);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         old_section,
         Some(section_key_share),
         event_tx,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     // Create new `Section` as a successor to the previous one.
@@ -1251,14 +1279,16 @@ async fn handle_untrusted_sync() -> Result<()> {
 
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = create_node(MIN_ADULT_AGE, None);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         old_section,
         None,
         event_tx,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     let sender = create_node(MIN_ADULT_AGE, None);
@@ -1338,14 +1368,16 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
     let section_key_share = create_section_key_share(&sk2_set, 0);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node.clone(),
         section_full.clone(),
         Some(section_key_share),
         event_tx,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     let original_node_msg = NodeMsg::Sync {
@@ -1430,14 +1462,16 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     assert!(section.update_member(node_state));
     let node = nodes.remove(0);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     let relocated_peer = match relocated_peer_role {
@@ -1531,7 +1565,9 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         comm_tx,
     )
     .await?;
-    let core = Core::first_node(comm, node, event_tx, create_test_register_store()?)?;
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
+
+    let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir)?;
     let node = core.node().clone();
     let section_pk = *core.section_chain().last_key();
     let dispatcher = Dispatcher::new(core);
@@ -1632,14 +1668,16 @@ async fn handle_elders_update() -> Result<()> {
     };
 
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section0.clone(),
         Some(section_key_share),
         event_tx,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     let commands = dispatcher
@@ -1738,14 +1776,16 @@ async fn handle_demote_during_split() -> Result<()> {
     }
 
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (used_space, root_storage_dir ) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         event_tx,
-        create_test_register_store()?,
-    );
+        used_space,
+        root_storage_dir
+    )?;
     let dispatcher = Dispatcher::new(core);
 
     let sk_set_v1_p0 = SecretKeySet::random();

@@ -9,7 +9,7 @@
 use crate::dbs;
 use crate::messaging::{data::Error as ErrorMessage, MessageId, WireMsg};
 use crate::routing::Prefix;
-use crate::types::{DataAddress, Error as DtError, PublicKey};
+use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;
@@ -183,15 +183,5 @@ pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
         other => {
             ErrorMessage::InvalidOperation(format!("Failed to perform operation: {:?}", other))
         }
-    }
-}
-pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> ErrorMessage {
-    match error {
-        DtError::InvalidOperation => {
-            ErrorMessage::InvalidOperation("DtError::InvalidOperation".to_string())
-        }
-        DtError::NoSuchEntry => ErrorMessage::NoSuchEntry,
-        DtError::AccessDenied(pk) => ErrorMessage::AccessDenied(pk),
-        other => ErrorMessage::InvalidOperation(format!("DtError: {:?}", other)),
     }
 }

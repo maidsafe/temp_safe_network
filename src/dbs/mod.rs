@@ -17,6 +17,6 @@ pub(crate) use data_store::{
     data::{Data, DataId},
     DataStore, Subdir,
 };
-pub(crate) use errors::Error;
-use errors::Result;
+pub(crate) use errors::Result;
+pub(crate) use errors::{convert_to_error_message, Error};
 pub(crate) use register_op_store::RegisterOpStore;

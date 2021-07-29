@@ -6,11 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::messaging::data::Error as ErrorMessage;
+use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};
 use std::io;
 use thiserror::Error;
 
 /// Specialisation of `std::Result` for dbs.
-pub(super) type Result<T, E = Error> = std::result::Result<T, E>;
+pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
@@ -22,7 +24,22 @@ pub enum Error {
     NotEnoughSpace,
     /// Key not found.
     #[error("Key not found")]
-    KeyNotFound(String),
+    KeyNotFound(DataAddress),
+    /// Sled Failed to create the database
+    #[error("Could not create the register database")]
+    UnableToCreateRegisterDb,
+    /// Key, Value pair not found.
+    #[error("No such data: {0:?}")]
+    NoSuchData(DataAddress),
+    /// Chunk already exists for this node
+    #[error("Data already exists at this node")]
+    DataExists,
+    /// Data owner provided is invalid.
+    #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
+    InvalidOwner(PublicKey),
+    /// Logic error.
+    #[error("Logic error: {0}")]
+    Logic(String),
     /// Serialization error
     #[error("Serialization error: {0}")]
     Serialize(String),
@@ -50,4 +67,19 @@ pub enum Error {
     /// Operation is invalid, eg signing validation
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
+}
+
+/// Convert db error to messaging error message for sending over the network.
+pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
+    match error {
+        Error::NotEnoughSpace => ErrorMessage::FailedToWriteFile,
+        Error::KeyNotFound(address) => ErrorMessage::DataNotFound(address),
+        Error::NoSuchData(address) => ErrorMessage::DataNotFound(address),
+        Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
+        Error::DataExists => ErrorMessage::DataExists,
+        Error::NetworkData(error) => convert_dt_error_to_error_message(error),
+        other => {
+            ErrorMessage::InvalidOperation(format!("Failed to perform operation: {:?}", other))
+        }
+    }
 }

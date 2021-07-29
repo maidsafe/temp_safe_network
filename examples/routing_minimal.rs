@@ -36,7 +36,7 @@
 use anyhow::Result;
 use futures::future::join_all;
 use safe_network::routing::{
-    create_test_register_store, Config, Event, EventStream, Routing, TransportConfig,
+    create_test_used_space_and_root_storage, Config, Event, EventStream, Routing, TransportConfig,
 };
 use std::{
     collections::HashSet,
@@ -196,9 +196,9 @@ async fn start_node(
         ..Default::default()
     };
 
-    let storage = create_test_register_store()?;
+    let (used_space, root) = create_test_used_space_and_root_storage()?;
 
-    let (node, event_stream) = Routing::new(config, storage)
+    let (node, event_stream) = Routing::new(config, used_space, root)
         .await
         .expect("Failed to instantiate a Node");
 

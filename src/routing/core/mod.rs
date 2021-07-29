@@ -18,11 +18,13 @@ mod msg_handling;
 mod signature_aggregator;
 mod split_barrier;
 
+use crate::dbs::UsedSpace;
 use crate::node::RegisterStorage;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub use signature_aggregator::Error as AggregatorError;
 pub(crate) use signature_aggregator::SignatureAggregator;
+use std::path::PathBuf;
 
 use self::{
     enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
@@ -71,7 +73,9 @@ pub(crate) struct Core {
     joins_allowed: bool,
     resource_proof: ResourceProof,
     end_users: EndUserRegistry,
-    register_storage: RegisterStorage,
+    used_space: UsedSpace,
+    pub(super) register_storage: RegisterStorage,
+    root_storage_dir: PathBuf,
 }
 
 impl Core {
@@ -82,14 +86,17 @@ impl Core {
         section: Section,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
-        register_storage: RegisterStorage,
-    ) -> Self {
+        used_space: UsedSpace,
+        root_storage_dir: PathBuf,
+    ) -> Result<Self> {
         let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share);
 
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
 
-        Self {
+        let register_storage = RegisterStorage::new(&root_storage_dir, used_space.clone())?;
+
+        Ok(Self {
             comm,
             node,
             section,
@@ -106,7 +113,9 @@ impl Core {
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             end_users: EndUserRegistry::new(),
             register_storage,
-        }
+            root_storage_dir: root_storage_dir.to_path_buf(),
+            used_space,
+        })
     }
 
     ////////////////////////////////////////////////////////////////////////////

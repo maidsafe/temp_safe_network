@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{delivery_group, Comm, Core};
+use crate::dbs::UsedSpace;
 use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, Section},
     EndUser, MessageId, SectionAuthorityProvider, SocketId, WireMsg,
 };
-use crate::node::RegisterStorage;
 use crate::routing::{
     error::Result,
     network::NetworkUtils,
@@ -23,6 +23,7 @@ use crate::routing::{
 };
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use tokio::sync::mpsc;
 use xor_name::{Prefix, XorName};
 
@@ -32,30 +33,33 @@ impl Core {
         comm: Comm,
         mut node: Node,
         event_tx: mpsc::Sender<Event>,
-        register_storage: RegisterStorage,
+        used_space: UsedSpace,
+        root_storage_dir: PathBuf,
     ) -> Result<Self> {
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
 
         let (section, section_key_share) = Section::first_node(node.peer())?;
-        Ok(Self::new(
+        Self::new(
             comm,
             node,
             section,
             Some(section_key_share),
             event_tx,
-            register_storage,
-        ))
+            used_space,
+            root_storage_dir,
+        )
     }
 
-    pub(crate) async fn relocated(&self, new_node: Node, new_section: Section) -> Self {
+    pub(crate) async fn relocated(&self, new_node: Node, new_section: Section) -> Result<Self> {
         Self::new(
             self.comm.clone(),
             new_node,
             new_section,
             None,
             self.event_tx.clone(),
-            self.register_storage.clone(),
+            self.used_space.clone(),
+            self.root_storage_dir.clone(),
         )
     }
 

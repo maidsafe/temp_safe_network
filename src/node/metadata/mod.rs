@@ -48,9 +48,9 @@ pub(crate) struct Metadata {
 }
 
 impl Metadata {
-    pub(crate) async fn new(capacity: Capacity, register_storage: RegisterStorage) -> Result<Self> {
+    pub(crate) async fn new(capacity: Capacity, network: Network) -> Result<Self> {
         let chunk_records = ChunkRecords::new(capacity);
-        let elder_stores = ElderStores::new(chunk_records, register_storage);
+        let elder_stores = ElderStores::new(chunk_records, network);
         Ok(Self { elder_stores })
     }
 

@@ -24,7 +24,7 @@ pub use chunk::{
     Address as ChunkAddress, Chunk, Kind as ChunkKind, PrivateChunk, PublicChunk,
     MAX_CHUNK_SIZE_IN_BYTES,
 };
-pub use errors::{Error, Result};
+pub use errors::{convert_dt_error_to_error_message, Error, Result};
 pub use keys::{
     keypair::{BlsKeypairShare, Keypair, OwnerType, Signing},
     node_keypairs::NodeKeypairs,

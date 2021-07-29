@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
+use crate::dbs::Error as DbError;
 use crate::messaging::{
     data::{
         CmdError, DataCmd, DataMsg, DataQuery, Error as ErrorMessage, ProcessMsg, RegisterRead,
@@ -15,7 +16,6 @@ use crate::messaging::{
     node::NodeMsg,
     Authority, DataSigned, DstLocation, EndUser, MessageId, MsgKind, WireMsg,
 };
-use crate::node::Error as NodeError;
 use crate::routing::{
     error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
     Event, SectionAuthorityProviderUtils,
@@ -27,7 +27,7 @@ impl Core {
     /// Forms a command to send the provided node error out
     fn send_error_response(
         &self,
-        error: NodeError,
+        error: DbError,
         target: EndUser,
         msg_id: MessageId,
     ) -> Result<Vec<Command>> {
@@ -51,6 +51,7 @@ impl Core {
         Ok(vec![command])
     }
 
+    /// Handle regsiter commands
     pub(crate) async fn handle_register_cmd(
         &self,
         msg_id: MessageId,
@@ -67,6 +68,7 @@ impl Core {
         }
     }
 
+    /// Handle register reads
     pub(crate) fn handle_register_read(
         &self,
         msg_id: MessageId,
@@ -106,6 +108,7 @@ impl Core {
         }
     }
 
+    /// Handle DataMsgs received
     pub(crate) async fn handle_data_msg_received(
         &self,
         msg_id: MessageId,
@@ -135,6 +138,8 @@ impl Core {
         }
     }
 
+    /// Handle incoming data msgs, determining if they should be handled at this node or fowrwarded
+    // TODO: streamline this as full AE for direct messaging is included.
     pub(crate) async fn handle_data_message(
         &mut self,
         sender: SocketAddr,

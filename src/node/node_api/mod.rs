@@ -17,7 +17,6 @@ use crate::dbs::UsedSpace;
 use crate::messaging::data::{DataMsg, ProcessingError};
 use crate::node::logging::log_ctx::LogCtx;
 use crate::node::logging::run_system_logger;
-use crate::node::metadata::RegisterStorage;
 use crate::node::{
     chunk_store::ChunkStore,
     error::convert_to_error_message,
@@ -39,7 +38,7 @@ use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -57,13 +56,6 @@ struct NodeInfo {
     reward_key: PublicKey,
 }
 
-impl NodeInfo {
-    ///
-    fn path(&self) -> &Path {
-        self.root_dir.as_path()
-    }
-}
-
 /// Main node struct.
 #[derive(custom_debug::Debug)]
 pub struct Node {
@@ -71,9 +63,6 @@ pub struct Node {
     network_api: Network,
     node_info: NodeInfo,
     used_space: UsedSpace,
-    // We instantiate this even if adult. It just won't be used until we're an elder.
-    // TODO: remove this from node once routing event loop is handling all our events
-    register_store: RegisterStorage,
     role: Arc<RwLock<Role>>,
 }
 
@@ -99,11 +88,9 @@ impl Node {
             reward_key,
         };
         let used_space = UsedSpace::new(config.max_capacity());
-        let register_store = RegisterStorage::new(node_info.path(), used_space.clone())?;
-
         let (network_api, network_events) = tokio::time::timeout(
             Duration::from_secs(JOINING_TIMEOUT),
-            Network::new(root_dir_buf.as_path(), config, register_store.clone()),
+            Network::new(root_dir_buf.as_path(), config, used_space.clone()),
         )
         .await
         .map_err(|_| Error::JoinTimeout)??;
@@ -116,7 +103,6 @@ impl Node {
             }))),
             node_info,
             used_space,
-            register_store,
             network_api: network_api.clone(),
         };
 
