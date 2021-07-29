@@ -227,53 +227,45 @@ impl RegisterStorage {
 
     /// --- Reading ---
 
-    pub(super) async fn read(
+    pub(crate) fn read(
         &self,
         read: &RegisterRead,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
-    ) -> Result<NodeDuty> {
+    ) -> Result<(QueryResponse, MessageId, EndUser)> {
         trace!("Reading register {:?}", read.dst_address());
         use RegisterRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, requester, origin).await,
-            Read(address) => {
-                self.read_register(*address, msg_id, requester, origin)
-                    .await
-            }
-            GetOwner(address) => self.get_owner(*address, msg_id, requester, origin).await,
+            Get(address) => self.get(*address, msg_id, requester, origin),
+            Read(address) => self.read_register(*address, msg_id, requester, origin),
+            GetOwner(address) => self.get_owner(*address, msg_id, requester, origin),
             GetUserPermissions { address, user } => {
                 self.get_user_permissions(*address, *user, msg_id, requester, origin)
-                    .await
             }
-            GetPolicy(address) => self.get_policy(*address, msg_id, requester, origin).await,
+            GetPolicy(address) => self.get_policy(*address, msg_id, requester, origin),
         }
     }
 
     /// Get entire Register.
-    async fn get(
+    fn get(
         &self,
         address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
-    ) -> Result<NodeDuty> {
-        let result = match self.get_register(&address, Action::Read, requester).await {
+    ) -> Result<(QueryResponse, MessageId, EndUser)> {
+        let result = match self.get_register(&address, Action::Read, requester) {
             Ok(register) => Ok(register),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(NodeDuty::Send(build_client_query_response(
-            QueryResponse::GetRegister(result),
-            msg_id,
-            origin,
-        )))
+        Ok((QueryResponse::GetRegister(result), msg_id, origin))
     }
 
     /// Get `Register` from the store and check permissions.
-    async fn get_register(
+    fn get_register(
         &self,
         address: &Address,
         action: Action,
@@ -295,57 +287,52 @@ impl RegisterStorage {
         Ok(state.clone())
     }
 
-    async fn read_register(
+    fn read_register(
         &self,
         address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
-    ) -> Result<NodeDuty> {
-        let result = match self.get_register(&address, Action::Read, requester).await {
+    ) -> Result<(QueryResponse, MessageId, EndUser)> {
+        let result = match self.get_register(&address, Action::Read, requester) {
             Ok(register) => register.read(Some(requester)).map_err(Error::from),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(error),
         };
 
-        Ok(NodeDuty::Send(build_client_query_response(
+        Ok((
             QueryResponse::ReadRegister(result.map_err(convert_to_error_message)),
             msg_id,
             origin,
-        )))
+        ))
     }
 
-    async fn get_owner(
+    fn get_owner(
         &self,
         address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
-    ) -> Result<NodeDuty> {
-        let result = match self.get_register(&address, Action::Read, requester).await {
+    ) -> Result<(QueryResponse, MessageId, EndUser)> {
+        let result = match self.get_register(&address, Action::Read, requester) {
             Ok(res) => Ok(res.owner()),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(NodeDuty::Send(build_client_query_response(
-            QueryResponse::GetRegisterOwner(result),
-            msg_id,
-            origin,
-        )))
+        Ok((QueryResponse::GetRegisterOwner(result), msg_id, origin))
     }
 
-    async fn get_user_permissions(
+    fn get_user_permissions(
         &self,
         address: Address,
         user: User,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
-    ) -> Result<NodeDuty> {
+    ) -> Result<(QueryResponse, MessageId, EndUser)> {
         let result = match self
             .get_register(&address, Action::Read, requester)
-            .await
             .and_then(|register| {
                 register
                     .permissions(user, Some(requester))
@@ -356,23 +343,22 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(NodeDuty::Send(build_client_query_response(
+        Ok((
             QueryResponse::GetRegisterUserPermissions(result),
             msg_id,
             origin,
-        )))
+        ))
     }
 
-    async fn get_policy(
+    fn get_policy(
         &self,
         address: Address,
         msg_id: MessageId,
         requester: PublicKey,
         origin: EndUser,
-    ) -> Result<NodeDuty> {
+    ) -> Result<(QueryResponse, MessageId, EndUser)> {
         let result = match self
             .get_register(&address, Action::Read, requester)
-            .await
             .and_then(|register| {
                 register
                     .policy(Some(requester))
@@ -384,11 +370,7 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(NodeDuty::Send(build_client_query_response(
-            QueryResponse::GetRegisterPolicy(result),
-            msg_id,
-            origin,
-        )))
+        Ok((QueryResponse::GetRegisterPolicy(result), msg_id, origin))
     }
 
     /// Load a register op store

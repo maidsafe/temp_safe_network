@@ -26,7 +26,7 @@ pub use self::{
     register::{RegisterCmd, RegisterRead, RegisterWrite},
 };
 
-use crate::messaging::MessageId;
+use crate::messaging::{data::Error as ErrorMessage, MessageId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     Chunk, PublicKey,
@@ -140,6 +140,57 @@ impl QueryResponse {
             ReadRegister(result) => result.is_ok(),
             GetRegisterPolicy(result) => result.is_ok(),
             GetRegisterUserPermissions(result) => result.is_ok(),
+        }
+    }
+
+    /// Returns true if data was not found
+    pub fn failed_with_data_not_found(&self) -> bool {
+        use QueryResponse::*;
+
+        // TODO: there has to be a better way of doing this...
+        match self {
+            GetChunk(result) => match result {
+                Ok(_) => false,
+                Err(error) => match error {
+                    &ErrorMessage::DataNotFound(_) => true,
+                    _ => false,
+                },
+            },
+            GetRegister(result) => match result {
+                Ok(_) => false,
+                Err(error) => match error {
+                    &ErrorMessage::DataNotFound(_) => true,
+                    _ => false,
+                },
+            },
+            GetRegisterOwner(result) => match result {
+                Ok(_) => false,
+                Err(error) => match error {
+                    &ErrorMessage::DataNotFound(_) => true,
+                    _ => false,
+                },
+            },
+            ReadRegister(result) => match result {
+                Ok(_) => false,
+                Err(error) => match error {
+                    &ErrorMessage::DataNotFound(_) => true,
+                    _ => false,
+                },
+            },
+            GetRegisterPolicy(result) => match result {
+                Ok(_) => false,
+                Err(error) => match error {
+                    &ErrorMessage::DataNotFound(_) => true,
+                    _ => false,
+                },
+            },
+            GetRegisterUserPermissions(result) => match result {
+                Ok(_) => false,
+                Err(error) => match error {
+                    &ErrorMessage::DataNotFound(_) => true,
+                    _ => false,
+                },
+            },
         }
     }
 }

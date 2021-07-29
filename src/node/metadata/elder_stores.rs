@@ -41,9 +41,8 @@ impl ElderStores {
         match &query {
             DataQuery::Blob(read) => self.chunk_records.read(read, msg_id, origin).await,
             DataQuery::Register(read) => {
-                self.register_storage
-                    .read(read, msg_id, requester, origin)
-                    .await
+                // This has been moved to routing/core/msg_handling
+                unimplemented!("Not reading Register in node duty flow anymore")
             }
         }
     }
