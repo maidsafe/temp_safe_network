@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.17.2](https://github.com/maidsafe/safe_network/compare/v0.17.1...v0.17.2) (2021-07-29)
+
+
+### Bug Fixes
+
+* **register:** load from disk if not in cache ([34ea897](https://github.com/maidsafe/safe_network/commit/34ea8979cc51b6470fe1592103bd1856a3cdb84d))
+
 ### [0.17.1](https://github.com/maidsafe/safe_network/compare/v0.17.0...v0.17.1) (2021-07-28)
 
 ## [0.17.0](https://github.com/maidsafe/safe_network/compare/v0.16.0...v0.17.0) (2021-07-27)
