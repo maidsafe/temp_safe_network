@@ -55,8 +55,8 @@ pub(super) struct Session {
     /// all elders we know about from SectionInfo messages
     network: PrefixMap<SectionAuthorityProvider>,
     section_prefix: Arc<RwLock<Option<Prefix>>>,
+    aggregator: Arc<RwLock<SignatureAggregator>>,
     is_connecting_to_new_elders: bool,
-    aggregator: Arc<SignatureAggregator>,
 }
 
 impl Session {
@@ -79,8 +79,8 @@ impl Session {
             our_section: Arc::new(RwLock::new(Default::default())),
             network: PrefixMap::new(),
             section_prefix: Arc::new(RwLock::new(None)),
+            aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             is_connecting_to_new_elders: false,
-            aggregator: Arc::new(SignatureAggregator::new()),
         })
     }
 
@@ -99,11 +99,11 @@ impl Session {
         }
     }
 
-    pub(super) async fn section_key(&self) -> Result<PublicKey, Error> {
+    pub(super) async fn section_key(&self) -> Result<bls::PublicKey, Error> {
         let keys = self.section_key_set.read().await.clone();
 
         match keys.borrow() {
-            Some(section_key_set) => Ok(PublicKey::Bls(section_key_set.public_key())),
+            Some(section_key_set) => Ok(section_key_set.public_key()),
             None => {
                 trace!("self.section_key_set.borrow() was None");
                 Err(Error::NotBootstrapped)
@@ -111,12 +111,13 @@ impl Session {
         }
     }
 
-    pub fn aggregate_incoming_message(
+    #[allow(unused)]
+    pub(crate) async fn aggregate_incoming_message(
         &mut self,
         bytes: Vec<u8>,
         sig_share: SigShare,
     ) -> Result<Option<Vec<u8>>, Error> {
-        match self.aggregator.add(&bytes, sig_share) {
+        match self.aggregator.write().await.add(&bytes, sig_share) {
             Ok(key_sig) => {
                 if key_sig.public_key.verify(&key_sig.signature, &bytes) {
                     Ok(Some(bytes))

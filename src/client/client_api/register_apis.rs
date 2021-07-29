@@ -550,7 +550,7 @@ mod tests {
                 ..
             }) => {}
             Err(err) => bail!(
-                "Unexpected error returned when attempting to delete a Public Register: {}",
+                "Unexpected error returned when attempting to delete a Public Register: {:?}",
                 err
             ),
             Ok(()) => {}
