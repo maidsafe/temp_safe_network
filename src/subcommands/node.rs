@@ -34,6 +34,10 @@ pub enum NodeSubCommands {
         /// Path where to install sn_node executable (default ~/.safe/node/). The SN_NODE_PATH env var can also be used to set the path
         #[structopt(long = "node-path", env = "SN_NODE_PATH")]
         node_path: Option<PathBuf>,
+        /// Specify the version of sn_node to install. If not supplied, the latest version will be
+        /// installed. Note: just the version number should be supplied, with no 'v' prefix.
+        #[structopt(short = "v", long)]
+        version: Option<String>,
     },
     #[structopt(name = "join")]
     /// Join an already running network
@@ -102,10 +106,10 @@ pub enum NodeSubCommands {
 pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
     match cmd {
         Some(NodeSubCommands::BinVersion { node_path }) => node_version(node_path),
-        Some(NodeSubCommands::Install { node_path }) => {
+        Some(NodeSubCommands::Install { node_path, version }) => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
-            let handler = std::thread::spawn(|| node_install(node_path));
+            let handler = std::thread::spawn(|| node_install(node_path, version));
             handler
                 .join()
                 .map_err(|err| anyhow!("Failed to run self update: {:?}", err))?

@@ -21,6 +21,7 @@ pub fn download_and_install_github_release_asset(
     target_path: PathBuf,
     exec_file_name: &str,
     repo_name: &str,
+    version: Option<String>,
 ) -> Result<String> {
     let target = get_target();
     let updater = self_update::backends::github::Update::configure()
@@ -34,9 +35,19 @@ pub fn download_and_install_github_release_asset(
             "Error fetching list of releases for maidsafe/{} repository",
             repo_name
         ))?;
-    let release = updater
-        .get_latest_release()
-        .context("Failed to find a release available to install")?;
+    let release;
+    if let Some(version) = version {
+        release = updater
+            .get_release_version(format!("v{}", version).as_str())
+            .context(format!(
+                "The maidsafe/{} repository has no release at version {}",
+                repo_name, version
+            ))?;
+    } else {
+        release = updater
+            .get_latest_release()
+            .context("Failed to find a release available to install")?;
+    }
     download_and_install_bin(target_path, &target, release, exec_file_name)
 }
 

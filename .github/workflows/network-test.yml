@@ -39,6 +39,19 @@ jobs:
           echo "$HOME/.safe/cli" >> $GITHUB_PATH
           echo "$HOME/.safe/node" >> $GITHUB_PATH
           chmod +x $HOME/.safe/cli/safe
+      - name: Test safe node install with specfic version
+        run: |
+          safe node install --version 0.10.0
+          sn_node_version=$(sn_node --version | awk '{print $2}')
+          if [[ "$sn_node_version" != "0.10.0" ]]; then
+            echo "The `safe node install --version` command should install the correct version."
+            echo "Expected version: 0.10.0"
+            echo "Version reported by sn_node: $sn_node_version"
+            exit 1
+          fi
+          # Clean this old version so that the next step installs the latest one
+          # to be used in the rest of the tests.
+          rm $HOME/.safe/node/sn_node
       - name: Test safe node install
         run: |
           safe node install

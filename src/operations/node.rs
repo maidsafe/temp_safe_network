@@ -97,15 +97,19 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
 }
 
 #[cfg(not(feature = "self-update"))]
-pub fn node_install(_vault_path: Option<PathBuf>) -> Result<()> {
+pub fn node_install(_vault_path: Option<PathBuf>, version: Option<String>) -> Result<()> {
     anyhow!("Self updates are disabled")
 }
 
 #[cfg(feature = "self-update")]
-pub fn node_install(node_path: Option<PathBuf>) -> Result<()> {
+pub fn node_install(node_path: Option<PathBuf>, version: Option<String>) -> Result<()> {
     let target_path = get_node_bin_path(node_path)?;
-    let _ =
-        download_and_install_github_release_asset(target_path, SN_NODE_EXECUTABLE, "safe_network")?;
+    let _ = download_and_install_github_release_asset(
+        target_path,
+        SN_NODE_EXECUTABLE,
+        "safe_network",
+        version,
+    )?;
     Ok(())
 }
 
