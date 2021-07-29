@@ -76,7 +76,7 @@ impl Client {
         let client_pk = keypair.public_key();
 
         // Create the session with the network
-        let mut session = Session::new(client_pk, qp2p_config, err_sender)?;
+        let mut session = Session::new(client_pk, config.qp2p, err_sender)?;
 
         // Bootstrap to the network, connecting to the section responsible
         // for our client public key

@@ -252,6 +252,7 @@ impl WireMsg {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::PublicKey;
     use crate::{
         messaging::{
             data::{ChunkRead, DataQuery, ServiceMsg, StorageLevel},
@@ -274,7 +275,10 @@ mod tests {
             section_pk: dst_section_pk,
         };
 
-        let query = SectionInfoMsg::GetSectionQuery(dst_section_pk.into());
+        let query = SectionInfoMsg::GetSectionQuery {
+            name: XorName::from(PublicKey::from(dst_section_pk)),
+            is_bootstrapping: true,
+        };
 
         let wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
         let serialized = wire_msg.serialize()?;
@@ -308,8 +312,10 @@ mod tests {
             name: dst_name,
             section_pk: dst_section_pk,
         };
-
-        let query = SectionInfoMsg::GetSectionQuery(dst_section_pk.into());
+        let query = SectionInfoMsg::GetSectionQuery {
+            name: XorName::from(PublicKey::from(dst_section_pk)),
+            is_bootstrapping: true,
+        };
 
         let mut wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
         let serialized = wire_msg.serialize()?;

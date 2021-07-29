@@ -58,7 +58,7 @@ use resource_proof::ResourceProof;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-
+use std::path::PathBuf;
 use xor_name::{Prefix, XorName};
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;

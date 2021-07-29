@@ -28,8 +28,10 @@ use rand::prelude::SliceRandom;
 use rand::rngs::OsRng;
 
 use super::{QueryResult, Session};
+use bls::SecretKey;
+use tokio::time::sleep;
 
-// Number of attemps when retrying to send a message to a node
+// Number of attempts when retrying to send a message to a node
 const NUMBER_OF_RETRIES: usize = 3;
 // Number of Elders subset to send queries to
 const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
@@ -100,20 +102,33 @@ impl Session {
         targets: usize,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint()?.clone();
+        let section_pk = self.section_key().await?;
+        let data_name = cmd.dst_address();
 
-        let elders = self
+        self.get_section_for(data_name).await?;
+
+        // Wait for 2 seconds to receive SAP
+        let _ = sleep(Duration::from_secs(2));
+
+        let our_elders = self
             .our_section
             .read()
             .await
-            .keys()
+            .values()
             .cloned()
             .collect::<Vec<SocketAddr>>();
 
-        if targets < elders.len() {
-            elders.shuffle(&mut OsRng);
-        }
-
-        elders = elders.into_iter().take(targets).collect();
+        // Get DataSection elders details. Resort to own section if DataSection is not available.
+        let (elders, section_pk) = self
+            .network
+            .get_matching(&data_name)
+            .map(|sap| {
+                (
+                    sap.elders.values().cloned().collect::<Vec<SocketAddr>>(),
+                    sap.public_key_set.public_key(),
+                )
+            })
+            .unwrap_or_else(|| (our_elders, section_pk));
 
         let msg_id = MessageId::new();
         debug!(
@@ -130,14 +145,8 @@ impl Session {
             msg_id
         );
 
-        let section_pk = self
-            .section_key()
-            .await?
-            .bls()
-            .ok_or(Error::NoBlsSectionKey)?;
-
         let dst_location = DstLocation::Section {
-            name: dst_address,
+            name: data_name,
             section_pk,
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
@@ -198,29 +207,43 @@ impl Session {
             None
         };
 
-        let section_pk = self
-            .section_key()
-            .await?
-            .bls()
-            .ok_or(Error::NoBlsSectionKey)?;
+        let data_name = query.dst_address();
 
-        let data_name = query.dst_name();
+        self.get_section_for(data_name).await?;
 
-        let msg_bytes = wire_msg.serialize()?;
-        // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest
-        // connected Elders to the data we are querying
-        let elders: Vec<SocketAddr> = self
-            .our_section
-            .read()
-            .await
-            .clone()
+        // Wait for 2 seconds to receive SAP
+        let _ = sleep(Duration::from_secs(2));
+
+        let our_section = self.our_section.read().await.clone();
+        let our_section_pk = self.section_key().await?;
+
+        // Get DataSection elders details. Resort to own section if DataSection is not available.
+        let (elders, section_pk) = self.network.get_matching(&data_name).map_or_else(
+            || (our_section, our_section_pk),
+            |sap| (sap.elders.clone(), sap.public_key_set.public_key()),
+        );
+
+        // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
+        let chosen_elders = elders
             .into_iter()
             .sorted_by(|(lhs_name, _), (rhs_name, _)| data_name.cmp_distance(lhs_name, rhs_name))
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
             .map(|(_, addr)| addr)
-            .collect();
+            .collect::<Vec<SocketAddr>>();
 
-        let elders_len = elders.len();
+        let msg_id = MessageId::new();
+        let wire_msg = WireMsg::new_msg(
+            msg_id,
+            payload,
+            MsgKind::ServiceMsg(auth),
+            DstLocation::Section {
+                name: data_name,
+                section_pk,
+            },
+        )?;
+        let msg_bytes = wire_msg.serialize()?;
+
+        let elders_len = chosen_elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES {
             error!(
                 "Not enough Elder connections: {}, minimum required: {}",
@@ -237,7 +260,7 @@ impl Session {
             msg_id,
             endpoint.socket_addr(),
             elders_len,
-            elders
+            chosen_elders
         );
 
         // We send the same message to all Elders concurrently
@@ -268,7 +291,7 @@ impl Session {
         let msg_bytes = wire_msg.serialize()?;
 
         // Set up response listeners
-        for socket in elders {
+        for socket in chosen_elders {
             let endpoint = endpoint.clone();
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
@@ -293,7 +316,7 @@ impl Session {
                         result = Err(Error::SendingQuery);
                         if attempt <= NUMBER_OF_RETRIES {
                             let millis = 2_u64.pow(attempt as u32 - 1) * 100;
-                            tokio::time::sleep(std::time::Duration::from_millis(millis)).await
+                            sleep(std::time::Duration::from_millis(millis)).await
                         }
                     } else {
                         trace!("ServiceMsg with id: {:?}, sent to {}", &msg_id, &socket);
@@ -429,26 +452,27 @@ impl Session {
         name: XorName,
         bootstrapped_peer: &SocketAddr,
     ) -> Result<(), Error> {
-        if self.is_connecting_to_new_elders {
-            // This should ideally be unreachable code. Leaving it while this is a WIP
-            error!("Already attempting elder connections, not sending section query until that is complete.");
-            return Ok(());
-        }
-
         trace!(
             "Querying for section info from bootstrapped node: {:?}",
             bootstrapped_peer
         );
 
         let msg_id = MessageId::new();
-        let query = SectionInfoMsg::GetSectionQuery(name);
+        let query = SectionInfoMsg::GetSectionQuery {
+            name,
+            is_bootstrapping: true,
+        };
+
         let payload = WireMsg::serialize_msg_payload(&query)?;
-        let msg_kind = MsgKind::SectionInfoMsg;
+
+        // Random section PK since we have no knowledge in the beginning
+        let random_section_pk = SecretKey::random().public_key();
+
         let dst_location = DstLocation::Section {
-            name: dst_section_name,
+            name,
             section_pk: random_section_pk,
         };
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, MsgKind::SectionInfoMsg, dst_location)?;
         let priority = wire_msg.msg_kind().priority();
         let msg_bytes = wire_msg.serialize()?;
 
@@ -475,20 +499,33 @@ impl Session {
         Ok(())
     }
 
-    pub async fn get_section_for(&self, name: XorName) -> Result<(), Error> {
-        let query = SectionInfoMsg::GetSectionQuery(name);
+    pub(crate) async fn get_section_for(&self, name: XorName) -> Result<(), Error> {
+        let query = SectionInfoMsg::GetSectionQuery {
+            name,
+            is_bootstrapping: false,
+        };
+
         let payload = WireMsg::serialize_msg_payload(&query)?;
-        let msg_kind = MsgKind::SectionInfoMsg;
+
+        // Random section PK since we have no knowledge
+        let random_section_pk = SecretKey::random().public_key();
+
         let dst_location = DstLocation::Section {
-            name: dst_section_name,
+            name,
             section_pk: random_section_pk,
         };
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+
+        let wire_msg = WireMsg::new_msg(
+            MessageId::new(),
+            payload,
+            MsgKind::SectionInfoMsg,
+            dst_location,
+        )?;
         let msg_bytes = wire_msg.serialize()?;
 
         for addr in self.our_section.read().await.values() {
             let msg_bytes = msg_bytes.clone();
-            self.endpoint?.send_message(msg_bytes, addr).await?;
+            self.endpoint()?.send_message(msg_bytes, addr).await?;
         }
 
         Ok(())
@@ -505,10 +542,10 @@ impl Session {
         }
 
         {
-            let mut session_elders = self.our_section.write().await;
+            let session_elders = self.our_section.write().await;
             trace!("Connecting to {} of our Elders.", session_elders.len());
             for (_, addr) in session_elders.iter() {
-                self.endpoint?.connect_to(addr).await?
+                self.endpoint()?.connect_to(addr).await?
             }
         }
 

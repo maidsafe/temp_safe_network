@@ -124,25 +124,26 @@ impl Session {
 
     // Apply updated info to a network session, and trigger connections
     async fn update_session_info(&mut self, sap: &SectionAuthorityProvider) -> Result<(), Error> {
-        self.network.insert(sap.clone());
+        let _ = self.network.insert(sap.clone());
 
         if sap.prefix.matches(&XorName::from(self.client_pk)) {
-            // Update session key set
-            let mut keyset = self.section_key_set.write().await;
-            if *keyset == Some(sap.public_key_set.clone()) {
-                trace!("We have previously received the key set already.");
-                return Ok(());
-            }
-
-            *keyset = Some(sap.public_key_set.clone());
             {
-                // update section prefix
-                let mut prefix = self.section_prefix.write().await;
-                *prefix = Some(sap.prefix);
-            }
+                // Update session key set
+                let mut keyset = self.section_key_set.write().await;
+                if *keyset == Some(sap.public_key_set.clone()) {
+                    trace!("We have previously received the key set already.");
+                    return Ok(());
+                }
 
-            debug!("Connecting to new set of Elders: {:?}", received_elders);
-            let new_elder_addresses = received_elders.values().cloned().collect::<BTreeSet<_>>();
+                *keyset = Some(sap.public_key_set.clone());
+                {
+                    // update section prefix
+                    let mut prefix = self.section_prefix.write().await;
+                    *prefix = Some(sap.prefix);
+                }
+            }
+            let new_elder_addresses = sap.elders.values().cloned().collect::<BTreeSet<_>>();
+            debug!("Connecting to new set of Elders: {:?}", new_elder_addresses);
             let updated_contacts = new_elder_addresses.iter().cloned().collect::<Vec<_>>();
             let old_elders = self
                 .our_section
@@ -169,7 +170,6 @@ impl Session {
     async fn handle_client_msg(&self, msg_id: MessageId, msg: ServiceMsg, src: SocketAddr) {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = self.pending_queries.clone();
-        let inquiry_queries = self.pending_inquiries.clone();
         let error_sender = self.incoming_err_sender.clone();
 
         let _ = tokio::spawn(async move {
@@ -213,7 +213,7 @@ impl Session {
                     let _ = error_sender.send(error.clone()).await;
 
                     match error {
-                        CmdError::Data(_error) | CmdError::Payment(PaymentError(_error)) => {
+                        CmdError::Data(_error) => {
                             // do nothing just yet
                         }
                     }
