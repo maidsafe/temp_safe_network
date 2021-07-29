@@ -147,8 +147,15 @@ impl NetworkUtils for Network {
             return false;
         }
 
-        // TODO: Let's make sure the proof chain can be trusted,
+        // Make sure the proof chain can be trusted,
         // i.e. check each key is signed by its parent/predecesor key.
+        if !proof_chain.self_verify() {
+            trace!(
+                "Failed to update remote section knowledge, proof chain contains invalid signatures: {:?}",
+                proof_chain
+            );
+            return false;
+        }
 
         // Check the SAP's key is the last key of the proof chain
         if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
@@ -159,40 +166,46 @@ impl NetworkUtils for Network {
             return false;
         }
 
-        // We currently don't keep the complete chain of remote sections (TODO??),
+        // We currently don't keep the complete chain of remote sections,
         // **but** the SAPs of remote sections we keep were already verified by us
         // as trusted before we store them in our local records.
         // Thus, we just need to check our knowledge of the remote section's key
         // is part of the proof chain received.
-        let is_sap_trusted = match self.sections.get(&signed_section_auth.value.prefix) {
+        match self.sections.get(&signed_section_auth.value.prefix) {
             Some(sap) if sap == &signed_section_auth => {
                 // It's the same SAP we are already aware of
+                trace!(
+                    "Skip update remote section knowledge, SAP received is the same as the one we already are aware of: {:?}",
+                    signed_section_auth.value
+                );
                 return false;
             }
             Some(sap) => {
-                // We are then aware of the prefix, let's just verify
-                // the new SAP can be trusted based on the SAP we
-                // aware of and the proof chain provided.
-                proof_chain.has_key(&sap.value.public_key_set.public_key())
+                // We are then aware of the prefix, let's just verify the new SAP can
+                // be trusted based on the SAP we aware of and the proof chain provided.
+                if !proof_chain.has_key(&sap.value.public_key_set.public_key()) {
+                    trace!(
+                        "Failed to update remote section knowledge, SAP cannot be trusted: {:?}",
+                        signed_section_auth.value
+                    );
+                    return false;
+                }
             }
             None => {
-                // We are not aware of the prefix, let's then verify
-                // it can be trusted based on our own section chain and the
-                // provided proof chain.
-                our_section_chain.check_trust(proof_chain.keys())
+                // We are not aware of the prefix, let's then verify it can be
+                // trusted based on our own section chain and the provided proof chain.
+                if !proof_chain.check_trust(our_section_chain.keys()) {
+                    trace!(
+                        "Failed to update remote section knowledge, cannot trust proof chain received for SAP: {:?}",
+                        signed_section_auth.value
+                    );
+                    return false;
+                }
             }
-        };
-
-        if !is_sap_trusted {
-            trace!(
-                "Failed to update remote section knowledge, SAP cannot be trusted: {:?}",
-                signed_section_auth.value
-            );
-            return false;
         }
 
         // We can now update our knowledge of the remote section's SAP.
-        // Note: we don't expect the the same SAP to be found in our records
+        // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
         let _ = self.sections.insert(signed_section_auth);
 
