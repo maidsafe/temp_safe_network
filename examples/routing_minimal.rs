@@ -35,7 +35,9 @@
 
 use anyhow::Result;
 use futures::future::join_all;
-use safe_network::routing::{Config, Event, EventStream, Routing, TransportConfig};
+use safe_network::routing::{
+    create_test_register_store, Config, Event, EventStream, Routing, TransportConfig,
+};
 use std::{
     collections::HashSet,
     convert::TryInto,
@@ -43,18 +45,9 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
 };
 use structopt::StructOpt;
-use tempfile::tempdir;
 use tokio::task::JoinHandle;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-
-use safe_network::node::RegisterStorage;
-use safe_network::UsedSpace;
-use std::path::Path;
-
-use rand::{distributions::Alphanumeric, Rng};
-
-const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
 
 /// Minimal example node.
 #[derive(Debug, StructOpt)]
@@ -203,16 +196,7 @@ async fn start_node(
         ..Default::default()
     };
 
-    let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
-    let tmp_dir = tempdir()?;
-
-    let register: String = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(7)
-        .map(char::from)
-        .collect();
-    let storage_dir = tmp_dir.into_path().join(Path::new(&register));
-    let storage = RegisterStorage::new(&storage_dir, used_space)?;
+    let storage = create_test_register_store()?;
 
     let (node, event_stream) = Routing::new(config, storage)
         .await
