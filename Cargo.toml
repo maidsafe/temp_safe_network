@@ -16,9 +16,18 @@ incremental = true
 [[bench]]
 name = "put"
 harness = false
+required-features = ["testing"]
+
+[[example]]
+name = "client_blob"
+required-features = ["testing"]
+
+[[example]]
+name = "network_split"
+required-features = ["testing"]
 
 [features]
-default = ["testing"]
+default = []
 always-joinable = []
 chaos = []
 client = ["qp2p/no-igd"]
