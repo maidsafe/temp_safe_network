@@ -21,7 +21,7 @@ mod network;
 mod node_api;
 mod node_ops;
 
-/// TODO: make these intrnal only once routing/node are collapsed
+/// TODO: make these internal only once routing/node are collapsed
 /// Storage interface for register data type
 pub use metadata::RegisterStorage;
 

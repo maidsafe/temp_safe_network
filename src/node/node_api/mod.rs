@@ -71,7 +71,7 @@ pub struct Node {
     network_api: Network,
     node_info: NodeInfo,
     used_space: UsedSpace,
-    // We instantiate this even if adult. It just won't be used, but makes it easier keep once storage instance going on.
+    // We instantiate this even if adult. It just won't be used until we're an elder.
     // TODO: remove this from node once routing event loop is handling all our events
     register_store: RegisterStorage,
     role: Arc<RwLock<Role>>,
