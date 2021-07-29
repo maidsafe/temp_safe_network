@@ -9,8 +9,8 @@
 mod agreement;
 mod anti_entropy;
 mod bad_msgs;
-mod dkg;
 mod data_msgs;
+mod dkg;
 mod join;
 mod proposals;
 mod relocation;
