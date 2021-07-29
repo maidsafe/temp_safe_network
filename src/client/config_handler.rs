@@ -16,7 +16,7 @@ use tokio::io::{self};
 use tracing::{debug, warn};
 
 /// Defaul amount of time to wait for responses to queries before giving up and returning an error.
-pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(20);
+pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// Configuration for sn_client.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
