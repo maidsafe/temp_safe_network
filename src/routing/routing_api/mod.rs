@@ -73,7 +73,7 @@ impl Routing {
         let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
         let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
 
-        let (core, backlog) = if config.first {
+        let core = if config.first {
             // Genesis node having a fix age of 255.
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
             let node_name = ed25519::name(&keypair.public);
@@ -105,7 +105,7 @@ impl Routing {
             .await;
             info!("{} Genesis node started!", node_name);
 
-            (core, vec![])
+            core
         } else {
             let keypair = config.keypair.unwrap_or_else(|| {
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE)
@@ -123,7 +123,7 @@ impl Routing {
                 bootstrap_addr
             );
             let joining_node = Node::new(keypair, comm.our_connection_info());
-            let (node, section, backlog) = join_network(
+            let (node, section) = join_network(
                 joining_node,
                 &comm,
                 &mut connection_event_rx,
@@ -133,16 +133,11 @@ impl Routing {
             let core = Core::new(comm, node, section, None, event_tx);
             info!("{} Joined the network!", core.node().name());
 
-            (core, backlog)
+            core
         };
 
         let dispatcher = Arc::new(Dispatcher::new(core));
         let event_stream = EventStream::new(event_rx);
-
-        // Process message backlog
-        for cmd in backlog {
-            dispatcher.clone().handle_commands(cmd).await?;
-        }
 
         // Start listening to incoming connections.
         let _ = task::spawn(handle_connection_events(
