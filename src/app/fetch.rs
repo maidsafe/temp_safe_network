@@ -581,6 +581,7 @@ mod tests {
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         assert!(
             content
@@ -588,7 +589,7 @@ mod tests {
                     xorurl: xorurl.clone(),
                     xorname: safe_url.xorname(),
                     type_tag: 1_100,
-                    version: 0,
+                    version: version0,
                     files_map,
                     data_type: SafeDataType::PublicRegister,
                     resolved_from: xorurl.clone(),
@@ -620,9 +621,10 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(VersionHash::default()));
+        safe_url.set_content_version(Some(version0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
             .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
             .await?;
@@ -647,7 +649,7 @@ mod tests {
                 assert_eq!(*xorurl, xorurl_without_subname);
                 assert_eq!(*xorname, safe_url.xorname());
                 assert_eq!(*type_tag, 1_100);
-                assert_eq!(*version, 0);
+                assert_eq!(*version, version0);
                 assert_eq!(*data_type, SafeDataType::PublicRegister);
                 assert_eq!(*files_map, the_files_map);
 

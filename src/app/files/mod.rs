@@ -1261,13 +1261,15 @@ mod tests {
         assert_eq!(files_map.len(), 0);
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         // let's add a file
         let (version, new_processed_files, new_files_map) = safe
             .files_container_add("../testdata/test.md", &xorurl, false, false, false, false)
             .await?;
 
-        assert_eq!(version, 1);
+        assert!(version != VersionHash::default());
+        assert!(version != version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 1);
 
@@ -1555,7 +1557,7 @@ mod tests {
             )
             .await?;
 
-        assert_eq!(version, 1);
+        assert!(version != VersionHash::default());
         assert_eq!(new_processed_files.len(), 2);
         assert_eq!(
             new_files_map.len(),
@@ -1631,7 +1633,7 @@ mod tests {
             )
             .await?;
 
-        assert_eq!(version, 1);
+        assert!(version != VersionHash::default());
         assert_eq!(new_processed_files.len(), 2);
         assert_eq!(
             new_files_map.len(),
@@ -1709,7 +1711,7 @@ mod tests {
             )
             .await?;
 
-        assert_eq!(version, 1);
+        assert!(version != VersionHash::default());
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 1);
 
@@ -1803,7 +1805,7 @@ mod tests {
             )
             .await?;
 
-        assert_eq!(version, 1);
+        assert!(version != VersionHash::default());
         assert_eq!(
             new_processed_files.len(),
             TESTDATA_PUT_FILEITEM_COUNT + SUBFOLDER_PUT_FILEITEM_COUNT
@@ -1984,7 +1986,7 @@ mod tests {
         ));
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(1));
+        safe_url.set_content_version(Some(VersionHash::default()));//TODO wrong v
         let (new_link, _) = retry_loop!(safe.parse_and_resolve_url(&nrsurl));
         assert_eq!(new_link.to_string(), safe_url.to_string());
 
@@ -2012,7 +2014,7 @@ mod tests {
             false,
         ));
 
-        assert_eq!(version, 1);
+        assert!(version != VersionHash::default());
         assert_eq!(
             new_processed_files.len(),
             SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
@@ -2082,7 +2084,7 @@ mod tests {
             false,
         ));
 
-        assert_eq!(version, 1);
+        assert!(version != VersionHash::default());
         assert_eq!(
             new_processed_files.len(),
             SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
@@ -2139,7 +2141,7 @@ mod tests {
 
         let (version, fetched_files_map) = retry_loop!(safe.files_container_get(&xorurl));
 
-        assert_eq!(version, 0);
+        assert!(version != VersionHash::default());
         assert_eq!(fetched_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), fetched_files_map.len());
         assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
@@ -2159,10 +2161,10 @@ mod tests {
         let (xorurl, _, _) =
             retry_loop!(safe.files_container_create(Some("../testdata/"), None, true, true, false));
 
-        let (version, _) = retry_loop!(safe.files_container_get(&xorurl));
-        assert_eq!(version, 0);
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        assert!(version0 != VersionHash::default());
 
-        let (version, _, _) = retry_loop!(safe.files_container_sync(
+        let (version1, _, _) = retry_loop!(safe.files_container_sync(
             "../testdata/subfolder/",
             &xorurl,
             true,
@@ -2171,13 +2173,14 @@ mod tests {
             false,
             false,
         ));
-        assert_eq!(version, 1);
+        assert!(version1 != VersionHash::default());
+        assert!(version1 != version0);
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(None);
         let (version, _) = retry_loop_for_pattern!(safe
-            .files_container_get(&safe_url.to_string()), Ok((version, _)) if *version == 1)?;
-        assert_eq!(version, 1);
+            .files_container_get(&safe_url.to_string()), Ok((version, _)) if *version == version1)?;
+        assert_eq!(version, version1);
 
         Ok(())
     }
@@ -2190,7 +2193,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // let's create a new version of the files container
-        let (_version, _new_processed_files, new_files_map) = retry_loop!(safe
+        let (version1, _new_processed_files, new_files_map) = retry_loop!(safe
             .files_container_sync(
                 "../testdata/subfolder/",
                 &xorurl,
@@ -2206,7 +2209,7 @@ mod tests {
         safe_url.set_content_version(Some(VersionHash::default()));
         let (version, v0_files_map) = retry_loop!(safe.files_container_get(&safe_url.to_string()));
 
-        assert_eq!(version, 0);
+        assert_eq!(version, VersionHash::default());
         assert_eq!(files_map, v0_files_map);
         // let's check that one of the files in v1 is still there
         let file_path1 = "/test.md";
@@ -2215,12 +2218,12 @@ mod tests {
             v0_files_map[file_path1][PREDICATE_LINK]
         );
 
-        // let's fetch version 1
-        safe_url.set_content_version(Some(1));
+        // let's fetch version1
+        safe_url.set_content_version(Some(version1));
         let (version, v1_files_map) = retry_loop_for_pattern!(safe
-                .files_container_get(&safe_url.to_string()), Ok((version, _)) if *version == 1)?;
+                .files_container_get(&safe_url.to_string()), Ok((version, _)) if *version == version1)?;
 
-        assert_eq!(version, 1);
+        assert!(version != version1);
         assert_eq!(new_files_map, v1_files_map);
         // let's check that some of the files are no in v2 anymore
         let file_path2 = "/another.md";
@@ -2231,18 +2234,19 @@ mod tests {
         assert!(v1_files_map.get(file_path3).is_none());
         assert!(v1_files_map.get(file_path4).is_none());
 
-        // let's fetch version 2 (invalid)
-        safe_url.set_content_version(Some(2));
+        // let's fetch version invalid version
+        safe_url.set_content_version(Some(VersionHash::default()));
         match safe.files_container_get(&safe_url.to_string()).await {
             Ok(_) => Err(anyhow!(
-                "Unexpectedly retrieved verion 2 of container".to_string(),
+                "Unexpectedly retrieved invalid version of container".to_string(),
             )),
             Err(Error::VersionNotFound(msg)) => {
+                let default_vh = format!("{}", VersionHash::default());
                 assert_eq!(
                     msg,
                     format!(
-                        "Version '2' is invalid for FilesContainer found at \"{}\"",
-                        safe_url
+                        "Version '{}' is invalid for FilesContainer found at \"{}\"",
+                        default_vh, safe_url
                     )
                 );
                 Ok(())
@@ -2283,10 +2287,11 @@ mod tests {
             false
         ));
         let _ = retry_loop!(safe.fetch(&xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(VersionHash::default()));
+        safe_url.set_content_version(Some(version0));
         let (nrs_xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
             &nrsurl,
             &safe_url.to_string(),
@@ -2296,7 +2301,7 @@ mod tests {
         ));
         let _ = retry_loop!(safe.fetch(&nrs_xorurl, None));
 
-        let _ = retry_loop!(safe.files_container_sync(
+        let (version1, _, _) = retry_loop!(safe.files_container_sync(
             "../testdata/subfolder/",
             &xorurl,
             false,
@@ -2306,7 +2311,7 @@ mod tests {
             false,
         ));
 
-        let _ = retry_loop!(safe.files_container_sync(
+        let (version2, _, _) = retry_loop!(safe.files_container_sync(
             "../testdata/",
             &nrsurl,
             false,
@@ -2326,8 +2331,8 @@ mod tests {
         // └── test.md
         //
         // So, we have 6 items.
-        let (version, fetched_files_map) = retry_loop_for_pattern!(safe.files_container_get(&xorurl), Ok((version, _)) if *version == 2)?;
-        assert_eq!(version, 2);
+        let (version, fetched_files_map) = retry_loop_for_pattern!(safe.files_container_get(&xorurl), Ok((version, _)) if *version == version2)?;
+        assert!(version != VersionHash::default());
         assert_eq!(fetched_files_map.len(), 6);
 
         Ok(())
@@ -2356,7 +2361,7 @@ mod tests {
             false,
         ));
 
-        assert_eq!(version, 1);
+        assert!(version != VersionHash::default());
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
@@ -2406,7 +2411,7 @@ mod tests {
             true, // dry run
         ));
 
-        assert_eq!(version, 1);
+        assert_eq!(version, VersionHash::default());
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
@@ -2488,9 +2493,10 @@ mod tests {
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         // let's try to add a file with same target name and same content, it should fail
-        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version1, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
             "../testdata/subfolder/sub2.md",
             &format!("{}/sub2.md", xorurl),
             false,
@@ -2499,7 +2505,7 @@ mod tests {
             false,
         ));
 
-        assert_eq!(version, 0);
+        assert_eq!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(
@@ -2509,7 +2515,7 @@ mod tests {
         assert_eq!(files_map, new_files_map);
 
         // let's try to add a file with same target name but with different content, it should still fail
-        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version2, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
             "../testdata/test.md",
             &format!("{}/sub2.md", xorurl),
             false,
@@ -2518,7 +2524,7 @@ mod tests {
             false,
         ));
 
-        assert_eq!(version, 0);
+        assert_eq!(version2, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(
@@ -2537,7 +2543,7 @@ mod tests {
             false,
         ));
 
-        assert_eq!(version, 1);
+        assert!(version != VersionHash::default());
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(
@@ -2629,12 +2635,13 @@ mod tests {
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         let data = b"0123456789";
         let file_xorurl = retry_loop!(safe.files_store_public_blob(data, None, false));
         let new_filename = "/new_filename_test.md";
 
-        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version1, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
             &file_xorurl,
             &format!("{}{}", xorurl, new_filename),
             false,
@@ -2643,7 +2650,8 @@ mod tests {
             false,
         ));
 
-        assert_eq!(version, 1);
+        assert!(version1 != VersionHash::default());
+        assert!(version1 != version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
@@ -2671,7 +2679,7 @@ mod tests {
         // let's add another file but with the same name
         let data = b"9876543210";
         let other_file_xorurl = retry_loop!(safe.files_store_public_blob(data, None, false));
-        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version2, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
             &other_file_xorurl,
             &format!("{}{}", xorurl, new_filename),
             true, // force to overwrite it with new link
@@ -2680,7 +2688,9 @@ mod tests {
             false,
         ));
 
-        assert_eq!(version, 2);
+        assert!(version2 != VersionHash::default());
+        assert!(version2 != version0);
+        assert!(version2 != version1);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
         assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
@@ -2709,11 +2719,12 @@ mod tests {
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         let data = b"0123456789";
         let new_filename = "/new_filename_test.md";
 
-        let (version, new_processed_files, new_files_map) = retry_loop!(safe
+        let (version1, new_processed_files, new_files_map) = retry_loop!(safe
             .files_container_add_from_raw(
                 data,
                 &format!("{}{}", xorurl, new_filename),
@@ -2722,7 +2733,8 @@ mod tests {
                 false,
             ));
 
-        assert_eq!(version, 1);
+        assert!(version1 != VersionHash::default());
+        assert!(version1 != version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
@@ -2734,7 +2746,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = b"9876543210";
-        let (version, new_processed_files, new_files_map) = retry_loop!(safe
+        let (version2, new_processed_files, new_files_map) = retry_loop!(safe
             .files_container_add_from_raw(
                 data,
                 &format!("{}{}", xorurl, new_filename),
@@ -2743,7 +2755,9 @@ mod tests {
                 false,
             ));
 
-        assert_eq!(version, 2);
+        assert!(version2 != VersionHash::default());
+        assert!(version2 != version0);
+        assert!(version2 != version1);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
         assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
@@ -2762,13 +2776,15 @@ mod tests {
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         // let's remove a file first
-        let (version, new_processed_files, new_files_map) = retry_loop!(
+        let (version1, new_processed_files, new_files_map) = retry_loop!(
             safe.files_container_remove_path(&format!("{}/test.md", xorurl), false, false, false)
         );
 
-        assert_eq!(version, 1);
+        assert!(version1 != VersionHash::default());
+        assert!(version1 != version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT - 1);
 
@@ -2780,11 +2796,13 @@ mod tests {
         );
 
         // let's remove an entire folder now with recursive flag
-        let (version, new_processed_files, new_files_map) = retry_loop!(
+        let (version2, new_processed_files, new_files_map) = retry_loop!(
             safe.files_container_remove_path(&format!("{}/subfolder", xorurl), true, false, false)
         );
 
-        assert_eq!(version, 2);
+        assert!(version2 != VersionHash::default());
+        assert!(version2 != version0);
+        assert!(version2 != version1);
         assert_eq!(new_processed_files.len(), 2);
         assert_eq!(
             new_files_map.len(),
