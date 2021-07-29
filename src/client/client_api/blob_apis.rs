@@ -361,7 +361,7 @@ mod tests {
     use self_encryption::{SelfEncryptionError, Storage};
     use tokio::time::{Duration, Instant};
 
-    const BLOB_TEST_QUERY_TIMEOUT: u64 = 60;
+    const BLOB_TEST_QUERY_TIMEOUT: u64 = 90;
 
     // Test storing and getting public Blob.
     #[tokio::test(flavor = "multi_thread")]
