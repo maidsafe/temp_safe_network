@@ -57,6 +57,13 @@ impl From<&EntryHash> for VersionHash {
     }
 }
 
+impl VersionHash {
+    /// Getter for register the entry hash corresponding to that version
+    pub fn register_entry_hash(&self) -> EntryHash {
+        self.register_entry_hash
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
