@@ -112,7 +112,7 @@ pub async fn run_split() -> Result<()> {
         "--nodes-dir",
         &arg_node_log_dir,
         "--interval",
-        &INTERVAL,
+        INTERVAL,
         "--local",
     ];
 

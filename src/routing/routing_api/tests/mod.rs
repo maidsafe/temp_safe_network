@@ -429,7 +429,7 @@ async fn aggregate_proposals() -> Result<()> {
     for (index, node) in nodes.iter().enumerate().take(THRESHOLD) {
         let sig_share = proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
         let wire_msg = WireMsg::single_src(
-            &node,
+            node,
             DstLocation::DirectAndUnrouted(*section.chain().last_key()),
             NodeMsg::Propose {
                 content: proposal.clone(),

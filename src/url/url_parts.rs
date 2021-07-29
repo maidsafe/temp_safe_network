@@ -87,7 +87,7 @@ impl SafeUrlParts {
         // (see below) we use a different parser to avoid normalization.
         // Parsing twice is inefficient, so there is room for improvement
         // later to standardize on a single parser.
-        let parsing_url = Url::parse(&url).map_err(|parse_err| {
+        let parsing_url = Url::parse(url).map_err(|parse_err| {
             let msg = format!("Problem parsing the URL \"{}\": {}", url, parse_err);
             Error::InvalidXorUrl(msg)
         })?;
@@ -260,7 +260,7 @@ mod tests {
             "safe://ideographic\u{3000}space",
         ];
         for url in urls {
-            match SafeUrlParts::parse(&url, false) {
+            match SafeUrlParts::parse(url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with whitespace {}",
@@ -349,7 +349,7 @@ mod tests {
             "safe://application\u{009F}programcommand",
         ];
         for url in urls {
-            match SafeUrlParts::parse(&url, false) {
+            match SafeUrlParts::parse(url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with control character {}",
@@ -404,7 +404,7 @@ mod tests {
             "safe://nominal\u{206F}digitshapes",
         ];
         for url in urls {
-            match SafeUrlParts::parse(&url, false) {
+            match SafeUrlParts::parse(url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with invalid character {}",

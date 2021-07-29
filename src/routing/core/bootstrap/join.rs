@@ -303,7 +303,7 @@ impl<'a> Join<'a> {
                         MsgKind::DataMsg(_) | MsgKind::SectionInfoMsg => continue,
                         MsgKind::NodeBlsShareSignedMsg(_) | MsgKind::SectionSignedMsg(_) => {
                             trace!(
-                                "Previously backlogged: sender: {:?} wire_msg: {:?}",
+                                "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
                                 sender,
                                 wire_msg
                             );
@@ -322,7 +322,7 @@ impl<'a> Join<'a> {
                                     | MessageType::Node { msg_id, .. },
                                 ) => {
                                     trace!(
-                                        "Previously backlogged: sender: {:?} msg_id: {:?}",
+                                        "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
                                         sender,
                                         msg_id
                                     );

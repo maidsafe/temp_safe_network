@@ -73,6 +73,6 @@ mod tests {
             public_key,
             signature,
         };
-        assert!(sig.verify(&data.as_bytes()));
+        assert!(sig.verify(data.as_bytes()));
     }
 }

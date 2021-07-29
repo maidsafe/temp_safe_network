@@ -290,6 +290,6 @@ mod tests {
 
     fn create_sig_share(sk_set: &bls::SecretKeySet, index: usize, payload: &[u8]) -> SigShare {
         let sk_share = sk_set.secret_key_share(index);
-        SigShare::new(sk_set.public_keys(), index, &sk_share, &payload)
+        SigShare::new(sk_set.public_keys(), index, &sk_share, payload)
     }
 }
