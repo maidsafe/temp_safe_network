@@ -20,7 +20,6 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
     peer::PeerUtils,
-    routing_api::command::Command,
     section::SectionUtils,
     SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
@@ -28,15 +27,10 @@ use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
-use std::{
-    collections::{HashSet, VecDeque},
-    net::SocketAddr,
-};
+use std::{collections::HashSet, net::SocketAddr};
 use tokio::sync::mpsc;
 use tracing::Instrument;
 use xor_name::{Prefix, XorName};
-
-const BACKLOG_CAPACITY: usize = 100;
 
 /// Join the network as new node.
 ///
@@ -48,7 +42,7 @@ pub(crate) async fn join_network(
     comm: &Comm,
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
     bootstrap_addr: SocketAddr,
-) -> Result<(Node, Section, Vec<Command>)> {
+) -> Result<(Node, Section)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap", name = %node.name());
@@ -67,8 +61,6 @@ struct Join<'a> {
     // Receiver for incoming messages.
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
-    // Backlog for unknown messages
-    backlog: VecDeque<Command>,
 }
 
 impl<'a> Join<'a> {
@@ -81,7 +73,6 @@ impl<'a> Join<'a> {
             send_tx,
             recv_rx,
             node,
-            backlog: VecDeque::with_capacity(BACKLOG_CAPACITY),
         }
     }
 
@@ -91,7 +82,7 @@ impl<'a> Join<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn run(self, bootstrap_addr: SocketAddr) -> Result<(Node, Section, Vec<Command>)> {
+    async fn run(self, bootstrap_addr: SocketAddr) -> Result<(Node, Section)> {
         // Use our XorName as we do not know their name or section key yet.
         let section_key = bls::SecretKey::random().public_key();
         let dst_xorname = self.node.name();
@@ -105,7 +96,7 @@ impl<'a> Join<'a> {
         mut self,
         mut section_key: BlsPublicKey,
         mut recipients: Vec<(XorName, SocketAddr)>,
-    ) -> Result<(Node, Section, Vec<Command>)> {
+    ) -> Result<(Node, Section)> {
         // We send a first join request to obtain the resource challenge, which
         // we will then use to generate the challenge proof and send the
         // `JoinRequest` again with it.
@@ -146,7 +137,6 @@ impl<'a> Join<'a> {
                     return Ok((
                         self.node,
                         Section::new(genesis_key, section_chain, section_auth)?,
-                        self.backlog.into_iter().collect(),
                     ));
                 }
                 JoinResponse::Retry(section_auth) => {
@@ -312,13 +302,14 @@ impl<'a> Join<'a> {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::DataMsg(_) | MsgKind::SectionInfoMsg => continue,
                         MsgKind::NodeBlsShareSignedMsg(_) | MsgKind::SectionSignedMsg(_) => {
-                            self.backlog_message(Command::HandleMessage { sender, wire_msg });
+                            trace!(
+                                "Previously backlogged: sender: {:?} wire_msg: {:?}",
+                                sender,
+                                wire_msg
+                            );
                             continue;
                         }
                         MsgKind::NodeSignedMsg(NodeSigned { .. }) => {
-                            // TOOD: find a way we don't need to reconstruct the WireMsg
-                            let payload = wire_msg.payload.clone();
-                            let msg_kind = wire_msg.msg_kind().clone();
                             match wire_msg.into_message() {
                                 Ok(MessageType::Node {
                                     msg: NodeMsg::JoinResponse(resp),
@@ -326,31 +317,15 @@ impl<'a> Join<'a> {
                                     ..
                                 }) => (*resp, sender, msg_authority.src_location().name()),
                                 Ok(
-                                    MessageType::Client {
-                                        msg_id,
-                                        dst_location,
-                                        ..
-                                    }
-                                    | MessageType::SectionInfo {
-                                        msg_id,
-                                        dst_location,
-                                        ..
-                                    }
-                                    | MessageType::Node {
-                                        msg_id,
-                                        dst_location,
-                                        ..
-                                    },
+                                    MessageType::Client { msg_id, .. }
+                                    | MessageType::SectionInfo { msg_id, .. }
+                                    | MessageType::Node { msg_id, .. },
                                 ) => {
-                                    // We just put the WireMsg in the backlog then
-                                    if let Ok(wire_msg) =
-                                        WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)
-                                    {
-                                        self.backlog_message(Command::HandleMessage {
-                                            sender,
-                                            wire_msg,
-                                        });
-                                    }
+                                    trace!(
+                                        "Previously backlogged: sender: {:?} msg_id: {:?}",
+                                        sender,
+                                        msg_id
+                                    );
                                     continue;
                                 }
                                 Err(err) => {
@@ -424,14 +399,6 @@ impl<'a> Join<'a> {
         error!("NodeMsg sender unexpectedly closed");
         // TODO: consider more specific error here (e.g. `BootstrapInterrupted`)
         Err(Error::InvalidState)
-    }
-
-    fn backlog_message(&mut self, cmd: Command) {
-        while self.backlog.len() >= BACKLOG_CAPACITY {
-            let _ = self.backlog.pop_front();
-        }
-
-        self.backlog.push_back(cmd)
     }
 }
 
@@ -573,7 +540,7 @@ mod tests {
         };
 
         // Drive both tasks to completion concurrently (but on the same thread).
-        let ((node, section, _backlog), _) = future::try_join(bootstrap, others).await?;
+        let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
         assert_eq!(*section.authority_provider(), section_auth);
         assert_eq!(*section.chain().last_key(), pk);
