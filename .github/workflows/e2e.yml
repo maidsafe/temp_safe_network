@@ -126,7 +126,7 @@ jobs:
 
       - name: Remove node dir and logs fo next test
         if: matrix.os == 'windows-latest'
-        run: rd /s /q ~/.safe/node
+        run: rd /s /q %USERPROFILE%\.safe\node
         shell: cmd
 
       - name: Remove node dir and logs fo next test
