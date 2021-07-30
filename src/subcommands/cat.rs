@@ -97,7 +97,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
             // Render NRS Map Container
             if OutputFmt::Pretty == output_fmt {
                 println!("NRS Map Container (version {}) at \"{}\":", version, url);
-                print_nrs_map(&nrs_map, public_name);
+                print_nrs_map(nrs_map, public_name);
             } else {
                 println!("{}", serialise_output(&(url, nrs_map), output_fmt));
             }

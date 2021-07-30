@@ -542,7 +542,7 @@ fn build_tree(
             return (dirs, files);
         }
 
-        let mut node = match node.find_child(&item) {
+        let mut node = match node.find_child(item) {
             Some(n) => n,
             None => {
                 let (fs_type, d, di, fi) = match details["type"].as_str() {
@@ -557,7 +557,7 @@ fn build_tree(
 
                 dirs += di;
                 files += fi;
-                let n = FileTreeNode::new(&item, fs_type, d.clone());
+                let n = FileTreeNode::new(item, fs_type, d.clone());
                 node.add_child(n);
                 // Very gross, but it works.
                 // if this can be done in a better way,
@@ -566,7 +566,7 @@ fn build_tree(
                 // add_child() to return it instead of &self, but couldn't
                 // get it to work.  Also, using `n` does not work.
 
-                match node.find_child(&item) {
+                match node.find_child(item) {
                     Some(n2) => n2,
                     None => panic!("But that's impossible!"),
                 }
@@ -703,7 +703,7 @@ fn format_symlink(name: &str, fd: &FileDetails) -> String {
     match fd.get("symlink_target") {
         Some(target) => {
             let target_txt = match fd.get("symlink_target_type") {
-                Some(t) if t == "dir" => if_tty(&target, Colour::Blue.bold()),
+                Some(t) if t == "dir" => if_tty(target, Colour::Blue.bold()),
                 _ => target.to_string(),
             };
             format!("{} -> {}", name_txt, target_txt)
@@ -749,7 +749,7 @@ fn print_files_map(files_map: &FilesMap, total_files: u64, version: u64, target_
                 cwd_files += 1;
             }
             let name_field = if file_item["type"] == "inode/symlink" {
-                format_symlink(&name, &file_item)
+                format_symlink(name, file_item)
             } else {
                 name.to_string()
             };
@@ -819,7 +819,7 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
                     let mut fileitem = fileitem.clone();
                     if is_folder {
                         // then set link to xorurl with path current subfolder
-                        safeurl.set_path(&subdirs[0]);
+                        safeurl.set_path(subdirs[0]);
                         let link = safeurl.to_string();
                         fileitem.insert("link".to_string(), link);
                         fileitem.insert("type".to_string(), "".to_string());

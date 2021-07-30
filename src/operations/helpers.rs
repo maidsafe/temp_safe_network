@@ -26,9 +26,9 @@ pub fn download_and_install_github_release_asset(
     let target = get_target();
     let updater = self_update::backends::github::Update::configure()
         .repo_owner("maidsafe")
-        .repo_name(&repo_name)
+        .repo_name(repo_name)
         .target(&target)
-        .bin_name(&exec_file_name)
+        .bin_name(exec_file_name)
         .current_version(env!("CARGO_PKG_VERSION"))
         .build()
         .context(format!(
@@ -75,7 +75,7 @@ fn download_and_install_bin(
         release.name, release.version
     );
     // get the corresponding asset from the release
-    let asset = release.asset_for(&target).ok_or_else(|| {
+    let asset = release.asset_for(target).ok_or_else(|| {
         anyhow!(
             "No asset found in latest release for the target platform {}",
             target
@@ -108,7 +108,7 @@ fn download_and_install_bin(
         target_path.display()
     );
     self_update::Extract::from_source(&tmp_tarball_path)
-        .extract_file(&target_path.as_path(), exec_file_name)
+        .extract_file(target_path.as_path(), exec_file_name)
         .with_context(|| {
             format!(
                 "Error extracting binary from downloaded asset '{}'",

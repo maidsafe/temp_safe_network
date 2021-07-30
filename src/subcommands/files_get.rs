@@ -166,7 +166,7 @@ pub async fn process_get_command(
                     status.path_local.parent()
                 };
                 if let Some(parent) = dirpath {
-                    if let Some(filepath) = path_contains_file(&parent) {
+                    if let Some(filepath) = path_contains_file(parent) {
                         let msg = format!(
                             "cannot overwrite non-directory '{}' with directory in '{}'",
                             filepath.display(),
@@ -439,10 +439,10 @@ async fn files_container_get_files(
     // Todo: This test will need to be modified once we support empty directories.
     let is_single_file = files_map.len() == 1;
 
-    let safeurl = SafeUrl::from_url(&url)?;
+    let safeurl = SafeUrl::from_url(url)?;
     let urlpath = safeurl.path_decoded()?;
 
-    let root = find_root_path(&dirpath, &urlpath, is_single_file)?;
+    let root = find_root_path(dirpath, &urlpath, is_single_file)?;
 
     // This is a constraint to verify that parent of dirpath exists.
     // Without this check, files_map_get_files() will happily create
@@ -574,8 +574,8 @@ async fn files_map_get_files(
 
         // Setup status to notify our caller of progress in callback.
         let mut status = FilesGetStatus {
-            path_remote: &Path::new(path),
-            path_local: &abspath.as_path(),
+            path_remote: Path::new(path),
+            path_local: abspath.as_path(),
             total_files: files_map.len() as u64,
             current_file: idx as u64 + 1,
             total_transfer_bytes,
@@ -610,13 +610,13 @@ async fn files_map_get_files(
                 continue;
             }
         };
-        create_dir_all(&dir_path)?;
+        create_dir_all(dir_path)?;
 
         if details.getattr("type")? == "inode/symlink" {
             create_symlink(
-                &Path::new(&denormalize_slashes(details.getattr("symlink_target")?)),
+                Path::new(&denormalize_slashes(details.getattr("symlink_target")?)),
                 &abspath,
-                &details.getattr("symlink_target_type")?,
+                details.getattr("symlink_target_type")?,
             )
             .await?;
             continue;
@@ -730,15 +730,15 @@ async fn download_file_from_net(
     let mut stream = BufWriter::new(fh);
 
     // gets public or private, based on xorurl type
-    let filedata = files_get_blob(safe, &xorurl, None).await?;
-    bytes_written += stream_write(&mut stream, &filedata, &path)? as u64;
+    let filedata = files_get_blob(safe, xorurl, None).await?;
+    bytes_written += stream_write(&mut stream, &filedata, path)? as u64;
     rcvd += filedata.len() as u64;
     trace!("received {} bytes of {}", rcvd, size,);
 
     // Close may generate an error, so we do a flush/sync first to detect such.
     // see https://github.com/rust-lang/rust/pull/63410#issuecomment-519965351
-    let fh = bufwriter_into_inner(stream, &path)?;
-    file_sync_all(&fh, &path)?;
+    let fh = bufwriter_into_inner(stream, path)?;
+    file_sync_all(&fh, path)?;
 
     Ok(bytes_written as u64)
 }
@@ -764,7 +764,7 @@ fn bufwriter_into_inner<W: Write>(w: BufWriter<W>, path: &Path) -> Result<W> {
 // Writes data to a file/stream.
 fn stream_write(writer: &mut dyn Write, data: &[u8], path: &Path) -> Result<usize> {
     writer
-        .write(&data)
+        .write(data)
         .with_context(|| format!("Error writing to file: \"{}\"", path.display(),))
 }
 
@@ -794,12 +794,12 @@ async fn files_get_private_blob(_safe: &Safe, _url: &str, _range: Range) -> Resu
 /// # Get Public or Private Blob
 /// Get immutable data blobs from the network.
 pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
-    match SafeUrl::from_url(&url)?.data_type() {
+    match SafeUrl::from_url(url)?.data_type() {
         SafeDataType::PublicBlob => {
-            let pub_blob = safe.files_get_public_blob(&url, range).await?;
+            let pub_blob = safe.files_get_public_blob(url, range).await?;
             Ok(pub_blob)
         }
-        SafeDataType::PrivateBlob => files_get_private_blob(&safe, &url, range).await,
+        SafeDataType::PrivateBlob => files_get_private_blob(safe, url, range).await,
         _ => Err(anyhow!("URL target is not immutable data")),
     }
 }

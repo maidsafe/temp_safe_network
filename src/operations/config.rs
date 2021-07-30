@@ -112,7 +112,7 @@ impl Config {
                     name, config_location
                 );
 
-                retrieve_conn_info(&config_location).await
+                retrieve_conn_info(config_location).await
             },
             Some(NetworkInfo::Addresses(addresses)) => Ok(addresses.clone()),
             None => bail!("No network with name '{}' was found in the config. Please use the networks 'add'/'set' subcommand to add it", name)
@@ -201,7 +201,7 @@ impl Config {
                 .context("Couldn't create folder for network connection info")?;
         }
 
-        let contacts = self.get_network_info(&name).await?;
+        let contacts = self.get_network_info(name).await?;
         let conn_info = serialise_contacts(&contacts)?;
         fs::write(&file_path, conn_info).with_context(|| {
             format!(

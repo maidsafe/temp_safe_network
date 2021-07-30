@@ -61,7 +61,7 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     let mut safeurl = SafeUrl::from_url(xorurl)?;
                     safeurl.set_content_type(SafeContentType::Raw)?;
                     println!("Native data XOR-URL: {}", safeurl.to_string());
-                    print_nrs_map(&nrs_map, &public_name);
+                    print_nrs_map(nrs_map, public_name);
                 }
                 SafeData::FilesContainer {
                     xorurl,

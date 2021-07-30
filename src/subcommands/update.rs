@@ -26,7 +26,7 @@ pub fn update_commander(no_confirm: bool) -> Result<(), Box<dyn Error>> {
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
         .repo_name(REPO_NAME)
-        .with_target(&target)
+        .with_target(target)
         .build()?
         .fetch()?;
 
@@ -43,8 +43,8 @@ pub fn update_commander(no_confirm: bool) -> Result<(), Box<dyn Error>> {
         let status = self_update::backends::github::Update::configure()
             .repo_owner("maidsafe")
             .repo_name(REPO_NAME)
-            .target(&target)
-            .bin_name(&bin_name)
+            .target(target)
+            .bin_name(bin_name)
             .no_confirm(no_confirm)
             .show_download_progress(true)
             .current_version(env!("CARGO_PKG_VERSION"))

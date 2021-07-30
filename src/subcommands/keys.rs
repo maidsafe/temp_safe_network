@@ -133,7 +133,7 @@ pub fn print_new_key_output(output_fmt: OutputFmt, xorurl: String, key_pair: Opt
 
         if let Some(pair) = &key_pair {
             println!("Key pair generated:");
-            match keypair_to_hex_strings(&pair) {
+            match keypair_to_hex_strings(pair) {
                 Ok((pk_hex, sk_hex)) => {
                     println!("Public Key = {}", pk_hex);
                     println!("Secret Key = {}", sk_hex);
@@ -142,7 +142,7 @@ pub fn print_new_key_output(output_fmt: OutputFmt, xorurl: String, key_pair: Opt
             }
         }
     } else if let Some(pair) = &key_pair {
-        match keypair_to_hex_strings(&pair) {
+        match keypair_to_hex_strings(pair) {
             Ok((pk_hex, sk_hex)) => println!(
                 "{}",
                 serialise_output(&(xorurl, (pk_hex, sk_hex)), output_fmt)
