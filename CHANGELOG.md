@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.5](https://github.com/maidsafe/sn_cli/compare/v0.33.4...v0.33.5) (2021-07-30)
+
+
+### Features
+
+* **install:** Support Aarch64 in Install Script ([5022064](https://github.com/maidsafe/sn_cli/commit/50220648c599b01f12f2f7cfaf359e9ade05a296))
+
+
+### Bug Fixes
+
+* Remove Use of Fork and Temp Branch ([201271f](https://github.com/maidsafe/sn_cli/commit/201271fd827eda42e933e5e0b66326de7abee876))
+
 ### [0.33.4](https://github.com/maidsafe/sn_cli/compare/v0.33.3...v0.33.4) (2021-07-29)
 
 
