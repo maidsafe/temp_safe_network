@@ -51,7 +51,6 @@ impl Safe {
         // Obtain the resolution chain without resolving the URL's path
         let mut resolution_chain = self
             .retrieve_from_url(
-                // TODO take a look at safe url code where its used, ask gab
                 &safe_url.to_string(),
                 false,
                 None,
@@ -354,6 +353,7 @@ fn sanitised_url(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::nrs_map::DefaultRdf;
+    use std::str::FromStr;
     use super::*;
     use crate::{
         app::{
@@ -373,7 +373,7 @@ mod tests {
 
         let (xor_url, _, nrs_map) = retry_loop!(safe.nrs_map_container_create(
             &site_name,
-            "safe://linked-from-site_name?v=0",
+            &format!("safe://linked-from-site_name?v={}", VersionHash::default()),
             true,
             false,
             false
@@ -382,7 +382,7 @@ mod tests {
         assert_eq!(nrs_map.sub_names_map.len(), 0);
         assert_eq!(
             nrs_map.get_default_link()?,
-            "safe://linked-from-site_name?v=0"
+            format!("safe://linked-from-site_name?v={}", VersionHash::default())
         );
 
         if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
@@ -390,7 +390,7 @@ mod tests {
                 .get(PREDICATE_LINK)
                 .ok_or_else(|| anyhow!("Entry not found with key '{}'", PREDICATE_LINK))?;
 
-            assert_eq!(*link, "safe://linked-from-site_name?v=0".to_string());
+            assert_eq!(*link, format!("safe://linked-from-site_name?v={}", VersionHash::default()));
             assert_eq!(
                 nrs_map.get_default()?,
                 &DefaultRdf::OtherRdf(def_data.clone())
@@ -412,7 +412,8 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create(None, None, true, true, false)
             .await?;
-        let link_v0 = format!("{}?v=0", link);
+        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let link_v0 = format!("{}?v={}", link, version0);
 
         let (xorurl, _, nrs_map) = retry_loop!(safe.nrs_map_container_create(
             &format!("b.{}", site_name),
@@ -427,8 +428,8 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // add subname and set it as the new default too
-        let link_v1 = format!("{}?v=1", link);
-        let (_version, _, _, updated_nrs_map) = retry_loop!(safe.nrs_map_container_add(
+        let link_v1 = format!("{}?v={}", link, VersionHash::default());
+        let (version, _, _, updated_nrs_map) = retry_loop!(safe.nrs_map_container_add(
             &format!("a.b.{}", site_name),
             &link_v1,
             true,
@@ -436,7 +437,7 @@ mod tests {
             false
         ));
 
-        // assert_eq!(version, 1); // Versions features disabled temporarily (TODO replace with hash)
+        assert!(version != version0);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
         assert_eq!(updated_nrs_map.get_default_link()?, link_v1);
 
@@ -452,18 +453,20 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create(None, None, true, true, false)
             .await?;
-        let link_v0 = format!("{}?v=0", link);
+        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let link_v0 = format!("{}?v={}", link, version0);
 
         let (xorurl, _, _) = retry_loop!(safe
             .nrs_map_container_create(&format!("b.{}", site_name), &link_v0, true, false, false));
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
-        let versioned_sitename = format!("a.b.{}?v=6", site_name);
+        let dummy_version = "hqt1zg7dwci3ze7dfqp48e3muqt4gkh5wqt1zg7dwci3ze7dfqp4y";
+        let versioned_sitename = format!("a.b.{}?v={}", site_name, dummy_version);
         match safe
             .nrs_map_container_add(
                 &versioned_sitename,
-                "safe://linked-from-a_b_site_name?v=0",
+                &format!("safe://linked-from-a_b_site_name?v={}", version0),
                 true,
                 false,
                 false,
@@ -518,7 +521,8 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create(None, None, true, true, false)
             .await?;
-        let link_v0 = format!("{}?v=0", link);
+        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let link_v0 = format!("{}?v={}", link, version0);
 
         let (xorurl, _, nrs_map) = retry_loop!(safe
             .nrs_map_container_create(
@@ -532,21 +536,21 @@ mod tests {
         assert_eq!(nrs_map.sub_names_map.len(), 1);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
-        let link_v1 = format!("{}?v=1", link);
-        let (version, _, _, _) = retry_loop!(safe
+        let dummy_version = "hqt1zg7dwci3ze7dfqp48e3muqt4gkh5wqt1zg7dwci3ze7dfqp4y";
+        let link_v1 = format!("{}?v={}", link, dummy_version);
+        let (version1, _, _, _) = retry_loop!(safe
             .nrs_map_container_add(&format!("a2.b.{}", site_name), &link_v1, true, false, false)
         );
 
-        // TODO use hash for version, this is a placeholder
-        let _ = retry_loop_for_pattern!(safe.nrs_map_container_get(&xorurl), Ok((version, _)) if *version == *version)?;
+        let _ = retry_loop_for_pattern!(safe.nrs_map_container_get(&xorurl), Ok((version, _)) if *version == version1)?;
 
         // remove subname
         let (version, _, _, updated_nrs_map) = retry_loop!(safe
             .nrs_map_container_remove(&format!("a.b.{}", site_name), false)
         );
 
-        // TODO use hash for version
-        // assert_eq!(version, 2);
+        assert!(version != version0);
+        assert!(version != version1);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
         assert_eq!(updated_nrs_map.get_default_link()?, link_v1);
 
@@ -562,7 +566,8 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create(None, None, true, true, false)
             .await?;
-        let link_v0 = format!("{}?v=0", link);
+        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let link_v0 = format!("{}?v={}", link, version0);
 
         let (xorurl, _, nrs_map) = retry_loop!(safe
             .nrs_map_container_create(
@@ -605,7 +610,8 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create(None, None, true, true, false)
             .await?;
-        let link_v0 = format!("{}?v=0", link);
+        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let link_v0 = format!("{}?v={}", link, version0);
 
         let (xorurl, _, nrs_map) = retry_loop!(safe
             .nrs_map_container_create(
@@ -624,8 +630,7 @@ mod tests {
             .nrs_map_container_remove(&format!("a.b.{}", site_name), false)
         );
 
-        // TODO use version hash
-        // assert_eq!(version, 1);
+        assert!(version != version0);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
         assert_eq!(updated_nrs_map.get_default_link()?, link_v0);
         Ok(())
