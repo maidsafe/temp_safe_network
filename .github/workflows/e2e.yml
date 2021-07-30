@@ -61,13 +61,13 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-${{ matrix.target }}-cargo-cache-1-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build launch local network
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --features=always-joinable
+          args: --release --features=always-joinable,testing
       
       - run: ./target/release/testnet
         if: matrix.os != 'windows-latest'
@@ -93,23 +93,23 @@ jobs:
       - name: Initital client tests...
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: timeout 25m cargo test --release --features=always-joinable -- client_api --skip client_api::seq --skip client_api::map --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
+        run: timeout 25m cargo test --release --features=always-joinable,testing -- client_api --skip client_api::seq --skip client_api::map --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
       
       - name: Client map tests against local network
         shell: bash
-        run: timeout 10m cargo test --release --features=always-joinable -- client_api::map && sleep 5
+        run: timeout 10m cargo test --release --features=always-joinable,testing -- client_api::map && sleep 5
       
       - name: Client reg tests against local network
         shell: bash
-        run: timeout 10m cargo test --release --features=always-joinable -- client_api::reg && sleep 5
+        run: timeout 10m cargo test --release --features=always-joinable,testing -- client_api::reg && sleep 5
       
       - name: Client sequence tests against local network
         shell: bash
-        run: timeout 10m cargo test --release --features=always-joinable -- client_api::seq && sleep 5
+        run: timeout 10m cargo test --release --features=always-joinable,testing -- client_api::seq && sleep 5
       
       - name: Client blob tests against local network
         shell: bash
-        run: timeout 15m cargo test --release --features=always-joinable -- client_api::blob && sleep 5
+        run: timeout 15m cargo test --release --features=always-joinable,testing -- client_api::blob && sleep 5
       
       - name: Run example app for Blob API against local network
         shell: bash
