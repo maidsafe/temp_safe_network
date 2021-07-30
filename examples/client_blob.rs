@@ -8,10 +8,7 @@
 
 use anyhow::{Context, Result};
 use safe_network::{
-    client::{
-        config_handler::Config, utils::test_utils::read_network_conn_info, Client,
-        DEFAULT_QUERY_TIMEOUT,
-    },
+    client::{utils::test_utils::read_network_conn_info, Client, Config, DEFAULT_QUERY_TIMEOUT},
     url::{SafeContentType, SafeUrl, DEFAULT_XORURL_BASE},
 };
 use std::{

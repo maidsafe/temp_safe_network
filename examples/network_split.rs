@@ -24,8 +24,7 @@ use tiny_keccak::{Hasher, Sha3};
 use anyhow::{anyhow, Context, Result};
 use safe_network::{
     client::{
-        config_handler::Config, utils::generate_random_vector,
-        utils::test_utils::read_network_conn_info, Client,
+        utils::generate_random_vector, utils::test_utils::read_network_conn_info, Client, Config,
     },
     types::ChunkAddress,
     url::{SafeContentType, SafeUrl, DEFAULT_XORURL_BASE},
