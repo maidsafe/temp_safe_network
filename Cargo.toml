@@ -30,7 +30,6 @@ required-features = ["testing"]
 default = []
 always-joinable = []
 chaos = []
-client = ["qp2p/no-igd"]
 testing = []
 
 [dependencies]
