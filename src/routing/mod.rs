@@ -88,7 +88,7 @@ pub fn create_test_used_space_and_root_storage() -> AnyhowResult<(UsedSpace, Pat
     let tmp = temp_dir();
     let storage_dir = Path::new(&tmp).join(random_filename);
 
-    Ok((used_space, storage_dir.to_path_buf()))
+    Ok((used_space, storage_dir))
 }
 
 /// SuperMajority of a given group (i.e. > 2/3)
