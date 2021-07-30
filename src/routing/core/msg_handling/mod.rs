@@ -9,8 +9,8 @@
 mod agreement;
 mod anti_entropy;
 mod bad_msgs;
+mod data_msgs;
 mod dkg;
-mod end_user;
 mod join;
 mod proposals;
 mod relocation;
@@ -20,9 +20,13 @@ mod sync;
 
 use super::Core;
 use crate::messaging::{
+    data::DataMsg,
     node::{NodeMsg, Proposal},
-    Authority, DstLocation, MessageId, MessageType, NodeMsgAuthority, SectionSigned, WireMsg,
+    Authority, DataSigned, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority,
+    SectionSigned, WireMsg,
 };
+use rand::rngs::OsRng;
+
 use crate::routing::{
     core::AggregatorError,
     error::{Error, Result},
@@ -33,6 +37,7 @@ use crate::routing::{
     section::SectionUtils,
     Event, MessageReceived, SectionAuthorityProviderUtils,
 };
+use crate::types::Keypair;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use std::{iter, net::SocketAddr};
@@ -88,13 +93,13 @@ impl Core {
                 self.handle_node_message(sender, msg_id, msg_authority, dst_location, msg, payload)
                     .await
             }
-            MessageType::Client {
+            MessageType::Data {
                 msg_id,
                 data_auth,
                 msg,
                 dst_location,
             } => {
-                self.handle_end_user_message(sender, msg_id, data_auth, msg, dst_location, payload)
+                self.handle_data_message(sender, msg_id, data_auth, msg, dst_location, payload)
                     .await
             }
         }
@@ -205,8 +210,12 @@ impl Core {
                 let payload = WireMsg::serialize_msg_payload(&msg)?;
                 let data_auth = Authority::verify(data_signed, &payload)?;
 
-                self.handle_client_msg_received(msg_id, msg, user, data_auth)
-                    .await
+                Ok(vec![Command::HandleDataMessage {
+                    msg_id,
+                    msg,
+                    user,
+                    data_auth,
+                }])
             }
             NodeMsg::SectionKnowledge {
                 src_info: (src_signed_sap, src_chain),
@@ -397,6 +406,7 @@ impl Core {
             // TODO: In the future the sn-node layer won't be receiving Events but just
             // plugging in msg handlers.
             NodeMsg::NodeCmd(node_cmd) => {
+                // Does this/can this /_should_ this ever happen via NodeMsg?
                 self.send_event(Event::MessageReceived {
                     msg_id,
                     src: msg_authority.src_location(),
@@ -404,6 +414,7 @@ impl Core {
                     msg: Box::new(MessageReceived::NodeCmd(node_cmd)),
                 })
                 .await;
+
                 Ok(vec![])
             }
             NodeMsg::NodeQuery(node_query) => {
@@ -480,5 +491,20 @@ impl Core {
                 Err(Error::InvalidSignatureShare)
             }
         }
+    }
+
+    // TODO: Dedupe this w/ node
+    fn random_client_signature(client_msg: &DataMsg) -> Result<(MsgKind, Bytes)> {
+        let mut rng = OsRng;
+        let keypair = Keypair::new_ed25519(&mut rng);
+        let payload = WireMsg::serialize_msg_payload(client_msg)?;
+        let signature = keypair.sign(&payload);
+
+        let msg = MsgKind::DataMsg(DataSigned {
+            public_key: keypair.public_key(),
+            signature,
+        });
+
+        Ok((msg, payload))
     }
 }

@@ -45,6 +45,13 @@ pub use qp2p::{Config as TransportConfig, SendStream};
 
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use std::env::temp_dir;
+
+use crate::dbs::UsedSpace;
+use anyhow::Result as AnyhowResult;
+use std::path::{Path, PathBuf};
+
 // ############################################################################
 // Private
 // ############################################################################
@@ -70,6 +77,19 @@ pub const RECOMMENDED_SECTION_SIZE: usize = 2 * ELDER_SIZE;
 
 /// Number of elders per section.
 pub const ELDER_SIZE: usize = 7;
+
+const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
+
+/// Create a register store for routing examples
+pub fn create_test_used_space_and_root_storage() -> AnyhowResult<(UsedSpace, PathBuf)> {
+    let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
+    let random_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let tmp = temp_dir();
+    let storage_dir = Path::new(&tmp).join(random_filename);
+
+    Ok((used_space, storage_dir))
+}
 
 /// SuperMajority of a given group (i.e. > 2/3)
 #[inline]

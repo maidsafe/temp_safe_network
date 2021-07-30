@@ -74,4 +74,7 @@ pub enum Error {
     NoMatchingElder,
     #[error("Node cannot join the network since it is not externally reachable: {0}")]
     NodeNotReachable(SocketAddr),
+    /// Database error.
+    #[error("Database error:: {0}")]
+    Database(#[from] crate::dbs::Error),
 }

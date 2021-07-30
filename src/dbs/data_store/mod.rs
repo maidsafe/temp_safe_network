@@ -121,7 +121,7 @@ impl<T: Data> DataStore<T> {
         let res = self
             .sled
             .get(key)
-            .map_err(|_| Error::KeyNotFound(format!("{:?}", id.to_data_address())))?;
+            .map_err(|_| Error::KeyNotFound(id.to_data_address()))?;
 
         if let Some(data) = res {
             let chunk = bincode::deserialize::<T>(&data)?;
@@ -131,7 +131,7 @@ impl<T: Data> DataStore<T> {
             }
         }
 
-        Err(Error::KeyNotFound(format!("{:?}", id.to_data_address())))
+        Err(Error::KeyNotFound(id.to_data_address()))
     }
 
     /// Used space to max capacity ratio.

@@ -11,20 +11,23 @@ use async_recursion::async_recursion;
 use dashmap::DashSet;
 use futures::future::join_all;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio::fs;
 
 #[derive(Clone, Debug)]
-pub(crate) struct UsedSpace {
+/// Tracking used space in supplied dirs, and providing checks to ensure max capacity isn't exceeded
+pub struct UsedSpace {
     /// the maximum (inclusive) allocated space for storage
     max_capacity: u64,
-    dirs: DashSet<PathBuf>,
+    dirs: Arc<DashSet<PathBuf>>,
 }
 
 impl UsedSpace {
-    pub(crate) fn new(max_capacity: u64) -> Self {
+    /// Create new UsedSpace tracker
+    pub fn new(max_capacity: u64) -> Self {
         Self {
             max_capacity,
-            dirs: DashSet::new(),
+            dirs: Arc::new(DashSet::new()),
         }
     }
 

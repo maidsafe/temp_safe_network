@@ -33,7 +33,11 @@
 //! command-line option for more details.
 //!
 
+use anyhow::Result;
 use futures::future::join_all;
+use safe_network::routing::{
+    create_test_used_space_and_root_storage, Config, Event, EventStream, Routing, TransportConfig,
+};
 use std::{
     collections::HashSet,
     convert::TryInto,
@@ -44,8 +48,6 @@ use structopt::StructOpt;
 use tokio::task::JoinHandle;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-
-use safe_network::routing::{Config, Event, EventStream, Routing, TransportConfig};
 
 /// Minimal example node.
 #[derive(Debug, StructOpt)]
@@ -97,13 +99,13 @@ struct Options {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let opts = Options::from_args();
     init_log(opts.verbosity);
 
     let handles: Vec<_> = if opts.count <= 1 {
         let handle =
-            start_single_node(opts.first, opts.bootstrap_contacts, opts.ip, opts.port).await;
+            start_single_node(opts.first, opts.bootstrap_contacts, opts.ip, opts.port).await?;
         iter::once(handle).collect()
     } else {
         start_multiple_nodes(
@@ -113,9 +115,11 @@ async fn main() {
             opts.ip,
             opts.port,
         )
-        .await
+        .await?
     };
     let _ = join_all(handles).await;
+
+    Ok(())
 }
 
 // Starts a single node and block until it terminates.
@@ -124,9 +128,9 @@ async fn start_single_node(
     contacts: Vec<SocketAddr>,
     ip: Option<IpAddr>,
     port: Option<u16>,
-) -> JoinHandle<()> {
-    let (_contact, handle) = start_node(0, first, contacts.into_iter().collect(), ip, port).await;
-    handle
+) -> Result<JoinHandle<()>> {
+    let (_contact, handle) = start_node(0, first, contacts.into_iter().collect(), ip, port).await?;
+    Ok(handle)
 }
 
 // Starts `count` nodes and blocks until all of them terminate.
@@ -139,11 +143,11 @@ async fn start_multiple_nodes(
     mut contacts: Vec<SocketAddr>,
     ip: Option<IpAddr>,
     base_port: Option<u16>,
-) -> Vec<JoinHandle<()>> {
+) -> Result<Vec<JoinHandle<()>>> {
     let mut handles = Vec::new();
     let first_index = if first {
         let (first_contact, first_handle) =
-            start_node(0, true, Vec::default(), ip, base_port).await;
+            start_node(0, true, Vec::default(), ip, base_port).await?;
         contacts.push(first_contact);
         handles.push(first_handle);
         1
@@ -153,10 +157,10 @@ async fn start_multiple_nodes(
 
     for index in first_index..count {
         let (_contact_info, handle) =
-            start_node(index, false, contacts.clone(), ip, base_port).await;
+            start_node(index, false, contacts.clone(), ip, base_port).await?;
         handles.push(handle);
     }
-    handles
+    Ok(handles)
 }
 
 // Starts a single node and blocks until it terminates.
@@ -166,7 +170,7 @@ async fn start_node(
     contacts: Vec<SocketAddr>,
     ip: Option<IpAddr>,
     base_port: Option<u16>,
-) -> (SocketAddr, JoinHandle<()>) {
+) -> Result<(SocketAddr, JoinHandle<()>)> {
     let ip = ip.unwrap_or_else(|| Ipv4Addr::LOCALHOST.into());
     let local_port = base_port.map(|base_port| {
         index
@@ -191,7 +195,10 @@ async fn start_node(
         transport_config,
         ..Default::default()
     };
-    let (node, event_stream) = Routing::new(config)
+
+    let (used_space, root) = create_test_used_space_and_root_storage()?;
+
+    let (node, event_stream) = Routing::new(config, used_space, root)
         .await
         .expect("Failed to instantiate a Node");
 
@@ -206,7 +213,7 @@ async fn start_node(
 
     let handle = run_node(index, node, event_stream);
 
-    (contact_info, handle)
+    Ok((contact_info, handle))
 }
 
 // Spawns a task to run the node until terminated.

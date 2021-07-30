@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
+    data::DataMsg,
     node::{DkgFailureSigSet, KeyedSig, Proposal, Section},
-    SectionAuthorityProvider, WireMsg,
+    Authority, DataSigned, EndUser, MessageId, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
 use std::{
@@ -26,6 +27,13 @@ pub(crate) enum Command {
     HandleMessage {
         sender: SocketAddr,
         wire_msg: WireMsg,
+    },
+    /// Handle DataMsg, either directly or notify via event listener
+    HandleDataMessage {
+        msg_id: MessageId,
+        msg: DataMsg,
+        user: EndUser,
+        data_auth: Authority<DataSigned>,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
@@ -48,6 +56,8 @@ pub(crate) enum Command {
         recipients: Vec<(XorName, SocketAddr)>,
         wire_msg: WireMsg,
     },
+    /// Parses WireMsg to send to the correct location
+    ParseAndSendWireMsg(WireMsg),
     /// Send a message to `delivery_group_size` peers out of the given `recipients`.
     SendMessageDeliveryGroup {
         recipients: Vec<(XorName, SocketAddr)>,

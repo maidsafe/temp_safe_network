@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::dbs::UsedSpace;
 use crate::messaging::{node::NodeMsg, DstLocation, WireMsg};
+use crate::node::RegisterStorage;
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
@@ -27,13 +29,18 @@ pub(crate) struct Network {
 
 #[allow(missing_docs)]
 impl Network {
-    pub(crate) async fn new(root_dir: &Path, config: &NodeConfig) -> Result<(Self, EventStream)> {
+    pub(crate) async fn new(
+        root_dir: &Path,
+        config: &NodeConfig,
+        used_space: UsedSpace,
+    ) -> Result<(Self, EventStream)> {
         let routing_config = RoutingConfig {
             first: config.is_first(),
             transport_config: config.network_config().clone(),
             keypair: None,
         };
-        let (routing, event_stream) = RoutingNode::new(routing_config).await?;
+        let (routing, event_stream) =
+            RoutingNode::new(routing_config, used_space, root_dir.to_path_buf()).await?;
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
         store_network_keypair(root_dir, routing.keypair_as_bytes().await).await?;
@@ -44,6 +51,10 @@ impl Network {
             },
             event_stream,
         ))
+    }
+
+    pub(crate) async fn get_register_storage(&self) -> RegisterStorage {
+        self.routing.get_register_storage().await
     }
 
     pub(crate) async fn age(&self) -> u8 {

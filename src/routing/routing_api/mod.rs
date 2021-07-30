@@ -23,10 +23,7 @@ use self::{
     event::{Elders, Event, NodeElderChange},
     event_stream::EventStream,
 };
-use crate::messaging::{
-    node::{NodeMsg, Peer},
-    DstLocation, EndUser, SectionAuthorityProvider, WireMsg,
-};
+use crate::dbs::UsedSpace;
 use crate::routing::{
     core::{join_network, Comm, ConnectionEvent, Core},
     ed25519,
@@ -38,9 +35,17 @@ use crate::routing::{
     section::SectionUtils,
     Error, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
 };
+use crate::{
+    messaging::{
+        node::{NodeMsg, Peer},
+        DstLocation, SectionAuthorityProvider, WireMsg,
+    },
+    node::RegisterStorage,
+};
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
+use std::path::PathBuf;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::{sync::mpsc, task};
 use xor_name::{Prefix, XorName};
@@ -69,7 +74,11 @@ impl Routing {
     /// NOTE: It's not guaranteed this function ever returns. This can happen due to messages being
     /// lost in transit during bootstrapping, or other reasons. It's the responsibility of the
     /// caller to handle this case, for example by using a timeout.
-    pub async fn new(config: Config) -> Result<(Self, EventStream)> {
+    pub async fn new(
+        config: Config,
+        used_space: UsedSpace,
+        root_storage_dir: PathBuf,
+    ) -> Result<(Self, EventStream)> {
         let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
         let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
 
@@ -86,7 +95,7 @@ impl Routing {
 
             let comm = Comm::new(config.transport_config, connection_event_tx).await?;
             let node = Node::new(keypair, comm.our_connection_info());
-            let core = Core::first_node(comm, node, event_tx)?;
+            let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir)?;
 
             let section = core.section();
 
@@ -130,7 +139,15 @@ impl Routing {
                 bootstrap_addr,
             )
             .await?;
-            let core = Core::new(comm, node, section, None, event_tx);
+            let core = Core::new(
+                comm,
+                node,
+                section,
+                None,
+                event_tx,
+                used_space,
+                root_storage_dir.to_path_buf(),
+            )?;
             info!("{} Joined the network!", core.node().name());
 
             core
@@ -148,6 +165,10 @@ impl Routing {
         let routing = Self { dispatcher };
 
         Ok((routing, event_stream))
+    }
+
+    pub(crate) async fn get_register_storage(&self) -> RegisterStorage {
+        self.dispatcher.get_register_storage().await
     }
 
     /// Sets the JoinsAllowed flag.
@@ -365,45 +386,11 @@ impl Routing {
 
     /// Send a message.
     /// Messages sent here, either section to section or node to node.
-    pub async fn send_message(&self, mut wire_msg: WireMsg) -> Result<()> {
-        if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
-            if self.our_prefix().await.matches(xorname) {
-                let addr = self
-                    .dispatcher
-                    .core
-                    .read()
-                    .await
-                    .get_socket_addr(*socket_id)
-                    .copied();
-
-                if let Some(socket_addr) = addr {
-                    // Send a message to a client peer.
-                    // Messages sent to a client are not signed
-                    // or validated as part of the routing library.
-                    debug!("Sending client msg to {:?}", socket_addr);
-
-                    let recipients = vec![(*xorname, socket_addr)];
-                    wire_msg.set_dst_section_pk(*self.section_chain().await.last_key());
-
-                    let command = Command::SendMessage {
-                        recipients,
-                        wire_msg,
-                    };
-                    return self.dispatcher.clone().handle_commands(command).await;
-                } else {
-                    debug!(
-                        "Could not find socketaddr corresponding to socket_id {:?}",
-                        socket_id
-                    );
-                    debug!("Relaying user message instead.. (Command::RelayMessage)");
-                }
-            } else {
-                debug!("Relaying message with sending user message (Command::RelayMessage)");
-            }
-        }
-
-        let command = Command::RelayMessage(wire_msg);
-        self.dispatcher.clone().handle_commands(command).await
+    pub async fn send_message(&self, wire_msg: WireMsg) -> Result<()> {
+        self.dispatcher
+            .clone()
+            .handle_commands(Command::ParseAndSendWireMsg(wire_msg))
+            .await
     }
 
     /// Returns the current BLS public key set if this node has one, or

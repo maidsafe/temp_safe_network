@@ -38,7 +38,7 @@ use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -54,13 +54,6 @@ struct NodeInfo {
     root_dir: PathBuf,
     /// The key used by the node to receive earned rewards.
     reward_key: PublicKey,
-}
-
-impl NodeInfo {
-    ///
-    fn path(&self) -> &Path {
-        self.root_dir.as_path()
-    }
 }
 
 /// Main node struct.
@@ -90,19 +83,17 @@ impl Node {
             }
         };
 
+        let node_info = NodeInfo {
+            root_dir: root_dir_buf.clone(),
+            reward_key,
+        };
+        let used_space = UsedSpace::new(config.max_capacity());
         let (network_api, network_events) = tokio::time::timeout(
             Duration::from_secs(JOINING_TIMEOUT),
-            Network::new(root_dir, config),
+            Network::new(root_dir_buf.as_path(), config, used_space.clone()),
         )
         .await
         .map_err(|_| Error::JoinTimeout)??;
-
-        let node_info = NodeInfo {
-            root_dir: root_dir_buf,
-            reward_key,
-        };
-
-        let used_space = UsedSpace::new(config.max_capacity());
 
         let node = Self {
             role: Arc::new(RwLock::new(Role::Adult(AdultRole {

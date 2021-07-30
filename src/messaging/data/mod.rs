@@ -26,7 +26,7 @@ pub use self::{
     register::{RegisterCmd, RegisterRead, RegisterWrite},
 };
 
-use crate::messaging::MessageId;
+use crate::messaging::{data::Error as ErrorMessage, MessageId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     Chunk, PublicKey,
@@ -140,6 +140,38 @@ impl QueryResponse {
             ReadRegister(result) => result.is_ok(),
             GetRegisterPolicy(result) => result.is_ok(),
             GetRegisterUserPermissions(result) => result.is_ok(),
+        }
+    }
+
+    /// Returns true if data was not found
+    pub fn failed_with_data_not_found(&self) -> bool {
+        use QueryResponse::*;
+
+        match self {
+            GetChunk(result) => match result {
+                Ok(_) => false,
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+            },
+            GetRegister(result) => match result {
+                Ok(_) => false,
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+            },
+            GetRegisterOwner(result) => match result {
+                Ok(_) => false,
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+            },
+            ReadRegister(result) => match result {
+                Ok(_) => false,
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+            },
+            GetRegisterPolicy(result) => match result {
+                Ok(_) => false,
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+            },
+            GetRegisterUserPermissions(result) => match result {
+                Ok(_) => false,
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+            },
         }
     }
 }

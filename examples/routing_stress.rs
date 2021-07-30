@@ -18,6 +18,7 @@ use rand::{
     distributions::{Distribution, WeightedIndex},
     Rng,
 };
+
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -34,6 +35,8 @@ use tokio_util::time::delay_queue::DelayQueue;
 use tracing_subscriber::EnvFilter;
 use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
+
+use safe_network::routing::create_test_used_space_and_root_storage;
 
 use safe_network::messaging::{
     data::Error::FailedToWriteFile, node::NodeMsg, DstLocation, MessageId,
@@ -628,8 +631,10 @@ impl Network {
     }
 }
 
-async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) {
-    let (node, mut events) = match Routing::new(config).await {
+async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) -> Result<()> {
+    let (storage, root_dir) = create_test_used_space_and_root_storage()?;
+
+    let (node, mut events) = match Routing::new(config, storage, root_dir).await {
         Ok(output) => output,
         Err(error) => {
             let _ = event_tx
@@ -638,7 +643,7 @@ async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) {
                     error: error.into(),
                 })
                 .await;
-            return;
+            return Ok(());
         }
     };
 
@@ -649,6 +654,8 @@ async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) {
             break;
         }
     }
+
+    Ok(())
 }
 
 // Schedule that defines when churn events happen.

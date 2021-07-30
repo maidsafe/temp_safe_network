@@ -63,7 +63,7 @@ impl Session {
                         error!("Error handling network info message: {:?}", error);
                     }
                 }
-                MessageType::Client { msg_id, msg, .. } => {
+                MessageType::Data { msg_id, msg, .. } => {
                     match msg {
                         DataMsg::Process(msg) => self.handle_client_msg(msg_id, msg, src).await,
                         DataMsg::ProcessingError(error) => {
