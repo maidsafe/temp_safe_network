@@ -10,7 +10,7 @@ use anyhow::Result;
 use criterion::{criterion_group, criterion_main, Criterion};
 use safe_network::client::utils::generate_random_vector;
 use safe_network::client::utils::test_utils::{read_network_conn_info, run_w_backoff_delayed};
-use safe_network::client::{Client, Error, DEFAULT_QUERY_TIMEOUT};
+use safe_network::client::{config_handler::Config, Client, Error, DEFAULT_QUERY_TIMEOUT};
 use tokio::runtime::Runtime;
 
 /// This bench requires a network already set up
@@ -18,7 +18,8 @@ async fn put_kbs(amount: usize) -> Result<(), Error> {
     let contact_info = read_network_conn_info().unwrap();
     let size = 1024 * amount;
     let data = generate_random_vector(size);
-    let client = Client::new(None, None, Some(contact_info), DEFAULT_QUERY_TIMEOUT).await?;
+    let config = Config::new(None, Some(contact_info)).await;
+    let client = Client::new(None, config, DEFAULT_QUERY_TIMEOUT).await?;
     let address = client.store_public_blob(&data).await?;
 
     // let's make sure the public chunk is stored

@@ -8,7 +8,10 @@
 
 use anyhow::{Context, Result};
 use safe_network::{
-    client::{utils::test_utils::read_network_conn_info, Client, DEFAULT_QUERY_TIMEOUT},
+    client::{
+        config_handler::Config, utils::test_utils::read_network_conn_info, Client,
+        DEFAULT_QUERY_TIMEOUT,
+    },
     url::{SafeContentType, SafeUrl, DEFAULT_XORURL_BASE},
 };
 use std::{
@@ -25,7 +28,8 @@ async fn main() -> Result<()> {
     let bootstrap_contacts = read_network_conn_info()?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_contacts);
-    let client = Client::new(None, None, Some(bootstrap_contacts), DEFAULT_QUERY_TIMEOUT).await?;
+    let config = Config::new(None, Some(bootstrap_contacts)).await;
+    let client = Client::new(None, config, DEFAULT_QUERY_TIMEOUT).await?;
 
     let pk = client.public_key();
     println!("Client Public Key: {}", pk);
