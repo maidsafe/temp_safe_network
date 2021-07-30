@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.18.0](https://github.com/maidsafe/safe_network/compare/v0.17.7...v0.18.0) (2021-07-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* This removes items from the (default) public API. They
+can be re-added by enabling the `testing` feature for the `safe_network`
+dependency.
+
+* Remove `testing` as a default feature ([fcbafe4](https://github.com/maidsafe/safe_network/commit/fcbafe4d3d68cbda9d3356e2e9634b3875745844))
+
 ### [0.17.7](https://github.com/maidsafe/safe_network/compare/v0.17.6...v0.17.7) (2021-07-30)
 
 ### [0.17.6](https://github.com/maidsafe/safe_network/compare/v0.17.5...v0.17.6) (2021-07-29)
