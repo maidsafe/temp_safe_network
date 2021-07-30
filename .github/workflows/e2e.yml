@@ -61,13 +61,13 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-${{ matrix.target }}-cargo-cache-1-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-${{ matrix.target }}-cargo-cache-2-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build launch local network
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --features=always-joinable,testing
+          args: --release --features=always-joinable,testing --bins --examples --tests
       
       - run: ./target/release/testnet
         if: matrix.os != 'windows-latest'
