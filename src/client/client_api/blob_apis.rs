@@ -364,7 +364,7 @@ mod tests {
     const BLOB_TEST_QUERY_TIMEOUT: u64 = 60;
 
     // Test storing and getting public Blob.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn parallel_timings() -> Result<()> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
@@ -396,7 +396,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn one_by_one_timings() -> Result<()> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
@@ -413,7 +413,7 @@ mod tests {
     }
 
     // Test storing and getting public Blob.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn public_blob_test() -> Result<()> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
         let value = generate_random_vector::<u8>(10);
@@ -438,7 +438,7 @@ mod tests {
     }
 
     // Test storing, getting, and deleting private chunk.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn private_blob_test() -> Result<()> {
         let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
@@ -503,7 +503,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn private_delete_large() -> Result<()> {
         let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
@@ -555,21 +555,21 @@ mod tests {
     }
 
     // Test creating and retrieving a 1kb blob.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1kb_pub_unencrypted() -> Result<()> {
         let size = 1024;
         gen_data_then_create_and_retrieve(size, true).await?;
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1kb_private_unencrypted() -> Result<()> {
         let size = 1024;
         gen_data_then_create_and_retrieve(size, false).await?;
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1kb_put_pub_retrieve_private() -> Result<()> {
         let size = 1024;
         let data = generate_random_vector(size);
@@ -589,7 +589,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1kb_put_private_retrieve_pub() -> Result<()> {
         let size = 1024;
 
@@ -611,14 +611,14 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1mb_public() -> Result<()> {
         let size = 1024 * 1024;
         gen_data_then_create_and_retrieve(size, true).await?;
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1mb_private() -> Result<()> {
         let size = 1024 * 1024;
         gen_data_then_create_and_retrieve(size, false).await?;
@@ -628,21 +628,21 @@ mod tests {
     // ----------------------------------------------------------------
     // 10mb (ie. more than 1 chunk)
     // ----------------------------------------------------------------
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_10mb_private() -> Result<()> {
         let size = 1024 * 1024 * 10;
         gen_data_then_create_and_retrieve(size, false).await?;
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_10mb_public() -> Result<()> {
         let size = 1024 * 1024 * 10;
         gen_data_then_create_and_retrieve(size, true).await?;
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn create_and_retrieve_100mb_public() -> Result<()> {
         let size = 1024 * 1024 * 100;
@@ -650,7 +650,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_index_based() -> Result<()> {
         create_and_index_based_retrieve(1024).await
     }

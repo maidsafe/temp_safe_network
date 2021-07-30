@@ -176,7 +176,7 @@ mod tests {
     const KEY: i8 = 0;
     const VALUE: &str = "VALUE";
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn set_and_get_value_with_default_duration() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
         let _ = cache.set(KEY, VALUE, None).await;
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(value, Some(VALUE), "value was not found in cache");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn set_and_get_value_without_duration() {
         let cache = Cache::with_capacity(usize::MAX);
         let _ = cache.set(KEY, VALUE, None).await;
@@ -192,7 +192,7 @@ mod tests {
         assert_eq!(value, Some(VALUE), "value was not found in cache");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn set_and_get_value_with_custom_duration() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(0));
         let _ = cache.set(KEY, VALUE, Some(Duration::from_secs(2))).await;
@@ -200,7 +200,7 @@ mod tests {
         assert_eq!(value, Some(VALUE), "value was not found in cache");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn set_do_not_get_expired_value() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(0));
         let _ = cache.set(KEY, VALUE, None).await;
@@ -208,7 +208,7 @@ mod tests {
         assert!(value.is_none(), "found expired value in cache");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn set_do_not_return_expired_value() {
         let timeout = Duration::from_millis(1);
         let cache = Cache::with_expiry_duration(timeout);
@@ -220,7 +220,7 @@ mod tests {
         assert!(value.is_none(), "exposed expired value from cache");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn set_replace_existing_value() {
         const NEW_VALUE: &str = "NEW_VALUE";
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
@@ -230,7 +230,7 @@ mod tests {
         assert_eq!(value, Some(NEW_VALUE), "value was not found in cache");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn remove_expired_item() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(0));
         assert!(cache.set(KEY, VALUE, None).await.is_none());
@@ -241,7 +241,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn remove_expired_do_not_remove_not_expired_item() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
         let _ = cache.set(KEY, VALUE, None).await;
@@ -252,7 +252,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn clear_not_expired_item() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
         let _ = cache.set(KEY, VALUE, None).await;
@@ -263,7 +263,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn remove_remove_expired_item() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
         let _ = cache.set(KEY, VALUE, None).await;
@@ -277,7 +277,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn remove_return_none_if_not_found() {
         let cache: Cache<i8, &str> = Cache::with_expiry_duration(Duration::from_secs(2));
         assert!(
@@ -286,14 +286,14 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn drop_excess_entry_zero_entry() {
         let cache = Cache::with_capacity(0);
         let _ = cache.set(KEY, VALUE, None).await;
         assert!(cache.get(&KEY).await.is_none());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn drop_excess_entry_one_entry() {
         let cache = Cache::with_capacity(1);
         let _ = cache.set(KEY, VALUE, None).await;

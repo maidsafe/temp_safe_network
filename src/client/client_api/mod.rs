@@ -170,14 +170,14 @@ mod tests {
     use anyhow::Result;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn client_creation() -> Result<()> {
         let _client = create_test_client(None).await?;
 
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn client_nonsense_bootstrap_fails() -> Result<()> {
         let mut nonsense_bootstrap = HashSet::new();
@@ -190,7 +190,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn client_creation_with_existing_keypair() -> Result<()> {
         let mut rng = OsRng;
         let full_id = Keypair::new_ed25519(&mut rng);
@@ -202,7 +202,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn long_lived_connection_survives() -> Result<()> {
         let client = create_test_client(None).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;

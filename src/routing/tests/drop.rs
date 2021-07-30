@@ -14,7 +14,7 @@ use bytes::Bytes;
 use crate::messaging::{Aggregation, DstLocation, Itinerary, SrcLocation};
 use crate::routing::routing_api::routing::{Event, NodeElderChange};
 /*
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_node_drop() -> Result<()> {
     // NOTE: create at least 4 nodes, so when one is dropped the remaining ones still form a
     // supermajority and the `Offline` proposals reach agreement.
