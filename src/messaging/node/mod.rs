@@ -28,7 +28,9 @@ pub use section::Peer;
 pub use section::{Section, SectionPeers};
 pub use signed::{KeyedSig, SigShare};
 
-use crate::messaging::{data::DataMsg, DataSigned, EndUser, MessageId, SectionAuthorityProvider};
+use crate::messaging::{
+    data::ServiceMsg, EndUser, MessageId, SectionAuthorityProvider, ServiceOpSig,
+};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use itertools::Itertools;
@@ -42,13 +44,13 @@ use xor_name::XorName;
 /// Message sent over the among nodes
 pub enum NodeMsg {
     /// Forward a data message.
-    ForwardDataMsg {
+    ForwardServiceMsg {
         /// The msg
-        msg: DataMsg,
+        msg: ServiceMsg,
         /// The origin
         user: EndUser,
         /// Signature provided by the requester.
-        data_signed: DataSigned,
+        data_signed: ServiceOpSig,
     },
     /// Inform other sections about our section or vice-versa.
     SectionKnowledge {

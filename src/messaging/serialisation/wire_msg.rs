@@ -8,7 +8,7 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::DataMsg, node::NodeMsg, section_info::SectionInfoMsg, Authority, DstLocation, Error,
+    data::ServiceMsg, node::NodeMsg, section_info::SectionInfoMsg, Authority, DstLocation, Error,
     MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -125,14 +125,14 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::DataMsg(data_signed) => {
-                let msg: DataMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+            MsgKind::ServiceMsg(data_signed) => {
+                let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
-                Ok(MessageType::Data {
+                Ok(MessageType::Service {
                     msg_id: self.header.msg_envelope.msg_id,
-                    data_auth: Authority::verify(data_signed, &self.payload)?,
+                    auth: Authority::verify(data_signed, &self.payload)?,
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })
@@ -249,9 +249,9 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            data::{ChunkRead, DataMsg, DataQuery, ProcessMsg},
+            data::{ChunkRead, DataQuery, ServiceMsg},
             node::{NodeCmd, NodeMsg},
-            Authority, DataSigned, MessageId, NodeSigned,
+            Authority, MessageId, NodeSigned, ServiceOpSig,
         },
         types::{ChunkAddress, Keypair},
     };
@@ -409,18 +409,18 @@ mod tests {
 
         let msg_id = MessageId::new();
 
-        let client_msg = DataMsg::Process(ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(
-            ChunkAddress::Private(XorName::random()),
+        let client_msg = ServiceMsg::Query(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
+            XorName::random(),
         ))));
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
-        let data_signed = DataSigned {
+        let data_signed = ServiceOpSig {
             public_key: src_client_keypair.public_key(),
             signature: src_client_keypair.sign(&payload),
         };
-        let data_auth = Authority::verify(data_signed.clone(), &payload).unwrap();
+        let auth = Authority::verify(data_signed.clone(), &payload).unwrap();
 
-        let msg_kind = MsgKind::DataMsg(data_signed);
+        let msg_kind = MsgKind::ServiceMsg(data_signed);
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
@@ -436,9 +436,9 @@ mod tests {
         // test deserialisation of payload
         assert_eq!(
             deserialized.into_message()?,
-            MessageType::Data {
+            MessageType::Service {
                 msg_id: wire_msg.msg_id(),
-                data_auth,
+                auth,
                 dst_location,
                 msg: client_msg,
             }

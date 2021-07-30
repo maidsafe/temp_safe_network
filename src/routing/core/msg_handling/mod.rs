@@ -20,10 +20,10 @@ mod sync;
 
 use super::Core;
 use crate::messaging::{
-    data::DataMsg,
+    data::ServiceMsg,
     node::{NodeMsg, Proposal},
-    Authority, DataSigned, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority,
-    SectionSigned, WireMsg,
+    Authority, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionSigned,
+    ServiceOpSig, WireMsg,
 };
 use rand::rngs::OsRng;
 
@@ -93,13 +93,13 @@ impl Core {
                 self.handle_node_message(sender, msg_id, msg_authority, dst_location, msg, payload)
                     .await
             }
-            MessageType::Data {
+            MessageType::Service {
                 msg_id,
-                data_auth,
+                auth,
                 msg,
                 dst_location,
             } => {
-                self.handle_data_message(sender, msg_id, data_auth, msg, dst_location, payload)
+                self.handle_data_message(sender, msg_id, auth, msg, dst_location, payload)
                     .await
             }
         }
@@ -194,7 +194,7 @@ impl Core {
         let src_name = msg_authority.name();
 
         match node_msg {
-            NodeMsg::ForwardDataMsg {
+            NodeMsg::ForwardServiceMsg {
                 msg,
                 user,
                 data_signed,
@@ -208,13 +208,13 @@ impl Core {
                 // TODO: preserve the source bytes so we don't need to serialize again here, or else
                 // verify earlier.
                 let payload = WireMsg::serialize_msg_payload(&msg)?;
-                let data_auth = Authority::verify(data_signed, &payload)?;
+                let auth = Authority::verify(data_signed, &payload)?;
 
-                Ok(vec![Command::HandleDataMessage {
+                Ok(vec![Command::HandleServiceMessage {
                     msg_id,
                     msg,
                     user,
-                    data_auth,
+                    auth,
                 }])
             }
             NodeMsg::SectionKnowledge {
@@ -494,13 +494,13 @@ impl Core {
     }
 
     // TODO: Dedupe this w/ node
-    fn random_client_signature(client_msg: &DataMsg) -> Result<(MsgKind, Bytes)> {
+    fn random_client_signature(client_msg: &ServiceMsg) -> Result<(MsgKind, Bytes)> {
         let mut rng = OsRng;
         let keypair = Keypair::new_ed25519(&mut rng);
         let payload = WireMsg::serialize_msg_payload(client_msg)?;
         let signature = keypair.sign(&payload);
 
-        let msg = MsgKind::DataMsg(DataSigned {
+        let msg = MsgKind::ServiceMsg(ServiceOpSig {
             public_key: keypair.public_key(),
             signature,
         });

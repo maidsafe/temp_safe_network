@@ -113,16 +113,16 @@ impl Dispatcher {
                     .handle_message(sender, wire_msg)
                     .await
             }
-            Command::HandleDataMessage {
+            Command::HandleServiceMessage {
                 msg_id,
                 user,
                 msg,
-                data_auth,
+                auth,
             } => {
                 self.core
                     .read()
                     .await
-                    .handle_data_msg_received(msg_id, msg, user, data_auth)
+                    .handle_data_msg_received(msg_id, msg, user, auth)
                     .await
             }
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
@@ -285,7 +285,7 @@ impl Dispatcher {
                 }
                 .map_err(|e: Error| e)?
             }
-            MsgKind::DataMsg(_) | MsgKind::SectionInfoMsg => {
+            MsgKind::ServiceMsg(_) | MsgKind::SectionInfoMsg => {
                 let _ = self
                     .core
                     .read()

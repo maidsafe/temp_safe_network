@@ -11,7 +11,7 @@ use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataCmd, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
-    DataSigned, MessageId, WireMsg,
+    MessageId, ServiceOpSig, WireMsg,
 };
 use crate::messaging::{DstLocation, MsgKind};
 use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
@@ -108,11 +108,11 @@ impl Session {
         Ok(())
     }
 
-    /// Send a `DataMsg` to the network without awaiting for a response.
+    /// Send a `ServiceMsg` to the network without awaiting for a response.
     pub(crate) async fn send_cmd(
         &self,
         cmd: DataCmd,
-        data_signed: DataSigned,
+        data_signed: ServiceOpSig,
         payload: Bytes,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint()?.clone();
@@ -151,7 +151,7 @@ impl Session {
             name: dst_section_name,
             section_pk,
         };
-        let msg_kind = MsgKind::DataMsg(data_signed);
+        let msg_kind = MsgKind::ServiceMsg(data_signed);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let msg_bytes = wire_msg.serialize()?;
@@ -191,11 +191,11 @@ impl Session {
         Ok(())
     }
 
-    /// Send a `DataMsg` to the network awaiting for the response.
+    /// Send a `ServiceMsg` to the network awaiting for the response.
     pub(crate) async fn send_query(
         &self,
         query: DataQuery,
-        data_signed: DataSigned,
+        data_signed: ServiceOpSig,
         payload: Bytes,
     ) -> Result<QueryResult, Error> {
         let endpoint = self.endpoint()?.clone();
@@ -219,7 +219,7 @@ impl Session {
             section_pk,
         };
         let msg_id = MessageId::new();
-        let msg_kind = MsgKind::DataMsg(data_signed);
+        let msg_kind = MsgKind::ServiceMsg(data_signed);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let msg_bytes = wire_msg.serialize()?;
@@ -297,7 +297,7 @@ impl Session {
                             tokio::time::sleep(std::time::Duration::from_millis(millis)).await
                         }
                     } else {
-                        trace!("DataMsg with id: {:?}, sent to {}", &msg_id, &socket);
+                        trace!("ServiceMsg with id: {:?}, sent to {}", &msg_id, &socket);
                         result = Ok(());
                         break;
                     }

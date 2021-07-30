@@ -9,7 +9,7 @@
 use super::chunk_records::ChunkRecords;
 use crate::messaging::{
     data::{DataCmd, DataExchange, DataQuery},
-    Authority, DataSigned, EndUser, MessageId,
+    Authority, EndUser, MessageId, ServiceOpSig,
 };
 use crate::node::{network::Network, node_ops::NodeDuty, Error, Result};
 use crate::routing::Prefix;
@@ -53,16 +53,14 @@ impl ElderStores {
         &mut self,
         cmd: DataCmd,
         msg_id: MessageId,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         info!("Writing Data");
         match cmd {
             DataCmd::Chunk(write) => {
                 info!("Writing Blob");
-                self.chunk_records
-                    .write(write, msg_id, data_auth, origin)
-                    .await
+                self.chunk_records.write(write, msg_id, auth, origin).await
             }
             DataCmd::Register(_write) => {
                 // This has been moved to routing/core/msg_handling

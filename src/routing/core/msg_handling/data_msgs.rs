@@ -8,13 +8,11 @@
 
 use super::Core;
 use crate::dbs::Error as DbError;
+use crate::messaging::data::ServiceMsg;
 use crate::messaging::{
-    data::{
-        CmdError, DataCmd, DataMsg, DataQuery, Error as ErrorMessage, ProcessMsg, RegisterRead,
-        RegisterWrite,
-    },
+    data::{CmdError, DataCmd, DataQuery, Error as ErrorMessage, RegisterRead, RegisterWrite},
     node::NodeMsg,
-    Authority, DataSigned, DstLocation, EndUser, MessageId, MsgKind, WireMsg,
+    Authority, DstLocation, EndUser, MessageId, MsgKind, ServiceOpSig, WireMsg,
 };
 use crate::routing::{
     error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
@@ -33,10 +31,10 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let sending_error = ErrorMessage::InvalidOperation(error.to_string());
 
-        let the_error_msg = DataMsg::Process(ProcessMsg::CmdError {
+        let the_error_msg = ServiceMsg::CmdError {
             error: CmdError::Data(sending_error),
             correlation_id: msg_id,
-        });
+        };
 
         let dst = DstLocation::EndUser(target);
 
@@ -57,9 +55,9 @@ impl Core {
         msg_id: MessageId,
         register_cmd: RegisterWrite,
         user: EndUser,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
     ) -> Result<Vec<Command>> {
-        match self.register_storage.write(register_cmd, data_auth).await {
+        match self.register_storage.write(register_cmd, auth).await {
             Ok(_) => Ok(vec![]),
             Err(error) => {
                 trace!("Problem on writing Register! {:?}", error);
@@ -74,19 +72,19 @@ impl Core {
         msg_id: MessageId,
         query: RegisterRead,
         user: EndUser,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
     ) -> Result<Vec<Command>> {
-        match self.register_storage.read(&query, data_auth.public_key) {
+        match self.register_storage.read(&query, auth.public_key) {
             Ok(response) => {
                 if response.failed_with_data_not_found() {
                     // we don't return data not found errors.
                     return Ok(vec![]);
                 }
 
-                let msg = DataMsg::Process(ProcessMsg::QueryResponse {
+                let msg = ServiceMsg::QueryResponse {
                     response,
                     correlation_id: msg_id,
-                });
+                };
 
                 // FIXME: define which signature/authority this message should really carry,
                 // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
@@ -112,24 +110,24 @@ impl Core {
     pub(crate) async fn handle_data_msg_received(
         &self,
         msg_id: MessageId,
-        msg: DataMsg,
+        msg: ServiceMsg,
         user: EndUser,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
     ) -> Result<Vec<Command>> {
         match msg {
-            DataMsg::Process(ProcessMsg::Cmd(DataCmd::Register(register_cmd))) => {
-                self.handle_register_cmd(msg_id, register_cmd, user, data_auth)
+            ServiceMsg::Cmd(DataCmd::Register(register_cmd)) => {
+                self.handle_register_cmd(msg_id, register_cmd, user, auth)
                     .await
             }
-            DataMsg::Process(ProcessMsg::Query(DataQuery::Register(read))) => {
-                self.handle_register_read(msg_id, read, user, data_auth)
+            ServiceMsg::Query(DataQuery::Register(read)) => {
+                self.handle_register_read(msg_id, read, user, auth)
             }
             _ => {
-                self.send_event(Event::DataMsgReceived {
+                self.send_event(Event::ServiceMsgReceived {
                     msg_id,
                     msg: Box::new(msg),
                     user,
-                    data_auth,
+                    auth,
                 })
                 .await;
 
@@ -144,8 +142,8 @@ impl Core {
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,
-        data_auth: Authority<DataSigned>,
-        msg: DataMsg,
+        auth: Authority<ServiceOpSig>,
+        msg: ServiceMsg,
         dst_location: DstLocation,
         payload: Bytes,
     ) -> Result<Vec<Command>> {
@@ -158,7 +156,7 @@ impl Core {
                             let wire_msg = WireMsg::new_msg(
                                 msg_id,
                                 payload,
-                                MsgKind::DataMsg(data_auth.into_inner()),
+                                MsgKind::ServiceMsg(auth.into_inner()),
                                 dst_location,
                             )?;
 
@@ -210,18 +208,18 @@ impl Core {
             // through the public event stream API
 
             // This is returned as a command to be handled via spawning
-            Ok(vec![Command::HandleDataMessage {
+            Ok(vec![Command::HandleServiceMessage {
                 msg_id,
                 msg,
                 user,
-                data_auth,
+                auth,
             }])
         } else {
             // Let's relay the client message then
-            let node_msg = NodeMsg::ForwardDataMsg {
+            let node_msg = NodeMsg::ForwardServiceMsg {
                 msg,
                 user,
-                data_signed: data_auth.into_inner(),
+                data_signed: auth.into_inner(),
             };
 
             let wire_msg = match WireMsg::single_src(

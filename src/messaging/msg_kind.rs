@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{BlsShareSigned, DataSigned, NodeSigned, SectionSigned};
+use super::{BlsShareSigned, NodeSigned, SectionSigned, ServiceOpSig};
 use serde::{Deserialize, Serialize};
 
 /// Source authority of a message.
@@ -28,7 +28,7 @@ pub enum MsgKind {
     /// A data message, with the requesting peer's authority.
     ///
     /// Authority is needed to access private data, such as reading or writing a private file.
-    DataMsg(DataSigned),
+    ServiceMsg(ServiceOpSig),
 
     /// A message from a Node with its own independent authority.
     ///

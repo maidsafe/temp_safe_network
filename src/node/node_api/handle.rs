@@ -203,16 +203,11 @@ impl Node {
             NodeDuty::WriteChunk {
                 write,
                 msg_id,
-                data_auth,
+                auth,
             } => {
                 let adult = self.as_adult().await?;
                 let handle = tokio::spawn(async move {
-                    let mut ops = vec![
-                        adult
-                            .chunks
-                            .write(&write, msg_id, data_auth.public_key)
-                            .await?,
-                    ];
+                    let mut ops = vec![adult.chunks.write(&write, msg_id, auth.public_key).await?];
                     ops.extend(adult.chunks.check_storage().await?);
                     Ok(NodeTask::from(ops))
                 });
@@ -297,7 +292,7 @@ impl Node {
             NodeDuty::ProcessRead {
                 query,
                 msg_id,
-                data_auth,
+                auth,
                 origin,
             } => {
                 let elder = self.as_elder().await?;
@@ -308,7 +303,7 @@ impl Node {
                             .meta_data
                             .write()
                             .await
-                            .read(query, msg_id, data_auth.public_key, origin)
+                            .read(query, msg_id, auth.public_key, origin)
                             .await?,
                     ];
                     Ok(NodeTask::from(duties))
@@ -319,7 +314,7 @@ impl Node {
                 cmd,
                 msg_id,
                 origin,
-                data_auth,
+                auth,
             } => {
                 let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
@@ -328,7 +323,7 @@ impl Node {
                             .meta_data
                             .write()
                             .await
-                            .write(cmd, msg_id, data_auth, origin)
+                            .write(cmd, msg_id, auth, origin)
                             .await?,
                     ]))
                 });

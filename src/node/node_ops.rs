@@ -8,11 +8,11 @@
 
 use crate::messaging::{
     data::{
-        ChunkRead, ChunkWrite, DataCmd, DataExchange, DataMsg, DataQuery, ProcessingError,
-        QueryResponse,
+        ChunkRead, ChunkWrite, DataCmd, DataExchange, DataQuery, QueryResponse, ServiceError,
+        ServiceMsg,
     },
     node::NodeMsg,
-    Authority, DataSigned, DstLocation, EndUser, MessageId,
+    Authority, DstLocation, EndUser, MessageId, ServiceOpSig,
 };
 use crate::routing::Prefix;
 use crate::types::{Chunk, PublicKey};
@@ -46,7 +46,7 @@ pub enum NodeDuty {
     WriteChunk {
         msg_id: MessageId,
         write: ChunkWrite,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
     },
     ProcessRepublish {
         msg_id: MessageId,
@@ -131,14 +131,14 @@ pub enum NodeDuty {
     ProcessRead {
         msg_id: MessageId,
         query: DataQuery,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
         origin: EndUser,
     },
     /// Process write of data
     ProcessWrite {
         msg_id: MessageId,
         cmd: DataCmd,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
         origin: EndUser,
     },
     /// Receive a chunk that is being replicated.
@@ -176,11 +176,11 @@ pub struct OutgoingMsg {
 #[allow(clippy::large_enum_variant)]
 pub enum MsgType {
     Node(NodeMsg),
-    Client(DataMsg),
+    Client(ServiceMsg),
 }
 
 #[derive(Debug, Clone)]
 pub struct OutgoingLazyError {
-    pub msg: ProcessingError,
+    pub msg: ServiceError,
     pub dst: DstLocation,
 }

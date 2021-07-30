@@ -34,21 +34,10 @@ use crate::types::{
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, convert::TryFrom};
 
-/// Messages that a client can send to the network, and their possible responses.
+/// A message indicating that an error occurred as a node was handling a client's message.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum DataMsg {
-    /// Data messages that a client or nodes can send, and their possible responses.
-    Process(ProcessMsg),
-
-    /// A response indicating that the recipient was unable to process a client's message.
-    ProcessingError(ProcessingError),
-}
-
-/// A response indicating that the recipient was unable to process a client's message.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct ProcessingError {
+pub struct ServiceError {
     /// Optional reason for the error.
     ///
     /// This can be used to handle the error.
@@ -56,13 +45,14 @@ pub struct ProcessingError {
     /// Message that triggered this error.
     ///
     /// This could be used to retry the message if the error could be handled.
-    pub source_message: Option<ProcessMsg>,
+    pub source_message: Option<Box<ServiceMsg>>,
 }
 
-/// Messages that a client can send to the network, and their possible responses.
+/// Network service messages that clients or nodes send in order to use the services,
+/// communicate and carry out the tasks.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum ProcessMsg {
+pub enum ServiceMsg {
     /// Messages that lead to mutation.
     ///
     /// There will be no response to these messages on success, only if something went wrong. Due to
@@ -93,11 +83,13 @@ pub enum ProcessMsg {
         /// [`Cmd`]: Self::Cmd
         correlation_id: MessageId,
     },
+    /// A message indicating that an error occurred as a node was handling a client's message.
+    ServiceError(ServiceError),
 }
 
 /// An error response to a [`Cmd`].
 ///
-/// [`Cmd`]: ProcessMsg::Cmd
+/// [`Cmd`]: ServiceMsg::Cmd
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum CmdError {
     /// An error response to a [`DataCmd`].
@@ -248,34 +240,34 @@ mod tests {
     }
 
     #[test]
-    fn generate_processing_error() {
-        let msg = ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
+    fn generate_service_error() {
+        let msg = ServiceMsg::Query(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
             XorName::random(),
         ))));
         let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
-        let lazy_error = ProcessingError {
+        let lazy_error = ServiceError {
             reason: Some(Error::DataNotFound(random_addr.clone())),
-            source_message: Some(msg),
+            source_message: Some(Box::new(msg)),
         };
 
         assert!(format!("{:?}", lazy_error).contains("Blob(Get(Private"));
-        assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
+        assert!(format!("{:?}", lazy_error).contains("ServiceError"));
         assert!(format!("{:?}", lazy_error).contains(&format!("DataNotFound({:?})", random_addr)));
     }
 
     #[test]
-    fn debug_format_processing_error() {
+    fn debug_format_service_error() {
         let chunk_addr = ChunkAddress::Public(XorName::random());
         let random_addr = DataAddress::Chunk(chunk_addr);
-        let errored_response = ProcessingError {
+        let errored_response = ServiceError {
             reason: Some(Error::DataNotFound(random_addr.clone())),
-            source_message: Some(ProcessMsg::Query(DataQuery::Blob(ChunkRead::Get(
-                chunk_addr,
+            source_message: Some(Box::new(ServiceMsg::Query(DataQuery::Blob(
+                ChunkRead::Get(chunk_addr),
             )))),
         };
 
         assert!(format!("{:?}", errored_response).contains("Blob(Get(Public"));
-        assert!(format!("{:?}", errored_response).contains("ProcessingError"));
+        assert!(format!("{:?}", errored_response).contains("ServiceError"));
         assert!(
             format!("{:?}", errored_response).contains(&format!("DataNotFound({:?})", random_addr))
         );

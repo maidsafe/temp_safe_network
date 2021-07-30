@@ -12,9 +12,9 @@ use anyhow::{anyhow, format_err, Result};
 use bytes::Bytes;
 use qp2p::QuicP2p;
 use crate::types::Keypair;
-use crate::messaging::client::ProcessMsg;
+use crate::messaging::client::ServiceMsg;
 use crate::messaging::{
-    client::{DataMsg, ClientSig, Query, TransferQuery},
+    client::{ServiceMsg, ClientSig, Query, TransferQuery},
     location::{Aggregation, Itinerary},
     DstLocation, MessageId, SrcLocation,
 };
@@ -57,7 +57,7 @@ async fn test_messages_client_node() -> Result<()> {
     let (client_endpoint, _, mut incoming_messages, _) = client.new_endpoint().await?;
     client_endpoint.connect_to(&node_addr).await?;
 
-    let query = DataMsg::Process(ProcessMsg::Query {
+    let query = ServiceMsg::Query {
         id,
         query: Query::Transfer(TransferQuery::GetBalance(pk)),
         client_sig,
@@ -68,7 +68,7 @@ async fn test_messages_client_node() -> Result<()> {
     let node_handler = tokio::spawn(async move {
         while let Some(event) = event_stream.next().await {
             match event {
-                Event::DataMsgReceived { msg, user } => {
+                Event::ServiceMsgReceived { msg, user } => {
                     assert_eq!(*msg, query_clone.clone());
                     node.send_message(
                         Itinerary {
@@ -109,7 +109,7 @@ async fn test_messages_client_node() -> Result<()> {
 
         assert_eq!(resp, expected_bytes);
 
-        let response_decoded = DataMsg::from(resp)?;
+        let response_decoded = ServiceMsg::from(resp)?;
         assert_eq!(response_decoded, query);
 
         Ok(())
