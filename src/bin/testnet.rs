@@ -65,16 +65,16 @@ async fn main() -> Result<(), String> {
         .await
         .expect("Cannot create nodes directory");
 
-    #[cfg(any(feature = "always-joinable"))]
-    let mut args: Vec<&str> = vec!["build", "--release"];
+    let mut args = vec!["build", "--release"];
 
-    #[cfg(not(feature = "always-joinable"))]
-    let args: Vec<&str> = vec!["build", "--release"];
-
-    #[cfg(any(feature = "always-joinable"))]
-    {
-        println!("Building node bin with always joinable feature set");
-        args.push("--features=always-joinable")
+    // Keep features consistent to avoid recompiling when possible
+    if cfg!(feature = "always-joinable") {
+        args.push("--features");
+        args.push("always-joinable");
+    }
+    if cfg!(feature = "testing") {
+        args.push("--features");
+        args.push("testing");
     }
 
     println!("Building current sn_node");
