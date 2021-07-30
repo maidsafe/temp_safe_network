@@ -515,12 +515,12 @@ impl Safe {
             // append entry to register
             let entry = files_map_xorurl.as_bytes().to_vec();
             let replace = self
-                .register_read(&url)
+                .register_read(&safe_url.to_string())
                 .await?
                 .iter()
                 .map(|(h, _)| h.to_owned())
                 .collect();
-            let entry_hash = &self.write_to_register(&url, entry, replace).await?;
+            let entry_hash = &self.write_to_register(&safe_url.to_string(), entry, replace).await?;
             let new_version: VersionHash = entry_hash.into();
 
             if update_nrs {
