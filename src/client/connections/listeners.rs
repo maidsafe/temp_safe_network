@@ -9,7 +9,7 @@
 use super::Session;
 use crate::client::Error;
 use crate::messaging::{
-    data::{CmdError, DataMsg, ProcessMsg},
+    data::{CmdError, ServiceMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
@@ -63,14 +63,8 @@ impl Session {
                         error!("Error handling network info message: {:?}", error);
                     }
                 }
-                MessageType::Data { msg_id, msg, .. } => {
-                    match msg {
-                        DataMsg::Process(msg) => self.handle_client_msg(msg_id, msg, src).await,
-                        DataMsg::ProcessingError(error) => {
-                            warn!("Processing error received. {:?}", error);
-                            // TODO: Handle lazy message errors
-                        }
-                    }
+                MessageType::Service { msg_id, msg, .. } => {
+                    self.handle_client_msg(msg_id, msg, src).await
                 }
                 msg_type => {
                     warn!("Unexpected message type received: {:?}", msg_type);
@@ -186,15 +180,15 @@ impl Session {
     }
 
     // Handle messages intended for client consumption (re: queries + commands)
-    async fn handle_client_msg(&self, msg_id: MessageId, msg: ProcessMsg, src: SocketAddr) {
-        debug!("DataMsg with id {:?} received from {:?}", msg_id, src);
+    async fn handle_client_msg(&self, msg_id: MessageId, msg: ServiceMsg, src: SocketAddr) {
+        debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = self.pending_queries.clone();
         let error_sender = self.incoming_err_sender.clone();
 
         let _ = tokio::spawn(async move {
             debug!("Thread spawned to handle this client message");
             match msg {
-                ProcessMsg::QueryResponse {
+                ServiceMsg::QueryResponse {
                     response,
                     correlation_id,
                     ..
@@ -217,7 +211,7 @@ impl Session {
                         trace!("No channel found for {:?}", correlation_id);
                     }
                 }
-                ProcessMsg::CmdError {
+                ServiceMsg::CmdError {
                     error,
                     correlation_id,
                     ..

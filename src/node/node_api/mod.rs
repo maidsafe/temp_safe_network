@@ -14,7 +14,7 @@ mod role;
 mod split;
 
 use crate::dbs::UsedSpace;
-use crate::messaging::data::{DataMsg, ProcessingError};
+use crate::messaging::data::ServiceError;
 use crate::node::logging::log_ctx::LogCtx;
 use crate::node::logging::run_system_logger;
 use crate::node::{
@@ -246,13 +246,10 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
                 );
             NodeDuty::NoOp
         }
-        Some(MsgContext::Client {
-            msg: DataMsg::Process(msg),
-            src,
-        }) => {
+        Some(MsgContext::Client { msg, src }) => {
             warn!("Sending in response to a message: {:?}", msg);
-            let err_msg = ProcessingError {
-                source_message: Some(msg),
+            let err_msg = ServiceError {
+                source_message: Some(Box::new(msg)),
                 reason: Some(convert_to_error_message(err)),
             };
 

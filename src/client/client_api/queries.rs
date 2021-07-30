@@ -9,8 +9,8 @@
 use super::Client;
 use crate::client::{connections::QueryResult, errors::Error};
 use crate::messaging::{
-    data::{DataMsg, DataQuery, ProcessMsg},
-    DataSigned, WireMsg,
+    data::{DataQuery, ServiceMsg},
+    ServiceOpSig, WireMsg,
 };
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
@@ -28,7 +28,7 @@ impl Client {
         signature: Signature,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
-        let data_signed = DataSigned {
+        let data_signed = ServiceOpSig {
             public_key: client_pk,
             signature,
         };
@@ -42,7 +42,7 @@ impl Client {
     // This function is a helper private to this module.
     pub(crate) async fn send_query(&self, query: DataQuery) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
-        let msg = DataMsg::Process(ProcessMsg::Query(query.clone()));
+        let msg = ServiceMsg::Query(query.clone());
         let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
         let signature = self.keypair.sign(&serialised_query);
 

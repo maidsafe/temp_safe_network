@@ -15,7 +15,7 @@ use xor_name::XorName;
 
 /// Authority of a network peer.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct DataSigned {
+pub struct ServiceOpSig {
     /// Peer's public key.
     pub public_key: PublicKey,
     /// Peer's signature.
@@ -161,7 +161,7 @@ pub trait VerifyAuthority: Sized + sealed::Sealed {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self>;
 }
 
-impl VerifyAuthority for DataSigned {
+impl VerifyAuthority for ServiceOpSig {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
         self.public_key
             .verify(&self.signature, payload)
@@ -169,7 +169,7 @@ impl VerifyAuthority for DataSigned {
         Ok(self)
     }
 }
-impl sealed::Sealed for DataSigned {}
+impl sealed::Sealed for ServiceOpSig {}
 
 impl VerifyAuthority for NodeSigned {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {

@@ -8,77 +8,61 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    data::{DataMsg, ProcessMsg, ProcessingError},
-    Authority, DataSigned, DstLocation, EndUser, MessageId, SrcLocation,
+    data::{ServiceError, ServiceMsg},
+    Authority, DstLocation, EndUser, MessageId, ServiceOpSig, SrcLocation,
 };
 use crate::node::{
     error::convert_to_error_message,
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error,
 };
-use tracing::warn;
 
 pub(super) fn map_client_msg(
     msg_id: MessageId,
-    msg: DataMsg,
-    data_auth: Authority<DataSigned>,
+    msg: ServiceMsg,
+    auth: Authority<ServiceOpSig>,
     user: EndUser,
 ) -> Mapping {
-    match &msg {
-        DataMsg::Process(process_msg) => {
-            // Signature has already been validated by the routing layer
-            let op = map_client_process_msg(msg_id, process_msg.clone(), user, data_auth);
+    // Signature has already been validated by the routing layer
+    let op = map_client_service_msg(msg_id, msg.clone(), user, auth);
 
-            let ctx = Some(MsgContext::Client {
-                msg,
-                src: SrcLocation::EndUser(user),
-            });
+    let ctx = Some(MsgContext::Client {
+        msg,
+        src: SrcLocation::EndUser(user),
+    });
 
-            Mapping { op, ctx }
-        }
-        DataMsg::ProcessingError(error) => {
-            warn!(
-                "A node should never receive a DataMsg::ProcessingError {:?}",
-                error
-            );
-
-            Mapping {
-                op: NodeDuty::NoOp,
-                ctx: None,
-            }
-        }
-    }
+    Mapping { op, ctx }
 }
 
-fn map_client_process_msg(
+fn map_client_service_msg(
     msg_id: MessageId,
-    process_msg: ProcessMsg,
+    service_msg: ServiceMsg,
     origin: EndUser,
-    data_auth: Authority<DataSigned>,
+    auth: Authority<ServiceOpSig>,
 ) -> NodeDuty {
-    match process_msg {
-        ProcessMsg::Query(query) => NodeDuty::ProcessRead {
+    match service_msg {
+        ServiceMsg::Query(query) => NodeDuty::ProcessRead {
             query,
             msg_id,
-            data_auth,
+            auth,
             origin,
         },
-        ProcessMsg::Cmd(cmd) => NodeDuty::ProcessWrite {
+        ServiceMsg::Cmd(cmd) => NodeDuty::ProcessWrite {
             cmd,
             msg_id,
-            data_auth,
+            auth,
             origin,
         },
-        ProcessMsg::QueryResponse {
+        ServiceMsg::QueryResponse {
             response,
             correlation_id,
         } => {
             let outgoing_msg = OutgoingMsg {
                 id: MessageId::in_response_to(&correlation_id),
-                msg: MsgType::Client(DataMsg::Process(ProcessMsg::QueryResponse {
+                msg: MsgType::Client(ServiceMsg::QueryResponse {
                     response,
                     correlation_id,
-                })),
+                }),
                 dst: DstLocation::EndUser(origin),
                 aggregation: false,
             };
@@ -87,16 +71,16 @@ fn map_client_process_msg(
         _ => {
             let error_data = convert_to_error_message(Error::InvalidMessage(
                 msg_id,
-                format!("Unknown user msg: {:?}", process_msg),
+                format!("Unknown user msg: {:?}", service_msg),
             ));
             let src = SrcLocation::EndUser(origin);
             let id = MessageId::in_response_to(&msg_id);
 
             NodeDuty::Send(OutgoingMsg {
                 id,
-                msg: MsgType::Client(DataMsg::ProcessingError(ProcessingError {
+                msg: MsgType::Client(ServiceMsg::ServiceError(ServiceError {
                     reason: Some(error_data),
-                    source_message: Some(process_msg),
+                    source_message: Some(Box::new(service_msg)),
                 })),
                 dst: src.to_dst(),
                 aggregation: false,

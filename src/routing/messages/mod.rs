@@ -24,7 +24,7 @@ use xor_name::XorName;
 
 // Utilities for WireMsg.
 pub(crate) trait WireMsgUtils {
-    /// Return 'true' if the message kind is MsgKind::DataMsg or MsgKind::SectionInfoMsg
+    /// Return 'true' if the message kind is MsgKind::ServiceMsg or MsgKind::SectionInfoMsg
     fn is_client_msg_kind(&self) -> bool;
 
     /// Creates a signed message where signature is assumed valid.
@@ -53,11 +53,11 @@ pub(crate) trait WireMsgUtils {
 }
 
 impl WireMsgUtils for WireMsg {
-    /// Return 'true' if the message kind is MsgKind::DataMsg or MsgKind::SectionInfoMsg
+    /// Return 'true' if the message kind is MsgKind::ServiceMsg or MsgKind::SectionInfoMsg
     fn is_client_msg_kind(&self) -> bool {
         matches!(
             self.msg_kind(),
-            MsgKind::DataMsg(_) | MsgKind::SectionInfoMsg
+            MsgKind::ServiceMsg(_) | MsgKind::SectionInfoMsg
         )
     }
 

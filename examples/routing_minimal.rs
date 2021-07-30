@@ -277,7 +277,7 @@ async fn handle_event(index: usize, node: &mut Routing, event: Event) -> bool {
                 index, previous_name, new_name,
             );
         }
-        Event::DataMsgReceived { msg, user, .. } => info!(
+        Event::ServiceMsgReceived { msg, user, .. } => info!(
             "Node #{} received message from user: {:?}, msg: {:?}",
             index, user, msg
         ),

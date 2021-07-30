@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::DataMsg,
+    data::ServiceMsg,
     node::{NodeCmd, NodeQuery, NodeQueryResponse},
-    Authority, DataSigned, DstLocation, EndUser, MessageId, SrcLocation,
+    Authority, DstLocation, EndUser, MessageId, ServiceOpSig, SrcLocation,
 };
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Keypair;
@@ -111,13 +111,13 @@ pub enum Event {
         new_keypair: Arc<Keypair>,
     },
     /// Received a message from a peer.
-    DataMsgReceived {
+    ServiceMsgReceived {
         /// The message ID
         msg_id: MessageId,
         /// The content of the message.
-        msg: Box<DataMsg>,
+        msg: Box<ServiceMsg>,
         /// Data authority
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
         /// The end user that sent the message.
         /// Its xorname is derived from the client public key,
         /// and the socket_id maps against the actual socketaddr

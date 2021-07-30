@@ -10,7 +10,7 @@ use crate::btree_set;
 use crate::messaging::{
     data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery},
-    Authority, DataSigned, EndUser, MessageId,
+    Authority, EndUser, MessageId, ServiceOpSig,
 };
 use crate::node::{
     capacity::{Capacity, CHUNK_COPY_COUNT},
@@ -75,13 +75,13 @@ impl ChunkRecords {
         &self,
         write: ChunkWrite,
         msg_id: MessageId,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         use ChunkWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, data_auth, origin).await,
-            DeletePrivate(address) => self.delete(address, data_auth, origin).await,
+            New(data) => self.store(data, msg_id, auth, origin).await,
+            DeletePrivate(address) => self.delete(address, auth, origin).await,
         }
     }
 
@@ -110,10 +110,10 @@ impl ChunkRecords {
         &self,
         chunk: Chunk,
         msg_id: MessageId,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        if let Err(error) = validate_chunk_owner(&chunk, &data_auth.public_key) {
+        if let Err(error) = validate_chunk_owner(&chunk, &auth.public_key) {
             return self.send_error(error, msg_id, origin).await;
         }
 
@@ -135,7 +135,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::New(chunk),
-                data_signed: data_auth.into_inner(),
+                data_signed: auth.into_inner(),
                 origin,
             }),
             targets: target_holders,
@@ -178,7 +178,7 @@ impl ChunkRecords {
                 info!("REMOVED CORRELATION ID: {}", correlation_id);
                 let our_prefix = network.our_prefix().await;
                 // If in same section, i.e. we are the ClientElders, then send response directly.
-                // Otherwise, i.e. we are the DataElders, forwarding using ForwardDataMsg.
+                // Otherwise, i.e. we are the DataElders, forwarding using ForwardServiceMsg.
                 if our_prefix.matches(&end_user.xorname) {
                     duties.push(NodeDuty::Send(build_client_query_response(
                         response,
@@ -247,7 +247,7 @@ impl ChunkRecords {
     async fn delete(
         &self,
         address: ChunkAddress,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.capacity.get_chunk_holder_adults(address.name()).await;
@@ -256,7 +256,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::DeletePrivate(address),
-                data_signed: data_auth.into_inner(),
+                data_signed: auth.into_inner(),
                 origin,
             }),
             targets,

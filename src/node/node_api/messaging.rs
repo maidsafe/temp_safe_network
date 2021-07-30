@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::DataMsg, node::NodeMsg, DataSigned, DstLocation, MessageId, MsgKind, WireMsg,
+    data::ServiceMsg, node::NodeMsg, DstLocation, MessageId, MsgKind, ServiceOpSig, WireMsg,
 };
 use crate::node::{
     network::Network,
@@ -57,7 +57,7 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
     // FIXME: define which signature/authority this message should really carry,
     // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
     // Giving a random sig temporarily
-    let (msg_kind, payload) = random_client_signature(&DataMsg::ProcessingError(msg.msg))?;
+    let (msg_kind, payload) = random_client_signature(&ServiceMsg::ServiceError(msg.msg))?;
 
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, msg.dst)?;
 
@@ -123,13 +123,13 @@ pub(crate) async fn send_to_nodes(
     Ok(())
 }
 
-fn random_client_signature(client_msg: &DataMsg) -> Result<(MsgKind, Bytes)> {
+fn random_client_signature(client_msg: &ServiceMsg) -> Result<(MsgKind, Bytes)> {
     let mut rng = OsRng;
     let keypair = Keypair::new_ed25519(&mut rng);
     let payload = WireMsg::serialize_msg_payload(client_msg)?;
     let signature = keypair.sign(&payload);
 
-    let msg_kind = MsgKind::DataMsg(DataSigned {
+    let msg_kind = MsgKind::ServiceMsg(ServiceOpSig {
         public_key: keypair.public_key(),
         signature,
     });

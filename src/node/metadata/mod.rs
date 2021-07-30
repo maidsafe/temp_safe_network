@@ -13,9 +13,9 @@ mod elder_stores;
 mod register_storage;
 
 use crate::messaging::{
-    data::{CmdError, DataCmd, DataExchange, DataMsg, DataQuery, ProcessMsg, QueryResponse},
+    data::{CmdError, DataCmd, DataExchange, DataQuery, QueryResponse, ServiceMsg},
     node::NodeMsg,
-    Authority, DataSigned, DstLocation, EndUser, MessageId, WireMsg,
+    Authority, DstLocation, EndUser, MessageId, ServiceOpSig, WireMsg,
 };
 
 use crate::node::{
@@ -92,10 +92,10 @@ impl Metadata {
         &mut self,
         cmd: DataCmd,
         id: MessageId,
-        data_auth: Authority<DataSigned>,
+        auth: Authority<ServiceOpSig>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        self.elder_stores.write(cmd, id, data_auth, origin).await
+        self.elder_stores.write(cmd, id, auth, origin).await
     }
 
     /// Adds a given node to the list of full nodes.
@@ -136,10 +136,10 @@ fn build_client_query_response(
 ) -> OutgoingMsg {
     OutgoingMsg {
         id: MessageId::in_response_to(&correlation_id),
-        msg: MsgType::Client(DataMsg::Process(ProcessMsg::QueryResponse {
+        msg: MsgType::Client(ServiceMsg::QueryResponse {
             response,
             correlation_id,
-        })),
+        }),
         dst: DstLocation::EndUser(origin),
         aggregation: false,
     }
@@ -151,24 +151,24 @@ fn build_forward_query_response(
     origin: EndUser,
     section_pk: BlsPublicKey,
 ) -> Result<OutgoingMsg> {
-    let msg = DataMsg::Process(ProcessMsg::QueryResponse {
+    let msg = ServiceMsg::QueryResponse {
         response,
         correlation_id,
-    });
+    };
 
     let mut rng = OsRng;
     let keypair = Keypair::new_ed25519(&mut rng);
     let payload = WireMsg::serialize_msg_payload(&msg)?;
     let signature = keypair.sign(&payload);
 
-    let data_signed = DataSigned {
+    let data_signed = ServiceOpSig {
         public_key: keypair.public_key(),
         signature,
     };
 
     Ok(OutgoingMsg {
         id: MessageId::in_response_to(&correlation_id),
-        msg: MsgType::Node(NodeMsg::ForwardDataMsg {
+        msg: MsgType::Node(NodeMsg::ForwardServiceMsg {
             msg,
             user: origin,
             data_signed,
@@ -184,18 +184,18 @@ fn build_forward_query_response(
 fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUser) -> OutgoingMsg {
     OutgoingMsg {
         id: MessageId::in_response_to(&msg_id),
-        msg: MsgType::Client(DataMsg::Process(ProcessMsg::CmdError {
+        msg: MsgType::Client(ServiceMsg::CmdError {
             error,
             correlation_id: msg_id,
-        })),
+        }),
         dst: DstLocation::EndUser(origin),
         aggregation: false,
     }
 }
 
 // TODO: verify earlier so that this isn't needed
-fn verify_op(data_signed: DataSigned, cmd: DataCmd) -> Result<Authority<DataSigned>> {
-    let message = DataMsg::Process(ProcessMsg::Cmd(cmd));
+fn verify_op(data_signed: ServiceOpSig, cmd: DataCmd) -> Result<Authority<ServiceOpSig>> {
+    let message = ServiceMsg::Cmd(cmd);
     let payload = WireMsg::serialize_msg_payload(&message)?;
     Ok(Authority::verify(data_signed, &payload)?)
 }
