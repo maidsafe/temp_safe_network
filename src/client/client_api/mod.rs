@@ -12,7 +12,7 @@ mod commands;
 mod queries;
 mod register_apis;
 
-use crate::client::{config_handler::Config, connections::Session, errors::Error};
+use crate::client::{connections::Session, errors::Error, Config};
 use crate::messaging::data::{CmdError, DataCmd};
 use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
 use lru::LruCache;

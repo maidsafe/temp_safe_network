@@ -10,7 +10,7 @@ use anyhow::Result;
 use criterion::{criterion_group, criterion_main, Criterion};
 use safe_network::client::utils::generate_random_vector;
 use safe_network::client::utils::test_utils::{read_network_conn_info, run_w_backoff_delayed};
-use safe_network::client::{config_handler::Config, Client, Error, DEFAULT_QUERY_TIMEOUT};
+use safe_network::client::{Client, Config, Error, DEFAULT_QUERY_TIMEOUT};
 use tokio::runtime::Runtime;
 
 /// This bench requires a network already set up

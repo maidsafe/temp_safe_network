@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::read_network_conn_info;
-use crate::client::{config_handler::Config, Client, DEFAULT_QUERY_TIMEOUT};
+use crate::client::{Client, Config, DEFAULT_QUERY_TIMEOUT};
 use crate::types::Keypair;
 use anyhow::Result;
 use std::sync::Once;

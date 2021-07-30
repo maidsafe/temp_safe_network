@@ -26,20 +26,20 @@
 //! TODO: update once data types are crdt compliant
 //!
 
+mod config_handler;
 mod connections;
 mod errors;
 
 // Export public API.
 
 pub use client_api::Client;
+pub use config_handler::Config;
 pub use errors::Error;
 pub use errors::ErrorMessage;
 pub use qp2p::Config as QuicP2pConfig;
 
 /// Client trait and related constants.
 pub mod client_api;
-/// Config file handling.
-pub mod config_handler;
 
 /// Default timeout in
 pub const DEFAULT_QUERY_TIMEOUT: u64 = 20; // 20 seconds
