@@ -520,7 +520,9 @@ impl Safe {
                 .iter()
                 .map(|(h, _)| h.to_owned())
                 .collect();
-            let entry_hash = &self.write_to_register(&safe_url.to_string(), entry, replace).await?;
+            let entry_hash = &self
+                .write_to_register(&safe_url.to_string(), entry, replace)
+                .await?;
             let new_version: VersionHash = entry_hash.into();
 
             if update_nrs {
