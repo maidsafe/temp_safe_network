@@ -113,7 +113,7 @@ impl Safe {
             nrs_map_xorurl.as_bytes().to_owned(),
         );
         let entry_hash = &self.multimap_insert(&xorurl, entry, old_values).await?;
-        let new_version:VersionHash = entry_hash.into();
+        let new_version: VersionHash = entry_hash.into();
 
         Ok((new_version, xorurl, processed_entries, nrs_map))
     }
@@ -225,7 +225,7 @@ impl Safe {
             nrs_map_xorurl.as_bytes().to_owned(),
         );
         let entry_hash = &self.multimap_insert(&xorurl, entry, old_values).await?;
-        let new_version:VersionHash = entry_hash.into();
+        let new_version: VersionHash = entry_hash.into();
 
         Ok((new_version, xorurl, processed_entries, nrs_map))
     }
@@ -253,58 +253,59 @@ impl Safe {
         debug!("Getting latest resolvable map container from: {:?}", url);
         let safe_url = Safe::parse_url(url)?;
 
-        // fetch multimap latest values
-        // TODO: manage multiple resolutions currently only returns the 1st one
-        let data = match self.fetch_multimap_values(&safe_url).await?.iter().next() {
-            Some((register_entry_hash, (_name, nrs_map_xorurl_bytes))) => {
-                Ok((register_entry_hash.into(), nrs_map_xorurl_bytes.to_owned()))
-            }
-            None => Err(Error::EmptyContent(format!(
-                "Empty Register found at XoR name {}",
-                safe_url.xorname()
-            ))),
-        };
+        // fetch latest entries and wrap errors
+        let entries = self
+            .fetch_multimap_values(&safe_url)
+            .await
+            .map_err(|e| match e {
+                Error::ContentNotFound(_) => {
+                    Error::ContentNotFound(ERROR_MSG_NO_NRS_MAP_FOUND.to_string())
+                }
+                Error::VersionNotFound(msg) => Error::VersionNotFound(msg),
+                err => Error::NetDataError(format!("Failed to get current version: {}", err)),
+            })?;
 
-        match data {
-            Ok((version, nrs_map_xorurl_bytes)) => {
-                // We first parse the NrsMap XOR-URL from the Register
-                let url = String::from_utf8(nrs_map_xorurl_bytes.to_owned()).map_err(|err| {
+        // take the 1st entry (TODO Multiple entries)
+        if entries.len() > 1 {
+            unimplemented!("Multiple NRS map entries not managed, this happends when 2 clients write concurrently to a NRS map");
+        }
+        let first_entry = entries.iter().next();
+        let (version, nrs_map_xorurl_bytes);
+        if let Some((v, (_name, m))) = first_entry {
+            version = v.into();
+            nrs_map_xorurl_bytes = m.to_owned();
+        } else {
+            warn!(
+                "NRS map Register found at XOR name \"{:?}\" was empty",
+                safe_url.xorname()
+            );
+            return Ok((VersionHash::default(), NrsMap::default()));
+        }
+
+        // get the xorurl from nrs container
+        let url = String::from_utf8(nrs_map_xorurl_bytes.to_owned()).map_err(|err| {
+            Error::ContentError(format!(
+                "Couldn't parse the NrsMap link stored in the NrsMapContainer: {:?}",
+                err
+            ))
+        })?;
+        debug!("Deserialised NrsMap XOR-URL: {}", url);
+        let nrs_map_xorurl = SafeUrl::from_url(&url)?;
+
+        // Using the NrsMap XOR-URL we can now fetch the NrsMap and deserialise it
+        let serialised_nrs_map = self.fetch_public_blob(&nrs_map_xorurl, None).await?;
+
+        debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
+        let nrs_map =
+            serde_json::from_str(&String::from_utf8_lossy(&serialised_nrs_map.as_slice()))
+                .map_err(|err| {
                     Error::ContentError(format!(
-                        "Couldn't parse the NrsMap link stored in the NrsMapContainer: {:?}",
+                        "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
                         err
                     ))
                 })?;
-                debug!("Deserialised NrsMap XOR-URL: {}", url);
-                let nrs_map_xorurl = SafeUrl::from_url(&url)?;
 
-                // Using the NrsMap XOR-URL we can now fetch the NrsMap and deserialise it
-                let serialised_nrs_map = self.fetch_public_blob(&nrs_map_xorurl, None).await?;
-
-                debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
-                let nrs_map =
-                    serde_json::from_str(&String::from_utf8_lossy(&serialised_nrs_map.as_slice()))
-                        .map_err(|err| {
-                            Error::ContentError(format!(
-                                "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
-                                err
-                            ))
-                        })?;
-
-                Ok((version, nrs_map))
-            }
-            Err(Error::EmptyContent(_)) => {
-                warn!("Nrs container found at {:?} was empty", &url);
-                Ok((VersionHash::default(), NrsMap::default()))
-            }
-            Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
-                ERROR_MSG_NO_NRS_MAP_FOUND.to_string(),
-            )),
-            Err(Error::VersionNotFound(msg)) => Err(Error::VersionNotFound(msg)),
-            Err(err) => Err(Error::NetDataError(format!(
-                "Failed to get current version: {}",
-                err
-            ))),
-        }
+        Ok((version, nrs_map))
     }
 
     // Private helper to serialise an NrsMap and store it in a Public Blob
@@ -353,7 +354,6 @@ fn sanitised_url(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::nrs_map::DefaultRdf;
-    use std::str::FromStr;
     use super::*;
     use crate::{
         app::{
@@ -390,7 +390,10 @@ mod tests {
                 .get(PREDICATE_LINK)
                 .ok_or_else(|| anyhow!("Entry not found with key '{}'", PREDICATE_LINK))?;
 
-            assert_eq!(*link, format!("safe://linked-from-site_name?v={}", VersionHash::default()));
+            assert_eq!(
+                *link,
+                format!("safe://linked-from-site_name?v={}", VersionHash::default())
+            );
             assert_eq!(
                 nrs_map.get_default()?,
                 &DefaultRdf::OtherRdf(def_data.clone())
@@ -456,8 +459,13 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
         let link_v0 = format!("{}?v={}", link, version0);
 
-        let (xorurl, _, _) = retry_loop!(safe
-            .nrs_map_container_create(&format!("b.{}", site_name), &link_v0, true, false, false));
+        let (xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
+            &format!("b.{}", site_name),
+            &link_v0,
+            true,
+            false,
+            false
+        ));
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
@@ -524,30 +532,31 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
         let link_v0 = format!("{}?v={}", link, version0);
 
-        let (xorurl, _, nrs_map) = retry_loop!(safe
-            .nrs_map_container_create(
-                &format!("a.b.{}", site_name),
-                &link_v0,
-                true,
-                false,
-                false,
-            )
-        );
+        let (xorurl, _, nrs_map) = retry_loop!(safe.nrs_map_container_create(
+            &format!("a.b.{}", site_name),
+            &link_v0,
+            true,
+            false,
+            false,
+        ));
         assert_eq!(nrs_map.sub_names_map.len(), 1);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let dummy_version = "hqt1zg7dwci3ze7dfqp48e3muqt4gkh5wqt1zg7dwci3ze7dfqp4y";
         let link_v1 = format!("{}?v={}", link, dummy_version);
-        let (version1, _, _, _) = retry_loop!(safe
-            .nrs_map_container_add(&format!("a2.b.{}", site_name), &link_v1, true, false, false)
-        );
+        let (version1, _, _, _) = retry_loop!(safe.nrs_map_container_add(
+            &format!("a2.b.{}", site_name),
+            &link_v1,
+            true,
+            false,
+            false
+        ));
 
         let _ = retry_loop_for_pattern!(safe.nrs_map_container_get(&xorurl), Ok((version, _)) if *version == version1)?;
 
         // remove subname
-        let (version, _, _, updated_nrs_map) = retry_loop!(safe
-            .nrs_map_container_remove(&format!("a.b.{}", site_name), false)
-        );
+        let (version, _, _, updated_nrs_map) =
+            retry_loop!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
 
         assert!(version != version0);
         assert!(version != version1);
@@ -569,22 +578,19 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
         let link_v0 = format!("{}?v={}", link, version0);
 
-        let (xorurl, _, nrs_map) = retry_loop!(safe
-            .nrs_map_container_create(
-                &format!("a.b.{}", site_name),
-                &link_v0,
-                true,
-                false,
-                false,
-            )
-        );
+        let (xorurl, _, nrs_map) = retry_loop!(safe.nrs_map_container_create(
+            &format!("a.b.{}", site_name),
+            &link_v0,
+            true,
+            false,
+            false,
+        ));
         assert_eq!(nrs_map.sub_names_map.len(), 1);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // remove subname
-        let (_version, _, _, updated_nrs_map) = retry_loop!(safe
-            .nrs_map_container_remove(&format!("a.b.{}", site_name), false)
-        );
+        let (_version, _, _, updated_nrs_map) =
+            retry_loop!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
         // assert_eq!(version, 1);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
         match updated_nrs_map.get_default_link() {
@@ -613,22 +619,19 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
         let link_v0 = format!("{}?v={}", link, version0);
 
-        let (xorurl, _, nrs_map) = retry_loop!(safe
-            .nrs_map_container_create(
-                &format!("a.b.{}", site_name),
-                &link_v0,
-                true,
-                true, // this sets the default to be a hard-link
-                false,
-            )
-        );
+        let (xorurl, _, nrs_map) = retry_loop!(safe.nrs_map_container_create(
+            &format!("a.b.{}", site_name),
+            &link_v0,
+            true,
+            true, // this sets the default to be a hard-link
+            false,
+        ));
         assert_eq!(nrs_map.sub_names_map.len(), 1);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // remove subname
-        let (version, _, _, updated_nrs_map) = retry_loop!(safe
-            .nrs_map_container_remove(&format!("a.b.{}", site_name), false)
-        );
+        let (version, _, _, updated_nrs_map) =
+            retry_loop!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
 
         assert!(version != version0);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 0);

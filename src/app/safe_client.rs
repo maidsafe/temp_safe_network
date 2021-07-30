@@ -14,7 +14,7 @@ use log::{debug, info};
 use safe_network::client::{Client, Error as ClientError};
 use safe_network::types::{
     register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
-    ChunkAddress, Error as SafeNdError, Keypair
+    ChunkAddress, Error as SafeNdError, Keypair,
 };
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},

@@ -65,19 +65,21 @@ impl Safe {
         // take entry with version hash
         if let Some(v) = safeurl.content_version() {
             let hash = v.register_entry_hash();
-            let entry = self.fetch_register_entry(&safeurl, hash).await.map_err(|e| match e {
-                Error::EmptyContent(_) => Error::EmptyContent(format!(
-                    "Register found at \"{}\" was empty",
-                    safeurl
-                )),
-                Error::ContentNotFound(_) => Error::ContentNotFound(
-                    "No Register found at this address".to_string(),
-                ),
-                other => other,
-            })?;
+            let entry = self
+                .fetch_register_entry(&safeurl, hash)
+                .await
+                .map_err(|e| match e {
+                    Error::EmptyContent(_) => {
+                        Error::EmptyContent(format!("Register found at \"{}\" was empty", safeurl))
+                    }
+                    Error::ContentNotFound(_) => {
+                        Error::ContentNotFound("No Register found at this address".to_string())
+                    }
+                    other => other,
+                })?;
             let mut set = BTreeSet::new();
             set.insert((hash, entry));
-            return Ok(set)
+            return Ok(set);
         }
 
         // else take latest entry

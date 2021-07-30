@@ -13,16 +13,15 @@ mod metadata;
 mod realpath;
 
 use crate::{
-    app::nrs::VersionHash,
-    app::consts::*, fetch::Range, Error, Result, Safe, SafeContentType, SafeDataType, SafeUrl,
-    XorUrl,
+    app::consts::*, app::nrs::VersionHash, fetch::Range, Error, Result, Safe, SafeContentType,
+    SafeDataType, SafeUrl, XorUrl,
 };
 use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
+use std::collections::BTreeMap;
 use std::{fs, path::Path};
-use std::collections::{BTreeMap};
 
 pub(crate) use metadata::FileMeta;
 pub(crate) use realpath::RealPath;
@@ -107,7 +106,11 @@ impl Safe {
             )?;
 
             let _ = self
-                .write_to_register(&xor_url, files_map_xorurl.as_bytes().to_vec(), Default::default())
+                .write_to_register(
+                    &xor_url,
+                    files_map_xorurl.as_bytes().to_vec(),
+                    Default::default(),
+                )
                 .await?;
 
             xor_url
@@ -145,23 +148,23 @@ impl Safe {
         safe_url: &SafeUrl,
     ) -> Result<(VersionHash, FilesMap)> {
         // fetch register entries and wrap errors
-        let entries = self.fetch_register_entries(&safe_url).await.map_err(|e| { match e {
-            Error::ContentNotFound(_) => Error::ContentNotFound(
-                ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string(),
-            ),
-            Error::HashNotFound(_) => Error::VersionNotFound(format!(
-                "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                match safe_url.content_version() {
-                    Some(v) => v.to_string(),
-                    None => "None".to_owned(),
-                },
-                safe_url
-            )),
-            err => Error::NetDataError(format!(
-                "Failed to get current version: {}",
-                err
-            )),
-        }})?;
+        let entries = self
+            .fetch_register_entries(&safe_url)
+            .await
+            .map_err(|e| match e {
+                Error::ContentNotFound(_) => {
+                    Error::ContentNotFound(ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string())
+                }
+                Error::HashNotFound(_) => Error::VersionNotFound(format!(
+                    "Version '{}' is invalid for FilesContainer found at \"{}\"",
+                    match safe_url.content_version() {
+                        Some(v) => v.to_string(),
+                        None => "None".to_owned(),
+                    },
+                    safe_url
+                )),
+                err => Error::NetDataError(format!("Failed to get current version: {}", err)),
+            })?;
 
         // take the 1st entry (TODO Multiple entries)
         if entries.len() > 1 {
@@ -174,7 +177,7 @@ impl Safe {
             curr_serialised_files_map = m.to_owned();
         } else {
             warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
-            return Ok((VersionHash::default(), FilesMap::default()))
+            return Ok((VersionHash::default(), FilesMap::default()));
         }
 
         debug!("Files map retrieved.... v{:?}", &version);
@@ -191,13 +194,12 @@ impl Safe {
 
         // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
         let serialised_files_map = self.fetch_public_blob(&files_map_xorurl, None).await?;
-        let files_map =
-            serde_json::from_slice(serialised_files_map.as_slice()).map_err(|err| {
-                Error::ContentError(format!(
-                    "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
-                    err
-                ))
-            })?;
+        let files_map = serde_json::from_slice(serialised_files_map.as_slice()).map_err(|err| {
+            Error::ContentError(format!(
+                "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
+                err
+            ))
+        })?;
 
         Ok((version, files_map))
     }
@@ -503,9 +505,7 @@ impl Safe {
         dry_run: bool,
         update_nrs: bool,
     ) -> Result<VersionHash> {
-        let version = if success_count == 0 {
-            current_version
-        } else if dry_run {
+        let version = if success_count == 0 || dry_run {
             current_version
         } else {
             // The FilesContainer is updated by adding an entry containing the link to
@@ -514,9 +514,14 @@ impl Safe {
 
             // append entry to register
             let entry = files_map_xorurl.as_bytes().to_vec();
-            let replace = self.register_read(&url).await?.iter().map(|(h,_)| h.to_owned()).collect();
+            let replace = self
+                .register_read(&url)
+                .await?
+                .iter()
+                .map(|(h, _)| h.to_owned())
+                .collect();
             let entry_hash = &self.write_to_register(&url, entry, replace).await?;
-            let new_version:VersionHash = entry_hash.into();
+            let new_version: VersionHash = entry_hash.into();
 
             if update_nrs {
                 // We need to update the link in the NRS container as well,
