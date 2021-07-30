@@ -310,7 +310,7 @@ mod tests {
 
     const TIMEOUT: Duration = Duration::from_secs(1);
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn successful_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::new(transport_config(), tx).await?;
@@ -341,7 +341,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn successful_send_to_subset() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::new(transport_config(), tx).await?;
@@ -372,7 +372,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn failed_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::new(
@@ -402,7 +402,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn successful_send_after_failed_attempts() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::new(
@@ -432,7 +432,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn partially_successful_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::new(
@@ -467,7 +467,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn send_after_reconnect() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let send_comm = Comm::new(transport_config(), tx).await?;
@@ -525,7 +525,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn incoming_connection_lost() -> Result<()> {
         let (tx, mut rx0) = mpsc::channel(1);
         let comm0 = Comm::new(transport_config(), tx).await?;

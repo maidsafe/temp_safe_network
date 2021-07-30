@@ -84,7 +84,7 @@ mod test {
     use tempfile::tempdir;
     use xor_name::XorName;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn history_of_register() -> Result<()> {
         let id = xor_name::XorName::random();
         let tmp_dir = tempdir()?;

@@ -87,7 +87,7 @@ impl Chunks {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn used_space_increases() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng)?;
@@ -121,7 +121,7 @@ async fn used_space_increases() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "it doesn't decrease.."]
 async fn used_space_decreases() -> Result<()> {
     let mut rng = new_rng();
@@ -158,7 +158,7 @@ async fn used_space_decreases() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn successful_put() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng)?;
@@ -189,7 +189,7 @@ async fn successful_put() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn failed_put_when_not_enough_space() -> Result<()> {
     let mut rng = new_rng();
     let root = temp_dir()?;
@@ -218,7 +218,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn delete() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng)?;
@@ -248,7 +248,7 @@ async fn delete() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn put_and_get_value_should_be_same() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng)?;
@@ -274,7 +274,7 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Has been failing for a long time, fix coming up."]
 async fn overwrite_value() -> Result<()> {
     let mut rng = new_rng();
@@ -312,7 +312,7 @@ async fn overwrite_value() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
@@ -332,7 +332,7 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn keys() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng)?;

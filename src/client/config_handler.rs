@@ -85,7 +85,7 @@ mod tests {
     // 2. Write the default config file to temp directory.
     // 3. Assert that `Config::new()` reads the default config written to disk.
     // 4. Verify that `Config::new()` returns the correct default config when no path is provided.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn custom_config_path() -> Result<()> {
         init_logger();
