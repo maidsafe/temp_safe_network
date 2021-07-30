@@ -170,10 +170,6 @@ pub async fn run_split() -> Result<()> {
 
     sleep(interval_duration).await;
 
-    // relative to the cargo run command's cwd
-    let path = std::fs::canonicalize("./scripts/has_split.sh")?;
-    let _ = Command::new(path).output()?;
-
     // now we read the data
     let bootstrap_contacts =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
