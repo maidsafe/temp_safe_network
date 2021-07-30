@@ -8,6 +8,23 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
+  install-script-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test safe install script with specific version
+        run: |
+          ./resources/install.sh --version="0.33.0"
+          safe_version=$($HOME/.safe/cli/safe --version | awk '{print $2}')
+          if [[ "$safe_version" != "0.33.0" ]]; then
+            echo "The install script with the --version option should install the correct version."
+            echo "Expected version: 0.33.0"
+            echo "Version reported by sn_node: $sn_node_version"
+            exit 1
+          fi
   network-test:
     # if: ${{ github.repository_owner == 'maidsafe' }}
     name: E2E against real network
@@ -29,7 +46,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build
         run: cargo build --release

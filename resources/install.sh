@@ -120,7 +120,8 @@ sn_cli_install() {
           exit 1
   esac
 
-  cli_package="sn_cli-$(sn_cli_latest_version)-$arch-$platform.tar.gz"
+  if [ -z "$safe_version" ]; then safe_version=$(sn_cli_latest_version); fi
+  cli_package="sn_cli-$safe_version-$arch-$platform.tar.gz"
   cli_package_url="https://sn-api.s3.eu-west-2.amazonaws.com/$cli_package"
   tmp_dir=$(mktemp -d)
   tmp_dir_package=$tmp_dir/$cli_package
@@ -185,6 +186,36 @@ sn_cli_reset() {
     sn_cli_profile_is_bash_or_zsh sn_cli_install
 }
 
+usage() {
+    printf "Usage: $0 [-v=<version> or --version=<version>]\n\n"
+    printf "To install a specific version of safe, you can optionally supply a version number.\n"
+    printf "You should supply it without the 'v' prefix.\n\n"
+    printf "Example: ./install.sh --version=0.33.0\n\n"
+    printf "If no version number is supplied, the latest version will be installed.\n"
+    exit 1
+}
+
+# It would have been nice to wrap the argument parsing in a little function, but
+# unfortunately it seems to be the case that you can't consume "$@" inside a
+# function.
+
+# The reason for doing this manually and not using getopts or getopt, is because
+# macOS doesn't have a getopts install and the version of getopt it has by
+# default is not the GNU one, so the behaviour will be different on macOS and
+# Linux. For that reason, we just parse them 'manually'.
+safe_version=""
+for arg in "$@"; do
+    case $arg in
+        -v=*|--version=*)
+            safe_version="${arg#*=}"
+            shift
+            ;;
+        *)
+            printf "The %s argument is not supported\n\n" "$arg"
+            usage
+            ;;
+    esac
+done
 sn_cli_install
 
 } # this ensures the entire script is downloaded #
