@@ -70,15 +70,11 @@ impl Client {
             }
         };
 
-        let mut qp2p_config = config.qp2p;
-        // We use feature `no-igd` so this will use the echo service only
-        qp2p_config.forward_port = true;
-
         // Incoming error notifiers
         let (err_sender, err_receiver) = tokio::sync::mpsc::channel::<CmdError>(10);
 
         // Create the session with the network
-        let mut session = Session::new(qp2p_config, err_sender)?;
+        let mut session = Session::new(config.qp2p, err_sender)?;
 
         let client_pk = keypair.public_key();
 
