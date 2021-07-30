@@ -17,10 +17,7 @@ use crate::messaging::data::{CmdError, DataCmd};
 use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
 use lru::LruCache;
 use rand::rngs::OsRng;
-use std::{
-    path::Path,
-    {collections::HashSet, net::SocketAddr, sync::Arc},
-};
+use std::sync::Arc;
 use tokio::{
     sync::{mpsc::Receiver, RwLock},
     time::Duration,
@@ -57,8 +54,7 @@ impl Client {
     ///
     pub async fn new(
         optional_keypair: Option<Keypair>,
-        config_file_path: Option<&Path>,
-        bootstrap_config: Option<HashSet<SocketAddr>>,
+        config: Config,
         query_timeout: u64,
     ) -> Result<Self, Error> {
         let mut rng = OsRng;
@@ -78,7 +74,7 @@ impl Client {
             }
         };
 
-        let mut qp2p_config = Config::new(config_file_path, bootstrap_config).await.qp2p;
+        let mut qp2p_config = config.qp2p;
         // We use feature `no-igd` so this will use the echo service only
         qp2p_config.forward_port = true;
 
@@ -168,7 +164,10 @@ mod tests {
     use super::*;
     use crate::client::utils::test_utils::{create_test_client, create_test_client_with};
     use anyhow::Result;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::{
+        collections::HashSet,
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+    };
 
     #[tokio::test(flavor = "multi_thread")]
     async fn client_creation() -> Result<()> {

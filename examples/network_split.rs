@@ -23,7 +23,10 @@ use tiny_keccak::{Hasher, Sha3};
 
 use anyhow::{anyhow, Context, Result};
 use safe_network::{
-    client::{utils::generate_random_vector, utils::test_utils::read_network_conn_info, Client},
+    client::{
+        config_handler::Config, utils::generate_random_vector,
+        utils::test_utils::read_network_conn_info, Client,
+    },
     types::ChunkAddress,
     url::{SafeContentType, SafeUrl, DEFAULT_XORURL_BASE},
 };
@@ -174,7 +177,8 @@ pub async fn run_split() -> Result<()> {
     let bootstrap_contacts =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
-    let client = Client::new(None, None, Some(bootstrap_contacts), QUERY_TIMEOUT).await?;
+    let config = Config::new(None, Some(bootstrap_contacts)).await;
+    let client = Client::new(None, config, QUERY_TIMEOUT).await?;
 
     for (address, hash) in all_data_put {
         println!("...fetching Blob at address {:?} ...", address);
@@ -211,7 +215,8 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_contacts);
-    let client = Client::new(None, None, Some(bootstrap_contacts), QUERY_TIMEOUT).await?;
+    let config = Config::new(None, Some(bootstrap_contacts)).await;
+    let client = Client::new(None, config, QUERY_TIMEOUT).await?;
 
     let raw_data = generate_random_vector::<u8>(1024 * 1024);
 

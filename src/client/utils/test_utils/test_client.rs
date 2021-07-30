@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::read_network_conn_info;
-use crate::client::{Client, DEFAULT_QUERY_TIMEOUT};
+use crate::client::{config_handler::Config, Client, DEFAULT_QUERY_TIMEOUT};
 use crate::types::Keypair;
 use anyhow::Result;
 use std::sync::Once;
@@ -43,7 +43,8 @@ pub async fn create_test_client_with(
     init_logger();
     let timeout = timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
     let contact_info = read_network_conn_info()?;
-    let client = Client::new(optional_keypair.clone(), None, Some(contact_info), timeout).await?;
+    let config = Config::new(None, Some(contact_info)).await;
+    let client = Client::new(optional_keypair.clone(), config, timeout).await?;
 
     Ok(client)
 }
