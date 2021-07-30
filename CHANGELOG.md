@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.19.0](https://github.com/maidsafe/safe_network/compare/v0.18.0...v0.19.0) (2021-07-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* MessageType::Client no longer exists
+
+### Features
+
+* Handle register writes in routing directly ([7cd84fa](https://github.com/maidsafe/safe_network/commit/7cd84fac2d56bb101ca5ae66e93237a8ed28a2f0))
+* move RegisterReads to routing ([e17626a](https://github.com/maidsafe/safe_network/commit/e17626a977704191626d0a0a21b714687526d688))
+
+
+* rename MessageType::Client to Data ([a53511c](https://github.com/maidsafe/safe_network/commit/a53511c6cf8614c2f0a15ab399bcdd33c697f241))
+
 ## [0.18.0](https://github.com/maidsafe/safe_network/compare/v0.17.7...v0.18.0) (2021-07-30)
 
 
