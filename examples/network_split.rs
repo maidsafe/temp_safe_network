@@ -40,7 +40,7 @@ const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "2";
 const RUST_LOG: &str = "RUST_LOG";
 const ADDITIONAL_NODES_TO_SPLIT: u64 = 30;
-const QUERY_TIMEOUT: u64 = 30;
+const QUERY_TIMEOUT: Duration = Duration::from_secs(30);
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
@@ -176,8 +176,8 @@ pub async fn run_split() -> Result<()> {
     let bootstrap_contacts =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
-    let config = Config::new(None, Some(bootstrap_contacts)).await;
-    let client = Client::new(None, config, QUERY_TIMEOUT).await?;
+    let config = Config::new(None, Some(bootstrap_contacts), Some(QUERY_TIMEOUT)).await;
+    let client = Client::new(None, config).await?;
 
     for (address, hash) in all_data_put {
         println!("...fetching Blob at address {:?} ...", address);
@@ -214,8 +214,8 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_contacts);
-    let config = Config::new(None, Some(bootstrap_contacts)).await;
-    let client = Client::new(None, config, QUERY_TIMEOUT).await?;
+    let config = Config::new(None, Some(bootstrap_contacts), Some(QUERY_TIMEOUT)).await;
+    let client = Client::new(None, config).await?;
 
     let raw_data = generate_random_vector::<u8>(1024 * 1024);
 

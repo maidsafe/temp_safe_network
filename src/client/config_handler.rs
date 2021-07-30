@@ -9,24 +9,37 @@
 use crate::client::Error;
 use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr, path::Path};
+use std::{collections::HashSet, net::SocketAddr, path::Path, time::Duration};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::io::{self};
 use tracing::{debug, warn};
+
+/// Defaul amount of time to wait for responses to queries before giving up and returning an error.
+pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Configuration for sn_client.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub struct Config {
     /// QuicP2p options.
     pub qp2p: QuicP2pConfig,
+
+    /// The amount of time to wait for responses to queries before giving up and returning an error.
+    pub query_timeout: Duration,
 }
 
 impl Config {
-    /// Returns a new `Config` instance. Tries to read quic-p2p config from file.
+    /// Returns a new `Config` instance.
+    ///
+    /// This will try to read QuicP2P configuration from `config_file_path`, or else use the default
+    /// QuicP2P config. In either case, `bootstrap_config` will be used to override the initial
+    /// network contacts.
+    ///
+    /// If `query_timeout` is not specified, [`DEFAULT_QUERY_TIMEOUT`] will be used.
     pub async fn new(
         config_file_path: Option<&Path>,
         bootstrap_config: Option<HashSet<SocketAddr>>,
+        query_timeout: Option<Duration>,
     ) -> Self {
         // If a config file path was provided we try to read it,
         // otherwise we use default qp2p config.
@@ -48,7 +61,10 @@ impl Config {
             qp2p.hard_coded_contacts = contacts;
         }
 
-        Self { qp2p }
+        Self {
+            qp2p,
+            query_timeout: query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT),
+        }
     }
 }
 
@@ -96,7 +112,7 @@ mod tests {
 
         // In the absence of a config file, the config handler
         // should initialize bootstrap_cache_dir only
-        let config = Config::new(Some(&config_filepath), None).await;
+        let config = Config::new(Some(&config_filepath), None, None).await;
         // convert to string for assert
         let mut str_path = path
             .to_str()
@@ -112,6 +128,7 @@ mod tests {
                 bootstrap_cache_dir: Some(str_path),
                 ..Default::default()
             },
+            query_timeout: DEFAULT_QUERY_TIMEOUT,
         };
         assert_eq!(config, expected_config);
 
@@ -122,10 +139,10 @@ mod tests {
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = Config::new(Some(&config_filepath), None).await;
+        let read_cfg = Config::new(Some(&config_filepath), None, None).await;
         assert_eq!(config_on_disk, read_cfg);
 
-        let default_cfg = Config::new(None, None).await;
+        let default_cfg = Config::new(None, None, None).await;
         assert_eq!(Config::default(), default_cfg);
 
         Ok(())
