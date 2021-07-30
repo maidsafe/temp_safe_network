@@ -10,7 +10,7 @@ use super::Core;
 use crate::messaging::{
     node::{
         DkgKey, ElderCandidates, JoinResponse, Network, NodeMsg, NodeState, Peer, Proposal,
-        RelocateDetails, RelocatePromise, Section, SectionSigned,
+        RelocateDetails, RelocatePromise, Section, SectionAuth,
     },
     DstLocation, WireMsg,
 };
@@ -113,10 +113,7 @@ impl Core {
     }
 
     // Send NodeApproval to a joining node which makes them a section member
-    pub(crate) fn send_node_approval(
-        &self,
-        node_state: SectionSigned<NodeState>,
-    ) -> Result<Command> {
+    pub(crate) fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Result<Command> {
         info!(
             "Our section with {:?} has approved peer {:?}.",
             self.section.prefix(),

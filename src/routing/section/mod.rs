@@ -17,11 +17,11 @@ pub(crate) use self::section_authority_provider::test_utils;
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 use crate::messaging::{
-    node::{ElderCandidates, KeyedSig, NodeState, Peer, Section, SectionPeers, SectionSigned},
+    node::{ElderCandidates, KeyedSig, NodeState, Peer, Section, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionSignedUtils,
+    dkg::SectionAuthUtils,
     error::{Error, Result},
     peer::PeerUtils,
     ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
@@ -43,7 +43,7 @@ pub(super) trait SectionUtils {
     fn new(
         genesis_key: bls::PublicKey,
         chain: SecuredLinkedList,
-        section_auth: SectionSigned<SectionAuthorityProvider>,
+        section_auth: SectionAuth<SectionAuthorityProvider>,
     ) -> Result<Self, Error>
     where
         Self: Sized;
@@ -60,12 +60,12 @@ pub(super) trait SectionUtils {
     /// Update the `SectionAuthorityProvider` of our section.
     fn update_elders(
         &mut self,
-        new_section_auth: SectionSigned<SectionAuthorityProvider>,
+        new_section_auth: SectionAuth<SectionAuthorityProvider>,
         new_key_sig: KeyedSig,
     ) -> bool;
 
     /// Update the member. Returns whether it actually changed anything.
-    fn update_member(&mut self, node_state: SectionSigned<NodeState>) -> bool;
+    fn update_member(&mut self, node_state: SectionAuth<NodeState>) -> bool;
 
     fn chain(&self) -> &SecuredLinkedList;
 
@@ -78,7 +78,7 @@ pub(super) trait SectionUtils {
 
     fn authority_provider(&self) -> &SectionAuthorityProvider;
 
-    fn section_signed_authority_provider(&self) -> &SectionSigned<SectionAuthorityProvider>;
+    fn section_signed_authority_provider(&self) -> &SectionAuth<SectionAuthorityProvider>;
 
     fn is_elder(&self, name: &XorName) -> bool;
 
@@ -120,7 +120,7 @@ impl SectionUtils for Section {
     fn new(
         genesis_key: bls::PublicKey,
         chain: SecuredLinkedList,
-        section_auth: SectionSigned<SectionAuthorityProvider>,
+        section_auth: SectionAuth<SectionAuthorityProvider>,
     ) -> Result<Self, Error> {
         if section_auth.sig.public_key != *chain.last_key() {
             error!("can't create section: section_auth signed with incorrect key");
@@ -154,7 +154,7 @@ impl SectionUtils for Section {
         for peer in section.section_auth.value.peers() {
             let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
-            let _ = section.members.update(SectionSigned {
+            let _ = section.members.update(SectionAuth {
                 value: node_state,
                 sig,
             });
@@ -205,7 +205,7 @@ impl SectionUtils for Section {
     /// Update the `SectionAuthorityProvider` of our section.
     fn update_elders(
         &mut self,
-        new_section_auth: SectionSigned<SectionAuthorityProvider>,
+        new_section_auth: SectionAuth<SectionAuthorityProvider>,
         new_key_sig: KeyedSig,
     ) -> bool {
         if new_section_auth.value.prefix() != *self.prefix()
@@ -244,7 +244,7 @@ impl SectionUtils for Section {
     }
 
     /// Update the member. Returns whether it actually changed anything.
-    fn update_member(&mut self, node_state: SectionSigned<NodeState>) -> bool {
+    fn update_member(&mut self, node_state: SectionAuth<NodeState>) -> bool {
         if !node_state.verify(&self.chain) {
             error!("can't merge member {:?}", node_state.value);
             return false;
@@ -285,7 +285,7 @@ impl SectionUtils for Section {
         &self.section_auth.value
     }
 
-    fn section_signed_authority_provider(&self) -> &SectionSigned<SectionAuthorityProvider> {
+    fn section_signed_authority_provider(&self) -> &SectionAuth<SectionAuthorityProvider> {
         &self.section_auth
     }
 
@@ -427,12 +427,12 @@ fn create_first_section_authority_provider(
     pk_set: &bls::PublicKeySet,
     sk_share: &bls::SecretKeyShare,
     mut peer: Peer,
-) -> Result<SectionSigned<SectionAuthorityProvider>> {
+) -> Result<SectionAuth<SectionAuthorityProvider>> {
     peer.set_reachable(true);
     let section_auth =
         SectionAuthorityProvider::new(iter::once(peer), Prefix::default(), pk_set.clone());
     let sig = create_first_sig(pk_set, sk_share, &section_auth)?;
-    Ok(SectionSigned::new(section_auth, sig))
+    Ok(SectionAuth::new(section_auth, sig))
 }
 
 fn create_first_sig<T: Serialize>(

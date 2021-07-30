@@ -11,7 +11,7 @@ use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataCmd, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
-    MessageId, ServiceOpSig, WireMsg,
+    MessageId, ServiceAuth, WireMsg,
 };
 use crate::messaging::{DstLocation, MsgKind};
 use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
@@ -112,7 +112,7 @@ impl Session {
     pub(crate) async fn send_cmd(
         &self,
         cmd: DataCmd,
-        data_signed: ServiceOpSig,
+        auth: ServiceAuth,
         payload: Bytes,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint()?.clone();
@@ -151,7 +151,7 @@ impl Session {
             name: dst_section_name,
             section_pk,
         };
-        let msg_kind = MsgKind::ServiceMsg(data_signed);
+        let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let msg_bytes = wire_msg.serialize()?;
@@ -195,7 +195,7 @@ impl Session {
     pub(crate) async fn send_query(
         &self,
         query: DataQuery,
-        data_signed: ServiceOpSig,
+        auth: ServiceAuth,
         payload: Bytes,
     ) -> Result<QueryResult, Error> {
         let endpoint = self.endpoint()?.clone();
@@ -219,7 +219,7 @@ impl Session {
             section_pk,
         };
         let msg_id = MessageId::new();
-        let msg_kind = MsgKind::ServiceMsg(data_signed);
+        let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let msg_bytes = wire_msg.serialize()?;

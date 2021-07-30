@@ -22,8 +22,8 @@ use super::Core;
 use crate::messaging::{
     data::ServiceMsg,
     node::{NodeMsg, Proposal},
-    Authority, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionSigned,
-    ServiceOpSig, WireMsg,
+    AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
+    ServiceAuth, WireMsg,
 };
 use rand::rngs::OsRng;
 
@@ -194,11 +194,7 @@ impl Core {
         let src_name = msg_authority.name();
 
         match node_msg {
-            NodeMsg::ForwardServiceMsg {
-                msg,
-                user,
-                data_signed,
-            } => {
+            NodeMsg::ForwardServiceMsg { msg, user, auth } => {
                 // If elder, always handle Forward
                 if self.is_not_elder() {
                     return Ok(vec![]);
@@ -208,7 +204,7 @@ impl Core {
                 // TODO: preserve the source bytes so we don't need to serialize again here, or else
                 // verify earlier.
                 let payload = WireMsg::serialize_msg_payload(&msg)?;
-                let auth = Authority::verify(data_signed, &payload)?;
+                let auth = AuthorityProof::verify(auth, &payload)?;
 
                 Ok(vec![Command::HandleServiceMessage {
                     msg_id,
@@ -476,7 +472,7 @@ impl Core {
             return Ok(false);
         };
 
-        match SectionSigned::try_authorize(
+        match SectionAuth::try_authorize(
             &mut self.message_aggregator,
             bls_share_auth.clone().into_inner(),
             &payload,
@@ -500,7 +496,7 @@ impl Core {
         let payload = WireMsg::serialize_msg_payload(client_msg)?;
         let signature = keypair.sign(&payload);
 
-        let msg = MsgKind::ServiceMsg(ServiceOpSig {
+        let msg = MsgKind::ServiceMsg(ServiceAuth {
             public_key: keypair.public_key(),
             signature,
         });

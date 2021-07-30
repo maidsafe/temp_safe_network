@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::SectionSigned, section::NodeState};
+use super::{agreement::SectionAuth, section::NodeState};
 use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
@@ -66,9 +66,9 @@ pub enum JoinResponse {
         /// Network genesis key (needed to validate) section_chain
         genesis_key: BlsPublicKey,
         /// SectionAuthorityProvider Signed by (current section)
-        section_auth: SectionSigned<SectionAuthorityProvider>,
+        section_auth: SectionAuth<SectionAuthorityProvider>,
         /// Current node's state
-        node_state: SectionSigned<NodeState>,
+        node_state: SectionAuth<NodeState>,
         /// Full verifiable section chain
         section_chain: SecuredLinkedList,
     },

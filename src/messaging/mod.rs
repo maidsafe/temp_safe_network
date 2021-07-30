@@ -42,7 +42,7 @@ mod sap;
 
 pub use self::{
     authority::{
-        Authority, BlsShareSigned, NodeSigned, SectionSigned, ServiceOpSig, VerifyAuthority,
+        AuthorityProof, BlsShareAuth, NodeAuth, SectionAuth, ServiceAuth, VerifyAuthority,
     },
     errors::{Error, Result},
     location::{DstLocation, EndUser, SocketId, SrcLocation},

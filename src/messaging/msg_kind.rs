@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{BlsShareSigned, NodeSigned, SectionSigned, ServiceOpSig};
+use super::{BlsShareAuth, NodeAuth, SectionAuth, ServiceAuth};
 use serde::{Deserialize, Serialize};
 
 /// Source authority of a message.
@@ -28,21 +28,21 @@ pub enum MsgKind {
     /// A data message, with the requesting peer's authority.
     ///
     /// Authority is needed to access private data, such as reading or writing a private file.
-    ServiceMsg(ServiceOpSig),
+    ServiceMsg(ServiceAuth),
 
     /// A message from a Node with its own independent authority.
     ///
     /// Node authority is needed when nodes send messages directly to other nodes.
     // FIXME: is the above true? What does is the recieving node validating against?
-    NodeSignedMsg(NodeSigned),
+    NodeAuthMsg(NodeAuth),
 
     /// A message from an Elder node with its share of the section authority.
     ///
     /// Section share authority is needed for messages related to section administration, such as
     /// DKG and relocation.
-    NodeBlsShareSignedMsg(BlsShareSigned),
+    NodeBlsShareAuthMsg(BlsShareAuth),
 
     /// A message from an Elder node with authority of its whole section.
     // FIXME: find an example.
-    SectionSignedMsg(SectionSigned),
+    SectionAuthMsg(SectionAuth),
 }

@@ -15,7 +15,7 @@ mod register_storage;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataExchange, DataQuery, QueryResponse, ServiceMsg},
     node::NodeMsg,
-    Authority, DstLocation, EndUser, MessageId, ServiceOpSig, WireMsg,
+    AuthorityProof, DstLocation, EndUser, MessageId, ServiceAuth, WireMsg,
 };
 
 use crate::node::{
@@ -92,7 +92,7 @@ impl Metadata {
         &mut self,
         cmd: DataCmd,
         id: MessageId,
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         self.elder_stores.write(cmd, id, auth, origin).await
@@ -161,7 +161,7 @@ fn build_forward_query_response(
     let payload = WireMsg::serialize_msg_payload(&msg)?;
     let signature = keypair.sign(&payload);
 
-    let data_signed = ServiceOpSig {
+    let auth = ServiceAuth {
         public_key: keypair.public_key(),
         signature,
     };
@@ -171,7 +171,7 @@ fn build_forward_query_response(
         msg: MsgType::Node(NodeMsg::ForwardServiceMsg {
             msg,
             user: origin,
-            data_signed,
+            auth,
         }),
         dst: DstLocation::Section {
             name: origin.xorname,
@@ -194,8 +194,8 @@ fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUs
 }
 
 // TODO: verify earlier so that this isn't needed
-fn verify_op(data_signed: ServiceOpSig, cmd: DataCmd) -> Result<Authority<ServiceOpSig>> {
+fn verify_op(auth: ServiceAuth, cmd: DataCmd) -> Result<AuthorityProof<ServiceAuth>> {
     let message = ServiceMsg::Cmd(cmd);
     let payload = WireMsg::serialize_msg_payload(&message)?;
-    Ok(Authority::verify(data_signed, &payload)?)
+    Ok(AuthorityProof::verify(auth, &payload)?)
 }

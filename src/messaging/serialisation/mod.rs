@@ -11,8 +11,8 @@ mod wire_msg_header;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    data::ServiceMsg, node::NodeMsg, section_info::SectionInfoMsg, Authority, BlsShareSigned,
-    DstLocation, MessageId, NodeSigned, SectionSigned, ServiceOpSig,
+    data::ServiceMsg, node::NodeMsg, section_info::SectionInfoMsg, AuthorityProof, BlsShareAuth,
+    DstLocation, MessageId, NodeAuth, SectionAuth, ServiceAuth,
 };
 
 /// Type of message.
@@ -35,7 +35,7 @@ pub enum MessageType {
         /// Message ID
         msg_id: MessageId,
         /// Requester's authority over this message
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
         /// Message destination location
         dst_location: DstLocation,
         /// the message
@@ -59,9 +59,9 @@ pub enum MessageType {
 #[derive(PartialEq, Debug, Clone)]
 pub enum NodeMsgAuthority {
     /// Authority of a single peer.
-    Node(Authority<NodeSigned>),
+    Node(AuthorityProof<NodeAuth>),
     /// Authority of a single peer that uses it's BLS Keyshare to sign the message.
-    BlsShare(Authority<BlsShareSigned>),
+    BlsShare(AuthorityProof<BlsShareAuth>),
     /// Authority of a whole section.
-    Section(Authority<SectionSigned>),
+    Section(AuthorityProof<SectionAuth>),
 }

@@ -10,7 +10,7 @@ use crate::btree_set;
 use crate::messaging::{
     data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery},
-    Authority, EndUser, MessageId, ServiceOpSig,
+    AuthorityProof, EndUser, MessageId, ServiceAuth,
 };
 use crate::node::{
     capacity::{Capacity, CHUNK_COPY_COUNT},
@@ -75,7 +75,7 @@ impl ChunkRecords {
         &self,
         write: ChunkWrite,
         msg_id: MessageId,
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         use ChunkWrite::*;
@@ -110,7 +110,7 @@ impl ChunkRecords {
         &self,
         chunk: Chunk,
         msg_id: MessageId,
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         if let Err(error) = validate_chunk_owner(&chunk, &auth.public_key) {
@@ -135,7 +135,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::New(chunk),
-                data_signed: auth.into_inner(),
+                auth: auth.into_inner(),
                 origin,
             }),
             targets: target_holders,
@@ -247,7 +247,7 @@ impl ChunkRecords {
     async fn delete(
         &self,
         address: ChunkAddress,
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.capacity.get_chunk_holder_adults(address.name()).await;
@@ -256,7 +256,7 @@ impl ChunkRecords {
             msg_id: MessageId::new(),
             msg: NodeMsg::NodeCmd(NodeCmd::Chunks {
                 cmd: ChunkWrite::DeletePrivate(address),
-                data_signed: auth.into_inner(),
+                auth: auth.into_inner(),
                 origin,
             }),
             targets,

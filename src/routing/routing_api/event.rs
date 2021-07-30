@@ -9,7 +9,7 @@
 use crate::messaging::{
     data::ServiceMsg,
     node::{NodeCmd, NodeQuery, NodeQueryResponse},
-    Authority, DstLocation, EndUser, MessageId, ServiceOpSig, SrcLocation,
+    AuthorityProof, DstLocation, EndUser, MessageId, ServiceAuth, SrcLocation,
 };
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Keypair;
@@ -117,7 +117,7 @@ pub enum Event {
         /// The content of the message.
         msg: Box<ServiceMsg>,
         /// Data authority
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
         /// The end user that sent the message.
         /// Its xorname is derived from the client public key,
         /// and the socket_id maps against the actual socketaddr

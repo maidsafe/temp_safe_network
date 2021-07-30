@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::SectionSigned, relocation::RelocatePayload, section::NodeState};
+use super::{agreement::SectionAuth, relocation::RelocatePayload, section::NodeState};
 use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
@@ -36,9 +36,9 @@ pub enum JoinAsRelocatedResponse {
     /// info to become a member of the section.
     Approval {
         /// Section Authority over this message for validation
-        section_auth: SectionSigned<SectionAuthorityProvider>,
+        section_auth: SectionAuth<SectionAuthorityProvider>,
         /// info on current members of the section
-        node_state: SectionSigned<NodeState>,
+        node_state: SectionAuth<NodeState>,
         /// The secured (signed) and verifiable section chain
         section_chain: SecuredLinkedList,
     },

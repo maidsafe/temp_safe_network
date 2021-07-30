@@ -36,7 +36,7 @@ async fn test_messages_client_node() -> Result<()> {
     let mut rng = rand::thread_rng();
     let keypair = Keypair::new_ed25519(&mut rng);
     let pk = keypair.public_key();
-    let client_sig = ClientSig {
+    let auth = ServiceAuth {
         public_key: pk,
         signature: keypair.sign(b"the msg"),
     };
@@ -60,7 +60,7 @@ async fn test_messages_client_node() -> Result<()> {
     let query = ServiceMsg::Query {
         id,
         query: Query::Transfer(TransferQuery::GetBalance(pk)),
-        client_sig,
+        auth,
     });
     let query_clone = query.clone();
 

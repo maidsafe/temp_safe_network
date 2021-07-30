@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{KeyedSig, SectionSignedUtils};
-use crate::messaging::node::SectionSigned;
+use super::{KeyedSig, SectionAuthUtils};
+use crate::messaging::node::SectionAuth;
 use crate::routing::{Error, Result};
 use serde::Serialize;
 
@@ -20,11 +20,11 @@ pub(crate) fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> R
     })
 }
 
-// Wrap the given payload in `SectionSigned`
+// Wrap the given payload in `SectionAuth`
 pub(crate) fn section_signed<T: Serialize>(
     secret_key: &bls::SecretKey,
     payload: T,
-) -> Result<SectionSigned<T>> {
+) -> Result<SectionAuth<T>> {
     let sig = prove(secret_key, &payload)?;
-    Ok(SectionSigned::new(payload, sig))
+    Ok(SectionAuth::new(payload, sig))
 }

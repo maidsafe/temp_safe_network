@@ -56,14 +56,14 @@ pub struct DkgFailureSigSet {
 
 /// A value together with the signature that it was agreed on by the majority of the section elders.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
-pub struct SectionSigned<T: Serialize> {
+pub struct SectionAuth<T: Serialize> {
     /// some value to be agreed upon by elders
     pub value: T,
     /// signature over the value
     pub sig: KeyedSig,
 }
 
-impl<T> Borrow<Prefix> for SectionSigned<T>
+impl<T> Borrow<Prefix> for SectionAuth<T>
 where
     T: Borrow<Prefix> + Serialize,
 {
@@ -105,7 +105,7 @@ pub enum Proposal {
     ///   4. the signature of the new key using the current key
     /// Which we can use to update the section section authority provider and the section chain at
     /// the same time as a single atomic operation without needing to cache anything.
-    OurElders(SectionSigned<SectionAuthorityProvider>),
+    OurElders(SectionAuth<SectionAuthorityProvider>),
     /// Proposal to change whether new nodes are allowed to join our section.
     JoinsAllowed((MessageId, bool)),
 }

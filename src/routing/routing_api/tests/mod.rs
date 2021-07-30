@@ -14,11 +14,11 @@ use crate::messaging::{
     node::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Network,
         NodeMsg, NodeState, Peer, Proposal, RelocateDetails, RelocatePayload,
-        ResourceProofResponse, Section, SectionSigned,
+        ResourceProofResponse, Section, SectionAuth,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
-    Authority, DstLocation, MessageId, MessageType, MsgKind, NodeSigned, SectionAuthorityProvider,
-    SectionSigned as MsgKindSectionSigned, WireMsg,
+    AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
+    SectionAuth as MsgKindSectionAuth, SectionAuthorityProvider, WireMsg,
 };
 use crate::node::RegisterStorage;
 
@@ -370,7 +370,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let relocate_node_msg = NodeMsg::Relocate(relocate_details);
     let payload = WireMsg::serialize_msg_payload(&relocate_node_msg)?;
     let signature = sk_set.secret_key().sign(&payload);
-    let section_signed = MsgKindSectionSigned {
+    let section_signed = MsgKindSectionAuth {
         section_pk: section_key,
         src_name: node_name,
         sig: KeyedSig {
@@ -378,7 +378,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
             signature,
         },
     };
-    let section_auth = Authority::verify(section_signed.clone(), &payload).unwrap();
+    let section_auth = AuthorityProof::verify(section_signed.clone(), &payload).unwrap();
 
     let relocate_payload = RelocatePayload::new(
         relocate_node_msg,
@@ -562,7 +562,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         peer.set_reachable(true);
         let node_state = NodeState::joined(peer, None);
         let sig = prove(sk_set.secret_key(), &node_state)?;
-        let _ = section.update_member(SectionSigned {
+        let _ = section.update_member(SectionAuth {
             value: node_state,
             sig,
         });
@@ -998,13 +998,13 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
         UntrustedMessageSource::Peer => {
             let mut rng = OsRng {};
             let keypair = ed25519_dalek::Keypair::generate(&mut rng);
-            MsgKind::NodeSignedMsg(NodeSigned {
+            MsgKind::NodeAuthMsg(NodeAuth {
                 section_pk: pk1,
                 public_key: keypair.public,
                 signature: keypair.sign(&payload),
             })
         }
-        UntrustedMessageSource::Accumulation => MsgKind::SectionSignedMsg(MsgKindSectionSigned {
+        UntrustedMessageSource::Accumulation => MsgKind::SectionAuthMsg(MsgKindSectionAuth {
             section_pk: pk1,
             src_name: Prefix::default().name(),
             sig: KeyedSig {

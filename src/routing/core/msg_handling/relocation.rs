@@ -9,7 +9,7 @@
 use super::Core;
 use crate::messaging::{
     node::{NodeMsg, Peer, Proposal, RelocateDetails, RelocatePromise},
-    Authority, SectionSigned,
+    AuthorityProof, SectionAuth,
 };
 use crate::routing::{
     core::bootstrap::JoiningAsRelocated,
@@ -93,7 +93,7 @@ impl Core {
         &mut self,
         relocate_details: RelocateDetails,
         node_msg: NodeMsg,
-        section_auth: Authority<SectionSigned>,
+        section_auth: AuthorityProof<SectionAuth>,
     ) -> Result<Option<Command>> {
         if relocate_details.pub_id != self.node.name() {
             // This `Relocate` message is not for us - it's most likely a duplicate of a previous

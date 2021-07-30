@@ -15,7 +15,7 @@ pub use node_state::MembershipState;
 pub use node_state::NodeState;
 pub use peer::Peer;
 
-use crate::messaging::{node::agreement::SectionSigned, SectionAuthorityProvider};
+use crate::messaging::{node::agreement::SectionAuth, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ pub struct Section {
     /// The secured linked list of previous section keys
     pub chain: SecuredLinkedList,
     /// Signed section authority
-    pub section_auth: SectionSigned<SectionAuthorityProvider>,
+    pub section_auth: SectionAuth<SectionAuthorityProvider>,
     /// memebers of the section
     pub members: SectionPeers,
 }
@@ -43,7 +43,7 @@ pub struct Section {
 #[derive(Clone, Default, Debug, Eq, Serialize, Deserialize)]
 pub struct SectionPeers {
     /// memebers of the section
-    pub members: BTreeMap<XorName, SectionSigned<NodeState>>,
+    pub members: BTreeMap<XorName, SectionAuth<NodeState>>,
 }
 
 impl PartialEq for SectionPeers {
@@ -59,10 +59,10 @@ impl Hash for SectionPeers {
 }
 
 #[derive(Debug)]
-pub struct IntoIter(btree_map::IntoIter<XorName, SectionSigned<NodeState>>);
+pub struct IntoIter(btree_map::IntoIter<XorName, SectionAuth<NodeState>>);
 
 impl Iterator for IntoIter {
-    type Item = SectionSigned<NodeState>;
+    type Item = SectionAuth<NodeState>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|(_, info)| info)
