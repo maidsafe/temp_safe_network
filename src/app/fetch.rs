@@ -785,9 +785,10 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
-        safe_url.set_content_version(Some(VersionHash::default()));
+        safe_url.set_content_version(Some(version0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
             .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
             .await?;
