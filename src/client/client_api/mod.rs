@@ -52,11 +52,7 @@ impl Client {
     ///
     /// TODO: update once data types are crdt compliant
     ///
-    pub async fn new(
-        optional_keypair: Option<Keypair>,
-        config: Config,
-        query_timeout: u64,
-    ) -> Result<Self, Error> {
+    pub async fn new(optional_keypair: Option<Keypair>, config: Config) -> Result<Self, Error> {
         let mut rng = OsRng;
 
         let keypair = match optional_keypair {
@@ -95,7 +91,7 @@ impl Client {
             keypair,
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
-            query_timeout: Duration::from_secs(query_timeout),
+            query_timeout: config.query_timeout,
             blob_cache: Arc::new(RwLock::new(LruCache::new(BLOB_CACHE_CAP))),
         };
 

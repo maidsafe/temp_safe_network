@@ -33,16 +33,13 @@ mod errors;
 // Export public API.
 
 pub use client_api::Client;
-pub use config_handler::Config;
+pub use config_handler::{Config, DEFAULT_QUERY_TIMEOUT};
 pub use errors::Error;
 pub use errors::ErrorMessage;
 pub use qp2p::Config as QuicP2pConfig;
 
 /// Client trait and related constants.
 pub mod client_api;
-
-/// Default timeout in
-pub const DEFAULT_QUERY_TIMEOUT: u64 = 20; // 20 seconds
 
 /// Utility functions.
 pub mod utils;
