@@ -243,7 +243,7 @@ mod tests {
     use tokio::time::Duration;
     use xor_name::XorName;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn measure_upload_times() -> Result<()> {
         let mut total = 0;
@@ -282,7 +282,7 @@ mod tests {
 
     /**** Register data tests ****/
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn register_basics() -> Result<()> {
         let client = create_test_client(None).await?;
 
@@ -323,7 +323,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn register_private_permissions() -> Result<()> {
         let client = create_test_client(None).await?;
         let name = XorName(rand::random());
@@ -364,7 +364,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn register_public_permissions() -> Result<()> {
         let client = create_test_client(None).await?;
 
@@ -404,7 +404,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn register_write() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
@@ -466,7 +466,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn register_owner() -> Result<()> {
         let name = XorName(rand::random());
         let tag = 10;
@@ -487,7 +487,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn register_can_delete_private() -> Result<()> {
         let mut client = create_test_client(None).await?;
         let name = XorName(rand::random());
@@ -526,7 +526,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn register_cannot_delete_public() -> Result<()> {
         let client = create_test_client(None).await?;
 

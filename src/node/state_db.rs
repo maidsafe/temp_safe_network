@@ -89,7 +89,7 @@ mod test {
     use rand::rngs::OsRng;
     use tempfile::{tempdir, TempDir};
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn pubkey_to_and_from_file() -> Result<()> {
         let mut rng = OsRng;
         let keypair = ed25519_dalek::Keypair::generate(&mut rng);
@@ -103,7 +103,7 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn keypair_to_and_from_file() -> Result<()> {
         let mut rng = OsRng;
         let keypair = ed25519_dalek::Keypair::generate(&mut rng);

@@ -53,13 +53,13 @@ mod tests {
 
     const OBJECT: &str = "OBJECT";
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn not_expired_when_duration_is_none() {
         let item = Item::new(OBJECT, None);
         assert!(!item.expired());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn expired_when_duration_is_zero() {
         let item = Item::new(OBJECT, Some(Duration::new(0, 0)));
         tokio::time::sleep(Duration::new(0, 0)).await;

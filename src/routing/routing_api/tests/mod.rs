@@ -66,7 +66,7 @@ use xor_name::{Prefix, XorName};
 
 static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn receive_matching_get_section_request_as_elder() -> Result<()> {
     let node = create_node(MIN_ADULT_AGE, None);
     let node_name = node.name();
@@ -124,7 +124,7 @@ async fn receive_matching_get_section_request_as_elder() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
     let good_prefix = Prefix::default().pushed(false);
 
@@ -199,7 +199,7 @@ async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
 // `Redirect` response containing addresses of nodes in a section that is closer to the joining
 // name.
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let node = create_node(FIRST_SECTION_MIN_AGE, None);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
@@ -255,7 +255,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let node = create_node(FIRST_SECTION_MIN_AGE, None);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
@@ -329,7 +329,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_from_relocated_node() -> Result<()> {
     let (section_auth, mut nodes) = create_section_auth();
 
@@ -426,7 +426,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn aggregate_proposals() -> Result<()> {
     let (section_auth, nodes) = create_section_auth();
     let sk_set = SecretKeySet::random();
@@ -504,7 +504,7 @@ async fn aggregate_proposals() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_online() -> Result<()> {
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
 
@@ -539,7 +539,7 @@ async fn handle_agreement_on_online() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let sk_set = SecretKeySet::random();
     let chain = SecuredLinkedList::new(sk_set.secret_key().public_key());
@@ -770,27 +770,27 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_online_of_rejoined_node_with_high_age_in_startup() -> Result<()> {
     handle_agreement_on_online_of_rejoined_node(NetworkPhase::Startup, 16).await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_online_of_rejoined_node_with_high_age_after_startup() -> Result<()> {
     handle_agreement_on_online_of_rejoined_node(NetworkPhase::Regular, 16).await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_online_of_rejoined_node_with_low_age_in_startup() -> Result<()> {
     handle_agreement_on_online_of_rejoined_node(NetworkPhase::Startup, 8).await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_online_of_rejoined_node_with_low_age_after_startup() -> Result<()> {
     handle_agreement_on_online_of_rejoined_node(NetworkPhase::Regular, 8).await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let (section_auth, mut nodes) = create_section_auth();
     let sk_set = SecretKeySet::random();
@@ -836,7 +836,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let (section_auth, mut nodes) = create_section_auth();
     let sk_set = SecretKeySet::random();
@@ -939,12 +939,12 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_untrusted_message_from_peer() -> Result<()> {
     handle_untrusted_message(UntrustedMessageSource::Peer).await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_untrusted_accumulated_message() -> Result<()> {
     handle_untrusted_message(UntrustedMessageSource::Accumulation).await
 }
@@ -1066,7 +1066,7 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_bounced_untrusted_message() -> Result<()> {
     let (section_auth, mut nodes, sk_set0) =
         gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
@@ -1159,7 +1159,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_sync() -> Result<()> {
     // Create first `Section` with a chain of length 2
     let sk0 = bls::SecretKey::random();
@@ -1248,7 +1248,7 @@ async fn handle_sync() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_untrusted_sync() -> Result<()> {
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
@@ -1343,7 +1343,7 @@ async fn handle_untrusted_sync() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_bounced_untrusted_sync() -> Result<()> {
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
@@ -1437,7 +1437,7 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn relocation_of_non_elder() -> Result<()> {
     relocation(RelocatedPeerRole::NonElder).await
 }
@@ -1538,12 +1538,12 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn node_message_to_self() -> Result<()> {
     message_to_self(MessageDst::Node).await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn section_message_to_self() -> Result<()> {
     message_to_self(MessageDst::Section).await
 }
@@ -1614,7 +1614,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_elders_update() -> Result<()> {
     // Start with section that has `ELDER_SIZE` elders with age 6, 1 non-elder with age 5 and one
     // to-be-elder with age 7:
@@ -1739,7 +1739,7 @@ async fn handle_elders_update() -> Result<()> {
 }
 
 // Test that demoted node still sends `Sync` messages on split.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_demote_during_split() -> Result<()> {
     let node = create_node(MIN_ADULT_AGE, None);
     let node_name = node.name();
