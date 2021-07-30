@@ -25,9 +25,6 @@ pub enum Error {
     /// Key not found.
     #[error("Key not found")]
     KeyNotFound(DataAddress),
-    /// Sled Failed to create the database
-    #[error("Could not create the register database")]
-    UnableToCreateRegisterDb,
     /// Key, Value pair not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),

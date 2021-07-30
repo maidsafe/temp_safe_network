@@ -45,7 +45,8 @@ pub use qp2p::{Config as TransportConfig, SendStream};
 
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
-use tempfile::tempdir;
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use std::env::temp_dir;
 
 use crate::dbs::UsedSpace;
 use anyhow::Result as AnyhowResult;
@@ -82,12 +83,12 @@ const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
 /// Create a register store for routing examples
 pub fn create_test_used_space_and_root_storage() -> AnyhowResult<(UsedSpace, PathBuf)> {
     let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
-    let tmp_dir = tempdir()?;
+    let random_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    // we only need the path here, the dir will be createdif it doesnt exist (as mpdir will cleanup when dropped below)
-    let storage_dir = tmp_dir.into_path().join(Path::new("/test-space"));
+    let tmp = temp_dir();
+    let storage_dir = Path::new(&tmp).join(random_filename);
 
-    Ok((used_space, storage_dir))
+    Ok((used_space, storage_dir.to_path_buf()))
 }
 
 /// SuperMajority of a given group (i.e. > 2/3)

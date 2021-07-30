@@ -91,7 +91,7 @@ mod test {
         let db_dir = tmp_dir.into_path().join(Path::new(&"db".to_string()));
         let db = sled::open(db_dir).map_err(|error| {
             trace!("Sled Error: {:?}", error);
-            Error::UnableToCreateRegisterDb
+            Error::Sled(error)
         })?;
         let mut store = RegisterOpStore::new(id, db)?;
 

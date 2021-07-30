@@ -57,7 +57,7 @@ impl RegisterStorage {
 
         let db = sled::open(db_dir).map_err(|error| {
             trace!("Sled Error: {:?}", error);
-            Error::UnableToCreateRegisterDb
+            Error::Sled(error)
         })?;
 
         Ok(Self {
