@@ -12,7 +12,7 @@ use crate::messaging::data::ServiceMsg;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataQuery, Error as ErrorMessage, RegisterRead, RegisterWrite},
     node::NodeMsg,
-    Authority, DstLocation, EndUser, MessageId, MsgKind, ServiceOpSig, WireMsg,
+    AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::routing::{
     error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
@@ -55,7 +55,7 @@ impl Core {
         msg_id: MessageId,
         register_cmd: RegisterWrite,
         user: EndUser,
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         match self.register_storage.write(register_cmd, auth).await {
             Ok(_) => Ok(vec![]),
@@ -72,7 +72,7 @@ impl Core {
         msg_id: MessageId,
         query: RegisterRead,
         user: EndUser,
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         match self.register_storage.read(&query, auth.public_key) {
             Ok(response) => {
@@ -112,7 +112,7 @@ impl Core {
         msg_id: MessageId,
         msg: ServiceMsg,
         user: EndUser,
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         match msg {
             ServiceMsg::Cmd(DataCmd::Register(register_cmd)) => {
@@ -142,7 +142,7 @@ impl Core {
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
         msg: ServiceMsg,
         dst_location: DstLocation,
         payload: Bytes,
@@ -219,7 +219,7 @@ impl Core {
             let node_msg = NodeMsg::ForwardServiceMsg {
                 msg,
                 user,
-                data_signed: auth.into_inner(),
+                auth: auth.into_inner(),
             };
 
             let wire_msg = match WireMsg::single_src(

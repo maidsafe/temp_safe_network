@@ -10,7 +10,7 @@ use super::Client;
 use crate::client::Error;
 use crate::messaging::{
     data::{DataCmd, ServiceMsg},
-    ServiceOpSig, WireMsg,
+    ServiceAuth, WireMsg,
 };
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
@@ -28,14 +28,12 @@ impl Client {
         signature: Signature,
     ) -> Result<(), Error> {
         debug!("Sending DataCmd: {:?}", cmd);
-        let data_signed = ServiceOpSig {
+        let auth = ServiceAuth {
             public_key: client_pk,
             signature,
         };
 
-        self.session
-            .send_cmd(cmd, data_signed, serialised_cmd)
-            .await
+        self.session.send_cmd(cmd, auth, serialised_cmd).await
     }
 
     // Send a DataCmd to the network without awaiting for a response.

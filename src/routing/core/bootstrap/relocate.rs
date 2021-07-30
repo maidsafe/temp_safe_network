@@ -11,10 +11,10 @@ use crate::messaging::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, RelocateDetails, RelocatePayload,
         Section,
     },
-    Authority, DstLocation, SectionAuthorityProvider, SectionSigned, WireMsg,
+    AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
-    dkg::SectionSignedUtils,
+    dkg::SectionAuthUtils,
     ed25519,
     error::{Error, Result},
     messages::WireMsgUtils,
@@ -37,7 +37,7 @@ pub(crate) struct JoiningAsRelocated {
     dst_section_key: BlsPublicKey,
     relocate_details: RelocateDetails,
     node_msg: NodeMsg,
-    node_msg_auth: Authority<SectionSigned>,
+    node_msg_auth: AuthorityProof<SectionAuth>,
     // Avoid sending more than one request to the same peer.
     used_recipients: HashSet<SocketAddr>,
     relocate_payload: Option<RelocatePayload>,
@@ -49,7 +49,7 @@ impl JoiningAsRelocated {
         genesis_key: BlsPublicKey,
         relocate_details: RelocateDetails,
         node_msg: NodeMsg,
-        section_auth: Authority<SectionSigned>,
+        section_auth: AuthorityProof<SectionAuth>,
     ) -> Result<Self> {
         let dst_section_key = relocate_details.dst_key;
 

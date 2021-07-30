@@ -63,7 +63,7 @@ pub struct RegisterCmd {
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
-    pub client_sig: crate::messaging::ServiceOpSig,
+    pub auth: crate::messaging::ServiceAuth,
 }
 
 /// [`Register`] write operations.

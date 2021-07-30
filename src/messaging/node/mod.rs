@@ -15,7 +15,7 @@ mod relocation;
 mod section;
 mod signed;
 
-pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionSigned};
+pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use network::{Network, OtherSection};
@@ -29,7 +29,7 @@ pub use section::{Section, SectionPeers};
 pub use signed::{KeyedSig, SigShare};
 
 use crate::messaging::{
-    data::ServiceMsg, EndUser, MessageId, SectionAuthorityProvider, ServiceOpSig,
+    data::ServiceMsg, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth,
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
@@ -50,12 +50,12 @@ pub enum NodeMsg {
         /// The origin
         user: EndUser,
         /// Signature provided by the requester.
-        data_signed: ServiceOpSig,
+        auth: ServiceAuth,
     },
     /// Inform other sections about our section or vice-versa.
     SectionKnowledge {
         /// `SectionAuthorityProvider` and `SecuredLinkedList` of the sender's section, with the proof chain.
-        src_info: (SectionSigned<SectionAuthorityProvider>, SecuredLinkedList),
+        src_info: (SectionAuth<SectionAuthorityProvider>, SecuredLinkedList),
         /// Message
         msg: Option<Box<NodeMsg>>,
     },

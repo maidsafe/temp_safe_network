@@ -9,7 +9,7 @@
 use crate::messaging::{
     data::ServiceMsg,
     node::{DkgFailureSigSet, KeyedSig, Proposal, Section},
-    Authority, EndUser, MessageId, SectionAuthorityProvider, ServiceOpSig, WireMsg,
+    AuthorityProof, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth, WireMsg,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
 use std::{
@@ -33,7 +33,7 @@ pub(crate) enum Command {
         msg_id: MessageId,
         msg: ServiceMsg,
         user: EndUser,
-        auth: Authority<ServiceOpSig>,
+        auth: AuthorityProof<ServiceAuth>,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),

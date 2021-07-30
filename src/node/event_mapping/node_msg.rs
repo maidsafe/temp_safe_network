@@ -10,7 +10,7 @@ use super::{Mapping, MsgContext};
 use crate::messaging::{
     data::{DataCmd, QueryResponse, ServiceMsg},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeQueryResponse},
-    Authority, DstLocation, MessageId, ServiceOpSig, SrcLocation, WireMsg,
+    AuthorityProof, DstLocation, MessageId, ServiceAuth, SrcLocation, WireMsg,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -75,29 +75,22 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
         // ------ metadata ------
         MessageReceived::NodeQuery(NodeQuery::Metadata {
             query,
-            data_signed,
+            auth,
             origin: query_origin,
-        }) => {
-            match verify_authority(
+        }) => match verify_authority(msg_id, origin, auth, ServiceMsg::Query(query.clone())) {
+            Ok(auth) => NodeDuty::ProcessRead {
+                query,
                 msg_id,
-                origin,
-                data_signed,
-                ServiceMsg::Query(query.clone()),
-            ) {
-                Ok(auth) => NodeDuty::ProcessRead {
-                    query,
-                    msg_id,
-                    auth,
-                    origin: query_origin,
-                },
-                Err(duty) => duty,
-            }
-        }
+                auth,
+                origin: query_origin,
+            },
+            Err(duty) => duty,
+        },
         MessageReceived::NodeCmd(NodeCmd::Metadata {
             cmd,
-            data_signed,
+            auth,
             origin: cmd_origin,
-        }) => match verify_authority(msg_id, origin, data_signed, ServiceMsg::Cmd(cmd.clone())) {
+        }) => match verify_authority(msg_id, origin, auth, ServiceMsg::Cmd(cmd.clone())) {
             Ok(auth) => NodeDuty::ProcessWrite {
                 cmd,
                 msg_id,
@@ -112,13 +105,11 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
             read: query,
             msg_id,
         },
-        MessageReceived::NodeCmd(NodeCmd::Chunks {
-            cmd, data_signed, ..
-        }) => {
+        MessageReceived::NodeCmd(NodeCmd::Chunks { cmd, auth, .. }) => {
             match verify_authority(
                 msg_id,
                 origin,
-                data_signed,
+                auth,
                 ServiceMsg::Cmd(DataCmd::Chunk(cmd.clone())),
             ) {
                 Ok(auth) => NodeDuty::WriteChunk {
@@ -163,11 +154,11 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
 fn verify_authority(
     msg_id: MessageId,
     origin: SrcLocation,
-    data_signed: ServiceOpSig,
+    auth: ServiceAuth,
     msg: ServiceMsg,
-) -> Result<Authority<ServiceOpSig>, NodeDuty> {
+) -> Result<AuthorityProof<ServiceAuth>, NodeDuty> {
     WireMsg::serialize_msg_payload(&msg)
-        .and_then(|payload| Authority::verify(data_signed, &payload))
+        .and_then(|payload| AuthorityProof::verify(auth, &payload))
         .map_err(|error| send_error(msg_id, origin, Error::Message(error), false))
 }
 

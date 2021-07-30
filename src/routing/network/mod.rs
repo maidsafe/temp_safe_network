@@ -10,13 +10,13 @@ mod stats;
 
 use self::stats::NetworkStats;
 use crate::routing::{
-    dkg::{verify_sig, KeyedSig, SectionSignedUtils},
+    dkg::{verify_sig, KeyedSig, SectionAuthUtils},
     peer::PeerUtils,
     Error, Result, SectionAuthorityProviderUtils,
 };
 
 use crate::messaging::{
-    node::{Network, OtherSection, Peer, SectionSigned},
+    node::{Network, OtherSection, Peer, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::types::PrefixMap;
@@ -57,7 +57,7 @@ pub(super) trait NetworkUtils {
     /// needed in that case.
     fn update_section(
         &mut self,
-        section_auth: SectionSigned<SectionAuthorityProvider>,
+        section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: Option<KeyedSig>,
         section_chain: &SecuredLinkedList,
     ) -> bool;
@@ -151,7 +151,7 @@ impl NetworkUtils for Network {
     /// needed in that case.
     fn update_section(
         &mut self,
-        section_auth: SectionSigned<SectionAuthorityProvider>,
+        section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: Option<KeyedSig>,
         section_chain: &SecuredLinkedList,
     ) -> bool {
@@ -321,7 +321,7 @@ mod tests {
     fn gen_section_auth(
         sk: &bls::SecretKey,
         prefix: Prefix,
-    ) -> Result<SectionSigned<SectionAuthorityProvider>> {
+    ) -> Result<SectionAuth<SectionAuthorityProvider>> {
         let (section_auth, _, _) = section::test_utils::gen_section_authority_provider(prefix, 5);
         dkg::test_utils::section_signed(sk, section_auth)
     }

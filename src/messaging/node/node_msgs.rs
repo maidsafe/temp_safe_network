@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     data::{ChunkRead, ChunkWrite, DataCmd, DataExchange, DataQuery, Result},
-    EndUser, ServiceOpSig,
+    EndUser, ServiceAuth,
 };
 use crate::types::{Chunk, PublicKey};
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ pub enum NodeCmd {
         /// The contianed command
         cmd: DataCmd,
         /// Requester pk and signature
-        data_signed: ServiceOpSig,
+        auth: ServiceAuth,
         /// Message source
         origin: EndUser,
     },
@@ -32,7 +32,7 @@ pub enum NodeCmd {
         /// The contianed command
         cmd: ChunkWrite,
         /// Requester pk and signature
-        data_signed: ServiceOpSig,
+        auth: ServiceAuth,
         /// Message source
         origin: EndUser,
     },
@@ -63,7 +63,7 @@ pub enum NodeQuery {
         /// The actual query message
         query: DataQuery,
         /// Client signature
-        data_signed: ServiceOpSig,
+        auth: ServiceAuth,
         /// The user that has initiated this query
         origin: EndUser,
     },

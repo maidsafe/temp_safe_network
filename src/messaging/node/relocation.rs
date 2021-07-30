@@ -9,7 +9,7 @@
 //! Relocation related messages.
 
 use super::NodeMsg;
-use crate::messaging::SectionSigned;
+use crate::messaging::SectionAuth;
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ pub struct RelocatePayload {
     /// Message whose content is Variant::Relocate
     pub details: NodeMsg,
     /// Section authority for the details
-    pub section_signed: SectionSigned,
+    pub section_signed: SectionAuth,
     /// The new name of the node signed using its old public_key, to prove the node identity.
     pub signature_of_new_name_with_old_key: Signature,
 }

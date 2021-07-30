@@ -30,7 +30,7 @@ use self::{
     enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
 };
 use crate::messaging::{
-    node::{Network, NodeMsg, Proposal, Section, SectionSigned},
+    node::{Network, NodeMsg, Proposal, Section, SectionAuth},
     MessageId, SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -133,7 +133,7 @@ impl Core {
 
     pub(crate) fn update_section_knowledge(
         &mut self,
-        section_auth: SectionSigned<SectionAuthorityProvider>,
+        section_auth: SectionAuth<SectionAuthorityProvider>,
         section_chain: SecuredLinkedList,
     ) {
         let prefix = section_auth.value.prefix;

@@ -8,7 +8,7 @@
 
 use super::node_state::NodeStateUtils;
 use crate::messaging::{
-    node::{MembershipState, NodeState, Peer, SectionPeers, SectionSigned},
+    node::{MembershipState, NodeState, Peer, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
 use crate::routing::{peer::PeerUtils, SectionAuthorityProviderUtils};
@@ -31,7 +31,7 @@ pub(crate) trait SectionPeersUtils {
     fn get(&self, name: &XorName) -> Option<&NodeState>;
 
     /// Get section_signed info for the member with the given name.
-    fn get_section_signed(&self, name: &XorName) -> Option<&SectionSigned<NodeState>>;
+    fn get_section_signed(&self, name: &XorName) -> Option<&SectionAuth<NodeState>>;
 
     /// Returns the candidates for elders out of all the nodes in this section.
     fn elder_candidates(
@@ -56,7 +56,7 @@ pub(crate) trait SectionPeersUtils {
 
     /// Update a member of our section.
     /// Returns whether anything actually changed.
-    fn update(&mut self, new_info: SectionSigned<NodeState>) -> bool;
+    fn update(&mut self, new_info: SectionAuth<NodeState>) -> bool;
 
     /// Remove all members whose name does not match `prefix`.
     fn prune_not_matching(&mut self, prefix: &Prefix);
@@ -93,7 +93,7 @@ impl SectionPeersUtils for SectionPeers {
     }
 
     /// Get section_signed info for the member with the given name.
-    fn get_section_signed(&self, name: &XorName) -> Option<&SectionSigned<NodeState>> {
+    fn get_section_signed(&self, name: &XorName) -> Option<&SectionAuth<NodeState>> {
         self.members.get(name)
     }
 
@@ -148,7 +148,7 @@ impl SectionPeersUtils for SectionPeers {
 
     /// Update a member of our section.
     /// Returns whether anything actually changed.
-    fn update(&mut self, new_info: SectionSigned<NodeState>) -> bool {
+    fn update(&mut self, new_info: SectionAuth<NodeState>) -> bool {
         match self.members.entry(*new_info.value.peer.name()) {
             Entry::Vacant(entry) => {
                 let _ = entry.insert(new_info);
@@ -193,7 +193,7 @@ fn elder_candidates<'a, I>(
     members: I,
 ) -> Vec<Peer>
 where
-    I: IntoIterator<Item = &'a SectionSigned<NodeState>>,
+    I: IntoIterator<Item = &'a SectionAuth<NodeState>>,
 {
     members
         .into_iter()
@@ -205,8 +205,8 @@ where
 
 // Compare candidates for the next elders. The one comparing `Less` wins.
 fn cmp_elder_candidates(
-    lhs: &SectionSigned<NodeState>,
-    rhs: &SectionSigned<NodeState>,
+    lhs: &SectionAuth<NodeState>,
+    rhs: &SectionAuth<NodeState>,
     current_elders: &SectionAuthorityProvider,
 ) -> Ordering {
     // Older nodes are preferred. In case of a tie, prefer current elders. If still a tie, break

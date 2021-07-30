@@ -10,7 +10,7 @@ mod msg_authority;
 
 pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
-    node::NodeMsg, BlsShareSigned, DstLocation, MessageId, MsgKind, NodeMsgAuthority, NodeSigned,
+    node::NodeMsg, BlsShareAuth, DstLocation, MessageId, MsgKind, NodeAuth, NodeMsgAuthority,
     WireMsg,
 };
 use crate::routing::{
@@ -71,16 +71,16 @@ impl WireMsgUtils for WireMsg {
         let (id, msg_kind) = match node_msg_authority {
             NodeMsgAuthority::Node(node_auth) => (
                 MessageId::from_content(&node_auth.signature).unwrap_or_default(),
-                MsgKind::NodeSignedMsg(node_auth.into_inner()),
+                MsgKind::NodeAuthMsg(node_auth.into_inner()),
             ),
             NodeMsgAuthority::BlsShare(bls_share_auth) => (
                 MessageId::from_content(&bls_share_auth.sig_share.signature_share.0)
                     .unwrap_or_default(),
-                MsgKind::NodeBlsShareSignedMsg(bls_share_auth.into_inner()),
+                MsgKind::NodeBlsShareAuthMsg(bls_share_auth.into_inner()),
             ),
             NodeMsgAuthority::Section(section_auth) => (
                 MessageId::from_content(&section_auth.sig.signature).unwrap_or_default(),
-                MsgKind::SectionSignedMsg(section_auth.into_inner()),
+                MsgKind::SectionAuthMsg(section_auth.into_inner()),
             ),
         };
 
@@ -100,7 +100,7 @@ impl WireMsgUtils for WireMsg {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let msg_authority = NodeMsgAuthority::BlsShare(BlsShareSigned::authorize(
+        let msg_authority = NodeMsgAuthority::BlsShare(BlsShareAuth::authorize(
             src_section_pk,
             src_name,
             key_share,
@@ -120,7 +120,7 @@ impl WireMsgUtils for WireMsg {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let msg_authority = NodeMsgAuthority::Node(NodeSigned::authorize(
+        let msg_authority = NodeMsgAuthority::Node(NodeAuth::authorize(
             src_section_pk,
             &node.keypair,
             &msg_payload,

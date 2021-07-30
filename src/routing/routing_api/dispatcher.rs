@@ -262,9 +262,9 @@ impl Dispatcher {
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
         let cmds = match wire_msg.msg_kind() {
-            MsgKind::NodeSignedMsg(_)
-            | MsgKind::NodeBlsShareSignedMsg(_)
-            | MsgKind::SectionSignedMsg(_) => {
+            MsgKind::NodeAuthMsg(_)
+            | MsgKind::NodeBlsShareAuthMsg(_)
+            | MsgKind::SectionAuthMsg(_) => {
                 let status = self
                     .core
                     .read()

@@ -8,11 +8,11 @@
 
 use std::mem;
 
-use crate::messaging::{node::SectionSigned, SectionAuthorityProvider};
+use crate::messaging::{node::SectionAuth, SectionAuthorityProvider};
 use crate::routing::dkg::KeyedSig;
 use xor_name::Prefix;
 
-type Entry = (SectionSigned<SectionAuthorityProvider>, KeyedSig);
+type Entry = (SectionAuth<SectionAuthorityProvider>, KeyedSig);
 
 // Helper structure to make sure we process a split by updating info about both our section and the
 // sibling section at the same time.
@@ -32,7 +32,7 @@ impl SplitBarrier {
     pub(crate) fn process(
         &mut self,
         our_prefix: &Prefix,
-        section_auth: SectionSigned<SectionAuthorityProvider>,
+        section_auth: SectionAuth<SectionAuthorityProvider>,
         keyed_sig: KeyedSig,
     ) -> Vec<Entry> {
         if !section_auth.value.prefix.is_extension_of(our_prefix) {

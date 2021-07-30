@@ -9,11 +9,11 @@
 use std::cmp;
 
 use crate::messaging::{
-    node::{KeyedSig, MembershipState, NodeMsg, NodeState, Proposal, SectionSigned},
+    node::{KeyedSig, MembershipState, NodeMsg, NodeState, Proposal, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionSignedUtils,
+    dkg::SectionAuthUtils,
     error::Result,
     network::NetworkUtils,
     peer::PeerUtils,
@@ -85,7 +85,7 @@ impl Core {
             }
         }
 
-        let new_info = SectionSigned {
+        let new_info = SectionAuth {
             value: new_info,
             sig,
         };
@@ -129,7 +129,7 @@ impl Core {
         let age = peer.age();
         let signature = sig.signature.clone();
 
-        if !self.section.update_member(SectionSigned {
+        if !self.section.update_member(SectionAuth {
             value: node_state,
             sig,
         }) {
@@ -165,7 +165,7 @@ impl Core {
         let mut commands = vec![];
         let equal_or_extension = section_auth.prefix() == *self.section.prefix()
             || section_auth.prefix().is_extension_of(self.section.prefix());
-        let section_auth = SectionSigned::new(section_auth, sig.clone());
+        let section_auth = SectionAuth::new(section_auth, sig.clone());
 
         if equal_or_extension {
             // Our section of sub-section
@@ -214,7 +214,7 @@ impl Core {
 
     async fn handle_our_elders_agreement(
         &mut self,
-        section_auth: SectionSigned<SectionAuthorityProvider>,
+        section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let updates = self

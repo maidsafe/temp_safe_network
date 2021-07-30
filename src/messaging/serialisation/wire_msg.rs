@@ -8,8 +8,8 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::ServiceMsg, node::NodeMsg, section_info::SectionInfoMsg, Authority, DstLocation, Error,
-    MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
+    data::ServiceMsg, node::NodeMsg, section_info::SectionInfoMsg, AuthorityProof, DstLocation,
+    Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -125,26 +125,26 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::ServiceMsg(data_signed) => {
+            MsgKind::ServiceMsg(auth) => {
                 let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
                 Ok(MessageType::Service {
                     msg_id: self.header.msg_envelope.msg_id,
-                    auth: Authority::verify(data_signed, &self.payload)?,
+                    auth: AuthorityProof::verify(auth, &self.payload)?,
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })
             }
-            MsgKind::NodeSignedMsg(node_signed) => {
+            MsgKind::NodeAuthMsg(node_signed) => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
 
                 Ok(MessageType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
-                    msg_authority: NodeMsgAuthority::Node(Authority::verify(
+                    msg_authority: NodeMsgAuthority::Node(AuthorityProof::verify(
                         node_signed,
                         &self.payload,
                     )?),
@@ -152,7 +152,7 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::NodeBlsShareSignedMsg(bls_share_signed) => {
+            MsgKind::NodeBlsShareAuthMsg(bls_share_signed) => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!(
                         "Node message payload (BLS share signed) as Msgpack: {}",
@@ -162,7 +162,7 @@ impl WireMsg {
 
                 Ok(MessageType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
-                    msg_authority: NodeMsgAuthority::BlsShare(Authority::verify(
+                    msg_authority: NodeMsgAuthority::BlsShare(AuthorityProof::verify(
                         bls_share_signed,
                         &self.payload,
                     )?),
@@ -170,7 +170,7 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::SectionSignedMsg(section_signed) => {
+            MsgKind::SectionAuthMsg(section_signed) => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!(
                         "Node message payload (section signed) as Msgpack: {}",
@@ -180,7 +180,7 @@ impl WireMsg {
 
                 Ok(MessageType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
-                    msg_authority: NodeMsgAuthority::Section(Authority::verify(
+                    msg_authority: NodeMsgAuthority::Section(AuthorityProof::verify(
                         section_signed,
                         &self.payload,
                     )?),
@@ -230,9 +230,9 @@ impl WireMsg {
     /// message if it's a NodeMsg
     pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
         match &self.header.msg_envelope.msg_kind {
-            MsgKind::NodeSignedMsg(node_signed) => Some(node_signed.section_pk),
-            MsgKind::NodeBlsShareSignedMsg(bls_share_signed) => Some(bls_share_signed.section_pk),
-            MsgKind::SectionSignedMsg(section_signed) => Some(section_signed.section_pk),
+            MsgKind::NodeAuthMsg(node_signed) => Some(node_signed.section_pk),
+            MsgKind::NodeBlsShareAuthMsg(bls_share_signed) => Some(bls_share_signed.section_pk),
+            MsgKind::SectionAuthMsg(section_signed) => Some(section_signed.section_pk),
             _ => None,
         }
     }
@@ -251,7 +251,7 @@ mod tests {
         messaging::{
             data::{ChunkRead, DataQuery, ServiceMsg},
             node::{NodeCmd, NodeMsg},
-            Authority, MessageId, NodeSigned, ServiceOpSig,
+            AuthorityProof, MessageId, NodeAuth, ServiceAuth,
         },
         types::{ChunkAddress, Keypair},
     };
@@ -366,9 +366,9 @@ mod tests {
         });
 
         let payload = WireMsg::serialize_msg_payload(&node_msg)?;
-        let node_auth = NodeSigned::authorize(src_section_pk, &src_node_keypair, &payload);
+        let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
 
-        let msg_kind = MsgKind::NodeSignedMsg(node_auth.clone().into_inner());
+        let msg_kind = MsgKind::NodeAuthMsg(node_auth.clone().into_inner());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
@@ -414,13 +414,13 @@ mod tests {
         ))));
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
-        let data_signed = ServiceOpSig {
+        let auth = ServiceAuth {
             public_key: src_client_keypair.public_key(),
             signature: src_client_keypair.sign(&payload),
         };
-        let auth = Authority::verify(data_signed.clone(), &payload).unwrap();
+        let auth_proof = AuthorityProof::verify(auth.clone(), &payload).unwrap();
 
-        let msg_kind = MsgKind::ServiceMsg(data_signed);
+        let msg_kind = MsgKind::ServiceMsg(auth);
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
@@ -438,7 +438,7 @@ mod tests {
             deserialized.into_message()?,
             MessageType::Service {
                 msg_id: wire_msg.msg_id(),
-                auth,
+                auth: auth_proof,
                 dst_location,
                 msg: client_msg,
             }

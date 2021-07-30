@@ -10,11 +10,11 @@ use crate::messaging::{
     node::{
         JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, ResourceProofResponse, Section,
     },
-    DstLocation, MessageType, MsgKind, NodeSigned, WireMsg,
+    DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
 use crate::routing::{
     core::{Comm, ConnectionEvent, SendStatus},
-    dkg::SectionSignedUtils,
+    dkg::SectionAuthUtils,
     ed25519,
     error::{Error, Result},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
@@ -301,7 +301,7 @@ impl<'a> Join<'a> {
                 ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) | MsgKind::SectionInfoMsg => continue,
-                        MsgKind::NodeBlsShareSignedMsg(_) | MsgKind::SectionSignedMsg(_) => {
+                        MsgKind::NodeBlsShareAuthMsg(_) | MsgKind::SectionAuthMsg(_) => {
                             trace!(
                                 "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
                                 sender,
@@ -309,31 +309,29 @@ impl<'a> Join<'a> {
                             );
                             continue;
                         }
-                        MsgKind::NodeSignedMsg(NodeSigned { .. }) => {
-                            match wire_msg.into_message() {
-                                Ok(MessageType::Node {
-                                    msg: NodeMsg::JoinResponse(resp),
-                                    msg_authority,
-                                    ..
-                                }) => (*resp, sender, msg_authority.src_location().name()),
-                                Ok(
-                                    MessageType::Service { msg_id, .. }
-                                    | MessageType::SectionInfo { msg_id, .. }
-                                    | MessageType::Node { msg_id, .. },
-                                ) => {
-                                    trace!(
-                                        "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
-                                        sender,
-                                        msg_id
-                                    );
-                                    continue;
-                                }
-                                Err(err) => {
-                                    debug!("Failed to deserialize message payload: {}", err);
-                                    continue;
-                                }
+                        MsgKind::NodeAuthMsg(NodeAuth { .. }) => match wire_msg.into_message() {
+                            Ok(MessageType::Node {
+                                msg: NodeMsg::JoinResponse(resp),
+                                msg_authority,
+                                ..
+                            }) => (*resp, sender, msg_authority.src_location().name()),
+                            Ok(
+                                MessageType::Service { msg_id, .. }
+                                | MessageType::SectionInfo { msg_id, .. }
+                                | MessageType::Node { msg_id, .. },
+                            ) => {
+                                trace!(
+                                    "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
+                                    sender,
+                                    msg_id
+                                );
+                                continue;
                             }
-                        }
+                            Err(err) => {
+                                debug!("Failed to deserialize message payload: {}", err);
+                                continue;
+                            }
+                        },
                     },
                     Err(err) => {
                         debug!("Failed to deserialize message: {}", err);

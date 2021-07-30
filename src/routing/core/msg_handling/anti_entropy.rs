@@ -143,7 +143,7 @@ fn process(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{MessageType, NodeSigned};
+    use crate::messaging::{MessageType, NodeAuth};
     use crate::routing::{
         dkg::test_utils::section_signed,
         ed25519,
@@ -300,7 +300,7 @@ mod tests {
             let msg_payload = WireMsg::serialize_msg_payload(&node_msg)
                 .context("Failed to create a test NodeMsg")?;
 
-            let node_msg_authority = NodeMsgAuthority::Node(NodeSigned::authorize(
+            let node_msg_authority = NodeMsgAuthority::Node(NodeAuth::authorize(
                 section_pk,
                 &sender.keypair,
                 &msg_payload,

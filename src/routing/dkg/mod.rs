@@ -20,7 +20,7 @@ pub(crate) use self::{
     voter::DkgVoter,
 };
 pub(crate) use crate::messaging::node::{KeyedSig, SigShare};
-pub(super) use section_signed::SectionSignedUtils;
+pub(super) use section_signed::SectionAuthUtils;
 use serde::Serialize;
 
 // Verify the integrity of `message` against `sig`.

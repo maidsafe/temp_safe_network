@@ -9,7 +9,7 @@
 use super::{Mapping, MsgContext};
 use crate::messaging::{
     data::{ServiceError, ServiceMsg},
-    Authority, DstLocation, EndUser, MessageId, ServiceOpSig, SrcLocation,
+    AuthorityProof, DstLocation, EndUser, MessageId, ServiceAuth, SrcLocation,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -20,7 +20,7 @@ use crate::node::{
 pub(super) fn map_client_msg(
     msg_id: MessageId,
     msg: ServiceMsg,
-    auth: Authority<ServiceOpSig>,
+    auth: AuthorityProof<ServiceAuth>,
     user: EndUser,
 ) -> Mapping {
     // Signature has already been validated by the routing layer
@@ -38,7 +38,7 @@ fn map_client_service_msg(
     msg_id: MessageId,
     service_msg: ServiceMsg,
     origin: EndUser,
-    auth: Authority<ServiceOpSig>,
+    auth: AuthorityProof<ServiceAuth>,
 ) -> NodeDuty {
     match service_msg {
         ServiceMsg::Query(query) => NodeDuty::ProcessRead {
