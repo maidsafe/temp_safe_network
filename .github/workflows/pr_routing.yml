@@ -51,7 +51,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       # Run tests.
       - shell: bash
@@ -99,7 +99,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install cross
         run: cargo install cross
