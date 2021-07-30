@@ -113,7 +113,7 @@ impl Core {
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             end_users: EndUserRegistry::new(),
             register_storage,
-            root_storage_dir: root_storage_dir.to_path_buf(),
+            root_storage_dir,
             used_space,
         })
     }

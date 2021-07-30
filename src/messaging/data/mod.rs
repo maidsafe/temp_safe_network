@@ -147,49 +147,30 @@ impl QueryResponse {
     pub fn failed_with_data_not_found(&self) -> bool {
         use QueryResponse::*;
 
-        // TODO: there has to be a better way of doing this...
         match self {
             GetChunk(result) => match result {
                 Ok(_) => false,
-                Err(error) => match error {
-                    &ErrorMessage::DataNotFound(_) => true,
-                    _ => false,
-                },
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
             GetRegister(result) => match result {
                 Ok(_) => false,
-                Err(error) => match error {
-                    &ErrorMessage::DataNotFound(_) => true,
-                    _ => false,
-                },
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
             GetRegisterOwner(result) => match result {
                 Ok(_) => false,
-                Err(error) => match error {
-                    &ErrorMessage::DataNotFound(_) => true,
-                    _ => false,
-                },
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
             ReadRegister(result) => match result {
                 Ok(_) => false,
-                Err(error) => match error {
-                    &ErrorMessage::DataNotFound(_) => true,
-                    _ => false,
-                },
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
             GetRegisterPolicy(result) => match result {
                 Ok(_) => false,
-                Err(error) => match error {
-                    &ErrorMessage::DataNotFound(_) => true,
-                    _ => false,
-                },
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
             GetRegisterUserPermissions(result) => match result {
                 Ok(_) => false,
-                Err(error) => match error {
-                    &ErrorMessage::DataNotFound(_) => true,
-                    _ => false,
-                },
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
         }
     }

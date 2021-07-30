@@ -632,9 +632,9 @@ impl Network {
 }
 
 async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) -> Result<()> {
-    let storage = create_test_used_space_and_root_storage()?;
+    let (storage, root_dir) = create_test_used_space_and_root_storage()?;
 
-    let (node, mut events) = match Routing::new(config, storage).await {
+    let (node, mut events) = match Routing::new(config, storage, root_dir).await {
         Ok(output) => output,
         Err(error) => {
             let _ = event_tx

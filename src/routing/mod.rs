@@ -86,7 +86,7 @@ pub fn create_test_used_space_and_root_storage() -> AnyhowResult<(UsedSpace, Pat
 
     // we only need the path here, the dir will be createdif it doesnt exist (as mpdir will cleanup when dropped below)
     let storage_dir = tmp_dir.into_path().join(Path::new("/test-space"));
-    
+
     Ok((used_space, storage_dir))
 }
 
