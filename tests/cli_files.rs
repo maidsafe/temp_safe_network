@@ -114,7 +114,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() -> Result<()> {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/aha/test.md");
     let file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
     assert_eq!(file_cat, "hello tests!");
@@ -184,12 +184,12 @@ fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/test.md");
     let file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
     assert_eq!(file_cat, "hello tests!");
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/subfolder/subexists.md");
     let subfile_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
     assert_eq!(subfile_cat, "hello from a subfolder!");
@@ -214,12 +214,12 @@ fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/testdata/test.md");
     let file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
     assert_eq!(file_cat, "hello tests!");
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/testdata/subfolder/subexists.md");
     let subfile_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
     assert_eq!(subfile_cat, "hello from a subfolder!");
@@ -254,7 +254,7 @@ fn calling_safe_files_sync() -> Result<()> {
     )
     .read()?;
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/subexists.md");
     safeurl.set_content_version(Some(1));
     let synced_file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
@@ -432,7 +432,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -
     )
     .read()?;
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/subexists.md");
     safeurl.set_content_version(None);
     let file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;

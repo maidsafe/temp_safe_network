@@ -57,7 +57,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
     fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
 
     files_get(
-        &src,
+        src,
         Some(&dest),
         Some(EXISTS_OVERWRITE),
         Some(PROGRESS_NONE),
@@ -85,7 +85,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
     fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
 
     files_get(
-        &src,
+        src,
         Some(&dest),
         Some(EXISTS_OVERWRITE),
         Some(PROGRESS_NONE),
@@ -113,8 +113,8 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
     remove_dest(&final_dest)?;
 
     files_get(
-        &src,
-        Some(&dest),
+        src,
+        Some(dest),
         Some(EXISTS_OVERWRITE),
         Some(PROGRESS_NONE),
         Some(0),
@@ -140,7 +140,7 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
     remove_dest(&final_dest)?;
 
     files_get(
-        &src,
+        src,
         None, // dest is not provided!
         Some(EXISTS_OVERWRITE),
         Some(PROGRESS_NONE),
@@ -197,7 +197,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     drop(f); // close file.
 
     let cmd_output = files_get(
-        &src,
+        src,
         Some(&dest),
         Some(EXISTS_OVERWRITE),
         Some(PROGRESS_NONE),
@@ -527,7 +527,7 @@ fn files_get_exists_preserve() -> Result<()> {
     drop(f); // close file.
 
     files_get(
-        &src,
+        src,
         Some(&dest),
         Some(EXISTS_PRESERVE),
         Some(PROGRESS_NONE),
@@ -562,7 +562,7 @@ fn files_get_exists_overwrite() -> Result<()> {
     drop(f); // close file.
 
     files_get(
-        &src,
+        src,
         Some(&dest),
         Some(EXISTS_OVERWRITE),
         Some(PROGRESS_NONE),
@@ -1270,7 +1270,7 @@ fn join_url_paths(path: &[&str]) -> String {
 fn source_path(url: &str, path: &[&str]) -> Result<String> {
     let pb = path.join("/");
 
-    let x = safeurl_from(&url).map_err(|e| anyhow!(e))?;
+    let x = safeurl_from(url).map_err(|e| anyhow!(e))?;
 
     let url = format!(
         "{}://{}/{}{}{}",
