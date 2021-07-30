@@ -450,12 +450,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cookie-factory"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "396de984970346b0d9e93d1415082923c679e5ae5c3ee3dcbd104f5610af126b"
-
-[[package]]
 name = "core-foundation-sys"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2410,7 +2404,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe_network"
-version = "0.17.7"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -2421,7 +2415,6 @@ dependencies = [
  "bls_dkg",
  "blsttc",
  "bytes 1.0.1",
- "cookie-factory",
  "crdts",
  "criterion",
  "custom_debug",
@@ -2431,8 +2424,6 @@ dependencies = [
  "ed25519-dalek",
  "exponential-backoff",
  "futures",
- "futures-util",
- "fxhash",
  "hex",
  "hex_fmt",
  "itertools 0.10.1",
@@ -2442,10 +2433,7 @@ dependencies = [
  "proptest",
  "qp2p",
  "rand 0.7.3",
- "rand_chacha 0.2.2",
- "rand_core 0.5.1",
  "rand_xorshift",
- "regex",
  "resource_proof",
  "rmp-serde",
  "secured_linked_list",
@@ -2466,7 +2454,6 @@ dependencies = [
  "tokio-util 0.6.7",
  "tracing",
  "tracing-appender",
- "tracing-futures",
  "tracing-subscriber",
  "uhttp_uri",
  "url",

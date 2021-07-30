@@ -8,9 +8,8 @@
 
 use crate::messaging::{DstLocation, Error, MessageId, MsgKind, Result};
 use bytes::Bytes;
-use cookie_factory::{bytes::be_u16, combinator::slice, gen, gen_simple};
 use serde::{Deserialize, Serialize};
-use std::mem::size_of;
+use std::{io::Write, mem::size_of};
 
 // Current version of the messaging protocol.
 // At this point this implementation supports only this version.
@@ -119,7 +118,7 @@ impl WireMsgHeader {
         Ok((header, payload_bytes))
     }
 
-    pub fn write<'a>(&self, buffer: &'a mut [u8]) -> Result<(&'a mut [u8], u16)> {
+    pub fn write<'a>(&self, mut buffer: &'a mut [u8]) -> Result<(&'a mut [u8], u16)> {
         // first serialise the msg envelope so we can figure out the total header size
         let msg_envelope_vec = rmp_serde::to_vec_named(&self.msg_envelope).map_err(|err| {
             Error::Serialisation(format!(
@@ -133,16 +132,19 @@ impl WireMsgHeader {
             (HDR_SIZE_BYTES_LEN + HDR_VERSION_BYTES_LEN + msg_envelope_vec.len()) as u16;
 
         // Let's write the header size first
-        let (buf_at_version, _) = gen(be_u16(header_size), buffer).map_err(|err| {
-            Error::Serialisation(format!(
-                "header size value couldn't be serialized into the header: {}",
-                err
-            ))
-        })?;
+        buffer
+            .write_all(&header_size.to_be_bytes())
+            .map_err(|err| {
+                Error::Serialisation(format!(
+                    "header size value couldn't be serialized into the header: {}",
+                    err
+                ))
+            })?;
 
         // Now let's write the serialisation protocol version bytes
-        let (buf_at_msg_envelope, _) =
-            gen(be_u16(self.version), buf_at_version).map_err(|err| {
+        buffer
+            .write_all(&self.version.to_be_bytes())
+            .map_err(|err| {
                 Error::Serialisation(format!(
                     "version field couldn't be serialized into the header: {}",
                     err
@@ -150,15 +152,14 @@ impl WireMsgHeader {
             })?;
 
         // ...now write the message envelope
-        let buf_at_payload =
-            gen_simple(slice(&msg_envelope_vec), buf_at_msg_envelope).map_err(|err| {
-                Error::Serialisation(format!(
-                    "message envelope couldn't be serialized into the header: {}",
-                    err
-                ))
-            })?;
+        buffer.write_all(&msg_envelope_vec).map_err(|err| {
+            Error::Serialisation(format!(
+                "message envelope couldn't be serialized into the header: {}",
+                err
+            ))
+        })?;
 
-        Ok((buf_at_payload, header_size))
+        Ok((buffer, header_size))
     }
 
     // Maximum size in bytes a WireMsgHeader can occupied when serialized.
