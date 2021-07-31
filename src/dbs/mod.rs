@@ -9,7 +9,7 @@
 mod data_store;
 mod encoding;
 mod errors;
-mod register_op_store;
+mod event_store;
 
 use data_store::to_db_key::ToDbKey;
 pub use data_store::used_space::UsedSpace;
@@ -19,4 +19,4 @@ pub(crate) use data_store::{
 };
 pub(crate) use errors::Result;
 pub(crate) use errors::{convert_to_error_message, Error};
-pub(crate) use register_op_store::RegisterOpStore;
+pub(crate) use event_store::EventStore;
