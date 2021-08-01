@@ -9,7 +9,7 @@
 
 use super::{register::Address, PublicKey};
 use crate::messaging::data::Error as ErrorMessage;
-use serde::{Deserialize, Serialize};
+
 use std::{
     collections::BTreeMap,
     fmt::{self, Debug, Formatter},
@@ -35,7 +35,7 @@ impl<'a, T> Debug for ErrorDebug<'a, T> {
 }
 
 /// Main error type for the crate.
-#[derive(Error, Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Error, Debug, Clone, PartialEq)]
 #[non_exhaustive]
 #[allow(clippy::large_enum_variant)]
 pub enum Error {
