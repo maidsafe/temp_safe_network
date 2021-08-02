@@ -214,34 +214,20 @@ impl Core {
                 }])
             }
             NodeMsg::SectionKnowledge {
-                src_info: (src_signed_sap, src_chain),
+                src_info: (signed_section_auth, proof_chain),
                 msg,
             } => {
                 if self.is_not_elder() {
                     return Ok(vec![]);
                 }
 
-                if !src_chain.check_trust(known_keys.iter()) {
-                    return Ok(vec![]);
-                }
-
-                self.update_section_knowledge(src_signed_sap, src_chain);
-                if let Some(node_msg) = msg {
-                    // This included message shall have been sent from us originally.
-                    // Now re-send it with the latest knowledge of the destination section.
-                    let dst_section_pk = self
-                        .network
-                        .key_by_name(&src_name)
-                        .map_err(|_| Error::NoMatchingSection)?;
-
-                    Ok(vec![self.send_direct_message(
-                        (src_name, sender),
-                        *node_msg,
-                        dst_section_pk,
-                    )?])
-                } else {
-                    Ok(vec![])
-                }
+                self.handle_section_knowledge_msg(
+                    signed_section_auth,
+                    proof_chain,
+                    msg,
+                    src_name,
+                    sender,
+                )
             }
             NodeMsg::Sync {
                 ref section,

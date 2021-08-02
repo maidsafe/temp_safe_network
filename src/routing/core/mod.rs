@@ -30,8 +30,8 @@ use self::{
     enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
 };
 use crate::messaging::{
-    node::{Network, NodeMsg, Proposal, Section, SectionAuth},
-    MessageId, SectionAuthorityProvider,
+    node::{Network, NodeMsg, Proposal, Section},
+    MessageId,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
@@ -46,7 +46,6 @@ use crate::routing::{
 };
 use itertools::Itertools;
 use resource_proof::ResourceProof;
-use secured_linked_list::SecuredLinkedList;
 use std::collections::BTreeSet;
 use tokio::sync::mpsc;
 use xor_name::{Prefix, XorName};
@@ -131,22 +130,6 @@ impl Core {
         }
     }
 
-    pub(crate) fn update_section_knowledge(
-        &mut self,
-        section_auth: SectionAuth<SectionAuthorityProvider>,
-        proof_chain: SecuredLinkedList,
-    ) {
-        let prefix = section_auth.value.prefix;
-        if self
-            .network
-            .update_remote_section_sap(section_auth, &proof_chain, self.section.chain())
-        {
-            info!("Neighbour section knowledge updated: {:?}", prefix);
-        } else {
-            warn!("Neighbour section update failed: {:?}", prefix);
-        }
-    }
-
     pub(crate) async fn update_state(&mut self, old: StateSnapshot) -> Result<Vec<Command>> {
         let mut commands = vec![];
         let new = self.state_snapshot();
@@ -187,6 +170,7 @@ impl Core {
                 self.print_network_stats();
 
                 // Sending SectionKnowledge to other sections for new SAP.
+                // TODO: remoev all this messaging once we have Anti-Entropy fully implemented.
                 let signed_sap = self.section.section_signed_authority_provider().clone();
                 let node_msg = NodeMsg::SectionKnowledge {
                     src_info: (signed_sap, self.section.chain().clone()),
