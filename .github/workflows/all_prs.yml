@@ -3,6 +3,7 @@ name: Standard PR Checks
 on: pull_request
 
 env:
+  CARGO_INCREMENTAL: '0'
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
 
@@ -31,7 +32,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       # Check if the code is formatted correctly.
       - name: Check formatting
@@ -47,8 +48,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
-        target: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -69,7 +69,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build launch local network
         uses: actions-rs/cargo@v1
@@ -97,8 +97,6 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: ./scripts/has_split.sh
 
-
-      # Check if the code is formatted correctly.
       - name: Bench
         run: cargo bench
 
@@ -127,7 +125,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       # Test build scripts.
       - name: Build
@@ -158,7 +156,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.rustc_hash }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-${{ matrix.target }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install cross
         run: cargo install cross
