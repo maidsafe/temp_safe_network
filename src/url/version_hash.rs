@@ -49,9 +49,7 @@ impl FromStr for VersionHash {
         let entry_hash = data
             .try_into()
             .map_err(|_| VersionHashError::InvalidHashLength)?;
-        Ok(VersionHash {
-            entry_hash,
-        })
+        Ok(VersionHash { entry_hash })
     }
 }
 
