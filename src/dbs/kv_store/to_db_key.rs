@@ -6,8 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{super::encoding::deserialise, Error, Result};
-use crate::types::{register::Address, utils, ChunkAddress, Keypair, PublicKey};
+use super::{
+    super::encoding::{deserialise, serialise},
+    Error, Result,
+};
+use crate::types::{register::Address, ChunkAddress, Keypair, PublicKey};
 use serde::{de::DeserializeOwned, Serialize};
 use xor_name::XorName;
 
@@ -15,7 +18,7 @@ pub(crate) trait ToDbKey: Serialize {
     /// The encoded string representation of an identifier, used as a key in the context of a
     /// Db <key,value> store.
     fn to_db_key(&self) -> Result<String> {
-        let serialised = utils::serialise(&self)?;
+        let serialised = serialise(&self)?;
         Ok(hex::encode(&serialised))
     }
 }

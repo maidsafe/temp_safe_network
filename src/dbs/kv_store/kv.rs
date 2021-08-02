@@ -7,14 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::ToDbKey;
-use crate::types::DataAddress;
 use serde::{de::DeserializeOwned, Serialize};
 
-pub(crate) trait Data: Serialize + DeserializeOwned {
-    type Id: DataId;
-    fn id(&self) -> &Self::Id;
-}
+pub(crate) trait Key: ToDbKey + PartialEq + Eq + DeserializeOwned {}
 
-pub(crate) trait DataId: ToDbKey + PartialEq + Eq + DeserializeOwned {
-    fn to_data_address(&self) -> DataAddress;
+pub(crate) trait Value: Serialize + DeserializeOwned {
+    type Key: Key;
+    fn key(&self) -> &Self::Key;
 }

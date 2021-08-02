@@ -6,17 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod data_store;
 mod encoding;
 mod errors;
 mod event_store;
+mod kv_store;
 
-use data_store::to_db_key::ToDbKey;
-pub use data_store::used_space::UsedSpace;
-pub(crate) use data_store::{
-    data::{Data, DataId},
-    DataStore, Subdir,
-};
+pub(crate) use encoding::deserialise;
 pub(crate) use errors::Result;
 pub(crate) use errors::{convert_to_error_message, Error};
 pub(crate) use event_store::EventStore;
+pub use kv_store::used_space::UsedSpace;
+pub(crate) use kv_store::{to_db_key::ToDbKey, Key, KvStore, Value};
+use std::path::Path;
+
+pub(crate) trait Subdir {
+    fn subdir() -> &'static Path;
+}

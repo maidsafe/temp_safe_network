@@ -7,15 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    data::{Data, DataId},
-    DataStore, Error, Result as DataStoreResult, Result, Subdir, ToDbKey, UsedSpace,
+    super::Subdir, Error, Key, KvStore, Result as KvStoreResult, Result, ToDbKey, UsedSpace, Value,
 };
-use crate::types::{ChunkAddress, DataAddress};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, u64};
 use tempfile::{tempdir, TempDir};
-use xor_name::XorName;
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct TestData {
@@ -23,10 +20,9 @@ struct TestData {
     value: Vec<u8>,
 }
 
-impl Data for TestData {
-    type Id = Id;
-
-    fn id(&self) -> &Self::Id {
+impl Value for TestData {
+    type Key = Id;
+    fn key(&self) -> &Self::Key {
         &self.id
     }
 }
@@ -35,15 +31,9 @@ impl Data for TestData {
 struct Id(u64);
 
 impl ToDbKey for Id {}
-impl DataId for Id {
-    fn to_data_address(&self) -> DataAddress {
-        DataAddress::Chunk(ChunkAddress::Public(XorName::from_content(&[&self
-            .0
-            .to_be_bytes()])))
-    }
-}
+impl Key for Id {}
 
-impl Subdir for DataStore<TestData> {
+impl Subdir for KvStore<Id, TestData> {
     fn subdir() -> &'static Path {
         Path::new("test")
     }
@@ -54,7 +44,7 @@ fn new_rng() -> ThreadRng {
     rand::thread_rng()
 }
 
-fn temp_dir() -> DataStoreResult<TempDir> {
+fn temp_dir() -> KvStoreResult<TempDir> {
     tempdir().map_err(|e| Error::TempDirCreationFailed(e.to_string()))
 }
 
@@ -94,9 +84,9 @@ async fn used_space_increases() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let data_store = DataStore::<TestData>::new(root.path(), used_space).await?;
+    let db = KvStore::<Id, TestData>::new(root.path(), used_space).await?;
 
-    let used_space_before = data_store.total_used_space().await;
+    let used_space_before = db.total_used_space().await;
 
     for (index, (data, _size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &TestData {
@@ -104,16 +94,16 @@ async fn used_space_increases() -> Result<()> {
             value: data.clone(),
         };
 
-        assert!(!data_store.has(&the_data.id).await?);
-        data_store.put(the_data).await?;
-        assert!(data_store.has(&the_data.id).await?);
+        assert!(!db.has(&the_data.id).await?);
+        db.store(the_data).await?;
+        assert!(db.has(&the_data.id).await?);
     }
 
-    let mut used_space_after = data_store.total_used_space().await;
+    let mut used_space_after = db.total_used_space().await;
 
     while used_space_before >= used_space_after {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        used_space_after = data_store.total_used_space().await;
+        used_space_after = db.total_used_space().await;
     }
 
     assert!(used_space_after > used_space_before);
@@ -129,7 +119,7 @@ async fn used_space_decreases() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let data_store = DataStore::<TestData>::new(root.path(), used_space).await?;
+    let db = KvStore::<Id, TestData>::new(root.path(), used_space).await?;
 
     for (index, (data, _size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &TestData {
@@ -137,22 +127,22 @@ async fn used_space_decreases() -> Result<()> {
             value: data.clone(),
         };
 
-        assert!(!data_store.has(&the_data.id).await?);
-        data_store.put(the_data).await?;
-        assert!(data_store.has(&the_data.id).await?);
+        assert!(!db.has(&the_data.id).await?);
+        db.store(the_data).await?;
+        assert!(db.has(&the_data.id).await?);
     }
 
-    let used_space_before = data_store.total_used_space().await;
+    let used_space_before = db.total_used_space().await;
 
-    for key in data_store.keys().await? {
-        data_store.delete(&key).await?;
+    for key in db.keys().await? {
+        db.delete(&key).await?;
     }
 
-    let mut used_space_after = data_store.total_used_space().await;
+    let mut used_space_after = db.total_used_space().await;
 
     while used_space_after >= used_space_before {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        used_space_after = data_store.total_used_space().await;
+        used_space_after = db.total_used_space().await;
     }
 
     Ok(())
@@ -165,19 +155,19 @@ async fn successful_put() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let data_store = DataStore::<TestData>::new(root.path(), used_space).await?;
+    let db = KvStore::<Id, TestData>::new(root.path(), used_space).await?;
 
     for (index, (data, _size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &TestData {
             id: Id(index as u64),
             value: data.clone(),
         };
-        assert!(!data_store.has(&the_data.id).await?);
-        data_store.put(the_data).await?;
-        assert!(data_store.has(&the_data.id).await?);
+        assert!(!db.has(&the_data.id).await?);
+        db.store(the_data).await?;
+        assert!(db.has(&the_data.id).await?);
     }
 
-    let mut keys = data_store.keys().await?;
+    let mut keys = db.keys().await?;
     keys.sort();
     assert_eq!(
         (0..chunks.data_and_sizes.len())
@@ -195,7 +185,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
     let root = temp_dir()?;
     let capacity = 32;
     let used_space = UsedSpace::new(capacity);
-    let data_store = DataStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space).await?;
 
     let data = TestData {
         id: Id(rng.gen()),
@@ -205,7 +195,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
             .collect(),
     };
 
-    match data_store.put(&data).await {
+    match db.store(&data).await {
         Err(Error::NotEnoughSpace) => (),
         x => {
             return Err(super::Error::InvalidOperation(format!(
@@ -225,22 +215,22 @@ async fn delete() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let data_store = DataStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space).await?;
 
     for (index, (data, _size)) in chunks.data_and_sizes.iter().enumerate() {
         let the_data = &TestData {
             id: Id(index as u64),
             value: data.clone(),
         };
-        data_store.put(the_data).await?;
+        db.store(the_data).await?;
 
-        while !data_store.has(&the_data.id).await? {
+        while !db.has(&the_data.id).await? {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
-        data_store.delete(&the_data.id).await?;
+        db.delete(&the_data.id).await?;
 
-        while data_store.has(&the_data.id).await? {
+        while db.has(&the_data.id).await? {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
     }
@@ -255,19 +245,18 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let data_store = DataStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
-        data_store
-            .put(&TestData {
-                id: Id(index as u64),
-                value: data.clone(),
-            })
-            .await?
+        db.store(&TestData {
+            id: Id(index as u64),
+            value: data.clone(),
+        })
+        .await?
     }
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
-        let retrieved_value = data_store.get(&Id(index as u64)).await?;
+        let retrieved_value = db.get(&Id(index as u64)).await?;
         assert_eq!(*data, retrieved_value.value);
     }
 
@@ -281,25 +270,24 @@ async fn overwrite_value() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let data_store = DataStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space).await?;
 
     let key = &Id(0);
-    let mut total_used_space = data_store.total_used_space().await;
+    let mut total_used_space = db.total_used_space().await;
 
     for (data, size) in chunks.data_and_sizes {
-        data_store
-            .put(&TestData {
-                id: *key,
-                value: data.clone(),
-            })
-            .await?;
+        db.store(&TestData {
+            id: *key,
+            value: data.clone(),
+        })
+        .await?;
 
-        while !data_store.has(key).await? {
+        while !db.has(key).await? {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
         loop {
-            let used_space = data_store.total_used_space().await;
+            let used_space = db.total_used_space().await;
             if used_space >= size + total_used_space {
                 total_used_space += size;
                 break;
@@ -307,7 +295,7 @@ async fn overwrite_value() -> Result<()> {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
-        let retrieved_data = data_store.get(key).await?;
+        let retrieved_data = db.get(key).await?;
         assert_eq!(data, retrieved_data.value);
     }
 
@@ -318,10 +306,10 @@ async fn overwrite_value() -> Result<()> {
 async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let data_store: DataStore<TestData> = DataStore::new(root.path(), used_space).await?;
+    let db: KvStore<Id, TestData> = KvStore::new(root.path(), used_space).await?;
 
     let id = Id(new_rng().gen());
-    match data_store.get(&id).await {
+    match db.get(&id).await {
         Err(Error::KeyNotFound(_)) => (),
         x => {
             return Err(super::Error::InvalidOperation(format!(
@@ -341,19 +329,18 @@ async fn keys() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let data_store = DataStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);
-        assert!(!data_store.keys().await?.contains(&id));
-        data_store
-            .put(&TestData {
-                id,
-                value: data.clone(),
-            })
-            .await?;
+        assert!(!db.keys().await?.contains(&id));
+        db.store(&TestData {
+            id,
+            value: data.clone(),
+        })
+        .await?;
 
-        let keys = data_store.keys().await?;
+        let keys = db.keys().await?;
         assert!(keys.contains(&id));
         assert_eq!(keys.len(), index + 1);
     }
@@ -361,10 +348,10 @@ async fn keys() -> Result<()> {
     for (index, _) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);
 
-        assert!(data_store.keys().await?.contains(&id));
-        data_store.delete(&id).await?;
+        assert!(db.keys().await?.contains(&id));
+        db.delete(&id).await?;
 
-        let keys = data_store.keys().await?;
+        let keys = db.keys().await?;
         assert!(!keys.contains(&id));
         assert_eq!(keys.len(), chunks.data_and_sizes.len() - index - 1);
     }

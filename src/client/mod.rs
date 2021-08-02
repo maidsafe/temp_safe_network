@@ -34,8 +34,8 @@ mod errors;
 
 pub use client_api::Client;
 pub use config_handler::{Config, DEFAULT_QUERY_TIMEOUT};
-pub use errors::Error;
 pub use errors::ErrorMessage;
+pub use errors::{Error, Result};
 pub use qp2p::Config as QuicP2pConfig;
 
 /// Client trait and related constants.

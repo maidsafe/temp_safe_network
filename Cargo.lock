@@ -2302,6 +2302,7 @@ dependencies = [
  "qp2p",
  "rand 0.7.3",
  "rand_xorshift",
+ "rayon",
  "resource_proof",
  "rmp-serde",
  "secured_linked_list",

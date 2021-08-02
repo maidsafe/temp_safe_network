@@ -10,7 +10,7 @@ use super::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 /// Wrapper for raw bincode::serialise.
-pub(super) fn serialise<T: Serialize>(data: &T) -> Result<Vec<u8>> {
+pub(crate) fn serialise<T: Serialize>(data: &T) -> Result<Vec<u8>> {
     bincode::serialize(data).map_err(|err| Error::Serialize(err.as_ref().to_string()))
 }
 
