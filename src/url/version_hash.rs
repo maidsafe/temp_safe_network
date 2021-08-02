@@ -9,10 +9,10 @@
 
 use crate::types::register::EntryHash;
 use multibase::Base;
-use std::str::FromStr;
-use std::fmt::{self, Display};
-use std::convert::TryInto;
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
+use std::fmt::{self, Display};
+use std::str::FromStr;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -25,15 +25,15 @@ pub enum VersionHashError {
     InvalidEncoding,
 }
 
-/// Version Hash corresponding to the register entry hash where the content is stored
+/// Version Hash corresponding to the entry hash where the content is stored
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, Copy)]
 pub struct VersionHash {
-    register_entry_hash: EntryHash,
+    entry_hash: EntryHash,
 }
 
 impl Display for VersionHash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let base32z = multibase::encode(Base::Base32Z, self.register_entry_hash);
+        let base32z = multibase::encode(Base::Base32Z, self.entry_hash);
         write!(f, "{}", base32z)
     }
 }
@@ -44,30 +44,36 @@ impl FromStr for VersionHash {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (base, data) = multibase::decode(s)?;
         if base != Base::Base32Z {
-            return Err(VersionHashError::InvalidEncoding)
+            return Err(VersionHashError::InvalidEncoding);
         }
-        let entry_hash = data.try_into().map_err(|_| VersionHashError::InvalidHashLength)?;
-        Ok(VersionHash{register_entry_hash: entry_hash})
+        let entry_hash = data
+            .try_into()
+            .map_err(|_| VersionHashError::InvalidHashLength)?;
+        Ok(VersionHash {
+            entry_hash,
+        })
     }
 }
 
 impl From<&EntryHash> for VersionHash {
-    fn from(register_entry_hash: &EntryHash) -> Self {
-        VersionHash{register_entry_hash: register_entry_hash.to_owned()}
+    fn from(entry_hash: &EntryHash) -> Self {
+        VersionHash {
+            entry_hash: entry_hash.to_owned(),
+        }
     }
 }
 
 impl VersionHash {
-    /// Getter for register the entry hash corresponding to that version
-    pub fn register_entry_hash(&self) -> EntryHash {
-        self.register_entry_hash
+    /// Getter for the entry hash corresponding to that version
+    pub fn entry_hash(&self) -> EntryHash {
+        self.entry_hash
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{Result, bail};
+    use anyhow::{bail, Result};
 
     #[test]
     fn test_version_hash_encode_decode() -> Result<()> {
