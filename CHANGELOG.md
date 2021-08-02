@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.6](https://github.com/maidsafe/sn_cli/compare/v0.33.5...v0.33.6) (2021-08-02)
+
+
+### Features
+
+* **install:** Support Specific Version ([f482dda](https://github.com/maidsafe/sn_cli/commit/f482dda403a73b49965339a518881eff5ec2125f))
+
 ### [0.33.5](https://github.com/maidsafe/sn_cli/compare/v0.33.4...v0.33.5) (2021-07-30)
 
 
