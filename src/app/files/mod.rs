@@ -171,10 +171,8 @@ impl Safe {
             unimplemented!("Multiple file container entries not managed, this happends when 2 clients write concurrently to a file container");
         }
         let first_entry = entries.iter().next();
-        let (version, curr_serialised_files_map);
-        if let Some((v, m)) = first_entry {
-            version = v.into();
-            curr_serialised_files_map = m.to_owned();
+        let (version, curr_serialised_files_map) = if let Some((v, m)) = first_entry {
+            (v.into(), m.to_owned())
         } else {
             warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
             return Ok((VersionHash::default(), FilesMap::default()));
