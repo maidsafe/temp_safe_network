@@ -61,7 +61,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          # We use a separate cache to the normal build caches as we use different features for e2e testing
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-e2e-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build launch local network
         uses: actions-rs/cargo@v1
