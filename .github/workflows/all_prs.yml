@@ -3,6 +3,7 @@ name: Standard PR Checks
 on: pull_request
 
 env:
+  CARGO_INCREMENTAL: '0'
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
 
