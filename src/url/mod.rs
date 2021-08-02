@@ -1752,8 +1752,8 @@ mod tests {
     #[test]
     fn test_native_url_to_string() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
-        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hyryygyynpm7tjdim96rdtz9kkyc758zqth5b3ynzya69njrjshgu7w84k3tomzy/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
+        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hyryygyynpm7tjdim96rdtz9kkyc758zqth5b3ynzya69njrjshgu7w84k3tomzy/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
 
         let nrs = NativeUrl::from_url(nrsurl)?;
         let xor = NativeUrl::from_url(xorurl)?;
@@ -1773,8 +1773,8 @@ mod tests {
     #[test]
     fn test_native_url_parts() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
-        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
+        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
 
         let nrs = NativeUrl::from_url(nrsurl)?;
         let xor = NativeUrl::from_url(xorurl)?;
@@ -1808,15 +1808,18 @@ mod tests {
 
         assert_eq!(
             nrs.query_string(),
-            "this=that&this=other&color=blue&name=John+Doe"
+            "this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe"
         );
         assert_eq!(
             xor.query_string(),
-            "this=that&this=other&color=blue&name=John+Doe"
+            "this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe"
         );
 
         assert_eq!(nrs.fragment(), "somefragment");
         assert_eq!(xor.fragment(), "somefragment");
+
+        assert_eq!(nrs.content_version(), Some(VersionHash::default()));
+        assert_eq!(xor.content_version(), Some(VersionHash::default()));
 
         Ok(())
     }
@@ -1899,7 +1902,7 @@ mod tests {
 
     #[test]
     fn test_native_url_validate() -> Result<()> {
-        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&name=John+Doe#somefragment";
+        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
         let trailing_slash = "safe://my.domain/";
         let double_q = "safe://my.domain/??foo=bar";
 
