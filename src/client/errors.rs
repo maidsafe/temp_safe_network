@@ -17,6 +17,9 @@ use std::io;
 
 use thiserror::Error;
 
+/// Specialisation of `std::Result` for Client.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
 /// Client Errors
 #[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
@@ -120,6 +123,12 @@ pub enum Error {
     /// Bincode error
     #[error(transparent)]
     Serialisation(#[from] Box<bincode::ErrorKind>),
+    /// Sled error.
+    #[error("Sled error:: {0}")]
+    Sled(#[from] sled::Error),
+    /// Database error.
+    #[error("Database error:: {0}")]
+    Database(#[from] crate::dbs::Error),
 }
 
 impl From<(CmdError, MessageId)> for Error {

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::node_ops::{MsgType, OutgoingMsg};
-use crate::dbs::{Data, DataId, DataStore, Subdir, UsedSpace};
+use crate::dbs::{Key, KvStore, Subdir, UsedSpace, Value};
 use crate::node::{
     node_ops::{NodeDuties, NodeDuty},
     Result,
@@ -32,23 +32,9 @@ use tracing::info;
 /// At 50% full, the node will report that it's reaching full capacity.
 pub(super) const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;
 
-impl Data for Chunk {
-    type Id = ChunkAddress;
-    fn id(&self) -> &Self::Id {
-        match self {
-            Chunk::Public(ref chunk) => chunk.address(),
-            Chunk::Private(ref chunk) => chunk.address(),
-        }
-    }
-}
+type Db = KvStore<ChunkAddress, Chunk>;
 
-impl DataId for ChunkAddress {
-    fn to_data_address(&self) -> DataAddress {
-        DataAddress::Chunk(*self)
-    }
-}
-
-impl Subdir for DataStore<Chunk> {
+impl Subdir for Db {
     fn subdir() -> &'static Path {
         Path::new("chunks")
     }
@@ -56,26 +42,39 @@ impl Subdir for DataStore<Chunk> {
 
 /// Operations on data chunks.
 pub(crate) struct ChunkStore {
-    store: DataStore<Chunk>,
+    db: Db,
+}
+
+impl Key for ChunkAddress {}
+
+impl Value for Chunk {
+    type Key = ChunkAddress;
+
+    fn key(&self) -> &Self::Key {
+        match self {
+            Chunk::Public(ref chunk) => chunk.address(),
+            Chunk::Private(ref chunk) => chunk.address(),
+        }
+    }
 }
 
 impl ChunkStore {
     pub(crate) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            store: DataStore::<Chunk>::new(path, used_space).await?,
+            db: Db::new(path, used_space).await?,
         })
     }
 
     pub(crate) async fn keys(&self) -> Result<Vec<ChunkAddress>> {
-        self.store.keys().await.map_err(Error::from)
+        self.db.keys().await.map_err(Error::from)
     }
 
     pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
-        self.store.delete(address).await.map_err(Error::from)
+        self.db.delete(address).await.map_err(Error::from)
     }
 
     pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
-        self.store
+        self.db
             .get(address)
             .await
             .map_err(|_| Error::NoSuchData(DataAddress::Chunk(*address)))
@@ -124,7 +123,7 @@ impl ChunkStore {
         match &write {
             ChunkWrite::New(data) => self.try_store(data).await,
             ChunkWrite::DeletePrivate(head_address) => {
-                if !self.store.has(head_address).await? {
+                if !self.db.has(head_address).await? {
                     info!(
                         "{}: Immutable chunk doesn't exist: {:?}",
                         self, head_address
@@ -132,10 +131,10 @@ impl ChunkStore {
                     return Ok(NodeDuty::NoOp);
                 }
 
-                match self.store.get(head_address).await {
+                match self.db.get(head_address).await {
                     Ok(Chunk::Private(data)) => {
                         if data.owner() == &requester {
-                            self.store
+                            self.db
                                 .delete(head_address)
                                 .await
                                 .map_err(|_error| ErrorMessage::FailedToDelete)
@@ -162,7 +161,7 @@ impl ChunkStore {
     }
 
     async fn try_store(&self, data: &Chunk) -> Result<NodeDuty> {
-        if self.store.has(data.address()).await? {
+        if self.db.has(data.address()).await? {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
@@ -170,7 +169,7 @@ impl ChunkStore {
             );
             return Err(Error::DataExists);
         }
-        self.store.put(data).await?;
+        self.db.store(data).await?;
 
         Ok(NodeDuty::NoOp)
     }
@@ -178,7 +177,7 @@ impl ChunkStore {
     // TODO: this is redundant, see if it can be omitted
     pub(crate) async fn check_storage(&self) -> Result<NodeDuties> {
         info!("Checking used storage");
-        if self.store.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
+        if self.db.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
             Ok(NodeDuties::from(NodeDuty::ReachingMaxCapacity))
         } else {
             Ok(vec![])
@@ -191,7 +190,7 @@ impl ChunkStore {
             "Trying to store for replication of chunk: {:?}",
             chunk.address()
         );
-        if self.store.has(chunk.address()).await? {
+        if self.db.has(chunk.address()).await? {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
@@ -200,7 +199,7 @@ impl ChunkStore {
             return Ok(NodeDuty::NoOp);
         }
 
-        self.store.put(&chunk).await?;
+        self.db.store(&chunk).await?;
 
         Ok(NodeDuty::NoOp)
     }

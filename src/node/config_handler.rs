@@ -37,7 +37,7 @@ pub struct Config {
     /// Upper limit in bytes for allowed network storage on this node.
     #[structopt(short, long)]
     pub max_capacity: Option<u64>,
-    /// Root directory for DataStores and cached state. If not set, it defaults to "root_dir"
+    /// Root directory for dbs and cached state. If not set, it defaults to "root_dir"
     /// within the sn_node project data directory, located at:
     /// Linux: $HOME/.safe/node/root_dir
     /// Windows: {FOLDERID_Profile}/.safe/node/root_dir
@@ -271,7 +271,7 @@ impl Config {
         self.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY)
     }
 
-    /// Root directory for `DataStore`s and cached state. If not set, it defaults to
+    /// Root directory for dbs and cached state. If not set, it defaults to
     /// `DEFAULT_ROOT_DIR_NAME` within the project's data directory (see `Config::root_dir` for the
     /// directories on each platform).
     pub fn root_dir(&self) -> Result<PathBuf> {
@@ -281,7 +281,7 @@ impl Config {
         })
     }
 
-    /// Set the root directory for `DataStore`s and cached state.
+    /// Set the root directory for dbs and cached state.
     pub fn set_root_dir<P: Into<PathBuf>>(&mut self, path: P) {
         self.root_dir = Some(path.into())
     }

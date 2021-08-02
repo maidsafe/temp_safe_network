@@ -19,13 +19,19 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[non_exhaustive]
 /// Node error variants.
 pub enum Error {
-    /// Not enough space in `DataStore` to perform `put`.
+    /// Not enough space to store the value.
     #[error("Not enough space")]
     NotEnoughSpace,
     /// Key not found.
-    #[error("Key not found")]
-    KeyNotFound(DataAddress),
+    #[error("Key not found: {0:?}")]
+    KeyNotFound(String),
     /// Key, Value pair not found.
+    #[error("No value found for key: {0:?}")]
+    NoSuchValue(String),
+    /// Data id not found.
+    #[error("Data id not found: {0:?}")]
+    DataIdNotFound(DataAddress),
+    /// Data not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),
     /// Chunk already exists for this node
@@ -70,7 +76,7 @@ pub enum Error {
 pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
     match error {
         Error::NotEnoughSpace => ErrorMessage::FailedToWriteFile,
-        Error::KeyNotFound(address) => ErrorMessage::DataNotFound(address),
+        Error::DataIdNotFound(address) => ErrorMessage::DataNotFound(address),
         Error::NoSuchData(address) => ErrorMessage::DataNotFound(address),
         Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
         Error::DataExists => ErrorMessage::DataExists,
