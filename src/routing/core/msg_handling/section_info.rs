@@ -52,13 +52,21 @@ impl Core {
                             .collect(),
                     })
                 } else {
-                    // If we are elder, we should know a section that is closer to `name` that us.
-                    // Otherwise redirect to our elders.
-                    let section_auth = self
-                        .network
-                        .closest(&name)
-                        .unwrap_or_else(|| self.section.authority_provider());
-                    GetSectionResponse::Redirect(section_auth.clone())
+                    // If we are elder, we should know a section that is closer
+                    // to `name` than us. Otherwise redirect to our elders.
+                    let section_auth = match self.network.closest(&name) {
+                        Some(section_auth) => section_auth.clone(),
+                        None if self.is_elder() => {
+                            error!(
+                                "Cannot redirect section info msg for name {} to a closest section",
+                                name
+                            );
+                            return vec![];
+                        }
+                        None => self.section.authority_provider().clone(),
+                    };
+
+                    GetSectionResponse::Redirect(section_auth)
                 };
 
                 let response = SectionInfoMsg::GetSectionResponse(response);
