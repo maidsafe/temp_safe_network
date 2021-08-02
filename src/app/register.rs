@@ -64,7 +64,7 @@ impl Safe {
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
         // take entry with version hash
         if let Some(v) = safeurl.content_version() {
-            let hash = v.register_entry_hash();
+            let hash = v.entry_hash();
             let entry = self
                 .fetch_register_entry(&safeurl, hash)
                 .await
