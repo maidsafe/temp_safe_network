@@ -103,11 +103,11 @@ The [install script](https://sn-api.s3.amazonaws.com/install.sh) will not only d
 
 Open a new console and run either of the following `curl` or `wget` commands:
 ```
-$ curl -so- https://sn-api.s3.amazonaws.com/install.sh | bash
+$ curl -so- https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/install.sh | bash
 ```
 or
 ```
-$ wget -qO- https://sn-api.s3.amazonaws.com/install.sh | bash
+$ wget -qO- https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/install.sh | bash
 ```
 
 ### Windows
@@ -123,7 +123,12 @@ Click the "Start" button and type "git-bash" in the search bar, then press the *
 
 Once you have an admin Git Bash console running, just run the above `curl` command to download and execute our install script:
 ```
-$ curl -so- https://sn-api.s3.amazonaws.com/install.sh | bash
+$ curl -so- https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/install.sh | bash
+```
+
+Should it be required, on all platforms, it's also possible to install a specific version:
+```
+$ curl -so- https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/install.sh | bash -s - --version=0.32.0
 ```
 
 Once the Safe CLI is downloaded and installed on your system, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
