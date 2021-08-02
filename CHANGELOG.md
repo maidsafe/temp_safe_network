@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.20.0](https://github.com/maidsafe/safe_network/compare/v0.19.2...v0.20.0) (2021-08-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* The `client` feature has been removed.
+* **client:** `Client::new` no longer takes a `query_timeout`
+argument, while `Config::new` now requires one.
+* **client:** Client `Config` now needs to be imported from
+`client::Config`, rather than `client::config_handler::Config`.
+* **client:** The signature for `Client::new` has changed to require
+a `Config`. `Config` itself can be constructed from the arguments that
+used to be supplied to `Client::new`.
+
+### Bug Fixes
+
+* **client:** Don't set `forward_port` for clients ([fade760](https://github.com/maidsafe/safe_network/commit/fade760aa1e2ccb17aee7a6fd2fd4aa37b29b4f2))
+
+
+* Remove `client` feature ([f1bdd10](https://github.com/maidsafe/safe_network/commit/f1bdd10936dc9fb022ab4a4a519c2cc96d4a003c))
+* **client:** Construct `Client` with `Config` ([a43e45b](https://github.com/maidsafe/safe_network/commit/a43e45b6d1458416dbdfc016647e19b72cbea9df))
+* **client:** Move query timeout into `Config` ([33a4227](https://github.com/maidsafe/safe_network/commit/33a4227ccf6455f9e76fb8056f8bb0a985c9848c))
+* **client:** Re-export `Config` from `client` ([73544fe](https://github.com/maidsafe/safe_network/commit/73544fedfcdc4aa877d51a0e8b7f310da06ccbef))
+
 ### [0.19.2](https://github.com/maidsafe/safe_network/compare/v0.19.1...v0.19.2) (2021-08-02)
 
 ### [0.19.1](https://github.com/maidsafe/safe_network/compare/v0.19.0...v0.19.1) (2021-07-30)
