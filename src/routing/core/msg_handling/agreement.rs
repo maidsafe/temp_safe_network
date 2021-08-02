@@ -165,13 +165,13 @@ impl Core {
         let mut commands = vec![];
         let equal_or_extension = section_auth.prefix() == *self.section.prefix()
             || section_auth.prefix().is_extension_of(self.section.prefix());
-        let section_auth = SectionAuth::new(section_auth, sig.clone());
+        let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
 
         if equal_or_extension {
             // Our section of sub-section
 
             let infos = self.section.promote_and_demote_elders(&self.node.name());
-            if !infos.contains(&section_auth.value.elder_candidates()) {
+            if !infos.contains(&signed_section_auth.value.elder_candidates()) {
                 // SectionInfo out of date, ignore.
                 return Ok(commands);
             }
@@ -198,15 +198,16 @@ impl Core {
             // Send the `OurElder` proposal to all of the to-be-elders so it's aggregated by them.
             let our_elders_recipients: Vec<_> =
                 infos.iter().flat_map(|info| info.peers()).collect();
-            commands.extend(
-                self.send_proposal(&our_elders_recipients, Proposal::OurElders(section_auth))?,
-            );
+            commands.extend(self.send_proposal(
+                &our_elders_recipients,
+                Proposal::OurElders(signed_section_auth),
+            )?);
         } else {
             // Other section
             // FIXME: we shouln't be receiving or updating a SAP for
             // a remote section here, that would be done with a AE msg response ???.
             let _ = self.network.update_remote_section_sap(
-                section_auth,
+                signed_section_auth,
                 self.section.chain(),
                 self.section.chain(),
             );
@@ -217,12 +218,12 @@ impl Core {
 
     async fn handle_our_elders_agreement(
         &mut self,
-        section_auth: SectionAuth<SectionAuthorityProvider>,
+        signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let updates = self
-            .split_barrier
-            .process(self.section.prefix(), section_auth, key_sig);
+        let updates =
+            self.split_barrier
+                .process(self.section.prefix(), signed_section_auth, key_sig);
         if updates.is_empty() {
             return Ok(vec![]);
         }
@@ -234,7 +235,7 @@ impl Core {
                 let _ = self.section.update_elders(section_auth, key_sig);
             } else {
                 // FIXME: we shouln't be receiving or updating a SAP for
-                // a remote section here, that would be done with a AE msg response ???.
+                // a remote section here, that should be done with a AE msg response.
                 let _ = self.network.update_remote_section_sap(
                     section_auth,
                     self.section.chain(),

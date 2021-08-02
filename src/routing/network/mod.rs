@@ -140,8 +140,8 @@ impl NetworkUtils for Network {
     ) -> bool {
         // Check if SAP signature is valid
         if !signed_section_auth.self_verify() {
-            trace!(
-                "Failed to update remote section knowledge, SAP signature invalid: {:?}",
+            warn!(
+                "Anti-Entropy: Failed to update remote section knowledge, SAP signature invalid: {:?}",
                 signed_section_auth.value
             );
             return false;
@@ -150,32 +150,40 @@ impl NetworkUtils for Network {
         // Make sure the proof chain can be trusted,
         // i.e. check each key is signed by its parent/predecesor key.
         if !proof_chain.self_verify() {
-            trace!(
-                "Failed to update remote section knowledge, proof chain contains invalid signatures: {:?}",
+            warn!(
+                "Anti-Entropy: Failed to update remote section knowledge, proof chain contains invalid signatures: {:?}",
                 proof_chain
             );
             return false;
         }
 
+        /*
         // Check the SAP's key is the last key of the proof chain
+        //
+        // FIXME: this verification currently breaks DKG flow, specifically when we receive
+        // a Proposal::OurElders we rely on updating the SAP of a remote section.
+        // We are keeping this verification disabled for the moment until Anti-Entropy
+        // is fully implemented, aty which point this verification shall be re-enabled.
         if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
-            trace!(
-                "Failed to update remote section knowledge, SAP's key ({:?}) doesn't match proof chain last key ({:?})",
+            warn!(
+                "Anti-Entropy: Failed to update remote section knowledge, SAP's key ({:?}) doesn't match proof chain last key ({:?})",
                  signed_section_auth.value.public_key_set.public_key(), proof_chain.last_key()
             );
             return false;
         }
+        */
 
         // We currently don't keep the complete chain of remote sections,
         // **but** the SAPs of remote sections we keep were already verified by us
         // as trusted before we store them in our local records.
         // Thus, we just need to check our knowledge of the remote section's key
         // is part of the proof chain received.
-        match self.sections.get(&signed_section_auth.value.prefix) {
+        let prefix = signed_section_auth.value.prefix;
+        match self.sections.get(&prefix) {
             Some(sap) if sap == &signed_section_auth => {
                 // It's the same SAP we are already aware of
-                trace!(
-                    "Skip update remote section knowledge, SAP received is the same as the one we already are aware of: {:?}",
+                warn!(
+                    "Anti-Entropy: Skip update remote section knowledge, SAP received is the same as the one we already are aware of: {:?}",
                     signed_section_auth.value
                 );
                 return false;
@@ -184,8 +192,8 @@ impl NetworkUtils for Network {
                 // We are then aware of the prefix, let's just verify the new SAP can
                 // be trusted based on the SAP we aware of and the proof chain provided.
                 if !proof_chain.has_key(&sap.value.public_key_set.public_key()) {
-                    trace!(
-                        "Failed to update remote section knowledge, SAP cannot be trusted: {:?}",
+                    warn!(
+                        "Anti-Entropy: Failed to update remote section knowledge, SAP cannot be trusted: {:?}",
                         signed_section_auth.value
                     );
                     return false;
@@ -195,8 +203,8 @@ impl NetworkUtils for Network {
                 // We are not aware of the prefix, let's then verify it can be
                 // trusted based on our own section chain and the provided proof chain.
                 if !proof_chain.check_trust(our_section_chain.keys()) {
-                    trace!(
-                        "Failed to update remote section knowledge, cannot trust proof chain received for SAP: {:?}",
+                    warn!(
+                        "Anti-Entropy: Failed to update remote section knowledge, cannot trust proof chain received for SAP: {:?}",
                         signed_section_auth.value
                     );
                     return false;
@@ -208,6 +216,10 @@ impl NetworkUtils for Network {
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
         let _ = self.sections.insert(signed_section_auth);
+        info!(
+            "Anti-Entropy: Remote section knowledge updated: {:?}",
+            prefix
+        );
 
         true
     }
