@@ -287,21 +287,35 @@ impl NetworkUtils for Network {
 mod tests {
     use super::*;
     use crate::routing::{dkg, section};
+    use anyhow::{Context, Result};
     use rand::Rng;
 
     #[test]
     fn closest() -> Result<()> {
-        let sk = bls::SecretKey::random();
-        let chain = SecuredLinkedList::new(sk.public_key());
+        let genesis_sk = bls::SecretKey::random();
+        let genesis_pk = genesis_sk.public_key();
 
+        let chain = SecuredLinkedList::new(genesis_pk);
         let p01: Prefix = "01".parse().unwrap();
         let p10: Prefix = "10".parse().unwrap();
         let p11: Prefix = "11".parse().unwrap();
 
         // Create map containing sections (00), (01) and (10)
         let mut map = Network::new();
-        let _ = map.update_remote_section_sap(gen_section_auth(&sk, p01)?, &chain, &chain);
-        let _ = map.update_remote_section_sap(gen_section_auth(&sk, p10)?, &chain, &chain);
+
+        let mut chain01 = chain.clone();
+        let section_auth_01 = gen_section_auth(&bls::SecretKey::random(), p01)?;
+        let pk01 = section_auth_01.value.public_key_set.public_key();
+        let sig01 = bincode::serialize(&pk01).map(|bytes| genesis_sk.sign(&bytes))?;
+        chain01.insert(&genesis_pk, pk01, sig01)?;
+        let _ = map.update_remote_section_sap(section_auth_01, &chain01, &chain);
+
+        let mut chain10 = chain.clone();
+        let section_auth_10 = gen_section_auth(&bls::SecretKey::random(), p10)?;
+        let pk10 = section_auth_10.value.public_key_set.public_key();
+        let sig10 = bincode::serialize(&pk10).map(|bytes| genesis_sk.sign(&bytes))?;
+        chain10.insert(&genesis_pk, pk10, sig10)?;
+        let _ = map.update_remote_section_sap(section_auth_10, &chain10, &chain);
 
         let mut rng = rand::thread_rng();
         let n01 = p01.substituted_in(rng.gen());
@@ -320,6 +334,6 @@ mod tests {
         prefix: Prefix,
     ) -> Result<SectionAuth<SectionAuthorityProvider>> {
         let (section_auth, _, _) = section::test_utils::gen_section_authority_provider(prefix, 5);
-        dkg::test_utils::section_signed(sk, section_auth)
+        dkg::test_utils::section_signed(sk, section_auth).context("Failed to generate SAP")
     }
 }

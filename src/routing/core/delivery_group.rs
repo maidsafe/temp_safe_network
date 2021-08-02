@@ -498,14 +498,19 @@ mod tests {
         let prefix0 = Prefix::default().pushed(false);
         let prefix1 = Prefix::default().pushed(true);
 
+        let genesis_sk = bls::SecretKey::random();
+        let genesis_pk = genesis_sk.public_key();
+
         let sk = bls::SecretKey::random();
         let pk = sk.public_key();
-        let chain = SecuredLinkedList::new(pk);
 
         let (section_auth0, _, _) = gen_section_authority_provider(prefix0, ELDER_SIZE);
         let elders0: Vec<_> = section_auth0.peers().collect();
         let section_auth0 = section_signed(&sk, section_auth0)?;
 
+        let mut chain = SecuredLinkedList::new(genesis_pk);
+        let sig = bincode::serialize(&pk).map(|bytes| genesis_sk.sign(&bytes))?;
+        chain.insert(&genesis_pk, pk, sig)?;
         let mut section = Section::new(pk, chain, section_auth0)?;
 
         for peer in elders0 {
@@ -518,7 +523,12 @@ mod tests {
 
         let (section_auth1, _, _) = gen_section_authority_provider(prefix1, ELDER_SIZE);
         let section_auth1 = section_signed(&sk, section_auth1)?;
-        assert!(network.update_remote_section_sap(section_auth1, section.chain(), section.chain()));
+        let mut proof_chain = SecuredLinkedList::new(genesis_pk);
+        let pk1 = section_auth1.value.public_key_set.public_key();
+        let sig = bincode::serialize(&pk1).map(|bytes| genesis_sk.sign(&bytes))?;
+        proof_chain.insert(&genesis_pk, pk1, sig)?;
+
+        assert!(network.update_remote_section_sap(section_auth1, &proof_chain, section.chain()));
 
         let our_name = choose_elder_name(section.authority_provider())?;
 
