@@ -8,11 +8,12 @@
 
 use super::{Command, Event};
 use crate::messaging::{
+    data::ChunkDataExchange,
     node::{NodeMsg, Section},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
-use crate::node::RegisterStorage;
 use crate::routing::{
+    core::{ChunkStore, RegisterStorage},
     core::{Core, SendStatus},
     error::Result,
     messages::WireMsgUtils,
@@ -20,9 +21,12 @@ use crate::routing::{
     peer::PeerUtils,
     section::SectionPeersUtils,
     section::SectionUtils,
-    Error, XorName,
+    Error, Prefix, XorName,
 };
+// use bls::PublicKey;
+use crate::types::PublicKey;
 use itertools::Itertools;
+use std::collections::BTreeSet;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::{watch, RwLock},
@@ -57,6 +61,26 @@ impl Dispatcher {
 
     pub(super) async fn get_register_storage(&self) -> RegisterStorage {
         self.core.read().await.register_storage.clone()
+    }
+
+    pub(super) async fn get_chunk_storage(&self) -> ChunkStore {
+        self.core.read().await.chunk_storage.clone()
+    }
+
+    pub(super) async fn get_chunk_data_of(&self, prefix: &Prefix) -> ChunkDataExchange {
+        self.core.read().await.get_data_of(prefix).await
+    }
+
+    pub(super) async fn increase_full_node_count(&self, node_id: &PublicKey) {
+        self.core
+            .read()
+            .await
+            .increase_full_node_count(node_id)
+            .await
+    }
+
+    pub(super) async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
+        self.core.read().await.retain_members_only(members).await
     }
 
     /// Handles the given command and transitively any new commands that are produced during its
@@ -122,7 +146,7 @@ impl Dispatcher {
                 self.core
                     .read()
                     .await
-                    .handle_data_msg_received(msg_id, msg, user, auth)
+                    .handle_service_msg_received(msg_id, msg, user, auth)
                     .await
             }
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
@@ -258,6 +282,7 @@ impl Dispatcher {
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
+        debug!(">>> sending msg");
         let cmds = match wire_msg.msg_kind() {
             MsgKind::NodeAuthMsg(_)
             | MsgKind::NodeBlsShareAuthMsg(_)
@@ -302,8 +327,11 @@ impl Dispatcher {
     /// Messages sent here, either section to section or node to node.
     pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
         if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
+            debug!(">>>> OUR DST is end user");
             if self.core.read().await.section().prefix().matches(xorname) {
+                debug!(">>> in our section");
                 let addr = self.core.read().await.get_socket_addr(*socket_id).copied();
+                debug!(">>> addr found");
 
                 if let Some(socket_addr) = addr {
                     // Send a message to a client peer.

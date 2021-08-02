@@ -240,12 +240,13 @@ impl Session {
 
         let pending_queries_for_thread = pending_queries.clone();
         let _ = tokio::spawn(async move {
-            // Remove the response sender
-            trace!("Inserting channel for {:?}", msg_id);
+            // Insert the response sender
+            let op_id = query.operation_id();
+            trace!("Inserting channel for {:?}", op_id);
             let _ = pending_queries_for_thread
                 .write()
                 .await
-                .insert(msg_id, sender);
+                .insert(op_id, sender);
         });
 
         let discarded_responses = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
@@ -330,12 +331,12 @@ impl Session {
         let response = loop {
             let mut error_response = None;
             match (receiver.recv().await, chunk_addr) {
-                (Some(QueryResponse::GetChunk(Ok(blob))), Some(chunk_addr)) => {
+                (Some(QueryResponse::GetChunk(Ok(chunk))), Some(chunk_addr)) => {
                     // We are dealing with Chunk query responses, thus we validate its hash
                     // matches its xorname, if so, we don't need to await for more responses
-                    debug!("Chunk QueryResponse received is: {:#?}", blob);
+                    debug!("Chunk QueryResponse received is: {:#?}", chunk);
 
-                    let xorname = match &blob {
+                    let xorname = match &chunk {
                         Chunk::Private(priv_chunk) => {
                             *PrivateChunk::new(priv_chunk.value().clone(), *priv_chunk.owner())
                                 .name()
@@ -347,7 +348,7 @@ impl Session {
 
                     if *chunk_addr.name() == xorname {
                         trace!("Valid Chunk received for {}", msg_id);
-                        break Some(QueryResponse::GetChunk(Ok(blob)));
+                        break Some(QueryResponse::GetChunk(Ok(chunk)));
                     } else {
                         // the Chunk content doesn't match its Xorname,
                         // this is suspicious and it could be a byzantine node
@@ -358,11 +359,16 @@ impl Session {
                 // Erring on the side of positivity. \
                 // Saving error, but not returning until we have more responses in
                 // (note, this will overwrite prior errors, so we'll just return whicever was last received)
-                (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
-                | (response @ Some(QueryResponse::GetRegister(Err(_))), None)
-                | (response @ Some(QueryResponse::GetRegisterPolicy(Err(_))), None)
-                | (response @ Some(QueryResponse::GetRegisterOwner(Err(_))), None)
-                | (response @ Some(QueryResponse::GetRegisterUserPermissions(Err(_))), None) => {
+                (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_)) => {
+                    debug!("QueryResponse error received (but may be overridden by a non-error reponse from another elder): {:#?}", &response);
+                    error_response = response;
+                    discarded_responses += 1;
+                }
+                (response @ Some(QueryResponse::GetRegister((Err(_), _))), None)
+                | (response @ Some(QueryResponse::GetRegisterPolicy((Err(_), _))), None)
+                | (response @ Some(QueryResponse::GetRegisterOwner((Err(_), _))), None)
+                | (response @ Some(QueryResponse::GetRegisterUserPermissions((Err(_), _))), None) =>
+                {
                     debug!("QueryResponse error received (but may be overridden by a non-error reponse from another elder): {:#?}", &response);
                     error_response = response;
                     discarded_responses += 1;
@@ -386,15 +392,35 @@ impl Session {
             msg_id, response
         );
 
-        let _ = tokio::spawn(async move {
+        // let _ = tokio::spawn(async move {
+        if let Some(query) = response.clone() {
+            let query_op_id = query
+                .operation_id()
+                .map_err(|_| Error::UnknownOperationId)?;
             // Remove the response sender
-            trace!("Removing channel for {:?}", msg_id);
-            let _ = pending_queries.clone().write().await.remove(&msg_id);
-        });
+            trace!("Removing channel for {:?}", query_op_id);
+            let _ = pending_queries.clone().write().await.remove(&query_op_id);
+        }
+        // });
 
-        response
-            .map(|response| QueryResult { response, msg_id })
-            .ok_or(Error::NoResponse)
+        // response
+        // .map(|response| {
+
+        match response {
+            Some(response) => {
+                let operation_id = *response
+                    .operation_id()
+                    .map_err(|_| Error::UnknownOperationId)?;
+                Ok(QueryResult {
+                    response,
+                    operation_id,
+                })
+            }
+            None => Err(Error::NoResponse),
+        }
+        // }
+        // )
+        // .ok_or(Error::NoResponse)
     }
 
     // Get section info from the peer we have bootstrapped with.

@@ -8,13 +8,12 @@
 
 mod adult_storage_info;
 
-use crate::node::metadata::adult_reader::AdultReader;
 use crate::routing::{Prefix, XorName};
 pub(super) use adult_storage_info::AdultsStorageInfo;
 use std::collections::BTreeSet;
 
-// The number of separate copies of a blob chunk which should be maintained.
-pub(super) const CHUNK_COPY_COUNT: usize = 4;
+// The number of separate copies of a chunk which should be maintained.
+pub(crate) const CHUNK_COPY_COUNT: usize = 4;
 
 /// A util for sharing the
 /// info on data capacity among the
@@ -31,11 +30,6 @@ impl Capacity {
         Self { reader, writer }
     }
 
-    /// Get the sections's current Prefix
-    pub(super) async fn our_prefix(&self) -> Prefix {
-        self.reader.our_prefix().await
-    }
-
     /// Whether the adult is recorded as full
     pub(super) async fn is_full(&self, adult: &XorName) -> bool {
         self.reader.is_full(adult).await
@@ -46,15 +40,14 @@ impl Capacity {
         self.reader.full_adults_count().await
     }
 
+    /// Full chunk storing nodes in the section.
+    pub(super) async fn full_adults(&self) -> BTreeSet<XorName> {
+        self.reader.full_adults().await
+    }
+
     /// Number of full chunk storing nodes in the section.
     pub(super) async fn full_adults_matching(&self, prefix: Prefix) -> BTreeSet<XorName> {
         self.reader.full_adults_matching(prefix).await
-    }
-
-    // Returns `XorName`s of the target holders for an Blob chunk.
-    // Used to fetch the list of holders for a new chunk.
-    pub(super) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
-        self.reader.get_chunk_holder_adults(target).await
     }
 
     pub(super) async fn insert_full_adults(&self, full_adults: BTreeSet<XorName>) {
@@ -74,28 +67,24 @@ impl Capacity {
 
 #[derive(Clone)]
 pub(super) struct CapacityReader {
-    reader: AdultReader,
+    // reader: AdultReader,
     adult_storage_info: AdultsStorageInfo,
 }
 
 #[derive(Clone)]
 pub(super) struct CapacityWriter {
-    reader: AdultReader,
+    // reader: AdultReader,
     adult_storage_info: AdultsStorageInfo,
 }
 
 impl CapacityReader {
     /// Pass in adult_storage_info with info on chunk holders.
-    pub(super) fn new(adult_storage_info: AdultsStorageInfo, reader: AdultReader) -> Self {
+    pub(super) fn new(adult_storage_info: AdultsStorageInfo, //, reader: AdultReader
+    ) -> Self {
         Self {
-            reader,
+            // reader,
             adult_storage_info,
         }
-    }
-
-    /// Get the sections's current Prefix
-    pub(super) async fn our_prefix(&self) -> Prefix {
-        self.reader.our_prefix().await
     }
 
     /// Whether the adult is recorded as full
@@ -124,23 +113,16 @@ impl CapacityReader {
             .collect()
     }
 
-    // Returns `XorName`s of the target holders for an Blob chunk.
-    // Used to fetch the list of holders for a new chunk.
-    pub(super) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
-        let full_adults = self.adult_storage_info.full_adults.read().await;
-        self.reader
-            .non_full_adults_closest_to(target, &full_adults, CHUNK_COPY_COUNT)
-            .await
+    /// Get full adults.
+    pub(super) async fn full_adults(&self) -> BTreeSet<XorName> {
+        self.adult_storage_info.full_adults.read().await.clone()
     }
 }
 
 impl CapacityWriter {
     /// Pass in adult_storage_info with info on chunk holders.
-    pub(super) fn new(adult_storage_info: AdultsStorageInfo, reader: AdultReader) -> Self {
-        Self {
-            reader,
-            adult_storage_info,
-        }
+    pub(super) fn new(adult_storage_info: AdultsStorageInfo) -> Self {
+        Self { adult_storage_info }
     }
 
     pub(super) async fn insert_full_adults(&self, full_adults: BTreeSet<XorName>) {

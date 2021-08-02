@@ -10,10 +10,7 @@ mod listeners;
 mod messaging;
 
 use crate::client::Error;
-use crate::messaging::{
-    data::{CmdError, QueryResponse},
-    MessageId,
-};
+use crate::messaging::data::{CmdError, QueryResponse};
 use crate::types::PublicKey;
 use bls::PublicKeySet;
 use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
@@ -30,11 +27,12 @@ use xor_name::{Prefix, XorName};
 
 type QueryResponseSender = Sender<QueryResponse>;
 
-type PendingQueryResponses = Arc<RwLock<HashMap<MessageId, QueryResponseSender>>>;
+type PendingQueryResponses = Arc<RwLock<HashMap<XorName, QueryResponseSender>>>;
 
 pub(crate) struct QueryResult {
     pub(super) response: QueryResponse,
-    pub(super) msg_id: MessageId,
+    // TODO: unify this
+    pub(super) operation_id: XorName,
 }
 
 #[derive(Clone, Debug)]

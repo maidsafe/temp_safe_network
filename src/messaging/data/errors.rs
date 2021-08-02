@@ -11,6 +11,7 @@ use crate::types::PublicKey;
 use serde::{Deserialize, Serialize};
 use std::result;
 use thiserror::Error;
+use xor_name::Prefix;
 
 /// A specialised `Result` type.
 pub type Result<T, E = Error> = result::Result<T, E>;
@@ -29,6 +30,9 @@ pub enum Error {
     /// Failed to write file, likely due to a system Io error
     #[error("Failed to write file")]
     FailedToWriteFile,
+    /// Insufficient Adults found to store data
+    #[error("Failed to store chunk. Insufficient space found at section {0:?} adults")]
+    InsufficientAdults(Prefix),
     /// Provided data already exists on the network
     #[error("Data provided already exists")]
     DataExists,
@@ -40,11 +44,19 @@ pub enum Error {
     NoSuchKey,
     /// The list of owner keys is invalid
     #[error("Invalid owner key: {0}")]
-    InvalidOwners(PublicKey),
+    InvalidOwner(PublicKey),
     /// Invalid Operation such as a POST on ImmutableData
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
+    /// Right now we dont need op ids for anything that's not a chunk. Add more functionality there when needed.
+    #[error("QueryResponse cannot derive an operation id for anything non-chunk at the moment.")]
+    NoOperationIdForElderData,
     /// Node failed to delete the requested data for some reason.
     #[error("Failed to delete requested data")]
     FailedToDelete,
+    /// Error is not valid for operation id generation. This should not absolve a black eye
+    #[error(
+        "Could not generation operation id for chunk retrieval. Error was not 'DataNotFound'."
+    )]
+    InvalidQueryResponseErrorForOperationId,
 }

@@ -29,10 +29,11 @@ pub use self::{
 use crate::messaging::{data::Error as ErrorMessage, MessageId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
-    Chunk, PublicKey,
+    Chunk, DataAddress, PublicKey,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, convert::TryFrom};
+use xor_name::XorName;
 
 /// A message indicating that an error occurred as a node was handling a client's message.
 #[allow(clippy::large_enum_variant)]
@@ -97,6 +98,8 @@ pub enum CmdError {
     Data(Error), // DataError enum for better differentiation?
 }
 
+type OperationId = XorName;
+
 /// The response to a query, containing the query result.
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -110,15 +113,15 @@ pub enum QueryResponse {
     // ===== Register Data =====
     //
     /// Response to [`RegisterRead::Get`].
-    GetRegister(Result<Register>),
+    GetRegister((Result<Register>, OperationId)),
     /// Response to [`RegisterRead::GetOwner`].
-    GetRegisterOwner(Result<PublicKey>),
+    GetRegisterOwner((Result<PublicKey>, OperationId)),
     /// Response to [`RegisterRead::Read`].
-    ReadRegister(Result<BTreeSet<(EntryHash, Entry)>>),
+    ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
     /// Response to [`RegisterRead::GetPolicy`].
-    GetRegisterPolicy(Result<Policy>),
+    GetRegisterPolicy((Result<Policy>, OperationId)),
     /// Response to [`RegisterRead::GetUserPermissions`].
-    GetRegisterUserPermissions(Result<Permissions>),
+    GetRegisterUserPermissions((Result<Permissions>, OperationId)),
 }
 
 impl QueryResponse {
@@ -127,11 +130,11 @@ impl QueryResponse {
         use QueryResponse::*;
         match self {
             GetChunk(result) => result.is_ok(),
-            GetRegister(result) => result.is_ok(),
-            GetRegisterOwner(result) => result.is_ok(),
-            ReadRegister(result) => result.is_ok(),
-            GetRegisterPolicy(result) => result.is_ok(),
-            GetRegisterUserPermissions(result) => result.is_ok(),
+            GetRegister((result, _xor)) => result.is_ok(),
+            GetRegisterOwner((result, _xor)) => result.is_ok(),
+            ReadRegister((result, _xor)) => result.is_ok(),
+            GetRegisterPolicy((result, _xor)) => result.is_ok(),
+            GetRegisterUserPermissions((result, _xor)) => result.is_ok(),
         }
     }
 
@@ -144,28 +147,55 @@ impl QueryResponse {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            GetRegister(result) => match result {
+            GetRegister((result, _xorname)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            GetRegisterOwner(result) => match result {
+            GetRegisterOwner((result, _xorname)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            ReadRegister(result) => match result {
+            ReadRegister((result, _xorname)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            GetRegisterPolicy(result) => match result {
+            GetRegisterPolicy((result, _xorname)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            GetRegisterUserPermissions(result) => match result {
+            GetRegisterUserPermissions((result, _xorname)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
         }
     }
+
+    /// Retrieves the operation identifier for this response, use in tracking node liveness
+    /// and responses at clients.
+    /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
+    pub fn operation_id(&self) -> Result<&XorName> {
+        use QueryResponse::*;
+
+        match self {
+            GetChunk(result) => match result {
+                Ok(chunk) => Ok(chunk.name()),
+                Err(error) => match error {
+                    ErrorMessage::DataNotFound(address) => match address {
+                        DataAddress::Chunk(address) => Ok(address.name()),
+                        _ => Err(Error::NoOperationIdForElderData),
+                    },
+                    _ => Err(Error::InvalidQueryResponseErrorForOperationId),
+                },
+            },
+
+            GetRegister((_result, operation_id)) => Ok(operation_id),
+            GetRegisterOwner((_result, operation_id)) => Ok(operation_id),
+            ReadRegister((_result, operation_id)) => Ok(operation_id),
+            GetRegisterPolicy((_result, operation_id)) => Ok(operation_id),
+            GetRegisterUserPermissions((_result, operation_id)) => Ok(operation_id),
+        }
+    }
+    // }
 }
 
 /// Error type for an attempted conversion from a [`QueryResponse`] variant to an expected wrapped
@@ -186,8 +216,8 @@ macro_rules! try_from {
             fn try_from(response: QueryResponse) -> std::result::Result<Self, Self::Error> {
                 match response {
                     $(
-                        QueryResponse::$variant(Ok(data)) => Ok(data),
-                        QueryResponse::$variant(Err(error)) => Err(TryFromError::Response(error)),
+                        QueryResponse::$variant((Ok(data), _xor)) => Ok(data),
+                        QueryResponse::$variant((Err(error), _xor)) => Err(TryFromError::Response(error)),
                     )*
                     _ => Err(TryFromError::WrongType),
                 }
@@ -196,7 +226,19 @@ macro_rules! try_from {
     };
 }
 
-try_from!(Chunk, GetChunk);
+// try_from!(Chunk, GetChunk);
+
+impl TryFrom<QueryResponse> for Chunk {
+    type Error = TryFromError;
+    fn try_from(response: QueryResponse) -> std::result::Result<Self, Self::Error> {
+        match response {
+            QueryResponse::GetChunk(Ok(data)) => Ok(data),
+            QueryResponse::GetChunk(Err(error)) => Err(TryFromError::Response(error)),
+            _ => Err(TryFromError::WrongType),
+        }
+    }
+}
+
 try_from!(Register, GetRegister);
 try_from!(PublicKey, GetRegisterOwner);
 try_from!(BTreeSet<(EntryHash, Entry)>, ReadRegister);
@@ -231,7 +273,8 @@ mod tests {
     #[test]
     fn debug_format_functional() -> Result<()> {
         if let Some(key) = gen_keys().first() {
-            let errored_response = QueryResponse::GetRegister(Err(Error::AccessDenied(*key)));
+            let errored_response =
+                QueryResponse::GetRegister((Err(Error::AccessDenied(*key)), XorName::random()));
             assert!(format!("{:?}", errored_response).contains("GetRegister(Err(AccessDenied("));
             Ok(())
         } else {

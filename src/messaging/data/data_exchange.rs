@@ -29,7 +29,7 @@ pub struct HolderMetadata {
     pub chunks: BTreeSet<ChunkAddress>,
 }
 
-/// Aggregate of chunk, map, and sequence data exchanges.
+/// Metadata (register and chunk holders) replication.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataExchange {
     /// Chunk data exchange.
@@ -41,7 +41,7 @@ pub struct DataExchange {
 /// Chunk data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChunkDataExchange {
-    /// Full adults register.
+    /// Full adults.
     pub full_adults: BTreeSet<XorName>,
 }
 

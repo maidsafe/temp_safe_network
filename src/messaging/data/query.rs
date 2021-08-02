@@ -49,4 +49,15 @@ impl DataQuery {
             Register(q) => q.dst_address(),
         }
     }
+
+    /// Retrieves the operation identifier for this response, use in tracking node liveness
+    /// and responses at clients.
+    /// Must be the same as the query response
+    /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
+    pub fn operation_id(&self) -> XorName {
+        match self {
+            DataQuery::Chunk(read) => read.dst_address(),
+            DataQuery::Register(read) => read.operation_id(),
+        }
+    }
 }

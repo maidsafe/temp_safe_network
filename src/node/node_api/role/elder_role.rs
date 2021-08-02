@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+// use crate::node::metadata::Metadata;
 use crate::node::metadata::Metadata;
 use std::sync::Arc;
 use tokio::sync::RwLock;

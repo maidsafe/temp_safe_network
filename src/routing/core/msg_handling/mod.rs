@@ -20,13 +20,11 @@ mod sync;
 
 use super::Core;
 use crate::messaging::{
-    data::ServiceMsg,
-    node::{NodeMsg, Proposal},
+    data::{DataCmd, DataQuery, ServiceMsg},
+    node::{NodeCmd, NodeMsg, NodeQuery, Proposal},
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
     ServiceAuth, WireMsg,
 };
-use rand::rngs::OsRng;
-
 use crate::routing::{
     core::AggregatorError,
     error::{Error, Result},
@@ -37,11 +35,12 @@ use crate::routing::{
     section::SectionUtils,
     Event, MessageReceived, SectionAuthorityProviderUtils,
 };
-use crate::types::Keypair;
+use crate::types::{Chunk, Keypair, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use std::{iter, net::SocketAddr};
-
+use rand::rngs::OsRng;
+use std::{collections::BTreeSet, iter, net::SocketAddr};
+use xor_name::XorName;
 // Message handling
 impl Core {
     pub(crate) async fn handle_message(
@@ -84,7 +83,7 @@ impl Core {
                 msg,
                 dst_location,
             } => {
-                self.handle_data_message(sender, msg_id, auth, msg, dst_location, payload)
+                self.handle_service_message(sender, msg_id, auth, msg, dst_location, payload)
                     .await
             }
         }
@@ -374,42 +373,109 @@ impl Core {
             // TODO: In the future the sn-node layer won't be receiving Events but just
             // plugging in msg handlers.
             NodeMsg::NodeCmd(node_cmd) => {
-                // Does this/can this /_should_ this ever happen via NodeMsg?
-                self.send_event(Event::MessageReceived {
-                    msg_id,
-                    src: msg_authority.src_location(),
-                    dst: dst_location,
-                    msg: Box::new(MessageReceived::NodeCmd(node_cmd)),
-                })
-                .await;
+                match node_cmd {
+                    NodeCmd::Chunks { cmd, auth, .. } => {
+                        info!(
+                            ">>> Processing storing chunk command with MessageId: {:?}",
+                            msg_id
+                        );
+                        let verified = WireMsg::verify_sig(
+                            auth,
+                            ServiceMsg::Cmd(DataCmd::Chunk(cmd.clone())),
+                        )?;
+                        self.chunk_storage.write(&cmd, verified.public_key).await?
+                    }
+                    NodeCmd::ReplicateChunk(chunk) => {
+                        info!(
+                            ">>> Processing replicate chunk command with MessageId: {:?}",
+                            msg_id
+                        );
+
+                        if self.is_elder() {
+                            return self.republish_chunk(chunk).await;
+                        } else {
+                            // We are an adult here, so just store away!
+
+                            // TODO: should this be a cmd returned for threading?
+                            self.chunk_storage.store_for_replication(chunk).await?;
+                        }
+                    }
+                    NodeCmd::RepublishChunk(chunk) => {
+                        info!(
+                            ">>>>> Republishing chunk {:?} with MessageId {:?}",
+                            chunk.address(),
+                            msg_id
+                        );
+
+                        return self.republish_chunk(chunk).await;
+                    }
+                    _ => {
+                        self.send_event(Event::MessageReceived {
+                            msg_id,
+                            src: msg_authority.src_location(),
+                            dst: dst_location,
+                            msg: Box::new(MessageReceived::NodeCmd(node_cmd)),
+                        })
+                        .await;
+                    }
+                }
 
                 Ok(vec![])
             }
             NodeMsg::NodeQuery(node_query) => {
-                self.send_event(Event::MessageReceived {
-                    msg_id,
-                    src: msg_authority.src_location(),
-                    dst: dst_location,
-                    msg: Box::new(MessageReceived::NodeQuery(node_query)),
-                })
-                .await;
-                Ok(vec![])
+                match node_query {
+                    // A request from EndUser - via elders - for locally stored chunk
+                    NodeQuery::Chunks {
+                        origin,
+                        query,
+                        auth,
+                    } => {
+                        let verified = WireMsg::verify_sig(
+                            auth,
+                            ServiceMsg::Query(DataQuery::Chunk(query.clone())),
+                        )?;
+                        // Send back response to our Elders
+                        self.handle_chunk_query_response_at_adult(
+                            msg_id,
+                            query,
+                            verified.public_key,
+                            origin,
+                        )
+                    }
+                    _ => {
+                        self.send_event(Event::MessageReceived {
+                            msg_id,
+                            src: msg_authority.src_location(),
+                            dst: dst_location,
+                            msg: Box::new(MessageReceived::NodeQuery(node_query)),
+                        })
+                        .await;
+                        Ok(vec![])
+                    }
+                }
             }
             NodeMsg::NodeQueryResponse {
                 response,
                 correlation_id,
+                user,
             } => {
-                self.send_event(Event::MessageReceived {
-                    msg_id,
-                    src: msg_authority.src_location(),
-                    dst: dst_location,
-                    msg: Box::new(MessageReceived::NodeQueryResponse {
-                        response,
-                        correlation_id,
-                    }),
-                })
-                .await;
-                Ok(vec![])
+                debug!(">>>> QueryResponse innnn from a node");
+                let sending_nodes_pk = match msg_authority {
+                    NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().public_key),
+                    _ => {
+                        return Err(Error::InvalidQueryResponseAuthority(
+                            response,
+                            msg_authority,
+                        ))
+                    }
+                };
+
+                self.handle_chunk_query_response_at_elder(
+                    correlation_id,
+                    response,
+                    user,
+                    sending_nodes_pk,
+                )
             }
             NodeMsg::NodeMsgError {
                 error,
@@ -428,6 +494,81 @@ impl Core {
                 Ok(vec![])
             }
         }
+    }
+
+    // Locate ideal chunk holders for this chunk, line up wiremsgs for those to instruct them to store the chunk
+    async fn republish_chunk(&self, chunk: Chunk) -> Result<Vec<Command>> {
+        // info!("Processing republish with MessageId: {:?}", msg_id);
+        if self.is_elder() {
+            let target_holders = self.get_chunk_holder_adults(chunk.name()).await;
+            info!(
+                "Republishing chunk {:?} to holders {:?}",
+                chunk.address(),
+                &target_holders,
+            );
+
+            let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk));
+            let aggregation = false;
+
+            return self.send_node_msg_to_targets(msg, target_holders, aggregation);
+        } else {
+            error!("Received unexpected message while Adult");
+            Ok(vec![])
+        }
+    }
+
+    /// Takes a message and forms commands to send to specified targets
+    pub(super) fn send_node_msg_to_targets(
+        &self,
+        msg: NodeMsg,
+        targets: BTreeSet<XorName>,
+        aggregation: bool,
+    ) -> Result<Vec<Command>> {
+        let msg_id = MessageId::new();
+
+        let _our_prefix = self.section().prefix();
+        let our_name = self.node().name();
+
+        // we create a dummy/random dst location,
+        // we will set it correctly for each msg and target
+        // let name = network.our_name().await;
+        let section_pk = *self.section_chain().last_key();
+
+        let dummy_dst_location = DstLocation::Node {
+            name: our_name,
+            section_pk,
+        };
+
+        // separate this into form_wire_msg based on agg
+        let mut wire_msg = if aggregation {
+            let src = our_name;
+
+            WireMsg::for_dst_accumulation(
+                self.key_share().map_err(|err| err)?,
+                src,
+                dummy_dst_location,
+                msg,
+                section_pk,
+            )
+        } else {
+            WireMsg::single_src(self.node(), dummy_dst_location, msg, section_pk)
+        }?;
+
+        wire_msg.set_msg_id(msg_id);
+
+        let mut commands = vec![];
+
+        for target in targets {
+            debug!("sending {:?} to {:?}", wire_msg, target);
+            let mut wire_msg = wire_msg.clone();
+            let dst_section_pk = self.section_key_by_name(&target);
+            wire_msg.set_dst_section_pk(dst_section_pk);
+            wire_msg.set_dst_xorname(target);
+
+            commands.push(Command::ParseAndSendWireMsg(wire_msg));
+        }
+
+        Ok(commands)
     }
 
     // Convert the provided NodeMsgAuthority to be a `Section` message

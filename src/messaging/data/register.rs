@@ -86,13 +86,17 @@ impl RegisterRead {
     /// Request variant.
     pub fn error(&self, error: Error) -> QueryResponse {
         match *self {
-            RegisterRead::Get(_) => QueryResponse::GetRegister(Err(error)),
-            RegisterRead::Read(_) => QueryResponse::ReadRegister(Err(error)),
-            RegisterRead::GetPolicy(_) => QueryResponse::GetRegisterPolicy(Err(error)),
-            RegisterRead::GetUserPermissions { .. } => {
-                QueryResponse::GetRegisterUserPermissions(Err(error))
+            RegisterRead::Get(_) => QueryResponse::GetRegister((Err(error), self.operation_id())),
+            RegisterRead::Read(_) => QueryResponse::ReadRegister((Err(error), self.operation_id())),
+            RegisterRead::GetPolicy(_) => {
+                QueryResponse::GetRegisterPolicy((Err(error), self.operation_id()))
             }
-            RegisterRead::GetOwner(_) => QueryResponse::GetRegisterOwner(Err(error)),
+            RegisterRead::GetUserPermissions { .. } => {
+                QueryResponse::GetRegisterUserPermissions((Err(error), self.operation_id()))
+            }
+            RegisterRead::GetOwner(_) => {
+                QueryResponse::GetRegisterOwner((Err(error), self.operation_id()))
+            }
         }
     }
 
@@ -104,6 +108,32 @@ impl RegisterRead {
             | RegisterRead::GetPolicy(ref address)
             | RegisterRead::GetUserPermissions { ref address, .. }
             | RegisterRead::GetOwner(ref address) => *address.name(),
+        }
+    }
+
+    /// Retrieves the operation identifier for this response, use in tracking node liveness
+    /// and responses at clients.
+    /// Must be the same as the query response
+    /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
+    pub fn operation_id(&self) -> XorName {
+        match self {
+            RegisterRead::Get(ref address) => {
+                XorName::from_content(&[format!("Get-{}", address.name()).as_bytes()])
+            }
+            RegisterRead::Read(ref address) => {
+                XorName::from_content(&[format!("Read-{}", address.name()).as_bytes()])
+            }
+            RegisterRead::GetPolicy(ref address) => {
+                XorName::from_content(&[format!("GetPolicy-{}", address.name()).as_bytes()])
+            }
+            RegisterRead::GetUserPermissions { ref address, .. } => {
+                XorName::from_content(
+                    &[format!("GetUserPermissions-{}", address.name()).as_bytes()],
+                )
+            }
+            RegisterRead::GetOwner(ref address) => {
+                XorName::from_content(&[format!("GetOwner-{}", address.name()).as_bytes()])
+            }
         }
     }
 }

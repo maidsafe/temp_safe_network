@@ -14,15 +14,13 @@ mod role;
 mod split;
 
 use crate::dbs::UsedSpace;
-use crate::messaging::data::ServiceError;
+
 use crate::node::logging::log_ctx::LogCtx;
 use crate::node::logging::run_system_logger;
 use crate::node::{
-    chunk_store::ChunkStore,
-    error::convert_to_error_message,
     event_mapping::{map_routing_event, Mapping, MsgContext},
     network::Network,
-    node_ops::{NodeDuty, OutgoingLazyError},
+    node_ops::NodeDuty,
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
@@ -97,9 +95,7 @@ impl Node {
 
         let node = Self {
             role: Arc::new(RwLock::new(Role::Adult(AdultRole {
-                chunks: Arc::new(
-                    ChunkStore::new(node_info.root_dir.as_path(), used_space.clone()).await?,
-                ),
+                network_api: network_api.clone(),
             }))),
             node_info,
             used_space,
@@ -245,18 +241,6 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
                     "Erroring when processing a message without a msg context, we cannot report it to the sender: {:?}", err
                 );
             NodeDuty::NoOp
-        }
-        Some(MsgContext::Client { msg, src }) => {
-            warn!("Sending in response to a message: {:?}", msg);
-            let err_msg = ServiceError {
-                source_message: Some(Box::new(msg)),
-                reason: Some(convert_to_error_message(err)),
-            };
-
-            NodeDuty::SendError(OutgoingLazyError {
-                msg: err_msg,
-                dst: src.to_dst(),
-            })
         }
         Some(_other) => NodeDuty::NoOp,
     }

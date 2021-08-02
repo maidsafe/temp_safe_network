@@ -8,9 +8,8 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    data::{DataCmd, DataQuery, QueryResponse, ServiceMsg},
-    node::{NodeCmd, NodeMsg, NodeQuery, NodeQueryResponse},
-    AuthorityProof, DstLocation, MessageId, ServiceAuth, SrcLocation, WireMsg,
+    node::{NodeCmd, NodeMsg},
+    DstLocation, MessageId, SrcLocation,
 };
 use crate::node::{
     error::convert_to_error_message,
@@ -33,7 +32,7 @@ pub(super) fn map_node_msg(
 
     match dst {
         DstLocation::Section { .. } | DstLocation::Node { .. } => Mapping {
-            op: match_node_msg(msg_id, msg.clone(), src),
+            op: match_node_msg(msg.clone()),
             ctx: Some(MsgContext::Node { msg, src }),
         },
         _ => {
@@ -66,121 +65,20 @@ pub(super) fn map_node_msg(
     }
 }
 
-fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) -> NodeDuty {
+fn match_node_msg(msg: MessageReceived) -> NodeDuty {
     match msg {
         // Churn synch
         MessageReceived::NodeCmd(NodeCmd::ReceiveExistingData { metadata }) => {
             NodeDuty::SynchState { metadata }
-        }
-        // ------ metadata ------
-        MessageReceived::NodeQuery(NodeQuery::Metadata {
-            query,
-            auth,
-            origin: query_origin,
-        }) => match verify_authority(msg_id, origin, auth, ServiceMsg::Query(query.clone())) {
-            Ok(auth) => NodeDuty::ProcessRead {
-                query,
-                msg_id,
-                auth,
-                origin: query_origin,
-            },
-            Err(duty) => duty,
-        },
-        MessageReceived::NodeCmd(NodeCmd::Metadata {
-            cmd,
-            auth,
-            origin: cmd_origin,
-        }) => match verify_authority(msg_id, origin, auth, ServiceMsg::Cmd(cmd.clone())) {
-            Ok(auth) => NodeDuty::ProcessWrite {
-                cmd,
-                msg_id,
-                auth,
-                origin: cmd_origin,
-            },
-            Err(duty) => duty,
-        },
-        //
-        // ------ Adult ------
-        MessageReceived::NodeQuery(NodeQuery::Chunks { query, auth, .. }) => {
-            match verify_authority(
-                msg_id,
-                origin,
-                auth,
-                ServiceMsg::Query(DataQuery::Chunk(query.clone())),
-            ) {
-                Ok(auth) => NodeDuty::ReadChunk {
-                    msg_id,
-                    read: query,
-                    auth,
-                },
-                Err(duty) => duty,
-            }
-        }
-        MessageReceived::NodeCmd(NodeCmd::Chunks { cmd, auth, .. }) => {
-            match verify_authority(
-                msg_id,
-                origin,
-                auth,
-                ServiceMsg::Cmd(DataCmd::Chunk(cmd.clone())),
-            ) {
-                Ok(auth) => NodeDuty::WriteChunk {
-                    write: cmd,
-                    msg_id,
-                    auth,
-                },
-                Err(duty) => duty,
-            }
-        }
-        // this cmd is accumulated, thus has authority
-        MessageReceived::NodeCmd(NodeCmd::ReplicateChunk(chunk)) => {
-            NodeDuty::ReplicateChunk { chunk, msg_id }
-        }
-        // Send a message to a section telling them to initiate replication of this chunk
-        MessageReceived::NodeCmd(NodeCmd::RepublishChunk(chunk)) => {
-            NodeDuty::ProcessRepublish { chunk, msg_id }
         }
         //
         // ------ system cmd ------
         MessageReceived::NodeCmd(NodeCmd::StorageFull { node_id, .. }) => {
             NodeDuty::IncrementFullNodeCount { node_id }
         }
-        // --- Adult Operation response ---
-        MessageReceived::NodeQueryResponse {
-            response: NodeQueryResponse::GetChunk(res),
-            correlation_id,
-        } => NodeDuty::RecordAdultReadLiveness {
-            response: QueryResponse::GetChunk(res),
-            correlation_id,
-            src: origin.name(),
-        },
-        _ => send_error(
-            msg_id,
-            origin,
-            Error::InvalidMessage(msg_id, format!("Invalid dst: {:?}", msg)),
-            true,
-        ),
+        _ => {
+            error!("Unexpected message received at the node (should probably be handled in routing: {:?}" , msg);
+            NodeDuty::NoOp
+        }
     }
-}
-
-fn verify_authority(
-    msg_id: MessageId,
-    origin: SrcLocation,
-    auth: ServiceAuth,
-    msg: ServiceMsg,
-) -> Result<AuthorityProof<ServiceAuth>, NodeDuty> {
-    WireMsg::serialize_msg_payload(&msg)
-        .and_then(|payload| AuthorityProof::verify(auth, &payload))
-        .map_err(|error| send_error(msg_id, origin, Error::Message(error), false))
-}
-
-fn send_error(msg_id: MessageId, origin: SrcLocation, error: Error, aggregation: bool) -> NodeDuty {
-    NodeDuty::Send(OutgoingMsg {
-        id: MessageId::in_response_to(&msg_id),
-        msg: MsgType::Node(NodeMsg::NodeMsgError {
-            error: convert_to_error_message(error),
-            correlation_id: msg_id,
-        }),
-        dst: origin.to_dst(),
-        aggregation,
-    })
 }

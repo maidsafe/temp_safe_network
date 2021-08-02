@@ -8,22 +8,33 @@
 
 mod api;
 mod bootstrap;
+mod capacity;
+mod chunk_records;
+mod chunk_store;
 mod comm;
 mod connectivity;
 mod delivery_group;
 mod enduser_registry;
+mod liveness_tracking;
 mod messaging;
 mod msg_handling;
+mod register_storage;
 mod signature_aggregator;
 mod split_barrier;
 
 use crate::dbs::UsedSpace;
-use crate::node::RegisterStorage;
+pub(crate) use capacity::CHUNK_COPY_COUNT;
+pub(crate) use register_storage::RegisterStorage;
+// use chunk_records::ChunkRecords;
+
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
+use capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter};
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub use signature_aggregator::Error as AggregatorError;
 pub(crate) use signature_aggregator::SignatureAggregator;
 use std::path::PathBuf;
+
+pub(crate) use chunk_store::ChunkStore;
 
 use self::{enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
 use crate::messaging::{
@@ -42,6 +53,7 @@ use crate::routing::{
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
 use itertools::Itertools;
+use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::collections::BTreeSet;
 use tokio::sync::mpsc;
@@ -70,7 +82,11 @@ pub(crate) struct Core {
     end_users: EndUserRegistry,
     used_space: UsedSpace,
     pub(super) register_storage: RegisterStorage,
+    pub(super) chunk_storage: ChunkStore,
+    // chunk_records: ChunkRecords,
     root_storage_dir: PathBuf,
+    capacity: Capacity,
+    liveness: Liveness,
 }
 
 impl Core {
@@ -90,6 +106,16 @@ impl Core {
         node.addr = comm.our_connection_info();
 
         let register_storage = RegisterStorage::new(&root_storage_dir, used_space.clone())?;
+        let chunk_storage = ChunkStore::new(&root_storage_dir, used_space.clone())?;
+
+        let adult_storage_info = AdultsStorageInfo::new();
+        // let adult_reader = AdultReader::new(self.network_api.clone());
+        let capacity_reader = CapacityReader::new(adult_storage_info.clone());
+        let capacity_writer = CapacityWriter::new(adult_storage_info.clone());
+        let capacity = Capacity::new(capacity_reader.clone(), capacity_writer);
+
+        let adult_liveness = Liveness::new();
+        // let chunk_records = ChunkRecords::new(capacity);
 
         Ok(Self {
             comm,
@@ -107,6 +133,9 @@ impl Core {
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             end_users: EndUserRegistry::new(),
             register_storage,
+            chunk_storage,
+            capacity,
+            liveness: adult_liveness,
             root_storage_dir,
             used_space,
         })

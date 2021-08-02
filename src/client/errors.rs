@@ -9,13 +9,15 @@
 pub use crate::messaging::data::Error as ErrorMessage;
 use crate::messaging::{
     data::{CmdError, QueryResponse},
-    Error as MessagingError, MessageId,
+    Error as MessagingError,
 };
 use crate::types::Error as DtError;
 use qp2p::Error as QuicP2pError;
 use std::io;
-
 use thiserror::Error;
+use xor_name::XorName;
+
+type OperationId = XorName;
 
 /// Specialisation of `std::Result` for Client.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -84,6 +86,9 @@ pub enum Error {
     /// Incorrect user permissions were returned
     #[error("Incorrect user permissions were returned")]
     IncorrectPermissions,
+    /// No operation Id could be found
+    #[error("Could not retrieve the operation id of a query response")]
+    UnknownOperationId,
     /// Unexpected response received
     #[error("Unexpected response received when querying {0:?}")]
     UnexpectedQueryResponse(QueryResponse),
@@ -94,16 +99,13 @@ pub enum Error {
     #[error(transparent)]
     NetworkDataError(#[from] DtError),
     /// Errors received from the network via sn_messaging
-    #[error(
-        "Error received from the network: {:?} MessageId: {:?}",
-        source,
-        msg_id
-    )]
+    #[error("Error received from the network: {:?} MessageId: {:?}", source, op_id)]
     ErrorMessage {
         /// The source of an error message
         source: ErrorMessage,
-        /// Message ID that was used to send the query
-        msg_id: MessageId,
+        /// operation ID that was used to send the query
+        // TODO unify this
+        op_id: XorName,
     },
     /// Errors occurred when serialising or deserialising messages
     #[error(transparent)]
@@ -131,15 +133,15 @@ pub enum Error {
     Database(#[from] crate::dbs::Error),
 }
 
-impl From<(CmdError, MessageId)> for Error {
-    fn from((error, msg_id): (CmdError, MessageId)) -> Self {
+impl From<(CmdError, OperationId)> for Error {
+    fn from((error, op_id): (CmdError, OperationId)) -> Self {
         let CmdError::Data(source) = error;
-        Error::ErrorMessage { source, msg_id }
+        Error::ErrorMessage { source, op_id }
     }
 }
 
-impl From<(ErrorMessage, MessageId)> for Error {
-    fn from((source, msg_id): (ErrorMessage, MessageId)) -> Self {
-        Self::ErrorMessage { source, msg_id }
+impl From<(ErrorMessage, OperationId)> for Error {
+    fn from((source, op_id): (ErrorMessage, OperationId)) -> Self {
+        Self::ErrorMessage { source, op_id }
     }
 }

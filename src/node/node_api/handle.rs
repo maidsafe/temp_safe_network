@@ -13,13 +13,12 @@ use super::{
 };
 use crate::messaging::MessageId;
 use crate::node::{
-    chunk_store::ChunkStore,
     event_mapping::MsgContext,
     node_ops::{NodeDuties, NodeDuty},
-    Error, Node, Result,
+    Node, Result,
 };
+
 use crate::routing::ELDER_SIZE;
-use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tracing::{debug, info};
 use xor_name::XorName;
@@ -180,53 +179,15 @@ impl Node {
             }
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
-                let store =
-                    ChunkStore::new(self.node_info.root_dir.as_path(), self.used_space.clone())
-                        .await?;
+                // TODO: Do we still want/need this demotion?
+                // let store =
+                //     ChunkStore::new(self.node_info.root_dir.as_path(), self.used_space.clone())
+                //         .await?;
                 *self.role.write().await = Role::Adult(AdultRole {
-                    chunks: Arc::new(store),
+                    // chunks: Arc::new(store),
+                    network_api: self.network_api.clone(),
                 });
                 Ok(NodeTask::None)
-            }
-            //
-            // -------- Immutable chunks --------
-            NodeDuty::ReadChunk { msg_id, read, auth } => {
-                let adult = self.as_adult().await?;
-                let our_section_pk = self.network_api.our_section_public_key().await;
-                let handle = tokio::spawn(async move {
-                    let mut ops = vec![
-                        adult
-                            .chunks
-                            .read(&read, msg_id, auth.public_key, our_section_pk)
-                            .await,
-                    ];
-                    ops.extend(adult.chunks.check_storage().await?);
-                    Ok(NodeTask::from(ops))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::WriteChunk {
-                write,
-                msg_id,
-                auth,
-            } => {
-                let adult = self.as_adult().await?;
-                let handle = tokio::spawn(async move {
-                    let mut ops = vec![adult.chunks.write(&write, msg_id, auth.public_key).await?];
-                    ops.extend(adult.chunks.check_storage().await?);
-                    Ok(NodeTask::from(ops))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::ProcessRepublish { chunk, msg_id, .. } => {
-                info!("Processing republish with MessageId: {:?}", msg_id);
-                let elder = self.as_elder().await?;
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        elder.meta_data.read().await.republish_chunk(chunk).await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ReachingMaxCapacity => {
                 let network_api = self.network_api.clone();
@@ -292,91 +253,6 @@ impl Node {
                 });
                 Ok(NodeTask::Thread(handle))
             }
-            //
-            // ------- Data ------------
-            NodeDuty::ProcessRead {
-                query,
-                msg_id,
-                auth,
-                origin,
-            } => {
-                let elder = self.as_elder().await?;
-                let handle = tokio::spawn(async move {
-                    let duties = vec![
-                        // this is a write here as we write the liveness check for each adult
-                        elder
-                            .meta_data
-                            .write()
-                            .await
-                            .read(query, msg_id, auth, origin)
-                            .await?,
-                    ];
-                    Ok(NodeTask::from(duties))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::ProcessWrite {
-                cmd,
-                msg_id,
-                origin,
-                auth,
-            } => {
-                let elder = self.as_elder().await?;
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        elder
-                            .meta_data
-                            .write()
-                            .await
-                            .write(cmd, msg_id, auth, origin)
-                            .await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            // --- Completion of Adult operations ---
-            NodeDuty::RecordAdultReadLiveness {
-                response,
-                correlation_id,
-                src,
-            } => {
-                let network_api = self.network_api.clone();
-                let elder = self.as_elder().await?;
-
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(
-                        elder
-                            .meta_data
-                            .write()
-                            .await
-                            .record_adult_read_liveness(correlation_id, response, src, &network_api)
-                            .await?,
-                    ))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
-            NodeDuty::ReplicateChunk { chunk, .. } => match self.as_adult().await {
-                Ok(adult) => {
-                    let handle = tokio::spawn(async move {
-                        Ok(NodeTask::from(vec![
-                            adult.chunks.store_for_replication(chunk).await?,
-                        ]))
-                    });
-                    Ok(NodeTask::Thread(handle))
-                }
-                Err(error) => match error {
-                    Error::NotAnAdult => {
-                        let elder = self.as_elder().await?;
-                        let handle = tokio::spawn(async move {
-                            Ok(NodeTask::from(vec![
-                                elder.meta_data.read().await.republish_chunk(chunk).await?,
-                            ]))
-                        });
-                        Ok(NodeTask::Thread(handle))
-                    }
-                    some_other_error => Err(some_other_error),
-                },
-            },
             NodeDuty::NoOp => Ok(NodeTask::None),
         }
     }

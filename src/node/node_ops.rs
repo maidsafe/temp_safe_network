@@ -7,15 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{
-        ChunkRead, ChunkWrite, DataCmd, DataExchange, DataQuery, QueryResponse, ServiceError,
-        ServiceMsg,
-    },
+    data::{DataExchange, ServiceError, ServiceMsg},
     node::NodeMsg,
-    AuthorityProof, DstLocation, EndUser, MessageId, ServiceAuth,
+    DstLocation, MessageId,
 };
 use crate::routing::Prefix;
-use crate::types::{Chunk, PublicKey};
+use crate::types::PublicKey;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -39,27 +36,6 @@ pub(super) type NodeDuties = Vec<NodeDuty>;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum NodeDuty {
-    ReadChunk {
-        msg_id: MessageId,
-        read: ChunkRead,
-        auth: AuthorityProof<ServiceAuth>,
-    },
-    WriteChunk {
-        msg_id: MessageId,
-        write: ChunkWrite,
-        auth: AuthorityProof<ServiceAuth>,
-    },
-    ProcessRepublish {
-        msg_id: MessageId,
-        chunk: Chunk,
-    },
-    /// Run at data-section Elders on receiving the result of
-    /// read operations from Adults
-    RecordAdultReadLiveness {
-        response: QueryResponse,
-        correlation_id: MessageId,
-        src: XorName,
-    },
     Genesis,
     EldersChanged {
         /// Our section prefix.
@@ -127,26 +103,6 @@ pub enum NodeDuty {
         msg: NodeMsg,
         targets: BTreeSet<XorName>,
         aggregation: bool,
-    },
-    /// Process read of data
-    ProcessRead {
-        msg_id: MessageId,
-        query: DataQuery,
-        auth: AuthorityProof<ServiceAuth>,
-        origin: EndUser,
-    },
-    /// Process write of data
-    ProcessWrite {
-        msg_id: MessageId,
-        cmd: DataCmd,
-        auth: AuthorityProof<ServiceAuth>,
-        origin: EndUser,
-    },
-    /// Receive a chunk that is being replicated.
-    /// This is run at an Adult (the new holder).
-    ReplicateChunk {
-        msg_id: MessageId,
-        chunk: Chunk,
     },
     /// Create proposals to vote unresponsive nodes as offline
     ProposeOffline(Vec<XorName>),

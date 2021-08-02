@@ -124,9 +124,11 @@ impl Client {
             .send_query(DataQuery::Chunk(ChunkRead::Get(head_address)))
             .await?;
 
-        let msg_id = res.msg_id;
+        let operation_id = res.operation_id;
         let chunk: Chunk = match res.response {
-            QueryResponse::GetChunk(result) => result.map_err(|err| Error::from((err, msg_id))),
+            QueryResponse::GetChunk(result) => {
+                result.map_err(|err| Error::from((err, operation_id)))
+            }
             _ => return Err(Error::ReceivedUnexpectedEvent),
         }?;
 
@@ -577,6 +579,7 @@ mod tests {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
         let address = client.store_public_blob(&data).await?;
 
+        println!("STOOOOOORED");
         // let's make sure the public chunk is stored
         let _ = run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
 
@@ -584,6 +587,7 @@ mod tests {
         let res = client
             .read_blob(ChunkAddress::Private(*address.name()), None, None)
             .await;
+
         assert!(res.is_err());
 
         Ok(())

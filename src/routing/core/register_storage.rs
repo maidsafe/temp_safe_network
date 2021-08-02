@@ -15,8 +15,9 @@ use crate::{
     messaging::{
         data::{
             DataCmd, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead, RegisterWrite,
+            ServiceMsg,
         },
-        AuthorityProof, ServiceAuth,
+        AuthorityProof, ServiceAuth, WireMsg,
     },
     types::DataAddress,
 };
@@ -38,7 +39,7 @@ type RegisterOpStore = EventStore<RegisterCmd>;
 /// Operations over the data type Register.
 // TODO: dont expose this
 #[derive(Clone, Debug)]
-pub struct RegisterStorage {
+pub(crate) struct RegisterStorage {
     path: PathBuf,
     used_space: UsedSpace,
     registers: Arc<DashMap<XorName, Option<StateEntry>>>,
@@ -53,7 +54,7 @@ struct StateEntry {
 
 impl RegisterStorage {
     /// Create new RegisterStorage
-    pub fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         used_space.add_dir(path);
         let db_dir = path.join("db").join(DATABASE_NAME.to_string());
 
@@ -73,7 +74,7 @@ impl RegisterStorage {
     /// --- Synching ---
 
     /// Used for replication of data to new Elders.
-    pub(super) async fn get_data_of(&self, prefix: Prefix) -> Result<RegisterDataExchange> {
+    pub(crate) async fn get_data_of(&self, prefix: Prefix) -> Result<RegisterDataExchange> {
         let mut the_data = BTreeMap::default();
 
         for entry in self.registers.iter() {
@@ -94,7 +95,7 @@ impl RegisterStorage {
     }
 
     /// On receiving data from Elders when promoted.
-    pub(super) fn update(&self, reg_data: RegisterDataExchange) -> Result<()> {
+    pub(crate) fn update(&self, reg_data: RegisterDataExchange) -> Result<()> {
         debug!("Updating Register store");
 
         let RegisterDataExchange(data) = reg_data;
@@ -102,10 +103,10 @@ impl RegisterStorage {
         // todo: make outer loop parallel
         for (_, history) in data {
             for op in history {
-                let auth = super::verify_op(op.auth.clone(), DataCmd::Register(op.write.clone()))
+                let auth = Self::verify_op(op.auth.clone(), DataCmd::Register(op.write.clone()))
                     .map_err(|_| {
-                    Error::Logic("Received register operation signature is invalid".to_string())
-                })?;
+                        Error::Logic("Received register operation signature is invalid".to_string())
+                    })?;
                 let _ = self.apply(op, auth)?;
             }
         }
@@ -235,27 +236,33 @@ impl RegisterStorage {
         requester_pk: PublicKey,
     ) -> Result<QueryResponse> {
         trace!("Reading register {:?}", read.dst_address());
+        let operation_id = read.operation_id();
         use RegisterRead::*;
         match read {
-            Get(address) => self.get(*address, requester_pk),
-            Read(address) => self.read_register(*address, requester_pk),
-            GetOwner(address) => self.get_owner(*address, requester_pk),
+            Get(address) => self.get(*address, requester_pk, operation_id),
+            Read(address) => self.read_register(*address, requester_pk, operation_id),
+            GetOwner(address) => self.get_owner(*address, requester_pk, operation_id),
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, requester_pk)
+                self.get_user_permissions(*address, *user, requester_pk, operation_id)
             }
-            GetPolicy(address) => self.get_policy(*address, requester_pk),
+            GetPolicy(address) => self.get_policy(*address, requester_pk, operation_id),
         }
     }
 
     /// Get entire Register.
-    fn get(&self, address: Address, requester_pk: PublicKey) -> Result<QueryResponse> {
+    fn get(
+        &self,
+        address: Address,
+        requester_pk: PublicKey,
+        operation_id: XorName,
+    ) -> Result<QueryResponse> {
         let result = match self.get_register(&address, Action::Read, requester_pk) {
             Ok(register) => Ok(register),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(QueryResponse::GetRegister(result))
+        Ok(QueryResponse::GetRegister((result, operation_id)))
     }
 
     /// Get `Register` from the store and check permissions.
@@ -281,26 +288,37 @@ impl RegisterStorage {
         Ok(state.clone())
     }
 
-    fn read_register(&self, address: Address, requester_pk: PublicKey) -> Result<QueryResponse> {
+    fn read_register(
+        &self,
+        address: Address,
+        requester_pk: PublicKey,
+        operation_id: XorName,
+    ) -> Result<QueryResponse> {
         let result = match self.get_register(&address, Action::Read, requester_pk) {
             Ok(register) => register.read(Some(requester_pk)).map_err(Error::from),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(error),
         };
 
-        Ok(QueryResponse::ReadRegister(
+        Ok(QueryResponse::ReadRegister((
             result.map_err(convert_to_error_message),
-        ))
+            operation_id,
+        )))
     }
 
-    fn get_owner(&self, address: Address, requester_pk: PublicKey) -> Result<QueryResponse> {
+    fn get_owner(
+        &self,
+        address: Address,
+        requester_pk: PublicKey,
+        operation_id: XorName,
+    ) -> Result<QueryResponse> {
         let result = match self.get_register(&address, Action::Read, requester_pk) {
             Ok(res) => Ok(res.owner()),
             Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(QueryResponse::GetRegisterOwner(result))
+        Ok(QueryResponse::GetRegisterOwner((result, operation_id)))
     }
 
     fn get_user_permissions(
@@ -308,6 +326,7 @@ impl RegisterStorage {
         address: Address,
         user: User,
         requester_pk: PublicKey,
+        operation_id: XorName,
     ) -> Result<QueryResponse> {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
@@ -321,10 +340,18 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(QueryResponse::GetRegisterUserPermissions(result))
+        Ok(QueryResponse::GetRegisterUserPermissions((
+            result,
+            operation_id,
+        )))
     }
 
-    fn get_policy(&self, address: Address, requester_pk: PublicKey) -> Result<QueryResponse> {
+    fn get_policy(
+        &self,
+        address: Address,
+        requester_pk: PublicKey,
+        operation_id: XorName,
+    ) -> Result<QueryResponse> {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
             .and_then(|register| {
@@ -338,7 +365,7 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(QueryResponse::GetRegisterPolicy(result))
+        Ok(QueryResponse::GetRegisterPolicy((result, operation_id)))
     }
 
     /// Load a register op store
@@ -368,6 +395,16 @@ impl RegisterStorage {
                 Error::Logic("A store was found, but its contents were invalid.".to_string())
             })
             .map(|state| StateEntry { state, store })
+    }
+
+    // TODO: verify earlier so that this isn't needed
+    fn verify_op(auth: ServiceAuth, cmd: DataCmd) -> Result<AuthorityProof<ServiceAuth>> {
+        let message = ServiceMsg::Cmd(cmd);
+        let payload = WireMsg::serialize_msg_payload(&message)
+            .map_err(|error| Error::Serialize(error.to_string()))?;
+        Ok(AuthorityProof::verify(auth, &payload).map_err(|_| {
+            Error::InvalidOperation("Register operation could not be verified.".to_string())
+        })?)
     }
 }
 

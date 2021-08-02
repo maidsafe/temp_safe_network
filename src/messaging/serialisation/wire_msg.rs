@@ -9,7 +9,7 @@
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::ServiceMsg, node::NodeMsg, section_info::SectionInfoMsg, AuthorityProof, DstLocation,
-    Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
+    Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result, ServiceAuth,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -241,6 +241,11 @@ impl WireMsg {
     /// bytes, returning the deserialized message.
     pub fn deserialize(bytes: Bytes) -> Result<MessageType> {
         Self::from(bytes)?.into_message()
+    }
+
+    /// Convenience function which validates the signature on a ServiceMsg.
+    pub fn verify_sig(auth: ServiceAuth, msg: ServiceMsg) -> Result<AuthorityProof<ServiceAuth>> {
+        Self::serialize_msg_payload(&msg).and_then(|payload| AuthorityProof::verify(auth, &payload))
     }
 }
 

@@ -23,9 +23,12 @@ use self::{
     event::{Elders, Event, NodeElderChange},
     event_stream::EventStream,
 };
-use crate::dbs::UsedSpace;
+use crate::messaging::{
+    node::{NodeMsg, Peer},
+    DstLocation, SectionAuthorityProvider, WireMsg,
+};
 use crate::routing::{
-    core::{join_network, Comm, ConnectionEvent, Core},
+    core::{join_network, ChunkStore, Comm, ConnectionEvent, Core, RegisterStorage},
     ed25519,
     error::Result,
     messages::WireMsgUtils,
@@ -35,14 +38,10 @@ use crate::routing::{
     section::SectionUtils,
     Error, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
 };
-use crate::{
-    messaging::{
-        node::{NodeMsg, Peer},
-        DstLocation, SectionAuthorityProvider, WireMsg,
-    },
-    node::RegisterStorage,
-};
+use crate::{dbs::UsedSpace, messaging::data::ChunkDataExchange};
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
+
+use crate::types::PublicKey as DtPublicKey;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::path::PathBuf;
@@ -169,6 +168,28 @@ impl Routing {
 
     pub(crate) async fn get_register_storage(&self) -> RegisterStorage {
         self.dispatcher.get_register_storage().await
+    }
+
+    pub(crate) async fn get_chunk_storage(&self) -> ChunkStore {
+        self.dispatcher.get_chunk_storage().await
+    }
+    pub(crate) async fn get_chunk_data_of(&self, prefix: &Prefix) -> ChunkDataExchange {
+        self.dispatcher.get_chunk_data_of(prefix).await
+    }
+    pub(crate) async fn increase_full_node_count(&self, node_id: &DtPublicKey) {
+        self.dispatcher.increase_full_node_count(node_id).await
+    }
+    pub(crate) async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
+        self.dispatcher.retain_members_only(members).await
+    }
+
+    pub(crate) async fn update_chunks(&self, chunks: ChunkDataExchange) {
+        self.dispatcher
+            .core
+            .read()
+            .await
+            .update_chunks(chunks)
+            .await
     }
 
     /// Sets the JoinsAllowed flag.

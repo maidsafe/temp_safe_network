@@ -8,26 +8,14 @@
 
 use super::role::{ElderRole, Role};
 use crate::messaging::data::DataExchange;
-use crate::node::{
-    capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter},
-    metadata::{adult_reader::AdultReader, Metadata},
-    node_ops::NodeDuty,
-    Node, Result,
-};
+use crate::node::{metadata::Metadata, node_ops::NodeDuty, Node, Result};
 use tracing::info;
 
 impl Node {
     /// Level up a newbie to an oldie on promotion
     pub async fn level_up(&self) -> Result<()> {
-        let adult_storage_info = AdultsStorageInfo::new();
-        let adult_reader = AdultReader::new(self.network_api.clone());
-        let capacity_reader = CapacityReader::new(adult_storage_info.clone(), adult_reader.clone());
-        let capacity_writer = CapacityWriter::new(adult_storage_info.clone(), adult_reader.clone());
-        let capacity = Capacity::new(capacity_reader.clone(), capacity_writer);
-
-        //
         // start handling metadata
-        let meta_data = Metadata::new(capacity.clone(), self.network_api.clone()).await?;
+        let meta_data = Metadata::new(self.network_api.clone()).await?;
 
         *self.role.write().await = Role::Elder(ElderRole::new(meta_data, false));
 

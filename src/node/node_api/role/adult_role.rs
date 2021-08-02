@@ -11,22 +11,19 @@ use crate::messaging::{
     MessageId,
 };
 use crate::node::{
-    capacity::CHUNK_COPY_COUNT,
-    chunk_store::ChunkStore,
+    network::Network as NetworkApi,
     node_ops::{NodeDuties, NodeDuty},
     Result,
 };
-use crate::routing::XorName;
+use crate::routing::{XorName, CHUNK_COPY_COUNT};
 use crate::types::{Chunk, ChunkAddress};
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
 use tracing::{info, trace, warn};
 
 #[derive(Clone)]
 pub(crate) struct AdultRole {
-    // immutable chunks
-    pub(crate) chunks: Arc<ChunkStore>,
+    pub(crate) network_api: NetworkApi,
 }
 
 impl AdultRole {
@@ -37,7 +34,8 @@ impl AdultRole {
         lost_adults: BTreeSet<XorName>,
         remaining: BTreeSet<XorName>,
     ) -> Result<NodeDuties> {
-        let keys = self.chunks.keys().await?;
+        let chunks = self.network_api.get_chunk_storage().await;
+        let keys = chunks.keys()?;
         let mut data_for_replication = BTreeMap::new();
         for addr in keys.iter() {
             if let Some((data, holders)) = self
@@ -66,6 +64,8 @@ impl AdultRole {
         lost_adults: &BTreeSet<XorName>,
         remaining: &BTreeSet<XorName>,
     ) -> Option<(Chunk, BTreeSet<XorName>)> {
+        let chunks = self.network_api.get_chunk_storage().await;
+
         let old_adult_list = remaining.union(lost_adults).copied().collect();
         let new_adult_list = remaining.union(new_adults).copied().collect();
         let new_holders = self.compute_holders(address, &new_adult_list);
@@ -78,9 +78,9 @@ impl AdultRole {
         if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
             info!("Republishing chunk at {:?}", address);
             trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
-            let chunk = self.chunks.get_chunk(address).await.ok()?;
+            let chunk = chunks.get_chunk(address).ok()?;
             if we_are_not_holder_anymore {
-                if let Err(err) = self.chunks.remove_chunk(address).await {
+                if let Err(err) = chunks.remove_chunk(address) {
                     warn!("Error deleting chunk during republish: {:?}", err);
                 }
             }

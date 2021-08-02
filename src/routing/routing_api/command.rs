@@ -12,6 +12,7 @@ use crate::messaging::{
     AuthorityProof, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth, WireMsg,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
+
 use std::{
     net::SocketAddr,
     sync::atomic::{AtomicU64, Ordering},

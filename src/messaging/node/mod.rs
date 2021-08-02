@@ -154,6 +154,8 @@ pub enum NodeMsg {
         response: NodeQueryResponse,
         /// ID of causing query.
         correlation_id: MessageId,
+        /// TEMP: Add user here as part of return flow. Remove this as we have chunk routing etc
+        user: EndUser,
     },
     /// The returned error, from any msg handling on recipient node.
     NodeMsgError {

@@ -20,7 +20,6 @@ use crate::messaging::{
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
     SectionAuth as MsgKindSectionAuth, SectionAuthorityProvider, WireMsg,
 };
-use crate::node::RegisterStorage;
 
 use crate::routing::{
     core::{ConnectionEvent, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},

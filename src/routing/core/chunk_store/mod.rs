@@ -12,17 +12,16 @@ use crate::node::{
     node_ops::{NodeDuties, NodeDuty},
     Result,
 };
+
+use crate::dbs::Error as DbError;
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use crate::{
     messaging::{
-        data::{ChunkRead, ChunkWrite, Error as ErrorMessage},
-        node::{NodeMsg, NodeQueryResponse},
-        DstLocation, MessageId,
+        data::{ChunkRead, ChunkWrite},
+        node::NodeQueryResponse,
     },
-    node::Error,
     types::DataAddress,
 };
-use bls::PublicKey as BlsPublicKey;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -41,6 +40,7 @@ impl Subdir for Db {
 }
 
 /// Operations on data chunks.
+#[derive(Clone)]
 pub(crate) struct ChunkStore {
     db: Db,
 }
@@ -59,7 +59,7 @@ impl Value for Chunk {
 }
 
 impl ChunkStore {
-    pub(crate) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             db: Db::new(path, used_space).await?,
         })
@@ -80,46 +80,27 @@ impl ChunkStore {
             .map_err(|_| Error::NoSuchData(DataAddress::Chunk(*address)))
     }
 
-    pub(crate) async fn read(
-        &self,
-        read: &ChunkRead,
-        msg_id: MessageId,
-        requester: PublicKey,
-        section_pk: BlsPublicKey,
-    ) -> NodeDuty {
+    // Read chunk from local store and return NodeQueryResponse
+    pub(crate) fn read(&self, read: &ChunkRead, requester: PublicKey) -> Result<NodeQueryResponse> {
         let ChunkRead::Get(address) = read;
-        let result = match self.get_chunk(address).await {
+        let result = match self.get_chunk(address) {
             Ok(Chunk::Private(data)) => {
                 if data.owner() == &requester {
                     Ok(Chunk::Private(data))
                 } else {
-                    Err(ErrorMessage::InvalidOwners(requester))
+                    Err(Error::InvalidOwner(requester))
                 }
             }
             Ok(chunk) => Ok(chunk),
-            error => error.map_err(|_| ErrorMessage::DataNotFound(DataAddress::Chunk(*address))),
+            error => error,
         };
 
-        NodeDuty::Send(OutgoingMsg {
-            id: MessageId::in_response_to(&msg_id),
-            msg: MsgType::Node(NodeMsg::NodeQueryResponse {
-                response: NodeQueryResponse::GetChunk(result),
-                correlation_id: msg_id,
-            }),
-            dst: DstLocation::Section {
-                name: *address.name(),
-                section_pk,
-            },
-            aggregation: false,
-        })
+        Ok(NodeQueryResponse::GetChunk(
+            result.map_err(convert_to_error_message),
+        ))
     }
 
-    pub(crate) async fn write(
-        &self,
-        write: &ChunkWrite,
-        msg_id: MessageId,
-        requester: PublicKey,
-    ) -> Result<NodeDuty> {
+    pub(super) async fn write(&self, write: &ChunkWrite, requester: PublicKey) -> Result<()> {
         match &write {
             ChunkWrite::New(data) => self.try_store(data).await,
             ChunkWrite::DeletePrivate(head_address) => {
@@ -128,7 +109,7 @@ impl ChunkStore {
                         "{}: Immutable chunk doesn't exist: {:?}",
                         self, head_address
                     );
-                    return Ok(NodeDuty::NoOp);
+                    return Ok(());
                 }
 
                 match self.db.get(head_address).await {
@@ -139,23 +120,28 @@ impl ChunkStore {
                                 .await
                                 .map_err(|_error| ErrorMessage::FailedToDelete)
                         } else {
-                            Err(ErrorMessage::InvalidOwners(requester))
+                            Err(Error::InvalidOwner(requester))
+                            // Err(ErrorMessage::InvalidOwners(requester))
                         }
                     }
                     Ok(_) => {
                         error!(
                             "{}: Invalid DeletePrivate(Chunk::Public) encountered: {:?}",
-                            self, msg_id
+                            self,
+                            write.dst_address()
                         );
-                        Err(ErrorMessage::InvalidOperation(format!(
+
+                        Err(Error::InvalidOperation(format!(
                             "{}: Invalid DeletePrivate(Chunk::Public) encountered: {:?}",
-                            self, msg_id
+                            self,
+                            write.dst_address()
                         )))
                     }
-                    _ => Err(ErrorMessage::NoSuchKey),
+                    _ => Ok(()),
+                    // _ => Err(Error::NoSuchKey),
                 }?;
 
-                Ok(NodeDuty::NoOp)
+                Ok(())
             }
         }
     }
@@ -171,21 +157,23 @@ impl ChunkStore {
         }
         self.db.store(data).await?;
 
-        Ok(NodeDuty::NoOp)
+        Ok(())
     }
 
-    // TODO: this is redundant, see if it can be omitted
-    pub(crate) async fn check_storage(&self) -> Result<NodeDuties> {
-        info!("Checking used storage");
-        if self.db.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
-            Ok(NodeDuties::from(NodeDuty::ReachingMaxCapacity))
-        } else {
-            Ok(vec![])
-        }
-    }
+    // // TODO: this is redundant, see if it can be omitted
+    // pub(crate) async fn check_storage(&self) -> Result<NodeDuties> {
+    //     info!("Checking used storage");
+    //     if self.db.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
+    //         Ok(NodeDuties::from(NodeDuty::ReachingMaxCapacity))
+    //     } else {
+    //         Ok(vec![])
+    //     }
+    // }
 
     /// Stores a chunk that Elders sent to it for replication.
-    pub(crate) async fn store_for_replication(&self, chunk: Chunk) -> Result<NodeDuty> {
+    /// Chunk should already have network authority
+    /// TODO: define what authority is needed here...
+    pub(crate) async fn store_for_replication(&self, chunk: Chunk) -> Result<()> {
         trace!(
             "Trying to store for replication of chunk: {:?}",
             chunk.address()
@@ -196,12 +184,12 @@ impl ChunkStore {
                 self,
                 chunk.address()
             );
-            return Ok(NodeDuty::NoOp);
+            return Ok(());
         }
 
         self.db.store(&chunk).await?;
 
-        Ok(NodeDuty::NoOp)
+        Ok(())
     }
 }
 

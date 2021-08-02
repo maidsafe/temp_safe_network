@@ -8,9 +8,7 @@
 
 //! Implementation of the "Node" node for the SAFE Network.
 
-mod capacity;
 mod chaos;
-mod chunk_store;
 /// Configuration handling
 pub mod config_handler;
 mod error;
@@ -20,10 +18,6 @@ mod metadata;
 mod network;
 mod node_api;
 mod node_ops;
-
-/// TODO: make these internal only once routing/node are collapsed
-/// Storage interface for register data type
-pub use metadata::RegisterStorage;
 
 /// Docs
 pub mod state_db;
