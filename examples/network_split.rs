@@ -44,7 +44,11 @@ const QUERY_TIMEOUT: Duration = Duration::from_secs(30);
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
-    let args: Vec<&str> = vec!["build", "--release", "--features=always-joinable,testing"];
+    let args: Vec<&str> = vec![
+        "build",
+        "--release",
+        "--features=always-joinable,test-utils",
+    ];
 
     println!("Building current sn_node");
     let _child = Command::new("cargo")
