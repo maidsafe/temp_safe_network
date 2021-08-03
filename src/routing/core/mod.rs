@@ -27,7 +27,7 @@ use std::path::PathBuf;
 
 use self::{enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
 use crate::messaging::{
-    node::{Network, NodeMsg, Proposal, Section},
+    node::{Network, Proposal, Section},
     MessageId,
 };
 use crate::routing::{
@@ -161,32 +161,6 @@ impl Core {
                 }
 
                 self.print_network_stats();
-
-                // Sending SectionKnowledge to other sections for new SAP.
-                // TODO: remoev all this messaging once we have Anti-Entropy fully implemented.
-                let signed_sap = self.section.section_signed_authority_provider().clone();
-                let node_msg = NodeMsg::SectionKnowledge {
-                    src_info: (signed_sap, self.section.chain().clone()),
-                    msg: None,
-                };
-
-                for sap in self.network.all() {
-                    let targets: Vec<_> = sap
-                        .elders()
-                        .iter()
-                        .map(|(name, addr)| (*name, *addr))
-                        .collect();
-
-                    trace!("Sending updated SectionInfo to all known sections");
-                    let dst_section_pk = sap.section_key();
-                    let cmd = self.send_direct_message_to_nodes(
-                        targets,
-                        node_msg.clone(),
-                        dst_section_pk,
-                    )?;
-
-                    commands.push(cmd);
-                }
             }
 
             if new.is_elder || old.is_elder {

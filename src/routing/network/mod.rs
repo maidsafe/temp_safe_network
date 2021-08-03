@@ -24,7 +24,7 @@ use xor_name::{Prefix, PrefixMap, XorName};
 pub(super) trait NetworkUtils {
     fn new() -> Self;
 
-    fn closest(&self, name: &XorName) -> Option<&SectionAuthorityProvider>;
+    fn closest(&self, name: &XorName) -> Option<&SectionAuth<SectionAuthorityProvider>>;
 
     /// Returns iterator over all known sections.
     fn all(&self) -> Box<dyn Iterator<Item = &SectionAuthorityProvider> + '_>;
@@ -72,9 +72,10 @@ impl NetworkUtils for Network {
 
     /// Returns the known section that is closest to the given name, regardless of whether `name`
     /// belongs in that section or not.
-    fn closest(&self, name: &XorName) -> Option<&SectionAuthorityProvider> {
-        self.all()
-            .min_by(|lhs, rhs| lhs.prefix.cmp_distance(&rhs.prefix, name))
+    fn closest(&self, name: &XorName) -> Option<&SectionAuth<SectionAuthorityProvider>> {
+        self.sections
+            .iter()
+            .min_by(|lhs, rhs| lhs.value.prefix.cmp_distance(&rhs.value.prefix, name))
     }
 
     /// Returns iterator over all known sections.
@@ -183,7 +184,7 @@ impl NetworkUtils for Network {
                 // be trusted based on the SAP we aware of and the proof chain provided.
                 if !proof_chain.has_key(&sap.value.public_key_set.public_key()) {
                     warn!(
-                        "Anti-Entropy: Failed to update remote section knowledge, SAP cannot be trusted: {:?}",
+                        "Anti-Entropy: Failed to update remote section knowledge, proof chain cannot be trusted based on currently known SAP: {:?}",
                         signed_section_auth.value
                     );
                     return false;
@@ -194,7 +195,7 @@ impl NetworkUtils for Network {
                 // trusted based on our own section chain and the provided proof chain.
                 if !proof_chain.check_trust(our_section_chain.keys()) {
                     warn!(
-                        "Anti-Entropy: Failed to update remote section knowledge, cannot trust proof chain received for SAP: {:?}",
+                        "Anti-Entropy: Failed to update remote section knowledge, cannot trust proof chain received for SAP based on our section chain: {:?}",
                         signed_section_auth.value
                     );
                     return false;
@@ -315,9 +316,9 @@ mod tests {
         let n10 = p10.substituted_in(rng.gen());
         let n11 = p11.substituted_in(rng.gen());
 
-        assert_eq!(map.closest(&n01).map(|i| &i.prefix), Some(&p01));
-        assert_eq!(map.closest(&n10).map(|i| &i.prefix), Some(&p10));
-        assert_eq!(map.closest(&n11).map(|i| &i.prefix), Some(&p10));
+        assert_eq!(map.closest(&n01).map(|i| &i.value.prefix), Some(&p01));
+        assert_eq!(map.closest(&n10).map(|i| &i.value.prefix), Some(&p10));
+        assert_eq!(map.closest(&n11).map(|i| &i.value.prefix), Some(&p10));
 
         Ok(())
     }

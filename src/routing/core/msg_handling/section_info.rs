@@ -8,19 +8,13 @@
 
 use super::super::Core;
 use crate::messaging::{
-    node::{NodeMsg, SectionAuth},
     section_info::{GetSectionResponse, SectionInfoMsg},
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
-    error::{Error, Result},
-    network::NetworkUtils,
-    peer::PeerUtils,
-    routing_api::command::Command,
-    section::SectionUtils,
+    network::NetworkUtils, peer::PeerUtils, routing_api::command::Command, section::SectionUtils,
     SectionAuthorityProviderUtils,
 };
-use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use xor_name::XorName;
 
@@ -52,17 +46,10 @@ impl Core {
                             .collect(),
                     })
                 } else {
-                    // If we are elder, we should know a section that is closer
-                    // to `name` than us. Otherwise redirect to our elders.
+                    // If we are elder, we should know a section that is closer to `name` that us.
+                    // Otherwise redirect to our elders.
                     let section_auth = match self.network.closest(&name) {
-                        Some(section_auth) => section_auth.clone(),
-                        None if self.is_elder() => {
-                            error!(
-                                "Cannot redirect section info msg for name {} to a closest section",
-                                name
-                            );
-                            return vec![];
-                        }
+                        Some(section_auth) => section_auth.value.clone(),
                         None => self.section.authority_provider().clone(),
                     };
 
@@ -91,40 +78,6 @@ impl Core {
                 error!("GetSectionResponse unexpectedly received: {:?}", response);
                 vec![]
             }
-        }
-    }
-
-    pub(crate) fn handle_section_knowledge_msg(
-        &mut self,
-        signed_section_auth: SectionAuth<SectionAuthorityProvider>,
-        proof_chain: SecuredLinkedList,
-        msg: Option<Box<NodeMsg>>,
-        src_name: XorName,
-        sender: SocketAddr,
-    ) -> Result<Vec<Command>> {
-        // TODO: if the update fails due to not trusted SAP/prof-chain,
-        // we may not need to resend the message as it's probably a sybil peer.
-        let _ = self.network.update_remote_section_sap(
-            signed_section_auth,
-            &proof_chain,
-            self.section.chain(),
-        );
-
-        if let Some(node_msg) = msg {
-            // This included message shall have been sent from us originally.
-            // Now re-send it with the latest knowledge of the destination section.
-            let dst_section_pk = self
-                .network
-                .key_by_name(&src_name)
-                .map_err(|_| Error::NoMatchingSection)?;
-
-            Ok(vec![self.send_direct_message(
-                (src_name, sender),
-                *node_msg,
-                dst_section_pk,
-            )?])
-        } else {
-            Ok(vec![])
         }
     }
 }

@@ -213,6 +213,7 @@ impl Core {
                     section_signed,
                     bounced_msg,
                     sender,
+                    src_name,
                 )
                 .await
             }
@@ -223,8 +224,8 @@ impl Core {
                 }
 
                 // Check the client authority is valid
-                // TODO: preserve the source bytes so we don't need to serialize again here, or else
-                // verify earlier.
+                // TODO: preserve the source bytes so we don't need to serialize again here,
+                // or else verify earlier.
                 let payload = WireMsg::serialize_msg_payload(&msg)?;
                 let auth = AuthorityProof::verify(auth, &payload)?;
 
@@ -234,22 +235,6 @@ impl Core {
                     user,
                     auth,
                 }])
-            }
-            NodeMsg::SectionKnowledge {
-                src_info: (signed_section_auth, proof_chain),
-                msg,
-            } => {
-                if self.is_not_elder() {
-                    return Ok(vec![]);
-                }
-
-                self.handle_section_knowledge_msg(
-                    signed_section_auth,
-                    proof_chain,
-                    msg,
-                    src_name,
-                    sender,
-                )
             }
             NodeMsg::Sync {
                 ref section,

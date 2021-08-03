@@ -77,13 +77,6 @@ pub enum NodeMsg {
         /// Signature provided by the requester.
         auth: ServiceAuth,
     },
-    /// Inform other sections about our section or vice-versa.
-    SectionKnowledge {
-        /// `SectionAuthorityProvider` and `SecuredLinkedList` of the sender's section, with the proof chain.
-        src_info: (SectionAuth<SectionAuthorityProvider>, SecuredLinkedList),
-        /// Message
-        msg: Option<Box<NodeMsg>>,
-    },
     /// Message sent to all members to update them about the state of our section.
     Sync {
         /// Information about our section.

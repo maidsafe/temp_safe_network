@@ -15,6 +15,7 @@ use crate::routing::{
     error::Result, messages::WireMsgUtils, network::NetworkUtils, routing_api::command::Command,
     section::SectionUtils, SectionAuthorityProviderUtils,
 };
+use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use std::{cmp::Ordering, net::SocketAddr};
@@ -54,13 +55,28 @@ impl Core {
     }
 
     pub(crate) async fn handle_anti_entropy_redirect_msg(
-        &self,
-        _section_auth: SectionAuthorityProvider,
-        _section_signed: KeyedSig,
-        _bounced_msg: Box<NodeMsg>,
-        _sender: SocketAddr,
+        &mut self,
+        section_auth: SectionAuthorityProvider,
+        section_signed: KeyedSig,
+        bounced_msg: Box<NodeMsg>,
+        sender: SocketAddr,
+        src_name: XorName,
     ) -> Result<Vec<Command>> {
-        unimplemented!();
+        info!(
+            "Anti-Entropy: message redirect received from peer: {}",
+            sender
+        );
+
+        // TODO: do validations on SAP and proof chain
+        let dst_section_pk = section_auth.public_key_set.public_key();
+        let section_signed = SectionAuth {
+            value: section_auth,
+            sig: section_signed,
+        };
+        let _ = self.network.sections.insert(section_signed);
+
+        let cmd = self.send_direct_message((src_name, sender), *bounced_msg, dst_section_pk)?;
+        Ok(vec![cmd])
     }
 
     pub(crate) async fn check_for_entropy(
@@ -78,10 +94,15 @@ impl Core {
 
         // For the case of receiving a join request not matching our prefix,
         // we just let the join request handler to deal with it later on.
+        // We also skip AE check on Anti-Entropy messages
+        //
         // TODO: consider changing the join and "join as relocated" flows to
         // make use of AntiEntropy retry/redirect responses.
         match node_msg {
-            NodeMsg::JoinRequest(_) | NodeMsg::JoinAsRelocatedRequest(_) => return Ok(None),
+            NodeMsg::AntiEntropyRetry { .. }
+            | NodeMsg::AntiEntropyRedirect { .. }
+            | NodeMsg::JoinRequest(_)
+            | NodeMsg::JoinAsRelocatedRequest(_) => return Ok(None),
             _ => {}
         }
 
@@ -107,52 +128,78 @@ impl Core {
             .section
             .chain()
             .cmp_by_position(dst_section_pk, self.section.chain().last_key())
-            == Ordering::Less
+            != Ordering::Less
         {
-            info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
-            let proof_chain = match self
-                .section
-                .chain()
-                .get_proof_chain_to_current(dst_section_pk)
-            {
-                Ok(chain) => chain,
-                Err(_) => {
-                    trace!(
-                        "Cannot find dst_section_pk {:?} sent by {} in our chain",
-                        dst_section_pk,
-                        sender
-                    );
-                    // TODO: don't we actually need to get up to date info from
-                    // other Elders in our section as it may be a section key we are not
-                    // aware of yet? once we acquire new key/s attempt AE check again?
-                    self.section.chain().clone()
-                }
-            };
-
-            let section_signed_auth = self.section.section_signed_authority_provider().clone();
-            let section_auth = section_signed_auth.value;
-            let section_signed = section_signed_auth.sig;
-
-            let ae_retry_node_msg = NodeMsg::AntiEntropyRetry {
-                section_auth,
-                section_signed,
-                proof_chain,
-                bounced_msg: Box::new(node_msg.clone()),
-            };
-            let wire_msg = WireMsg::single_src(
-                &self.node,
-                src_location.to_dst(),
-                ae_retry_node_msg,
-                self.section.authority_provider().section_key(),
-            )?;
-
-            Ok(Some(Command::SendMessage {
-                recipients: vec![(src_location.name(), sender)],
-                wire_msg,
-            }))
-        } else {
-            Ok(None)
+            // Destination section key matches our current section key
+            return Ok(None);
         }
+
+        info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
+        let ae_node_msg = match self
+            .section
+            .chain()
+            .get_proof_chain_to_current(dst_section_pk)
+        {
+            Ok(proof_chain) => {
+                let section_signed_auth = self.section.section_signed_authority_provider().clone();
+                let section_auth = section_signed_auth.value;
+                let section_signed = section_signed_auth.sig;
+
+                NodeMsg::AntiEntropyRetry {
+                    section_auth,
+                    section_signed,
+                    proof_chain,
+                    bounced_msg: Box::new(node_msg.clone()),
+                }
+            }
+            Err(_) => {
+                trace!(
+                    "Anti-Entropy: cannot find dst_section_pk {:?} sent by {} in our chain",
+                    dst_section_pk,
+                    sender
+                );
+
+                // Let's try to find a section closer to the destination section key,
+                // otherwise we just drop the message.
+                let name = XorName::from(PublicKey::Bls(*dst_section_pk));
+                match self.network.closest(&name) {
+                    Some(section_auth)
+                        if &section_auth.value != self.section.authority_provider() =>
+                    {
+                        // Redirect to the closest section
+                        NodeMsg::AntiEntropyRedirect {
+                            section_auth: section_auth.value.clone(),
+                            section_signed: section_auth.sig.clone(),
+                            bounced_msg: Box::new(node_msg.clone()),
+                        }
+                    }
+                    Some(_) | None => {
+                        // TODO: instead of just dropping the message, don't we actually need
+                        // to get up to date info from other Elders in our section as it may be
+                        // a section key we are not aware of yet?
+                        // ...and once we acquired new key/s we attempt AE check again?
+                        error!(
+                                "Anti-Entropy: cannot reply with redirect msg for dest key {:?} to a closest section",
+                                dst_section_pk
+                            );
+                        // FIXME: drop the message
+                        return Ok(None);
+                    }
+                }
+            }
+        };
+
+        let wire_msg = WireMsg::single_src(
+            &self.node,
+            src_location.to_dst(),
+            ae_node_msg,
+            self.section.authority_provider().section_key(),
+        )?;
+
+        Ok(Some(Command::SendMessage {
+            recipients: vec![(src_location.name(), sender)],
+            wire_msg,
+        }))
     }
 }
 

@@ -528,7 +528,7 @@ mod tests {
         let sig = bincode::serialize(&pk1).map(|bytes| genesis_sk.sign(&bytes))?;
         proof_chain.insert(&genesis_pk, pk1, sig)?;
 
-        assert!(network.update_remote_section_sap(section_auth1, &proof_chain, section.chain()));
+        assert!(network.update_remote_section_sap(section_auth1, &proof_chain, section.chain(),));
 
         let our_name = choose_elder_name(section.authority_provider())?;
 
