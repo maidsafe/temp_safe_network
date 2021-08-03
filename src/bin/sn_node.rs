@@ -27,7 +27,7 @@
     unused_results
 )]
 
-use eyre::{eyre, Result};
+use eyre::{eyre, Result, WrapErr};
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
@@ -41,22 +41,26 @@ const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 use safe_network::routing;
 
 /// Runs a Safe Network node.
-fn main() {
-    let sn_node_thread = std::thread::Builder::new()
+fn main() -> Result<()> {
+    color_eyre::install()?;
+
+    let handle = std::thread::Builder::new()
         .name("sn_node".to_string())
         .stack_size(16 * 1024 * 1024)
         .spawn(move || -> Result<()> {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(run_node())?;
             Ok(())
-        });
+        })
+        .wrap_err("Failed to spawn node thread")?;
 
-    match sn_node_thread {
-        Ok(thread) => match thread.join() {
-            Ok(_) => {}
-            Err(err) => println!("Failed to run node: {:?}", err),
-        },
-        Err(err) => println!("Failed to run node: {:?}", err),
+    match handle.join() {
+        Ok(result) => result,
+        Err(error) => {
+            // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
+            // the best thing to do is propagate the panic.
+            std::panic::resume_unwind(error)
+        }
     }
 }
 
