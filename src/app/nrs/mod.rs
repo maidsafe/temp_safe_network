@@ -287,14 +287,13 @@ impl Safe {
         let serialised_nrs_map = self.fetch_public_blob(&nrs_map_xorurl, None).await?;
 
         debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
-        let nrs_map =
-            serde_json::from_str(&String::from_utf8_lossy(serialised_nrs_map.as_slice()))
-                .map_err(|err| {
-                    Error::ContentError(format!(
-                        "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
-                        err
-                    ))
-                })?;
+        let nrs_map = serde_json::from_str(&String::from_utf8_lossy(serialised_nrs_map.as_slice()))
+            .map_err(|err| {
+                Error::ContentError(format!(
+                    "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
+                    err
+                ))
+            })?;
 
         Ok((version, nrs_map))
     }
