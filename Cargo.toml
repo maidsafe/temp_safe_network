@@ -16,29 +16,29 @@ incremental = true
 [[bench]]
 name = "put"
 harness = false
-required-features = ["testing"]
+required-features = ["test-utils"]
 
 [[example]]
 name = "client_blob"
-required-features = ["testing"]
+required-features = ["test-utils"]
 
 [[example]]
 name = "network_split"
-required-features = ["testing"]
+required-features = ["test-utils"]
 
 [[example]]
 name = "routing_minimal"
-required-features = ["testing"]
+required-features = ["test-utils"]
 
 [[example]]
 name = "routing_stress"
-required-features = ["testing"]
+required-features = ["test-utils"]
 
 [features]
 default = []
 always-joinable = []
 chaos = []
-testing = []
+test-utils = []
 
 [dependencies]
 anyhow = "1.0.40"

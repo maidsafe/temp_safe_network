@@ -72,9 +72,9 @@ async fn main() -> Result<(), String> {
         args.push("--features");
         args.push("always-joinable");
     }
-    if cfg!(feature = "testing") {
+    if cfg!(feature = "test-utils") {
         args.push("--features");
-        args.push("testing");
+        args.push("test-utils");
     }
 
     println!("Building current sn_node");

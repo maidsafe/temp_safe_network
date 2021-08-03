@@ -45,7 +45,7 @@ pub use qp2p::{Config as TransportConfig, SendStream};
 
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
-#[cfg(any(test, feature = "testing"))]
+#[cfg(any(test, feature = "test-utils"))]
 pub use test_utils::*;
 
 // ############################################################################
@@ -80,7 +80,7 @@ pub(crate) const fn supermajority(group_size: usize) -> usize {
     1 + group_size * 2 / 3
 }
 
-#[cfg(any(test, feature = "testing"))]
+#[cfg(any(test, feature = "test-utils"))]
 mod test_utils {
     use crate::dbs::UsedSpace;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
