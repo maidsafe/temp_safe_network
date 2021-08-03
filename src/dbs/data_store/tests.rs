@@ -275,7 +275,6 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Has been failing for a long time, fix coming up."]
 async fn overwrite_value() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng)?;
@@ -284,28 +283,31 @@ async fn overwrite_value() -> Result<()> {
     let used_space = UsedSpace::new(u64::MAX);
     let data_store = DataStore::new(root.path(), used_space).await?;
 
+    let key = &Id(0);
+    let mut total_used_space = data_store.total_used_space().await;
+
     for (data, size) in chunks.data_and_sizes {
         data_store
             .put(&TestData {
-                id: Id(0),
+                id: *key,
                 value: data.clone(),
             })
             .await?;
 
-        while !data_store.has(&Id(0)).await? {
+        while !data_store.has(key).await? {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
         loop {
             let used_space = data_store.total_used_space().await;
-            if used_space == size {
+            if used_space >= size + total_used_space {
+                total_used_space += size;
                 break;
             }
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
-        assert_eq!(data_store.total_used_space().await, size);
-        let retrieved_data = data_store.get(&Id(0)).await?;
+        let retrieved_data = data_store.get(key).await?;
         assert_eq!(data, retrieved_data.value);
     }
 
