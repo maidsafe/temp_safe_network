@@ -57,7 +57,7 @@ impl Safe {
 
     /// Fetch a Register from a SafeUrl without performing any type of URL resolution
     /// Works with version hashes
-    // e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
+    /// e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
     pub(crate) async fn fetch_register_entries(
         &self,
         safeurl: &SafeUrl,

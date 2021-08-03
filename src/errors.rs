@@ -95,4 +95,7 @@ pub enum Error {
     /// SafeUrlError
     #[error("SafeUrlError: {0}")]
     SafeUrlError(#[from] SafeUrlError),
+    /// NotImplementedError
+    #[error("NotImplementedError: {0}")]
+    NotImplementedError(String),
 }

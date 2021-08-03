@@ -17,7 +17,6 @@ use crate::{
         consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
         Safe,
     },
-    register::EntryHash,
     Error, Result, SafeUrl, XorUrl,
 };
 use log::{debug, info, warn};
@@ -102,12 +101,8 @@ impl Safe {
         }
 
         let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
-        let old_values: BTreeSet<EntryHash> = self
-            .fetch_multimap_values(&safe_url)
-            .await?
-            .iter()
-            .map(|(hash, _)| hash.to_owned())
-            .collect();
+        let mut old_values = BTreeSet::new();
+        old_values.insert(version.entry_hash());
         let entry = (
             name.as_bytes().to_owned(),
             nrs_map_xorurl.as_bytes().to_owned(),
@@ -122,7 +117,7 @@ impl Safe {
     ///
     /// ## Example
     ///
-    /// ```rust_no_run
+    /// ```rust,no_run
     /// # use rand::distributions::Alphanumeric;
     /// # use rand::{thread_rng, Rng};
     /// # use sn_api::Safe;
@@ -209,12 +204,8 @@ impl Safe {
         }
 
         debug!("Removing from multimap");
-        let old_values: BTreeSet<EntryHash> = self
-            .fetch_multimap_values(&safe_url)
-            .await?
-            .iter()
-            .map(|(hash, _)| hash.to_owned())
-            .collect();
+        let mut old_values = BTreeSet::new();
+        old_values.insert(version.entry_hash());
 
         // TODO use remove
         // self.multimap_remove(&xorurl, old_values).await?;
@@ -267,7 +258,7 @@ impl Safe {
 
         // take the 1st entry (TODO Multiple entries)
         if entries.len() > 1 {
-            unimplemented!("Multiple NRS map entries not managed, this happends when 2 clients write concurrently to a NRS map");
+            return Err(Error::NotImplementedError("Multiple NRS map entries not managed, this happends when 2 clients write concurrently to a NRS map".to_string()));
         }
         let first_entry = entries.iter().next();
         let (version, nrs_map_xorurl_bytes);
@@ -440,7 +431,7 @@ mod tests {
             false
         ));
 
-        assert!(version != version0);
+        assert_ne!(version, version0);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
         assert_eq!(updated_nrs_map.get_default_link()?, link_v1);
 
@@ -558,8 +549,8 @@ mod tests {
         let (version, _, _, updated_nrs_map) =
             retry_loop!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
 
-        assert!(version != version0);
-        assert!(version != version1);
+        assert_ne!(version, version0);
+        assert_ne!(version, version1);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
         assert_eq!(updated_nrs_map.get_default_link()?, link_v1);
 
@@ -633,7 +624,7 @@ mod tests {
         let (version, _, _, updated_nrs_map) =
             retry_loop!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
 
-        assert!(version != version0);
+        assert_ne!(version, version0);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
         assert_eq!(updated_nrs_map.get_default_link()?, link_v0);
         Ok(())

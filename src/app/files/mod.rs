@@ -20,7 +20,7 @@ use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::{fs, path::Path};
 
 pub(crate) use metadata::FileMeta;
@@ -168,7 +168,7 @@ impl Safe {
 
         // take the 1st entry (TODO Multiple entries)
         if entries.len() > 1 {
-            unimplemented!("Multiple file container entries not managed, this happends when 2 clients write concurrently to a file container");
+            return Err(Error::NotImplementedError("Multiple file container entries not managed, this happends when 2 clients write concurrently to a file container".to_string()));
         }
         let first_entry = entries.iter().next();
         let (version, curr_serialised_files_map) = if let Some((v, m)) = first_entry {
@@ -176,11 +176,11 @@ impl Safe {
         } else {
             warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
             return Ok((VersionHash::default(), FilesMap::default()));
-        }
+        };
 
         debug!("Files map retrieved.... v{:?}", &version);
         // TODO: use RDF format and deserialise it
-        // We first obtain the FilesMap XOR-URL from the Sequence
+        // We first obtain the FilesMap XOR-URL from the Register
         let files_map_xorurl = SafeUrl::from_url(
             &String::from_utf8(curr_serialised_files_map).map_err(|err| {
                 Error::ContentError(format!(
@@ -496,6 +496,7 @@ impl Safe {
     async fn append_version_to_files_container(
         &mut self,
         success_count: u64,
+        // current_version: BTreeSet<VersionHash>, // TODO replace multiple versions
         current_version: VersionHash,
         new_files_map: &FilesMap,
         url: &str,
@@ -512,12 +513,8 @@ impl Safe {
 
             // append entry to register
             let entry = files_map_xorurl.as_bytes().to_vec();
-            let replace = self
-                .register_read(&safe_url.to_string())
-                .await?
-                .iter()
-                .map(|(h, _)| h.to_owned())
-                .collect();
+            let mut replace = BTreeSet::new();
+            replace.insert(current_version.entry_hash());
             let entry_hash = &self
                 .write_to_register(&safe_url.to_string(), entry, replace)
                 .await?;
@@ -1242,8 +1239,8 @@ mod tests {
             .files_container_add("../testdata/test.md", &xorurl, false, false, false, false)
             .await?;
 
-        assert!(version != VersionHash::default());
-        assert!(version != version0);
+        assert_ne!(version, VersionHash::default());
+        assert_ne!(version, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 1);
 
@@ -1532,7 +1529,7 @@ mod tests {
             )
             .await?;
 
-        assert!(version != version0);
+        assert_ne!(version, version0);
         assert_eq!(new_processed_files.len(), 2);
         assert_eq!(
             new_files_map.len(),
@@ -1608,7 +1605,7 @@ mod tests {
             )
             .await?;
 
-        assert!(version != VersionHash::default());
+        assert_ne!(version, VersionHash::default());
         assert_eq!(new_processed_files.len(), 2);
         assert_eq!(
             new_files_map.len(),
@@ -1686,7 +1683,7 @@ mod tests {
             )
             .await?;
 
-        assert!(version != VersionHash::default());
+        assert_ne!(version, VersionHash::default());
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 1);
 
@@ -1781,7 +1778,7 @@ mod tests {
             )
             .await?;
 
-        assert!(version1 != version0);
+        assert_ne!(version1, version0);
         assert_eq!(
             new_processed_files.len(),
             TESTDATA_PUT_FILEITEM_COUNT + SUBFOLDER_PUT_FILEITEM_COUNT
@@ -1965,7 +1962,8 @@ mod tests {
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version1));
         let (new_link, _) = retry_loop!(safe.parse_and_resolve_url(&nrsurl));
-        assert_eq!(new_link.to_string(), safe_url.to_string());
+        // NRS points to the v0: check if different from v1 url
+        assert_ne!(new_link.to_string(), safe_url.to_string());
 
         Ok(())
     }
@@ -1991,7 +1989,7 @@ mod tests {
             false,
         ));
 
-        assert!(version != VersionHash::default());
+        assert_ne!(version, VersionHash::default());
         assert_eq!(
             new_processed_files.len(),
             SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
@@ -2061,7 +2059,7 @@ mod tests {
             false,
         ));
 
-        assert!(version != VersionHash::default());
+        assert_ne!(version, VersionHash::default());
         assert_eq!(
             new_processed_files.len(),
             SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
@@ -2118,7 +2116,7 @@ mod tests {
 
         let (version, fetched_files_map) = retry_loop!(safe.files_container_get(&xorurl));
 
-        assert!(version != VersionHash::default());
+        assert_ne!(version, VersionHash::default());
         assert_eq!(fetched_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), fetched_files_map.len());
         assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
@@ -2148,7 +2146,7 @@ mod tests {
             false,
             false,
         ));
-        assert!(version1 != version0);
+        assert_ne!(version1, version0);
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(None);
@@ -2209,19 +2207,19 @@ mod tests {
         assert!(v1_files_map.get(file_path3).is_none());
         assert!(v1_files_map.get(file_path4).is_none());
 
-        // let's fetch version invalid version
+        // let's fetch invalid version
         safe_url.set_content_version(Some(VersionHash::default()));
         match safe.files_container_get(&safe_url.to_string()).await {
             Ok(_) => Err(anyhow!(
                 "Unexpectedly retrieved invalid version of container".to_string(),
             )),
             Err(Error::VersionNotFound(msg)) => {
-                let default_vh = format!("{}", VersionHash::default());
                 assert_eq!(
                     msg,
                     format!(
                         "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                        default_vh, safe_url
+                        VersionHash::default(),
+                        safe_url
                     )
                 );
                 Ok(())
@@ -2307,7 +2305,7 @@ mod tests {
         //
         // So, we have 6 items.
         let (version, fetched_files_map) = retry_loop_for_pattern!(safe.files_container_get(&xorurl), Ok((version, _)) if *version == version2)?;
-        assert!(version != VersionHash::default());
+        assert_ne!(version, VersionHash::default());
         assert_eq!(fetched_files_map.len(), 6);
 
         Ok(())
@@ -2337,7 +2335,7 @@ mod tests {
             false,
         ));
 
-        assert!(version1 != version0);
+        assert_ne!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
@@ -2626,7 +2624,7 @@ mod tests {
             false,
         ));
 
-        assert!(version1 != version0);
+        assert_ne!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
@@ -2663,8 +2661,8 @@ mod tests {
             false,
         ));
 
-        assert!(version2 != version0);
-        assert!(version2 != version1);
+        assert_ne!(version2, version0);
+        assert_ne!(version2, version1);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
         assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
@@ -2708,7 +2706,7 @@ mod tests {
             ));
 
         assert!(version1 != VersionHash::default());
-        assert!(version1 != version0);
+        assert_ne!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
@@ -2730,8 +2728,8 @@ mod tests {
             ));
 
         assert!(version2 != VersionHash::default());
-        assert!(version2 != version0);
-        assert!(version2 != version1);
+        assert_ne!(version2, version0);
+        assert_ne!(version2, version1);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
         assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
@@ -2757,7 +2755,7 @@ mod tests {
             safe.files_container_remove_path(&format!("{}/test.md", xorurl), false, false, false)
         );
 
-        assert!(version1 != version0);
+        assert_ne!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT - 1);
 
@@ -2773,8 +2771,8 @@ mod tests {
             safe.files_container_remove_path(&format!("{}/subfolder", xorurl), true, false, false)
         );
 
-        assert!(version2 != version0);
-        assert!(version2 != version1);
+        assert_ne!(version2, version0);
+        assert_ne!(version2, version1);
         assert_eq!(new_processed_files.len(), 2);
         assert_eq!(
             new_files_map.len(),
