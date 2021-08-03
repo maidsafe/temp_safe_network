@@ -277,9 +277,9 @@ dependencies = [
 
 [[package]]
 name = "blsttc"
-version = "2.3.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba6c2136f0f0b7d99f0a2a722a776d3f40e78bae15cfddc15c4fa590d6d4d53f"
+checksum = "34ced99c15fb1f1ddc66ba71aa6dc41bd4835b3cb25e4a73d49295e82d17cc67"
 dependencies = [
  "blst",
  "byteorder",

@@ -75,7 +75,7 @@ impl PublicKey {
                 e.to_string()
             ))
         })?;
-        let bytes_fixed_len: &[u8; bls::PK_SIZE] = bytes.as_slice().try_into()
+        let bytes_fixed_len: [u8; bls::PK_SIZE] = bytes.as_slice().try_into()
             .map_err(|_| Error::FailedToParse(format!(
                 "Couldn't parse BLS public key bytes from hex. The provided string must represent exactly {} bytes.",
                 bls::PK_SIZE
