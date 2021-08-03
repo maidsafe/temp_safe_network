@@ -149,7 +149,7 @@ impl Safe {
     ) -> Result<(VersionHash, FilesMap)> {
         // fetch register entries and wrap errors
         let entries = self
-            .fetch_register_entries(&safe_url)
+            .fetch_register_entries(safe_url)
             .await
             .map_err(|e| match e {
                 Error::ContentNotFound(_) => {
@@ -507,7 +507,9 @@ impl Safe {
         let version = if success_count == 0 {
             current_version
         } else if dry_run {
-            return Err(Error::NotImplementedError("No dry run for append_version_to_files_container".to_string()));
+            return Err(Error::NotImplementedError(
+                "No dry run for append_version_to_files_container".to_string(),
+            ));
         } else {
             // The FilesContainer is updated by adding an entry containing the link to
             // the Blob with the serialised new version of the FilesMap.

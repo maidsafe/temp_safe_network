@@ -148,7 +148,7 @@ impl Safe {
         }
 
         let mut nrs_map = NrsMap::default();
-        let link = nrs_map.update(&name, link, default, hard_link)?;
+        let link = nrs_map.update(name, link, default, hard_link)?;
         let mut processed_entries = ProcessedEntries::new();
         processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
         debug!("The new NRS Map: {:?}", nrs_map);
@@ -288,7 +288,7 @@ impl Safe {
 
         debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
         let nrs_map =
-            serde_json::from_str(&String::from_utf8_lossy(&serialised_nrs_map.as_slice()))
+            serde_json::from_str(&String::from_utf8_lossy(serialised_nrs_map.as_slice()))
                 .map_err(|err| {
                     Error::ContentError(format!(
                         "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",

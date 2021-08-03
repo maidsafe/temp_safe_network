@@ -66,9 +66,9 @@ impl Safe {
             Some(v) => {
                 // take entry with version hash
                 let hash = v.entry_hash();
-                self.fetch_register_entry(&safeurl, hash)
+                self.fetch_register_entry(safeurl, hash)
                     .await
-                    .map(|entry| vec![(hash, entry)].iter().collect())
+                    .map(|entry| vec![(hash, entry)].into_iter().collect())
             }
             None => {
                 // then take latest entry
