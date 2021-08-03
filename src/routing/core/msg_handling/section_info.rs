@@ -28,9 +28,7 @@ impl Core {
         message: SectionInfoMsg,
     ) -> Vec<Command> {
         match message {
-            SectionInfoMsg::GetSectionQuery(public_key) => {
-                let name = XorName::from(public_key);
-
+            SectionInfoMsg::GetSectionQuery(name) => {
                 debug!("Received GetSectionQuery({}) from {}", name, sender);
 
                 let response = if let (true, Ok(pk_set)) =

@@ -11,7 +11,6 @@ mod bootstrap;
 mod comm;
 mod connectivity;
 mod delivery_group;
-mod enduser_registry;
 mod message_filter;
 mod messaging;
 mod msg_handling;
@@ -26,9 +25,7 @@ pub use signature_aggregator::Error as AggregatorError;
 pub(crate) use signature_aggregator::SignatureAggregator;
 use std::path::PathBuf;
 
-use self::{
-    enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
-};
+use self::{message_filter::MessageFilter, split_barrier::SplitBarrier};
 use crate::messaging::{
     node::{Network, NodeMsg, Proposal, Section, SectionAuth},
     MessageId, SectionAuthorityProvider,
@@ -72,7 +69,6 @@ pub(crate) struct Core {
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: bool,
     resource_proof: ResourceProof,
-    end_users: EndUserRegistry,
     used_space: UsedSpace,
     pub(super) register_storage: RegisterStorage,
     root_storage_dir: PathBuf,
@@ -111,7 +107,6 @@ impl Core {
             event_tx,
             joins_allowed: true,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
-            end_users: EndUserRegistry::new(),
             register_storage,
             root_storage_dir,
             used_space,

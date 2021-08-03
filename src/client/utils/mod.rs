@@ -10,9 +10,14 @@
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
+use super::Error;
+
 use rand::distributions::{Alphanumeric, Distribution, Standard};
 use rand::rngs::OsRng;
 use rand::{self, Rng};
+use std::net::SocketAddr;
+use tiny_keccak::{Hasher, Sha3};
+use xor_name::XorName;
 
 /// Generates a `String` from `length` random UTF-8 `char`s.  Note that the NULL character will be
 /// excluded to allow conversion to a `CString` if required, and that the actual `len()` of the
@@ -46,6 +51,16 @@ where
         .map(|()| rng.gen::<T>())
         .take(length)
         .collect()
+}
+
+/// Generate the Connection ID that will be generated for our client at Elders
+pub fn get_connection_id(addr: &SocketAddr) -> Result<XorName, Error> {
+    let data = bincode::serialize(&addr)?;
+    let mut hasher = Sha3::v256();
+    let mut output = [0u8; 32];
+    hasher.update(&data);
+    hasher.finalize(&mut output);
+    Ok(XorName(output))
 }
 
 /// Convert binary data to a diplay-able format

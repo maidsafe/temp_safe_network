@@ -179,7 +179,7 @@ impl ChunkRecords {
                 let our_prefix = network.our_prefix().await;
                 // If in same section, i.e. we are the ClientElders, then send response directly.
                 // Otherwise, i.e. we are the DataElders, forwarding using ForwardServiceMsg.
-                if our_prefix.matches(&end_user.xorname) {
+                if our_prefix.matches(&end_user.id) {
                     duties.push(NodeDuty::Send(build_client_query_response(
                         response,
                         origin_msg_id,
@@ -187,7 +187,7 @@ impl ChunkRecords {
                     )));
                 } else {
                     let section_pk_option = if let Ok(section_pk) =
-                        network.get_section_pk_by_name(&end_user.xorname).await
+                        network.get_section_pk_by_name(&end_user.id).await
                     {
                         section_pk.bls()
                     } else {
@@ -198,7 +198,7 @@ impl ChunkRecords {
                     } else {
                         error!(
                             "Cannot get EndUser({:?})'s section's section key.",
-                            end_user.xorname
+                            end_user.id
                         );
                         return Err(Error::NoSectionPublicKey);
                     };

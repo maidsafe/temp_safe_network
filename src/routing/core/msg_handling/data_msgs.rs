@@ -14,6 +14,7 @@ use crate::messaging::{
     node::NodeMsg,
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
+use crate::routing::Error;
 use crate::routing::{
     error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
     Event, SectionAuthorityProviderUtils,
@@ -151,8 +152,8 @@ impl Core {
             Some(dst_name) => {
                 let is_in_destination = self.section().prefix().matches(&dst_name);
                 if is_in_destination {
-                    if let DstLocation::EndUser(EndUser { socket_id, xorname }) = dst_location {
-                        if let Some(addr) = self.get_socket_addr(socket_id) {
+                    if let DstLocation::EndUser(EndUser { id }) = dst_location {
+                        if let Some(addr) = self.get_socket_addr(&id).await {
                             let wire_msg = WireMsg::new_msg(
                                 msg_id,
                                 payload,
@@ -161,7 +162,7 @@ impl Core {
                             )?;
 
                             return Ok(vec![Command::SendMessage {
-                                recipients: vec![(xorname, *addr)],
+                                recipients: vec![(id, addr)],
                                 wire_msg,
                             }]);
                         }
@@ -173,35 +174,10 @@ impl Core {
             None => true, // it's a DirectAndUnrouted dst
         };
 
-        let user = match self.get_enduser_by_addr(&sender) {
-            Some(end_user) => {
-                debug!(
-                    "Message ({}) from client {}, socket id already exists: {:?}",
-                    msg_id, sender, end_user
-                );
-                *end_user
-            }
-            None => {
-                // This is the first time we receive a message from this client
-                debug!(
-                    "First message ({}) from client {}, creating a socket id",
-                    msg_id, sender
-                );
-
-                // TODO: remove the enduser registry and simply encrypt socket
-                // addr with this node's keypair and use that as the socket id
-                match self.try_add_enduser(sender) {
-                    Ok(end_user) => end_user,
-                    Err(err) => {
-                        error!(
-                            "Failed to cache client socket address for message {:?}: {:?}",
-                            msg, err
-                        );
-                        return Ok(vec![]);
-                    }
-                }
-            }
-        };
+        let user = self
+            .get_enduser_by_addr(&sender)
+            .await
+            .ok_or(Error::CannotRoute)?;
 
         if is_in_destination {
             // We send this message to be handled by the upper Node layer

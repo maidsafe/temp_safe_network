@@ -134,7 +134,7 @@ impl Dispatcher {
                     .await
             }
             Command::HandleConnectionLost(addr) => {
-                self.core.read().await.handle_connection_lost(addr)
+                self.core.read().await.handle_connection_lost(addr).await
             }
             Command::HandlePeerLost(addr) => self.core.read().await.handle_peer_lost(&addr),
             Command::HandleDkgOutcome {
@@ -304,9 +304,9 @@ impl Dispatcher {
     /// Send a message.
     /// Messages sent here, either section to section or node to node.
     pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
-        if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
-            if self.core.read().await.section().prefix().matches(xorname) {
-                let addr = self.core.read().await.get_socket_addr(*socket_id).copied();
+        if let DstLocation::EndUser(EndUser { id }) = wire_msg.dst_location() {
+            if self.core.read().await.section().prefix().matches(id) {
+                let addr = self.core.read().await.get_socket_addr(id).await;
 
                 if let Some(socket_addr) = addr {
                     // Send a message to a client peer.
@@ -314,7 +314,7 @@ impl Dispatcher {
                     // or validated as part of the routing library.
                     debug!("Sending client msg to {:?}", socket_addr);
 
-                    let recipients = vec![(*xorname, socket_addr)];
+                    let recipients = vec![(*id, socket_addr)];
                     wire_msg.set_dst_section_pk(
                         *self.core.read().await.section_chain().clone().last_key(),
                     );
@@ -326,8 +326,8 @@ impl Dispatcher {
                     return Ok(vec![command]);
                 } else {
                     debug!(
-                        "Could not find socketaddr corresponding to socket_id {:?}",
-                        socket_id
+                        "Could not find socketaddr corresponding to EndUser ID {:?}",
+                        id
                     );
                     debug!("Relaying user message instead.. (Command::RelayMessage)");
                 }

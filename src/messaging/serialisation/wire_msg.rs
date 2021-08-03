@@ -269,7 +269,7 @@ mod tests {
             section_pk: dst_section_pk,
         };
 
-        let query = SectionInfoMsg::GetSectionQuery(dst_section_pk.into());
+        let query = SectionInfoMsg::GetSectionQuery(dst_name);
 
         let wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
         let serialized = wire_msg.serialize()?;
@@ -304,7 +304,7 @@ mod tests {
             section_pk: dst_section_pk,
         };
 
-        let query = SectionInfoMsg::GetSectionQuery(dst_section_pk.into());
+        let query = SectionInfoMsg::GetSectionQuery(dst_name);
 
         let mut wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
         let serialized = wire_msg.serialize()?;

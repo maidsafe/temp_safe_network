@@ -19,13 +19,13 @@ use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
 impl Core {
-    pub(crate) fn handle_connection_lost(&self, addr: SocketAddr) -> Result<Vec<Command>> {
+    pub(crate) async fn handle_connection_lost(&self, addr: SocketAddr) -> Result<Vec<Command>> {
         if let Some(peer) = self.section.find_joined_member_by_addr(&addr) {
             debug!(
                 "Possible connection loss detected with known peer {:?}",
                 peer
             )
-        } else if let Some(end_user) = self.get_enduser_by_addr(&addr) {
+        } else if let Some(end_user) = self.get_enduser_by_addr(&addr).await {
             debug!(
                 "Possible connection loss detected with known client {:?}",
                 end_user

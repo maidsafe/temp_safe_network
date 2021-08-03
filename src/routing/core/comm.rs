@@ -18,8 +18,8 @@ use xor_name::XorName;
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
 pub(crate) struct Comm {
-    quic_p2p: QuicP2p,
-    endpoint: Endpoint,
+    quic_p2p: QuicP2p<XorName>,
+    endpoint: Endpoint<XorName>,
 }
 
 impl Drop for Comm {
@@ -128,7 +128,7 @@ impl Comm {
             ..Default::default()
         };
 
-        let qp2p = QuicP2p::with_config(Some(qp2p_config), &[], false)
+        let qp2p = QuicP2p::<XorName>::with_config(Some(qp2p_config), &[], false)
             .map_err(|err| Error::InvalidConfig { err })?;
         let (connectivity_endpoint, _, _, _) = qp2p
             .new_endpoint()
@@ -147,6 +147,14 @@ impl Comm {
             });
         connectivity_endpoint.close();
         result
+    }
+
+    pub(crate) async fn get_enduser_by_addr(&self, addr: &SocketAddr) -> Option<XorName> {
+        self.endpoint.get_connection_id(addr).await
+    }
+
+    pub(crate) async fn get_socket_addr(&self, id: &XorName) -> Option<SocketAddr> {
+        self.endpoint.get_socket_addr_by_id(id).await
     }
 
     /// Sends a message to multiple recipients. Attempts to send to `delivery_group_size`
@@ -472,14 +480,14 @@ mod tests {
         let (tx, _rx) = mpsc::channel(1);
         let send_comm = Comm::new(transport_config(), tx).await?;
 
-        let recv_transport = QuicP2p::with_config(Some(transport_config()), &[], false)?;
+        let recv_transport = QuicP2p::<XorName>::with_config(Some(transport_config()), &[], false)?;
         let (recv_endpoint, _, mut incoming_msgs, _) = recv_transport.new_endpoint().await?;
         let recv_addr = recv_endpoint.socket_addr();
         let name = XorName::random();
 
         // Send the first message.
         let key0 = bls::SecretKey::random().public_key();
-        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key0));
+        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key0).into());
         let dst_location = DstLocation::Node {
             name,
             section_pk: key0,
@@ -503,7 +511,7 @@ mod tests {
 
         // Send the second message.
         let key1 = bls::SecretKey::random().public_key();
-        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key1));
+        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key1).into());
         let dst_location = DstLocation::Node {
             name,
             section_pk: key1,
@@ -565,7 +573,7 @@ mod tests {
 
     fn new_section_info_message() -> Result<WireMsg> {
         let random_bls_pk = bls::SecretKey::random().public_key();
-        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(random_bls_pk));
+        let query = SectionInfoMsg::GetSectionQuery(PublicKey::Bls(random_bls_pk).into());
         let dst_location = DstLocation::Node {
             name: XorName::random(),
             section_pk: bls::SecretKey::random().public_key(),
@@ -585,7 +593,7 @@ mod tests {
 
     impl Peer {
         async fn new() -> Result<Self> {
-            let transport = QuicP2p::with_config(Some(transport_config()), &[], false)?;
+            let transport = QuicP2p::<XorName>::with_config(Some(transport_config()), &[], false)?;
 
             let (endpoint, incoming_connections, mut incoming_messages, disconnections) =
                 transport.new_endpoint().await?;

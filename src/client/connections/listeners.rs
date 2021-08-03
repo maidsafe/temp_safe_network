@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Session;
+use crate::client::utils::get_connection_id;
 use crate::client::Error;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
-use crate::types::PublicKey;
 use qp2p::IncomingMessages;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -26,14 +26,13 @@ impl Session {
     pub(crate) async fn spawn_message_listener_thread(
         &self,
         mut incoming_messages: IncomingMessages,
-        client_pk: PublicKey,
     ) {
         debug!("Listening for incoming messages");
         let mut session = self.clone();
         let _ = tokio::spawn(async move {
             loop {
                 match session
-                    .process_incoming_message(&mut incoming_messages, client_pk)
+                    .process_incoming_message(&mut incoming_messages)
                     .await
                 {
                     Ok(true) => (),
@@ -52,14 +51,13 @@ impl Session {
     pub(crate) async fn process_incoming_message(
         &mut self,
         incoming_messages: &mut IncomingMessages,
-        client_pk: PublicKey,
     ) -> Result<bool, Error> {
         if let Some((src, message)) = incoming_messages.next().await {
             let message_type = WireMsg::deserialize(message)?;
             trace!("Incoming message from {:?}", &src);
             match message_type {
                 MessageType::SectionInfo { msg, .. } => {
-                    if let Err(error) = self.handle_section_info_msg(msg, src, client_pk).await {
+                    if let Err(error) = self.handle_section_info_msg(msg, src).await {
                         error!("Error handling network info message: {:?}", error);
                     }
                 }
@@ -83,7 +81,6 @@ impl Session {
         &mut self,
         msg: SectionInfoMsg,
         src: SocketAddr,
-        client_pk: PublicKey,
     ) -> Result<(), Error> {
         trace!("Handling network info message {:?}", msg);
 
@@ -106,7 +103,9 @@ impl Session {
                     .qp2p
                     .rebootstrap(&endpoint, new_elders_addrs.as_slice())
                     .await?;
-                self.send_get_section_query(client_pk, &boostrapped_peer)
+                let our_addr = endpoint.socket_addr();
+                let conn_id = get_connection_id(&our_addr)?;
+                self.send_get_section_query(conn_id, &boostrapped_peer)
                     .await?;
 
                 Ok(())

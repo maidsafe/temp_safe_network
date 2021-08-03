@@ -174,7 +174,7 @@ fn build_forward_query_response(
             auth,
         }),
         dst: DstLocation::Section {
-            name: origin.xorname,
+            name: origin.id,
             section_pk,
         },
         aggregation: false,

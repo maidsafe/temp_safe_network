@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{QueryResult, Session};
+use crate::client::utils::get_connection_id;
 use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataCmd, DataQuery, QueryResponse},
@@ -68,8 +69,9 @@ impl Session {
                 };
             }
         });
-
-        self.send_get_section_query(client_pk, &bootstrapped_peer)
+        let our_socket_addr = endpoint.socket_addr();
+        let conn_id = get_connection_id(&our_socket_addr)?;
+        self.send_get_section_query(conn_id, &bootstrapped_peer)
             .await?;
 
         // Bootstrap and send a handshake request to the bootstrapped peer
@@ -79,7 +81,7 @@ impl Session {
             // has responded with a SectionInfo Message
             if let Ok(Ok(true)) = timeout(
                 Duration::from_secs(30),
-                self.process_incoming_message(&mut incoming_messages, client_pk),
+                self.process_incoming_message(&mut incoming_messages),
             )
             .await
             {
@@ -97,8 +99,7 @@ impl Session {
             }
         }
 
-        self.spawn_message_listener_thread(incoming_messages, client_pk)
-            .await;
+        self.spawn_message_listener_thread(incoming_messages).await;
 
         debug!(
             "Successfully obtained the list of Elders to send all messages to: {:?}",
@@ -413,7 +414,7 @@ impl Session {
     // Get section info from the peer we have bootstrapped with.
     pub(crate) async fn send_get_section_query(
         &self,
-        client_pk: PublicKey,
+        conn_id: XorName,
         bootstrapped_peer: &SocketAddr,
     ) -> Result<(), Error> {
         if self.is_connecting_to_new_elders {
@@ -427,17 +428,15 @@ impl Session {
             bootstrapped_peer
         );
 
-        let dst_section_name = XorName::from(client_pk);
-
         // FIXME: we don't know our section PK. We must supply a pk for now we do a random one...
         let random_section_pk = bls::SecretKey::random().public_key();
 
         let msg_id = MessageId::new();
-        let query = SectionInfoMsg::GetSectionQuery(client_pk);
+        let query = SectionInfoMsg::GetSectionQuery(conn_id);
         let payload = WireMsg::serialize_msg_payload(&query)?;
         let msg_kind = MsgKind::SectionInfoMsg;
         let dst_location = DstLocation::Section {
-            name: dst_section_name,
+            name: conn_id,
             section_pk: random_section_pk,
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;

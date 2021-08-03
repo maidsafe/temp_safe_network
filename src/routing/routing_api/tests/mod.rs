@@ -88,7 +88,7 @@ async fn receive_matching_get_section_request_as_elder() -> Result<()> {
         new_node_comm.our_connection_info(),
     );
 
-    let query = SectionInfoMsg::GetSectionQuery(PublicKey::from(new_node.keypair.public));
+    let query = SectionInfoMsg::GetSectionQuery(PublicKey::from(new_node.keypair.public).into());
     let dst_location = DstLocation::Node {
         name: node_name,
         section_pk: node_section_pk,
@@ -161,7 +161,7 @@ async fn receive_mismatching_get_section_request_as_adult() -> Result<()> {
     let new_node_comm = create_comm().await?;
     let new_node_addr = new_node_comm.our_connection_info();
 
-    let query = SectionInfoMsg::GetSectionQuery(random_pk);
+    let query = SectionInfoMsg::GetSectionQuery(random_pk.into());
     let dst_location = DstLocation::Node {
         name: node_name,
         section_pk: node_section_pk,

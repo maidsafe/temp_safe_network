@@ -10,16 +10,11 @@ use bls::PublicKey as BlsPublicKey;
 use serde::{Deserialize, Serialize};
 use xor_name::{Prefix, XorName};
 
-/// This maps to the SocketAddr at the Elders where the EndUser is proxied through.
-pub type SocketId = XorName;
-
-/// An EndUser is represented by the name it's proxied through, and its socket id.
+/// An EndUser is represented by a XorName which matches the prefix of the Elders it connects to.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub struct EndUser {
-    /// The name it's proxied through.
-    pub xorname: XorName,
     /// This maps to the SocketAddr at the Elders where the `EndUser` is proxied through.
-    pub socket_id: SocketId,
+    pub id: XorName,
 }
 
 /// Message source location.
@@ -47,7 +42,7 @@ impl SrcLocation {
     /// Returns the name of this location.
     pub fn name(&self) -> XorName {
         match self {
-            Self::EndUser(user) => user.xorname,
+            Self::EndUser(user) => user.id,
             Self::Node { name, .. } => *name,
             Self::Section { name, .. } => *name,
         }
@@ -118,7 +113,7 @@ impl DstLocation {
         }
 
         match self {
-            Self::EndUser(user) => prefix.matches(&user.xorname),
+            Self::EndUser(user) => prefix.matches(&user.id),
             Self::Node {
                 name: self_name, ..
             } => name == self_name,
@@ -132,7 +127,7 @@ impl DstLocation {
     /// Returns the name of this location, or `None` if it is `Direct`.
     pub fn name(&self) -> Option<XorName> {
         match self {
-            Self::EndUser(user) => Some(user.xorname),
+            Self::EndUser(user) => Some(user.id),
             Self::Node { name, .. } => Some(*name),
             Self::Section { name, .. } => Some(*name),
             Self::DirectAndUnrouted(_) => None,
@@ -142,7 +137,7 @@ impl DstLocation {
     /// Updates the name of this location if it's not `DirectAndUnrouted`.
     pub fn set_name(&mut self, new_name: XorName) {
         match self {
-            Self::EndUser(EndUser { xorname, .. }) => *xorname = new_name,
+            Self::EndUser(EndUser { id, .. }) => *id = new_name,
             Self::Node { name, .. } => *name = new_name,
             Self::Section { name, .. } => *name = new_name,
             Self::DirectAndUnrouted(_) => {}

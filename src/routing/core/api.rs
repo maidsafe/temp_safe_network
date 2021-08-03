@@ -10,7 +10,7 @@ use super::{delivery_group, Comm, Core};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, Section},
-    EndUser, MessageId, SectionAuthorityProvider, SocketId, WireMsg,
+    EndUser, MessageId, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     error::Result,
@@ -63,17 +63,15 @@ impl Core {
         )
     }
 
-    pub(crate) fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<&EndUser> {
-        self.end_users.get_enduser_by_addr(sender)
+    pub(crate) async fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<EndUser> {
+        self.comm
+            .get_enduser_by_addr(sender)
+            .await
+            .map(|id| EndUser { id })
     }
 
-    pub(crate) fn get_socket_addr(&self, id: SocketId) -> Option<&SocketAddr> {
-        self.end_users.get_socket_addr(id)
-    }
-
-    pub(crate) fn try_add_enduser(&mut self, sender: SocketAddr) -> Result<EndUser> {
-        let section_prefix = self.section.prefix();
-        self.end_users.try_add(sender, section_prefix)
+    pub(crate) async fn get_socket_addr(&self, id: &XorName) -> Option<SocketAddr> {
+        self.comm.get_socket_addr(id).await
     }
 
     pub(crate) fn node(&self) -> &Node {

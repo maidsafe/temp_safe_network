@@ -46,7 +46,7 @@ pub(crate) fn delivery_targets(
 
     match dst {
         DstLocation::Section { name, .. } => section_candidates(name, our_name, section, network),
-        DstLocation::EndUser(user) => section_candidates(&user.xorname, our_name, section, network),
+        DstLocation::EndUser(user) => section_candidates(&user.id, our_name, section, network),
         DstLocation::Node { name, .. } => {
             if name == our_name {
                 return Ok((Vec::new(), 0));
