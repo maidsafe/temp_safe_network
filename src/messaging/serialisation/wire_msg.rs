@@ -255,8 +255,8 @@ mod tests {
         },
         types::{ChunkAddress, Keypair},
     };
-    use anyhow::Result;
     use bls::SecretKey;
+    use eyre::Result;
     use rand::rngs::OsRng;
     use xor_name::XorName;
 

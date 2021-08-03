@@ -301,8 +301,8 @@ mod tests {
     use super::*;
     use crate::messaging::{section_info::SectionInfoMsg, DstLocation, WireMsg};
     use crate::types::PublicKey;
-    use anyhow::Result;
     use assert_matches::assert_matches;
+    use eyre::Result;
     use futures::future;
     use qp2p::Config;
     use std::{net::Ipv4Addr, time::Duration};

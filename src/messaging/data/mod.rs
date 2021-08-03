@@ -207,7 +207,7 @@ try_from!(Permissions, GetRegisterUserPermissions);
 mod tests {
     use super::*;
     use crate::types::{ChunkAddress, DataAddress, Keypair, PrivateChunk};
-    use anyhow::{anyhow, Result};
+    use eyre::{eyre, Result};
     use std::convert::{TryFrom, TryInto};
     use xor_name::XorName;
 
@@ -235,7 +235,7 @@ mod tests {
             assert!(format!("{:?}", errored_response).contains("GetRegister(Err(AccessDenied("));
             Ok(())
         } else {
-            Err(anyhow!("Could not generate public key"))
+            Err(eyre!("Could not generate public key"))
         }
     }
 
@@ -278,7 +278,7 @@ mod tests {
         use QueryResponse::*;
         let key = match gen_keys().first() {
             Some(key) => *key,
-            None => return Err(anyhow!("Could not generate public key")),
+            None => return Err(eyre!("Could not generate public key")),
         };
 
         let owner = PublicKey::Bls(bls::SecretKey::random().public_key());
@@ -289,7 +289,7 @@ mod tests {
             i_data,
             GetChunk(Ok(i_data.clone()))
                 .try_into()
-                .map_err(|_| anyhow!("Mismatched types".to_string()))?
+                .map_err(|_| eyre!("Mismatched types".to_string()))?
         );
         assert_eq!(
             Err(TryFromError::Response(e.clone())),

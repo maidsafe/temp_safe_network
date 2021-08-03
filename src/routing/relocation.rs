@@ -250,8 +250,8 @@ mod tests {
         routing_api::tests::SecretKeySet, section::NodeStateUtils, SectionAuthorityProviderUtils,
         ELDER_SIZE, MIN_AGE,
     };
-    use anyhow::Result;
     use assert_matches::assert_matches;
+    use eyre::Result;
     use itertools::Itertools;
     use proptest::prelude::*;
     use rand::{rngs::SmallRng, Rng, SeedableRng};

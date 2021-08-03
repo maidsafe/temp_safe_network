@@ -11,8 +11,8 @@ mod test_client;
 
 use crate::client::Error;
 use crate::types::Keypair;
-use anyhow::{anyhow, Context, Result as AnyhowResult};
 use dirs_next::home_dir;
+use eyre::{eyre, Context, Result};
 use std::path::Path;
 use std::{collections::HashSet, fs::File, io::BufReader, net::SocketAddr};
 #[cfg(test)]
@@ -76,8 +76,8 @@ pub fn gen_ed_keypair() -> Keypair {
 }
 
 /// Read local network bootstrapping/connection information
-pub fn read_network_conn_info() -> AnyhowResult<HashSet<SocketAddr>> {
-    let user_dir = home_dir().ok_or_else(|| anyhow!("Could not fetch home directory"))?;
+pub fn read_network_conn_info() -> Result<HashSet<SocketAddr>> {
+    let user_dir = home_dir().ok_or_else(|| eyre!("Could not fetch home directory"))?;
     let conn_info_path = user_dir.join(Path::new(GENESIS_CONN_INFO_FILEPATH));
 
     let file = File::open(&conn_info_path).with_context(|| {

@@ -810,6 +810,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "eyre"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "221239d1d5ea86bf5d6f91c9d6bc3646ffe471b08ff9b0f91c44f115ac969d2b"
+dependencies = [
+ "indenter",
+ "once_cell",
+]
+
+[[package]]
 name = "ff"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1307,6 +1317,12 @@ dependencies = [
  "url",
  "xmltree",
 ]
+
+[[package]]
+name = "indenter"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce23b50ad8242c51a442f3ff322d56b02f08852c77e4c0b4d3fd684abc89c683"
 
 [[package]]
 name = "indexmap"
@@ -2405,7 +2421,6 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 name = "safe_network"
 version = "0.24.2"
 dependencies = [
- "anyhow",
  "assert_matches",
  "async-recursion",
  "async-trait",
@@ -2422,6 +2437,7 @@ dependencies = [
  "ed25519",
  "ed25519-dalek",
  "exponential-backoff",
+ "eyre",
  "futures",
  "hex",
  "hex_fmt",

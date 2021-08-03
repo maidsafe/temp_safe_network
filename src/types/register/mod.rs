@@ -205,7 +205,7 @@ mod tests {
         },
         utils, Error, Keypair, Result,
     };
-    use anyhow::anyhow;
+    use eyre::eyre;
     use proptest::prelude::*;
     use rand::{rngs::OsRng, seq::SliceRandom, thread_rng};
     use std::{
@@ -320,7 +320,7 @@ mod tests {
     }
 
     #[test]
-    fn register_get_by_hash() -> anyhow::Result<()> {
+    fn register_get_by_hash() -> eyre::Result<()> {
         let (_, register) = &mut create_public_reg_replicas(1)[0];
 
         let entry1 = b"value0".to_vec();
@@ -357,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn register_query_public_policy() -> anyhow::Result<()> {
+    fn register_query_public_policy() -> eyre::Result<()> {
         let register_name = XorName::random();
         let register_tag = 43_666;
 
@@ -417,7 +417,7 @@ mod tests {
     }
 
     #[test]
-    fn register_query_private_policy() -> anyhow::Result<()> {
+    fn register_query_private_policy() -> eyre::Result<()> {
         let register_name = XorName::random();
         let register_tag = 43_666;
 
@@ -490,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn register_public_write_fails_when_no_perms_for_authority() -> anyhow::Result<()> {
+    fn register_public_write_fails_when_no_perms_for_authority() -> eyre::Result<()> {
         let register_name = XorName::random();
         let register_tag = 43_666;
 
@@ -542,7 +542,7 @@ mod tests {
     }
 
     #[test]
-    fn register_private_write_fails_when_no_perms_for_authority() -> anyhow::Result<()> {
+    fn register_private_write_fails_when_no_perms_for_authority() -> eyre::Result<()> {
         let register_name = XorName::random();
         let register_tag = 43_666;
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
@@ -711,14 +711,14 @@ mod tests {
     }
 
     // check it fails due to not having permissions
-    fn check_op_not_allowed_failure<T>(result: Result<T>) -> anyhow::Result<()> {
+    fn check_op_not_allowed_failure<T>(result: Result<T>) -> eyre::Result<()> {
         match result {
             Err(Error::AccessDenied(_)) => Ok(()),
-            Err(err) => Err(anyhow!(
+            Err(err) => Err(eyre!(
                 "Error returned was the unexpected one for a non-allowed op: {}",
                 err
             )),
-            Ok(_) => Err(anyhow!(
+            Ok(_) => Err(eyre!(
                 "Register operation succeded unexpectedly, an AccessDenied error was expected"
                     .to_string(),
             )),

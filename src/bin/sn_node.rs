@@ -27,7 +27,7 @@
     unused_results
 )]
 
-use anyhow::{anyhow, Error as AnyhowError, Result};
+use eyre::{eyre, Result};
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
@@ -45,10 +45,10 @@ fn main() {
     let sn_node_thread = std::thread::Builder::new()
         .name("sn_node".to_string())
         .stack_size(16 * 1024 * 1024)
-        .spawn(move || {
+        .spawn(move || -> Result<()> {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(run_node())?;
-            Ok::<(), AnyhowError>(())
+            Ok(())
         });
 
     match sn_node_thread {
@@ -101,7 +101,7 @@ async fn run_node() -> Result<()> {
             EnvFilter::from_default_env().add_directive(
                 module_log_filter
                     .parse()
-                    .map_err(|_| anyhow!("Could not parse module log filter"))?,
+                    .map_err(|_| eyre!("Could not parse module log filter"))?,
             )
         }
     };

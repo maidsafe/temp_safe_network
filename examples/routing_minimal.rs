@@ -33,7 +33,7 @@
 //! command-line option for more details.
 //!
 
-use anyhow::Result;
+use eyre::Result;
 use futures::future::join_all;
 use safe_network::routing::{
     create_test_used_space_and_root_storage, Config, Event, EventStream, Routing, TransportConfig,

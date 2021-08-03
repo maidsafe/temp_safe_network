@@ -434,8 +434,8 @@ mod tests {
         section::test_utils::*, section::NodeStateUtils, SectionAuthorityProviderUtils, ELDER_SIZE,
         MIN_ADULT_AGE, MIN_AGE,
     };
-    use anyhow::{anyhow, Error, Result};
     use assert_matches::assert_matches;
+    use eyre::{eyre, Error, Result};
     use futures::{
         future::{self, Either},
         pin_mut,
@@ -476,7 +476,7 @@ mod tests {
             let (wire_msg, recipients) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
+                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             let bootstrap_addrs: Vec<SocketAddr> =
                 recipients.iter().map(|(_name, addr)| *addr).collect();
@@ -501,7 +501,7 @@ mod tests {
             let (wire_msg, recipients) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
+                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
             let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, dst_location,.. }) =>
                 (msg, dst_location));
 
@@ -569,7 +569,7 @@ mod tests {
             let (wire_msg, recipients) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
+                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_eq!(
                 recipients
@@ -603,7 +603,7 @@ mod tests {
             let (wire_msg, recipients) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
+                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_eq!(
                 recipients
@@ -657,7 +657,7 @@ mod tests {
             let (wire_msg, _) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
+                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, .. }) =>
                         assert_matches!(msg, NodeMsg::JoinRequest{..}));
@@ -693,7 +693,7 @@ mod tests {
             let (wire_msg, _) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
+                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, .. }) =>
                             assert_matches!(msg, NodeMsg::JoinRequest{..}));
@@ -731,7 +731,7 @@ mod tests {
             let (wire_msg, _) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("JoinRequest was not received"))?;
+                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_matches!(wire_msg.into_message(), Ok(MessageType::Node { msg, .. }) =>
                                 assert_matches!(msg, NodeMsg::JoinRequest{..}));
@@ -752,7 +752,7 @@ mod tests {
 
         if let Err(RoutingError::TryJoinLater) = join_result {
         } else {
-            return Err(anyhow!("Not getting an execpted network rejection."));
+            return Err(eyre!("Not getting an execpted network rejection."));
         }
 
         test_result
@@ -796,7 +796,7 @@ mod tests {
             let (wire_msg, _) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
+                .ok_or_else(|| eyre!("NodeMsg was not received"))?;
 
             let node_msg =
                 assert_matches!(wire_msg.into_message(), Ok(MessageType::Node{ msg, .. }) => msg);
@@ -826,7 +826,7 @@ mod tests {
             let (wire_msg, _) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
+                .ok_or_else(|| eyre!("NodeMsg was not received"))?;
 
             let node_msg =
                 assert_matches!(wire_msg.into_message(), Ok(MessageType::Node{ msg, .. }) => msg);

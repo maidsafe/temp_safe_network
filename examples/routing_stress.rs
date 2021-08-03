@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use anyhow::{anyhow, format_err, Error, Result};
 use bls::PublicKey;
+use eyre::{eyre, Context, Error, Result};
 use futures::{
     future,
     stream::{self, StreamExt},
@@ -88,13 +88,13 @@ async fn main() -> Result<()> {
     let opts = Options::from_args();
 
     if opts.schedule.is_empty() {
-        return Err(format_err!(
+        return Err(eyre!(
             "Must specify churn schedule (run with --help for more info)."
         ));
     }
 
     if opts.probe_frequency <= 0.0 {
-        return Err(format_err!("Probe frequency must be greater than zero."));
+        return Err(eyre!("Probe frequency must be greater than zero."));
     }
 
     // Init logging.
@@ -361,7 +361,7 @@ impl Network {
                         DstLocation::Section { name, section_pk } => (name, section_pk),
                         DstLocation::Node { name, section_pk } => (name, section_pk),
                         DstLocation::DirectAndUnrouted(_) | DstLocation::EndUser(_) => {
-                            return Err(format_err!("unexpected probe message dst: {:?}", dst))
+                            return Err(eyre!("unexpected probe message dst: {:?}", dst))
                         }
                     };
 
@@ -431,7 +431,7 @@ impl Network {
             let nodes_section = node
                 .matching_section(&node.name().await)
                 .await
-                .map_err(|_| anyhow!("No pk found for our node's section"))?;
+                .context("No pk found for our node's section")?;
 
             let nodes_section_pk = nodes_section.public_key_set.public_key();
             if self.try_send_probe(node, dst).await? {
@@ -476,8 +476,9 @@ impl Network {
 
         match node.send_message(wire_msg).await {
             Ok(()) => Ok(true),
-            Err(error) => Err(Error::from(error)
-                .context(format!("failed to send probe by {}", node.name().await))),
+            Err(error) => {
+                Err(error).context(format!("failed to send probe by {}", node.name().await))
+            }
         }
     }
 

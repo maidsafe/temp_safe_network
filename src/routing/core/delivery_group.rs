@@ -170,7 +170,7 @@ mod tests {
         },
         SectionAuthorityProviderUtils, MIN_ADULT_AGE,
     };
-    use anyhow::{Context, Result};
+    use eyre::{ContextCompat, Result};
     use rand::seq::IteratorRandom;
     use secured_linked_list::SecuredLinkedList;
     use xor_name::Prefix;

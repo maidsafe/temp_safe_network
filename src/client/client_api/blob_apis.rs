@@ -355,8 +355,8 @@ mod tests {
         test_utils::{create_test_client, run_w_backoff_delayed},
     };
     use crate::retry_err_loop;
-    use anyhow::{anyhow, bail, Result};
     use bincode::deserialize;
+    use eyre::{bail, eyre, Result};
     use futures::future::join_all;
     use self_encryption::{SelfEncryptionError, Storage};
     use tokio::time::{Duration, Instant};
@@ -547,7 +547,7 @@ mod tests {
             }
             Ok(())
         } else {
-            Err(anyhow!(
+            Err(eyre!(
                 "It didn't return DataMap::Chunks, instead: {:?}",
                 root_data_map
             ))

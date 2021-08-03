@@ -1241,13 +1241,13 @@ impl fmt::Display for NativeUrl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{anyhow, bail, Result};
+    use eyre::{bail, eyre, Result};
 
     macro_rules! verify_expected_result {
             ($result:expr, $pattern:pat $(if $cond:expr)?) => {
                 match $result {
                     $pattern $(if $cond)? => Ok(()),
-                    other => Err(anyhow!("Expecting {}, got {:?}", stringify!($pattern), other)),
+                    other => Err(eyre!("Expecting {}, got {:?}", stringify!($pattern), other)),
                 }
             }
         }
@@ -1543,17 +1543,14 @@ mod tests {
             "safe://heyyynunctugo4ucp3a8radnctugo4ucp3a8radnctugo4ucp3a8radnctmfp5zq75zq75zq7";
 
         match NativeUrl::from_xorurl(xorurl) {
-            Ok(_) => Err(anyhow!(
+            Ok(_) => Err(eyre!(
                 "Unexpectedly parsed an invalid (too long) xorurl".to_string(),
             )),
             Err(Error::InvalidXorUrl(msg)) => {
                 assert!(msg.starts_with("Invalid XOR-URL, encoded string too long"));
                 Ok(())
             }
-            other => Err(anyhow!(
-                "Error returned is not the expected one: {:?}",
-                other
-            )),
+            other => Err(eyre!("Error returned is not the expected one: {:?}", other)),
         }
     }
 
@@ -1570,17 +1567,14 @@ mod tests {
         // TODO: we need to add checksum to be able to detect even 1 single char change
         let len = xorurl.len() - 2;
         match NativeUrl::from_xorurl(&xorurl[..len]) {
-            Ok(_) => Err(anyhow!(
+            Ok(_) => Err(eyre!(
                 "Unexpectedly parsed an invalid (too short) xorurl".to_string(),
             )),
             Err(Error::InvalidXorUrl(msg)) => {
                 assert!(msg.starts_with("Invalid XOR-URL, encoded string too short"));
                 Ok(())
             }
-            other => Err(anyhow!(
-                "Error returned is not the expected one: {:?}",
-                other
-            )),
+            other => Err(eyre!("Error returned is not the expected one: {:?}", other)),
         }
     }
 

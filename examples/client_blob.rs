@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use anyhow::{Context, Result};
+use eyre::{Context, Result};
 use safe_network::{
     client::{utils::test_utils::read_network_conn_info, Client, Config},
     url::{ContentType, NativeUrl, Scope, DEFAULT_XORURL_BASE},

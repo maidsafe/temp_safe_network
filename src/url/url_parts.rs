@@ -225,7 +225,7 @@ fn validate_url_chars(url: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{anyhow, Result};
+    use eyre::{eyre, Result};
 
     #[test]
     fn test_native_url_validate_url_chars_with_whitespace() -> Result<()> {
@@ -262,16 +262,13 @@ mod tests {
         for url in urls {
             match NativeUrlParts::parse(url, false) {
                 Ok(_) => {
-                    return Err(anyhow!(
-                        "Unexpectedly validated url with whitespace {}",
-                        url
-                    ));
+                    return Err(eyre!("Unexpectedly validated url with whitespace {}", url));
                 }
                 Err(Error::InvalidInput(msg)) => {
                     assert_eq!(msg, "The URL cannot contain whitespace".to_string());
                 }
                 Err(err) => {
-                    return Err(anyhow!("Error returned is not the expected one: {}", err));
+                    return Err(eyre!("Error returned is not the expected one: {}", err));
                 }
             };
         }
@@ -351,7 +348,7 @@ mod tests {
         for url in urls {
             match NativeUrlParts::parse(url, false) {
                 Ok(_) => {
-                    return Err(anyhow!(
+                    return Err(eyre!(
                         "Unexpectedly validated url with control character {}",
                         url
                     ));
@@ -360,7 +357,7 @@ mod tests {
                     assert_eq!(msg, "The URL cannot contain control characters".to_string());
                 }
                 Err(err) => {
-                    return Err(anyhow!("Error returned is not the expected one: {}", err));
+                    return Err(eyre!("Error returned is not the expected one: {}", err));
                 }
             };
         }
@@ -406,7 +403,7 @@ mod tests {
         for url in urls {
             match NativeUrlParts::parse(url, false) {
                 Ok(_) => {
-                    return Err(anyhow!(
+                    return Err(eyre!(
                         "Unexpectedly validated url with invalid character {}",
                         url
                     ));
@@ -415,7 +412,7 @@ mod tests {
                     assert_eq!(msg, "The URL cannot contain invalid characters".to_string());
                 }
                 Err(err) => {
-                    return Err(anyhow!("Error returned is not the expected one: {}", err));
+                    return Err(eyre!("Error returned is not the expected one: {}", err));
                 }
             };
         }
