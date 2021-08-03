@@ -27,10 +27,10 @@
     unused_results
 )]
 
-use eyre::{eyre, Result, WrapErr};
+use eyre::{Result, WrapErr};
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
-use std::{io::Write, process};
+use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
 use tracing::{self, error, info};
@@ -47,9 +47,9 @@ fn main() -> Result<()> {
     let handle = std::thread::Builder::new()
         .name("sn_node".to_string())
         .stack_size(16 * 1024 * 1024)
-        .spawn(move || -> Result<()> {
+        .spawn(move || {
             let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(run_node())?;
+            rt.block_on(run_node());
             Ok(())
         })
         .wrap_err("Failed to spawn node thread")?;
@@ -64,13 +64,12 @@ fn main() -> Result<()> {
     }
 }
 
-async fn run_node() -> Result<()> {
+async fn run_node() {
     let config = match Config::new().await {
         Ok(cfg) => cfg,
         Err(e) => {
             println!("Failed to create Config: {:?}", e);
             exit(1);
-            return Ok(());
         }
     };
 
@@ -87,7 +86,7 @@ async fn run_node() -> Result<()> {
             Err(e) => println!("Unknown completions option. {}", e),
         }
         // we exit program on both success and error.
-        return Ok(());
+        return;
     }
 
     // ==============
@@ -100,13 +99,11 @@ async fn run_node() -> Result<()> {
         Err(_) => {
             // we manually determine level filter instead of using tracing EnvFilter.
             let level_filter = config.verbose();
-            let module_log_filter = format!("{}={}", MODULE_NAME, level_filter.to_string());
-
-            EnvFilter::from_default_env().add_directive(
-                module_log_filter
-                    .parse()
-                    .map_err(|_| eyre!("Could not parse module log filter"))?,
-            )
+            let module_filter = format!("{}={}", MODULE_NAME, level_filter)
+                .parse()
+                // parsing will fail only if `MODULE_NAME` or `LevelFilter::fmt` is broken
+                .expect("BUG: invalid module filter constructed");
+            EnvFilter::from_default_env().add_directive(module_filter)
         }
     };
 
@@ -229,19 +226,13 @@ async fn run_node() -> Result<()> {
     match node.run(event_stream).await {
         Ok(()) => {
             exit(0);
-            Ok(())
         }
         Err(e) => {
             println!("Cannot start node due to error: {:?}", e);
             error!("Cannot start node due to error: {:?}", e);
             exit(1);
-            Ok(())
         }
     }
-}
-
-fn exit(exit_code: i32) {
-    process::exit(exit_code);
 }
 
 fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
