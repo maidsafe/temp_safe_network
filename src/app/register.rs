@@ -56,48 +56,41 @@ impl Safe {
     }
 
     /// Fetch a Register from a SafeUrl without performing any type of URL resolution
-    /// Works with version hashes
+    /// Supports version hashes:
     /// e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
     pub(crate) async fn fetch_register_entries(
         &self,
         safeurl: &SafeUrl,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        // take entry with version hash
-        if let Some(v) = safeurl.content_version() {
-            let hash = v.entry_hash();
-            let entry = self
-                .fetch_register_entry(&safeurl, hash)
-                .await
-                .map_err(|e| match e {
-                    Error::EmptyContent(_) => {
-                        Error::EmptyContent(format!("Register found at \"{}\" was empty", safeurl))
-                    }
-                    Error::ContentNotFound(_) => {
-                        Error::ContentNotFound("No Register found at this address".to_string())
-                    }
-                    other => other,
-                })?;
-            let mut set = BTreeSet::new();
-            set.insert((hash, entry));
-            return Ok(set);
-        }
+        let result = match safeurl.content_version() {
+            Some(v) => {
+                // take entry with version hash
+                let hash = v.entry_hash();
+                self.fetch_register_entry(&safeurl, hash)
+                    .await
+                    .map(|entry| vec![(hash, entry)].iter().collect())
+            }
+            None => {
+                // then take latest entry
+                let address = safeurl.register_address()?;
+                self.safe_client.read_register(address).await
+            }
+        };
 
-        // else take latest entry
-        let address = safeurl.register_address()?;
-
-        match self.safe_client.read_register(address).await {
+        match result {
             Ok(data) => {
-                debug!("Register retrieved...");
+                debug!("Register retrieved from {}...", safeurl);
                 Ok(data)
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
                 "Register found at \"{}\" was empty",
                 safeurl
             ))),
-            Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
-                "No Register found at this address".to_string(),
-            )),
-            other => other,
+            Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(format!(
+                "No Register found at \"{}\"",
+                safeurl
+            ))),
+            other_err => other_err,
         }
     }
 
