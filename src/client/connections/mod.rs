@@ -6,19 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::{
-    borrow::Borrow,
-    collections::{BTreeMap, HashMap},
-    net::SocketAddr,
-    sync::Arc,
-};
-
-use bls::PublicKeySet;
 use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
+use std::{borrow::Borrow, collections::HashMap, sync::Arc};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::{debug, trace};
-use xor_name::{Prefix, XorName};
 
 use crate::client::Error;
 use crate::messaging::{
@@ -28,6 +20,7 @@ use crate::messaging::{
     MessageId, SectionAuthorityProvider,
 };
 use crate::types::{PrefixMap, PublicKey};
+use xor_name::XorName;
 
 mod listeners;
 mod messaging;
@@ -45,16 +38,12 @@ pub(crate) struct QueryResult {
 #[derive(Clone, Debug)]
 pub(super) struct Session {
     client_pk: PublicKey,
-    pub(super) section_key_set: Arc<RwLock<Option<PublicKeySet>>>,
     qp2p: QuicP2p<XorName>,
     pending_queries: PendingQueryResponses,
     incoming_err_sender: Arc<Sender<CmdError>>,
     endpoint: Option<Endpoint<XorName>>,
-    /// Elders of our section
-    our_section: Arc<RwLock<BTreeMap<XorName, SocketAddr>>>,
-    /// all elders we know about from SectionInfo messages
+    /// All elders we know about from SectionInfo messages
     network: PrefixMap<SectionAuthorityProvider>,
-    section_prefix: Arc<RwLock<Option<Prefix>>>,
     aggregator: Arc<RwLock<SignatureAggregator>>,
     is_connecting_to_new_elders: bool,
 }
@@ -75,18 +64,16 @@ impl Session {
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
             endpoint: None,
-            section_key_set: Arc::new(RwLock::new(None)),
-            our_section: Arc::new(RwLock::new(Default::default())),
             network: PrefixMap::new(),
-            section_prefix: Arc::new(RwLock::new(None)),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             is_connecting_to_new_elders: false,
         })
     }
 
-    /// Get the elders count of our section elders as provided by SectionInfo
+    /// Get the count of elders we have knowledge of
+    #[allow(unused)]
     pub(super) async fn known_elders_count(&self) -> usize {
-        self.our_section.read().await.len()
+        self.network.iter().map(|sap| sap.elders.len()).sum()
     }
 
     pub(super) fn endpoint(&self) -> Result<&Endpoint<XorName>, Error> {
@@ -94,18 +81,6 @@ impl Session {
             Some(endpoint) => Ok(endpoint),
             None => {
                 trace!("self.endpoint.borrow() was None");
-                Err(Error::NotBootstrapped)
-            }
-        }
-    }
-
-    pub(super) async fn section_key(&self) -> Result<bls::PublicKey, Error> {
-        let keys = self.section_key_set.read().await.clone();
-
-        match keys.borrow() {
-            Some(section_key_set) => Ok(section_key_set.public_key()),
-            None => {
-                trace!("self.section_key_set.borrow() was None");
                 Err(Error::NotBootstrapped)
             }
         }
