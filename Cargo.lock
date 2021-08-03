@@ -74,12 +74,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "595d3cfa7a60d4555cb5067b99f07142a08ea778de5cf993f7b75c7d8fabc486"
-
-[[package]]
 name = "assert_matches"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -244,16 +238,14 @@ checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
 name = "bls_dkg"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e2c19530d31f5bdf3892ea3647adcdebd72f752a446437aae95c9a2c9fe19fa"
+checksum = "d8c82ee7e80ec22a6ba8f5ac0d6cf3c6a94b790a488a62bc761c2c5ac856a816"
 dependencies = [
  "aes",
- "anyhow",
  "bincode",
  "block-modes",
  "blsttc",
- "itertools 0.9.0",
  "log",
  "rand 0.7.3",
  "rand_core 0.5.1",
