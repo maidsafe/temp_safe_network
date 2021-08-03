@@ -26,6 +26,14 @@ required-features = ["testing"]
 name = "network_split"
 required-features = ["testing"]
 
+[[example]]
+name = "routing_minimal"
+required-features = ["testing"]
+
+[[example]]
+name = "routing_stress"
+required-features = ["testing"]
+
 [features]
 default = []
 always-joinable = []
