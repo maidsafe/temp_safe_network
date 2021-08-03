@@ -9,7 +9,7 @@
 use super::{QueryResult, Session};
 use crate::client::Error;
 use crate::messaging::{
-    data::{ChunkRead, DataCmd, DataQuery, QueryResponse},
+    data::{ChunkRead, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
     MessageId, ServiceAuth, WireMsg,
 };
@@ -111,7 +111,7 @@ impl Session {
     /// Send a `ServiceMsg` to the network without awaiting for a response.
     pub(crate) async fn send_cmd(
         &self,
-        cmd: DataCmd,
+        dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
     ) -> Result<(), Error> {
@@ -134,9 +134,9 @@ impl Session {
         );
 
         trace!(
-            "Sending (from {}) command message {:?} w/ id: {:?}",
+            "Sending (from {}) dst {:?} w/ id: {:?}",
             endpoint.socket_addr(),
-            cmd,
+            dst_address,
             msg_id
         );
 
@@ -146,9 +146,8 @@ impl Session {
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
 
-        let dst_section_name = cmd.dst_address();
         let dst_location = DstLocation::Section {
-            name: dst_section_name,
+            name: dst_address,
             section_pk,
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
@@ -214,15 +213,6 @@ impl Session {
             .ok_or(Error::NoBlsSectionKey)?;
 
         let data_name = query.dst_address();
-        let dst_location = DstLocation::Section {
-            name: data_name,
-            section_pk,
-        };
-        let msg_id = MessageId::new();
-        let msg_kind = MsgKind::ServiceMsg(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
-
-        let msg_bytes = wire_msg.serialize()?;
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest
         // connected Elders to the data we are querying
@@ -245,6 +235,8 @@ impl Session {
             );
             return Err(Error::InsufficientElderConnections(elders_len));
         }
+
+        let msg_id = MessageId::new();
 
         debug!(
             "Sending query message {:?}, msg_id: {}, from {}, to the {} Elders closest to data name: {:?}",
@@ -269,13 +261,21 @@ impl Session {
                 .insert(msg_id, sender);
         });
 
-        let responses_discarded = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
+        let discarded_responses = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
+
+        let dst_location = DstLocation::Section {
+            name: data_name,
+            section_pk,
+        };
+        let msg_kind = MsgKind::ServiceMsg(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let msg_bytes = wire_msg.serialize()?;
 
         // Set up response listeners
         for socket in elders {
             let endpoint = endpoint.clone();
             let msg_bytes = msg_bytes.clone();
-            let counter_clone = responses_discarded.clone();
+            let counter_clone = discarded_responses.clone();
             let task_handle = tokio::spawn(async move {
                 endpoint.connect_to(&socket).await?;
 
@@ -328,7 +328,7 @@ impl Session {
         // so we don't need more than one valid response to prevent from accepting invaid responses
         // from byzantine nodes, however for mutable data (non-Chunk esponses) we will
         // have to review the approach.
-        let mut responses_discarded: usize = 0;
+        let mut discarded_responses: usize = 0;
 
         // Send all queries concurrently
         let results = join_all(tasks).await;
@@ -336,7 +336,7 @@ impl Session {
         for result in results {
             if let Err(err) = result {
                 error!("Error spawning task to send query: {:?} ", err);
-                responses_discarded += 1;
+                discarded_responses += 1;
             }
         }
 
@@ -365,7 +365,7 @@ impl Session {
                         // the Chunk content doesn't match its Xorname,
                         // this is suspicious and it could be a byzantine node
                         warn!("We received an invalid Chunk response from one of the nodes");
-                        responses_discarded += 1;
+                        discarded_responses += 1;
                     }
                 }
                 // Erring on the side of positivity. \
@@ -378,7 +378,7 @@ impl Session {
                 | (response @ Some(QueryResponse::GetRegisterUserPermissions(Err(_))), None) => {
                     debug!("QueryResponse error received (but may be overridden by a non-error reponse from another elder): {:#?}", &response);
                     error_response = response;
-                    responses_discarded += 1;
+                    discarded_responses += 1;
                 }
                 (Some(response), _) => {
                     debug!("QueryResponse received is: {:#?}", response);
@@ -389,7 +389,7 @@ impl Session {
                     break None;
                 }
             }
-            if responses_discarded == elders_len {
+            if discarded_responses == elders_len {
                 break error_response;
             }
         };
