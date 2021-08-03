@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.21.0](https://github.com/maidsafe/safe_network/compare/v0.20.3...v0.21.0) (2021-08-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **routing:** changes in messaging defs make this non-backward-compatible.
+
+### Features
+
+* **routing:** adding verification to proof chain before accepting a remote section SAP update ([c77d59e](https://github.com/maidsafe/safe_network/commit/c77d59ed524331047e1d85c218036f260ab1d53a))
+* **routing:** validate remote section new SAP key matches the last key of the provided proof chain ([7359722](https://github.com/maidsafe/safe_network/commit/7359722ee16ac30060ba9df4040b27b73c65338d))
+
+
+### Bug Fixes
+
+* **routing:** apply correct validations of remote section SAP before updating our local network knowledge records ([35a28e6](https://github.com/maidsafe/safe_network/commit/35a28e6905f23cb6b2c6b57d62d72295951e3165))
+* **routing:** improving AE logs, and removing incorrect validation for SectionKnowledge msgs ([6299893](https://github.com/maidsafe/safe_network/commit/62998935f50092b10a47bec24175dfb1b4a14887))
+
+
+* **routing:** adapting tests to generate correct proof chains for test remote sections ([1c5aa43](https://github.com/maidsafe/safe_network/commit/1c5aa43d92a5823a7da87fcbd6e052cab70733a3))
+
 ### [0.20.3](https://github.com/maidsafe/safe_network/compare/v0.20.2...v0.20.3) (2021-08-02)
 
 ### [0.20.2](https://github.com/maidsafe/safe_network/compare/v0.20.1...v0.20.2) (2021-08-02)
