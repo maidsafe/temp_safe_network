@@ -14,7 +14,7 @@ use crate::messaging::{
 };
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
-use tracing::debug;
+use xor_name::XorName;
 
 impl Client {
     /// Send a signed DataCmd to the network.
@@ -22,29 +22,33 @@ impl Client {
     /// provide the serialised and already signed command.
     pub async fn send_signed_command(
         &self,
-        cmd: DataCmd,
+        dst_address: XorName,
         client_pk: PublicKey,
         serialised_cmd: Bytes,
         signature: Signature,
     ) -> Result<(), Error> {
-        debug!("Sending DataCmd: {:?}", cmd);
         let auth = ServiceAuth {
             public_key: client_pk,
             signature,
         };
 
-        self.session.send_cmd(cmd, auth, serialised_cmd).await
+        self.session
+            .send_cmd(dst_address, auth, serialised_cmd)
+            .await
     }
 
     // Send a DataCmd to the network without awaiting for a response.
     // This function is a helper private to this module.
     pub(crate) async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
         let client_pk = self.public_key();
-        let msg = ServiceMsg::Cmd(cmd.clone());
-        let serialised_cmd = WireMsg::serialize_msg_payload(&msg)?;
+        let dst_address = cmd.dst_address();
+        let serialised_cmd = {
+            let msg = ServiceMsg::Cmd(cmd);
+            WireMsg::serialize_msg_payload(&msg)?
+        };
         let signature = self.keypair.sign(&serialised_cmd);
 
-        self.send_signed_command(cmd, client_pk, serialised_cmd, signature)
+        self.send_signed_command(dst_address, client_pk, serialised_cmd, signature)
             .await
     }
 }
