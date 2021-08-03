@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::{collections::BTreeSet, net::SocketAddr};
+use std::net::SocketAddr;
 
 use qp2p::IncomingMessages;
 use tracing::{debug, error, info, trace, warn};
@@ -16,7 +16,7 @@ use crate::client::Error;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
-    MessageId, MessageType, SectionAuthorityProvider, WireMsg,
+    MessageId, MessageType, WireMsg,
 };
 use crate::types::PublicKey;
 
@@ -88,9 +88,10 @@ impl Session {
         trace!("Handling network info message {:?}", msg);
 
         match &msg {
-            SectionInfoMsg::GetSectionResponse(GetSectionResponse::Success(info)) => {
+            SectionInfoMsg::GetSectionResponse(GetSectionResponse::Success(sap)) => {
                 debug!("GetSectionResponse::Success!");
-                self.update_session_info(info).await
+                let _ = self.network.insert(sap.clone());
+                Ok(())
             }
             SectionInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(sap)) => {
                 trace!("GetSectionResponse::Redirect, re-bootstrapping with provided peers");
@@ -112,57 +113,14 @@ impl Session {
 
                     Ok(())
                 } else {
-                    self.update_session_info(sap).await
+                    let _ = self.network.insert(sap.clone());
+                    Ok(())
                 }
             }
             SectionInfoMsg::GetSectionQuery { .. } => Err(Error::UnexpectedMessageOnJoin(format!(
                 "bootstrapping failed since an invalid response ({:?}) was received",
                 msg
             ))),
-        }
-    }
-
-    // Apply updated info to a network session, and trigger connections
-    async fn update_session_info(&mut self, sap: &SectionAuthorityProvider) -> Result<(), Error> {
-        let _ = self.network.insert(sap.clone());
-
-        if sap.prefix.matches(&XorName::from(self.client_pk)) {
-            {
-                // Update session key set
-                let mut keyset = self.section_key_set.write().await;
-                if *keyset == Some(sap.public_key_set.clone()) {
-                    trace!("We have previously received the key set already.");
-                    return Ok(());
-                }
-
-                *keyset = Some(sap.public_key_set.clone());
-                {
-                    // update section prefix
-                    let mut prefix = self.section_prefix.write().await;
-                    *prefix = Some(sap.prefix);
-                }
-            }
-            let new_elder_addresses = sap.elders.values().cloned().collect::<BTreeSet<_>>();
-            debug!("Connecting to new set of Elders: {:?}", new_elder_addresses);
-            let updated_contacts = new_elder_addresses.iter().cloned().collect::<Vec<_>>();
-            let old_elders = self
-                .our_section
-                .read()
-                .await
-                .values()
-                .filter_map(|addr| {
-                    if !new_elder_addresses.contains(addr) {
-                        Some(*addr)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-            self.disconnect_from_peers(old_elders).await?;
-            self.qp2p.update_bootstrap_contacts(&updated_contacts);
-            self.connect_to_elders().await
-        } else {
-            Ok(())
         }
     }
 

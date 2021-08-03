@@ -37,7 +37,8 @@ const NUMBER_OF_RETRIES: usize = 3;
 const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
 impl Session {
-    /// Bootstrap to the network maintaining connections to several nodes.
+    /// Bootstrap to the network, connecting with the closest section to
+    /// the XorName of our PublicKey.
     pub(crate) async fn bootstrap(&mut self) -> Result<(), Error> {
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
@@ -59,35 +60,35 @@ impl Session {
             .await?;
 
         // Bootstrap and send a handshake request to the bootstrapped peer
-        let mut we_have_keyset = false;
-        while !we_have_keyset {
+        while !self.network.iter().count() == 1 {
             // This means that the peer we bootstrapped to
             // has responded with a SectionInfo Message
-            if let Ok(Ok(true)) = timeout(
+            match timeout(
                 Duration::from_secs(30),
                 self.process_incoming_message(&mut incoming_messages),
             )
             .await
             {
-                we_have_keyset = self.section_key_set.read().await.is_some();
-            } else {
-                // Remove the unresponsive peer we boostrapped to and bootstrap again
-                let _ = bootstrap_nodes.remove(&bootstrapped_peer);
-                bootstrapped_peer = self
-                    .qp2p
-                    .rebootstrap(
-                        &endpoint,
-                        &bootstrap_nodes.iter().cloned().collect::<Vec<_>>(),
-                    )
-                    .await?;
+                Ok(Ok(true)) => {}
+                _ => {
+                    // Remove the unresponsive peer we bootstrapped to and bootstrap again
+                    let _ = bootstrap_nodes.remove(&bootstrapped_peer);
+                    bootstrapped_peer = self
+                        .qp2p
+                        .rebootstrap(
+                            &endpoint,
+                            &bootstrap_nodes.iter().cloned().collect::<Vec<_>>(),
+                        )
+                        .await?;
+                }
             }
         }
 
         self.spawn_message_listener_thread(incoming_messages).await;
 
         debug!(
-            "Successfully obtained the list of Elders to send all messages to: {:?}",
-            self.our_section.read().await.values()
+            "Successfully obtained the initial list of Elders: {:?}",
+            self.network
         );
 
         Ok(())
@@ -102,21 +103,7 @@ impl Session {
         targets: usize,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint()?.clone();
-        let section_pk = self.section_key().await?;
         let data_name = cmd.dst_address();
-
-        self.get_section_for(data_name).await?;
-
-        // Wait for 2 seconds to receive SAP
-        let _ = sleep(Duration::from_secs(2));
-
-        let our_elders = self
-            .our_section
-            .read()
-            .await
-            .values()
-            .cloned()
-            .collect::<Vec<SocketAddr>>();
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
         let (elders, section_pk) = self
@@ -128,7 +115,7 @@ impl Session {
                     sap.public_key_set.public_key(),
                 )
             })
-            .unwrap_or_else(|| (our_elders, section_pk));
+            .ok_or(Error::NotBootstrapped)?;
 
         let msg_id = MessageId::new();
         debug!(
@@ -209,19 +196,12 @@ impl Session {
 
         let data_name = query.dst_address();
 
-        self.get_section_for(data_name).await?;
-
-        // Wait for 2 seconds to receive SAP
-        let _ = sleep(Duration::from_secs(2));
-
-        let our_section = self.our_section.read().await.clone();
-        let our_section_pk = self.section_key().await?;
-
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let (elders, section_pk) = self.network.get_matching(&data_name).map_or_else(
-            || (our_section, our_section_pk),
-            |sap| (sap.elders.clone(), sap.public_key_set.public_key()),
-        );
+        let (elders, section_pk) = self
+            .network
+            .get_matching(&data_name)
+            .map(|sap| (sap.elders.clone(), sap.public_key_set.public_key()))
+            .ok_or(Error::NotBootstrapped)?;
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders = elders
@@ -495,61 +475,6 @@ impl Session {
         for elder in peers {
             self.endpoint()?.disconnect_from(&elder).await?;
         }
-
-        Ok(())
-    }
-
-    pub(crate) async fn get_section_for(&self, name: XorName) -> Result<(), Error> {
-        let query = SectionInfoMsg::GetSectionQuery {
-            name,
-            is_bootstrapping: false,
-        };
-
-        let payload = WireMsg::serialize_msg_payload(&query)?;
-
-        // Random section PK since we have no knowledge
-        let random_section_pk = SecretKey::random().public_key();
-
-        let dst_location = DstLocation::Section {
-            name,
-            section_pk: random_section_pk,
-        };
-
-        let wire_msg = WireMsg::new_msg(
-            MessageId::new(),
-            payload,
-            MsgKind::SectionInfoMsg,
-            dst_location,
-        )?;
-        let msg_bytes = wire_msg.serialize()?;
-
-        for addr in self.our_section.read().await.values() {
-            let msg_bytes = msg_bytes.clone();
-            self.endpoint()?.send_message(msg_bytes, addr).await?;
-        }
-
-        Ok(())
-    }
-
-    // Connect to a set of Elders nodes which will be
-    // the recipients of our messages on the network.
-    pub(crate) async fn connect_to_elders(&mut self) -> Result<(), Error> {
-        self.is_connecting_to_new_elders = true;
-
-        if self.known_elders_count().await == 0 {
-            // this is not necessarily an error in case we didn't get elder info back yet
-            warn!("Insufficient Elders");
-        }
-
-        {
-            let session_elders = self.our_section.write().await;
-            trace!("Connecting to {} of our Elders.", session_elders.len());
-            for (_, addr) in session_elders.iter() {
-                self.endpoint()?.connect_to(addr).await?
-            }
-        }
-
-        self.is_connecting_to_new_elders = false;
 
         Ok(())
     }
