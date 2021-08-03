@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use anyhow::Result;
 use criterion::{criterion_group, criterion_main, Criterion};
+use eyre::Result;
 use safe_network::client::utils::generate_random_vector;
 use safe_network::client::utils::test_utils::{read_network_conn_info, run_w_backoff_delayed};
 use safe_network::client::{Client, Config, Error};

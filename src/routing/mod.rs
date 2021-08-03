@@ -90,7 +90,7 @@ mod test_utils {
     const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
 
     /// Create a register store for routing examples
-    pub fn create_test_used_space_and_root_storage() -> anyhow::Result<(UsedSpace, PathBuf)> {
+    pub fn create_test_used_space_and_root_storage() -> eyre::Result<(UsedSpace, PathBuf)> {
         let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
         let random_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 

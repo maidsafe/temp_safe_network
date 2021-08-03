@@ -97,7 +97,7 @@ pub enum ProposalError {
 mod tests {
     use super::*;
     use crate::routing::{dkg, section};
-    use anyhow::Result;
+    use eyre::Result;
     use std::fmt::Debug;
     use xor_name::Prefix;
 

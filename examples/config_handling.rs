@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use anyhow::Result;
+use eyre::Result;
 use safe_network::node::Config;
 use structopt::StructOpt;
 use tokio::{fs::remove_file, io};

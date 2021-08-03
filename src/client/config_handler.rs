@@ -89,7 +89,7 @@ async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
 mod tests {
     use super::*;
     use crate::client::utils::test_utils::init_logger;
-    use anyhow::Result;
+    use eyre::Result;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use std::env::temp_dir;
     use std::fs::File;
@@ -116,7 +116,7 @@ mod tests {
         // convert to string for assert
         let mut str_path = path
             .to_str()
-            .ok_or(anyhow::anyhow!("No path for to_str".to_string()))?
+            .ok_or(eyre::eyre!("No path for to_str".to_string()))?
             .to_string();
         // normalise for mac
         if str_path.ends_with('/') {

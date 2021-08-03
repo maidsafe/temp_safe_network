@@ -43,9 +43,9 @@ use crate::routing::{
     MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
-use anyhow::{anyhow, Context, Result};
 use assert_matches::assert_matches;
 use ed25519_dalek::Signer;
+use eyre::{eyre, Context, Result};
 use rand::rngs::OsRng;
 use rand::{distributions::Alphanumeric, Rng};
 use resource_proof::ResourceProof;
@@ -963,7 +963,7 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     let sender = *section_auth
         .addresses()
         .get(0)
-        .ok_or_else(|| anyhow!("section_auth is empty"))?;
+        .ok_or_else(|| eyre!("section_auth is empty"))?;
 
     let section_signed_section_auth = section_signed(&sk0, section_auth.clone())?;
     let mut section = Section::new(pk0, chain, section_signed_section_auth)?;

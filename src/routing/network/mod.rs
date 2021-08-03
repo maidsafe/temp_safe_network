@@ -275,7 +275,7 @@ impl NetworkUtils for Network {
 mod tests {
     use super::*;
     use crate::routing::{dkg, section};
-    use anyhow::{Context, Result};
+    use eyre::{Context, Result};
     use rand::Rng;
 
     #[test]

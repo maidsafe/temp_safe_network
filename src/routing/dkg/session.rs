@@ -368,8 +368,8 @@ mod tests {
         node::Node, section::section_authority_provider::ElderCandidatesUtils,
         section::test_utils::gen_addr, ELDER_SIZE, MIN_ADULT_AGE,
     };
-    use anyhow::{bail, Context, Result};
     use assert_matches::assert_matches;
+    use eyre::{bail, ContextCompat, Result};
     use proptest::prelude::*;
     use rand::{rngs::SmallRng, SeedableRng};
     use std::{collections::HashMap, iter};

@@ -85,7 +85,7 @@ mod test {
     use super::{
         get_network_keypair, get_reward_pk, store_network_keypair, store_new_reward_keypair,
     };
-    use anyhow::{anyhow, Result};
+    use eyre::{eyre, Result};
     use rand::rngs::OsRng;
     use tempfile::{tempdir, TempDir};
 
@@ -120,12 +120,12 @@ mod test {
             assert_eq!(kp.public, keypair.public);
             Ok(())
         } else {
-            Err(anyhow!("Network keypair was not read from file"))
+            Err(eyre!("Network keypair was not read from file"))
         }
     }
 
     // creates a temp dir
     fn create_temp_root() -> Result<TempDir> {
-        tempdir().map_err(|e| anyhow!("Failed to create temp dir: {}", e))
+        tempdir().map_err(|e| eyre!("Failed to create temp dir: {}", e))
     }
 }

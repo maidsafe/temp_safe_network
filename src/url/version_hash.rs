@@ -71,7 +71,7 @@ impl VersionHash {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{bail, Result};
+    use eyre::{bail, Result};
 
     #[test]
     fn test_version_hash_encode_decode() -> Result<()> {

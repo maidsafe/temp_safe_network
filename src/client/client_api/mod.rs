@@ -155,7 +155,7 @@ async fn attempt_bootstrap(session: &mut Session, client_pk: PublicKey) -> Resul
 mod tests {
     use super::*;
     use crate::client::utils::test_utils::{create_test_client, create_test_client_with};
-    use anyhow::Result;
+    use eyre::Result;
     use std::{
         collections::HashSet,
         net::{IpAddr, Ipv4Addr, SocketAddr},

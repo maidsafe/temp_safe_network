@@ -9,7 +9,7 @@
 use super::read_network_conn_info;
 use crate::client::{Client, Config};
 use crate::types::Keypair;
-use anyhow::Result;
+use eyre::Result;
 use std::{sync::Once, time::Duration};
 use tracing_subscriber::{fmt, EnvFilter};
 

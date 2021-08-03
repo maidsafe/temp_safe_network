@@ -150,8 +150,8 @@ mod tests {
         section::test_utils::{gen_addr, gen_section_authority_provider},
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
-    use anyhow::{anyhow, Context, Result};
     use assert_matches::assert_matches;
+    use eyre::{eyre, Context, Result};
     use secured_linked_list::SecuredLinkedList;
     use xor_name::Prefix;
 
@@ -220,7 +220,7 @@ mod tests {
             dst_section_pk,
         )?;
 
-        let wire_msg = msg_to_send.ok_or_else(|| anyhow!("expected an anti-entropy message"))?;
+        let wire_msg = msg_to_send.ok_or_else(|| eyre!("expected an anti-entropy message"))?;
         let msg_type = wire_msg
             .into_message()
             .context("failed to deserialised anti-entropy message")?;

@@ -21,7 +21,7 @@ use tracing::{debug, info};
 
 use tiny_keccak::{Hasher, Sha3};
 
-use anyhow::{anyhow, Context, Result};
+use eyre::{eyre, Context, Result};
 use safe_network::{
     client::{
         utils::generate_random_vector, utils::test_utils::read_network_conn_info, Client, Config,
@@ -59,7 +59,7 @@ async fn main() -> Result<()> {
         .stderr(Stdio::inherit())
         .output()
         .map_err(|err| {
-            anyhow!(
+            eyre!(
                 "Failed to run build command with args '{:?}': {}",
                 args, err
             )
@@ -77,7 +77,7 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
         Some(p) => Ok(p),
         None => {
             let mut home_dirs =
-                home_dir().ok_or_else(|| anyhow!("Failed to obtain user's home path"))?;
+                home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
 
             home_dirs.push(".safe");
             home_dirs.push("node");
@@ -100,7 +100,7 @@ pub async fn run_split() -> Result<()> {
     if !node_log_dir.exists() {
         debug!("Creating '{}' folder", node_log_dir.display());
         create_dir_all(node_log_dir.clone()).await.map_err(|err| {
-            anyhow!(
+            eyre!(
                 "Couldn't create target path to store nodes' generated data: {}",
                 err
             )
@@ -142,7 +142,7 @@ pub async fn run_split() -> Result<()> {
     // We can now call the tool with the args
     info!("Launching local Safe network...");
     run_with(Some(&sn_launch_tool_args))
-        .map_err(|err| anyhow!("Error starting the testnet, {:?}", err))?;
+        .map_err(|err| eyre!("Error starting the testnet, {:?}", err))?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
     let interval_duration = Duration::from_secs(interval_as_int * start_node_count);
@@ -169,7 +169,7 @@ pub async fn run_split() -> Result<()> {
     // We can now call the tool with the args
     info!("Adding nodes to the local Safe network...");
     run_with(Some(&sn_launch_tool_args))
-        .map_err(|err| anyhow!("Error adding nodes to the testnet, {:?}", err))?;
+        .map_err(|err| eyre!("Error adding nodes to the testnet, {:?}", err))?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
     let interval_duration = Duration::from_secs(interval_as_int * additional_node_count);

@@ -235,7 +235,7 @@ mod tests {
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         Error as DtError, PublicKey,
     };
-    use anyhow::{anyhow, bail, Result};
+    use eyre::{bail, eyre, Result};
     use std::{
         collections::{BTreeMap, BTreeSet},
         time::Instant,
@@ -389,7 +389,7 @@ mod tests {
                 assert_eq!(None, user_perms.is_allowed(Action::Write));
             }
             Permissions::Private(_) => {
-                return Err(anyhow!("Unexpectedly obtained incorrect user permissions",));
+                return Err(eyre!("Unexpectedly obtained incorrect user permissions",));
             }
         }
 
@@ -460,7 +460,7 @@ mod tests {
             .await
         {
             Err(_) => Ok(()),
-            Ok(_data) => Err(anyhow!(
+            Ok(_data) => Err(eyre!(
                 "Unexpectedly retrieved a register entry at index that's too high!",
             )),
         }
@@ -516,13 +516,11 @@ mod tests {
 
         match res {
             Err(Error::NoResponse) => Ok(()),
-            Err(err) => Err(anyhow!(
+            Err(err) => Err(eyre!(
                 "Unexpected error returned when deleting a nonexisting Private Register: {}",
                 err
             )),
-            Ok(_data) => Err(anyhow!(
-                "Unexpectedly retrieved a deleted Private Register!",
-            )),
+            Ok(_data) => Err(eyre!("Unexpectedly retrieved a deleted Private Register!",)),
         }
     }
 
