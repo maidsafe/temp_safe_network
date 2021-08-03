@@ -504,8 +504,10 @@ impl Safe {
         dry_run: bool,
         update_nrs: bool,
     ) -> Result<VersionHash> {
-        let version = if success_count == 0 || dry_run {
+        let version = if success_count == 0 {
             current_version
+        } else if dry_run {
+            return Err(Error::NotImplementedError("No dry run for append_version_to_files_container".to_string()));
         } else {
             // The FilesContainer is updated by adding an entry containing the link to
             // the Blob with the serialised new version of the FilesMap.
@@ -2385,7 +2387,7 @@ mod tests {
             true, // dry run
         ));
 
-        // skip version hash check since hash didn't change on dry run
+        // skip version hash check since not NotImplemented
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
