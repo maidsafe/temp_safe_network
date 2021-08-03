@@ -91,7 +91,7 @@ urlencoding = "1.1.1"
 xor_name = "1.1.10"
 
 [dependencies.self_update]
-version = "0.16.0"
+version = "0.26.0"
 default-features = false
 features = ["archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate", "rustls"]
 
