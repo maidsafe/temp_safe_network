@@ -66,7 +66,7 @@ const INVALID_NRS_CHARS: [char; 30] = [
 //
 // This is kept internal to the parent module.
 #[derive(Debug, Clone)]
-pub(super) struct SafeUrlParts {
+pub(super) struct NativeUrlParts {
     pub(super) scheme: String,
     pub(super) public_name: String, // "a.b.name" in "a.b.name"
     pub(super) top_name: String,    // "name"     in "a.b.name"
@@ -77,7 +77,7 @@ pub(super) struct SafeUrlParts {
     pub(super) fragment: String,
 }
 
-impl SafeUrlParts {
+impl NativeUrlParts {
     // parses a URL into its component parts, performing basic validation.
     pub(super) fn parse(url: &str, ignore_labels_size: bool) -> Result<Self> {
         // detect any invalid url chars before parsing
@@ -228,7 +228,7 @@ mod tests {
     use anyhow::{anyhow, Result};
 
     #[test]
-    fn test_safeurl_validate_url_chars_with_whitespace() -> Result<()> {
+    fn test_native_url_validate_url_chars_with_whitespace() -> Result<()> {
         let urls = vec![
             // tests for
             // https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt
@@ -260,7 +260,7 @@ mod tests {
             "safe://ideographic\u{3000}space",
         ];
         for url in urls {
-            match SafeUrlParts::parse(url, false) {
+            match NativeUrlParts::parse(url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with whitespace {}",
@@ -279,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn test_safeurl_validate_url_chars_with_control_characters() -> Result<()> {
+    fn test_native_url_validate_url_chars_with_control_characters() -> Result<()> {
         let urls = vec![
             // tests for
             // https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Basic_ASCII_control_codes
@@ -349,7 +349,7 @@ mod tests {
             "safe://application\u{009F}programcommand",
         ];
         for url in urls {
-            match SafeUrlParts::parse(url, false) {
+            match NativeUrlParts::parse(url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with control character {}",
@@ -368,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn test_safeurl_validate_url_chars_with_invalid_characters() -> Result<()> {
+    fn test_native_url_validate_url_chars_with_invalid_characters() -> Result<()> {
         let urls = vec![
             // values from
             // INVALID_NRS_CHARS const
@@ -404,7 +404,7 @@ mod tests {
             "safe://nominal\u{206F}digitshapes",
         ];
         for url in urls {
-            match SafeUrlParts::parse(url, false) {
+            match NativeUrlParts::parse(url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with invalid character {}",
