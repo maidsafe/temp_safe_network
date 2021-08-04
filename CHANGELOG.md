@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.23.0](https://github.com/maidsafe/safe_network/compare/v0.22.2...v0.23.0) (2021-08-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chunks:** Renames DataQuery::Blob to DataQuery::Chunk.
+
+### Bug Fixes
+
+* **chunks:** add authorisation of read ops ([8560dcd](https://github.com/maidsafe/safe_network/commit/8560dcd72e2e75695a2ee58bb0831a4785da6620))
+
 ### [0.22.2](https://github.com/maidsafe/safe_network/compare/v0.22.1...v0.22.2) (2021-08-04)
 
 ### [0.22.1](https://github.com/maidsafe/safe_network/compare/v0.22.0...v0.22.1) (2021-08-04)
