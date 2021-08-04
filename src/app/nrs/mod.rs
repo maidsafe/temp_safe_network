@@ -97,7 +97,9 @@ impl Safe {
         debug!("The new NRS Map: {:?}", nrs_map);
 
         if dry_run {
-            return Ok((version, xorurl, processed_entries, nrs_map));
+            return Err(Error::NotImplementedError(
+                "No dry run for nrs_map_container_add (missing version info)".to_string(),
+            ));
         }
 
         let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
@@ -200,7 +202,9 @@ impl Safe {
         );
 
         if dry_run {
-            return Ok((version, xorurl, processed_entries, nrs_map));
+            return Err(Error::NotImplementedError(
+                "No dry run for nrs_map_container_remove (missing version info)".to_string(),
+            ));
         }
 
         debug!("Removing from multimap");
