@@ -33,9 +33,6 @@ pub(super) trait NetworkUtils {
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
     fn get(&self, prefix: &Prefix) -> Option<&SectionAuthorityProvider>;
 
-    /// Returns all elders from all known sections.
-    fn elders(&'_ self) -> Box<dyn Iterator<Item = Peer> + '_>;
-
     /// Returns a `Peer` of an elder from a known section.
     fn get_elder(&self, name: &XorName) -> Option<Peer>;
 
@@ -59,18 +56,12 @@ pub(super) trait NetworkUtils {
     /// Returns the latest known key for the prefix that matches `name`.
     fn key_by_name(&self, name: &XorName) -> Result<bls::PublicKey>;
 
-    /// Returns the latest known key for a section with `prefix`.
-    /// If this returns `None` that means the latest known key is the genesis key.
-    fn key_by_prefix(&self, prefix: &Prefix) -> Option<bls::PublicKey>;
-
     /// Returns the section_auth and the latest known key for the prefix that matches `name`,
     /// excluding self section.
     fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider>;
 
     /// Returns network statistics.
     fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats;
-
-    fn network_elder_counts(&self, our: &SectionAuthorityProvider) -> (u64, u64, bool);
 }
 
 impl NetworkUtils for Network {
@@ -97,11 +88,6 @@ impl NetworkUtils for Network {
         self.sections
             .get(prefix)
             .map(|section_auth| &section_auth.value)
-    }
-
-    /// Returns all elders from all known sections.
-    fn elders(&'_ self) -> Box<dyn Iterator<Item = Peer> + '_> {
-        Box::new(self.all().flat_map(|info| info.peers()))
     }
 
     /// Returns a `Peer` of an elder from a known section.
@@ -241,14 +227,6 @@ impl NetworkUtils for Network {
             .map(|section_auth| section_auth.value.section_key())
     }
 
-    /// Returns the latest known key for a section with `prefix`.
-    /// If this returns `None` that means the latest known key is the genesis key.
-    fn key_by_prefix(&self, prefix: &Prefix) -> Option<bls::PublicKey> {
-        self.sections
-            .get_equal_or_ancestor(prefix)
-            .map(|section_auth| section_auth.value.section_key())
-    }
-
     /// Returns the section_auth and the latest known key for the prefix that matches `name`,
     /// excluding self section.
     fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
@@ -260,27 +238,14 @@ impl NetworkUtils for Network {
 
     /// Returns network statistics.
     fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
-        let (known_elders, total_elders, total_elders_exact) = self.network_elder_counts(our);
-
-        NetworkStats {
-            known_elders,
-            total_elders,
-            total_elders_exact,
-        }
-    }
-
-    // Compute an estimate of the total number of elders in the network from the size of our
-    // routing table.
-    //
-    // Return (known, total, exact), where `exact` indicates whether `total` is an exact number of
-    // an estimate.
-    fn network_elder_counts(&self, our: &SectionAuthorityProvider) -> (u64, u64, bool) {
+        // Let's compute an estimate of the total number of elders in the network
+        // from the size of our routing table.
         let known_prefixes = iter::once(&our.prefix).chain(
             self.sections
                 .iter()
                 .map(|section_auth| &section_auth.value.prefix),
         );
-        let is_exact = Prefix::default().is_covered_by(known_prefixes.clone());
+        let total_elders_exact = Prefix::default().is_covered_by(known_prefixes.clone());
 
         // Estimated fraction of the network that we have in our RT.
         // Computed as the sum of 1 / 2^(prefix.bit_count) for all known section prefixes.
@@ -288,10 +253,21 @@ impl NetworkUtils for Network {
             .map(|p| 1.0 / (p.bit_count() as f64).exp2())
             .sum();
 
-        let known = our.elder_count() + self.elders().count();
+        let network_elders_count: usize = self
+            .sections
+            .iter()
+            .map(|info| info.value.elder_count())
+            .sum();
+        let known = our.elder_count() + network_elders_count;
         let total = known as f64 / network_fraction;
 
-        (known as u64, total.ceil() as u64, is_exact)
+        // `total_elders_exact` indicates whether `total_elders` is
+        // an exact number or an estimate.
+        NetworkStats {
+            known_elders: known as u64,
+            total_elders: total.ceil() as u64,
+            total_elders_exact,
+        }
     }
 }
 

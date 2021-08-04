@@ -70,23 +70,6 @@ where
         self.0.get(prefix).map(|entry| &entry.0)
     }
 
-    /// Get the entry at `prefix` or any of its ancestors. In case of multiple matches, returns the
-    /// one with the longest prefix.
-    pub fn get_equal_or_ancestor(&self, prefix: &Prefix) -> Option<&T> {
-        let mut prefix = *prefix;
-        loop {
-            if let Some(entry) = self.get(&prefix) {
-                return Some(entry);
-            }
-
-            if prefix.is_empty() {
-                return None;
-            }
-
-            prefix = prefix.popped();
-        }
-    }
-
     /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
     /// one with the longest prefix.
     pub fn get_matching(&self, name: &XorName) -> Option<&T> {
@@ -319,36 +302,6 @@ mod tests {
         assert_eq!(map.insert((prefix("0"), 2)), Some((prefix("0"), 2)));
         assert_eq!(map.get(&prefix("0")), None);
         assert_eq!(map.get(&prefix("00")), Some(&(prefix("00"), 1)));
-    }
-
-    #[test]
-    fn get_equal_or_ancestor() {
-        let mut map = PrefixMap::new();
-        let _ = map.insert((prefix("0"), 0));
-        let _ = map.insert((prefix("10"), 1));
-
-        assert_eq!(
-            map.get_equal_or_ancestor(&prefix("0")),
-            Some(&(prefix("0"), 0))
-        );
-        assert_eq!(
-            map.get_equal_or_ancestor(&prefix("00")),
-            Some(&(prefix("0"), 0))
-        );
-        assert_eq!(
-            map.get_equal_or_ancestor(&prefix("01")),
-            Some(&(prefix("0"), 0))
-        );
-
-        assert_eq!(map.get_equal_or_ancestor(&prefix("1")), None);
-        assert_eq!(
-            map.get_equal_or_ancestor(&prefix("10")),
-            Some(&(prefix("10"), 1))
-        );
-        assert_eq!(
-            map.get_equal_or_ancestor(&prefix("100")),
-            Some(&(prefix("10"), 1))
-        );
     }
 
     #[test]
