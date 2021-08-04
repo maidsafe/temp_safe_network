@@ -21,7 +21,9 @@ use crate::routing::{
     error::Error,
     network::NetworkUtils,
     peer::PeerUtils,
-    section::{SectionPeersUtils, SectionUtils},
+    section::{
+        section_authority_provider::SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils,
+    },
 };
 use xor_name::XorName;
 
@@ -84,9 +86,10 @@ impl RelocateDetailsUtils for RelocateDetails {
         dst: XorName,
         age: u8,
     ) -> RelocateDetails {
-        let dst_key = network
-            .key_by_name(&dst)
-            .unwrap_or_else(|_| *section.chain().root_key());
+        let dst_key = network.section_by_name(&dst).map_or_else(
+            |_| *section.chain().root_key(),
+            |section_auth| section_auth.section_key(),
+        );
 
         RelocateDetails {
             pub_id: *peer.name(),
