@@ -23,6 +23,10 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     #[error("Failed signature check.")]
     FailedSignature,
+    #[error("Section authority provider cannot be trusted: {0}")]
+    UntrustedSectionAuthProvider(String),
+    #[error("Proof chain cannot be trusted: {0}")]
+    UntrustedProofChain(String),
     #[error("Cannot route.")]
     CannotRoute,
     #[error("Empty recipient list")]

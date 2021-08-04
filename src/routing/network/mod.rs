@@ -47,7 +47,7 @@ pub(super) trait NetworkUtils {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
         our_section_chain: &SecuredLinkedList,
-    ) -> bool;
+    ) -> Result<bool>;
 
     /// Returns the known section keys.
     fn keys(&self) -> Box<dyn Iterator<Item = (Prefix, bls::PublicKey)> + '_>;
@@ -128,24 +128,22 @@ impl NetworkUtils for Network {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
         our_section_chain: &SecuredLinkedList,
-    ) -> bool {
+    ) -> Result<bool> {
         // Check if SAP signature is valid
         if !signed_section_auth.self_verify() {
-            warn!(
-                "Anti-Entropy: Failed to update remote section knowledge, SAP signature invalid: {:?}",
+            return Err(Error::UntrustedSectionAuthProvider(format!(
+                "invalid signature: {:?}",
                 signed_section_auth.value
-            );
-            return false;
+            )));
         }
 
         // Make sure the proof chain can be trusted,
         // i.e. check each key is signed by its parent/predecesor key.
         if !proof_chain.self_verify() {
-            warn!(
-                "Anti-Entropy: Failed to update remote section knowledge, proof chain contains invalid signatures: {:?}",
+            return Err(Error::UntrustedProofChain(format!(
+                "invalid signature: {:?}",
                 proof_chain
-            );
-            return false;
+            )));
         }
 
         /*
@@ -156,11 +154,11 @@ impl NetworkUtils for Network {
         // We are keeping this verification disabled for the moment until Anti-Entropy
         // is fully implemented, aty which point this verification shall be re-enabled.
         if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
-            warn!(
-                "Anti-Entropy: Failed to update remote section knowledge, SAP's key ({:?}) doesn't match proof chain last key ({:?})",
-                 signed_section_auth.value.public_key_set.public_key(), proof_chain.last_key()
-            );
-            return false;
+            return Err(Error::UntrustedSectionAuthProvider(format!(
+                "SAP's key ({:?}) doesn't match proof chain last key ({:?})",
+                signed_section_auth.value.public_key_set.public_key(),
+                proof_chain.last_key()
+            )));
         }
         */
 
@@ -177,28 +175,26 @@ impl NetworkUtils for Network {
                     "Anti-Entropy: Skip update remote section knowledge, SAP received is the same as the one we already are aware of: {:?}",
                     signed_section_auth.value
                 );
-                return false;
+                return Ok(false);
             }
             Some((_, sap)) => {
                 // We are then aware of the prefix, let's just verify the new SAP can
                 // be trusted based on the SAP we aware of and the proof chain provided.
                 if !proof_chain.has_key(&sap.value.public_key_set.public_key()) {
-                    warn!(
-                        "Anti-Entropy: Failed to update remote section knowledge, proof chain cannot be trusted based on currently known SAP: {:?}",
+                    return Err(Error::UntrustedProofChain(format!(
+                        "none of the keys match the SAP's key we currently know: {:?}",
                         signed_section_auth.value
-                    );
-                    return false;
+                    )));
                 }
             }
             None => {
                 // We are not aware of the prefix, let's then verify it can be
                 // trusted based on our own section chain and the provided proof chain.
                 if !proof_chain.check_trust(our_section_chain.keys()) {
-                    warn!(
-                        "Anti-Entropy: Failed to update remote section knowledge, cannot trust proof chain received for SAP based on our section chain: {:?}",
+                    return Err(Error::UntrustedProofChain(format!(
+                        "none of the keys were found on our section chain: {:?}",
                         signed_section_auth.value
-                    );
-                    return false;
+                    )));
                 }
             }
         }
@@ -212,7 +208,7 @@ impl NetworkUtils for Network {
             prefix
         );
 
-        true
+        Ok(true)
     }
 
     /// Returns the known section keys.

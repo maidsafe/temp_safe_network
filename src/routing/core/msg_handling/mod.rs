@@ -213,7 +213,6 @@ impl Core {
                     section_signed,
                     bounced_msg,
                     sender,
-                    src_name,
                 )
                 .await
             }
