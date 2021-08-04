@@ -13,7 +13,6 @@ use crate::messaging::{
 };
 use crate::node::{network::Network, node_ops::NodeDuty, Error, Result};
 use crate::routing::Prefix;
-use crate::types::PublicKey;
 use tracing::info;
 
 /// The various data type stores,
@@ -37,11 +36,11 @@ impl ElderStores {
         &self,
         query: DataQuery,
         msg_id: MessageId,
-        _requester_pk: PublicKey,
+        auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         match &query {
-            DataQuery::Blob(read) => self.chunk_records.read(read, msg_id, origin).await,
+            DataQuery::Chunk(read) => self.chunk_records.read(read, msg_id, auth, origin).await,
             DataQuery::Register(_read) => {
                 // This has been moved to routing/core/msg_handling
                 unimplemented!("Not reading Register in node duty flow anymore")
@@ -59,7 +58,7 @@ impl ElderStores {
         info!("Writing Data");
         match cmd {
             DataCmd::Chunk(write) => {
-                info!("Writing Blob");
+                info!("Writing Chunk");
                 self.chunk_records.write(write, msg_id, auth, origin).await
             }
             DataCmd::Register(_write) => {

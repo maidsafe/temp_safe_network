@@ -71,6 +71,8 @@ pub enum NodeQuery {
     Chunks {
         /// The actual query message
         query: ChunkRead,
+        /// Client signature
+        auth: ServiceAuth,
         /// The user that has initiated this query
         origin: EndUser,
     },

@@ -335,11 +335,6 @@ impl Routing {
             .collect()
     }
 
-    /// Returns the last known public key of the section with `prefix`.
-    pub async fn section_key(&self, prefix: &Prefix) -> Option<bls::PublicKey> {
-        self.dispatcher.core.read().await.section_key(prefix)
-    }
-
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         let core = self.dispatcher.core.read().await;

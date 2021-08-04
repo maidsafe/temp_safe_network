@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.23.1](https://github.com/maidsafe/safe_network/compare/v0.23.0...v0.23.1) (2021-08-04)
+
+## [0.23.0](https://github.com/maidsafe/safe_network/compare/v0.22.2...v0.23.0) (2021-08-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chunks:** Renames DataQuery::Blob to DataQuery::Chunk.
+
+### Bug Fixes
+
+* **chunks:** add authorisation of read ops ([8560dcd](https://github.com/maidsafe/safe_network/commit/8560dcd72e2e75695a2ee58bb0831a4785da6620))
+
+### [0.22.2](https://github.com/maidsafe/safe_network/compare/v0.22.1...v0.22.2) (2021-08-04)
+
+### [0.22.1](https://github.com/maidsafe/safe_network/compare/v0.22.0...v0.22.1) (2021-08-04)
+
+
+### Bug Fixes
+
+* **client:** send cmd to 3 random Elders ([453aa7c](https://github.com/maidsafe/safe_network/commit/453aa7c4aa67321009ec67dfe606f7f0117b131f))
+
+## [0.22.0](https://github.com/maidsafe/safe_network/compare/v0.21.2...v0.22.0) (2021-08-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* Renames the public types
+
+* rename SafeUrl to NativeUrl ([9786c7b](https://github.com/maidsafe/safe_network/commit/9786c7bb0708383c95003b39dc05ac024086469d))
+
+### [0.21.2](https://github.com/maidsafe/safe_network/compare/v0.21.1...v0.21.2) (2021-08-04)
+
+
+### Bug Fixes
+
+* **tests:** make overwrite_value test pass ([fffdfdf](https://github.com/maidsafe/safe_network/commit/fffdfdf5aad3a8e0e97ae6b3f4679c1df5b7b9c5))
+
 ### [0.21.1](https://github.com/maidsafe/safe_network/compare/v0.21.0...v0.21.1) (2021-08-04)
 
 

@@ -121,7 +121,7 @@ impl Client {
         }
 
         let res = self
-            .send_query(DataQuery::Blob(ChunkRead::Get(head_address)))
+            .send_query(DataQuery::Chunk(ChunkRead::Get(head_address)))
             .await?;
 
         let msg_id = res.msg_id;

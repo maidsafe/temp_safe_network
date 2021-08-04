@@ -25,7 +25,7 @@ use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
-use xor_name::{Prefix, XorName};
+use xor_name::XorName;
 
 impl Core {
     // Creates `Core` for the first node in the network
@@ -122,24 +122,6 @@ impl Core {
             .key_share()?
             .public_key_set
             .clone())
-    }
-
-    /// Returns the latest known public key of the section with `prefix`.
-    pub(crate) fn section_key(&self, prefix: &Prefix) -> Option<bls::PublicKey> {
-        if prefix == self.section.prefix() || prefix.is_extension_of(self.section.prefix()) {
-            Some(*self.section.chain().last_key())
-        } else {
-            self.network.key_by_prefix(prefix).or_else(|| {
-                if self.is_elder() {
-                    // We are elder - the first key is the genesis key
-                    Some(*self.section.chain().root_key())
-                } else {
-                    // We are not elder - the chain might be truncated so the first key is not
-                    // necessarily the genesis key.
-                    None
-                }
-            })
-        }
     }
 
     /// Returns the info about the section matching the name.

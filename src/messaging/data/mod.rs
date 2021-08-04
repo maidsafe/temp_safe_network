@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn generate_service_error() {
-        let msg = ServiceMsg::Query(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
+        let msg = ServiceMsg::Query(DataQuery::Chunk(ChunkRead::Get(ChunkAddress::Private(
             XorName::random(),
         ))));
         let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
@@ -250,7 +250,7 @@ mod tests {
             source_message: Some(Box::new(msg)),
         };
 
-        assert!(format!("{:?}", lazy_error).contains("Blob(Get(Private"));
+        assert!(format!("{:?}", lazy_error).contains("Chunk(Get(Private"));
         assert!(format!("{:?}", lazy_error).contains("ServiceError"));
         assert!(format!("{:?}", lazy_error).contains(&format!("DataNotFound({:?})", random_addr)));
     }
@@ -261,12 +261,12 @@ mod tests {
         let random_addr = DataAddress::Chunk(chunk_addr);
         let errored_response = ServiceError {
             reason: Some(Error::DataNotFound(random_addr.clone())),
-            source_message: Some(Box::new(ServiceMsg::Query(DataQuery::Blob(
+            source_message: Some(Box::new(ServiceMsg::Query(DataQuery::Chunk(
                 ChunkRead::Get(chunk_addr),
             )))),
         };
 
-        assert!(format!("{:?}", errored_response).contains("Blob(Get(Public"));
+        assert!(format!("{:?}", errored_response).contains("Chunk(Get(Public"));
         assert!(format!("{:?}", errored_response).contains("ServiceError"));
         assert!(
             format!("{:?}", errored_response).contains(&format!("DataNotFound({:?})", random_addr))

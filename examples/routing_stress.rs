@@ -428,10 +428,12 @@ impl Network {
                 .entry(prefix)
                 .or_insert_with(|| prefix.substituted_in(rand::random()));
 
-            let nodes_section_pk = node
-                .section_key(prefix)
+            let nodes_section = node
+                .matching_section(&node.name().await)
                 .await
-                .ok_or_else(|| anyhow!("No pk found for our node's section"))?;
+                .map_err(|_| anyhow!("No pk found for our node's section"))?;
+
+            let nodes_section_pk = nodes_section.public_key_set.public_key();
             if self.try_send_probe(node, dst).await? {
                 self.probe_tracker
                     .send(*prefix, dst, nodes_section_pk)
