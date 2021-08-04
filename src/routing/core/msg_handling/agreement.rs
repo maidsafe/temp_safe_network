@@ -15,7 +15,6 @@ use crate::messaging::{
 use crate::routing::{
     dkg::SectionAuthUtils,
     error::Result,
-    network::NetworkUtils,
     peer::PeerUtils,
     routing_api::command::Command,
     section::{ElderCandidatesUtils, SectionPeersUtils, SectionUtils},
@@ -162,18 +161,16 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
         let equal_or_extension = section_auth.prefix() == *self.section.prefix()
             || section_auth.prefix().is_extension_of(self.section.prefix());
-        let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
 
         if equal_or_extension {
-            // Our section of sub-section
-
+            // Our section or sub-section
+            let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let infos = self.section.promote_and_demote_elders(&self.node.name());
             if !infos.contains(&signed_section_auth.value.elder_candidates()) {
                 // SectionInfo out of date, ignore.
-                return Ok(commands);
+                return Ok(vec![]);
             }
 
             // Send a `Sync` message to all the to-be-promoted members so they have the full
@@ -184,6 +181,8 @@ impl Core {
                 .filter(|peer| !self.section.is_elder(peer.name()))
                 .map(|peer| (*peer.name(), *peer.addr()))
                 .collect();
+
+            let mut commands = vec![];
             if !sync_recipients.is_empty() {
                 let node_msg = NodeMsg::Sync {
                     section: self.section.clone(),
@@ -202,18 +201,14 @@ impl Core {
                 &our_elders_recipients,
                 Proposal::OurElders(signed_section_auth),
             )?);
-        } else {
-            // Other section
-            // FIXME: we shouln't be receiving or updating a SAP for
-            // a remote section here, that would be done with a AE msg response ???.
-            let _ = self.network.update_remote_section_sap(
-                signed_section_auth,
-                self.section.chain(),
-                self.section.chain(),
-            );
-        }
 
-        Ok(commands)
+            Ok(commands)
+        } else {
+            // Other section. We shouln't be receiving or updating a SAP for
+            // a remote section here, that is done with a AE msg response.
+            debug!("Ignoring Proposal::SectionInfo since prefix doesn't match ours.");
+            Ok(vec![])
+        }
     }
 
     async fn handle_our_elders_agreement(
@@ -234,13 +229,9 @@ impl Core {
             if section_auth.value.prefix.matches(&self.node.name()) {
                 let _ = self.section.update_elders(section_auth, key_sig);
             } else {
-                // FIXME: we shouln't be receiving or updating a SAP for
-                // a remote section here, that should be done with a AE msg response.
-                let _ = self.network.update_remote_section_sap(
-                    section_auth,
-                    self.section.chain(),
-                    self.section.chain(),
-                );
+                // We shouln't be receiving or updating a SAP for
+                // a remote section here, that's done with a AE msg response.
+                debug!("Ignoring Proposal::OurElders since prefix doesn't match ours.");
             }
         }
 

@@ -146,13 +146,7 @@ impl NetworkUtils for Network {
             )));
         }
 
-        /*
         // Check the SAP's key is the last key of the proof chain
-        //
-        // FIXME: this verification currently breaks DKG flow, specifically when we receive
-        // a Proposal::OurElders we rely on updating the SAP of a remote section.
-        // We are keeping this verification disabled for the moment until Anti-Entropy
-        // is fully implemented, aty which point this verification shall be re-enabled.
         if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "SAP's key ({:?}) doesn't match proof chain last key ({:?})",
@@ -160,7 +154,6 @@ impl NetworkUtils for Network {
                 proof_chain.last_key()
             )));
         }
-        */
 
         // We currently don't keep the complete chain of remote sections,
         // **but** the SAPs of remote sections we keep were already verified by us
