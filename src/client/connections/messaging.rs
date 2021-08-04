@@ -18,6 +18,8 @@ use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
+use rand::prelude::SliceRandom;
+use rand::rngs::OsRng;
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tokio::{sync::mpsc::channel, task::JoinHandle, time::timeout};
 use tracing::{debug, error, info, trace, warn};
@@ -114,16 +116,23 @@ impl Session {
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
+        targets: usize,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint()?.clone();
 
-        let elders = self
+        let mut elders = self
             .connected_elders
             .read()
             .await
             .keys()
             .cloned()
             .collect::<Vec<SocketAddr>>();
+
+        if targets < elders.len() {
+            elders.shuffle(&mut OsRng);
+        }
+
+        elders = elders.into_iter().take(targets).collect();
 
         let msg_id = MessageId::new();
         debug!(
