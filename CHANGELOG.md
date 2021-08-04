@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.22.0](https://github.com/maidsafe/safe_network/compare/v0.21.2...v0.22.0) (2021-08-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* Renames the public types
+
+* rename SafeUrl to NativeUrl ([9786c7b](https://github.com/maidsafe/safe_network/commit/9786c7bb0708383c95003b39dc05ac024086469d))
+
 ### [0.21.2](https://github.com/maidsafe/safe_network/compare/v0.21.1...v0.21.2) (2021-08-04)
 
 
