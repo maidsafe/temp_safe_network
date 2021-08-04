@@ -23,7 +23,7 @@ pub enum DataQuery {
     /// [`Chunk`] read operation.
     ///
     /// [`Chunk`]: crate::types::Chunk
-    Blob(ChunkRead),
+    Chunk(ChunkRead),
     /// [`Register`] read operation.
     ///
     /// [`Register`]: crate::types::register::Register
@@ -36,7 +36,7 @@ impl DataQuery {
     pub fn error(&self, error: Error) -> QueryResponse {
         use DataQuery::*;
         match self {
-            Blob(q) => q.error(error),
+            Chunk(q) => q.error(error),
             Register(q) => q.error(error),
         }
     }
@@ -45,7 +45,7 @@ impl DataQuery {
     pub fn dst_address(&self) -> XorName {
         use DataQuery::*;
         match self {
-            Blob(q) => q.dst_address(),
+            Chunk(q) => q.dst_address(),
             Register(q) => q.dst_address(),
         }
     }

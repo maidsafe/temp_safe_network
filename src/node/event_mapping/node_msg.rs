@@ -8,7 +8,7 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    data::{DataCmd, QueryResponse, ServiceMsg},
+    data::{DataCmd, DataQuery, QueryResponse, ServiceMsg},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeQueryResponse},
     AuthorityProof, DstLocation, MessageId, ServiceAuth, SrcLocation, WireMsg,
 };
@@ -101,10 +101,21 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
         },
         //
         // ------ Adult ------
-        MessageReceived::NodeQuery(NodeQuery::Chunks { query, .. }) => NodeDuty::ReadChunk {
-            read: query,
-            msg_id,
-        },
+        MessageReceived::NodeQuery(NodeQuery::Chunks { query, auth, .. }) => {
+            match verify_authority(
+                msg_id,
+                origin,
+                auth,
+                ServiceMsg::Query(DataQuery::Chunk(query.clone())),
+            ) {
+                Ok(auth) => NodeDuty::ReadChunk {
+                    msg_id,
+                    read: query,
+                    auth,
+                },
+                Err(duty) => duty,
+            }
+        }
         MessageReceived::NodeCmd(NodeCmd::Chunks { cmd, auth, .. }) => {
             match verify_authority(
                 msg_id,

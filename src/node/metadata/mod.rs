@@ -58,10 +58,10 @@ impl Metadata {
         &self,
         query: DataQuery,
         id: MessageId,
-        requester: PublicKey,
+        auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        match self.elder_stores.read(query, id, requester, origin).await {
+        match self.elder_stores.read(query, id, auth, origin).await {
             Err(Error::NoSuchData(_)) => Ok(NodeDuty::NoOp),
             res => res,
         }
