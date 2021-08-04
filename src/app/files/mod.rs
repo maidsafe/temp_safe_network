@@ -105,7 +105,7 @@ impl Safe {
                 false,
             )?;
 
-            let entry_hash = &self
+            let _ = &self
                 .write_to_register(
                     &xor_url,
                     files_map_xorurl.as_bytes().to_vec(),
@@ -113,9 +113,7 @@ impl Safe {
                 )
                 .await?;
 
-            let mut versionned_url = SafeUrl::from_xorurl(&xor_url)?;
-            versionned_url.set_content_version(Some(entry_hash.into()));
-            versionned_url.to_string()
+            xor_url
         };
 
         Ok((xorurl, processed_files, files_map))
