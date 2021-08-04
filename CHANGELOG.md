@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.22.1](https://github.com/maidsafe/safe_network/compare/v0.22.0...v0.22.1) (2021-08-04)
+
+
+### Bug Fixes
+
+* **client:** send cmd to 3 random Elders ([453aa7c](https://github.com/maidsafe/safe_network/commit/453aa7c4aa67321009ec67dfe606f7f0117b131f))
+
 ## [0.22.0](https://github.com/maidsafe/safe_network/compare/v0.21.2...v0.22.0) (2021-08-04)
 
 
