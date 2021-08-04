@@ -139,7 +139,7 @@ impl ChunkRecords {
                 origin,
             }),
             targets: target_holders,
-            aggregation: true,
+            aggregation: false,
         })
     }
 
@@ -260,7 +260,7 @@ impl ChunkRecords {
                 origin,
             }),
             targets,
-            aggregation: true,
+            aggregation: false,
         })
     }
 

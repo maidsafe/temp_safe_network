@@ -26,6 +26,7 @@ impl Client {
         client_pk: PublicKey,
         serialised_cmd: Bytes,
         signature: Signature,
+        targets: usize,
     ) -> Result<(), Error> {
         let auth = ServiceAuth {
             public_key: client_pk,
@@ -33,7 +34,7 @@ impl Client {
         };
 
         self.session
-            .send_cmd(dst_address, auth, serialised_cmd)
+            .send_cmd(dst_address, auth, serialised_cmd, targets)
             .await
     }
 
@@ -42,13 +43,26 @@ impl Client {
     pub(crate) async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
         let client_pk = self.public_key();
         let dst_address = cmd.dst_address();
+
+        // (should be a global constant in the codebase,
+        // derived from also global const Elder count,
+        // and the max num faulty assumption - also as a const).
+        // Explanation:
+        // max num faulty = < 1/3
+        // So it's no more than 2 with 7 Elders.
+        // With 3 we are "guaranteed" 1 correctly functioning Elder.
+        let targets = match &cmd {
+            DataCmd::Chunk(_) => 3, // stored at Adults, so only 1 correctly functioning Elder need to relay
+            DataCmd::Register(_) => 7, // only stored at Elders, all need a copy
+        };
+
         let serialised_cmd = {
             let msg = ServiceMsg::Cmd(cmd);
             WireMsg::serialize_msg_payload(&msg)?
         };
         let signature = self.keypair.sign(&serialised_cmd);
 
-        self.send_signed_command(dst_address, client_pk, serialised_cmd, signature)
+        self.send_signed_command(dst_address, client_pk, serialised_cmd, signature, targets)
             .await
     }
 }

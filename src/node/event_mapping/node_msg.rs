@@ -58,7 +58,7 @@ pub(super) fn map_node_msg(
                         correlation_id: msg_id,
                     }),
                     dst: src.to_dst(),
-                    aggregation: true,
+                    aggregation: false,
                 }),
                 ctx: Some(MsgContext::Node { msg, src }),
             }
