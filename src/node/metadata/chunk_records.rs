@@ -287,10 +287,11 @@ impl ChunkRecords {
         &self,
         read: &ChunkRead,
         msg_id: MessageId,
+        auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         match read {
-            ChunkRead::Get(address) => self.get(*address, msg_id, origin).await,
+            ChunkRead::Get(address) => self.get(*address, msg_id, auth, origin).await,
         }
     }
 
@@ -298,6 +299,7 @@ impl ChunkRecords {
         &self,
         address: ChunkAddress,
         msg_id: MessageId,
+        auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.capacity.get_chunk_holder_adults(address.name()).await;
@@ -321,6 +323,7 @@ impl ChunkRecords {
         {
             let msg = NodeMsg::NodeQuery(NodeQuery::Chunks {
                 query: ChunkRead::Get(address),
+                auth: auth.into_inner(),
                 origin,
             });
 

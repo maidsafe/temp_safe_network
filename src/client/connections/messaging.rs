@@ -209,7 +209,7 @@ impl Session {
         let endpoint = self.endpoint()?.clone();
         let pending_queries = self.pending_queries.clone();
 
-        let chunk_addr = if let DataQuery::Blob(ChunkRead::Get(address)) = query {
+        let chunk_addr = if let DataQuery::Chunk(ChunkRead::Get(address)) = query {
             Some(address)
         } else {
             None

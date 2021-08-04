@@ -409,9 +409,9 @@ mod tests {
 
         let msg_id = MessageId::new();
 
-        let client_msg = ServiceMsg::Query(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
-            XorName::random(),
-        ))));
+        let client_msg = ServiceMsg::Query(DataQuery::Chunk(ChunkRead::Get(
+            ChunkAddress::Private(XorName::random()),
+        )));
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
         let auth = ServiceAuth {

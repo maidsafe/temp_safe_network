@@ -190,11 +190,16 @@ impl Node {
             }
             //
             // -------- Immutable chunks --------
-            NodeDuty::ReadChunk { read, msg_id } => {
+            NodeDuty::ReadChunk { msg_id, read, auth } => {
                 let adult = self.as_adult().await?;
                 let our_section_pk = self.network_api.our_section_public_key().await;
                 let handle = tokio::spawn(async move {
-                    let mut ops = vec![adult.chunks.read(&read, msg_id, our_section_pk).await];
+                    let mut ops = vec![
+                        adult
+                            .chunks
+                            .read(&read, msg_id, auth.public_key, our_section_pk)
+                            .await,
+                    ];
                     ops.extend(adult.chunks.check_storage().await?);
                     Ok(NodeTask::from(ops))
                 });
@@ -303,7 +308,7 @@ impl Node {
                             .meta_data
                             .write()
                             .await
-                            .read(query, msg_id, auth.public_key, origin)
+                            .read(query, msg_id, auth, origin)
                             .await?,
                     ];
                     Ok(NodeTask::from(duties))

@@ -85,13 +85,21 @@ impl ChunkStore {
         &self,
         read: &ChunkRead,
         msg_id: MessageId,
+        requester: PublicKey,
         section_pk: BlsPublicKey,
     ) -> NodeDuty {
         let ChunkRead::Get(address) = read;
-        let result = self
-            .get_chunk(address)
-            .await
-            .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Chunk(*address)));
+        let result = match self.get_chunk(address).await {
+            Ok(Chunk::Private(data)) => {
+                if data.owner() == &requester {
+                    Ok(Chunk::Private(data))
+                } else {
+                    Err(ErrorMessage::InvalidOwners(requester))
+                }
+            }
+            Ok(chunk) => Ok(chunk),
+            error => error.map_err(|_| ErrorMessage::DataNotFound(DataAddress::Chunk(*address))),
+        };
 
         NodeDuty::Send(OutgoingMsg {
             id: MessageId::in_response_to(&msg_id),

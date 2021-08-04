@@ -42,6 +42,7 @@ pub enum NodeDuty {
     ReadChunk {
         msg_id: MessageId,
         read: ChunkRead,
+        auth: AuthorityProof<ServiceAuth>,
     },
     WriteChunk {
         msg_id: MessageId,
