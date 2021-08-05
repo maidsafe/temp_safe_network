@@ -12,11 +12,17 @@ use crate::messaging::{
     DstLocation, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils, error::Result, messages::WireMsgUtils, network::NetworkUtils,
-    routing_api::command::Command, section::SectionUtils, SectionAuthorityProviderUtils,
+    dkg::SectionAuthUtils,
+    error::{Error, Result},
+    messages::WireMsgUtils,
+    network::NetworkUtils,
+    routing_api::command::Command,
+    section::SectionUtils,
+    SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
+use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::{cmp::Ordering, net::SocketAddr};
 use xor_name::XorName;
@@ -33,29 +39,40 @@ impl Core {
     ) -> Result<Vec<Command>> {
         info!("Anti-Entropy: retry message received from peer: {}", sender);
 
-        let dst_section_pk = section_auth.public_key_set.public_key();
-        let section_signed = SectionAuth {
-            value: section_auth,
-            sig: section_signed,
-        };
-
         match self.network.update_remote_section_sap(
-            section_signed,
+            SectionAuth {
+                value: section_auth.clone(),
+                sig: section_signed,
+            },
             &proof_chain,
             self.section.chain(),
         ) {
-            Ok(_) => {
+            Ok(updated) => {
+                if updated {
+                    info!(
+                        "Anti-Entropy: updated remote section SAP updated for {:?}",
+                        section_auth.prefix
+                    );
+                } else {
+                    debug!(
+                        "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                        section_auth.prefix, section_auth
+                    );
+                }
+
                 // Regardless if the SAP already existed, it may have been just updated by
                 // a concurrent handler of another bounced msg, so we still resend this message.
+                //
                 // TODO: we may need to check if 'bounced_msg' dest section pk is different
-                // from the received new SAP pk, to prevent from endlessly resending a msg
+                // from the received new SAP key, to prevent from endlessly resending a msg
                 // if a sybil/corrupt peer keeps sending us the same AE msg.
+                let dst_section_pk = section_auth.public_key_set.public_key();
                 let cmd =
                     self.send_direct_message((src_name, sender), *bounced_msg, dst_section_pk)?;
                 Ok(vec![cmd])
             }
             Err(err) => {
-                warn!("Anti-Entropy: failed to update remote section SAP upon receiving Anti-Entropy bounced msg: {:?}, {}", bounced_msg, err);
+                warn!("Anti-Entropy: failed to update remote section SAP, bounced msg dropped: {:?}, {}", bounced_msg, err);
                 Ok(vec![])
             }
         }
@@ -68,42 +85,50 @@ impl Core {
         bounced_msg: Box<NodeMsg>,
         sender: SocketAddr,
     ) -> Result<Vec<Command>> {
-        info!(
+        debug!(
             "Anti-Entropy: redirect message received from peer: {}",
             sender
         );
 
-        let section_signed = SectionAuth {
-            value: section_auth,
-            sig: section_signed,
+        // We retrieve from our records a SAP we know of and trust, to send the redirect msg,
+        // if we don't have one, we'll then send the msg with the genesis key so we provoke
+        // an AE-Retry msg to be sent back with a proof chain we can verify the SAP with.
+        let (dst_elders, dst_section_pk) = match self
+            .network
+            .section_by_name(&section_auth.prefix.name())
+        {
+            Ok(trusted_sap) => (trusted_sap.elders, trusted_sap.public_key_set.public_key()),
+            Err(_) => {
+                // We verify SAP signature although we cannot trust it
+                // without a proof chain anyways.
+                let section_signed = SectionAuth {
+                    value: section_auth,
+                    sig: section_signed,
+                };
+
+                if section_signed.self_verify() {
+                    (section_signed.value.elders, *self.section.genesis_key())
+                } else {
+                    warn!(
+                        "Anti-Entropy: failed to verify signature of SAP received in a redirect msg, bounced msg dropped: {:?}",
+                        bounced_msg
+                    );
+                    return Ok(vec![]);
+                }
+            }
         };
 
-        // TODO: is there a value in verifying SAP signature since we cannot trust it anyways??
-        if section_signed.self_verify() {
-            // We retrieve a SAP we know and trust from our records to send the redirect msg,
-            // if we don't have one then we'll send the msg with the genesis key so we get
-            // a AE-Retry with a proof chain we can verify the SAP with.
-            let (dst_elders, dst_section_pk) = match self
-                .network
-                .section_by_name(&section_signed.value.prefix.name())
-            {
-                Ok(section_auth) => (
-                    section_auth.elders,
-                    section_auth.public_key_set.public_key(),
-                ),
-                Err(_) => (section_signed.value.elders, *self.section.genesis_key()),
-            };
+        // We send the msg to the Elder closest to the dest section key,
+        // just to pick one of them in a random but deterministic fashion.
+        let name = XorName::from(PublicKey::Bls(dst_section_pk));
+        let chosen_dst_elder = dst_elders
+            .iter()
+            .sorted_by(|lhs, rhs| name.cmp_distance(lhs.0, rhs.0))
+            .next();
 
-            // FIXME: pick the closest Elder instead??
-            if let Some((name, addr)) = dst_elders.iter().next() {
-                let cmd = self.send_direct_message((*name, *addr), *bounced_msg, dst_section_pk)?;
-                return Ok(vec![cmd]);
-            }
-        } else {
-            warn!(
-                "Anti-Entropy: failed to verify SAP signature upon receiving a redirect msg for: {:?}",
-                bounced_msg
-            );
+        if let Some((name, addr)) = chosen_dst_elder {
+            let cmd = self.send_direct_message((*name, *addr), *bounced_msg, dst_section_pk)?;
+            return Ok(vec![cmd]);
         }
 
         Ok(vec![])
@@ -212,8 +237,8 @@ impl Core {
                                 "Anti-Entropy: cannot reply with redirect msg for dest key {:?} to a closest section",
                                 dst_section_pk
                             );
-                        // FIXME: drop the message
-                        return Ok(None);
+
+                        return Err(Error::NoMatchingSection);
                     }
                 }
             }

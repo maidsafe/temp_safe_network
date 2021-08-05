@@ -55,7 +55,7 @@ pub(super) trait NetworkUtils {
     /// Returns the latest known key for the prefix that matches `name`.
     fn key_by_name(&self, name: &XorName) -> Result<bls::PublicKey>;
 
-    /// Returns the section_auth and the latest known key for the prefix that matches `name`,
+    /// Returns the section authority provider for the prefix that matches `name`,
     /// excluding self section.
     fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider>;
 
@@ -75,7 +75,8 @@ impl NetworkUtils for Network {
     fn closest(&self, name: &XorName) -> Option<&SectionAuth<SectionAuthorityProvider>> {
         self.sections
             .iter()
-            .min_by(|lhs, rhs| lhs.value.prefix.cmp_distance(&rhs.value.prefix, name))
+            .min_by(|(lhs_prefix, _), (rhs_prefix, _)| lhs_prefix.cmp_distance(rhs_prefix, name))
+            .map(|(_, sap)| sap)
     }
 
     /// Returns iterator over all known sections.
@@ -164,10 +165,6 @@ impl NetworkUtils for Network {
         match self.sections.get(&prefix) {
             Some((_, sap)) if sap == &signed_section_auth => {
                 // It's the same SAP we are already aware of
-                warn!(
-                    "Anti-Entropy: Skip update remote section knowledge, SAP received is the same as the one we already are aware of: {:?}",
-                    signed_section_auth.value
-                );
                 return Ok(false);
             }
             Some((_, sap)) => {
@@ -196,10 +193,6 @@ impl NetworkUtils for Network {
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
         let _ = self.sections.insert(prefix, signed_section_auth);
-        info!(
-            "Anti-Entropy: Remote section knowledge updated: {:?}",
-            prefix
-        );
 
         Ok(true)
     }
@@ -221,7 +214,7 @@ impl NetworkUtils for Network {
             .map(|(_, section_auth)| section_auth.value.section_key())
     }
 
-    /// Returns the section_auth and the latest known key for the prefix that matches `name`,
+    /// Returns the section authority provider for the prefix that matches `name`,
     /// excluding self section.
     fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.sections
