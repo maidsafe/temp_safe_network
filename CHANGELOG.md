@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.24.0](https://github.com/maidsafe/safe_network/compare/v0.23.2...v0.24.0) (2021-08-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **url:** This changes the structure of the NativeUrl.
+
+* **url:** simplify data type, impl scope ([7324573](https://github.com/maidsafe/safe_network/commit/7324573d72c986103356039968328a4a7698dcec))
+
 ### [0.23.2](https://github.com/maidsafe/safe_network/compare/v0.23.1...v0.23.2) (2021-08-05)
 
 

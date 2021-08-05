@@ -9,7 +9,7 @@
 use anyhow::{Context, Result};
 use safe_network::{
     client::{utils::test_utils::read_network_conn_info, Client, Config},
-    url::{ContentType, NativeUrl, DEFAULT_XORURL_BASE},
+    url::{ContentType, NativeUrl, Scope, DEFAULT_XORURL_BASE},
 };
 use std::{
     io::{stdout, Write},
@@ -36,7 +36,12 @@ async fn main() -> Result<()> {
     println!("Storing data on Blob: {}", raw_data);
 
     let address = client.store_public_blob(raw_data.as_bytes()).await?;
-    let xorurl = NativeUrl::encode_blob(*address.name(), ContentType::Raw, DEFAULT_XORURL_BASE)?;
+    let xorurl = NativeUrl::encode_blob(
+        *address.name(),
+        Scope::Public,
+        ContentType::Raw,
+        DEFAULT_XORURL_BASE,
+    )?;
     println!("Blob stored at xorurl: {}", xorurl);
 
     let delay = 10;

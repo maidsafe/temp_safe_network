@@ -34,7 +34,7 @@ const SAFE_URL_PROTOCOL: &str = "safe://";
 const SAFE_URL_SCHEME: &str = "safe";
 const XOR_URL_VERSION_1: u64 = 0x1; // TODO: consider using 16 bits
 const XOR_URL_STR_MAX_LENGTH: usize = 44;
-const XOR_NAME_BYTES_OFFSET: usize = 4; // offset where to find the XoR name bytes
+const XOR_NAME_BYTES_OFFSET: usize = 5; // offset where to find the XoR name bytes
 const URL_VERSION_QUERY_NAME: &str = "v";
 
 /// The XOR-URL type
@@ -155,13 +155,9 @@ pub enum DataType {
     #[allow(missing_docs)]
     SafeKey = 0x00,
     #[allow(missing_docs)]
-    PublicBlob = 0x01,
+    Blob = 0x01,
     #[allow(missing_docs)]
-    PrivateBlob = 0x02,
-    #[allow(missing_docs)]
-    PublicRegister = 0x03,
-    #[allow(missing_docs)]
-    PrivateRegister = 0x04,
+    Register = 0x02,
 }
 
 impl std::fmt::Display for DataType {
@@ -170,18 +166,13 @@ impl std::fmt::Display for DataType {
     }
 }
 
-impl DataType {
+/// We also encode the data scope - i.e. accessibility on the SAFE Network.
+#[derive(Debug, Copy, Clone, PartialEq, Deserialize, Serialize)]
+pub enum Scope {
     #[allow(missing_docs)]
-    pub fn from_u64(value: u64) -> Result<Self> {
-        match value {
-            0 => Ok(Self::SafeKey),
-            1 => Ok(Self::PublicBlob),
-            2 => Ok(Self::PrivateBlob),
-            3 => Ok(Self::PublicRegister),
-            4 => Ok(Self::PrivateRegister),
-            _ => Err(Error::InvalidInput("Invalid DataType code".to_string())),
-        }
-    }
+    Public = 0x00,
+    #[allow(missing_docs)]
+    Private = 0x01,
 }
 
 /// An enumeration of possible NativeUrl types.
@@ -244,6 +235,7 @@ pub struct NativeUrl {
     sub_names: String,          // "a.b" in "a.b.name"
     sub_names_vec: Vec<String>, // vec!["a", "b"] in "a.b.name"
     type_tag: u64,
+    scope: Scope,                   // See Scope
     data_type: DataType,            // See DataType
     content_type: ContentType,      // See ContentType
     content_type_u16: u16,          // validated u16 id of content_type
@@ -292,6 +284,7 @@ impl NativeUrl {
         xor_name: XorName,
         nrs_name: Option<&str>,
         type_tag: u64,
+        scope: Scope,
         data_type: DataType,
         content_type: ContentType,
         path: Option<&str>,
@@ -354,6 +347,7 @@ impl NativeUrl {
             sub_names: sub_names_str,
             sub_names_vec,
             type_tag,
+            scope,
             data_type,
             content_type,
             content_type_u16,
@@ -429,7 +423,8 @@ impl NativeUrl {
             hashed_name,
             Some(&parts.public_name),
             NRS_MAP_TYPE_TAG,
-            DataType::PublicRegister,
+            Scope::Public,
+            DataType::Register,
             ContentType::NrsMapContainer,
             Some(&parts.path),
             Some(parts.sub_names_vec),
@@ -503,15 +498,24 @@ impl NativeUrl {
             content_type
         );
 
-        let data_type = match xorurl_bytes[3] {
-            0 => DataType::SafeKey,
-            1 => DataType::PublicBlob,
-            2 => DataType::PrivateBlob,
-            3 => DataType::PublicRegister,
-            4 => DataType::PrivateRegister,
+        let scope = match xorurl_bytes[3] {
+            0 => Scope::Public,
+            1 => Scope::Private,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
-                    "Invalid SAFE data type encoded in the XOR-URL string: {}",
+                    "Invalid scope encoded in the XOR-URL string: {}",
+                    other
+                )))
+            }
+        };
+
+        let data_type = match xorurl_bytes[4] {
+            0 => DataType::SafeKey,
+            1 => DataType::Blob,
+            2 => DataType::Register,
+            other => {
+                return Err(Error::InvalidXorUrl(format!(
+                    "Invalid data type encoded in the XOR-URL string: {}",
                     other
                 )))
             }
@@ -532,6 +536,7 @@ impl NativeUrl {
             xor_name,
             None, // no nrs_name for an xorurl
             type_tag,
+            scope,
             data_type,
             content_type,
             Some(&parts.path),
@@ -579,8 +584,10 @@ impl NativeUrl {
         let name = self.xor_name;
         let tag = self.type_tag;
         match self.data_type {
-            DataType::PrivateRegister => Ok(register::Address::Private { name, tag }),
-            DataType::PublicRegister => Ok(register::Address::Public { name, tag }),
+            DataType::Register => match self.scope {
+                Scope::Public => Ok(register::Address::Public { name, tag }),
+                Scope::Private => Ok(register::Address::Private { name, tag }),
+            },
             _ => Err(Error::InvalidInput(format!(
                 "Attempting to create a register address for wrong datatype {}",
                 self.data_type
@@ -642,6 +649,11 @@ impl NativeUrl {
     /// returns XorUrl type tag
     pub fn type_tag(&self) -> u64 {
         self.type_tag
+    }
+
+    /// returns XorUrl scope
+    pub fn scope(&self) -> Scope {
+        self.scope
     }
 
     /// returns path portion of URL, percent encoded (unmodified).
@@ -856,10 +868,11 @@ impl NativeUrl {
         &self.native_url_type
     }
 
-    // XOR-URL encoding format (var length from 36 to 44 bytes):
+    // XOR-URL encoding format (var length from 37 to 45 bytes):
     // 1 byte for encoding version
     // 2 bytes for content type (enough to start including some MIME types also)
-    // 1 byte for SAFE native data type
+    // 1 byte for scope
+    // 1 byte for data type
     // 32 bytes for XoR Name
     // and up to 8 bytes for type_tag
     // query param "v=" is treated as the content version
@@ -912,7 +925,10 @@ impl NativeUrl {
 
         cid_vec.extend_from_slice(&self.content_type_u16.to_be_bytes());
 
-        // push the SAFE data type byte
+        // push the scope byte
+        cid_vec.push(self.scope as u8);
+
+        // push the data type byte
         cid_vec.push(self.data_type.clone() as u8);
 
         // add the xor_name 32 bytes
@@ -970,6 +986,7 @@ impl NativeUrl {
         xor_name: XorName,
         nrs_name: Option<&str>,
         type_tag: u64,
+        scope: Scope,
         data_type: DataType,
         content_type: ContentType,
         path: Option<&str>,
@@ -983,6 +1000,7 @@ impl NativeUrl {
             xor_name,
             nrs_name,
             type_tag,
+            scope,
             data_type,
             content_type,
             path,
@@ -1001,6 +1019,7 @@ impl NativeUrl {
             xor_name,
             None,
             0,
+            Scope::Public,
             DataType::SafeKey,
             ContentType::Raw,
             None,
@@ -1015,6 +1034,7 @@ impl NativeUrl {
     /// A non-member Blob encoder function for convenience
     pub fn encode_blob(
         xor_name: XorName,
+        scope: Scope,
         content_type: ContentType,
         base: XorUrlBase,
     ) -> Result<String> {
@@ -1022,7 +1042,8 @@ impl NativeUrl {
             xor_name,
             None,
             0,
-            DataType::PublicBlob,
+            scope,
+            DataType::Blob,
             content_type,
             None,
             None,
@@ -1037,19 +1058,16 @@ impl NativeUrl {
     pub fn encode_register(
         xor_name: XorName,
         type_tag: u64,
+        scope: Scope,
         content_type: ContentType,
         base: XorUrlBase,
-        is_private: bool,
     ) -> Result<String> {
         NativeUrl::encode(
             xor_name,
             None,
             type_tag,
-            if is_private {
-                DataType::PrivateRegister
-            } else {
-                DataType::PublicRegister
-            },
+            scope,
+            DataType::Register,
             content_type,
             None,
             None,
@@ -1243,7 +1261,8 @@ mod tests {
             xor_name,
             None,
             NRS_MAP_TYPE_TAG,
-            DataType::PublicRegister,
+            Scope::Public,
+            DataType::Register,
             ContentType::MediaType("garbage/trash".to_string()),
             None,
             None,
@@ -1258,7 +1277,8 @@ mod tests {
             xor_name,
             Some(""), // passing empty string as nrs name
             NRS_MAP_TYPE_TAG,
-            DataType::PublicRegister,
+            Scope::Public,
+            DataType::Register,
             ContentType::NrsMapContainer,
             None,
             None,
@@ -1273,7 +1293,8 @@ mod tests {
             xor_name,
             Some("a.b.c"), // passing nrs name not matching xor_name.
             NRS_MAP_TYPE_TAG,
-            DataType::PublicRegister,
+            Scope::Public,
+            DataType::Register,
             ContentType::NrsMapContainer,
             None,
             None,
@@ -1288,7 +1309,8 @@ mod tests {
             xor_name,
             Some("a..b.c"), // passing empty sub-name in nrs name
             NRS_MAP_TYPE_TAG,
-            DataType::PublicRegister,
+            Scope::Public,
+            DataType::Register,
             ContentType::NrsMapContainer,
             None,
             None,
@@ -1303,7 +1325,8 @@ mod tests {
             xor_name,
             None, // not NRS
             NRS_MAP_TYPE_TAG,
-            DataType::PublicRegister,
+            Scope::Public,
+            DataType::Register,
             ContentType::NrsMapContainer,
             None,
             Some(vec!["a".to_string(), "".to_string(), "b".to_string()]),
@@ -1323,7 +1346,8 @@ mod tests {
             xor_name,
             None,
             0xa632_3c4d_4a32,
-            DataType::PublicBlob,
+            Scope::Public,
+            DataType::Blob,
             ContentType::Raw,
             None,
             None,
@@ -1333,7 +1357,7 @@ mod tests {
             XorUrlBase::Base32,
         )?;
         let base32_xorurl =
-            "safe://baeaaaajrgiztinjwg44dsmbrgiztinjwg44dsmbrgiztinjwg44dsmbrgktdepcnjiza";
+            "safe://baeaaaaabgezdgnbvgy3tqojqgezdgnbvgy3tqojqgezdgnbvgy3tqojqgezkmmr4jvfde";
         assert_eq!(xorurl, base32_xorurl);
         Ok(())
     }
@@ -1341,8 +1365,13 @@ mod tests {
     #[test]
     fn test_native_url_base32z_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = NativeUrl::encode_blob(xor_name, ContentType::Raw, XorUrlBase::Base32z)?;
-        let base32z_xorurl = "safe://hyryyyyjtge3uepjsghhd1cbtge3uepjsghhd1cbtge3uepjsghhd1cbtge";
+        let xorurl = NativeUrl::encode_blob(
+            xor_name,
+            Scope::Public,
+            ContentType::Raw,
+            XorUrlBase::Base32z,
+        )?;
+        let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
     }
@@ -1353,11 +1382,11 @@ mod tests {
         let xorurl = NativeUrl::encode_register(
             xor_name,
             4_584_545,
+            Scope::Public,
             ContentType::FilesContainer,
             XorUrlBase::Base64,
-            false,
         )?;
-        let base64_xorurl = "safe://mAQACAzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
+        let base64_xorurl = "safe://mAQACAAIxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMkX0YQ";
         assert_eq!(xorurl, base64_xorurl);
         let native_url = NativeUrl::from_url(base64_xorurl)?;
         assert_eq!(base64_xorurl, native_url.to_base(XorUrlBase::Base64));
@@ -1365,7 +1394,8 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, native_url.encoding_version());
         assert_eq!(xor_name, native_url.xorname());
         assert_eq!(4_584_545, native_url.type_tag());
-        assert_eq!(DataType::PublicRegister, native_url.data_type());
+        assert_eq!(Scope::Public, native_url.scope());
+        assert_eq!(DataType::Register, native_url.data_type());
         assert_eq!(ContentType::FilesContainer, native_url.content_type());
         Ok(())
     }
@@ -1373,8 +1403,13 @@ mod tests {
     #[test]
     fn test_native_url_default_base_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let base32z_xorurl = "safe://hyryyyyjtge3uepjsghhd1cbtge3uepjsghhd1cbtge3uepjsghhd1cbtge";
-        let xorurl = NativeUrl::encode_blob(xor_name, ContentType::Raw, DEFAULT_XORURL_BASE)?;
+        let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
+        let xorurl = NativeUrl::encode_blob(
+            xor_name,
+            Scope::Public,
+            ContentType::Raw,
+            DEFAULT_XORURL_BASE,
+        )?;
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
     }
@@ -1392,7 +1427,8 @@ mod tests {
             xor_name,
             None,
             type_tag,
-            DataType::PublicBlob,
+            Scope::Public,
+            DataType::Blob,
             ContentType::Raw,
             Some(subdirs),
             Some(vec!["subname".to_string()]),
@@ -1407,7 +1443,8 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, native_url.encoding_version());
         assert_eq!(xor_name, native_url.xorname());
         assert_eq!(type_tag, native_url.type_tag());
-        assert_eq!(DataType::PublicBlob, native_url.data_type());
+        assert_eq!(Scope::Public, native_url.scope());
+        assert_eq!(DataType::Blob, native_url.data_type());
         assert_eq!(ContentType::Raw, native_url.content_type());
         assert_eq!(Some(content_version), native_url.content_version());
         assert_eq!(query_string_v, native_url.query_string());
@@ -1422,9 +1459,9 @@ mod tests {
         let xorurl = NativeUrl::encode_register(
             xor_name,
             type_tag,
+            Scope::Public,
             ContentType::Wallet,
             XorUrlBase::Base32z,
-            false,
         )?;
 
         let xorurl_with_path = format!("{}/subfolder/file", xorurl);
@@ -1437,7 +1474,8 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, native_url_with_path.encoding_version());
         assert_eq!(xor_name, native_url_with_path.xorname());
         assert_eq!(type_tag, native_url_with_path.type_tag());
-        assert_eq!(DataType::PublicRegister, native_url_with_path.data_type());
+        assert_eq!(Scope::Public, native_url_with_path.scope());
+        assert_eq!(DataType::Register, native_url_with_path.data_type());
         assert_eq!(ContentType::Wallet, native_url_with_path.content_type());
         Ok(())
     }
@@ -1450,7 +1488,8 @@ mod tests {
             xor_name,
             None,
             type_tag,
-            DataType::PublicBlob,
+            Scope::Public,
+            DataType::Blob,
             ContentType::NrsMapContainer,
             None,
             Some(vec!["sub".to_string()]),
@@ -1483,6 +1522,7 @@ mod tests {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let xorurl = NativeUrl::encode_blob(
             xor_name,
+            Scope::Public,
             ContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,
         )?;
@@ -1520,6 +1560,7 @@ mod tests {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let xorurl = NativeUrl::encode_blob(
             xor_name,
+            Scope::Public,
             ContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,
         )?;
@@ -1705,7 +1746,7 @@ mod tests {
     fn test_native_url_to_string() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
         let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hyryygy5k9cke7k99tyhp941od8q375wxgaqeyiag8za1jnpzbw9pb61sccn7a/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hyryygyynpm7tjdim96rdtz9kkyc758zqth5b3ynzya69njrjshgu7w84k3tomzy/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
 
         let nrs = NativeUrl::from_url(nrsurl)?;
         let xor = NativeUrl::from_url(xorurl)?;
@@ -1844,7 +1885,7 @@ mod tests {
         // todo: we should have tests for these.  help anyone?
         // "Invalid or unsupported XOR-URL encoding version: {}",
         // "Invalid content type encoded in the XOR-URL string: {}",
-        // "Invalid SAFE data type encoded in the XOR-URL string: {}",
+        // "Invalid data type encoded in the XOR-URL string: {}",
 
         Ok(())
     }
