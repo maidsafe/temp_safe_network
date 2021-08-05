@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.24.1](https://github.com/maidsafe/safe_network/compare/v0.24.0...v0.24.1) (2021-08-05)
+
+
+### Features
+
+* replace u64 versions with new VersionHash ([91388fa](https://github.com/maidsafe/safe_network/commit/91388fa63422531ecd6223c85fb7bbe489626f85))
+* version hash getter ([2b457d3](https://github.com/maidsafe/safe_network/commit/2b457d3c20c12b01de5a98fc4053cab643711dde))
+
 ## [0.24.0](https://github.com/maidsafe/safe_network/compare/v0.23.2...v0.24.0) (2021-08-05)
 
 
