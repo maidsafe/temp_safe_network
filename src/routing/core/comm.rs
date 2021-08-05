@@ -97,7 +97,6 @@ impl Comm {
         recipients: &[(XorName, SocketAddr)],
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
-        debug!(">>> Sending on existing conn");
         for (name, addr) in recipients {
             wire_msg.set_dst_xorname(*name);
             let bytes = wire_msg.serialize()?;

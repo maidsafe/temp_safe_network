@@ -85,15 +85,6 @@ impl Network {
         self.routing.update_chunks(chunks).await
     }
 
-    pub(crate) async fn propose_offline(&self, name: XorName) -> Result<()> {
-        // Notify the entire section to test connectivity to this node
-        self.routing.start_connectivity_test(name).await?;
-        self.routing
-            .propose_offline(name)
-            .await
-            .map_err(|_| Error::NotAnElder)
-    }
-
     /// Returns public key of our section public key set.
     pub(crate) async fn section_public_key(&self) -> Result<PublicKey> {
         Ok(PublicKey::Bls(
@@ -173,15 +164,6 @@ impl Network {
             .into_iter()
             .map(|p2p_node| *p2p_node.name())
             .collect::<BTreeSet<_>>()
-    }
-
-    pub(crate) async fn our_adults_sorted_by_distance_to(&self, name: &XorName) -> Vec<XorName> {
-        self.routing
-            .our_adults_sorted_by_distance_to(name)
-            .await
-            .into_iter()
-            .map(|p2p_node| *p2p_node.name())
-            .collect::<Vec<_>>()
     }
 
     pub(crate) async fn sign_msg_for_dst_accumulation(

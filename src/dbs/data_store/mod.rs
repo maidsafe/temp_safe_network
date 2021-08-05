@@ -90,8 +90,6 @@ impl<T: Data> DataStore<T> {
     ///
     /// If a chunk with the same id already exists, it will be overwritten.
     pub(crate) async fn put(&self, chunk: &T) -> Result<()> {
-        info!("Writing chunk");
-
         let serialised_chunk = serialise(chunk)?.to_vec();
         let consumed_space = serialised_chunk.len() as u64;
         info!("consumed space: {:?}", consumed_space);

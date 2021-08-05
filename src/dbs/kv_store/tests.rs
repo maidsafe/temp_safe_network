@@ -84,7 +84,7 @@ async fn used_space_increases() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::<Id, TestData>::new(root.path(), used_space).await?;
+    let db = KvStore::<Id, TestData>::new(root.path(), used_space)?;
 
     let used_space_before = db.total_used_space().await;
 
@@ -94,9 +94,9 @@ async fn used_space_increases() -> Result<()> {
             value: data.clone(),
         };
 
-        assert!(!db.has(&the_data.id).await?);
+        assert!(!db.has(&the_data.id)?);
         db.store(the_data).await?;
-        assert!(db.has(&the_data.id).await?);
+        assert!(db.has(&the_data.id)?);
     }
 
     let mut used_space_after = db.total_used_space().await;
@@ -119,7 +119,7 @@ async fn used_space_decreases() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::<Id, TestData>::new(root.path(), used_space).await?;
+    let db = KvStore::<Id, TestData>::new(root.path(), used_space)?;
 
     for (index, (data, _size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &TestData {
@@ -127,15 +127,15 @@ async fn used_space_decreases() -> Result<()> {
             value: data.clone(),
         };
 
-        assert!(!db.has(&the_data.id).await?);
+        assert!(!db.has(&the_data.id)?);
         db.store(the_data).await?;
-        assert!(db.has(&the_data.id).await?);
+        assert!(db.has(&the_data.id)?);
     }
 
     let used_space_before = db.total_used_space().await;
 
-    for key in db.keys().await? {
-        db.delete(&key).await?;
+    for key in db.keys()? {
+        db.delete(&key)?;
     }
 
     let mut used_space_after = db.total_used_space().await;
@@ -155,19 +155,19 @@ async fn successful_put() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::<Id, TestData>::new(root.path(), used_space).await?;
+    let db = KvStore::<Id, TestData>::new(root.path(), used_space)?;
 
     for (index, (data, _size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &TestData {
             id: Id(index as u64),
             value: data.clone(),
         };
-        assert!(!db.has(&the_data.id).await?);
+        assert!(!db.has(&the_data.id)?);
         db.store(the_data).await?;
-        assert!(db.has(&the_data.id).await?);
+        assert!(db.has(&the_data.id)?);
     }
 
-    let mut keys = db.keys().await?;
+    let mut keys = db.keys()?;
     keys.sort();
     assert_eq!(
         (0..chunks.data_and_sizes.len())
@@ -185,7 +185,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
     let root = temp_dir()?;
     let capacity = 32;
     let used_space = UsedSpace::new(capacity);
-    let db = KvStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space)?;
 
     let data = TestData {
         id: Id(rng.gen()),
@@ -215,7 +215,7 @@ async fn delete() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space)?;
 
     for (index, (data, _size)) in chunks.data_and_sizes.iter().enumerate() {
         let the_data = &TestData {
@@ -224,13 +224,13 @@ async fn delete() -> Result<()> {
         };
         db.store(the_data).await?;
 
-        while !db.has(&the_data.id).await? {
+        while !db.has(&the_data.id)? {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
-        db.delete(&the_data.id).await?;
+        db.delete(&the_data.id)?;
 
-        while db.has(&the_data.id).await? {
+        while db.has(&the_data.id)? {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
     }
@@ -245,7 +245,7 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space)?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         db.store(&TestData {
@@ -256,7 +256,7 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
     }
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
-        let retrieved_value = db.get(&Id(index as u64)).await?;
+        let retrieved_value = db.get(&Id(index as u64))?;
         assert_eq!(*data, retrieved_value.value);
     }
 
@@ -270,7 +270,7 @@ async fn overwrite_value() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space)?;
 
     let key = &Id(0);
     let mut total_used_space = db.total_used_space().await;
@@ -282,7 +282,7 @@ async fn overwrite_value() -> Result<()> {
         })
         .await?;
 
-        while !db.has(key).await? {
+        while !db.has(key)? {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
@@ -295,7 +295,7 @@ async fn overwrite_value() -> Result<()> {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
-        let retrieved_data = db.get(key).await?;
+        let retrieved_data = db.get(key)?;
         assert_eq!(data, retrieved_data.value);
     }
 
@@ -306,10 +306,10 @@ async fn overwrite_value() -> Result<()> {
 async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db: KvStore<Id, TestData> = KvStore::new(root.path(), used_space).await?;
+    let db: KvStore<Id, TestData> = KvStore::new(root.path(), used_space)?;
 
     let id = Id(new_rng().gen());
-    match db.get(&id).await {
+    match db.get(&id) {
         Err(Error::KeyNotFound(_)) => (),
         x => {
             return Err(super::Error::InvalidOperation(format!(
@@ -329,18 +329,18 @@ async fn keys() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::new(root.path(), used_space).await?;
+    let db = KvStore::new(root.path(), used_space)?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);
-        assert!(!db.keys().await?.contains(&id));
+        assert!(!db.keys()?.contains(&id));
         db.store(&TestData {
             id,
             value: data.clone(),
         })
         .await?;
 
-        let keys = db.keys().await?;
+        let keys = db.keys()?;
         assert!(keys.contains(&id));
         assert_eq!(keys.len(), index + 1);
     }
@@ -348,10 +348,10 @@ async fn keys() -> Result<()> {
     for (index, _) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);
 
-        assert!(db.keys().await?.contains(&id));
-        db.delete(&id).await?;
+        assert!(db.keys()?.contains(&id));
+        db.delete(&id)?;
 
-        let keys = db.keys().await?;
+        let keys = db.keys()?;
         assert!(!keys.contains(&id));
         assert_eq!(keys.len(), chunks.data_and_sizes.len() - index - 1);
     }

@@ -33,6 +33,7 @@ const DB_DIR: &str = "db";
 
 /// `KvStore` is a store of keys and values into a Sled db, while maintaining a maximum disk
 /// usage to restrict storage.
+#[derive(Clone)]
 pub(crate) struct KvStore<K, V> {
     // tracks space used.
     used_space: UsedSpace,
@@ -51,7 +52,7 @@ where
     /// the required folder structure is created.
     ///
     /// Used space of the dir is tracked.
-    pub(crate) async fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
+    pub(crate) fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
         let dir = root.as_ref().join(DB_DIR).join(Self::subdir());
 
         used_space.add_dir(&dir);
@@ -74,7 +75,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
     }
 
     /// Tests if a value has been previously stored under `key`.
-    pub(crate) async fn has(&self, key: &V::Key) -> Result<bool> {
+    pub(crate) fn has(&self, key: &V::Key) -> Result<bool> {
         let key = key.to_db_key()?;
         self.db.contains_key(key).map_err(Error::from)
     }
@@ -83,7 +84,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
     ///
     /// If the data doesn't exist, it does nothing and returns `Ok`.  In the case of an IO error, it
     /// returns `Error::Io`.
-    pub(crate) async fn delete(&self, key: &V::Key) -> Result<()> {
+    pub(crate) fn delete(&self, key: &V::Key) -> Result<()> {
         let key = key.to_db_key()?;
         self.db.remove(key).map_err(Error::from).map(|_| ())
     }
@@ -178,7 +179,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
     /// Returns a value previously stored under `key`.
     ///
     /// If the value can't be accessed, it returns `Error::NoSuchData`.
-    pub(crate) async fn get(&self, key: &V::Key) -> Result<V> {
+    pub(crate) fn get(&self, key: &V::Key) -> Result<V> {
         let db_key = key.to_db_key()?;
         let res = self
             .db
@@ -209,7 +210,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
 
     /// Lists all keys of currently stored data.
     #[cfg_attr(not(test), allow(unused))]
-    pub(crate) async fn keys(&self) -> Result<Vec<V::Key>> {
+    pub(crate) fn keys(&self) -> Result<Vec<V::Key>> {
         let keys = self
             .db
             .iter()

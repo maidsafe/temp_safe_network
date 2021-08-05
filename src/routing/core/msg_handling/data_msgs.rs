@@ -15,7 +15,7 @@ use crate::messaging::{
         ChunkRead, CmdError, DataCmd, DataQuery, Error as ErrorMessage, QueryResponse,
         RegisterRead, RegisterWrite,
     },
-    node::{NodeMsg, NodeQueryResponse},
+    node::{NodeCmd, NodeMsg, NodeQueryResponse},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;
@@ -122,18 +122,54 @@ impl Core {
         }
     }
 
+    /// Sign and serialize node message to be sent
+    pub(crate) fn prepare_node_msg(&self, msg: NodeMsg, dst: DstLocation) -> Result<Vec<Command>> {
+        let msg_id = MessageId::new();
+
+        let section_pk = *self.section().chain().last_key();
+
+        let payload = WireMsg::serialize_msg_payload(&msg)?;
+
+        let auth = NodeAuth::authorize(section_pk, &self.node().keypair, &payload);
+        let msg_kind = MsgKind::NodeAuthMsg(auth.into_inner());
+
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
+
+        let command = Command::ParseAndSendWireMsg(wire_msg);
+        // commands.push(command);
+        Ok(vec![command])
+    }
+
     /// Handle chunk read
-    pub(crate) fn handle_chunk_query_response_at_adult(
+    pub(crate) async fn handle_chunk_query_at_adult(
         &self,
         msg_id: MessageId,
         query: ChunkRead,
         requester: PublicKey,
         user: EndUser,
     ) -> Result<Vec<Command>> {
-        // TODO ensure we track liveness.
+        let mut commands = vec![];
+        if self.chunk_storage.is_storage_getting_full().await {
+            let section_pk = self.public_key_set()?.public_key();
+            let node_id = self.node().keypair.public;
+
+            let node_xorname = XorName::from(PublicKey::from(node_id));
+
+            // we should notify the section about this
+            let msg = NodeMsg::NodeCmd(NodeCmd::StorageFull {
+                section: node_xorname,
+                node_id: PublicKey::from(self.node().keypair.public),
+            });
+
+            let dst = DstLocation::Section {
+                name: node_xorname,
+                section_pk,
+            };
+
+            commands.push(Command::PrepareNodeMsgToSend { msg, dst });
+        }
 
         debug!(">>>> HANDLE chunk read at adult");
-        // let pk = auth.into_inner().public_key;
         match self.chunk_storage.read(&query, requester) {
             Ok(response) => {
                 let msg = NodeMsg::NodeQueryResponse {
@@ -145,25 +181,18 @@ impl Core {
                 // Setup node authority on this response and send this back to our elders
                 let section_pk = *self.section().chain().last_key();
                 let dst = DstLocation::Section {
-                    name: query.dst_address(),
+                    name: query.dst_name(),
                     section_pk,
                 };
 
-                let payload = WireMsg::serialize_msg_payload(&msg)?;
+                commands.push(Command::PrepareNodeMsgToSend { msg, dst });
 
-                let auth = NodeAuth::authorize(section_pk, &self.node().keypair, &payload);
-                let msg_kind = MsgKind::NodeAuthMsg(auth.into_inner());
-
-                let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
-
-                let command = Command::ParseAndSendWireMsg(wire_msg);
-
-                Ok(vec![command])
+                Ok(commands)
             }
             Err(error) => {
-                error!("Problem on reading chunk! {:?}", error);
-                // Nothing to do, we've had a bad time here...
-                Ok(vec![])
+                error!("Problem reading chunk from storage! {:?}", error);
+                // Nothing more to do, we've had a bad time here...
+                Ok(commands)
             }
         }
     }
@@ -171,7 +200,7 @@ impl Core {
     /// Handle chunk read
     /// Records response in liveness tracking
     /// Forms a response to send to the requester
-    pub(crate) fn handle_chunk_query_response_at_elder(
+    pub(crate) async fn handle_chunk_query_response_at_elder(
         &self,
         // msg_id: MessageId,
         correlation_id: MessageId,
@@ -179,32 +208,45 @@ impl Core {
         user: EndUser,
         sending_nodes_pk: PublicKey,
     ) -> Result<Vec<Command>> {
-        // TODO ensure we track liveness.
-
         let msg_id = MessageId::new();
+        let mut commands = vec![];
         debug!(
             ">>>>>> HANDLE chunk read @ elders from {:?} ",
             sending_nodes_pk
         );
 
         let NodeQueryResponse::GetChunk(response) = response;
-        // let pk = auth.into_inner().public_key;
+
         let query_response = QueryResponse::GetChunk(response);
 
-        if query_response.failed_with_data_not_found() {
+        match query_response.operation_id() {
+            Ok(op_id) => {
+                let node_id = XorName::from(sending_nodes_pk);
+                self.liveness.remove_black_eye(&node_id, &op_id)
+            }
+            Err(error) => {
+                warn!("Node problems noted when retrieving data: {:?}", error)
+            }
+        }
+
+        // Check for unresponsive adults here.
+        for (name, count) in self.liveness.find_unresponsive_nodes() {
+            warn!(
+                "Node {} has {} pending ops. It might be unresponsive",
+                name, count
+            );
+            commands.push(Command::ProposeOffline(name));
+        }
+
+        // Send response if one is warrented
+        if query_response.failed_with_data_not_found()
+            || (!query_response.is_success()
+                && self.capacity.is_full(XorName::from(sending_nodes_pk)).await)
+        {
             // we don't return data not found errors.
             debug!(">>>> {:?}, saying data not found", sending_nodes_pk);
 
-            match query_response.operation_id() {
-                Ok(op_id) => {
-                    let node_id = XorName::from(sending_nodes_pk);
-                    self.liveness.remove_black_eye(&node_id, op_id)
-                }
-                Err(error) => {
-                    warn!("Node problems noted when retrieving data: {:?}", error)
-                }
-            }
-            return Ok(vec![]);
+            return Ok(commands);
         }
 
         let msg = ServiceMsg::QueryResponse {
@@ -221,9 +263,8 @@ impl Core {
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
 
         let command = Command::ParseAndSendWireMsg(wire_msg);
-        debug!(">>>> Should be sending to client now... {:?}", dst);
-
-        Ok(vec![command])
+        commands.push(command);
+        Ok(commands)
     }
 
     /// Handle ServiceMsgs received from EndUser
@@ -274,18 +315,14 @@ impl Core {
     // Used to fetch the list of holders for a given chunk.
     pub(crate) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
-        // TODO, tidy this up,  was basically non_full_adults_closest_to func in adult_reader
-
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self
             .section()
             .adults()
             .copied()
-            .map(|p2p_node| *p2p_node.name())
-            .collect::<Vec<_>>();
+            .map(|p2p_node| *p2p_node.name());
 
         adults
-            .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
             .filter(|name| !full_adults.contains(name))
             .take(CHUNK_COPY_COUNT)

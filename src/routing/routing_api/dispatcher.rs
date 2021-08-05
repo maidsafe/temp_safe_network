@@ -130,6 +130,9 @@ impl Dispatcher {
 
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
+            Command::PrepareNodeMsgToSend { msg, dst } => {
+                self.core.read().await.prepare_node_msg(msg, dst)
+            }
             Command::HandleMessage { sender, wire_msg } => {
                 self.core
                     .write()

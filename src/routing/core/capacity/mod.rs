@@ -31,8 +31,8 @@ impl Capacity {
     }
 
     /// Whether the adult is recorded as full
-    pub(super) async fn is_full(&self, adult: &XorName) -> bool {
-        self.reader.is_full(adult).await
+    pub(super) async fn is_full(&self, adult: XorName) -> bool {
+        self.reader.is_full(&adult).await
     }
 
     /// Number of full chunk storing nodes in the section.

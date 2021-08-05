@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{chunk::ChunkRead, register::RegisterRead, Error, QueryResponse};
+use super::{chunk::ChunkRead, register::RegisterRead, Error, OperationId, QueryResponse};
 use xor_name::XorName;
 
 use serde::{Deserialize, Serialize};
@@ -41,12 +41,12 @@ impl DataQuery {
         }
     }
 
-    /// Returns the address of the destination for `request`.
-    pub fn dst_address(&self) -> XorName {
+    /// Returns the xorname of the data destination for `request`.
+    pub fn dst_name(&self) -> XorName {
         use DataQuery::*;
         match self {
-            Chunk(q) => q.dst_address(),
-            Register(q) => q.dst_address(),
+            Chunk(q) => q.dst_name(),
+            Register(q) => q.dst_name(),
         }
     }
 
@@ -54,9 +54,9 @@ impl DataQuery {
     /// and responses at clients.
     /// Must be the same as the query response
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
-    pub fn operation_id(&self) -> XorName {
+    pub fn operation_id(&self) -> OperationId {
         match self {
-            DataQuery::Chunk(read) => read.dst_address(),
+            DataQuery::Chunk(read) => read.operation_id(),
             DataQuery::Register(read) => read.operation_id(),
         }
     }

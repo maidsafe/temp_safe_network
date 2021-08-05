@@ -6,9 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{CmdError, Error, QueryResponse};
+use super::{CmdError, Error, OperationId, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use xor_name::XorName;
 
 /// [`Chunk`] read operations.
@@ -42,11 +44,27 @@ impl ChunkRead {
     }
 
     /// Returns the address of the destination for `request`.
-    pub fn dst_address(&self) -> XorName {
+    pub fn dst_address(&self) -> ChunkAddress {
+        use ChunkRead::*;
+        match self {
+            Get(address) => *address,
+        }
+    }
+
+    /// Returns the address of the destination for `request`.
+    pub fn dst_name(&self) -> XorName {
         use ChunkRead::*;
         match self {
             Get(address) => *address.name(),
         }
+    }
+
+    /// Return operation Id of the read
+    pub fn operation_id(&self) -> OperationId {
+        let mut hasher = DefaultHasher::new();
+
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
@@ -58,11 +76,20 @@ impl ChunkWrite {
     }
 
     /// Returns the address of the destination for `request`.
-    pub fn dst_address(&self) -> XorName {
+    pub fn dst_name(&self) -> XorName {
         use ChunkWrite::*;
         match self {
             New(ref data) => *data.name(),
             DeletePrivate(ref address) => *address.name(),
+        }
+    }
+
+    /// Returns the address of the destination for `request`.
+    pub fn dst_address(&self) -> ChunkAddress {
+        use ChunkWrite::*;
+        match self {
+            New(ref data) => *data.address(),
+            DeletePrivate(ref address) => *address,
         }
     }
 

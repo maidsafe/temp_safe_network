@@ -244,7 +244,7 @@ impl Address {
 }
 
 /// Object storing an Chunk variant.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Debug)]
 pub enum Chunk {
     /// Private Chunk.
     Private(PrivateChunk),
@@ -328,7 +328,7 @@ impl From<PublicChunk> for Chunk {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::Result, utils};
+    use super::{super::Result, utils, Error};
     use super::{Address, PrivateChunk, PublicChunk, PublicKey, XorName};
     use bls::SecretKey;
     use hex::encode;
@@ -354,6 +354,37 @@ mod tests {
         assert_ne!(ichunk1.name(), ichunk2.name());
         assert_ne!(ichunk1.name(), ichunk3.name());
         assert_ne!(ichunk2.name(), ichunk3.name());
+    }
+
+    #[test]
+    fn deterministic_address() -> Result<()> {
+        let chunk1 = b"Hello".to_vec();
+
+        let owner1 = PublicKey::Bls(SecretKey::random().public_key());
+
+        let ichunk1 = PrivateChunk::new(chunk1.clone(), owner1);
+        let ichunk2 = PublicChunk::new(chunk1.clone());
+
+        let ichunk3 = PrivateChunk::new(chunk1, owner1);
+
+        assert_eq!(ichunk1.name(), ichunk3.name());
+        assert_eq!(ichunk1.address(), ichunk3.address());
+
+        assert_ne!(ichunk1.name(), ichunk2.name());
+        assert_ne!(ichunk1.address(), ichunk2.address());
+
+        println!("{:?}", ichunk1.address());
+        println!("{:?}", ichunk2.address());
+        assert_ne!(
+            bincode::serialize(ichunk1.address()).map_err(|_| Error::Serialisation(
+                "Test address serialisation failed".to_string()
+            ))?,
+            bincode::serialize(ichunk2.address()).map_err(|_| Error::Serialisation(
+                "Test address serialisation failed".to_string()
+            ))?
+        );
+
+        Ok(())
     }
 
     #[test]

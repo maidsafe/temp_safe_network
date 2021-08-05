@@ -109,13 +109,11 @@ impl Core {
         let chunk_storage = ChunkStore::new(&root_storage_dir, used_space.clone())?;
 
         let adult_storage_info = AdultsStorageInfo::new();
-        // let adult_reader = AdultReader::new(self.network_api.clone());
         let capacity_reader = CapacityReader::new(adult_storage_info.clone());
-        let capacity_writer = CapacityWriter::new(adult_storage_info.clone());
-        let capacity = Capacity::new(capacity_reader.clone(), capacity_writer);
+        let capacity_writer = CapacityWriter::new(adult_storage_info);
+        let capacity = Capacity::new(capacity_reader, capacity_writer);
 
         let adult_liveness = Liveness::new();
-        // let chunk_records = ChunkRecords::new(capacity);
 
         Ok(Self {
             comm,

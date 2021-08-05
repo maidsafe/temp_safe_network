@@ -104,8 +104,6 @@ pub enum NodeDuty {
         targets: BTreeSet<XorName>,
         aggregation: bool,
     },
-    /// Create proposals to vote unresponsive nodes as offline
-    ProposeOffline(Vec<XorName>),
     NoOp,
 }
 

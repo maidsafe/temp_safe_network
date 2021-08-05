@@ -60,7 +60,7 @@ impl Core {
         auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<Vec<Command>> {
-        debug!(">>>> init of writing chunk to adults");
+        trace!("Init of sending. ChunkWrite to adults {:?}", write);
         use ChunkWrite::*;
         match write {
             New(data) => self.store(data, msg_id, auth, origin).await,
@@ -104,7 +104,7 @@ impl Core {
             return self.send_error(error, msg_id, origin).await;
         }
 
-        let target = chunk.name().clone();
+        let target = *chunk.name();
 
         let msg = NodeMsg::NodeCmd(NodeCmd::Chunks {
             cmd: ChunkWrite::New(chunk),
@@ -118,12 +118,10 @@ impl Core {
 
         if self.get_copy_count() > targets.len() {
             let error = CmdError::Data(ErrorMessage::InsufficientAdults(*self.section().prefix()));
-            debug!(">>> LOW COPY COUNT");
             return self.send_cmd_error_response(error, origin, msg_id);
         }
 
-        debug!(">>>> sending chunk write msgs to adults");
-        return self.send_node_msg_to_targets(msg, targets, aggregation);
+        self.send_node_msg_to_targets(msg, targets, aggregation)
     }
 
     pub(crate) async fn send_error(
@@ -145,6 +143,7 @@ impl Core {
         origin: EndUser,
         _msg_id: MessageId,
     ) -> Result<Vec<Command>> {
+        trace!("Handling delete at elders, forwarding to adults");
         let targets = self.get_chunk_holder_adults(address.name()).await;
 
         let msg = NodeMsg::NodeCmd(NodeCmd::Chunks {
@@ -155,8 +154,7 @@ impl Core {
 
         let aggregation = false;
 
-        debug!(">>>> sending chunk delete msgs to adults");
-        return self.send_node_msg_to_targets(msg, targets, aggregation);
+        self.send_node_msg_to_targets(msg, targets, aggregation)
     }
 
     pub(super) async fn read_chunk_from_adults(
@@ -166,18 +164,9 @@ impl Core {
         auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<Vec<Command>> {
-        match read {
-            ChunkRead::Get(address) => self.get(*address, msg_id, auth, origin).await,
-        }
-    }
+        trace!("setting up ChunkRead for adults, {:?}", read.dst_address());
 
-    async fn get(
-        &self,
-        address: ChunkAddress,
-        msg_id: MessageId,
-        auth: AuthorityProof<ServiceAuth>,
-        origin: EndUser,
-    ) -> Result<Vec<Command>> {
+        let ChunkRead::Get(address) = read;
         let targets = self.get_chunk_holder_adults(address.name()).await;
 
         if targets.is_empty() {
@@ -192,7 +181,10 @@ impl Core {
 
         let mut fresh_targets = BTreeSet::new();
         for target in targets {
-            if self.liveness.is_fresh_black_eye(target, address.name()) {
+            if self
+                .liveness
+                .is_fresh_black_eye(target, &read.operation_id())
+            {
                 let _ = fresh_targets.insert(target);
             } else {
                 info!(
@@ -204,14 +196,14 @@ impl Core {
         }
 
         let msg = NodeMsg::NodeQuery(NodeQuery::Chunks {
-            query: ChunkRead::Get(address),
+            query: ChunkRead::Get(*address),
             auth: auth.into_inner(),
             origin,
         });
 
         let aggregation = false;
 
-        return self.send_node_msg_to_targets(msg, fresh_targets, aggregation);
+        self.send_node_msg_to_targets(msg, fresh_targets, aggregation)
     }
 }
 

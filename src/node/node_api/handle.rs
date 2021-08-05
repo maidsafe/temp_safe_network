@@ -144,12 +144,6 @@ impl Node {
                     Ok(NodeTask::Thread(handle))
                 }
             }
-            NodeDuty::ProposeOffline(unresponsive_adults) => {
-                for adult in unresponsive_adults {
-                    self.network_api.propose_offline(adult).await?;
-                }
-                Ok(NodeTask::None)
-            }
             NodeDuty::ProcessLostMember { name, .. } => {
                 info!("Member Lost: {:?}", name);
                 let elder = self.as_elder().await?;

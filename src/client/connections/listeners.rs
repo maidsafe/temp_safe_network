@@ -20,7 +20,6 @@ use std::{
     net::SocketAddr,
 };
 use tracing::{debug, error, info, trace, warn};
-use xor_name::XorName;
 
 impl Session {
     // Listen for incoming messages on a connection
@@ -203,8 +202,8 @@ impl Session {
                     // Once we are satisfied with the response this is channel is discarded in
                     // ConnectionManager::send_query
 
-                    let backup_id = &XorName::random();
-                    let op_id = response.operation_id().unwrap_or(&backup_id);
+                    let backup_id = 0_u64;
+                    let op_id = response.operation_id().unwrap_or(backup_id);
                     debug!("Query response (op_id issss: {})", op_id);
 
                     if let Some(sender) = &queries.read().await.get(&op_id) {

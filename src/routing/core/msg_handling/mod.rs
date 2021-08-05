@@ -435,12 +435,8 @@ impl Core {
                             ServiceMsg::Query(DataQuery::Chunk(query.clone())),
                         )?;
                         // Send back response to our Elders
-                        self.handle_chunk_query_response_at_adult(
-                            msg_id,
-                            query,
-                            verified.public_key,
-                            origin,
-                        )
+                        self.handle_chunk_query_at_adult(msg_id, query, verified.public_key, origin)
+                            .await
                     }
                     _ => {
                         self.send_event(Event::MessageReceived {
@@ -462,12 +458,7 @@ impl Core {
                 debug!(">>>> QueryResponse innnn from a node");
                 let sending_nodes_pk = match msg_authority {
                     NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().public_key),
-                    _ => {
-                        return Err(Error::InvalidQueryResponseAuthority(
-                            response,
-                            msg_authority,
-                        ))
-                    }
+                    _ => return Err(Error::InvalidQueryResponseAuthority),
                 };
 
                 self.handle_chunk_query_response_at_elder(
@@ -476,6 +467,7 @@ impl Core {
                     user,
                     sending_nodes_pk,
                 )
+                .await
             }
             NodeMsg::NodeMsgError {
                 error,
@@ -498,7 +490,6 @@ impl Core {
 
     // Locate ideal chunk holders for this chunk, line up wiremsgs for those to instruct them to store the chunk
     async fn republish_chunk(&self, chunk: Chunk) -> Result<Vec<Command>> {
-        // info!("Processing republish with MessageId: {:?}", msg_id);
         if self.is_elder() {
             let target_holders = self.get_chunk_holder_adults(chunk.name()).await;
             info!(
@@ -510,7 +501,7 @@ impl Core {
             let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk));
             let aggregation = false;
 
-            return self.send_node_msg_to_targets(msg, target_holders, aggregation);
+            self.send_node_msg_to_targets(msg, target_holders, aggregation)
         } else {
             error!("Received unexpected message while Adult");
             Ok(vec![])

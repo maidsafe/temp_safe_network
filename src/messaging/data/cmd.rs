@@ -42,12 +42,12 @@ impl DataCmd {
         }
     }
 
-    /// Returns the address of the destination for command.
-    pub fn dst_address(&self) -> XorName {
+    /// Returns the xorname of the data for this command.
+    pub fn dst_name(&self) -> XorName {
         use DataCmd::*;
         match self {
-            Chunk(c) => c.dst_address(),
-            Register(c) => c.dst_address(),
+            Chunk(c) => c.dst_name(),
+            Register(c) => c.dst_name(),
         }
     }
 

@@ -8,7 +8,6 @@
 
 use super::Prefix;
 use crate::messaging::data::Error as ErrorMessage;
-use crate::messaging::{node::NodeQueryResponse, NodeMsgAuthority};
 pub use crate::routing::core::AggregatorError;
 pub use crate::routing::dkg::proposal::ProposalError;
 use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};
@@ -150,8 +149,8 @@ pub enum Error {
     Configuration(String),
 
     /// Configuration error.
-    #[error("Invalid node authority received for a QueryResponse message {0:?} {1:?}")]
-    InvalidQueryResponseAuthority(NodeQueryResponse, NodeMsgAuthority),
+    #[error("Invalid node authority received for a QueryResponse message")]
+    InvalidQueryResponseAuthority,
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {

@@ -199,7 +199,7 @@ impl Session {
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
 
-        let data_name = query.dst_address();
+        let data_name = query.dst_name();
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest
         // connected Elders to the data we are querying
@@ -403,12 +403,9 @@ impl Session {
         }
         // });
 
-        // response
-        // .map(|response| {
-
         match response {
             Some(response) => {
-                let operation_id = *response
+                let operation_id = response
                     .operation_id()
                     .map_err(|_| Error::UnknownOperationId)?;
                 Ok(QueryResult {

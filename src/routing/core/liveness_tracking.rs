@@ -8,6 +8,7 @@
 
 use crate::routing::XorName;
 
+use crate::messaging::data::OperationId;
 use dashmap::DashMap;
 use dashmap::DashSet;
 use itertools::Itertools;
@@ -19,12 +20,11 @@ const MIN_PENDING_OPS: usize = 10;
 const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
 
 /// Some reproducible xorname derived from the operation. Which can be re-derived from the appropriate response when received (to remove from tracking)
-type OperationIdentifier = XorName;
 type NodeIdentifier = XorName;
 
 /// Something the node in question is yet to do
 // https://en.wikipedia.org/wiki/Colonel_Cathcart
-type BlackEye = OperationIdentifier;
+type BlackEye = OperationId;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Liveness {
@@ -47,7 +47,7 @@ impl Liveness {
     pub(crate) fn is_fresh_black_eye(
         &self,
         node_id: NodeIdentifier,
-        operation_id: &OperationIdentifier,
+        operation_id: &OperationId,
     ) -> bool {
         let new_operation = if let Some(black_eyes) = self.black_eyes.get(&node_id) {
             let black_eyes_for_node = black_eyes.value();
@@ -61,7 +61,7 @@ impl Liveness {
             }
         } else {
             let black_eyes = DashSet::new();
-            let _ = black_eyes.insert(operation_id.clone());
+            let _ = black_eyes.insert(*operation_id);
             let _ = self.black_eyes.insert(node_id, black_eyes);
 
             debug!("BLACK EYE ADDED: {:?}", operation_id);
@@ -96,16 +96,15 @@ impl Liveness {
     }
 
     /// Removes a black eye from the node liveness records
-    pub(crate) fn remove_black_eye(
-        &self,
-        node_id: &NodeIdentifier,
-        operation_id: &OperationIdentifier,
-    ) {
+    pub(crate) fn remove_black_eye(&self, node_id: &NodeIdentifier, operation_id: &OperationId) {
+        trace!("Attempting black eye {:?} op: {:?}", node_id, operation_id);
+
         if let Some(black_eyes) = self.black_eyes.get_mut(node_id) {
             let _ = black_eyes.remove(operation_id);
-            debug!(
-                "BLACK EYE REMOVED for node: {:?} op: {:?}",
-                node_id, operation_id
+            trace!(
+                "Black eye removed for node: {:?} op: {:?}",
+                node_id,
+                operation_id
             );
         }
     }
@@ -133,6 +132,8 @@ impl Liveness {
         let mut unresponsive_nodes = Vec::new();
         for entry in self.closest_nodes_to.iter() {
             let (node, neighbours) = entry.pair();
+
+            let node = *node;
             if let Some(max_pending_by_neighbours) = neighbours
                 .iter()
                 .map(|neighbour| {
@@ -160,7 +161,7 @@ impl Liveness {
                         black_eyes_count,
                         max_pending_by_neighbours
                     );
-                    unresponsive_nodes.push((node.clone(), black_eyes_count));
+                    unresponsive_nodes.push((node, black_eyes_count));
                 }
             }
         }

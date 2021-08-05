@@ -8,8 +8,9 @@
 
 use crate::messaging::{
     data::ServiceMsg,
-    node::{DkgFailureSigSet, KeyedSig, Proposal, Section},
-    AuthorityProof, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth, WireMsg,
+    node::{DkgFailureSigSet, KeyedSig, NodeMsg, Proposal, Section},
+    AuthorityProof, DstLocation, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth,
+    WireMsg,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
 
@@ -59,6 +60,8 @@ pub(crate) enum Command {
     },
     /// Parses WireMsg to send to the correct location
     ParseAndSendWireMsg(WireMsg),
+    /// Performs serialisation and signing for sending of NodeMst
+    PrepareNodeMsgToSend { msg: NodeMsg, dst: DstLocation },
     /// Send a message to `delivery_group_size` peers out of the given `recipients`.
     SendMessageDeliveryGroup {
         recipients: Vec<(XorName, SocketAddr)>,

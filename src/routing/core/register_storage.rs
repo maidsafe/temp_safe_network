@@ -14,8 +14,8 @@ use crate::types::{
 use crate::{
     messaging::{
         data::{
-            DataCmd, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead, RegisterWrite,
-            ServiceMsg,
+            DataCmd, OperationId, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead,
+            RegisterWrite, ServiceMsg,
         },
         AuthorityProof, ServiceAuth, WireMsg,
     },
@@ -254,7 +254,7 @@ impl RegisterStorage {
         &self,
         address: Address,
         requester_pk: PublicKey,
-        operation_id: XorName,
+        operation_id: OperationId,
     ) -> Result<QueryResponse> {
         let result = match self.get_register(&address, Action::Read, requester_pk) {
             Ok(register) => Ok(register),
@@ -292,7 +292,7 @@ impl RegisterStorage {
         &self,
         address: Address,
         requester_pk: PublicKey,
-        operation_id: XorName,
+        operation_id: OperationId,
     ) -> Result<QueryResponse> {
         let result = match self.get_register(&address, Action::Read, requester_pk) {
             Ok(register) => register.read(Some(requester_pk)).map_err(Error::from),
@@ -310,7 +310,7 @@ impl RegisterStorage {
         &self,
         address: Address,
         requester_pk: PublicKey,
-        operation_id: XorName,
+        operation_id: OperationId,
     ) -> Result<QueryResponse> {
         let result = match self.get_register(&address, Action::Read, requester_pk) {
             Ok(res) => Ok(res.owner()),
@@ -326,7 +326,7 @@ impl RegisterStorage {
         address: Address,
         user: User,
         requester_pk: PublicKey,
-        operation_id: XorName,
+        operation_id: OperationId,
     ) -> Result<QueryResponse> {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
@@ -350,7 +350,7 @@ impl RegisterStorage {
         &self,
         address: Address,
         requester_pk: PublicKey,
-        operation_id: XorName,
+        operation_id: OperationId,
     ) -> Result<QueryResponse> {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
@@ -402,9 +402,9 @@ impl RegisterStorage {
         let message = ServiceMsg::Cmd(cmd);
         let payload = WireMsg::serialize_msg_payload(&message)
             .map_err(|error| Error::Serialize(error.to_string()))?;
-        Ok(AuthorityProof::verify(auth, &payload).map_err(|_| {
+        AuthorityProof::verify(auth, &payload).map_err(|_| {
             Error::InvalidOperation("Register operation could not be verified.".to_string())
-        })?)
+        })
     }
 }
 

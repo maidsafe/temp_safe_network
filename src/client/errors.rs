@@ -8,16 +8,13 @@
 
 pub use crate::messaging::data::Error as ErrorMessage;
 use crate::messaging::{
-    data::{CmdError, QueryResponse},
+    data::{CmdError, OperationId, QueryResponse},
     Error as MessagingError,
 };
 use crate::types::Error as DtError;
 use qp2p::Error as QuicP2pError;
 use std::io;
 use thiserror::Error;
-use xor_name::XorName;
-
-type OperationId = XorName;
 
 /// Specialisation of `std::Result` for Client.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -104,8 +101,7 @@ pub enum Error {
         /// The source of an error message
         source: ErrorMessage,
         /// operation ID that was used to send the query
-        // TODO unify this
-        op_id: XorName,
+        op_id: OperationId,
     },
     /// Errors occurred when serialising or deserialising messages
     #[error(transparent)]

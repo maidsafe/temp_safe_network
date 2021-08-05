@@ -42,7 +42,7 @@ impl Client {
     // This function is a helper private to this module.
     pub(crate) async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
         let client_pk = self.public_key();
-        let dst_address = cmd.dst_address();
+        let dst_name = cmd.dst_name();
 
         // (should be a global constant in the codebase,
         // derived from also global const Elder count,
@@ -62,7 +62,7 @@ impl Client {
         };
         let signature = self.keypair.sign(&serialised_cmd);
 
-        self.send_signed_command(dst_address, client_pk, serialised_cmd, signature, targets)
+        self.send_signed_command(dst_name, client_pk, serialised_cmd, signature, targets)
             .await
     }
 }

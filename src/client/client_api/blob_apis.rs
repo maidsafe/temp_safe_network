@@ -527,6 +527,7 @@ mod tests {
         };
 
         client.delete_blob(address).await?;
+
         client.clear_blob_cache().await;
 
         client.query_timeout = Duration::from_secs(5); // override with a short timeout
@@ -576,13 +577,13 @@ mod tests {
         let size = 1024;
         let data = generate_random_vector(size);
 
-        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
         let address = client.store_public_blob(&data).await?;
 
-        println!("STOOOOOORED");
         // let's make sure the public chunk is stored
         let _ = run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
 
+        client.query_timeout = Duration::from_secs(5);
         // and now trying to read a private chunk with same address should fail
         let res = client
             .read_blob(ChunkAddress::Private(*address.name()), None, None)
@@ -599,12 +600,14 @@ mod tests {
 
         let value = generate_random_vector(size);
 
-        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
+        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let address = client.store_private_blob(&value).await?;
 
         // let's make sure the private chunk is stored
         let _ = run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
+
+        client.query_timeout = Duration::from_secs(5);
 
         // and now trying to read a public chunk with same address should fail (timeout)
         let res = client

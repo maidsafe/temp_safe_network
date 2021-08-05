@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{CmdError, Error, QueryResponse};
+use crate::messaging::data::OperationId;
 use crate::types::{
     register::{Address, Entry, Register, RegisterOp, User},
     PublicKey,
@@ -100,8 +101,19 @@ impl RegisterRead {
         }
     }
 
-    /// Returns the address of the destination for request.
-    pub fn dst_address(&self) -> XorName {
+    /// Returns the address of the data for request. (Scoped to Private/Public)
+    pub fn dst_address(&self) -> Address {
+        match self {
+            RegisterRead::Get(ref address)
+            | RegisterRead::Read(ref address)
+            | RegisterRead::GetPolicy(ref address)
+            | RegisterRead::GetUserPermissions { ref address, .. }
+            | RegisterRead::GetOwner(ref address) => *address,
+        }
+    }
+
+    /// Returns the xorname of the data for request.
+    pub fn dst_name(&self) -> XorName {
         match self {
             RegisterRead::Get(ref address)
             | RegisterRead::Read(ref address)
@@ -115,26 +127,31 @@ impl RegisterRead {
     /// and responses at clients.
     /// Must be the same as the query response
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
-    pub fn operation_id(&self) -> XorName {
-        match self {
-            RegisterRead::Get(ref address) => {
-                XorName::from_content(&[format!("Get-{}", address.name()).as_bytes()])
-            }
-            RegisterRead::Read(ref address) => {
-                XorName::from_content(&[format!("Read-{}", address.name()).as_bytes()])
-            }
-            RegisterRead::GetPolicy(ref address) => {
-                XorName::from_content(&[format!("GetPolicy-{}", address.name()).as_bytes()])
-            }
+    pub fn operation_id(&self) -> OperationId {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hasher;
+
+        let mut hasher = DefaultHasher::new();
+
+        let op_id_string = match self {
+            RegisterRead::Get(ref address) => format!("Get-{:?}", address),
+
+            RegisterRead::Read(ref address) => format!("Read-{:?}", address),
+
+            RegisterRead::GetPolicy(ref address) => format!("GetPolicy-{:?}", address),
+
             RegisterRead::GetUserPermissions { ref address, .. } => {
-                XorName::from_content(
-                    &[format!("GetUserPermissions-{}", address.name()).as_bytes()],
-                )
+                format!("GetUserPermissions-{:?}", address)
             }
-            RegisterRead::GetOwner(ref address) => {
-                XorName::from_content(&[format!("GetOwner-{}", address.name()).as_bytes()])
-            }
-        }
+
+            RegisterRead::GetOwner(ref address) => format!("GetOwner-{:?}", address),
+        };
+
+        // op_id_string.as_bytes().hash();
+
+        hasher.write(op_id_string.as_bytes());
+
+        hasher.finish()
     }
 }
 
@@ -146,7 +163,7 @@ impl RegisterWrite {
     }
 
     /// Returns the address of the destination for request.
-    pub fn dst_address(&self) -> XorName {
+    pub fn dst_name(&self) -> XorName {
         match self {
             RegisterWrite::New(ref data) => *data.name(),
             RegisterWrite::Delete(ref address) => *address.name(),

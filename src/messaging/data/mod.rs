@@ -14,6 +14,8 @@ mod data_exchange;
 mod errors;
 mod query;
 mod register;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 pub use self::{
     chunk::{ChunkRead, ChunkWrite},
@@ -33,7 +35,9 @@ use crate::types::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, convert::TryFrom};
-use xor_name::XorName;
+
+/// Derivable Id of an operation. Query/Response should return the same id
+pub type OperationId = u64;
 
 /// A message indicating that an error occurred as a node was handling a client's message.
 #[allow(clippy::large_enum_variant)]
@@ -98,9 +102,8 @@ pub enum CmdError {
     Data(Error), // DataError enum for better differentiation?
 }
 
-type OperationId = XorName;
-
 /// The response to a query, containing the query result.
+/// Response operation id should match query operation_id
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum QueryResponse {
@@ -173,26 +176,36 @@ impl QueryResponse {
     /// Retrieves the operation identifier for this response, use in tracking node liveness
     /// and responses at clients.
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
-    pub fn operation_id(&self) -> Result<&XorName> {
+    pub fn operation_id(&self) -> Result<OperationId> {
         use QueryResponse::*;
+        let mut hasher = DefaultHasher::new();
 
+        // TODO: Operation Id should eventually encompass _who_ the op is for.
         match self {
             GetChunk(result) => match result {
-                Ok(chunk) => Ok(chunk.name()),
+                Ok(chunk) => {
+                    chunk.address().hash(&mut hasher);
+
+                    Ok(hasher.finish())
+                }
                 Err(error) => match error {
                     ErrorMessage::DataNotFound(address) => match address {
-                        DataAddress::Chunk(address) => Ok(address.name()),
+                        DataAddress::Chunk(address) => {
+                            address.hash(&mut hasher);
+
+                            Ok(hasher.finish())
+                        }
                         _ => Err(Error::NoOperationIdForElderData),
                     },
                     _ => Err(Error::InvalidQueryResponseErrorForOperationId),
                 },
             },
 
-            GetRegister((_result, operation_id)) => Ok(operation_id),
-            GetRegisterOwner((_result, operation_id)) => Ok(operation_id),
-            ReadRegister((_result, operation_id)) => Ok(operation_id),
-            GetRegisterPolicy((_result, operation_id)) => Ok(operation_id),
-            GetRegisterUserPermissions((_result, operation_id)) => Ok(operation_id),
+            GetRegister((_result, operation_id)) => Ok(*operation_id),
+            GetRegisterOwner((_result, operation_id)) => Ok(*operation_id),
+            ReadRegister((_result, operation_id)) => Ok(*operation_id),
+            GetRegisterPolicy((_result, operation_id)) => Ok(*operation_id),
+            GetRegisterUserPermissions((_result, operation_id)) => Ok(*operation_id),
         }
     }
     // }
@@ -274,7 +287,7 @@ mod tests {
     fn debug_format_functional() -> Result<()> {
         if let Some(key) = gen_keys().first() {
             let errored_response =
-                QueryResponse::GetRegister((Err(Error::AccessDenied(*key)), XorName::random()));
+                QueryResponse::GetRegister((Err(Error::AccessDenied(*key)), 0_u64));
             assert!(format!("{:?}", errored_response).contains("GetRegister(Err(AccessDenied("));
             Ok(())
         } else {
