@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.23.2](https://github.com/maidsafe/safe_network/compare/v0.23.1...v0.23.2) (2021-08-05)
+
+
+### Bug Fixes
+
+* adjust for breaking change in blsttc ([5bffb4c](https://github.com/maidsafe/safe_network/commit/5bffb4c6be5a470ef7b8432a918f810e48ec3072))
+
 ### [0.23.1](https://github.com/maidsafe/safe_network/compare/v0.23.0...v0.23.1) (2021-08-04)
 
 ## [0.23.0](https://github.com/maidsafe/safe_network/compare/v0.22.2...v0.23.0) (2021-08-04)
