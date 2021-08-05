@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.25.0](https://github.com/maidsafe/safe_network/compare/v0.24.2...v0.25.0) (2021-08-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* Functions exposed with the `test-utils` feature enabled
+now return `eyre::Report` rather than `anyhow::Error`.
+* The `testing` feature has been renamed to `test-utils`.
+
+### Features
+
+* **sn_node:** Use `eyre` to report errors ([82b2714](https://github.com/maidsafe/safe_network/commit/82b271415c3e94f49f38f8e708af4de7b7ec7045))
+* Use `color-eyre` in `sn_node` for pretty errors ([3447f74](https://github.com/maidsafe/safe_network/commit/3447f747a0c1d074c03f5c5bc8f6f03de6f6667f))
+
+
+### Bug Fixes
+
+* Restore `criterion` dependency ([48a7671](https://github.com/maidsafe/safe_network/commit/48a767140757c7c961c605e9d6bb5b77d24e6c65))
+
+
+* Rename `testing` feature to `test-utils` ([093b76f](https://github.com/maidsafe/safe_network/commit/093b76fb304045c5d162c0d230400c7bbe25fb0d))
+* Switch from `anyhow` to `eyre` ([3674e67](https://github.com/maidsafe/safe_network/commit/3674e678119fa4be7a101b737ee089d9fcae7b0e))
+
 ### [0.24.2](https://github.com/maidsafe/safe_network/compare/v0.24.1...v0.24.2) (2021-08-05)
 
 ### [0.24.1](https://github.com/maidsafe/safe_network/compare/v0.24.0...v0.24.1) (2021-08-05)
