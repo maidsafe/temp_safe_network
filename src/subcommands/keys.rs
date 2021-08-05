@@ -9,7 +9,7 @@
 
 use super::{helpers::serialise_output, OutputFmt};
 use crate::operations::auth_and_connect::{create_credentials_file, read_credentials};
-use anyhow::{anyhow, bail, Context, Result};
+use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use hex::encode;
 use sn_api::{
     fetch::{SafeData, SafeUrl},
@@ -63,7 +63,7 @@ pub async fn key_commander(
                         // 32 bytes long, just like a xorname.
                         // TODO: support for BLS keys which are longer.
                         let pk = ed25519_dalek::PublicKey::from_bytes(&xorname).map_err(|err| {
-                            anyhow!(
+                            eyre!(
                                 "Failed to derive Ed25519 PublicKey from SafeKey at '{}': {:?}",
                                 url,
                                 err
@@ -108,10 +108,10 @@ pub async fn key_commander(
                 println!("Setting new SafeKey to be used by CLI...");
                 let (mut file, file_path) = create_credentials_file()?;
                 let serialised_keypair = serde_json::to_string(&key_pair)
-                    .context("Unable to serialise the credentials created")?;
+                    .wrap_err("Unable to serialise the credentials created")?;
 
                 file.write_all(serialised_keypair.as_bytes())
-                    .with_context(|| {
+                    .wrap_err_with(|| {
                         format!("Unable to write credentials in {}", file_path.display(),)
                     })?;
 

@@ -9,7 +9,7 @@
 
 #[cfg(feature = "self-update")]
 use super::helpers::download_and_install_github_release_asset;
-use anyhow::{anyhow, bail, Context, Result};
+use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use log::debug;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use sn_launch_tool::{join_with, run_with};
@@ -54,7 +54,7 @@ fn run_safe_cmd(
             Stdio::inherit()
         })
         .spawn()
-        .with_context(|| format!("Failed to run 'safe' with args '{:?}'", args))?;
+        .wrap_err_with(|| format!("Failed to run 'safe' with args '{:?}'", args))?;
 
     Ok(())
 }
@@ -65,7 +65,7 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
     let path_str = bin_path.display().to_string();
 
     if !bin_path.as_path().is_file() {
-        return Err(anyhow!(format!(
+        return Err(eyre!(format!(
             "node executable not found at '{}'.",
             path_str
         )));
@@ -77,7 +77,7 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
         .stderr(Stdio::piped())
         .output()
         .map_err(|err| {
-            anyhow!(format!(
+            eyre!(format!(
                 "Failed to execute node from '{}': {}",
                 path_str, err
             ))
@@ -86,9 +86,9 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
     if output.status.success() {
         io::stdout()
             .write_all(&output.stdout)
-            .map_err(|err| anyhow!(format!("failed to write to stdout: {}", err)))
+            .map_err(|err| eyre!(format!("failed to write to stdout: {}", err)))
     } else {
-        Err(anyhow!(
+        Err(eyre!(
             "Failed to get node version nodes when invoking executable from '{}': {}",
             path_str,
             String::from_utf8_lossy(&output.stderr)
@@ -98,7 +98,7 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
 
 #[cfg(not(feature = "self-update"))]
 pub fn node_install(_vault_path: Option<PathBuf>, version: Option<String>) -> Result<()> {
-    anyhow!("Self updates are disabled")
+    eyre!("Self updates are disabled")
 }
 
 #[cfg(feature = "self-update")]
@@ -131,7 +131,7 @@ pub fn node_run(
     if !nodes_dir.exists() {
         println!("Creating '{}' folder", nodes_dir.display());
         create_dir_all(nodes_dir.clone())
-            .context("Couldn't create target path to store nodes' generated data")?;
+            .wrap_err("Couldn't create target path to store nodes' generated data")?;
     }
     let arg_nodes_dir = nodes_dir.display().to_string();
     println!("Storing nodes' generated data at {}", arg_nodes_dir);
@@ -174,7 +174,7 @@ pub fn node_run(
 
     // We can now call the tool with the args
     println!("Launching local Safe network...");
-    run_with(Some(&sn_launch_tool_args)).map_err(|err| anyhow!(err))?;
+    run_with(Some(&sn_launch_tool_args)).map_err(|err| eyre!(err))?;
 
     let interval_duration = Duration::from_secs(interval_as_int * 15);
     thread::sleep(interval_duration);
@@ -239,7 +239,7 @@ pub fn node_join(
     if !node_data_dir.exists() {
         println!("Creating '{}' folder", node_data_dir.display());
         create_dir_all(node_data_dir.clone())
-            .context("Couldn't create target path to store nodes' generated data")?;
+            .wrap_err("Couldn't create target path to store nodes' generated data")?;
     }
     let arg_nodes_dir = node_data_dir.display().to_string();
     println!("Storing nodes' generated data at {}", arg_nodes_dir);
@@ -296,7 +296,7 @@ pub fn node_join(
 
     // We can now call the tool with the args
     println!("Starting a node to join a Safe network...");
-    join_with(Some(&sn_launch_tool_args)).map_err(|err| anyhow!(err))?;
+    join_with(Some(&sn_launch_tool_args)).map_err(|err| eyre!(err))?;
     Ok(())
 }
 
@@ -330,8 +330,8 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
     match node_path {
         Some(p) => Ok(p),
         None => {
-            let mut path = dirs_next::home_dir()
-                .ok_or_else(|| anyhow!("Failed to obtain user's home path"))?;
+            let mut path =
+                dirs_next::home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
 
             path.push(".safe");
             path.push("node");
@@ -345,7 +345,7 @@ fn kill_nodes(exec_name: &str) -> Result<()> {
     let output = Command::new("killall")
         .arg(exec_name)
         .output()
-        .with_context(|| {
+        .wrap_err_with(|| {
             format!(
                 "Error when atempting to stop nodes ({}) processes",
                 exec_name
@@ -359,7 +359,7 @@ fn kill_nodes(exec_name: &str) -> Result<()> {
         );
         Ok(())
     } else {
-        Err(anyhow!(
+        Err(eyre!(
             "Failed to stop nodes ({}) processes: {}",
             exec_name,
             String::from_utf8_lossy(&output.stderr)
@@ -372,7 +372,7 @@ fn kill_nodes(exec_name: &str) -> Result<()> {
     let output = Command::new("taskkill")
         .args(&["/F", "/IM", exec_name])
         .output()
-        .with_context(|| {
+        .wrap_err_with(|| {
             format!(
                 "Error when atempting to stop nodes ({}) processes",
                 exec_name
@@ -386,7 +386,7 @@ fn kill_nodes(exec_name: &str) -> Result<()> {
         );
         Ok(())
     } else {
-        Err(anyhow!(
+        Err(eyre!(
             "Failed to stop nodes ({}) processes: {}",
             exec_name,
             String::from_utf8_lossy(&output.stderr)
@@ -403,19 +403,19 @@ pub fn node_update(node_path: Option<PathBuf>) -> Result<()> {
     let child = Command::new(&arg_node_path)
         .args(vec!["--update-only"])
         .spawn()
-        .with_context(|| format!("Failed to update node at '{}'", arg_node_path))?;
+        .wrap_err_with(|| format!("Failed to update node at '{}'", arg_node_path))?;
 
     let output = child
         .wait_with_output()
-        .with_context(|| format!("Failed to update node at '{}'", arg_node_path))?;
+        .wrap_err_with(|| format!("Failed to update node at '{}'", arg_node_path))?;
 
     if output.status.success() {
         io::stdout()
             .write_all(&output.stdout)
-            .context("Failed to output stdout")?;
+            .wrap_err("Failed to output stdout")?;
         Ok(())
     } else {
-        Err(anyhow!(
+        Err(eyre!(
             "Failed when invoking node executable from '{}':\n{}",
             arg_node_path,
             String::from_utf8_lossy(&output.stderr)

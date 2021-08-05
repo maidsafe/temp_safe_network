@@ -9,7 +9,7 @@
 
 #![cfg(feature = "self-update")]
 
-use anyhow::{anyhow, Context, Result};
+use color_eyre::{eyre::eyre, eyre::WrapErr, Result};
 #[cfg(not(target_os = "windows"))]
 use std::os::unix::fs::PermissionsExt;
 use std::{
@@ -31,7 +31,7 @@ pub fn download_and_install_github_release_asset(
         .bin_name(exec_file_name)
         .current_version(env!("CARGO_PKG_VERSION"))
         .build()
-        .context(format!(
+        .wrap_err(format!(
             "Error fetching list of releases for maidsafe/{} repository",
             repo_name
         ))?;
@@ -39,14 +39,14 @@ pub fn download_and_install_github_release_asset(
     if let Some(version) = version {
         release = updater
             .get_release_version(format!("v{}", version).as_str())
-            .context(format!(
+            .wrap_err(format!(
                 "The maidsafe/{} repository has no release at version {}",
                 repo_name, version
             ))?;
     } else {
         release = updater
             .get_latest_release()
-            .context("Failed to find a release available to install")?;
+            .wrap_err("Failed to find a release available to install")?;
     }
     download_and_install_bin(target_path, &target, release, exec_file_name)
 }
@@ -76,14 +76,14 @@ fn download_and_install_bin(
     );
     // get the corresponding asset from the release
     let asset = release.asset_for(target).ok_or_else(|| {
-        anyhow!(
+        eyre!(
             "No asset found in latest release for the target platform {}",
             target
         )
     })?;
     let tmp_dir = std::env::temp_dir();
     let tmp_tarball_path = tmp_dir.join(&asset.name);
-    let tmp_tarball = File::create(&tmp_tarball_path).with_context(|| {
+    let tmp_tarball = File::create(&tmp_tarball_path).wrap_err_with(|| {
         format!(
             "Error creating temp file ('{}') for downloading the release",
             tmp_tarball_path.display(),
@@ -94,12 +94,12 @@ fn download_and_install_bin(
     self_update::Download::from_url(&asset.download_url)
         .show_progress(true)
         .download_to(&tmp_tarball)
-        .with_context(|| format!("Error downloading release asset '{}'", asset.download_url))?;
+        .wrap_err_with(|| format!("Error downloading release asset '{}'", asset.download_url))?;
 
     if !target_path.exists() {
         println!("Creating '{}' folder", target_path.display());
         create_dir_all(target_path.clone())
-            .context("Couldn't create target path to install binary")?;
+            .wrap_err("Couldn't create target path to install binary")?;
     }
 
     println!(
@@ -109,7 +109,7 @@ fn download_and_install_bin(
     );
     self_update::Extract::from_source(&tmp_tarball_path)
         .extract_file(target_path.as_path(), exec_file_name)
-        .with_context(|| {
+        .wrap_err_with(|| {
             format!(
                 "Error extracting binary from downloaded asset '{}'",
                 tmp_tarball_path.display(),
@@ -137,7 +137,7 @@ fn set_exec_perms(file_path: PathBuf) -> Result<()> {
         "Setting execution permissions to installed binary '{}'...",
         file_path.display()
     );
-    let file = File::open(&file_path).with_context(|| {
+    let file = File::open(&file_path).wrap_err_with(|| {
         format!(
             "Error when preparing to set execution permissions to installed binary '{}'",
             file_path.display(),
@@ -146,7 +146,7 @@ fn set_exec_perms(file_path: PathBuf) -> Result<()> {
 
     let mut perms = file
         .metadata()
-        .with_context(|| {
+        .wrap_err_with(|| {
             format!(
                 "Error when reading metadata from installed binary '{}'",
                 file_path.display(),
@@ -158,7 +158,7 @@ fn set_exec_perms(file_path: PathBuf) -> Result<()> {
     // Allow unusual bit grouping to clearly separate 3 bits parts
     #[allow(clippy::unusual_byte_groupings)]
     perms.set_mode(perms.mode() | 0b0_001_001_001);
-    file.set_permissions(perms).with_context(|| {
+    file.set_permissions(perms).wrap_err_with(|| {
         format!(
             "Failed to set execution permissions to installed binary '{}'",
             file_path.display(),

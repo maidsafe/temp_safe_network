@@ -11,7 +11,7 @@ use super::{
     helpers::{get_from_arg_or_stdin, notice_dry_run, serialise_output},
     OutputFmt,
 };
-use anyhow::Result;
+use color_eyre::Result;
 use prettytable::{format::FormatBuilder, Table};
 use sn_api::{Safe, XorUrl};
 use std::collections::BTreeMap;

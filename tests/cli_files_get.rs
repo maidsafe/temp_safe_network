@@ -18,7 +18,7 @@ const EXISTS_OVERWRITE: &str = "overwrite";
 const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
-use anyhow::{anyhow, bail, Result};
+use color_eyre::{eyre::bail, eyre::eyre, Result};
 use sn_cmd_test_utilities::util::{
     can_write_symlinks, create_and_upload_test_absolute_symlinks_folder, create_nrs_link,
     create_symlink, digest_file, get_random_nrs_string, parse_files_put_or_sync_output,
@@ -54,7 +54,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
     let final_dest = dest_dir(&[TESTDATA, TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| eyre!(e.to_string()))?;
 
     files_get(
         src,
@@ -82,7 +82,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| eyre!(e.to_string()))?;
 
     files_get(
         src,
@@ -191,9 +191,9 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| eyre!(e.to_string()))?;
     let existing_file = Path::new(&dest).join("subfolder");
-    let f = fs::File::create(&existing_file).map_err(|e| anyhow!(e.to_string()))?;
+    let f = fs::File::create(&existing_file).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
     let cmd_output = files_get(
@@ -237,7 +237,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     let mut nrs_name = "NRS_NAME".to_string();
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|e| anyhow!(e.to_string()))?
+        .map_err(|e| eyre!(e.to_string()))?
         .as_micros();
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
@@ -250,7 +250,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
         &files_container_xor
     )
     .read()
-    .map_err(|e| anyhow!("{:#?}", e))?;
+    .map_err(|e| eyre!("{:#?}", e))?;
 
     let src = format!("safe://{}", &nrs_name);
     let final_dest = Path::new(".").join(TESTDATA).display().to_string();
@@ -296,7 +296,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     let mut nrs_name = "NRS_NAME".to_string();
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|e| anyhow!(e.to_string()))?
+        .map_err(|e| eyre!(e.to_string()))?
         .as_micros();
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
@@ -309,7 +309,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
         &xor_url_with_path
     )
     .read()
-    .map_err(|e| anyhow!("{:#?}", e))?;
+    .map_err(|e| eyre!("{:#?}", e))?;
 
     // make safe://nrsname/sub2.md
     let src = format!("safe://{}/{}", &nrs_name, TEST_FILE);
@@ -405,8 +405,8 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
     let src_dir = dest_dir(&[DIR_WITH_SPACE]);
     let src_file = dest_dir(&[DIR_WITH_SPACE, FILE_WITH_SPACE]);
     remove_dest(&src_dir)?;
-    fs::create_dir_all(&src_dir).map_err(|e| anyhow!(e.to_string()))?;
-    let f = fs::File::create(&src_file).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&src_dir).map_err(|e| eyre!(e.to_string()))?;
+    let f = fs::File::create(&src_file).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
     let files_container = cmd!(
@@ -418,7 +418,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| anyhow!("{:#?}", e))?;
+    .map_err(|e| eyre!("{:#?}", e))?;
 
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
 
@@ -459,8 +459,8 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
     let src_dir = dest_dir(&[DIR_WITH_SPACE]);
     let src_file = dest_dir(&[DIR_WITH_SPACE, FILE_WITH_SPACE]);
     remove_dest(&src_dir)?;
-    fs::create_dir_all(&src_dir).map_err(|e| anyhow!(e.to_string()))?;
-    let f = fs::File::create(&src_file).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&src_dir).map_err(|e| eyre!(e.to_string()))?;
+    let f = fs::File::create(&src_file).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
     let files_container = cmd!(
@@ -472,7 +472,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| anyhow!("{:#?}", e))?;
+    .map_err(|e| eyre!("{:#?}", e))?;
 
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
 
@@ -521,9 +521,9 @@ fn files_get_exists_preserve() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| eyre!(e.to_string()))?;
     let existing_file = Path::new(&dest).join("test.md");
-    let f = fs::File::create(&existing_file).map_err(|e| anyhow!(e.to_string()))?;
+    let f = fs::File::create(&existing_file).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -556,9 +556,9 @@ fn files_get_exists_overwrite() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| eyre!(e.to_string()))?;
     let existing_file = Path::new(&dest).join("test.md");
-    let f = fs::File::create(&existing_file).map_err(|e| anyhow!(e.to_string()))?;
+    let f = fs::File::create(&existing_file).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -699,7 +699,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     let final_dest = dest_dir(&[TESTDATA, TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| eyre!(e.to_string()))?;
 
     files_get(
         &src,
@@ -729,7 +729,7 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    let f = fs::File::create(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    let f = fs::File::create(&dest).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
     let cmd_output = files_get(
@@ -790,7 +790,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     let final_dest = dest_dir(&[NEWNAME, TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| eyre!(e.to_string()))?;
 
     files_get(
         &src,
@@ -820,7 +820,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
     let dest = dest_dir(&[NEWNAME]);
 
     remove_dest(&dest)?;
-    let f = fs::File::create(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    let f = fs::File::create(&dest).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
     let cmd_output = files_get(
@@ -883,7 +883,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     let final_dest = dest_dir(&[NOEXTENSION, NOEXTENSION]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| eyre!(e.to_string()))?;
 
     files_get(
         &src,
@@ -911,7 +911,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     let dest = dest_dir(&[NOEXTENSION]);
 
     remove_dest(&dest)?;
-    let f = fs::File::create(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    let f = fs::File::create(&dest).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -970,7 +970,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     let final_dest = dest_dir(&[NEWNAME, NOEXTENSION]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| eyre!(e.to_string()))?;
 
     files_get(
         &src,
@@ -998,7 +998,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     let dest = dest_dir(&[NEWNAME]);
 
     remove_dest(&dest)?;
-    let f = fs::File::create(&dest).map_err(|e| anyhow!(e.to_string()))?;
+    let f = fs::File::create(&dest).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -1138,8 +1138,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     // create a new symlink inside the directory.
     let new_symlink_path = Path::new(&symlinks_dir).join("newlink");
     let new_symlink_target = Path::new(&symlinks_dir).join("newlink_target");
-    create_symlink(&new_symlink_target, &new_symlink_path, false)
-        .map_err(|e| anyhow!("{:?}", e))?;
+    create_symlink(&new_symlink_target, &new_symlink_path, false).map_err(|e| eyre!("{:?}", e))?;
 
     // sync dir with new symlink to network
     let args = ["files", "sync", &symlinks_dir, &safeurl.to_string()];
@@ -1174,9 +1173,9 @@ fn files_get_symlinks_after_sync() -> Result<()> {
 fn remove_dest(path: &str) -> Result<()> {
     let p = Path::new(path);
     if p.is_file() {
-        fs::remove_file(&path).map_err(|e| anyhow!(e.to_string()))
+        fs::remove_file(&path).map_err(|e| eyre!(e.to_string()))
     } else if p.is_dir() {
-        fs::remove_dir_all(&path).map_err(|e| anyhow!(e.to_string()))
+        fs::remove_dir_all(&path).map_err(|e| eyre!(e.to_string()))
     } else {
         Ok(())
     }
@@ -1210,7 +1209,7 @@ fn files_get(
         .stderr_capture()
         .unchecked()
         .run()
-        .map_err(|e| anyhow!("{:#?}", e))?;
+        .map_err(|e| eyre!("{:#?}", e))?;
 
     if let Some(ec) = expect_exit_code {
         match output.status.code() {
@@ -1270,7 +1269,7 @@ fn join_url_paths(path: &[&str]) -> String {
 fn source_path(url: &str, path: &[&str]) -> Result<String> {
     let pb = path.join("/");
 
-    let x = safeurl_from(url).map_err(|e| anyhow!(e))?;
+    let x = safeurl_from(url).map_err(|e| eyre!(e))?;
 
     let url = format!(
         "{}://{}/{}{}{}",

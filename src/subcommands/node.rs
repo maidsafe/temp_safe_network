@@ -11,7 +11,7 @@ use crate::operations::{
     config::{read_current_network_conn_info, Config},
     node::*,
 };
-use anyhow::{anyhow, Result};
+use color_eyre::{eyre::eyre, Result};
 use log::debug;
 use std::{collections::HashSet, iter::FromIterator, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
@@ -112,7 +112,7 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
             let handler = std::thread::spawn(|| node_install(node_path, version));
             handler
                 .join()
-                .map_err(|err| anyhow!("Failed to run self update: {:?}", err))?
+                .map_err(|err| eyre!("Failed to run self update: {:?}", err))?
         }
         Some(NodeSubCommands::Join {
             network_name,
@@ -170,6 +170,6 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
         ),
         Some(NodeSubCommands::Killall { node_path }) => node_shutdown(node_path),
         Some(NodeSubCommands::Update { node_path }) => node_update(node_path),
-        None => Err(anyhow!("Missing node subcommand")),
+        None => Err(eyre!("Missing node subcommand")),
     }
 }

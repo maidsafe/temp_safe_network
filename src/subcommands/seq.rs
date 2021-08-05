@@ -13,7 +13,7 @@ use super::{
     },
     OutputFmt,
 };
-use anyhow::Result;
+use color_eyre::Result;
 use sn_api::Safe;
 use structopt::StructOpt;
 

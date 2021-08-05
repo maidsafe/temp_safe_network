@@ -11,7 +11,7 @@ use super::{
     helpers::{div_or, pluralize, prompt_user},
     OutputFmt,
 };
-use anyhow::{anyhow, bail, Context, Result};
+use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, TickTimeLimit};
 use log::{debug, info, trace, warn};
@@ -527,10 +527,7 @@ fn ensure_parent_dir_exists(path: &str) -> Result<()> {
         }
     } else {
         // This should never happen.
-        Err(anyhow!(
-            "Parent directory not found for: \"{}\"",
-            p.display()
-        ))
+        Err(eyre!("Parent directory not found for: \"{}\"", p.display()))
     }
 }
 
@@ -753,11 +750,7 @@ fn file_sync_all(f: &fs::File, path: &Path) -> Result<()> {
 fn bufwriter_into_inner<W: Write>(w: BufWriter<W>, path: &Path) -> Result<W> {
     match w.into_inner() {
         Ok(inner) => Ok(inner),
-        Err(err) => Err(anyhow!(
-            "Error flushing file \"{}\": {}",
-            path.display(),
-            err
-        )),
+        Err(err) => Err(eyre!("Error flushing file \"{}\": {}", path.display(), err)),
     }
 }
 
@@ -800,6 +793,6 @@ pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<
             Ok(pub_blob)
         }
         SafeDataType::PrivateBlob => files_get_private_blob(safe, url, range).await,
-        _ => Err(anyhow!("URL target is not immutable data")),
+        _ => Err(eyre!("URL target is not immutable data")),
     }
 }

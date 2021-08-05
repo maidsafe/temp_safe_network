@@ -9,7 +9,7 @@
 
 #[allow(dead_code)]
 pub mod util {
-    use anyhow::{anyhow, bail, Context, Result};
+    use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
     use duct::cmd;
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -79,14 +79,14 @@ pub mod util {
 
         let (wallet_xor, _key_xorurl, key_pair) = parse_wallet_create_output(&wallet_create_result);
         let unwrapped_key_pair =
-            key_pair.ok_or_else(|| anyhow!("Could not parse wallet".to_string()))?;
+            key_pair.ok_or_else(|| eyre!("Could not parse wallet".to_string()))?;
 
         Ok((
             wallet_xor,
             unwrapped_key_pair.public_key().to_string(),
             unwrapped_key_pair
                 .secret_key()
-                .context("Error extracting SecretKey from keypair")?
+                .wrap_err("Error extracting SecretKey from keypair")?
                 .to_string(),
         ))
     }
@@ -153,23 +153,23 @@ pub mod util {
 
         let subdir = symlinks.join("subdir");
         fs::create_dir(&subdir)
-            .context(format!("Failed to create directory: {}", subdir.display()))?;
+            .wrap_err(format!("Failed to create directory: {}", subdir.display()))?;
 
         let dir_link_path = symlinks.join("absolute_link_to_dir");
-        create_symlink(&subdir, &dir_link_path, false).context(format!(
+        create_symlink(&subdir, &dir_link_path, false).wrap_err(format!(
             "Failed to create symlink '{}' to: {}",
             dir_link_path.display(),
             subdir.display()
         ))?;
 
         let filepath = symlinks.join("file.txt");
-        fs::write(&filepath, "Some data").context(format!(
+        fs::write(&filepath, "Some data").wrap_err(format!(
             "Failed to write to file at: {}",
             filepath.display()
         ))?;
 
         let file_link_path = symlinks.join("absolute_link_to_file.txt");
-        create_symlink(&filepath, &file_link_path, false).context(format!(
+        create_symlink(&filepath, &file_link_path, false).wrap_err(format!(
             "Failed to create symlink '{}' to: {}",
             file_link_path.display(),
             filepath.display()
@@ -198,7 +198,7 @@ pub mod util {
         let name = get_random_nrs_string();
         let path_random = env::temp_dir().join(name);
         let path_emptyfolder = path_random.join(folder_name);
-        fs::create_dir_all(&path_emptyfolder).context(format!(
+        fs::create_dir_all(&path_emptyfolder).wrap_err(format!(
             "Failed to create path: {}",
             path_emptyfolder.display()
         ))?;
@@ -239,7 +239,7 @@ pub mod util {
             let relpath = p
                 .path()
                 .strip_prefix(path)
-                .context(format!(
+                .wrap_err(format!(
                     "Failed to strip prefix '{}' to '{}'",
                     path,
                     p.path().display()
@@ -250,7 +250,7 @@ pub mod util {
             if p.path().is_file() {
                 digests.push_str(&digest_file(&p.path().display().to_string())?);
             } else if p.path_is_symlink() {
-                let target_path = fs::read_link(&p.path()).context(format!(
+                let target_path = fs::read_link(&p.path()).wrap_err(format!(
                     "Failed to follow link from file at: {}",
                     p.path().display()
                 ))?;
@@ -282,7 +282,7 @@ pub mod util {
     // returns sha3_256 digest/hash of a file as a string.
     pub fn digest_file(path: &str) -> Result<String> {
         let data = fs::read_to_string(&path)
-            .context(format!("Failed to read string from file at: {}", path))?;
+            .wrap_err(format!("Failed to read string from file at: {}", path))?;
         Ok(str_to_sha3_256(&data))
     }
 
@@ -291,7 +291,7 @@ pub mod util {
     }
 
     pub fn safeurl_from(url: &str) -> Result<SafeUrl> {
-        SafeUrl::from_url(url).map_err(|e| anyhow!("Failed to parse URL: {}", e))
+        SafeUrl::from_url(url).map_err(|e| eyre!("Failed to parse URL: {}", e))
     }
 
     pub fn parse_files_container_output(
@@ -350,7 +350,7 @@ pub mod util {
             .stderr_capture()
             .unchecked()
             .run()
-            .with_context(|| {
+            .wrap_err_with(|| {
                 format!("Failed to run 'safe' command with args: {}", args.join(" "))
             })?;
 
@@ -371,7 +371,7 @@ pub mod util {
     pub fn safe_cmd_stdout(args: &[&str], expect_exit_code: Option<i32>) -> Result<String> {
         let output = safe_cmd(&args, expect_exit_code)?;
         String::from_utf8(output.stdout)
-            .context("Failed to parse the error output as a UTF-8 string".to_string())
+            .wrap_err("Failed to parse the error output as a UTF-8 string".to_string())
     }
 
     // Executes arbitrary `safe ` commands and returns
@@ -382,7 +382,7 @@ pub mod util {
     pub fn safe_cmd_stderr(args: &[&str], expect_exit_code: Option<i32>) -> Result<String> {
         let output = safe_cmd(&args, expect_exit_code)?;
         String::from_utf8(output.stderr)
-            .context("Failed to parse the error output as a UTF-8 string".to_string())
+            .wrap_err("Failed to parse the error output as a UTF-8 string".to_string())
     }
 
     // returns true if the OS permits writing symlinks
@@ -421,7 +421,7 @@ pub mod util {
 
         match result {
             Ok(meta) => Ok(meta.file_type().is_symlink()),
-            Err(e) => Err(anyhow!("{:?}", e)),
+            Err(e) => Err(eyre!("{:?}", e)),
         }
     }
 }

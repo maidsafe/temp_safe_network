@@ -11,7 +11,7 @@ use super::{
     helpers::{get_from_arg_or_stdin, print_nrs_map, serialise_output},
     OutputFmt,
 };
-use anyhow::{Context, Result};
+use color_eyre::{eyre::WrapErr, Result};
 use log::{debug, trace};
 use prettytable::Table;
 use sn_api::{fetch::SafeData, Safe};

@@ -12,9 +12,9 @@ mod operations;
 mod shell;
 mod subcommands;
 
-use anyhow::Result;
 use chrono::Local;
 use cli::run;
+use color_eyre::{Report, Result};
 use human_panic::{handle_dump, Metadata};
 use log::debug;
 use std::io::Write;
@@ -31,7 +31,8 @@ const APP_NAME: &str = "Safe CLI";
 const APP_VENDOR: &str = "MaidSafe.net Ltd";
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), Report> {
+    color_eyre::install()?;
     let mut builder = env_logger::Builder::from_default_env();
     builder
         .format(|buf, record| {

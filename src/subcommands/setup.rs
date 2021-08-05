@@ -9,7 +9,7 @@
 
 use super::{helpers::serialise_output, OutputFmt};
 use crate::cli::CmdArgs;
-use anyhow::{anyhow, bail, Context, Result};
+use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use std::io::Write;
 use structopt::{clap, StructOpt};
 
@@ -48,7 +48,7 @@ fn setup_completions_dumpone(shell: clap::Shell, output_fmt: OutputFmt) -> Resul
         // Pretty format just writes the shell completion to stdout
         std::io::stdout()
             .write_all(&buf)
-            .context("Failed to print shell completions")?;
+            .wrap_err("Failed to print shell completions")?;
         println!();
     } else {
         // will be serialized as a string.  no object container.
@@ -73,14 +73,14 @@ fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<()> {
         for shellname in shellnames.iter() {
             let shell = shellname
                 .parse::<clap::Shell>()
-                .map_err(|err| anyhow!("Failed to parse shell name: {}", err))?;
+                .map_err(|err| eyre!("Failed to parse shell name: {}", err))?;
 
             let buf = gen_completions_for_shell(shell)?;
 
             println!("--- {} ---", shellname);
             std::io::stdout()
                 .write_all(&buf)
-                .context("Failed to print shell completions")?
+                .wrap_err("Failed to print shell completions")?
         }
         println!();
     } else {
@@ -91,7 +91,7 @@ fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<()> {
         for shellname in shellnames.iter() {
             let shell = shellname
                 .parse::<clap::Shell>()
-                .map_err(|err| anyhow!("Failed to parse shell name: {}", err))?;
+                .map_err(|err| eyre!("Failed to parse shell name: {}", err))?;
             let buf = gen_completions_for_shell(shell)?;
             match std::str::from_utf8(&buf) {
                 Ok(v) => {
@@ -112,7 +112,7 @@ fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<()> {
 // generates completions for a given shell, eg bash.
 fn gen_completions_for_shell(shell: clap::Shell) -> Result<Vec<u8>> {
     // Get exe path
-    let exe_path = std::env::current_exe().context("Can't get the exec path")?;
+    let exe_path = std::env::current_exe().wrap_err("Can't get the exec path")?;
 
     // get filename without preceding path as std::ffi::OsStr (C string)
     let exec_name_ffi = match exe_path.file_name() {

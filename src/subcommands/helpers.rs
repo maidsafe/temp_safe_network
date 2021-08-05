@@ -9,7 +9,7 @@
 
 use super::OutputFmt;
 use ansi_term::Style;
-use anyhow::{anyhow, bail, Context, Result};
+use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use log::debug;
 use num_traits::Float;
 use prettytable::{format::FormatBuilder, Table};
@@ -52,7 +52,7 @@ pub fn get_from_arg_or_stdin(arg: Option<String>, message: Option<&str>) -> Resu
         Some(ref t) if t.is_empty() => {
             let val = get_from_stdin(message)?;
             Ok(String::from_utf8(val).map_err(|err| {
-                anyhow!(
+                eyre!(
                     "String read from STDIN contains invalid UTF-8 characters: {}",
                     err
                 )
@@ -62,7 +62,7 @@ pub fn get_from_arg_or_stdin(arg: Option<String>, message: Option<&str>) -> Resu
         None => {
             let val = get_from_stdin(message)?;
             Ok(String::from_utf8(val).map_err(|err| {
-                anyhow!(
+                eyre!(
                     "String read from STDIN contains invalid UTF-8 characters: {}",
                     err
                 )
@@ -105,7 +105,7 @@ pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> Result<String> {
     let _ = stdout().flush();
     let buf = read_stdin_response()?;
     if buf.is_empty() {
-        Err(anyhow!(error_msg.to_string()))
+        Err(eyre!(error_msg.to_string()))
     } else {
         Ok(buf)
     }

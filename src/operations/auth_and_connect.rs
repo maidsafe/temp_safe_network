@@ -9,7 +9,7 @@
 
 use super::config::read_current_network_conn_info;
 use crate::{APP_ID, APP_NAME, APP_VENDOR};
-use anyhow::{anyhow, Context, Result};
+use color_eyre::{eyre::eyre, eyre::WrapErr, Result};
 use log::{debug, info, warn};
 use sn_api::{Keypair, Safe};
 use std::{
@@ -30,13 +30,13 @@ pub async fn authorise_cli(endpoint: Option<String>, is_self_authing: bool) -> R
     println!("Waiting for authorising response from authd...");
     let app_keypair = Safe::auth_app(APP_ID, APP_NAME, APP_VENDOR, endpoint.as_deref())
         .await
-        .context("Application authorisation failed")?;
+        .wrap_err("Application authorisation failed")?;
 
     let serialised_keypair = serde_json::to_string(&app_keypair)
-        .context("Unable to serialise the credentials obtained")?;
+        .wrap_err("Unable to serialise the credentials obtained")?;
 
     file.write_all(serialised_keypair.as_bytes())
-        .with_context(|| format!("Unable to write credentials in {}", file_path.display(),))?;
+        .wrap_err_with(|| format!("Unable to write credentials in {}", file_path.display(),))?;
 
     println!("Safe CLI app was successfully authorised");
     println!("Credentials were stored in {}", file_path.display());
@@ -75,11 +75,11 @@ pub async fn connect(safe: &mut Safe) -> Result<Option<Keypair>> {
             warn!("Credentials found for CLI are invalid, connecting with read-only access...");
             safe.connect(None, None, Some(bootstrap_contacts))
                 .await
-                .context("Failed to connect with read-only access")?;
+                .wrap_err("Failed to connect with read-only access")?;
 
             Ok(None)
         }
-        Err(err) => Err(anyhow!("Failed to connect: {}", err)),
+        Err(err) => Err(eyre!("Failed to connect: {}", err)),
         Ok(()) => Ok(app_keypair),
     }
 }
@@ -144,7 +144,7 @@ pub fn clear_credentials() -> Result<()> {
 
 fn get_credentials_file_path() -> Result<(PathBuf, PathBuf)> {
     let mut project_data_path =
-        dirs_next::home_dir().ok_or_else(|| anyhow!("Failed to obtain user's home path"))?;
+        dirs_next::home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
 
     project_data_path.push(".safe");
     project_data_path.push("cli");

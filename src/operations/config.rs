@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use anyhow::{anyhow, bail, Context, Result};
+use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use log::debug;
 use prettytable::Table;
 use serde::{Deserialize, Serialize};
@@ -72,17 +72,17 @@ impl Config {
                 settings: Settings::default(),
                 file_path: file_path.clone(),
             };
-            empty_config.write_settings_to_file().with_context(|| {
+            empty_config.write_settings_to_file().wrap_err_with(|| {
                 format!("Unable to create config at '{}'", file_path.display(),)
             })?;
             debug!("Empty config file created at '{}'", file_path.display(),);
             empty_config
         } else {
-            let file = fs::File::open(&file_path).with_context(|| {
+            let file = fs::File::open(&file_path).wrap_err_with(|| {
                 format!("Error opening config file from '{}'", file_path.display(),)
             })?;
 
-            let settings: Settings = serde_json::from_reader(file).with_context(|| {
+            let settings: Settings = serde_json::from_reader(file).wrap_err_with(|| {
                 format!(
                     "Format of the config file at '{}' is not valid and couldn't be parsed",
                     file_path.display()
@@ -198,12 +198,12 @@ impl Config {
                 base_path.display()
             );
             create_dir_all(&base_path)
-                .context("Couldn't create folder for network connection info")?;
+                .wrap_err("Couldn't create folder for network connection info")?;
         }
 
         let contacts = self.get_network_info(name).await?;
         let conn_info = serialise_contacts(&contacts)?;
-        fs::write(&file_path, conn_info).with_context(|| {
+        fs::write(&file_path, conn_info).wrap_err_with(|| {
             format!(
                 "Unable to write network connection info in '{}'",
                 base_path.display(),
@@ -236,10 +236,10 @@ impl Config {
     // Private helpers
 
     fn write_settings_to_file(&self) -> Result<()> {
-        let serialised_settings =
-            serde_json::to_string(&self.settings).context("Failed to serialise config settings")?;
+        let serialised_settings = serde_json::to_string(&self.settings)
+            .wrap_err("Failed to serialise config settings")?;
 
-        fs::write(&self.file_path, serialised_settings.as_bytes()).with_context(|| {
+        fs::write(&self.file_path, serialised_settings.as_bytes()).wrap_err_with(|| {
             format!(
                 "Unable to write config settings to '{}'",
                 self.file_path.display()
@@ -258,14 +258,14 @@ impl Config {
 
 pub fn read_current_network_conn_info() -> Result<(PathBuf, HashSet<SocketAddr>)> {
     let (_, file_path) = get_current_network_conn_info_path()?;
-    let current_conn_info = fs::read(&file_path).with_context(||
+    let current_conn_info = fs::read(&file_path).wrap_err_with(||
         format!(
             "There doesn't seem to be a any network setup in your system. Unable to read current network connection information from '{}'",
             file_path.display()
         )
     )?;
 
-    let contacts = deserialise_contacts(&current_conn_info).with_context(|| {
+    let contacts = deserialise_contacts(&current_conn_info).wrap_err_with(|| {
         format!(
             "Unable to read current network connection information from '{}'",
             file_path.display()
@@ -284,7 +284,7 @@ fn config_file_path() -> Result<PathBuf> {
             config_local_path.display()
         );
         create_dir_all(config_local_path)
-            .context("Couldn't create project's local config folder")?;
+            .wrap_err("Couldn't create project's local config folder")?;
     }
 
     Ok(file_path)
@@ -299,12 +299,12 @@ fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Result
             file_path.display()
         );
         create_dir_all(&file_path)
-            .context("Couldn't create folder for networks information cache")?;
+            .wrap_err("Couldn't create folder for networks information cache")?;
     }
 
     file_path.push(format!("{}_node_connection_info.config", network_name));
     let conn_info = serialise_contacts(contacts)?;
-    fs::write(&file_path, conn_info).with_context(|| {
+    fs::write(&file_path, conn_info).wrap_err_with(|| {
         format!(
             "Unable to cache connection information in '{}'",
             file_path.display(),
@@ -320,22 +320,23 @@ async fn retrieve_conn_info(location: &str) -> Result<HashSet<SocketAddr>> {
         #[cfg(feature = "self-update")]
         {
             // Fetch info from an HTTP/s location
-            let resp = reqwest::get(location).await.with_context(|| {
+            let resp = reqwest::get(location).await.wrap_err_with(|| {
                 format!("Failed to fetch connection information from '{}'", location)
             })?;
 
-            let conn_info = resp.text().await.with_context(|| {
+            let conn_info = resp.text().await.wrap_err_with(|| {
                 format!("Failed to fetch connection information from '{}'", location)
             })?;
 
             conn_info.as_bytes().to_vec()
         }
         #[cfg(not(feature = "self-update"))]
-        anyhow!("Self updates are disabled")
+        eyre!("Self updates are disabled")
     } else {
         // Fetch it from a local file then
-        fs::read(location)
-            .with_context(|| format!("Unable to read connection information from '{}'", location))?
+        fs::read(location).wrap_err_with(|| {
+            format!("Unable to read connection information from '{}'", location)
+        })?
     };
 
     deserialise_contacts(&contacts_bytes)
@@ -343,16 +344,16 @@ async fn retrieve_conn_info(location: &str) -> Result<HashSet<SocketAddr>> {
 
 fn deserialise_contacts(bytes: &[u8]) -> Result<HashSet<SocketAddr>> {
     serde_json::from_slice(bytes)
-        .with_context(|| "Format of the contacts addresses is not valid and couldn't be parsed")
+        .wrap_err_with(|| "Format of the contacts addresses is not valid and couldn't be parsed")
 }
 
 pub fn serialise_contacts(contacts: &HashSet<SocketAddr>) -> Result<String> {
-    serde_json::to_string(contacts).with_context(|| "Failed to serialise network connection info")
+    serde_json::to_string(contacts).wrap_err_with(|| "Failed to serialise network connection info")
 }
 
 fn get_current_network_conn_info_path() -> Result<(PathBuf, PathBuf)> {
     let mut node_data_path =
-        dirs_next::home_dir().ok_or_else(|| anyhow!("Failed to obtain user's home path"))?;
+        dirs_next::home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
 
     node_data_path.push(".safe");
     node_data_path.push("node");
@@ -365,7 +366,7 @@ fn get_current_network_conn_info_path() -> Result<(PathBuf, PathBuf)> {
 
 fn get_cli_config_path() -> Result<PathBuf> {
     let mut project_data_path =
-        dirs_next::home_dir().ok_or_else(|| anyhow!("Couldn't find user's home directory"))?;
+        dirs_next::home_dir().ok_or_else(|| eyre!("Couldn't find user's home directory"))?;
     project_data_path.push(".safe");
     project_data_path.push("cli");
 

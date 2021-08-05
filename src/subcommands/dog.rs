@@ -11,7 +11,7 @@ use super::{
     helpers::{get_from_arg_or_stdin, print_nrs_map, serialise_output, xorname_to_hex},
     OutputFmt,
 };
-use anyhow::Result;
+use color_eyre::Result;
 use log::debug;
 use sn_api::{
     fetch::{SafeContentType, SafeData},

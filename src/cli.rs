@@ -17,7 +17,7 @@ use crate::{
         xorurl::xorurl_commander, OutputFmt, SubCommands,
     },
 };
-use anyhow::{anyhow, Result};
+use color_eyre::{eyre::eyre, Result};
 use log::debug;
 use sn_api::{Safe, XorUrlBase};
 use std::env;
@@ -57,7 +57,7 @@ pub async fn run() -> Result<()> {
     let cli_timeout: u64 = match env::var("SN_CLI_QUERY_TIMEOUT") {
         Ok(timeout) => timeout
             .parse::<u64>()
-            .map_err(|_| anyhow!("Could not parse \'SN_CLI_QUERY_TIMEOUT\' env var"))?,
+            .map_err(|_| eyre!("Could not parse \'SN_CLI_QUERY_TIMEOUT\' env var"))?,
         Err(_) => DEFAULT_TIMEOUT_SECS,
     };
 
@@ -98,11 +98,11 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
             // the no_confirm flag.
             let handler = std::thread::spawn(move || {
                 update_commander(no_confirm)
-                    .map_err(|err| anyhow!("Error performing update: {}", err))
+                    .map_err(|err| eyre!("Error performing update: {}", err))
             });
             handler
                 .join()
-                .map_err(|err| anyhow!("Failed to run self update: {:?}", err))?
+                .map_err(|err| eyre!("Failed to run self update: {:?}", err))?
         }
         Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
         Some(SubCommands::Xorurl {
@@ -128,7 +128,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, args.dry, safe).await,
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, safe).await,
                 SubCommands::Seq(cmd) => seq_commander(cmd, output_fmt, safe).await,
-                _ => Err(anyhow!("Unknown safe subcommand")),
+                _ => Err(eyre!("Unknown safe subcommand")),
             }
         }
         None => shell::shell_run(), // then enter in interactive shell

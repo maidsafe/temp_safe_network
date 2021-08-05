@@ -10,7 +10,7 @@
 use crate::APP_ID;
 use log::debug;
 use sn_api::Safe;
-use anyhow::Result;
+use color_eyre::Result;
 
 pub async fn authorise_cli(
     _safe: Safe,

@@ -16,7 +16,7 @@ use super::{
     OutputFmt,
 };
 use ansi_term::Colour;
-use anyhow::{bail, Context, Result};
+use color_eyre::{eyre::bail, eyre::eyre, Result};
 use log::debug;
 use prettytable::{format::FormatBuilder, Table};
 use serde::Serialize;
@@ -369,7 +369,7 @@ pub async fn files_commander(
             let mut resolution_chain = safe.inspect(&target_url).await?;
             let resolved_content = resolution_chain
                 .pop()
-                .context("Unexpectedly failed to obtain the resolved content")?;
+                .ok_or_else(|| eyre!("Unexpectedly failed to obtain the resolved content"))?;
 
             let (version, files_map, total) = match resolved_content {
                 SafeData::FilesContainer {

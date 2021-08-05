@@ -10,7 +10,7 @@
 #[cfg(feature = "self-update")]
 use super::helpers::download_from_s3_and_install_bin;
 use crate::APP_ID;
-use anyhow::{anyhow, bail, Context, Result};
+use color_eyre::{eyre::eyre, eyre::bail, eyre::WithErr, Result};
 use envy::from_env;
 use log::info;
 use prettytable::Table;
@@ -46,7 +46,7 @@ struct SafeSeed {
 
 #[cfg(not(feature = "self-update"))]
 pub fn authd_install(_authd_path: Option<String>) -> Result<()> {
-    anyhow!("Self updates are disabled")
+    eyre!("Self updates are disabled")
 }
 
 #[cfg(feature = "self-update")]
@@ -113,7 +113,7 @@ pub async fn authd_create(
         // println!("Secret Key = {}", sk);
         Ok(())
     } else {
-        Err(anyhow!(
+        Err(eyre!(
             "Please use --test-coins option, other options are not implemented yet"
         ))
         // TODO: support generating a payment proof to be sent to authd, either
@@ -384,7 +384,7 @@ fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf> {
                 Ok(PathBuf::from(authd_path))
             } else {
                 let mut path = dirs_next::home_dir()
-                    .ok_or_else(|| anyhow!("Failed to obtain user's home path"))?;
+                    .ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
 
                 path.push(".safe");
                 path.push("authd");

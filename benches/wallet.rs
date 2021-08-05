@@ -12,7 +12,7 @@ extern crate duct;
 use criterion::Criterion;
 use std::time::Duration;
 
-use anyhow::Result;
+use color_eyre::Result;
 use sn_cmd_test_utilities::util::{create_wallet_with_balance, get_bin_location};
 
 // sample size is _NOT_ the number of times the command is run...

@@ -10,8 +10,8 @@
 #[macro_use]
 extern crate duct;
 
-use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
+use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::fetch::{SafeContentType, SafeDataType};
 use sn_cmd_test_utilities::util::{
@@ -39,10 +39,10 @@ fn calling_safe_cat() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| eyre!(e.to_string()))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &map[TEST_FILE].1])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
@@ -68,7 +68,7 @@ fn calling_safe_cat_subfolders() -> Result<()> {
         "--recursive",
     )
     .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| eyre!(e.to_string()))?;
 
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
 
@@ -79,7 +79,7 @@ fn calling_safe_cat_subfolders() -> Result<()> {
         "--json",
     )
     .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| eyre!(e.to_string()))?;
 
     let (_xorurl, filesmap) = parse_files_container_output(&content);
 
@@ -100,10 +100,10 @@ fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| eyre!(e.to_string()))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
 
     let relative_url = format!("{}/something_relative.wasm", &map[TEST_FILE].1);
     cmd.args(&vec!["cat", &relative_url])
@@ -123,10 +123,10 @@ fn calling_safe_cat_hexdump() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| eyre!(e.to_string()))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", "--hexdump", &map[TEST_FILE].1])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_HEXDUMP_CONTENT))
@@ -151,41 +151,41 @@ fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| eyre!(e.to_string()))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     // let's sync with another file so we get a new version, and a different content in the file
     let mut safeurl = safeurl_from(&container_xorurl)?;
     safeurl.set_path("/test.md");
     safeurl.set_content_version(None);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["files", "sync", ANOTHER_FILE, &safeurl.to_string()])
         .assert()
         .success();
 
     safeurl.set_content_version(None);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &safeurl.to_string()])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
     safeurl.set_content_version(Some(0));
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &safeurl.to_string()])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
     safeurl.set_content_version(Some(1));
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &safeurl.to_string()])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
     safeurl.set_content_version(Some(2));
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &safeurl.to_string()])
         .assert()
         .failure();
@@ -202,7 +202,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| eyre!(e.to_string()))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
@@ -215,10 +215,10 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
         &container_xorurl,
     )
     .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| eyre!(e.to_string()))?;
 
     let nrsurl_with_path = format!("{}/test.md", nrsurl);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &nrsurl_with_path])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
@@ -228,14 +228,14 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     let mut safeurl = safeurl_from(&container_xorurl)?;
     safeurl.set_path("/test.md");
     safeurl.set_content_version(None);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["files", "sync", ANOTHER_FILE, &safeurl.to_string()])
         .assert()
         .success();
 
     // NRS name was not updated (with --updated-nrs) when doing files sync,
     // so our file should not have been updated
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &nrsurl_with_path])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
@@ -243,7 +243,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
 
     // NRS name has only one version which is 0, so using version 0 should also fetch the file
     let nrsurl_with_path_v0 = format!("{}/test.md?v=0", nrsurl);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &nrsurl_with_path_v0])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
@@ -251,7 +251,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
 
     // there is no version 1 of NRS name
     let invalid_version_nrsurl = format!("{}/test.md?v=1", nrsurl);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &invalid_version_nrsurl])
         .assert()
         .failure();
@@ -264,7 +264,7 @@ fn calling_safe_cat_safekey() -> Result<()> {
 
     let cat_output = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &safekey_xorurl,)
         .read()
-        .map_err(|e| anyhow!(e.to_string()))?;
+        .map_err(|e| eyre!(e.to_string()))?;
 
     assert_eq!(cat_output, "No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
     Ok(())

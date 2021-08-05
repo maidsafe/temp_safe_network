@@ -8,8 +8,8 @@
 // Software.
 
 use super::cli;
-use anyhow::Result;
 use async_std::task;
+use color_eyre::Result;
 use shrust::{Shell, ShellIO};
 use sn_api::{Safe, SafeAuthdClient};
 use std::io::Write;

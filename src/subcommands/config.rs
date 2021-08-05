@@ -8,7 +8,7 @@
 // Software.
 
 use crate::operations::config::{Config, NetworkInfo};
-use anyhow::Result;
+use color_eyre::Result;
 use log::debug;
 use structopt::StructOpt;
 

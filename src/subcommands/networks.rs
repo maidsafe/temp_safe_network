@@ -8,7 +8,7 @@
 // Software.
 
 use crate::operations::config::{read_current_network_conn_info, Config, NetworkInfo};
-use anyhow::{bail, Result};
+use color_eyre::{eyre::bail, Result};
 use log::debug;
 use std::{collections::HashSet, iter::FromIterator, net::SocketAddr};
 use structopt::StructOpt;

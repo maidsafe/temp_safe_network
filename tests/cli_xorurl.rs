@@ -10,8 +10,8 @@
 #[macro_use]
 extern crate duct;
 
-use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
+use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::SafeUrl;
 use sn_cmd_test_utilities::util::{parse_xorurl_output, safeurl_from, CLI, SAFE_PROTOCOL};
@@ -22,7 +22,7 @@ const TEST_FOLDER: &str = "./testdata/";
 
 #[test]
 fn calling_safe_xorurl() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["xorurl", TEST_FILE])
         .assert()
         .stdout(predicate::str::contains("1 file/s processed"))
@@ -34,7 +34,7 @@ fn calling_safe_xorurl() -> Result<()> {
 
 #[test]
 fn calling_safe_xorurl_recursive() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["xorurl", TEST_FOLDER, "--recursive"])
         .assert()
         .stdout(predicate::str::contains("11 file/s processed"))
@@ -48,7 +48,7 @@ fn calling_safe_xorurl_recursive() -> Result<()> {
 fn calling_safe_xorurl_decode() -> Result<()> {
     let content = cmd!(env!("CARGO_BIN_EXE_safe"), "xorurl", TEST_FILE, "--json",)
         .read()
-        .map_err(|e| anyhow!(e.to_string()))?;
+        .map_err(|e| eyre!(e.to_string()))?;
 
     let xorurls = parse_xorurl_output(&content);
     let file_xorurl = &xorurls[0].1;
@@ -62,7 +62,7 @@ fn calling_safe_xorurl_decode() -> Result<()> {
         "--json",
     )
     .read()
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| eyre!(e.to_string()))?;
 
     let decoded_obj: SafeUrl = serde_json::from_str(&xorurl_decoded)
         .expect("Failed to parse output of `safe xorurl decode`");

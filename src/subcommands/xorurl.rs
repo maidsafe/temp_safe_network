@@ -11,7 +11,7 @@ use super::{
     helpers::{gen_processed_files_table, get_from_arg_or_stdin, serialise_output, xorname_to_hex},
     OutputFmt,
 };
-use anyhow::{anyhow, Result};
+use color_eyre::{eyre::eyre, Result};
 use sn_api::{PublicKey, Safe, SafeUrl, XorName};
 use structopt::StructOpt;
 
@@ -77,7 +77,7 @@ pub async fn xorurl_commander(
         Some(XorurlSubCommands::Pk { pk }) => {
             let public_key = PublicKey::ed25519_from_hex(&pk)
                 .or_else(|_| PublicKey::bls_from_hex(&pk))
-                .map_err(|_| anyhow!("Invalid (Ed25519/BLS) public key bytes: {}", pk))?;
+                .map_err(|_| eyre!("Invalid (Ed25519/BLS) public key bytes: {}", pk))?;
 
             let xorname = XorName::from(public_key);
             let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
