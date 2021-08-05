@@ -6,21 +6,27 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, Comm, Core};
+use super::{
+    delivery_group, enduser_registry::EndUserRegistry, message_filter::MessageFilter,
+    split_barrier::SplitBarrier, Comm, Core, SignatureAggregator, KEY_CACHE_SIZE,
+    RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, Section},
     EndUser, MessageId, SectionAuthorityProvider, SocketId, WireMsg,
 };
 use crate::routing::{
+    dkg::{DkgVoter, ProposalAggregator},
     error::Result,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionKeyShare, SectionUtils},
+    section::{NodeStateUtils, SectionKeyShare, SectionKeysProvider, SectionUtils},
     Error, Event,
 };
+use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -51,16 +57,37 @@ impl Core {
         )
     }
 
-    pub(crate) async fn relocated(&self, new_node: Node, new_section: Section) -> Result<Self> {
-        Self::new(
-            self.comm.clone(),
-            new_node,
-            new_section,
-            None,
-            self.event_tx.clone(),
-            self.used_space.clone(),
-            self.root_storage_dir.clone(),
-        )
+    pub(crate) async fn relocated(&self, mut new_node: Node, new_section: Section) -> Result<Self> {
+        let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None);
+
+        // make sure the new Node has the correct local addr as Comm
+        let comm = self.comm.clone();
+        new_node.addr = comm.our_connection_info();
+        let mut network = self.network.clone();
+        // TODO: remove our new section from the new network knowledge
+        // ...and perhaps add current section to the new network knowledge??
+        // network.prune(new_section.prefx());
+
+        Ok(Self {
+            comm,
+            node: new_node,
+            section: new_section,
+            network,
+            section_keys_provider,
+            proposal_aggregator: ProposalAggregator::default(),
+            split_barrier: SplitBarrier::new(),
+            message_aggregator: SignatureAggregator::default(),
+            dkg_voter: DkgVoter::default(),
+            relocate_state: None,
+            msg_filter: MessageFilter::new(),
+            event_tx: self.event_tx.clone(),
+            joins_allowed: true,
+            resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
+            end_users: EndUserRegistry::new(),
+            register_storage: self.register_storage.clone(),
+            root_storage_dir: self.root_storage_dir.clone(),
+            used_space: self.used_space.clone(),
+        })
     }
 
     pub(crate) fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<&EndUser> {
