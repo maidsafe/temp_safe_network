@@ -62,10 +62,12 @@ impl Core {
         // make sure the new Node has the correct local addr as Comm
         let comm = self.comm.clone();
         new_node.addr = comm.our_connection_info();
-        let network = self.network.clone();
-        // TODO: remove our new section from the new network knowledge
-        // ...and perhaps add current section to the new network knowledge??
-        // network.prune(new_section.prefx());
+
+        let network = Network::new();
+        // TODO: to keep our knowledge of the network and avoid unnecessary AE msgs:
+        // - clone self.network instead,
+        // - remove the SAP of our new section from the cloned network
+        // - and add current section's SAP to the cloned network
 
         Ok(Self {
             comm,

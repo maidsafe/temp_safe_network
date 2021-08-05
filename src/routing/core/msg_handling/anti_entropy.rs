@@ -157,16 +157,14 @@ impl Core {
             NodeMsg::AntiEntropyRetry { .. }
             | NodeMsg::AntiEntropyRedirect { .. }
             | NodeMsg::JoinRequest(_)
-            | NodeMsg::JoinAsRelocatedRequest(_) => return Ok(None),
-            _ => {}
-        }
-
-        match dst_location.section_pk() {
-            None => Ok(None),
-            Some(dst_section_pk) => {
-                self.check_dest_section_pk(node_msg, src_location, &dst_section_pk, sender)
-                    .await
-            }
+            | NodeMsg::JoinAsRelocatedRequest(_) => Ok(None),
+            _ => match dst_location.section_pk() {
+                None => Ok(None),
+                Some(dst_section_pk) => {
+                    self.check_dest_section_pk(node_msg, src_location, &dst_section_pk, sender)
+                        .await
+                }
+            },
         }
     }
 
@@ -272,7 +270,7 @@ mod tests {
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
-    use eyre::{Context, Result};
+    use eyre::{eyre, Context, Result};
     use secured_linked_list::SecuredLinkedList;
     use tokio::sync::mpsc;
     use xor_name::Prefix;
@@ -299,46 +297,33 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ae_newer_dst_key_of_our_section() -> Result<()> {
-        let env = Env::new(1).await?;
-
-        let our_new_sk = bls::SecretKey::random();
-        let our_new_pk = our_new_sk.public_key();
-
-        let (node_msg, src_location) =
-            env.create_message(env.core.section().prefix(), our_new_pk)?;
-        let sender = env.core.node().addr;
-
-        let command = env
-            .core
-            .check_dest_section_pk(&node_msg, &src_location, &our_new_pk, sender)
-            .await?;
-
-        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
-            wire_msg
-                .into_message()
-                .context("failed to deserialised anti-entropy message")?
-        });
-
-        assert_matches!(msg_type, MessageType::Node{ msg, .. } => {
-            assert_matches!(msg, NodeMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(section_auth, env.core.section().authority_provider());
-                assert_eq!(proof_chain, env.core.section_chain());
-            });
-        });
-
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
     async fn ae_redirect_to_other_section() -> Result<()> {
-        let env = Env::new(2).await?;
+        let mut env = Env::new(2).await?;
 
-        let (node_msg, src_location) =
-            env.create_message(&env.their_prefix, *env.core.section_chain().last_key())?;
+        let other_sk = bls::SecretKey::random();
+        let other_pk = other_sk.public_key();
+
+        let (node_msg, src_location) = env.create_message(&env.other_prefix, other_pk)?;
         let sender = env.core.node().addr;
 
-        let dst_section_pk = *env.core.section_chain().root_key();
+        // since it's not aware of the other prefix, it shall fail
+        let dst_section_pk = other_pk;
+        match env
+            .core
+            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, sender)
+            .await
+        {
+            Err(Error::NoMatchingSection) => {}
+            _ => return Err(eyre!("expected Error::NoMatchingSection")),
+        }
+
+        // now let's insert a SAP to make it aware of the other prefix
+        let (some_other_auth, _, _) = gen_section_authority_provider(env.other_prefix, ELDER_SIZE);
+        let some_other_sap = section_signed(&other_sk, some_other_auth)?;
+        let _ = env.core.network.sections.insert(some_other_sap.clone());
+
+        // and it now shall give us an AE redirect msg
+        // with the SAP we inserted for other prefix
         let command = env
             .core
             .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, sender)
@@ -351,8 +336,8 @@ mod tests {
         });
 
         assert_matches!(msg_type, MessageType::Node{ msg, .. } => {
-            assert_matches!(msg, NodeMsg::AntiEntropyRedirect { ref section_auth, .. } => {
-                assert_eq!(section_auth, env.core.section().authority_provider());
+            assert_matches!(msg, NodeMsg::AntiEntropyRedirect { section_auth, .. } => {
+                assert_eq!(section_auth, some_other_sap.value);
             });
         });
 
@@ -393,7 +378,7 @@ mod tests {
 
     struct Env {
         core: Core,
-        their_prefix: Prefix,
+        other_prefix: Prefix,
     }
 
     impl Env {
@@ -423,7 +408,7 @@ mod tests {
 
             Ok(Self {
                 core,
-                their_prefix: prefix1,
+                other_prefix: prefix1,
             })
         }
 
