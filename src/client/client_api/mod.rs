@@ -202,4 +202,14 @@ mod tests {
 
         Ok(())
     }
+
+    // Send is an important trait that assures futures can be run in a
+    // multithreaded context. If a future depends on a non-Send future, directly
+    // or indirectly, the future itself becomes non-Send and so on. Thus, it can
+    // happen that high-level API functions will become non-Send by accident.
+    #[test]
+    fn client_is_send() {
+        fn require_send<T: Send>(_t: T) {}
+        require_send(create_test_client(None));
+    }
 }
