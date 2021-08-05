@@ -96,16 +96,23 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
     ///
     /// If a value with the same id already exists, it will be overwritten.
     pub(crate) async fn store(&self, value: &V) -> Result<()> {
-        info!("Writing value");
+        debug!("Writing value to KV store");
+
+        let key = value.key().to_db_key()?;
+        let exists = self.db.contains_key(key.clone()).map_err(Error::from)?;
+
+        trace!(">> Does this entry exist; {:?}: {:?}", key, exists);
 
         let serialised_value = serialise(value)?.to_vec();
+        // FIXME: We're not considering overwriting here. So the space isn't necessarily all 'consumed' 
+        // if we overwrite same value eg, or it's only 5 bytes longer/shorter etc
         let consumed_space = serialised_value.len() as u64;
+
         info!("consumed space: {:?}", consumed_space);
         if !self.used_space.can_consume(consumed_space).await {
             return Err(Error::NotEnoughSpace);
         }
 
-        let key = value.key().to_db_key()?;
         let res = self.db.insert(key, serialised_value);
 
         match res {

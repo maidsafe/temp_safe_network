@@ -130,12 +130,67 @@ impl Dispatcher {
 
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
+            // Non-data node msg that requires more locking
+            Command::HandleVerifiedNodeDataMessage {
+                msg_id,
+                auth,
+                dst_location,
+                msg,
+            } => {
+                self.core
+                    .read()
+                    .await
+                    .handle_verified_data_message(
+                        // sender,
+                        msg_id,
+                        auth,
+                        dst_location,
+                        msg,
+                    )
+                    .await
+            }
+            // Non-data node msg that requires more locking
+            Command::HandleVerifiedNodeNonDataMessage {
+                sender,
+                msg_id,
+                auth,
+                dst_location,
+                msg,
+                known_keys,
+            } => {
+                self.core
+                    .write()
+                    .await
+                    .handle_verified_non_data_node_message(
+                        sender,
+                        msg_id,
+                        auth,
+                        dst_location,
+                        msg,
+                        &known_keys,
+                    )
+                    .await
+            }
+            Command::HandleNodeMessage {
+                sender,
+                msg_id,
+                auth,
+                dst_location,
+                msg,
+                payload,
+            } => {
+                self.core
+                    .read()
+                    .await
+                    .handle_node_message(sender, msg_id, auth, dst_location, msg, payload)
+                    .await
+            }
             Command::PrepareNodeMsgToSend { msg, dst } => {
                 self.core.read().await.prepare_node_msg(msg, dst)
             }
             Command::HandleMessage { sender, wire_msg } => {
                 self.core
-                    .write()
+                    .read()
                     .await
                     .handle_message(sender, wire_msg)
                     .await
@@ -195,7 +250,7 @@ impl Dispatcher {
             }
             Command::ParseAndSendWireMsg(wire_msg) => self.send_wire_message(wire_msg).await,
             Command::RelayMessage(wire_msg) => {
-                let cmd = self.core.write().await.relay_message(wire_msg).await?;
+                let cmd = self.core.read().await.relay_message(wire_msg)?;
                 Ok(vec![cmd])
             }
             Command::ScheduleTimeout { duration, token } => Ok(self
@@ -330,7 +385,7 @@ impl Dispatcher {
     pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
         if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
             if self.core.read().await.section().prefix().matches(xorname) {
-                let addr = self.core.read().await.get_socket_addr(*socket_id).copied();
+                let addr = self.core.read().await.get_socket_addr(*socket_id);
 
                 if let Some(socket_addr) = addr {
                     // Send a message to a client peer.
