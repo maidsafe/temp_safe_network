@@ -83,7 +83,6 @@ pub(crate) struct Core {
     used_space: UsedSpace,
     pub(super) register_storage: RegisterStorage,
     pub(super) chunk_storage: ChunkStore,
-    // chunk_records: ChunkRecords,
     root_storage_dir: PathBuf,
     capacity: Capacity,
     liveness: Liveness,

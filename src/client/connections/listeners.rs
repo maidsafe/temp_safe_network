@@ -202,8 +202,7 @@ impl Session {
                     // Once we are satisfied with the response this is channel is discarded in
                     // ConnectionManager::send_query
 
-                    let backup_id = 0_u64;
-                    let op_id = response.operation_id().unwrap_or(backup_id);
+                    let op_id = response.operation_id().unwrap_or(0_u64);
                     debug!("Query response (op_id issss: {})", op_id);
 
                     if let Some(sender) = &queries.read().await.get(&op_id) {

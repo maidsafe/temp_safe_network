@@ -392,16 +392,16 @@ impl Session {
             msg_id, response
         );
 
-        // let _ = tokio::spawn(async move {
-        if let Some(query) = response.clone() {
-            let query_op_id = query
-                .operation_id()
-                .map_err(|_| Error::UnknownOperationId)?;
-            // Remove the response sender
-            trace!("Removing channel for {:?}", query_op_id);
-            let _ = pending_queries.clone().write().await.remove(&query_op_id);
-        }
-        // });
+        let removal_response = response.clone();
+        let _ = tokio::spawn(async move {
+            if let Some(query) = removal_response {
+                if let Ok(query_op_id) = query.operation_id() {
+                    // Remove the response sender
+                    trace!("Removing channel for {:?}", query_op_id);
+                    let _ = pending_queries.clone().write().await.remove(&query_op_id);
+                }
+            }
+        });
 
         match response {
             Some(response) => {
@@ -415,9 +415,6 @@ impl Session {
             }
             None => Err(Error::NoResponse),
         }
-        // }
-        // )
-        // .ok_or(Error::NoResponse)
     }
 
     // Get section info from the peer we have bootstrapped with.

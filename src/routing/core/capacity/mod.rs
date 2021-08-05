@@ -67,13 +67,11 @@ impl Capacity {
 
 #[derive(Clone)]
 pub(super) struct CapacityReader {
-    // reader: AdultReader,
     adult_storage_info: AdultsStorageInfo,
 }
 
 #[derive(Clone)]
 pub(super) struct CapacityWriter {
-    // reader: AdultReader,
     adult_storage_info: AdultsStorageInfo,
 }
 
@@ -81,10 +79,7 @@ impl CapacityReader {
     /// Pass in adult_storage_info with info on chunk holders.
     pub(super) fn new(adult_storage_info: AdultsStorageInfo, //, reader: AdultReader
     ) -> Self {
-        Self {
-            // reader,
-            adult_storage_info,
-        }
+        Self { adult_storage_info }
     }
 
     /// Whether the adult is recorded as full

@@ -175,8 +175,6 @@ impl Core {
                 .await;
         }
 
-        // deterministic msg id based on content
-        // let new_msg_id = MessageId::from_content(&(msg_id, address))?;
         let _new_msg_id = MessageId::from_content(&(msg_id, address))?;
 
         let mut fresh_targets = BTreeSet::new();

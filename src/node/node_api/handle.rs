@@ -172,13 +172,7 @@ impl Node {
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::LevelDown => {
-                info!("Getting Demoted");
-                // TODO: Do we still want/need this demotion?
-                // let store =
-                //     ChunkStore::new(self.node_info.root_dir.as_path(), self.used_space.clone())
-                //         .await?;
                 *self.role.write().await = Role::Adult(AdultRole {
-                    // chunks: Arc::new(store),
                     network_api: self.network_api.clone(),
                 });
                 Ok(NodeTask::None)

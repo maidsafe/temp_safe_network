@@ -285,7 +285,6 @@ impl Dispatcher {
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
-        debug!(">>> sending msg");
         let cmds = match wire_msg.msg_kind() {
             MsgKind::NodeAuthMsg(_)
             | MsgKind::NodeBlsShareAuthMsg(_)
@@ -330,11 +329,8 @@ impl Dispatcher {
     /// Messages sent here, either section to section or node to node.
     pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
         if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
-            debug!(">>>> OUR DST is end user");
             if self.core.read().await.section().prefix().matches(xorname) {
-                debug!(">>> in our section");
                 let addr = self.core.read().await.get_socket_addr(*socket_id).copied();
-                debug!(">>> addr found");
 
                 if let Some(socket_addr) = addr {
                     // Send a message to a client peer.

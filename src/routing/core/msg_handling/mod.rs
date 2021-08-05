@@ -376,7 +376,7 @@ impl Core {
                 match node_cmd {
                     NodeCmd::Chunks { cmd, auth, .. } => {
                         info!(
-                            ">>> Processing storing chunk command with MessageId: {:?}",
+                            "Processing storing chunk command with MessageId: {:?}",
                             msg_id
                         );
                         let verified = WireMsg::verify_sig(
@@ -387,7 +387,7 @@ impl Core {
                     }
                     NodeCmd::ReplicateChunk(chunk) => {
                         info!(
-                            ">>> Processing replicate chunk command with MessageId: {:?}",
+                            "Processing replicate chunk command with MessageId: {:?}",
                             msg_id
                         );
 
@@ -402,7 +402,7 @@ impl Core {
                     }
                     NodeCmd::RepublishChunk(chunk) => {
                         info!(
-                            ">>>>> Republishing chunk {:?} with MessageId {:?}",
+                            "Republishing chunk {:?} with MessageId {:?}",
                             chunk.address(),
                             msg_id
                         );
@@ -455,7 +455,7 @@ impl Core {
                 correlation_id,
                 user,
             } => {
-                debug!(">>>> QueryResponse innnn from a node");
+                debug!("QueryResponse received from a node");
                 let sending_nodes_pk = match msg_authority {
                     NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().public_key),
                     _ => return Err(Error::InvalidQueryResponseAuthority),

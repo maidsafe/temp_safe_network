@@ -148,6 +148,7 @@ impl Core {
         requester: PublicKey,
         user: EndUser,
     ) -> Result<Vec<Command>> {
+        trace!("Handling chunk read at adult");
         let mut commands = vec![];
         if self.chunk_storage.is_storage_getting_full().await {
             let section_pk = self.public_key_set()?.public_key();
@@ -169,7 +170,6 @@ impl Core {
             commands.push(Command::PrepareNodeMsgToSend { msg, dst });
         }
 
-        debug!(">>>> HANDLE chunk read at adult");
         match self.chunk_storage.read(&query, requester) {
             Ok(response) => {
                 let msg = NodeMsg::NodeQueryResponse {
@@ -211,7 +211,7 @@ impl Core {
         let msg_id = MessageId::new();
         let mut commands = vec![];
         debug!(
-            ">>>>>> HANDLE chunk read @ elders from {:?} ",
+            "Handling chunk read @ elders, received from {:?} ",
             sending_nodes_pk
         );
 
@@ -244,7 +244,7 @@ impl Core {
                 && self.capacity.is_full(XorName::from(sending_nodes_pk)).await)
         {
             // we don't return data not found errors.
-            debug!(">>>> {:?}, saying data not found", sending_nodes_pk);
+            trace!("Node {:?}, reported data not found", sending_nodes_pk);
 
             return Ok(commands);
         }
@@ -340,7 +340,7 @@ impl Core {
         dst_location: DstLocation,
         payload: Bytes,
     ) -> Result<Vec<Command>> {
-        debug!(">>>>> Incoming service msg...");
+        trace!("Service msg being handled");
         let is_in_destination = match dst_location.name() {
             Some(dst_name) => {
                 let is_in_destination = self.section().prefix().matches(&dst_name);
@@ -400,7 +400,6 @@ impl Core {
         if is_in_destination {
             // We send this message to be handled by the upper Node layer
             // through the public event stream API
-            debug!(">>> In destination");
             // This is returned as a command to be handled via spawning
             Ok(vec![Command::HandleServiceMessage {
                 msg_id,

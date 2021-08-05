@@ -147,8 +147,6 @@ impl RegisterRead {
             RegisterRead::GetOwner(ref address) => format!("GetOwner-{:?}", address),
         };
 
-        // op_id_string.as_bytes().hash();
-
         hasher.write(op_id_string.as_bytes());
 
         hasher.finish()

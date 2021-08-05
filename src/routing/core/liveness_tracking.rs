@@ -36,7 +36,6 @@ pub(crate) struct Liveness {
 impl Liveness {
     pub(crate) fn new() -> Self {
         Self {
-            // ops: Arc::new(DashMap::new()),
             black_eyes: Arc::new(DashMap::new()),
             closest_nodes_to: Arc::new(DashMap::new()),
         }
