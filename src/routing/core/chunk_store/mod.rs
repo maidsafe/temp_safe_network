@@ -182,16 +182,7 @@ impl ChunkStore {
             "Trying to store for replication of chunk: {:?}",
             chunk.address()
         );
-        if self.db.has(chunk.address())? {
-            info!(
-                "{}: Immutable chunk already exists, not storing: {:?}",
-                self,
-                chunk.address()
-            );
-            return Ok(());
-        }
-
-        self.db.store(&chunk).await?;
+        self.try_store(&chunk).await?;
 
         Ok(())
     }

@@ -289,6 +289,7 @@ impl Core {
             ServiceMsg::Query(DataQuery::Chunk(read)) => {
                 self.read_chunk_from_adults(&read, msg_id, auth, user).await
             }
+
             _ => {
                 warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
                 Ok(vec![])
@@ -315,8 +316,8 @@ impl Core {
 
     /// Handle incoming data msgs, determining if they should be handled at this node or fowrwarded
     // TODO: streamline this as full AE for direct messaging is included.
-    pub(crate) async fn handle_service_message(
-        &mut self,
+    pub(crate) fn handle_service_message(
+        &self,
         sender: SocketAddr,
         msg_id: MessageId,
         auth: AuthorityProof<ServiceAuth>,
@@ -339,7 +340,7 @@ impl Core {
                             )?;
 
                             return Ok(vec![Command::SendMessage {
-                                recipients: vec![(xorname, *addr)],
+                                recipients: vec![(xorname, addr)],
                                 wire_msg,
                             }]);
                         }
@@ -357,12 +358,12 @@ impl Core {
                     "Message ({}) from client {}, socket id already exists: {:?}",
                     msg_id, sender, end_user
                 );
-                *end_user
+                end_user
             }
             None => {
                 // This is the first time we receive a message from this client
                 debug!(
-                    "First message ({}) from client {}, creating a socket id",
+                    "First message ({}) from sender {}, creating a socket id",
                     msg_id, sender
                 );
 
@@ -382,6 +383,8 @@ impl Core {
         };
 
         if is_in_destination {
+            trace!("In the destination for this msg");
+
             // We send this message to be handled by the upper Node layer
             // through the public event stream API
             // This is returned as a command to be handled via spawning
@@ -415,7 +418,7 @@ impl Core {
                 }
             };
 
-            match self.relay_message(wire_msg).await {
+            match self.relay_message(wire_msg) {
                 Ok(cmd) => return Ok(vec![cmd]),
                 Err(err) => {
                     error!("Failed to relay msg {:?}", err);

@@ -29,7 +29,8 @@ use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use tokio::sync::{mpsc, RwLock};
 use xor_name::XorName;
 
 impl Core {
@@ -77,7 +78,7 @@ impl Core {
             section_keys_provider,
             proposal_aggregator: ProposalAggregator::default(),
             split_barrier: SplitBarrier::new(),
-            message_aggregator: SignatureAggregator::default(),
+            message_aggregator: Arc::new(RwLock::new(SignatureAggregator::default())),
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
             event_tx: self.event_tx.clone(),
@@ -93,15 +94,15 @@ impl Core {
         })
     }
 
-    pub(crate) fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<&EndUser> {
+    pub(crate) fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<EndUser> {
         self.end_users.get_enduser_by_addr(sender)
     }
 
-    pub(crate) fn get_socket_addr(&self, id: SocketId) -> Option<&SocketAddr> {
+    pub(crate) fn get_socket_addr(&self, id: SocketId) -> Option<SocketAddr> {
         self.end_users.get_socket_addr(id)
     }
 
-    pub(crate) fn try_add_enduser(&mut self, sender: SocketAddr) -> Result<EndUser> {
+    pub(crate) fn try_add_enduser(&self, sender: SocketAddr) -> Result<EndUser> {
         let section_prefix = self.section.prefix();
         self.end_users.try_add(sender, section_prefix)
     }
@@ -192,7 +193,7 @@ impl Core {
     }
 
     // Send message over the network.
-    pub(crate) async fn relay_message(&self, mut wire_msg: WireMsg) -> Result<Command> {
+    pub(crate) fn relay_message(&self, mut wire_msg: WireMsg) -> Result<Command> {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,

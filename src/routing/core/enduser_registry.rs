@@ -8,38 +8,40 @@
 
 use crate::messaging::{EndUser, SocketId};
 use crate::routing::error::{Error, Result};
-use std::{
-    collections::{btree_map::Entry, BTreeMap},
-    net::SocketAddr,
-};
+use dashmap::{mapref::entry::Entry, DashMap};
+use std::net::SocketAddr;
+use std::sync::Arc;
 use xor_name::{Prefix, XorName};
 
+#[derive(Clone)]
 pub(crate) struct EndUserRegistry {
-    clients: BTreeMap<SocketAddr, EndUser>,
-    socket_id_mapping: BTreeMap<SocketId, SocketAddr>,
+    clients: Arc<DashMap<SocketAddr, EndUser>>,
+    socket_id_mapping: Arc<DashMap<SocketId, SocketAddr>>,
 }
 
 impl EndUserRegistry {
     pub(crate) fn new() -> Self {
         Self {
-            clients: BTreeMap::default(),
-            socket_id_mapping: BTreeMap::default(),
+            clients: Arc::new(DashMap::default()),
+            socket_id_mapping: Arc::new(DashMap::default()),
         }
     }
 
-    pub(crate) fn get_enduser_by_addr(&self, socketaddr: &SocketAddr) -> Option<&EndUser> {
-        self.clients.get(socketaddr)
+    pub(crate) fn get_enduser_by_addr(&self, socketaddr: &SocketAddr) -> Option<EndUser> {
+        match self.clients.get(socketaddr) {
+            Some(entry) => Some(entry.value().clone()),
+            None => None,
+        }
     }
 
-    pub(crate) fn get_socket_addr(&self, socket_id: SocketId) -> Option<&SocketAddr> {
-        self.socket_id_mapping.get(&socket_id)
+    pub(crate) fn get_socket_addr(&self, socket_id: SocketId) -> Option<SocketAddr> {
+        match self.socket_id_mapping.get(&socket_id) {
+            Some(entry) => Some(entry.value().clone()),
+            None => None,
+        }
     }
 
-    pub(crate) fn try_add(
-        &mut self,
-        sender: SocketAddr,
-        section_prefix: &Prefix,
-    ) -> Result<EndUser> {
+    pub(crate) fn try_add(&self, sender: SocketAddr, section_prefix: &Prefix) -> Result<EndUser> {
         // create a unique socket id from client socket addr
         let socket_id = XorName::from_content(&[
             &bincode::serialize(&sender).map_err(|_| Error::FailedSignature)?

@@ -20,8 +20,8 @@ use xor_name::XorName;
 
 // Message handling
 impl Core {
-    pub(crate) async fn handle_section_info_msg(
-        &mut self,
+    pub(crate) fn handle_section_info_msg(
+        &self,
         sender: SocketAddr,
         mut dst_location: DstLocation,
         message: SectionInfoMsg,
