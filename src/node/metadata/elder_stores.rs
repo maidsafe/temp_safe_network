@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// use super::chunk_records::ChunkRecords;
 use crate::messaging::data::DataExchange;
 use crate::node::{network::Network, Error, Result};
 use crate::routing::Prefix;
