@@ -96,7 +96,7 @@ pub enum Error {
     #[error(transparent)]
     NetworkDataError(#[from] DtError),
     /// Errors received from the network via sn_messaging
-    #[error("Error received from the network: {:?} MessageId: {:?}", source, op_id)]
+    #[error("Error received from the network: {:?} Operationid: {:?}", source, op_id)]
     ErrorMessage {
         /// The source of an error message
         source: ErrorMessage,
