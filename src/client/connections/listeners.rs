@@ -188,11 +188,7 @@ impl Session {
         let _ = tokio::spawn(async move {
             debug!("Thread spawned to handle this client message");
             match msg {
-                ServiceMsg::QueryResponse {
-                    response,
-                    correlation_id,
-                    ..
-                } => {
+                ServiceMsg::QueryResponse { response, .. } => {
                     trace!("The received query response is {:?}", response);
 
                     // Note that this doesn't remove the sender from here since multiple
@@ -201,14 +197,16 @@ impl Session {
                     // ConnectionManager::send_query
 
                     if let Ok(op_id) = response.operation_id() {
-                        trace!("Query response (op_id is: {})", op_id);
+                        debug!("Query response (op_id is: {})", op_id);
 
                         if let Some(sender) = &queries.read().await.get(&op_id) {
                             trace!("Sending response for query w/{} via channel.", op_id);
                             let _ = sender.send(response).await;
                         } else {
-                            trace!("No channel found for {:?}", correlation_id);
+                            trace!("No channel found for operation {}", op_id);
                         }
+                    } else {
+                        warn!("Ignoring query response without operation id");
                     }
                 }
                 ServiceMsg::CmdError {
