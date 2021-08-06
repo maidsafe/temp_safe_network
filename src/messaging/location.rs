@@ -148,4 +148,9 @@ impl DstLocation {
             Self::DirectAndUnrouted(_) => {}
         }
     }
+
+    /// Check whether the destination is to a Node.
+    pub fn is_to_node(&self) -> bool {
+        matches!(self, Self::Node { .. })
+    }
 }
