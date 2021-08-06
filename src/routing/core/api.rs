@@ -180,6 +180,21 @@ impl Core {
         );
 
         let target_name = dst_location.name().ok_or(Error::CannotRoute)?;
+
+        // To avoid loop: if destination is to Node, targets are multiple, self is an elder,
+        //     self section prefix matches the destination name, then don't carry out a relay.
+        if self.is_elder()
+            && targets.len() > 1
+            && dst_location.is_to_node()
+            && self.section.prefix().matches(&target_name)
+        {
+            return Ok(Command::SendMessageDeliveryGroup {
+                recipients: Vec::new(),
+                delivery_group_size: 0,
+                wire_msg,
+            });
+        }
+
         let dst_pk = self.section_key_by_name(&target_name);
         wire_msg.set_dst_section_pk(dst_pk);
 
