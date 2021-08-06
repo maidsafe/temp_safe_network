@@ -399,16 +399,6 @@ impl RegisterStorage {
             })
             .map(|state| StateEntry { state, store })
     }
-
-    // TODO: verify earlier so that this isn't needed
-    fn verify_op(auth: ServiceAuth, cmd: DataCmd) -> Result<AuthorityProof<ServiceAuth>> {
-        let message = ServiceMsg::Cmd(cmd);
-        let payload = WireMsg::serialize_msg_payload(&message)
-            .map_err(|error| Error::Serialize(error.to_string()))?;
-        AuthorityProof::verify(auth, &payload).map_err(|_| {
-            Error::InvalidOperation("Register operation could not be verified.".to_string())
-        })
-    }
 }
 
 /// This also encodes the Public | Private scope,

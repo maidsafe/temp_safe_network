@@ -11,10 +11,7 @@ use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
 use crate::messaging::data::ServiceMsg;
 use crate::messaging::NodeAuth;
 use crate::messaging::{
-    data::{
-        ChunkRead, CmdError, DataCmd, DataQuery, Error as ErrorMessage, QueryResponse,
-        RegisterRead, RegisterWrite,
-    },
+    data::{ChunkRead, CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite},
     node::{NodeCmd, NodeMsg, NodeQueryResponse},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
@@ -273,9 +270,6 @@ impl Core {
         user: EndUser,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
-        let requester = auth.public_key;
-        let service_auth = auth.into_inner();
-
         match msg {
             // Register
             // Commands to be handled at elder.
