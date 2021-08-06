@@ -160,7 +160,9 @@ impl ChunkStore {
                 self,
                 data.address()
             );
-            return Err(Error::DataExists);
+            // Nothing more to do here
+            return Ok(());
+
         }
         self.db.store(data).await?;
 
