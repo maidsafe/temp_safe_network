@@ -193,8 +193,6 @@ impl Session {
                     correlation_id,
                     ..
                 } => {
-                    debug!("Query response (relating to msgid: {})", correlation_id);
-
                     trace!("The received query response is {:?}", response);
 
                     // Note that this doesn't remove the sender from here since multiple
@@ -202,17 +200,15 @@ impl Session {
                     // Once we are satisfied with the response this is channel is discarded in
                     // ConnectionManager::send_query
 
-                    let op_id = response.operation_id().unwrap_or(0_u64);
-                    debug!("Query response (op_id issss: {})", op_id);
+                    if let Ok(op_id) = response.operation_id() {
+                        trace!("Query response (op_id is: {})", op_id);
 
-                    if let Some(sender) = &queries.read().await.get(&op_id) {
-                        trace!(
-                            "Sending response for query w/{} via channel.",
-                            correlation_id
-                        );
-                        let _ = sender.send(response).await;
-                    } else {
-                        trace!("No channel found for {:?}", correlation_id);
+                        if let Some(sender) = &queries.read().await.get(&op_id) {
+                            trace!("Sending response for query w/{} via channel.", op_id);
+                            let _ = sender.send(response).await;
+                        } else {
+                            trace!("No channel found for {:?}", correlation_id);
+                        }
                     }
                 }
                 ServiceMsg::CmdError {

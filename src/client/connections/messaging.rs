@@ -359,12 +359,8 @@ impl Session {
                 // Erring on the side of positivity. \
                 // Saving error, but not returning until we have more responses in
                 // (note, this will overwrite prior errors, so we'll just return whicever was last received)
-                (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_)) => {
-                    debug!("QueryResponse error received (but may be overridden by a non-error reponse from another elder): {:#?}", &response);
-                    error_response = response;
-                    discarded_responses += 1;
-                }
-                (response @ Some(QueryResponse::GetRegister((Err(_), _))), None)
+                (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
+                | (response @ Some(QueryResponse::GetRegister((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterPolicy((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterOwner((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterUserPermissions((Err(_), _))), None) =>

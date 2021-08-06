@@ -40,8 +40,6 @@ impl Core {
         target: EndUser,
         msg_id: MessageId,
     ) -> Result<Vec<Command>> {
-        // let sending_error = ErrorMessage::InvalidOperation(error.to_string());
-
         let the_error_msg = ServiceMsg::CmdError {
             error,
             correlation_id: msg_id,
@@ -136,7 +134,7 @@ impl Core {
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
 
         let command = Command::ParseAndSendWireMsg(wire_msg);
-        // commands.push(command);
+
         Ok(vec![command])
     }
 

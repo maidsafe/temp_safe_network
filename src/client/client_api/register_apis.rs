@@ -134,7 +134,6 @@ impl Client {
         // Let's fetch the Register from the network
         let query = DataQuery::Register(RegisterRead::Get(address));
         let query_result = self.send_query(query).await?;
-        let _operation_id = query_result.operation_id;
         match query_result.response {
             QueryResponse::GetRegister((res, op_id)) => {
                 res.map_err(|err| Error::ErrorMessage { source: err, op_id })
