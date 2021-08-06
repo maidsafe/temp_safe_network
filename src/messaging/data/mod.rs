@@ -288,7 +288,7 @@ mod tests {
         if let Some(key) = gen_keys().first() {
             let errored_response =
                 QueryResponse::GetRegister((Err(Error::AccessDenied(*key)), 0_u64));
-            assert!(format!("{:?}", errored_response).contains("GetRegister(Err(AccessDenied("));
+            assert!(format!("{:?}", errored_response).contains("GetRegister((Err(AccessDenied("));
             Ok(())
         } else {
             Err(eyre!("Could not generate public key"))
