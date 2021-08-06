@@ -276,7 +276,6 @@ impl Core {
         let requester = auth.public_key;
         let service_auth = auth.into_inner();
 
-
         match msg {
             // Register
             // Commands to be handled at elder.
@@ -294,8 +293,7 @@ impl Core {
                     .await
             }
             ServiceMsg::Query(DataQuery::Chunk(read)) => {
-                self.read_chunk_from_adults(&read, msg_id, auth, user)
-                    .await
+                self.read_chunk_from_adults(&read, msg_id, auth, user).await
             }
             _ => {
                 warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);

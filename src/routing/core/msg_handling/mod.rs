@@ -517,7 +517,6 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let msg_id = MessageId::new();
 
-        let _our_prefix = self.section().prefix();
         let our_name = self.node().name();
 
         // we create a dummy/random dst location,

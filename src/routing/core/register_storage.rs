@@ -103,10 +103,13 @@ impl RegisterStorage {
         // todo: make outer loop parallel
         for (_, history) in data {
             for op in history {
-                let auth = Self::verify_op(op.auth.clone(), DataCmd::Register(op.write.clone()))
-                    .map_err(|_| {
-                        Error::Logic("Received register operation signature is invalid".to_string())
-                    })?;
+                let auth = WireMsg::verify_sig(
+                    op.auth.clone(),
+                    ServiceMsg::Cmd(DataCmd::Register(op.write.clone())),
+                )
+                .map_err(|_| {
+                    Error::Logic("Received register operation signature is invalid".to_string())
+                })?;
                 let _ = self.apply(op, auth)?;
             }
         }
