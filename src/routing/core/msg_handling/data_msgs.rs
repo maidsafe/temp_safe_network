@@ -275,32 +275,26 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let requester = auth.public_key;
         let service_auth = auth.into_inner();
-        let verified = match WireMsg::verify_sig(service_auth, msg.clone()) {
-            Ok(verified) => verified,
-            Err(_e) => {
-                let error = CmdError::Data(ErrorMessage::InvalidOwner(requester));
-                return self.send_cmd_error_response(error, user, msg_id);
-            }
-        };
+
 
         match msg {
             // Register
             // Commands to be handled at elder.
             ServiceMsg::Cmd(DataCmd::Register(register_write)) => {
-                self.handle_register_write(msg_id, register_write, user, verified)
+                self.handle_register_write(msg_id, register_write, user, auth)
                     .await
             }
             ServiceMsg::Query(DataQuery::Register(read)) => {
-                self.handle_register_read(msg_id, read, user, verified)
+                self.handle_register_read(msg_id, read, user, auth)
             }
             // These will only be received at elders.
             // These reads/writes are for adult nodes...
             ServiceMsg::Cmd(DataCmd::Chunk(chunk_write)) => {
-                self.write_chunk_to_adults(chunk_write, msg_id, verified, user)
+                self.write_chunk_to_adults(chunk_write, msg_id, auth, user)
                     .await
             }
             ServiceMsg::Query(DataQuery::Chunk(read)) => {
-                self.read_chunk_from_adults(&read, msg_id, verified, user)
+                self.read_chunk_from_adults(&read, msg_id, auth, user)
                     .await
             }
             _ => {
