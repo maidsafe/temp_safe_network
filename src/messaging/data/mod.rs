@@ -208,7 +208,6 @@ impl QueryResponse {
             GetRegisterUserPermissions((_result, operation_id)) => Ok(*operation_id),
         }
     }
-    // }
 }
 
 /// Error type for an attempted conversion from a [`QueryResponse`] variant to an expected wrapped
