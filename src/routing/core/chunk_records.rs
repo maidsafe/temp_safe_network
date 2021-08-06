@@ -175,7 +175,6 @@ impl Core {
                 .await;
         }
 
-
         let mut fresh_targets = BTreeSet::new();
         for target in targets {
             if self
