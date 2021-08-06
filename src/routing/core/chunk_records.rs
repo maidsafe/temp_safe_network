@@ -175,7 +175,6 @@ impl Core {
                 .await;
         }
 
-        let _new_msg_id = MessageId::from_content(&(msg_id, address))?;
 
         let mut fresh_targets = BTreeSet::new();
         for target in targets {
