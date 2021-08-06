@@ -201,11 +201,11 @@ impl QueryResponse {
                 },
             },
 
-            GetRegister((_result, operation_id)) => Ok(*operation_id),
-            GetRegisterOwner((_result, operation_id)) => Ok(*operation_id),
-            ReadRegister((_result, operation_id)) => Ok(*operation_id),
-            GetRegisterPolicy((_result, operation_id)) => Ok(*operation_id),
-            GetRegisterUserPermissions((_result, operation_id)) => Ok(*operation_id),
+            GetRegister((_, operation_id))
+            | GetRegisterOwner((_, operation_id))
+            | ReadRegister((_, operation_id))
+            | GetRegisterPolicy((_, operation_id))
+            | GetRegisterUserPermissions((_, operation_id)) => Ok(*operation_id),
         }
     }
 }
