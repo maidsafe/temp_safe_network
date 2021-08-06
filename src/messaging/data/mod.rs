@@ -133,11 +133,11 @@ impl QueryResponse {
         use QueryResponse::*;
         match self {
             GetChunk(result) => result.is_ok(),
-            GetRegister((result, _xor)) => result.is_ok(),
-            GetRegisterOwner((result, _xor)) => result.is_ok(),
-            ReadRegister((result, _xor)) => result.is_ok(),
-            GetRegisterPolicy((result, _xor)) => result.is_ok(),
-            GetRegisterUserPermissions((result, _xor)) => result.is_ok(),
+            GetRegister((result, _op_id)) => result.is_ok(),
+            GetRegisterOwner((result, _op_id)) => result.is_ok(),
+            ReadRegister((result, _op_id)) => result.is_ok(),
+            GetRegisterPolicy((result, _op_id)) => result.is_ok(),
+            GetRegisterUserPermissions((result, _op_id)) => result.is_ok(),
         }
     }
 
@@ -150,23 +150,23 @@ impl QueryResponse {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            GetRegister((result, _xorname)) => match result {
+            GetRegister((result, _op_id)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            GetRegisterOwner((result, _xorname)) => match result {
+            GetRegisterOwner((result, _op_id)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            ReadRegister((result, _xorname)) => match result {
+            ReadRegister((result, _op_id)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            GetRegisterPolicy((result, _xorname)) => match result {
+            GetRegisterPolicy((result, _op_id)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
-            GetRegisterUserPermissions((result, _xorname)) => match result {
+            GetRegisterUserPermissions((result, _op_id)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
@@ -228,8 +228,8 @@ macro_rules! try_from {
             fn try_from(response: QueryResponse) -> std::result::Result<Self, Self::Error> {
                 match response {
                     $(
-                        QueryResponse::$variant((Ok(data), _xor)) => Ok(data),
-                        QueryResponse::$variant((Err(error), _xor)) => Err(TryFromError::Response(error)),
+                        QueryResponse::$variant((Ok(data), _op_id)) => Ok(data),
+                        QueryResponse::$variant((Err(error), _op_id)) => Err(TryFromError::Response(error)),
                     )*
                     _ => Err(TryFromError::WrongType),
                 }
