@@ -22,7 +22,7 @@ use rand::prelude::SliceRandom;
 use rand::rngs::OsRng;
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tokio::{sync::mpsc::channel, task::JoinHandle, time::timeout};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
 // Number of attemps when retrying to send a message to a node
@@ -38,7 +38,7 @@ impl Session {
             client_pk
         );
 
-        let (endpoint, _, mut incoming_messages, mut disconnections, mut bootstrapped_peer) =
+        let (endpoint, _, mut incoming_messages, _disconnections, mut bootstrapped_peer) =
             self.qp2p.bootstrap().await?;
 
         self.endpoint = Some(endpoint.clone());
@@ -48,28 +48,6 @@ impl Session {
             .to_vec()
             .into_iter()
             .collect::<BTreeSet<_>>();
-
-        let cloned_endpoint = endpoint.clone();
-        let _ = tokio::spawn(async move {
-            while let Some(disconnected_peer) = disconnections.next().await {
-                // we assume elders should have high connectivity.
-                // any problem there and they'd be voted off and we'd get an updated section
-                // so just keep trying to reconnect
-                warn!(
-                    "Disconnected from elder {:?}. Attempting to reconnect",
-                    disconnected_peer
-                );
-                match cloned_endpoint.connect_to(&disconnected_peer).await {
-                    Ok(_) => info!("Reconnected to {:?}", disconnected_peer),
-                    Err(error) => {
-                        warn!(
-                            "Could not reconnect to {:?}, error: {:?}",
-                            disconnected_peer, error
-                        );
-                    }
-                };
-            }
-        });
 
         self.send_get_section_query(client_pk, &bootstrapped_peer)
             .await?;
