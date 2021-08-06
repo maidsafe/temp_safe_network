@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.1](https://github.com/maidsafe/safe_network/compare/v0.25.0...v0.25.1) (2021-08-06)
+
+
+### Bug Fixes
+
+* avoid looping relay targeting non-existing Node destination message ([5e0568d](https://github.com/maidsafe/safe_network/commit/5e0568d886e8228add08f08688c627342dfb3d61))
+
 ## [0.25.0](https://github.com/maidsafe/safe_network/compare/v0.24.2...v0.25.0) (2021-08-05)
 
 
