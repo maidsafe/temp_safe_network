@@ -48,26 +48,19 @@ impl Liveness {
         node_id: NodeIdentifier,
         operation_id: &OperationId,
     ) -> bool {
-        let new_operation = if let Some(black_eyes) = self.black_eyes.get(&node_id) {
-            let black_eyes_for_node = black_eyes.value();
-            if black_eyes_for_node.contains(operation_id) {
-                false
-            } else {
-                let _ = black_eyes_for_node.insert(*operation_id);
-                debug!("BLACK EYE ADDED: {:?}", operation_id);
+        let new_operation = self
+            .black_eyes
+            .entry(node_id)
+            .or_default()
+            .insert(*operation_id);
 
-                true
-            }
-        } else {
-            let black_eyes = DashSet::new();
-            let _ = black_eyes.insert(*operation_id);
-            let _ = self.black_eyes.insert(node_id, black_eyes);
-
-            debug!("BLACK EYE ADDED: {:?}", operation_id);
-
-            true
-        };
-
+        if new_operation {
+            trace!(
+                "Black eye added against node: {:?}: for op: {:?}",
+                node_id,
+                operation_id
+            );
+        }
         new_operation
     }
 
@@ -78,18 +71,12 @@ impl Liveness {
             .map(|entry| *entry.key())
             .collect();
 
-        let _removed_members = all_keys
-            .iter()
-            .filter_map(|key| {
-                if !current_members.contains(key) {
-                    let _ = self.black_eyes.remove(key);
-                    let _ = self.closest_nodes_to.remove(key);
-                    Some(*key)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        for key in &all_keys {
+            if !current_members.contains(key) {
+                let _ = self.black_eyes.remove(key);
+                let _ = self.closest_nodes_to.remove(key);
+            }
+        }
 
         self.recompute_closest_nodes();
     }

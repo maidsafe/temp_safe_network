@@ -162,7 +162,6 @@ impl ChunkStore {
             );
             // Nothing more to do here
             return Ok(());
-
         }
         self.db.store(data).await?;
 
