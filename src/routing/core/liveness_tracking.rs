@@ -52,7 +52,7 @@ impl Liveness {
             .black_eyes
             .entry(node_id)
             .or_default()
-            .insert(*operation_id);
+            .insert(operation_id.clone());
 
         if new_operation {
             trace!(

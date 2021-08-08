@@ -48,9 +48,9 @@ pub enum Error {
     /// Invalid Operation such as a POST on ImmutableData
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
-    /// Right now we dont need op ids for anything that's not a chunk. Add more functionality there when needed.
-    #[error("QueryResponse cannot derive an operation id for anything non-chunk at the moment.")]
-    NoOperationIdForElderData,
+    /// There was an error forming the OperationId
+    #[error("Operation id could not be derived.")]
+    NoOperationId,
     /// Node failed to delete the requested data for some reason.
     #[error("Failed to delete requested data")]
     FailedToDelete,

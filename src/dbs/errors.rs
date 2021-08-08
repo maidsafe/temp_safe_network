@@ -61,6 +61,9 @@ pub enum Error {
     ///Db key parse error.
     #[error("Could not parse key:: {0:?}")]
     CouldNotParseDbKey(Vec<u8>),
+    ///Operation Id could not be generated
+    #[error("Operation Id could not be generated")]
+    NoOperationId,
     /// Sled error.
     #[error("Sled error:: {0}")]
     Sled(#[from] sled::Error),

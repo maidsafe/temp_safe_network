@@ -6,11 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{CmdError, Error, OperationId, QueryResponse};
+use super::{CmdError, Error, OperationId, QueryResponse, Result};
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use xor_name::XorName;
 
 /// [`Chunk`] read operations.
@@ -60,11 +58,10 @@ impl ChunkRead {
     }
 
     /// Return operation Id of the read
-    pub fn operation_id(&self) -> OperationId {
-        let mut hasher = DefaultHasher::new();
-
-        self.hash(&mut hasher);
-        hasher.finish()
+    pub fn operation_id(&self) -> Result<OperationId> {
+        self.dst_address()
+            .encode_to_zbase32()
+            .map_err(|_| Error::NoOperationId)
     }
 }
 

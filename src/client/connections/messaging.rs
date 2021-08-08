@@ -239,15 +239,16 @@ impl Session {
         let (sender, mut receiver) = channel::<QueryResponse>(7);
 
         let pending_queries_for_thread = pending_queries.clone();
-        let _ = tokio::spawn(async move {
-            // Insert the response sender
-            let op_id = query.operation_id();
-            trace!("Inserting channel for {:?}", op_id);
-            let _ = pending_queries_for_thread
-                .write()
-                .await
-                .insert(op_id, sender);
-        });
+        if let Ok(op_id) = query.operation_id() {
+            let _ = tokio::spawn(async move {
+                // Insert the response sender
+                trace!("Inserting channel for {:?}", op_id);
+                let _ = pending_queries_for_thread
+                    .write()
+                    .await
+                    .insert(op_id, sender);
+            });
+        }
 
         let discarded_responses = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
 

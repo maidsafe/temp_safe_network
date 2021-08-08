@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{chunk::ChunkRead, register::RegisterRead, Error, OperationId, QueryResponse};
+use super::{chunk::ChunkRead, register::RegisterRead, Error, OperationId, QueryResponse, Result};
 use xor_name::XorName;
 
 use serde::{Deserialize, Serialize};
@@ -33,10 +33,10 @@ pub enum DataQuery {
 impl DataQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
-    pub fn error(&self, error: Error) -> QueryResponse {
+    pub fn error(&self, error: Error) -> Result<QueryResponse> {
         use DataQuery::*;
         match self {
-            Chunk(q) => q.error(error),
+            Chunk(q) => Ok(q.error(error)),
             Register(q) => q.error(error),
         }
     }
@@ -54,7 +54,7 @@ impl DataQuery {
     /// and responses at clients.
     /// Must be the same as the query response
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
-    pub fn operation_id(&self) -> OperationId {
+    pub fn operation_id(&self) -> Result<OperationId> {
         match self {
             DataQuery::Chunk(read) => read.operation_id(),
             DataQuery::Register(read) => read.operation_id(),

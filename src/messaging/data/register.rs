@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{CmdError, Error, QueryResponse};
+use super::{CmdError, Error, QueryResponse, Result};
 use crate::messaging::data::OperationId;
 use crate::types::{
     register::{Address, Entry, Register, RegisterOp, User},
@@ -85,19 +85,27 @@ pub enum RegisterWrite {
 impl RegisterRead {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
-    pub fn error(&self, error: Error) -> QueryResponse {
+    pub fn error(&self, error: Error) -> Result<QueryResponse> {
         match *self {
-            RegisterRead::Get(_) => QueryResponse::GetRegister((Err(error), self.operation_id())),
-            RegisterRead::Read(_) => QueryResponse::ReadRegister((Err(error), self.operation_id())),
-            RegisterRead::GetPolicy(_) => {
-                QueryResponse::GetRegisterPolicy((Err(error), self.operation_id()))
-            }
-            RegisterRead::GetUserPermissions { .. } => {
-                QueryResponse::GetRegisterUserPermissions((Err(error), self.operation_id()))
-            }
-            RegisterRead::GetOwner(_) => {
-                QueryResponse::GetRegisterOwner((Err(error), self.operation_id()))
-            }
+            RegisterRead::Get(_) => Ok(QueryResponse::GetRegister((
+                Err(error),
+                self.operation_id()?,
+            ))),
+            RegisterRead::Read(_) => Ok(QueryResponse::ReadRegister((
+                Err(error),
+                self.operation_id()?,
+            ))),
+            RegisterRead::GetPolicy(_) => Ok(QueryResponse::GetRegisterPolicy((
+                Err(error),
+                self.operation_id()?,
+            ))),
+            RegisterRead::GetUserPermissions { .. } => Ok(
+                QueryResponse::GetRegisterUserPermissions((Err(error), self.operation_id()?)),
+            ),
+            RegisterRead::GetOwner(_) => Ok(QueryResponse::GetRegisterOwner((
+                Err(error),
+                self.operation_id()?,
+            ))),
         }
     }
 
@@ -127,29 +135,39 @@ impl RegisterRead {
     /// and responses at clients.
     /// Must be the same as the query response
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
-    pub fn operation_id(&self) -> OperationId {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::Hasher;
-
-        let mut hasher = DefaultHasher::new();
-
-        let op_id_string = match self {
-            RegisterRead::Get(ref address) => format!("Get-{:?}", address),
-
-            RegisterRead::Read(ref address) => format!("Read-{:?}", address),
-
-            RegisterRead::GetPolicy(ref address) => format!("GetPolicy-{:?}", address),
-
-            RegisterRead::GetUserPermissions { ref address, .. } => {
-                format!("GetUserPermissions-{:?}", address)
-            }
-
-            RegisterRead::GetOwner(ref address) => format!("GetOwner-{:?}", address),
-        };
-
-        hasher.write(op_id_string.as_bytes());
-
-        hasher.finish()
+    pub fn operation_id(&self) -> Result<OperationId> {
+        match self {
+            RegisterRead::Get(ref address) => Ok(format!(
+                "Get-{:?}",
+                address
+                    .encode_to_zbase32()
+                    .map_err(|_| Error::NoOperationId)?
+            )),
+            RegisterRead::Read(ref address) => Ok(format!(
+                "Read-{:?}",
+                address
+                    .encode_to_zbase32()
+                    .map_err(|_| Error::NoOperationId)?
+            )),
+            RegisterRead::GetPolicy(ref address) => Ok(format!(
+                "GetPolicy-{:?}",
+                address
+                    .encode_to_zbase32()
+                    .map_err(|_| Error::NoOperationId)?
+            )),
+            RegisterRead::GetUserPermissions { ref address, .. } => Ok(format!(
+                "GetUserPermissions-{:?}",
+                address
+                    .encode_to_zbase32()
+                    .map_err(|_| Error::NoOperationId)?
+            )),
+            RegisterRead::GetOwner(ref address) => Ok(format!(
+                "GetOwner-{:?}",
+                address
+                    .encode_to_zbase32()
+                    .map_err(|_| Error::NoOperationId)?
+            )),
+        }
     }
 }
 
