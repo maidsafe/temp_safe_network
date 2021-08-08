@@ -45,12 +45,12 @@ pub struct DkgFailureSig {
     pub signature: Signature,
 }
 
-/// Dkg failure info for a round
+/// DTO: Dkg failure info for a round
 #[derive(Default, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct DkgFailureSigSet {
-    #[allow(missing_docs)]
+    ///
     pub sigs: Vec<DkgFailureSig>,
-    #[allow(missing_docs)]
+    ///
     pub failed_participants: BTreeSet<XorName>,
 }
 

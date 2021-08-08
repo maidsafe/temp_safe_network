@@ -6,12 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    data::ServiceMsg,
-    node::{DkgFailureSigSet, KeyedSig, Proposal, Section},
-    AuthorityProof, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth, WireMsg,
+use crate::{
+    messaging::{
+        data::ServiceMsg,
+        node::{DkgFailureSigSet, KeyedSig, Proposal, SectionDto},
+        AuthorityProof, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth, WireMsg,
+    },
+    routing::{dkg::SectionDkgOutcome, node::Node, routing_api::Peer, XorName},
 };
-use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
+
 use std::{
     net::SocketAddr,
     sync::atomic::{AtomicU64, Ordering},
@@ -47,7 +50,7 @@ pub(crate) enum Command {
     /// the proposed new elders).
     HandleDkgOutcome {
         section_auth: SectionAuthorityProvider,
-        outcome: SectionKeyShare,
+        outcome: SectionDkgOutcome,
     },
     /// Handle a DKG failure that was observed by a majority of the DKG participants.
     HandleDkgFailure(DkgFailureSigSet),
@@ -74,7 +77,7 @@ pub(crate) enum Command {
         /// New Node state and information
         node: Node,
         /// New section where we relocated
-        section: Section,
+        section: SectionDto,
     },
     /// Attempt to set JoinsAllowed flag.
     SetJoinsAllowed(bool),

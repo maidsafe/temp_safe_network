@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::node::{KeyedSig, SigShare};
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use crate::routing::Signer;
+use dashmap::DashMap;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use thiserror::Error;
 use tiny_keccak::{Hasher, Sha3};
 
@@ -32,8 +32,9 @@ type Digest256 = [u8; 32];
 /// otherwise lead to invalid signature to be produced even though all the shares are valid.
 ///
 #[allow(missing_debug_implementations)]
+#[derive(Clone)]
 pub(crate) struct SignatureAggregator {
-    map: HashMap<Digest256, State>,
+    map: Arc<DashMap<Digest256, State>>,
     expiration: Duration,
 }
 
@@ -46,7 +47,7 @@ impl SignatureAggregator {
     /// Create new aggregator with the given expiration.
     pub(crate) fn with_expiration(expiration: Duration) -> Self {
         Self {
-            map: Default::default(),
+            map: Arc::new(Default::default()),
             expiration,
         }
     }
@@ -59,7 +60,7 @@ impl SignatureAggregator {
     /// shares still need to be added for that particular payload. This error could be safely
     /// ignored (it might still be useful perhaps for debugging). The other error variants, however,
     /// indicate failures and should be treated a such. See [Error] for more info.
-    pub(crate) fn add(&mut self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
+    pub(crate) fn add(&self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
         self.remove_expired();
 
         if !sig_share.verify(payload) {
@@ -86,7 +87,7 @@ impl SignatureAggregator {
             })
     }
 
-    fn remove_expired(&mut self) {
+    fn remove_expired(&self) {
         let expiration = self.expiration;
         self.map
             .retain(|_, state| state.modified.elapsed() < expiration)
@@ -117,14 +118,14 @@ pub enum Error {
 }
 
 struct State {
-    shares: HashMap<usize, bls::SignatureShare>,
+    shares: Arc<DashMap<usize, bls::SignatureShare>>,
     modified: Instant,
 }
 
 impl State {
     fn new() -> Self {
         Self {
-            shares: Default::default(),
+            shares: Arc::new(Default::default()),
             modified: Instant::now(),
         }
     }
@@ -142,9 +143,17 @@ impl State {
         }
 
         if self.shares.len() > sig_share.public_key_set.threshold() {
+            let sigs: Vec<_> = self
+                .shares
+                .iter()
+                .map(|entry| {
+                    let (index, share) = entry.pair();
+                    (*index, share.clone())
+                })
+                .collect();
             let signature = sig_share
                 .public_key_set
-                .combine_signatures(self.shares.iter().map(|(&index, share)| (index, share)))
+                .combine_signatures(sigs.iter().map(|(i, s)| (*i, s)))
                 .map_err(Error::Combine)?;
             self.shares.clear();
 
@@ -167,7 +176,7 @@ mod tests {
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let mut aggregator = SignatureAggregator::default();
+        let aggregator = SignatureAggregator::default();
         let payload = b"hello";
 
         // Not enough shares yet
@@ -204,7 +213,7 @@ mod tests {
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let mut aggregator = SignatureAggregator::new();
+        let aggregator = SignatureAggregator::new();
         let payload = b"good";
 
         // First insert less than threshold + 1 valid shares.
@@ -235,7 +244,7 @@ mod tests {
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let mut aggregator = SignatureAggregator::with_expiration(Duration::from_millis(500));
+        let aggregator = SignatureAggregator::with_expiration(Duration::from_millis(500));
         let payload = b"hello";
 
         for index in 0..threshold {
@@ -261,7 +270,7 @@ mod tests {
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let mut aggregator = SignatureAggregator::new();
+        let aggregator = SignatureAggregator::new();
 
         let payload = b"hello";
 
@@ -290,6 +299,21 @@ mod tests {
 
     fn create_sig_share(sk_set: &bls::SecretKeySet, index: usize, payload: &[u8]) -> SigShare {
         let sk_share = sk_set.secret_key_share(index);
-        SigShare::new(sk_set.public_keys(), index, &sk_share, payload)
+        SigShare::new(
+            sk_set.public_keys(),
+            index,
+            TestSigner { sk_share },
+            payload,
+        )
     }
+}
+
+impl Signer for TestSigner {
+    fn sign<M: AsRef<[u8]>>(self, msg: M) -> bls::SignatureShare {
+        self.sk_share.sign(msg)
+    }
+}
+
+struct TestSigner {
+    sk_share: bls_dkg::SecretKeyShare,
 }

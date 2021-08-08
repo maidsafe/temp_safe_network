@@ -6,13 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    node::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, RelocateDetails, RelocatePayload,
-        Section,
-    },
-    AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider, WireMsg,
-};
 use crate::routing::{
     dkg::SectionAuthUtils,
     ed25519,
@@ -22,25 +15,36 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    section::SectionUtils,
+    section::{Section, SectionLogic},
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
+use crate::{
+    messaging::{
+        node::{
+            JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, RelocateDetails,
+            RelocatePayload,
+        },
+        AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider, WireMsg,
+    },
+    types::CFValue,
+};
 use bls::PublicKey as BlsPublicKey;
-use std::{collections::HashSet, net::SocketAddr};
+use dashmap::DashSet;
+use std::net::SocketAddr;
 use xor_name::{Prefix, XorName};
 
 /// Re-join as a relocated node.
 pub(crate) struct JoiningAsRelocated {
-    node: Node,
+    node: CFValue<Node>,
     genesis_key: BlsPublicKey,
-    dst_section_key: BlsPublicKey,
+    dst_section_key: CFValue<BlsPublicKey>,
     relocate_details: RelocateDetails,
     node_msg: NodeMsg,
     node_msg_auth: AuthorityProof<SectionAuth>,
     // Avoid sending more than one request to the same peer.
-    used_recipients: HashSet<SocketAddr>,
-    relocate_payload: Option<RelocatePayload>,
+    used_recipients: DashSet<SocketAddr>,
+    relocate_payload: CFValue<Option<RelocatePayload>>,
 }
 
 impl JoiningAsRelocated {
@@ -51,36 +55,37 @@ impl JoiningAsRelocated {
         node_msg: NodeMsg,
         section_auth: AuthorityProof<SectionAuth>,
     ) -> Result<Self> {
-        let dst_section_key = relocate_details.dst_key;
-
+        let dst_section_key = CFValue::new(relocate_details.dst_key);
         Ok(Self {
-            node,
+            node: CFValue::new(node),
             genesis_key,
             dst_section_key,
             relocate_details,
             node_msg,
             node_msg_auth: section_auth,
-            used_recipients: HashSet::<SocketAddr>::new(),
-            relocate_payload: None,
+            used_recipients: DashSet::new(),
+            relocate_payload: CFValue::new(None),
         })
     }
 
     // Generates the first command to send a `JoinAsRelocatedRequest`, responses
     // shall be fed back with `handle_join_response` function.
-    pub(crate) fn start(&mut self, bootstrap_addrs: Vec<SocketAddr>) -> Result<Command> {
+    pub(crate) async fn start(&self, bootstrap_addrs: Vec<SocketAddr>) -> Result<Command> {
         let dst_xorname = self.relocate_details.dst;
         let recipients: Vec<(XorName, SocketAddr)> = bootstrap_addrs
             .iter()
             .map(|addr| (dst_xorname, *addr))
             .collect();
 
-        self.used_recipients.extend(bootstrap_addrs);
+        for addr in bootstrap_addrs {
+            let _ = self.used_recipients.insert(addr);
+        }
 
         // We send a first join request to obtain the section prefix, which
         // we will then use to generate the relocation payload and send the
         // `JoinAsRelocatedRequest` again with it.
         // TODO: include the section Prefix in the RelocationDetails so we save one request.
-        self.build_join_request_cmd(&recipients)
+        self.build_join_request_cmd(&recipients).await
     }
 
     // Handles a `JoinAsRelocatedResponse`, if it's a:
@@ -89,7 +94,7 @@ impl JoiningAsRelocated {
     // - `Approval`: returns the `Section` to use by this node, completing the relocation.
     // - `NodeNotReachable`: returns an error, completing the relocation attempt.
     pub(crate) async fn handle_join_response(
-        &mut self,
+        &self,
         join_response: JoinAsRelocatedResponse,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
@@ -99,7 +104,7 @@ impl JoiningAsRelocated {
                 section_chain,
                 node_state,
             } => {
-                if node_state.value.peer.name() != &self.node.name() {
+                if node_state.value.peer.name() != &self.node.get().await.name() {
                     trace!("Ignore NodeApproval not for us");
                     return Ok(None);
                 }
@@ -113,7 +118,7 @@ impl JoiningAsRelocated {
                     return Err(Error::InvalidMessage);
                 }
 
-                if !section_chain.check_trust(Some(&self.dst_section_key)) {
+                if !section_chain.check_trust(Some(self.dst_section_key.get().await.as_ref())) {
                     error!("Verification failed - untrusted Join approval message",);
                     return Ok(None);
                 }
@@ -124,8 +129,10 @@ impl JoiningAsRelocated {
                 );
 
                 Ok(Some(Command::HandleRelocationComplete {
-                    node: self.node.clone(),
-                    section: Section::new(self.genesis_key, section_chain, section_auth)?,
+                    node: self.node.clone().await,
+                    section: Section::new(self.genesis_key, section_chain, section_auth)?
+                        .clone()
+                        .await,
                 }))
             }
             JoinAsRelocatedResponse::Retry(section_auth) => {
@@ -133,7 +140,7 @@ impl JoiningAsRelocated {
                     return Ok(None);
                 }
 
-                if section_auth.section_key() == self.dst_section_key {
+                if self.dst_section_key.clone().await == section_auth.section_key() {
                     return Ok(None);
                 }
 
@@ -145,19 +152,20 @@ impl JoiningAsRelocated {
 
                 // if we are relocating, and we didn't generate
                 // the relocation payload yet, we do it now
-                if self.relocate_payload.is_none() {
-                    self.build_relocation_payload(&section_auth.prefix)?;
+                if self.relocate_payload.get().await.is_none() {
+                    self.build_relocation_payload(&section_auth.prefix).await?;
                 }
 
                 info!(
                     "Newer Join response for our prefix {:?} from {:?}",
                     section_auth, sender
                 );
-                self.dst_section_key = section_auth.section_key();
+                self.dst_section_key.set(section_auth.section_key()).await;
 
-                let cmd = self.build_join_request_cmd(&new_recipients)?;
-                self.used_recipients
-                    .extend(new_recipients.iter().map(|(_, addr)| addr));
+                let cmd = self.build_join_request_cmd(&new_recipients).await?;
+                new_recipients.into_iter().for_each(|(_, addr)| {
+                    let _ = self.used_recipients.insert(addr);
+                });
 
                 Ok(Some(cmd))
             }
@@ -166,7 +174,7 @@ impl JoiningAsRelocated {
                     return Ok(None);
                 }
 
-                if section_auth.section_key() == self.dst_section_key {
+                if self.dst_section_key.clone().await == section_auth.section_key() {
                     return Ok(None);
                 }
 
@@ -190,19 +198,20 @@ impl JoiningAsRelocated {
 
                 // if we are relocating, and we didn't generate
                 // the relocation payload yet, we do it now
-                if self.relocate_payload.is_none() {
-                    self.build_relocation_payload(&section_auth.prefix)?;
+                if self.relocate_payload.get().await.is_none() {
+                    self.build_relocation_payload(&section_auth.prefix).await?;
                 }
 
                 info!(
                     "Newer Join response for our prefix {:?} from {:?}",
                     section_auth, sender
                 );
-                self.dst_section_key = section_auth.section_key();
+                self.dst_section_key.set(section_auth.section_key()).await;
 
-                let cmd = self.build_join_request_cmd(&new_recipients)?;
-                self.used_recipients
-                    .extend(new_recipients.iter().map(|(_, addr)| addr));
+                let cmd = self.build_join_request_cmd(&new_recipients).await?;
+                new_recipients.into_iter().for_each(|(_, addr)| {
+                    let _ = self.used_recipients.insert(addr);
+                });
 
                 Ok(Some(cmd))
             }
@@ -217,7 +226,7 @@ impl JoiningAsRelocated {
     }
 
     // Change our name to fit the destination section and apply the new age.
-    fn build_relocation_payload(&mut self, prefix: &Prefix) -> Result<()> {
+    async fn build_relocation_payload(&self, prefix: &Prefix) -> Result<()> {
         // We are relocating so we need to change our name.
         // Use a name that will match the destination even after multiple splits
         let extra_split_count = 3;
@@ -229,31 +238,38 @@ impl JoiningAsRelocated {
         let age = self.relocate_details.age;
         let new_keypair = ed25519::gen_keypair(&name_prefix.range_inclusive(), age);
         let new_name = XorName::from(PublicKey::from(new_keypair.public));
-        self.relocate_payload = Some(RelocatePayload::new(
-            self.node_msg.clone(),
-            self.node_msg_auth.clone(),
-            &new_name,
-            &self.node.keypair,
-        ));
+        self.relocate_payload
+            .set(Some(RelocatePayload::new(
+                self.node_msg.clone(),
+                self.node_msg_auth.clone(),
+                &new_name,
+                &self.node.get().await.keypair,
+            )))
+            .await;
 
         info!("Changing name to {}", new_name);
-        self.node = Node::new(new_keypair, self.node.addr);
+        self.node
+            .set(Node::new(new_keypair, self.node.get().await.addr))
+            .await;
 
         Ok(())
     }
 
-    fn build_join_request_cmd(&self, recipients: &[(XorName, SocketAddr)]) -> Result<Command> {
+    async fn build_join_request_cmd(
+        &self,
+        recipients: &[(XorName, SocketAddr)],
+    ) -> Result<Command> {
         let join_request = JoinAsRelocatedRequest {
-            section_key: self.dst_section_key,
-            relocate_payload: self.relocate_payload.clone(),
+            section_key: self.dst_section_key.clone().await,
+            relocate_payload: self.relocate_payload.clone().await,
         };
 
         info!("Sending {:?} to {:?}", join_request, recipients);
 
         let node_msg = NodeMsg::JoinAsRelocatedRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
-            &self.node,
-            DstLocation::DirectAndUnrouted(self.dst_section_key),
+            self.node.get().await.as_ref(),
+            DstLocation::DirectAndUnrouted(self.dst_section_key.clone().await),
             node_msg,
             self.genesis_key,
         )?;

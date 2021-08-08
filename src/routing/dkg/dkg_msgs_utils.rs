@@ -13,6 +13,8 @@ use crate::routing::{
     section::ElderCandidatesUtils,
     supermajority,
 };
+use crate::types::CFSet;
+use dashmap::DashSet;
 use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
@@ -60,26 +62,73 @@ impl DkgFailureSigUtils for DkgFailureSig {
 }
 
 pub(crate) trait DkgFailureSigSetUtils {
-    fn insert(&mut self, sig: DkgFailureSig, failed_participants: &BTreeSet<XorName>) -> bool;
+    fn insert(&self, sig: DkgFailureSig, failed_participants: &BTreeSet<XorName>) -> bool;
 
     fn has_agreement(&self, elder_candidates: &ElderCandidates) -> bool;
 
     fn verify(&self, elder_candidates: &ElderCandidates, generation: u64) -> bool;
 }
+/// Dkg failure info for a round
+#[derive(Debug)]
+pub(crate) struct DkgFailChecker {
+    //
+    pub(crate) sigs: CFSet<DkgFailureSig>,
+    //
+    pub(crate) failed_participants: DashSet<XorName>,
+}
 
-impl DkgFailureSigSetUtils for DkgFailureSigSet {
+impl From<&DkgFailureSigSet> for DkgFailChecker {
+    fn from(set: &DkgFailureSigSet) -> Self {
+        let mapped = DkgFailChecker::new();
+        for sig in &set.sigs {
+            let _ = mapped.insert(*sig, &set.failed_participants);
+        }
+        mapped
+    }
+}
+
+impl DkgFailChecker {
+    ///
+    pub(crate) fn new() -> Self {
+        Self {
+            sigs: CFSet::new(),
+            failed_participants: DashSet::new(),
+        }
+    }
+
+    /// data transfer object
+    pub(crate) fn dto(&self) -> DkgFailureSigSet {
+        let mapped = DkgFailureSigSet {
+            sigs: self
+                .sigs
+                .values()
+                .into_iter()
+                .map(|s| s.as_ref().clone())
+                .collect(),
+            failed_participants: self
+                .failed_participants
+                .iter()
+                .map(|r| (*r))
+                .collect::<BTreeSet<_>>(),
+        };
+        mapped
+    }
+}
+
+impl DkgFailureSigSetUtils for DkgFailChecker {
     // Insert a signature into this set. The signature is assumed valid. Returns `true` if the signature was
     // not already present in the set and `false` otherwise.
-    fn insert(&mut self, sig: DkgFailureSig, failed_participants: &BTreeSet<XorName>) -> bool {
+    fn insert(&self, sig: DkgFailureSig, failed_participants: &BTreeSet<XorName>) -> bool {
         if self.failed_participants.is_empty() {
-            self.failed_participants = failed_participants.clone();
+            failed_participants.iter().for_each(|key| {
+                let _ = self.failed_participants.insert(*key);
+            });
         }
         if self
             .sigs
-            .iter()
             .all(|existing_sig| existing_sig.public_key != sig.public_key)
         {
-            self.sigs.push(sig);
+            let _ = self.sigs.push(sig);
             true
         } else {
             false
@@ -95,18 +144,18 @@ impl DkgFailureSigSetUtils for DkgFailureSigSet {
     fn verify(&self, elder_candidates: &ElderCandidates, generation: u64) -> bool {
         let hash = hashed_failure(
             &DkgKey::new(elder_candidates, generation),
-            &self.failed_participants,
+            &self
+                .failed_participants
+                .iter()
+                .map(|r| *r)
+                .collect::<BTreeSet<_>>(),
         );
-        let votes = self
-            .sigs
-            .iter()
-            .filter(|sig| {
-                elder_candidates
-                    .elders
-                    .contains_key(&ed25519::name(&sig.public_key))
-                    && sig.public_key.verify(&hash, &sig.signature).is_ok()
-            })
-            .count();
+        let votes = self.sigs.count(|sig| {
+            elder_candidates
+                .elders
+                .contains_key(&ed25519::name(&sig.public_key))
+                && sig.public_key.verify(&hash, &sig.signature).is_ok()
+        });
 
         has_failure_agreement(elder_candidates.elders.len(), votes)
     }

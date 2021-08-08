@@ -3,7 +3,7 @@ use super::{
     Error, Result,
 };
 use crate::{
-    routing::{AggregatorError, SectionKeyShare, SignatureAggregator},
+    routing::{AggregatorError, SectionKeyShare, SignatureAggregator, Signer},
     types::{PublicKey, Signature},
 };
 use bls::PublicKey as BlsPublicKey;
@@ -65,18 +65,18 @@ pub struct BlsShareAuth {
 impl BlsShareAuth {
     /// Construct verified authority of a single node's share of section authority.
     pub(crate) fn authorize(
-        section_pk: BlsPublicKey,
         src_name: XorName,
-        key_share: &SectionKeyShare,
+        key_share: SectionKeyShare<impl Signer>,
         payload: impl AsRef<[u8]>,
     ) -> AuthorityProof<Self> {
+        let section_pk = key_share.public_key_set.public_key();
         AuthorityProof(BlsShareAuth {
             section_pk,
             src_name,
             sig_share: SigShare {
                 public_key_set: key_share.public_key_set.clone(),
                 index: key_share.index,
-                signature_share: key_share.secret_key_share.sign(payload),
+                signature_share: key_share.signer.sign(payload),
             },
         })
     }
@@ -96,7 +96,7 @@ pub struct SectionAuth {
 impl SectionAuth {
     /// Try to construct verified section authority by aggregating a new share.
     pub(crate) fn try_authorize(
-        aggregator: &mut SignatureAggregator,
+        aggregator: &SignatureAggregator,
         share: BlsShareAuth,
         payload: impl AsRef<[u8]>,
     ) -> Result<AuthorityProof<Self>, AggregatorError> {

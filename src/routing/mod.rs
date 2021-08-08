@@ -40,7 +40,10 @@ pub use self::{
         section_authority_provider::SectionAuthorityProviderUtils,
     },
 };
-pub(crate) use self::{core::SignatureAggregator, section::section_keys::SectionKeyShare};
+pub(crate) use self::{
+    core::SignatureAggregator,
+    section::section_keys::{SectionKeyShare, Signer},
+};
 pub use qp2p::{Config as TransportConfig, SendStream};
 
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update

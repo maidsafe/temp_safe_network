@@ -52,8 +52,8 @@ pub enum Error {
     InvalidMessage,
     #[error("A signature share is invalid.")]
     InvalidSignatureShare,
-    #[error("The secret key share is missing.")]
-    MissingSecretKeyShare,
+    #[error("The section key share is missing.")]
+    MissingSectionKeyShare,
     #[error("Failed to send a message to {0}, {1}")]
     FailedSend(SocketAddr, XorName),
     #[error("Connection closed locally")]

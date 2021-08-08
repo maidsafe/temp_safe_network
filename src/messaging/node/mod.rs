@@ -18,14 +18,14 @@ mod signed;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
-pub use network::Network;
+pub use network::NetworkDto;
 pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::ElderCandidates;
 pub use section::MembershipState;
 pub use section::NodeState;
 pub use section::Peer;
-pub use section::{Section, SectionPeers};
+pub use section::{SectionDto, SectionPeersDto};
 pub use signed::{KeyedSig, SigShare};
 
 use crate::messaging::{
@@ -63,10 +63,10 @@ pub enum NodeMsg {
     Sync {
         /// Information about our section.
         #[debug(with = "fmt_sync_section")]
-        section: Section,
+        section: SectionDto,
         /// Information about the rest of the network that we know of.
         #[debug(with = "fmt_sync_network")]
-        network: Network,
+        network: NetworkDto,
     },
     /// Send from a section to the node to be immediately relocated.
     Relocate(RelocateDetails),
@@ -155,14 +155,14 @@ pub enum NodeMsg {
     },
 }
 
-fn fmt_sync_section(section: &Section, f: &mut fmt::Formatter) -> fmt::Result {
+fn fmt_sync_section(section: &SectionDto, f: &mut fmt::Formatter) -> fmt::Result {
     f.debug_struct("Section")
         .field("section_auth", &section.section_auth.value)
         .field("key", &section.chain.last_key())
         .finish()
 }
 
-fn fmt_sync_network(network: &Network, f: &mut fmt::Formatter) -> fmt::Result {
+fn fmt_sync_network(network: &NetworkDto, f: &mut fmt::Formatter) -> fmt::Result {
     f.debug_struct("Network")
         .field(
             "sections",

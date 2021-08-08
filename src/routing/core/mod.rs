@@ -17,8 +17,11 @@ mod msg_handling;
 mod signature_aggregator;
 mod split_barrier;
 
-use crate::dbs::UsedSpace;
-use crate::node::RegisterStorage;
+use crate::{
+    dbs::UsedSpace,
+    node::RegisterStorage,
+    types::{CFOption, CFValue},
+};
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub use signature_aggregator::Error as AggregatorError;
@@ -27,25 +30,27 @@ use std::path::PathBuf;
 
 use self::{enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
 use crate::messaging::{
-    node::{Network, NodeMsg, Proposal, Section},
+    node::{NodeMsg, Proposal},
     MessageId,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
-    network::NetworkUtils,
+    network::NetworkLogic,
     node::Node,
     peer::PeerUtils,
-    relocation::RelocateState,
+    relocation::RelocationStatus,
     routing_api::command::Command,
-    section::{SectionKeyShare, SectionKeysProvider, SectionUtils},
+    section::{Section, SectionKeysProvider, SectionLogic},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use std::collections::BTreeSet;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use xor_name::{Prefix, XorName};
+
+use super::{dkg::SectionDkgOutcome, network::Network};
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
@@ -56,16 +61,16 @@ pub(crate) struct Core {
     pub(crate) comm: Comm,
     node: Node,
     section: Section,
-    network: Network,
-    section_keys_provider: SectionKeysProvider,
+    network: CFValue<Network>,
+    section_keys: CFValue<SectionKeysProvider>,
     message_aggregator: SignatureAggregator,
     proposal_aggregator: ProposalAggregator,
-    split_barrier: SplitBarrier,
+    split_barrier: RwLock<SplitBarrier>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
-    relocate_state: Option<RelocateState>,
+    relocation_state: CFOption<RelocationStatus>,
     pub(super) event_tx: mpsc::Sender<Event>,
-    joins_allowed: bool,
+    joins_allowed: CFValue<bool>,
     resource_proof: ResourceProof,
     end_users: EndUserRegistry,
     used_space: UsedSpace,
@@ -79,12 +84,12 @@ impl Core {
         comm: Comm,
         mut node: Node,
         section: Section,
-        section_key_share: Option<SectionKeyShare>,
+        secret_key_share: Option<SectionDkgOutcome>,
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
     ) -> Result<Self> {
-        let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share);
+        let section_keys = CFValue::new(SectionKeysProvider::new(KEY_CACHE_SIZE, secret_key_share));
 
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
@@ -95,15 +100,15 @@ impl Core {
             comm,
             node,
             section,
-            network: Network::new(),
-            section_keys_provider,
+            network: CFValue::new(Network::new()),
+            section_keys,
             proposal_aggregator: ProposalAggregator::default(),
-            split_barrier: SplitBarrier::new(),
+            split_barrier: RwLock::new(SplitBarrier::new()),
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
-            relocate_state: None,
+            relocation_state: CFOption::new(),
             event_tx,
-            joins_allowed: true,
+            joins_allowed: CFValue::new(true),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             end_users: EndUserRegistry::new(),
             register_storage,
@@ -116,21 +121,23 @@ impl Core {
     // Miscellaneous
     ////////////////////////////////////////////////////////////////////////////
 
-    pub(crate) fn state_snapshot(&self) -> StateSnapshot {
+    pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
             is_elder: self.is_elder(),
-            last_key: *self.section.chain().last_key(),
-            prefix: *self.section.prefix(),
-            elders: self.section().authority_provider().names(),
+            last_key: self.section.last_key().await,
+            prefix: self.section.prefix().await,
+            elders: self.section().authority_provider().await.names(),
         }
     }
 
-    pub(crate) async fn update_state(&mut self, old: StateSnapshot) -> Result<Vec<Command>> {
+    pub(crate) async fn update_state(&self, old: StateSnapshot) -> Result<Vec<Command>> {
         let mut commands = vec![];
-        let new = self.state_snapshot();
+        let new = self.state_snapshot().await;
 
-        self.section_keys_provider
-            .finalise_dkg(self.section.chain().last_key());
+        self.section_keys
+            .get()
+            .await
+            .finalise_dkg(&self.section.last_key().await);
 
         if new.prefix != old.prefix {
             info!("Split");
@@ -138,62 +145,84 @@ impl Core {
 
         if new.last_key != old.last_key {
             if new.is_elder {
-                info!(
-                    "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
-                    new.prefix,
-                    new.last_key,
-                    self.section.authority_provider().peers().format(", ")
-                );
+                {
+                    let provider = self.section.authority_provider().await;
+                    let peers = provider.peers().format(", ");
+                    info!(
+                        "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
+                        new.prefix, new.last_key, peers,
+                    );
+                }
 
-                if self.section_keys_provider.has_key_share() {
-                    commands.extend(self.promote_and_demote_elders()?);
+                if self.section_keys.get().await.has_key_share() {
+                    commands.extend(self.promote_and_demote_elders().await?);
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
                     let active_members: Vec<XorName> = self
                         .section
                         .active_members()
+                        .await
                         .map(|peer| *peer.name())
                         .collect();
                     let msg_id = MessageId::from_content(&active_members)?;
                     commands.extend(
-                        self.propose(Proposal::JoinsAllowed((msg_id, self.joins_allowed)))?,
+                        self.propose(Proposal::JoinsAllowed((
+                            msg_id,
+                            self.joins_allowed.clone().await,
+                        )))
+                        .await?,
                     );
                 }
 
-                self.print_network_stats();
+                self.print_network_stats().await;
 
                 // Sending SectionKnowledge to other sections for new SAP.
                 // TODO: remoev all this messaging once we have Anti-Entropy fully implemented.
-                let signed_sap = self.section.section_signed_authority_provider().clone();
+                let signed_sap = self
+                    .section
+                    .section_signed_authority_provider()
+                    .await
+                    .clone();
                 let node_msg = NodeMsg::SectionKnowledge {
-                    src_info: (signed_sap, self.section.chain().clone()),
+                    src_info: (signed_sap, self.section.chain_clone().await),
                     msg: None,
                 };
-
-                for sap in self.network.all() {
-                    let targets: Vec<_> = sap
-                        .elders()
-                        .iter()
-                        .map(|(name, addr)| (*name, *addr))
-                        .collect();
-
+                let network = self.network.get().await;
+                let sap_targets: Vec<_> = network
+                    .all()
+                    .await
+                    .iter()
+                    .map(|sap| {
+                        let targets: Vec<_> = sap
+                            .elders()
+                            .iter()
+                            .map(|(name, addr)| (*name, *addr))
+                            .collect();
+                        let dst_section_pk = sap.section_key();
+                        (targets, dst_section_pk)
+                    })
+                    .collect();
+                for (targets, dst_section_pk) in sap_targets {
                     trace!("Sending updated SectionInfo to all known sections");
-                    let dst_section_pk = sap.section_key();
-                    let cmd = self.send_direct_message_to_nodes(
-                        targets,
-                        node_msg.clone(),
-                        dst_section_pk,
-                    )?;
+                    let cmd = self
+                        .send_direct_message_to_nodes(targets, node_msg.clone(), dst_section_pk)
+                        .await?;
 
                     commands.push(cmd);
                 }
             }
 
             if new.is_elder || old.is_elder {
-                commands.extend(self.send_sync(self.section.clone(), self.network.clone())?);
+                commands.extend(
+                    self.send_sync(
+                        &self.section,
+                        self.network.get().await.as_ref().clone().await,
+                    )
+                    .await?,
+                );
             }
 
-            let current: BTreeSet<_> = self.section.authority_provider().names();
+            let current: BTreeSet<_> = self.section.authority_provider().await.names();
             let added = current.difference(&old.elders).copied().collect();
             let removed = old.elders.difference(&current).copied().collect();
             let remaining = old.elders.intersection(&current).copied().collect();
@@ -211,27 +240,34 @@ impl Core {
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
                 info!("Demoted");
-                self.network = Network::new();
-                self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None);
+                self.network.set(Network::new()).await;
+                self.section_keys
+                    .set(SectionKeysProvider::new(KEY_CACHE_SIZE, None))
+                    .await;
                 NodeElderChange::Demoted
             } else {
                 NodeElderChange::None
             };
 
             let sibling_elders = if new.prefix != old.prefix {
-                self.network.get(&new.prefix.sibling()).map(|sec_auth| {
-                    let current: BTreeSet<_> = sec_auth.names();
-                    let added = current.difference(&old.elders).copied().collect();
-                    let removed = old.elders.difference(&current).copied().collect();
-                    let remaining = old.elders.intersection(&current).copied().collect();
-                    Elders {
-                        prefix: new.prefix.sibling(),
-                        key: sec_auth.section_key(),
-                        remaining,
-                        added,
-                        removed,
-                    }
-                })
+                self.network
+                    .get()
+                    .await
+                    .get(&new.prefix.sibling())
+                    .await
+                    .map(|sec_auth| {
+                        let current: BTreeSet<_> = sec_auth.names();
+                        let added = current.difference(&old.elders).copied().collect();
+                        let removed = old.elders.difference(&current).copied().collect();
+                        let remaining = old.elders.intersection(&current).copied().collect();
+                        Elders {
+                            prefix: new.prefix.sibling(),
+                            key: sec_auth.section_key(),
+                            remaining,
+                            added,
+                            removed,
+                        }
+                    })
             } else {
                 None
             };
@@ -253,32 +289,35 @@ impl Core {
         }
 
         if !new.is_elder {
-            commands.extend(self.return_relocate_promise());
+            commands.extend(self.return_relocate_promise().await);
         }
 
         Ok(commands)
     }
 
-    pub(crate) fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
-        if self.section.prefix().matches(name) {
-            *self.section.chain().last_key()
-        } else if let Ok(key) = self.network.key_by_name(name) {
+    pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
+        if self.section.prefix().await.matches(name) {
+            self.section.last_key().await
+        } else if let Ok(key) = self.network.get().await.key_by_name(name).await {
             key
-        } else if self.section.prefix().sibling().matches(name) {
+        } else if self.section.prefix().await.sibling().matches(name) {
             // For sibling with unknown key, use the previous key in our chain under the assumption
             // that it's the last key before the split and therefore the last key of theirs we know.
             // In case this assumption is not correct (because we already progressed more than one
             // key since the split) then this key would be unknown to them and they would send
             // us back their whole section chain. However, this situation should be rare.
-            *self.section.chain().prev_key()
+            self.section.prev_key().await
         } else {
-            *self.section.chain().root_key()
+            self.section.root_key().await
         }
     }
 
-    pub(crate) fn print_network_stats(&self) {
+    pub(crate) async fn print_network_stats(&self) {
         self.network
-            .network_stats(self.section.authority_provider())
+            .get()
+            .await
+            .network_stats(&self.section.authority_provider().await)
+            .await
             .print()
     }
 }

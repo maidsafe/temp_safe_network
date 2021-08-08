@@ -29,10 +29,10 @@ use crate::routing::{
     ed25519,
     error::Result,
     messages::WireMsgUtils,
-    network::NetworkUtils,
+    network::NetworkLogic,
     node::Node,
     peer::PeerUtils,
-    section::SectionUtils,
+    section::SectionLogic,
     Error, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
 };
 use crate::{
@@ -95,15 +95,15 @@ impl Routing {
 
             let comm = Comm::new(config.transport_config, connection_event_tx).await?;
             let node = Node::new(keypair, comm.our_connection_info());
-            let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir)?;
+            let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir).await?;
 
             let section = core.section();
 
             let elders = Elders {
-                prefix: *section.prefix(),
-                key: *section.chain().last_key(),
+                prefix: section.prefix().await,
+                key: section.last_key().await,
                 remaining: BTreeSet::new(),
-                added: section.authority_provider().names(),
+                added: section.authority_provider().await.names(),
                 removed: BTreeSet::new(),
             };
 
@@ -195,26 +195,26 @@ impl Routing {
 
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
-        self.dispatcher.core.read().await.node().age()
+        self.dispatcher.core.get().await.node().age()
     }
 
     /// Returns the ed25519 public key of this node.
     pub async fn public_key(&self) -> PublicKey {
-        self.dispatcher.core.read().await.node().keypair.public
+        self.dispatcher.core.get().await.node().keypair.public
     }
 
     /// Returns the ed25519 keypair of this node, as bytes.
     pub async fn keypair_as_bytes(&self) -> [u8; KEYPAIR_LENGTH] {
-        self.dispatcher.core.read().await.node().keypair.to_bytes()
+        self.dispatcher.core.get().await.node().keypair.to_bytes()
     }
 
     /// Signs `data` with the ed25519 key of this node.
     pub async fn sign_as_node(&self, data: &[u8]) -> Signature {
-        self.dispatcher.core.read().await.node().keypair.sign(data)
+        self.dispatcher.core.get().await.node().keypair.sign(data)
     }
 
     /// Signs `data` with the BLS secret key share of this node, if it has any. Returns
-    /// `Error::MissingSecretKeyShare` otherwise.
+    /// `Error::MissingSectionKeyShare` otherwise.
     pub async fn sign_as_elder(
         &self,
         data: &[u8],
@@ -222,16 +222,17 @@ impl Routing {
     ) -> Result<(usize, bls::SignatureShare)> {
         self.dispatcher
             .core
-            .read()
+            .get()
             .await
             .sign_with_section_key_share(data, public_key)
+            .await
     }
 
     /// Verifies `signature` on `data` with the ed25519 public key of this node.
     pub async fn verify(&self, data: &[u8], signature: &Signature) -> bool {
         self.dispatcher
             .core
-            .read()
+            .get()
             .await
             .node()
             .keypair
@@ -241,22 +242,28 @@ impl Routing {
 
     /// The name of this node.
     pub async fn name(&self) -> XorName {
-        self.dispatcher.core.read().await.node().name()
+        self.dispatcher.core.get().await.node().name()
     }
 
     /// Returns connection info of this node.
     pub async fn our_connection_info(&self) -> SocketAddr {
-        self.dispatcher.core.read().await.our_connection_info()
+        self.dispatcher.core.get().await.our_connection_info()
     }
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
-        self.dispatcher.core.read().await.section_chain().clone()
+        self.dispatcher
+            .core
+            .get()
+            .await
+            .section_chain()
+            .await
+            .clone()
     }
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        *self.dispatcher.core.read().await.section().prefix()
+        self.dispatcher.core.get().await.section().prefix().await
     }
 
     /// Finds out if the given XorName matches our prefix.
@@ -266,17 +273,18 @@ impl Routing {
 
     /// Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
-        self.dispatcher.core.read().await.is_elder()
+        self.dispatcher.core.get().await.is_elder()
     }
 
     /// Returns the information of all the current section elders.
     pub async fn our_elders(&self) -> Vec<Peer> {
         self.dispatcher
             .core
-            .read()
+            .get()
             .await
             .section()
             .authority_provider()
+            .await
             .peers()
             .collect()
     }
@@ -294,11 +302,11 @@ impl Routing {
     pub async fn our_adults(&self) -> Vec<Peer> {
         self.dispatcher
             .core
-            .read()
+            .get()
             .await
             .section()
             .adults()
-            .copied()
+            .await
             .collect()
     }
 
@@ -316,29 +324,23 @@ impl Routing {
     pub async fn our_section_auth(&self) -> SectionAuthorityProvider {
         self.dispatcher
             .core
-            .read()
+            .get()
             .await
             .section()
             .authority_provider()
+            .await
             .clone()
     }
 
     /// Returns the info about other sections in the network known to us.
     pub async fn other_sections(&self) -> Vec<SectionAuthorityProvider> {
-        self.dispatcher
-            .core
-            .read()
-            .await
-            .network()
-            .all()
-            .cloned()
-            .collect()
+        self.dispatcher.core.get().await.network().await.all().await
     }
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        let core = self.dispatcher.core.read().await;
-        core.matching_section(name)
+        let core = self.dispatcher.core.get().await;
+        core.matching_section(name).await
     }
 
     /// Builds a WireMsg signed by this Node
@@ -349,7 +351,7 @@ impl Routing {
     ) -> Result<WireMsg> {
         let src_section_pk = *self.section_chain().await.last_key();
         WireMsg::single_src(
-            self.dispatcher.core.read().await.node(),
+            self.dispatcher.core.get().await.node(),
             dst,
             node_msg,
             src_section_pk,
@@ -363,19 +365,18 @@ impl Routing {
         dst: DstLocation,
     ) -> Result<WireMsg> {
         let src = self.name().await;
-        let src_section_pk = *self.section_chain().await.last_key();
 
         WireMsg::for_dst_accumulation(
             self.dispatcher
                 .core
-                .read()
+                .get()
                 .await
                 .key_share()
+                .await
                 .map_err(|err| err)?,
             src,
             dst,
             node_msg,
-            src_section_pk,
         )
     }
 
@@ -389,15 +390,15 @@ impl Routing {
     }
 
     /// Returns the current BLS public key set if this node has one, or
-    /// `Error::MissingSecretKeyShare` otherwise.
+    /// `Error::MissingSectionKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.dispatcher.core.read().await.public_key_set()
+        self.dispatcher.core.get().await.public_key_set().await
     }
 
     /// Returns our index in the current BLS group if this node is a member of one, or
-    /// `Error::MissingSecretKeyShare` otherwise.
+    /// `Error::MissingSectionKeyShare` otherwise.
     pub async fn our_index(&self) -> Result<usize> {
-        self.dispatcher.core.read().await.our_index()
+        self.dispatcher.core.get().await.our_index().await
     }
 }
 
@@ -430,7 +431,7 @@ async fn handle_connection_events(
                 };
 
                 let span = {
-                    let core = dispatcher.core.read().await;
+                    let core = dispatcher.core.get().await;
                     trace_span!("handle_message", name = %core.node().name(), %sender)
                 };
                 let _span_guard = span.enter();

@@ -15,7 +15,7 @@ use crate::messaging::{
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::routing::{
-    error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
+    error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionLogic,
     Event, SectionAuthorityProviderUtils,
 };
 use bytes::Bytes;
@@ -106,8 +106,8 @@ impl Core {
         }
     }
 
-    /// Handle DataMsgs received
-    pub(crate) async fn handle_data_msg_received(
+    /// Handle ServiceMsgs received from EndUser
+    pub(crate) async fn handle_service_msg_received(
         &self,
         msg_id: MessageId,
         msg: ServiceMsg,
@@ -138,8 +138,8 @@ impl Core {
 
     /// Handle incoming data msgs, determining if they should be handled at this node or fowrwarded
     // TODO: streamline this as full AE for direct messaging is included.
-    pub(crate) async fn handle_data_message(
-        &mut self,
+    pub(crate) async fn handle_service_message(
+        &self,
         sender: SocketAddr,
         msg_id: MessageId,
         auth: AuthorityProof<ServiceAuth>,
@@ -149,7 +149,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let is_in_destination = match dst_location.name() {
             Some(dst_name) => {
-                let is_in_destination = self.section().prefix().matches(&dst_name);
+                let is_in_destination = self.section().prefix().await.matches(&dst_name);
                 if is_in_destination {
                     if let DstLocation::EndUser(EndUser { socket_id, xorname }) = dst_location {
                         if let Some(addr) = self.get_socket_addr(socket_id) {
@@ -161,7 +161,7 @@ impl Core {
                             )?;
 
                             return Ok(vec![Command::SendMessage {
-                                recipients: vec![(xorname, *addr)],
+                                recipients: vec![(xorname, addr)],
                                 wire_msg,
                             }]);
                         }
@@ -179,7 +179,7 @@ impl Core {
                     "Message ({}) from client {}, socket id already exists: {:?}",
                     msg_id, sender, end_user
                 );
-                *end_user
+                end_user
             }
             None => {
                 // This is the first time we receive a message from this client
@@ -190,7 +190,7 @@ impl Core {
 
                 // TODO: remove the enduser registry and simply encrypt socket
                 // addr with this node's keypair and use that as the socket id
-                match self.try_add_enduser(sender) {
+                match self.try_add_enduser(sender).await {
                     Ok(end_user) => end_user,
                     Err(err) => {
                         error!(
@@ -226,7 +226,7 @@ impl Core {
                 &self.node,
                 dst_location,
                 node_msg,
-                self.section.authority_provider().section_key(),
+                self.section.authority_provider().await.section_key(),
             ) {
                 Ok(mut wire_msg) => {
                     wire_msg.set_msg_id(msg_id);

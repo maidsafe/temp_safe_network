@@ -28,7 +28,7 @@ use xor_name::XorName;
 /// Container for storing information about a section.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// All information about a section
-pub struct Section {
+pub struct SectionDto {
     /// network genesis key
     pub genesis_key: BlsPublicKey,
     /// The secured linked list of previous section keys
@@ -36,23 +36,23 @@ pub struct Section {
     /// Signed section authority
     pub section_auth: SectionAuth<SectionAuthorityProvider>,
     /// memebers of the section
-    pub members: SectionPeers,
+    pub members: SectionPeersDto,
 }
 
 /// Container for storing information about members of our section.
 #[derive(Clone, Default, Debug, Eq, Serialize, Deserialize)]
-pub struct SectionPeers {
+pub struct SectionPeersDto {
     /// memebers of the section
     pub members: BTreeMap<XorName, SectionAuth<NodeState>>,
 }
 
-impl PartialEq for SectionPeers {
+impl PartialEq for SectionPeersDto {
     fn eq(&self, other: &Self) -> bool {
         self.members == other.members
     }
 }
 
-impl Hash for SectionPeers {
+impl Hash for SectionPeersDto {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.members.hash(state)
     }
@@ -69,7 +69,7 @@ impl Iterator for IntoIter {
     }
 }
 
-impl IntoIterator for SectionPeers {
+impl IntoIterator for SectionPeersDto {
     type IntoIter = IntoIter;
     type Item = <Self::IntoIter as Iterator>::Item;
 

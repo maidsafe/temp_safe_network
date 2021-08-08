@@ -7,13 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::{
-    node::{NodeMsg, Peer},
-    NodeMsgAuthority,
-};
 use crate::routing::{
     messages::NodeMsgAuthorityUtils, peer::PeerUtils, routing_api::command::Command,
-    section::SectionUtils, Error, Result,
+    section::SectionLogic, Error, Result,
+};
+use crate::{
+    messaging::{
+        node::{NodeMsg, Peer},
+        NodeMsgAuthority,
+    },
+    routing::section::Section,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;
@@ -22,7 +25,7 @@ use std::net::SocketAddr;
 impl Core {
     // Handle message whose trust we can't establish because its signature
     // contains only keys we don't know.
-    pub(crate) fn handle_untrusted_message(
+    pub(crate) async fn handle_untrusted_message(
         &self,
         sender: SocketAddr,
         node_msg: NodeMsg,
@@ -30,7 +33,7 @@ impl Core {
     ) -> Result<Command> {
         let src_name = msg_authority.name();
 
-        let bounce_dst_section_pk = self.section_key_by_name(&src_name);
+        let bounce_dst_section_pk = self.section_key_by_name(&src_name).await;
 
         let bounce_node_msg = NodeMsg::BouncedUntrustedMessage {
             msg: Box::new(node_msg),
@@ -38,9 +41,10 @@ impl Core {
         };
 
         self.send_direct_message((src_name, sender), bounce_node_msg, bounce_dst_section_pk)
+            .await
     }
 
-    pub(crate) fn handle_bounced_untrusted_message(
+    pub(crate) async fn handle_bounced_untrusted_message(
         &self,
         sender: Peer,
         dst_section_key: BlsPublicKey,
@@ -55,8 +59,10 @@ impl Core {
                 // Instead we use the section chain that's part of the included `Section` struct.
                 // Problem is we can't extend that chain as it would invalidate the signature. We
                 // must construct a new message instead.
-                let section = section
-                    .extend_chain(&dst_section_key, self.section.chain())
+
+                let section = Section::from(section)
+                    .extend_chain(&dst_section_key, &self.section.chain_clone().await)
+                    .await
                     .map_err(|err| {
                         error!("extending section chain failed: {:?}", err);
                         Error::InvalidMessage // TODO: more specific error
@@ -67,11 +73,13 @@ impl Core {
             bounced_msg => bounced_msg,
         };
 
-        let cmd = self.send_direct_message(
-            (*sender.name(), *sender.addr()),
-            new_node_msg,
-            dst_section_key,
-        )?;
+        let cmd = self
+            .send_direct_message(
+                (*sender.name(), *sender.addr()),
+                new_node_msg,
+                dst_section_key,
+            )
+            .await?;
 
         Ok(cmd)
     }

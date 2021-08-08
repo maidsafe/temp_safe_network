@@ -7,33 +7,34 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Command, Event};
-use crate::messaging::{
-    node::{NodeMsg, Section},
-    DstLocation, EndUser, MsgKind, WireMsg,
+use crate::{
+    messaging::{
+        node::{NodeMsg, SectionDto},
+        DstLocation, EndUser, MsgKind, WireMsg,
+    },
+    types::CFValue,
 };
-use crate::node::RegisterStorage;
-use crate::routing::{
-    core::{Core, SendStatus},
-    error::Result,
-    messages::WireMsgUtils,
-    node::Node,
-    peer::PeerUtils,
-    section::SectionPeersUtils,
-    section::SectionUtils,
-    Error, XorName,
+use crate::{
+    node::RegisterStorage,
+    routing::{
+        core::{Core, SendStatus},
+        error::Result,
+        messages::WireMsgUtils,
+        node::Node,
+        peer::PeerUtils,
+        section::SectionLogic,
+        section::SectionPeersLogic,
+        Error, XorName,
+    },
 };
 use itertools::Itertools;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{
-    sync::{watch, RwLock},
-    time,
-};
+use tokio::{sync::watch, time};
 use tracing::Instrument;
 
 // `Command` Dispatcher.
 pub(super) struct Dispatcher {
-    pub(super) core: RwLock<Core>,
-
+    pub(super) core: CFValue<Core>,
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
 }
@@ -49,14 +50,14 @@ impl Dispatcher {
     pub(super) fn new(core: Core) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         Self {
-            core: RwLock::new(core),
+            core: CFValue::new(core),
             cancel_timer_tx,
             cancel_timer_rx,
         }
     }
 
     pub(super) async fn get_register_storage(&self) -> RegisterStorage {
-        self.core.read().await.register_storage.clone()
+        self.core.get().await.register_storage.clone()
     }
 
     /// Handles the given command and transitively any new commands that are produced during its
@@ -82,13 +83,15 @@ impl Dispatcher {
         // analyzing logs produced by running multiple nodes within the same process, for example
         // from integration tests.
         let span = {
-            let core = self.core.read().await;
+            let core = self.core.get().await;
+            let elder = core.is_elder();
+            let prefix = core.section().prefix().await;
             trace_span!(
                 "handle_command",
                 name = %core.node().name(),
-                prefix = format_args!("({:b})", core.section().prefix()),
+                prefix = format_args!("({:b})", prefix),
                 age = core.node().age(),
-                elder = core.is_elder(),
+                elder,
             )
         };
 
@@ -107,11 +110,7 @@ impl Dispatcher {
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
             Command::HandleMessage { sender, wire_msg } => {
-                self.core
-                    .write()
-                    .await
-                    .handle_message(sender, wire_msg)
-                    .await
+                self.core.get().await.handle_message(sender, wire_msg).await
             }
             Command::HandleServiceMessage {
                 msg_id,
@@ -120,36 +119,35 @@ impl Dispatcher {
                 auth,
             } => {
                 self.core
-                    .read()
+                    .get()
                     .await
-                    .handle_data_msg_received(msg_id, msg, user, auth)
+                    .handle_service_msg_received(msg_id, msg, user, auth)
                     .await
             }
-            Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
+            Command::HandleTimeout(token) => self.core.get().await.handle_timeout(token).await,
             Command::HandleAgreement { proposal, sig } => {
-                self.core
-                    .write()
-                    .await
-                    .handle_agreement(proposal, sig)
-                    .await
+                self.core.get().await.handle_agreement(proposal, sig).await
             }
             Command::HandleConnectionLost(addr) => {
-                self.core.read().await.handle_connection_lost(addr)
+                self.core.get().await.handle_connection_lost(addr).await
             }
-            Command::HandlePeerLost(addr) => self.core.read().await.handle_peer_lost(&addr),
+            Command::HandlePeerLost(addr) => self.core.get().await.handle_peer_lost(&addr).await,
             Command::HandleDkgOutcome {
                 section_auth,
                 outcome,
-            } => self
-                .core
-                .write()
-                .await
-                .handle_dkg_outcome(section_auth, outcome),
+            } => {
+                self.core
+                    .get()
+                    .await
+                    .handle_dkg_outcome(section_auth, outcome)
+                    .await
+            }
             Command::HandleDkgFailure(signeds) => self
                 .core
-                .write()
+                .get()
                 .await
                 .handle_dkg_failure(signeds)
+                .await
                 .map(|command| vec![command]),
             Command::SendMessage {
                 recipients,
@@ -168,7 +166,7 @@ impl Dispatcher {
             }
             Command::ParseAndSendWireMsg(wire_msg) => self.send_wire_message(wire_msg).await,
             Command::RelayMessage(wire_msg) => {
-                let cmd = self.core.write().await.relay_message(wire_msg).await?;
+                let cmd = self.core.get().await.relay_message(wire_msg).await?;
                 Ok(vec![cmd])
             }
             Command::ScheduleTimeout { duration, token } => Ok(self
@@ -181,7 +179,7 @@ impl Dispatcher {
                 Ok(vec![])
             }
             Command::SetJoinsAllowed(joins_allowed) => {
-                self.core.read().await.set_joins_allowed(joins_allowed)
+                self.core.get().await.set_joins_allowed(joins_allowed).await
             }
             Command::ProposeOnline {
                 mut peer,
@@ -191,53 +189,52 @@ impl Dispatcher {
                 // The reachability check was completed during the initial bootstrap phase
                 peer.set_reachable(true);
                 self.core
-                    .read()
+                    .get()
                     .await
                     .make_online_proposal(peer, previous_name, dst_key)
                     .await
             }
-            Command::ProposeOffline(name) => self.core.read().await.propose_offline(name),
+            Command::ProposeOffline(name) => self.core.get().await.propose_offline(name).await,
             Command::StartConnectivityTest(name) => {
                 let msg = {
-                    let core = self.core.read().await;
+                    let core = self.core.get().await;
                     let node = core.node();
-                    let section_pk = *core.section().chain.last_key();
+                    let section_pk = core.section().last_key().await;
                     WireMsg::single_src(
                         node,
                         DstLocation::Section {
-                            name: core.node().name(),
+                            name: node.name(),
                             section_pk,
                         },
                         NodeMsg::StartConnectivityTest(name),
                         section_pk,
                     )?
                 };
-                let our_name = self.core.read().await.node().name();
-                let peers = self
-                    .core
-                    .read()
-                    .await
+                let core = self.core.get().await;
+                let our_name = core.node().name();
+                let peers = core
                     .section()
                     .active_members()
+                    .await
                     .filter(|peer| peer.name() != &name && peer.name() != &our_name)
-                    .cloned()
                     .collect_vec();
-                Ok(self.core.read().await.send_or_handle(msg, &peers))
+                Ok(core.send_or_handle(msg, &peers).await)
             }
             Command::TestConnectivity(name) => {
                 let mut commands = vec![];
                 if let Some(peer) = self
                     .core
-                    .read()
+                    .get()
                     .await
                     .section()
                     .members()
                     .get(&name)
+                    .await
                     .map(|member_info| member_info.peer)
                 {
                     if self
                         .core
-                        .read()
+                        .get()
                         .await
                         .comm
                         .is_reachable(peer.addr())
@@ -264,7 +261,7 @@ impl Dispatcher {
             | MsgKind::SectionAuthMsg(_) => {
                 let status = self
                     .core
-                    .read()
+                    .get()
                     .await
                     .comm
                     .send(recipients, delivery_group_size, wire_msg)
@@ -285,7 +282,7 @@ impl Dispatcher {
             MsgKind::ServiceMsg(_) | MsgKind::SectionInfoMsg => {
                 let _ = self
                     .core
-                    .read()
+                    .get()
                     .await
                     .comm
                     .send_on_existing_connection(recipients, wire_msg)
@@ -302,8 +299,9 @@ impl Dispatcher {
     /// Messages sent here, either section to section or node to node.
     pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
         if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
-            if self.core.read().await.section().prefix().matches(xorname) {
-                let addr = self.core.read().await.get_socket_addr(*socket_id).copied();
+            let core = self.core.get().await;
+            if core.section().prefix().await.matches(xorname) {
+                let addr = core.get_socket_addr(*socket_id);
 
                 if let Some(socket_addr) = addr {
                     // Send a message to a client peer.
@@ -312,9 +310,7 @@ impl Dispatcher {
                     debug!("Sending client msg to {:?}", socket_addr);
 
                     let recipients = vec![(*xorname, socket_addr)];
-                    wire_msg.set_dst_section_pk(
-                        *self.core.read().await.section_chain().clone().last_key(),
-                    );
+                    wire_msg.set_dst_section_pk(*core.section_chain().await.clone().last_key());
 
                     let command = Command::SendMessage {
                         recipients,
@@ -350,18 +346,27 @@ impl Dispatcher {
         }
     }
 
-    async fn handle_relocation_complete(&self, new_node: Node, new_section: Section) -> Result<()> {
-        let previous_name = self.core.read().await.node().name();
+    async fn handle_relocation_complete(
+        &self,
+        new_node: Node,
+        new_section: SectionDto,
+    ) -> Result<()> {
+        let core = self.core.get().await;
+        let previous_name = core.node().name();
         let new_keypair = new_node.keypair.clone();
 
-        let mut core = self.core.write().await;
-        *core = core.relocated(new_node, new_section).await?;
+        self.core
+            .set(core.relocated(new_node, new_section).await?)
+            .await;
 
-        core.send_event(Event::Relocated {
-            previous_name,
-            new_keypair,
-        })
-        .await;
+        self.core
+            .get()
+            .await
+            .send_event(Event::Relocated {
+                previous_name,
+                new_keypair,
+            })
+            .await;
 
         Ok(())
     }

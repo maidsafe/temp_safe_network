@@ -14,12 +14,14 @@ pub mod register;
 /// Encoding utils
 pub mod utils;
 
+mod cf;
 mod chunk;
 mod errors;
 mod keys;
 pub mod prefix_map;
 mod token;
 
+pub use cf::{map::CFMap, option::CFOption, set::CFSet, value::CFValue};
 pub use chunk::{
     Address as ChunkAddress, Chunk, Kind as ChunkKind, PrivateChunk, PublicChunk,
     MAX_CHUNK_SIZE_IN_BYTES,

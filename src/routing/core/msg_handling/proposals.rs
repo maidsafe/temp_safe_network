@@ -16,7 +16,7 @@ use crate::routing::{
 impl Core {
     // Insert the proposal into the proposal aggregator and handle it if aggregated.
     pub(crate) fn handle_proposal(
-        &mut self,
+        &self,
         proposal: Proposal,
         sig_share: SigShare,
     ) -> Result<Vec<Command>> {
