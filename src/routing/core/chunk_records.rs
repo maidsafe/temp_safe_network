@@ -17,7 +17,7 @@ use crate::messaging::{
 use super::Command;
 use super::{capacity::CHUNK_COPY_COUNT, Prefix, Result};
 use crate::routing::error::convert_to_error_message;
-use crate::routing::section::SectionUtils;
+use crate::routing::section::SectionLogic;
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use std::collections::BTreeSet;
 use tracing::info;
@@ -117,11 +117,14 @@ impl Core {
         let aggregation = false;
 
         if self.get_copy_count() > targets.len() {
-            let error = CmdError::Data(ErrorMessage::InsufficientAdults(*self.section().prefix()));
+            let error = CmdError::Data(ErrorMessage::InsufficientAdults(
+                self.section().prefix().await,
+            ));
             return self.send_cmd_error_response(error, origin, msg_id);
         }
 
         self.send_node_msg_to_targets(msg, targets, aggregation)
+            .await
     }
 
     pub(crate) async fn send_error(
@@ -155,6 +158,7 @@ impl Core {
         let aggregation = false;
 
         self.send_node_msg_to_targets(msg, targets, aggregation)
+            .await
     }
 
     pub(super) async fn read_chunk_from_adults(
@@ -171,7 +175,11 @@ impl Core {
 
         if targets.is_empty() {
             return self
-                .send_error(Error::NoAdults(*self.section().prefix()), msg_id, origin)
+                .send_error(
+                    Error::NoAdults(self.section().prefix().await),
+                    msg_id,
+                    origin,
+                )
                 .await;
         }
 
@@ -192,6 +200,7 @@ impl Core {
         let aggregation = false;
 
         self.send_node_msg_to_targets(msg, fresh_targets, aggregation)
+            .await
     }
 }
 

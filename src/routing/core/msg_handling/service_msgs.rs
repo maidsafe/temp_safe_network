@@ -17,7 +17,8 @@ use crate::messaging::{
 };
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;
 use crate::routing::peer::PeerUtils;
-use crate::routing::{error::Result, routing_api::command::Command, section::SectionUtils};
+use crate::routing::{error::Result, routing_api::command::Command, section::SectionLogic};
+// use bls::PublicKey;
 use crate::types::PublicKey;
 use itertools::Itertools;
 use std::collections::BTreeSet;
@@ -113,10 +114,14 @@ impl Core {
     }
 
     /// Sign and serialize node message to be sent
-    pub(crate) fn prepare_node_msg(&self, msg: NodeMsg, dst: DstLocation) -> Result<Vec<Command>> {
+    pub(crate) async fn prepare_node_msg(
+        &self,
+        msg: NodeMsg,
+        dst: DstLocation,
+    ) -> Result<Vec<Command>> {
         let msg_id = MessageId::new();
 
-        let section_pk = *self.section().chain().last_key();
+        let section_pk = self.section().last_key().await;
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
 
@@ -141,7 +146,7 @@ impl Core {
         trace!("Handling chunk read at adult");
         let mut commands = vec![];
         if self.chunk_storage.is_storage_getting_full().await {
-            let section_pk = self.public_key_set()?.public_key();
+            let section_pk = self.public_key_set().await?.public_key();
             let node_id = self.node().keypair.public;
 
             let node_xorname = XorName::from(PublicKey::from(node_id));
@@ -169,7 +174,7 @@ impl Core {
                 };
 
                 // Setup node authority on this response and send this back to our elders
-                let section_pk = *self.section().chain().last_key();
+                let section_pk = self.section().last_key().await;
                 let dst = DstLocation::Section {
                     name: query.dst_name(),
                     section_pk,
@@ -301,7 +306,7 @@ impl Core {
         let adults = self
             .section()
             .adults()
-            .copied()
+            .await
             .map(|p2p_node| *p2p_node.name());
 
         adults

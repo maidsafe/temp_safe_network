@@ -8,6 +8,7 @@
 
 use super::{KeyedSig, SigShare};
 use crate::messaging::node::Proposal;
+use crate::routing::Signer;
 use crate::routing::{
     core::{AggregatorError, SignatureAggregator},
     error::Result,
@@ -20,7 +21,7 @@ pub(crate) trait ProposalUtils {
         &self,
         public_key_set: bls::PublicKeySet,
         index: usize,
-        secret_key_share: &bls::SecretKeyShare,
+        signer: impl Signer,
     ) -> Result<SigShare>;
 
     fn as_signable(&self) -> SignableView;
@@ -32,12 +33,12 @@ impl ProposalUtils for Proposal {
         &self,
         public_key_set: bls::PublicKeySet,
         index: usize,
-        secret_key_share: &bls::SecretKeyShare,
+        signer: impl Signer,
     ) -> Result<SigShare> {
         Ok(SigShare::new(
             public_key_set,
             index,
-            secret_key_share,
+            signer,
             &bincode::serialize(&self.as_signable()).map_err(|_| ProposalError::Invalid)?,
         ))
     }
@@ -67,14 +68,14 @@ impl<'a> Serialize for SignableView<'a> {
 pub(crate) struct ProposalAggregator(SignatureAggregator);
 
 impl ProposalAggregator {
-    pub(crate) fn add(
-        &mut self,
+    pub(crate) async fn add(
+        &self,
         proposal: Proposal,
         sig_share: SigShare,
     ) -> Result<(Proposal, KeyedSig), ProposalError> {
         let bytes =
             bincode::serialize(&SignableView(&proposal)).map_err(|_| ProposalError::Invalid)?;
-        let sig = self.0.add(&bytes, sig_share)?;
+        let sig = self.0.add(&bytes, sig_share).await?;
         Ok((proposal, sig))
     }
 }

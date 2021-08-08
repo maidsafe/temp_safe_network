@@ -16,7 +16,7 @@ use crate::messaging::{
 use crate::routing::{
     error::{Error, Result},
     node::Node,
-    section::SectionKeyShare,
+    section::{SectionKeyShare, Signer},
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -36,11 +36,10 @@ pub(crate) trait WireMsgUtils {
 
     /// Creates a message signed using a BLS KeyShare for destination accumulation
     fn for_dst_accumulation(
-        key_share: &SectionKeyShare,
+        key_share: SectionKeyShare<impl Signer>,
         src_name: XorName,
         dst: DstLocation,
         node_msg: NodeMsg,
-        src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error>;
 
     /// Creates a signed message from single node.
@@ -91,21 +90,16 @@ impl WireMsgUtils for WireMsg {
 
     /// Creates a message signed using a BLS KeyShare for destination accumulation
     fn for_dst_accumulation(
-        key_share: &SectionKeyShare,
+        key_share: SectionKeyShare<impl Signer>,
         src_name: XorName,
         dst: DstLocation,
         node_msg: NodeMsg,
-        src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error> {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let msg_authority = NodeMsgAuthority::BlsShare(BlsShareAuth::authorize(
-            src_section_pk,
-            src_name,
-            key_share,
-            &msg_payload,
-        ));
+        let msg_authority =
+            NodeMsgAuthority::BlsShare(BlsShareAuth::authorize(src_name, key_share, &msg_payload));
 
         Self::new_signed(msg_payload, msg_authority, dst)
     }

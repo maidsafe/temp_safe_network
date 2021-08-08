@@ -13,7 +13,22 @@ use xor_name::PrefixMap;
 
 /// Container for storing information about other sections in the network.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Network {
+pub struct NetworkDto {
     /// Other sections: maps section prefixes to their latest signed section authority providers.
     pub sections: PrefixMap<SectionAuth<SectionAuthorityProvider>>,
+}
+
+impl NetworkDto {
+    ///
+    pub fn new() -> Self {
+        Self {
+            sections: PrefixMap::new(),
+        }
+    }
+}
+
+impl Default for NetworkDto {
+    fn default() -> Self {
+        NetworkDto::new()
+    }
 }

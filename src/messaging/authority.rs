@@ -3,7 +3,7 @@ use super::{
     Error, Result,
 };
 use crate::{
-    routing::{AggregatorError, SectionKeyShare, SignatureAggregator},
+    routing::{AggregatorError, SectionKeyShare, SignatureAggregator, Signer},
     types::{PublicKey, Signature},
 };
 use bls::PublicKey as BlsPublicKey;
@@ -11,8 +11,6 @@ use ed25519_dalek::{
     Keypair as EdKeypair, PublicKey as EdPublicKey, Signature as EdSignature, Signer as _,
     Verifier as _,
 };
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use xor_name::XorName;
 
 /// Authority of a network peer.
@@ -67,18 +65,18 @@ pub struct BlsShareAuth {
 impl BlsShareAuth {
     /// Construct verified authority of a single node's share of section authority.
     pub(crate) fn authorize(
-        section_pk: BlsPublicKey,
         src_name: XorName,
-        key_share: &SectionKeyShare,
+        key_share: SectionKeyShare<impl Signer>,
         payload: impl AsRef<[u8]>,
     ) -> AuthorityProof<Self> {
+        let section_pk = key_share.public_key_set.public_key();
         AuthorityProof(BlsShareAuth {
             section_pk,
             src_name,
             sig_share: SigShare {
                 public_key_set: key_share.public_key_set.clone(),
                 index: key_share.index,
-                signature_share: key_share.secret_key_share.sign(payload),
+                signature_share: key_share.signer.sign(payload),
             },
         })
     }
@@ -98,12 +96,13 @@ pub struct SectionAuth {
 impl SectionAuth {
     /// Try to construct verified section authority by aggregating a new share.
     pub(crate) async fn try_authorize(
-        aggregator: Arc<RwLock<SignatureAggregator>>,
+        aggregator: SignatureAggregator,
         share: BlsShareAuth,
         payload: impl AsRef<[u8]>,
     ) -> Result<AuthorityProof<Self>, AggregatorError> {
-        let mut aggregator = aggregator.write().await;
-        let sig = aggregator.add(payload.as_ref(), share.sig_share.clone())?;
+        let sig = aggregator
+            .add(payload.as_ref(), share.sig_share.clone())
+            .await?;
 
         if share.sig_share.public_key_set.public_key() != sig.public_key {
             return Err(AggregatorError::InvalidShare);

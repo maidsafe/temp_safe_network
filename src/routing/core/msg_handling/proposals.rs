@@ -15,12 +15,12 @@ use crate::routing::{
 // Decisions
 impl Core {
     // Insert the proposal into the proposal aggregator and handle it if aggregated.
-    pub(crate) fn handle_proposal(
-        &mut self,
+    pub(crate) async fn handle_proposal(
+        &self,
         proposal: Proposal,
         sig_share: SigShare,
     ) -> Result<Vec<Command>> {
-        match self.proposal_aggregator.add(proposal, sig_share) {
+        match self.proposal_aggregator.add(proposal, sig_share).await {
             Ok((proposal, sig)) => Ok(vec![Command::HandleAgreement { proposal, sig }]),
             Err(ProposalError::Aggregation(AggregatorError::NotEnoughShares)) => Ok(vec![]),
             Err(error) => {

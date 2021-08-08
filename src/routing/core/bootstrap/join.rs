@@ -6,29 +6,33 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    node::{
-        JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, ResourceProofResponse, Section,
+use crate::{
+    messaging::{
+        node::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, ResourceProofResponse},
+        DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
     },
-    DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
+    routing::section::Section,
 };
-use crate::routing::{
-    core::{Comm, ConnectionEvent, SendStatus},
-    dkg::SectionAuthUtils,
-    ed25519,
-    error::{Error, Result},
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    node::Node,
-    peer::PeerUtils,
-    section::SectionUtils,
-    SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+use crate::{
+    routing::{
+        core::{Comm, ConnectionEvent, SendStatus},
+        dkg::SectionAuthUtils,
+        ed25519,
+        error::{Error, Result},
+        messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+        node::Node,
+        peer::PeerUtils,
+        section::SectionLogic,
+        SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+    },
+    types::CFValue,
 };
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
 use std::{collections::HashSet, net::SocketAddr};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tracing::Instrument;
 use xor_name::{Prefix, XorName};
 
@@ -59,8 +63,8 @@ struct Join<'a> {
     // Sender for outgoing messages.
     send_tx: mpsc::Sender<(WireMsg, Vec<(XorName, SocketAddr)>)>,
     // Receiver for incoming messages.
-    recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
-    node: Node,
+    recv_rx: RwLock<&'a mut mpsc::Receiver<ConnectionEvent>>,
+    node: CFValue<Node>,
 }
 
 impl<'a> Join<'a> {
@@ -71,8 +75,8 @@ impl<'a> Join<'a> {
     ) -> Self {
         Self {
             send_tx,
-            recv_rx,
-            node,
+            recv_rx: RwLock::new(recv_rx),
+            node: CFValue::new(node),
         }
     }
 
@@ -85,7 +89,7 @@ impl<'a> Join<'a> {
     async fn run(self, bootstrap_addr: SocketAddr) -> Result<(Node, Section)> {
         // Use our XorName as we do not know their name or section key yet.
         let section_key = bls::SecretKey::random().public_key();
-        let dst_xorname = self.node.name();
+        let dst_xorname = self.node.get().await.name();
 
         let recipients = vec![(dst_xorname, bootstrap_addr)];
 
@@ -93,7 +97,7 @@ impl<'a> Join<'a> {
     }
 
     async fn join(
-        mut self,
+        self,
         mut section_key: BlsPublicKey,
         mut recipients: Vec<(XorName, SocketAddr)>,
     ) -> Result<(Node, Section)> {
@@ -135,7 +139,7 @@ impl<'a> Join<'a> {
                     ..
                 } => {
                     return Ok((
-                        self.node,
+                        self.node.clone().await,
                         Section::new(genesis_key, section_chain, section_auth)?,
                     ));
                 }
@@ -155,7 +159,7 @@ impl<'a> Join<'a> {
 
                     // For the first section, using age random among 6 to 100 to avoid
                     // relocating too many nodes at the same time.
-                    if prefix.is_empty() && self.node.age() < FIRST_SECTION_MIN_AGE {
+                    if prefix.is_empty() && self.node.get().await.age() < FIRST_SECTION_MIN_AGE {
                         let age: u8 = (FIRST_SECTION_MIN_AGE..FIRST_SECTION_MAX_AGE)
                             .choose(&mut rand::thread_rng())
                             .unwrap_or(FIRST_SECTION_MAX_AGE);
@@ -165,18 +169,22 @@ impl<'a> Join<'a> {
                         let new_name = ed25519::name(&new_keypair.public);
 
                         info!("Setting Node name to {}", new_name);
-                        self.node = Node::new(new_keypair, self.node.addr);
+                        self.node
+                            .set(Node::new(new_keypair, self.node.get().await.addr))
+                            .await;
                     }
 
-                    if prefix.matches(&self.node.name()) {
+                    if prefix.matches(&self.node.get().await.name()) {
                         // After section split, new node must join with the age of MIN_ADULT_AGE.
-                        if !prefix.is_empty() && self.node.age() != MIN_ADULT_AGE {
+                        if !prefix.is_empty() && self.node.get().await.age() != MIN_ADULT_AGE {
                             let new_keypair =
                                 ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE);
                             let new_name = ed25519::name(&new_keypair.public);
 
                             info!("Setting Node name to {}", new_name);
-                            self.node = Node::new(new_keypair, self.node.addr);
+                            self.node
+                                .set(Node::new(new_keypair, self.node.get().await.addr))
+                                .await;
                         }
 
                         info!(
@@ -222,7 +230,7 @@ impl<'a> Join<'a> {
                         );
                     }
 
-                    if section_auth.prefix.matches(&self.node.name()) {
+                    if section_auth.prefix.matches(&self.node.get().await.name()) {
                         info!(
                             "Newer Join response for our prefix {:?} from {:?}",
                             section_auth, sender
@@ -272,7 +280,7 @@ impl<'a> Join<'a> {
     }
 
     async fn send_join_requests(
-        &mut self,
+        &self,
         join_request: JoinRequest,
         recipients: &[(XorName, SocketAddr)],
         section_key: BlsPublicKey,
@@ -281,7 +289,7 @@ impl<'a> Join<'a> {
 
         let node_msg = NodeMsg::JoinRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            self.node.get().await.as_ref(),
             DstLocation::DirectAndUnrouted(section_key),
             node_msg,
             section_key,
@@ -294,8 +302,8 @@ impl<'a> Join<'a> {
 
     // TODO: receive JoinResponse from the JoinResponse handler directly,
     // analogous to the JoinAsRelocated flow.
-    async fn receive_join_response(&mut self) -> Result<(JoinResponse, SocketAddr, XorName)> {
-        while let Some(event) = self.recv_rx.recv().await {
+    async fn receive_join_response(&self) -> Result<(JoinResponse, SocketAddr, XorName)> {
+        while let Some(event) = self.recv_rx.write().await.recv().await {
             // we are interested only in `JoinResponse` type of messages
             let (join_response, sender, src_name) = match event {
                 ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
@@ -366,7 +374,7 @@ impl<'a> Join<'a> {
                     ref section_chain,
                     ..
                 } => {
-                    if node_state.value.peer.name() != &self.node.name() {
+                    if node_state.value.peer.name() != &self.node.get().await.name() {
                         trace!("Ignore NodeApproval not for us");
                         continue;
                     }
@@ -540,8 +548,8 @@ mod tests {
         // Drive both tasks to completion concurrently (but on the same thread).
         let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
-        assert_eq!(*section.authority_provider(), section_auth);
-        assert_eq!(*section.chain().last_key(), pk);
+        assert_eq!(section.authority_provider().await, section_auth);
+        assert_eq!(section.last_key().await, pk);
         assert_eq!(node.age(), node_age);
 
         Ok(())

@@ -6,22 +6,30 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates},
-    SectionAuthorityProvider,
-};
 use crate::routing::{
-    dkg::session::{Backlog, Session},
+    dkg::{
+        session::{Backlog, Session},
+        DkgFailChecker, SectionDkgOutcome,
+    },
     ed25519,
     error::Result,
     node::Node,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionKeyShare},
+    section::ElderCandidatesUtils,
     supermajority, SectionAuthorityProviderUtils,
+};
+use crate::{
+    messaging::{
+        node::{DkgFailureSig, DkgKey, ElderCandidates},
+        SectionAuthorityProvider,
+    },
+    types::CFValue,
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
-use std::collections::{BTreeSet, HashMap};
+use dashmap::DashMap;
+use std::collections::BTreeSet;
+use tokio::sync::RwLock;
 use xor_name::XorName;
 
 /// DKG voter carries out the work of participating and/or observing a DKG.
@@ -41,27 +49,27 @@ use xor_name::XorName;
 /// successfully. Some kind of disambiguation strategy needs to be employed in that case, but that
 /// is currently not a responsibility of this module.
 pub(crate) struct DkgVoter {
-    sessions: HashMap<DkgKey, Session>,
+    sessions: DashMap<DkgKey, Session>,
 
     // Due to the asyncronous nature of the network we might sometimes receive a DKG message before
     // we created the corresponding session. To avoid losing those messages, we store them in this
     // backlog and replay them once we create the session.
-    backlog: Backlog,
+    backlog: RwLock<Backlog>,
 }
 
 impl Default for DkgVoter {
     fn default() -> Self {
         Self {
-            sessions: HashMap::default(),
-            backlog: Backlog::new(),
+            sessions: DashMap::default(),
+            backlog: RwLock::new(Backlog::new()),
         }
     }
 }
 
 impl DkgVoter {
     // Starts a new DKG session.
-    pub(crate) fn start(
-        &mut self,
+    pub(crate) async fn start(
+        &self,
         node: &Node,
         dkg_key: DkgKey,
         elder_candidates: ElderCandidates,
@@ -92,7 +100,7 @@ impl DkgVoter {
             );
             return Ok(vec![Command::HandleDkgOutcome {
                 section_auth,
-                outcome: SectionKeyShare {
+                outcome: SectionDkgOutcome {
                     public_key_set: secret_key_set.public_keys(),
                     index: participant_index,
                     secret_key_share: secret_key_set.secret_key_share(0),
@@ -107,20 +115,30 @@ impl DkgVoter {
             Ok((key_gen, message)) => {
                 trace!("DKG for {:?} starting", elder_candidates);
 
-                let mut session = Session {
-                    key_gen,
+                let session = Session {
+                    key_gen: RwLock::new(key_gen),
                     elder_candidates,
                     participant_index,
-                    timer_token: 0,
-                    failures: DkgFailureSigSet::default(),
-                    complete: false,
+                    timer_token: CFValue::new(0),
+                    failures: RwLock::new(DkgFailChecker::new()),
+                    complete: CFValue::new(false),
                 };
 
                 let mut commands = vec![];
-                commands.extend(session.broadcast(node, &dkg_key, message, section_pk)?);
+                commands.extend(
+                    session
+                        .broadcast(node, &dkg_key, message, section_pk)
+                        .await?,
+                );
 
-                for message in self.backlog.take(&dkg_key).into_iter() {
-                    commands.extend(session.process_message(node, &dkg_key, message, section_pk)?);
+                {
+                    for message in self.backlog.write().await.take(&dkg_key).into_iter() {
+                        commands.extend(
+                            session
+                                .process_message(node, &dkg_key, message, section_pk)
+                                .await?,
+                        );
+                    }
                 }
 
                 let _ = self.sessions.insert(dkg_key, session);
@@ -129,7 +147,10 @@ impl DkgVoter {
                 self.sessions.retain(|existing_dkg_key, _| {
                     existing_dkg_key.generation >= dkg_key.generation
                 });
-                self.backlog.prune(&dkg_key);
+
+                {
+                    self.backlog.write().await.prune(&dkg_key);
+                }
 
                 Ok(commands)
             }
@@ -142,41 +163,42 @@ impl DkgVoter {
     }
 
     // Make key generator progress with timed phase.
-    pub(crate) fn handle_timeout(
-        &mut self,
+    pub(crate) async fn handle_timeout(
+        &self,
         node: &Node,
         timer_token: u64,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
-        if let Some((dkg_key, session)) = self
-            .sessions
-            .iter_mut()
-            .find(|(_, session)| session.timer_token() == timer_token)
-        {
-            session.handle_timeout(node, dkg_key, section_pk)
-        } else {
-            Ok(vec![])
+        for pair in self.sessions.iter_mut() {
+            if pair.value().timer_token().await == timer_token {
+                let session = pair.value();
+                let dkg_key = pair.key();
+                return session.handle_timeout(node, dkg_key, section_pk).await;
+            }
         }
+        Ok(vec![])
     }
 
     // Handle a received DkgMessage.
-    pub(crate) fn process_message(
-        &mut self,
+    pub(crate) async fn process_message(
+        &self,
         node: &Node,
         dkg_key: &DkgKey,
         message: DkgMessage,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         if let Some(session) = self.sessions.get_mut(dkg_key) {
-            session.process_message(node, dkg_key, message, section_pk)
+            session
+                .process_message(node, dkg_key, message, section_pk)
+                .await
         } else {
-            self.backlog.push(*dkg_key, message);
+            self.backlog.write().await.push(*dkg_key, message);
             Ok(vec![])
         }
     }
 
-    pub(crate) fn process_failure(
-        &mut self,
+    pub(crate) async fn process_failure(
+        &self,
         dkg_key: &DkgKey,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
@@ -184,5 +206,6 @@ impl DkgVoter {
         self.sessions
             .get_mut(dkg_key)?
             .process_failure(dkg_key, failed_participants, signed)
+            .await
     }
 }

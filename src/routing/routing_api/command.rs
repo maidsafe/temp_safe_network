@@ -6,11 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    node::{DkgFailureSigSet, KeyedSig, NodeMsg, Proposal, Section},
-    DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
+use crate::{
+    messaging::{
+        node::{DkgFailureSigSet, KeyedSig, NodeMsg, Peer, Proposal, SectionDto},
+        DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
+    },
+    routing::{dkg::SectionDkgOutcome, node::Node},
 };
-use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use custom_debug::Debug;
@@ -19,6 +21,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
+use xor_name::XorName;
 
 /// Command for node.
 #[allow(clippy::large_enum_variant)]
@@ -69,7 +72,7 @@ pub(crate) enum Command {
     /// the proposed new elders).
     HandleDkgOutcome {
         section_auth: SectionAuthorityProvider,
-        outcome: SectionKeyShare,
+        outcome: SectionDkgOutcome,
     },
     /// Handle a DKG failure that was observed by a majority of the DKG participants.
     HandleDkgFailure(DkgFailureSigSet),
@@ -96,7 +99,7 @@ pub(crate) enum Command {
         /// New Node state and information
         node: Node,
         /// New section where we relocated
-        section: Section,
+        section: SectionDto,
     },
     /// Attempt to set JoinsAllowed flag.
     SetJoinsAllowed(bool),

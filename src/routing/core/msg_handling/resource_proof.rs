@@ -13,7 +13,7 @@ use crate::routing::{
     ed25519,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::SectionUtils,
+    section::SectionLogic,
     Error, Result,
 };
 use ed25519_dalek::Verifier;
@@ -46,7 +46,7 @@ impl Core {
             .validate_all(&response.nonce, &response.data, response.solution)
     }
 
-    pub(crate) fn send_resource_proof_challenge(&self, peer: &Peer) -> Result<Command> {
+    pub(crate) async fn send_resource_proof_challenge(&self, peer: &Peer) -> Result<Command> {
         let nonce: [u8; 32] = rand::random();
         let serialized =
             bincode::serialize(&(peer.name(), &nonce)).map_err(|_| Error::InvalidMessage)?;
@@ -60,7 +60,8 @@ impl Core {
         self.send_direct_message(
             (*peer.name(), *peer.addr()),
             response,
-            *self.section.chain().last_key(),
+            self.section.last_key().await,
         )
+        .await
     }
 }

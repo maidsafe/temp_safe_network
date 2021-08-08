@@ -15,9 +15,10 @@ use crate::messaging::{
 use crate::routing::{
     dkg::SectionAuthUtils,
     error::Result,
+    network::NetworkLogic,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionPeersUtils, SectionUtils},
+    section::{ElderCandidatesUtils, SectionLogic, SectionPeersLogic},
     Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
 
@@ -26,7 +27,7 @@ use super::Core;
 // Agreement
 impl Core {
     pub(crate) async fn handle_agreement(
-        &mut self,
+        &self,
         proposal: Proposal,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
@@ -37,20 +38,20 @@ impl Core {
             }
             Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
             Proposal::SectionInfo(section_auth) => {
-                self.handle_section_info_agreement(section_auth, sig)
+                self.handle_section_info_agreement(section_auth, sig).await
             }
             Proposal::OurElders(section_auth) => {
                 self.handle_our_elders_agreement(section_auth, sig).await
             }
             Proposal::JoinsAllowed(joins_allowed) => {
-                self.joins_allowed = joins_allowed.1;
+                self.joins_allowed.set(joins_allowed.1).await;
                 Ok(vec![])
             }
         }
     }
 
     async fn handle_online_agreement(
-        &mut self,
+        &self,
         new_info: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
@@ -59,6 +60,7 @@ impl Core {
             .section
             .members()
             .get_section_signed(new_info.peer.name())
+            .await
         {
             // This node is rejoin with same name.
 
@@ -77,8 +79,11 @@ impl Core {
             if new_age > MIN_AGE {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
-                commands.push(self.send_node_approval(old_info.clone())?);
-                commands.extend(self.relocate_rejoining_peer(&new_info.peer, new_age)?);
+                commands.push(self.send_node_approval(old_info.as_ref().clone()).await?);
+                commands.extend(
+                    self.relocate_rejoining_peer(&new_info.peer, new_age)
+                        .await?,
+                );
 
                 return Ok(commands);
             }
@@ -89,7 +94,7 @@ impl Core {
             sig,
         };
 
-        if !self.section.update_member(new_info.clone()) {
+        if !self.section.update_member(new_info.clone()).await {
             info!("ignore Online: {:?}", new_info.value.peer);
             return Ok(vec![]);
         }
@@ -103,23 +108,26 @@ impl Core {
         })
         .await;
 
-        commands.extend(self.relocate_peers(new_info.value.peer.name(), &new_info.sig.signature)?);
+        commands.extend(
+            self.relocate_peers(new_info.value.peer.name(), &new_info.sig.signature)
+                .await?,
+        );
 
-        let result = self.promote_and_demote_elders()?;
+        let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            commands.extend(self.send_sync_to_adults()?);
+            commands.extend(self.send_sync_to_adults().await?);
         }
 
         commands.extend(result);
-        commands.push(self.send_node_approval(new_info)?);
+        commands.push(self.send_node_approval(new_info).await?);
 
-        self.print_network_stats();
+        self.print_network_stats().await;
 
         Ok(commands)
     }
 
     async fn handle_offline_agreement(
-        &mut self,
+        &self,
         node_state: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
@@ -128,21 +136,25 @@ impl Core {
         let age = peer.age();
         let signature = sig.signature.clone();
 
-        if !self.section.update_member(SectionAuth {
-            value: node_state,
-            sig,
-        }) {
+        if !self
+            .section
+            .update_member(SectionAuth {
+                value: node_state,
+                sig,
+            })
+            .await
+        {
             info!("ignore Offline: {:?}", peer);
             return Ok(commands);
         }
 
         info!("handle Offline: {:?}", peer);
 
-        commands.extend(self.relocate_peers(peer.name(), &signature)?);
+        commands.extend(self.relocate_peers(peer.name(), &signature).await?);
 
-        let result = self.promote_and_demote_elders()?;
+        let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            commands.extend(self.send_sync_to_adults()?);
+            commands.extend(self.send_sync_to_adults().await?);
         }
 
         commands.extend(result);
@@ -156,18 +168,23 @@ impl Core {
         Ok(commands)
     }
 
-    fn handle_section_info_agreement(
-        &mut self,
+    async fn handle_section_info_agreement(
+        &self,
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let equal_or_extension = section_auth.prefix() == *self.section.prefix()
-            || section_auth.prefix().is_extension_of(self.section.prefix());
+        let equal_or_extension = section_auth.prefix() == self.section.prefix().await
+            || section_auth
+                .prefix()
+                .is_extension_of(&self.section.prefix().await);
 
         if equal_or_extension {
             // Our section or sub-section
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
-            let infos = self.section.promote_and_demote_elders(&self.node.name());
+            let infos = self
+                .section
+                .promote_and_demote_elders(&self.node.name())
+                .await;
             if !infos.contains(&signed_section_auth.value.elder_candidates()) {
                 // SectionInfo out of date, ignore.
                 return Ok(vec![]);
@@ -178,18 +195,19 @@ impl Core {
             let sync_recipients: Vec<_> = infos
                 .iter()
                 .flat_map(|info| info.peers())
-                .filter(|peer| !self.section.is_elder(peer.name()))
+                .filter(|peer| self.section.is_elder(peer.name()))
                 .map(|peer| (*peer.name(), *peer.addr()))
                 .collect();
 
             let mut commands = vec![];
             if !sync_recipients.is_empty() {
                 let node_msg = NodeMsg::Sync {
-                    section: self.section.clone(),
-                    network: self.network.clone(),
+                    section: self.section.as_dto().await,
+                    network: self.network.as_dto().await,
                 };
-                let cmd =
-                    self.send_direct_message_to_nodes(sync_recipients, node_msg, sig.public_key)?;
+                let cmd = self
+                    .send_direct_message_to_nodes(sync_recipients, node_msg, sig.public_key)
+                    .await?;
 
                 commands.push(cmd);
             }
@@ -197,10 +215,13 @@ impl Core {
             // Send the `OurElder` proposal to all of the to-be-elders so it's aggregated by them.
             let our_elders_recipients: Vec<_> =
                 infos.iter().flat_map(|info| info.peers()).collect();
-            commands.extend(self.send_proposal(
-                &our_elders_recipients,
-                Proposal::OurElders(signed_section_auth),
-            )?);
+            commands.extend(
+                self.send_proposal(
+                    &our_elders_recipients,
+                    Proposal::OurElders(signed_section_auth),
+                )
+                .await?,
+            );
 
             Ok(commands)
         } else {
@@ -215,22 +236,24 @@ impl Core {
     }
 
     async fn handle_our_elders_agreement(
-        &mut self,
+        &self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let updates =
-            self.split_barrier
-                .process(self.section.prefix(), signed_section_auth, key_sig);
+        let updates = self.split_barrier.write().await.process(
+            &self.section.prefix().await,
+            signed_section_auth,
+            key_sig,
+        );
         if updates.is_empty() {
             return Ok(vec![]);
         }
 
-        let snapshot = self.state_snapshot();
+        let snapshot = self.state_snapshot().await;
 
         for (section_auth, key_sig) in updates {
             if section_auth.value.prefix.matches(&self.node.name()) {
-                let _ = self.section.update_elders(section_auth, key_sig);
+                let _ = self.section.update_elders(section_auth, key_sig).await;
             } else {
                 // We shouln't be receiving or updating a SAP for
                 // a remote section here, that's done with a AE msg response.

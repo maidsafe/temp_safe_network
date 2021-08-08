@@ -12,7 +12,7 @@ use crate::messaging::{
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
-    network::NetworkUtils, peer::PeerUtils, routing_api::command::Command, section::SectionUtils,
+    network::NetworkLogic, peer::PeerUtils, routing_api::command::Command, section::SectionLogic,
     SectionAuthorityProviderUtils,
 };
 use std::net::SocketAddr;
@@ -20,7 +20,7 @@ use xor_name::XorName;
 
 // Message handling
 impl Core {
-    pub(crate) fn handle_section_info_msg(
+    pub(crate) async fn handle_section_info_msg(
         &self,
         sender: SocketAddr,
         mut dst_location: DstLocation,
@@ -32,15 +32,17 @@ impl Core {
 
                 debug!("Received GetSectionQuery({}) from {}", name, sender);
 
-                let response = if let (true, Ok(pk_set)) =
-                    (self.section.prefix().matches(&name), self.public_key_set())
-                {
+                let response = if let (true, Ok(pk_set)) = (
+                    self.section.prefix().await.matches(&name),
+                    self.public_key_set().await,
+                ) {
                     GetSectionResponse::Success(SectionAuthorityProvider {
-                        prefix: self.section.authority_provider().prefix(),
+                        prefix: self.section.authority_provider().await.prefix(),
                         public_key_set: pk_set,
                         elders: self
                             .section
                             .authority_provider()
+                            .await
                             .peers()
                             .map(|peer| (*peer.name(), *peer.addr()))
                             .collect(),
@@ -48,11 +50,10 @@ impl Core {
                 } else {
                     // If we are elder, we should know a section that is closer to `name` that us.
                     // Otherwise redirect to our elders.
-                    let section_auth = match self.network.closest(&name) {
-                        Some(section_auth) => section_auth.value.clone(),
-                        None => self.section.authority_provider().clone(),
+                    let section_auth = match self.network.closest(&name).await {
+                        Some(section_auth) => section_auth.value,
+                        None => self.section.authority_provider().await,
                     };
-
                     GetSectionResponse::Redirect(section_auth)
                 };
 
@@ -61,7 +62,7 @@ impl Core {
 
                 // Provide our PK as the dst PK, only redundant as the message
                 // itself contains details regarding relocation/registration.
-                dst_location.set_section_pk(*self.section().chain().last_key());
+                dst_location.set_section_pk(self.section().last_key().await);
 
                 match WireMsg::new_section_info_msg(&response, dst_location) {
                     Ok(wire_msg) => vec![Command::SendMessage {

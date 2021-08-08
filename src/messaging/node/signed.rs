@@ -8,6 +8,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::routing::Signer;
+
 /// Signature created when a quorum of the section elders has agreed on something.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct KeyedSig {
@@ -40,13 +42,13 @@ impl SigShare {
     pub fn new(
         public_key_set: bls::PublicKeySet,
         index: usize,
-        secret_key_share: &bls::SecretKeyShare,
+        signer: impl Signer,
         payload: &[u8],
     ) -> Self {
         Self {
             public_key_set,
             index,
-            signature_share: secret_key_share.sign(payload),
+            signature_share: signer.sign(payload),
         }
     }
 

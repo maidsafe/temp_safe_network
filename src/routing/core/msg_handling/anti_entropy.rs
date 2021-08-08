@@ -15,9 +15,9 @@ use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
     messages::WireMsgUtils,
-    network::NetworkUtils,
+    network::NetworkLogic,
     routing_api::command::Command,
-    section::SectionUtils,
+    section::SectionLogic,
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
@@ -29,7 +29,7 @@ use xor_name::XorName;
 
 impl Core {
     pub(crate) async fn handle_anti_entropy_retry_msg(
-        &mut self,
+        &self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
@@ -42,14 +42,18 @@ impl Core {
             src_name, sender
         );
 
-        match self.network.update_remote_section_sap(
-            SectionAuth {
-                value: section_auth.clone(),
-                sig: section_signed,
-            },
-            &proof_chain,
-            self.section.chain(),
-        ) {
+        match self
+            .network
+            .update_remote_section_sap(
+                SectionAuth {
+                    value: section_auth.clone(),
+                    sig: section_signed,
+                },
+                &proof_chain,
+                &self.section.chain_clone().await,
+            )
+            .await
+        {
             Ok(updated) => {
                 if updated {
                     info!(
@@ -70,8 +74,9 @@ impl Core {
                 // from the received new SAP key, to prevent from endlessly resending a msg
                 // if a sybil/corrupt peer keeps sending us the same AE msg.
                 let dst_section_pk = section_auth.public_key_set.public_key();
-                let cmd =
-                    self.send_direct_message((src_name, sender), *bounced_msg, dst_section_pk)?;
+                let cmd = self
+                    .send_direct_message((src_name, sender), *bounced_msg, dst_section_pk)
+                    .await?;
                 Ok(vec![cmd])
             }
             Err(err) => {
@@ -82,7 +87,7 @@ impl Core {
     }
 
     pub(crate) async fn handle_anti_entropy_redirect_msg(
-        &mut self,
+        &self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         bounced_msg: Box<NodeMsg>,
@@ -99,6 +104,7 @@ impl Core {
         let (dst_elders, dst_section_pk) = match self
             .network
             .section_by_name(&section_auth.prefix.name())
+            .await
         {
             Ok(trusted_sap) => (trusted_sap.elders, trusted_sap.public_key_set.public_key()),
             Err(_) => {
@@ -130,7 +136,9 @@ impl Core {
             .next();
 
         if let Some((name, addr)) = chosen_dst_elder {
-            let cmd = self.send_direct_message((*name, *addr), *bounced_msg, dst_section_pk)?;
+            let cmd = self
+                .send_direct_message((*name, *addr), *bounced_msg, dst_section_pk)
+                .await?;
             return Ok(vec![cmd]);
         }
 
@@ -187,7 +195,7 @@ impl Core {
         dst_name: Option<XorName>,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
-        if dst_section_pk == self.section.chain().last_key() {
+        if dst_section_pk == &self.section.last_key().await {
             // Destination section key matches our current section key
             return Ok(None);
         }
@@ -195,11 +203,11 @@ impl Core {
         info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
         let ae_node_msg = match self
             .section
-            .chain()
             .get_proof_chain_to_current(dst_section_pk)
+            .await
         {
             Ok(proof_chain) => {
-                let section_signed_auth = self.section.section_signed_authority_provider().clone();
+                let section_signed_auth = self.section.section_signed_authority_provider().await;
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
 
@@ -220,12 +228,12 @@ impl Core {
                 // Let's try to find a section closer to the destination,
                 // otherwise we just drop the message.
                 let name = dst_name.ok_or_else(|| Error::InvalidDstLocation(format!("DirectAndUnrouted destination with section key ({:?}) not found in our section chain", dst_section_pk)))?;
-                match self.network.closest(&name) {
+                match self.network.closest(&name).await {
                     Some(section_auth) => {
                         // Redirect to the closest section
                         NodeMsg::AntiEntropyRedirect {
                             section_auth: section_auth.value.clone(),
-                            section_signed: section_auth.sig.clone(),
+                            section_signed: section_auth.sig,
                             bounced_msg: Box::new(node_msg.clone()),
                         }
                     }
@@ -249,7 +257,7 @@ impl Core {
             &self.node,
             src_location.to_dst(),
             ae_node_msg,
-            self.section.authority_provider().section_key(),
+            self.section.authority_provider().await.section_key(),
         )?;
 
         Ok(Some(Command::SendMessage {
@@ -262,7 +270,8 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{node::Section, MessageType};
+    use crate::messaging::MessageType;
+    use crate::routing::section::Section;
     use crate::routing::{
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
@@ -282,13 +291,12 @@ mod tests {
     async fn ae_everything_up_to_date() -> Result<()> {
         let env = Env::new().await?;
 
-        let (node_msg, src_location) = env.create_message(
-            env.core.section().prefix(),
-            *env.core.section_chain().last_key(),
-        )?;
-        let sender = env.core.node().addr;
-        let dst_section_pk = *env.core.section_chain().last_key();
+        let dst_section_pk = env.core.section().last_key().await;
 
+        let (node_msg, src_location) =
+            env.create_message(&env.core.section().prefix().await, dst_section_pk)?;
+
+        let sender = env.core.node().addr;
         let command = env
             .core
             .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, None, sender)
@@ -301,7 +309,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_redirect_to_other_section() -> Result<()> {
-        let mut env = Env::new().await?;
+        let env = Env::new().await?;
 
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();
@@ -327,7 +335,6 @@ mod tests {
         let _ = env
             .core
             .network
-            .sections
             .insert(some_other_sap.value.prefix, some_other_sap.clone());
 
         // and it now shall give us an AE redirect msg
@@ -357,11 +364,11 @@ mod tests {
         let env = Env::new().await?;
 
         let (node_msg, src_location) = env.create_message(
-            env.core.section().prefix(),
-            *env.core.section_chain().last_key(),
+            &env.core.section().prefix().await,
+            env.core.section().last_key().await,
         )?;
         let sender = env.core.node().addr;
-        let dst_section_pk = *env.core.section_chain().root_key();
+        let dst_section_pk = env.core.section().root_key().await;
 
         let command = env
             .core
@@ -374,10 +381,10 @@ mod tests {
                 .context("failed to deserialised anti-entropy message")?
         });
 
-        assert_matches!(msg_type, MessageType::Node{ msg, .. } => {
-            assert_matches!(msg, NodeMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(section_auth, env.core.section().authority_provider());
-                assert_eq!(proof_chain, env.core.section_chain());
+        assert_matches!(msg_type, MessageType::Node { msg, .. } => {
+            assert_matches!(msg, NodeMsg::AntiEntropyRetry { section_auth, proof_chain, .. } => {
+                assert_eq!(section_auth, env.core.section().authority_provider().await);
+                assert_eq!(proof_chain, env.core.section_chain().await);
             });
         });
 
@@ -415,8 +422,9 @@ mod tests {
                 mpsc::channel(1).0,
                 used_space,
                 root_storage_dir,
-            )?;
-            let core = tmp_core.relocated(node, section).await?;
+            )
+            .await?;
+            let core = tmp_core.relocated(node, section.as_dto().await).await?;
 
             Ok(Self {
                 core,

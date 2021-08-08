@@ -12,32 +12,32 @@ use super::{
 };
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    node::{Network, NodeState, Peer, Proposal, Section},
+    node::{NodeState, Peer, Proposal, SectionDto},
     MessageId, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
-    network::NetworkUtils,
+    network::{Network, NetworkLogic},
     node::Node,
     peer::PeerUtils,
     routing_api::command::Command,
     section::{
-        ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionKeysProvider, SectionUtils,
+        ElderCandidatesUtils, NodeStateUtils, Section, SectionKeyShare, SectionKeysProvider,
+        SectionLogic,
     },
-    Error, Event,
+    Error, Event, Signer,
 };
+use crate::types::{CFOption, CFValue};
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{net::SocketAddr, path::PathBuf};
 use tokio::sync::{mpsc, RwLock};
 use xor_name::XorName;
 
 impl Core {
     // Creates `Core` for the first node in the network
-    pub(crate) fn first_node(
+    pub(crate) async fn first_node(
         comm: Comm,
         mut node: Node,
         event_tx: mpsc::Sender<Event>,
@@ -47,26 +47,27 @@ impl Core {
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
 
-        let (section, section_key_share) = Section::first_node(node.peer())?;
+        let (section, secret_key_share) = Section::first_node(node.peer()).await?;
         Self::new(
             comm,
             node,
             section,
-            Some(section_key_share),
+            Some(secret_key_share),
             event_tx,
             used_space,
             root_storage_dir,
         )
     }
 
-    pub(crate) async fn relocated(&self, mut new_node: Node, new_section: Section) -> Result<Self> {
-        let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None);
-
+    pub(crate) async fn relocated(
+        &self,
+        mut new_node: Node,
+        new_section: SectionDto,
+    ) -> Result<Self> {
         // make sure the new Node has the correct local addr as Comm
         let comm = self.comm.clone();
         new_node.addr = comm.our_connection_info();
 
-        let network = Network::new();
         // TODO: to keep our knowledge of the network and avoid unnecessary AE msgs:
         // - clone self.network instead,
         // - remove the SAP of our new section from the cloned network
@@ -75,16 +76,16 @@ impl Core {
         Ok(Self {
             comm,
             node: new_node,
-            section: new_section,
-            network,
-            section_keys_provider,
+            section: Section::from(new_section),
+            network: Network::new(),
+            section_keys: CFValue::new(SectionKeysProvider::new(KEY_CACHE_SIZE, None)),
             proposal_aggregator: ProposalAggregator::default(),
-            split_barrier: SplitBarrier::new(),
-            message_aggregator: Arc::new(RwLock::new(SignatureAggregator::default())),
+            split_barrier: RwLock::new(SplitBarrier::new()),
+            message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
-            relocate_state: None,
+            relocation_state: CFOption::new(),
             event_tx: self.event_tx.clone(),
-            joins_allowed: true,
+            joins_allowed: CFValue::new(true),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage: self.register_storage.clone(),
             root_storage_dir: self.root_storage_dir.clone(),
@@ -103,12 +104,12 @@ impl Core {
         &self.section
     }
 
-    pub(crate) fn section_chain(&self) -> &SecuredLinkedList {
-        self.section.chain()
+    pub(crate) async fn section_chain(&self) -> SecuredLinkedList {
+        self.section.chain_clone().await
     }
 
-    pub(crate) fn network(&self) -> &Network {
-        &self.network
+    pub(crate) async fn network(&self) -> Network {
+        self.network.clone()
     }
 
     /// Is this node an elder?
@@ -126,42 +127,41 @@ impl Core {
     }
 
     /// Tries to sign with the secret corresponding to the provided BLS public key
-    pub(crate) fn sign_with_section_key_share(
+    pub(crate) async fn sign_with_section_key_share(
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
     ) -> Result<(usize, bls::SignatureShare)> {
-        self.section_keys_provider.sign_with(data, public_key)
+        self.section_keys.get().await.sign_with(data, public_key)
     }
 
     /// Returns the current BLS public key set
-    pub(crate) fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        Ok(self
-            .section_keys_provider
-            .key_share()?
-            .public_key_set
-            .clone())
+    pub(crate) async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+        Ok(self.section_keys.get().await.key_share()?.public_key_set)
     }
 
     /// Returns the info about the section matching the name.
-    pub(crate) fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        if self.section.prefix().matches(name) {
-            Ok(self.section.authority_provider().clone())
+    pub(crate) async fn matching_section(
+        &self,
+        name: &XorName,
+    ) -> Result<SectionAuthorityProvider> {
+        if self.section.prefix().await.matches(name) {
+            Ok(self.section.authority_provider().await)
         } else {
-            self.network.section_by_name(name)
+            self.network.section_by_name(name).await
         }
     }
 
     /// Returns our index in the current BLS group if this node is a member of one, or
-    /// `Error::MissingSecretKeyShare` otherwise.
-    pub(crate) fn our_index(&self) -> Result<usize> {
-        Ok(self.section_keys_provider.key_share()?.index)
+    /// `Error::MissingSectionKeyShare` otherwise.
+    pub(crate) async fn our_index(&self) -> Result<usize> {
+        Ok(self.section_keys.get().await.key_share()?.index)
     }
 
     /// Returns our key share in the current BLS group if this node is a member of one, or
-    /// `Error::MissingSecretKeyShare` otherwise.
-    pub(crate) fn key_share(&self) -> Result<&SectionKeyShare> {
-        self.section_keys_provider.key_share()
+    /// `Error::MissingSectionKeyShare` otherwise.
+    pub(crate) async fn key_share(&self) -> Result<SectionKeyShare<impl Signer>> {
+        self.section_keys.get().await.key_share()
     }
 
     pub(crate) async fn send_event(&self, event: Event) {
@@ -175,20 +175,22 @@ impl Core {
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
 
-    pub(crate) fn handle_timeout(&mut self, token: u64) -> Result<Vec<Command>> {
+    pub(crate) async fn handle_timeout(&self, token: u64) -> Result<Vec<Command>> {
         self.dkg_voter
-            .handle_timeout(&self.node, token, *self.section_chain().last_key())
+            .handle_timeout(&self.node, token, *self.section_chain().await.last_key())
+            .await
     }
 
     // Send message to peers on the network.
-    pub(crate) fn send_msg_to_peers(&self, mut wire_msg: WireMsg) -> Result<Command> {
+    pub(crate) async fn send_msg_to_peers(&self, mut wire_msg: WireMsg) -> Result<Command> {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
             &self.node.name(),
             &self.section,
             &self.network,
-        )?;
+        )
+        .await?;
 
         trace!(
             "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
@@ -205,7 +207,7 @@ impl Core {
         if self.is_elder()
             && targets.len() > 1
             && dst_location.is_to_node()
-            && self.section.prefix().matches(&target_name)
+            && self.section.prefix().await.matches(&target_name)
         {
             return Ok(Command::SendMessageDeliveryGroup {
                 recipients: Vec::new(),
@@ -214,7 +216,7 @@ impl Core {
             });
         }
 
-        let dst_pk = self.section_key_by_name(&target_name);
+        let dst_pk = self.section_key_by_name(&target_name).await;
         wire_msg.set_dst_section_pk(dst_pk);
 
         let command = Command::SendMessageDeliveryGroup {
@@ -230,29 +232,37 @@ impl Core {
     }
 
     // Setting the JoinsAllowed triggers a round Proposal::SetJoinsAllowed to update the flag.
-    pub(crate) fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
+    pub(crate) async fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();
-        if self.is_elder() && joins_allowed != self.joins_allowed {
+        if self.is_elder() && joins_allowed != self.joins_allowed.clone().await {
             let active_members: Vec<XorName> = self
                 .section
                 .active_members()
+                .await
                 .map(|peer| *peer.name())
                 .collect();
             let msg_id = MessageId::from_content(&active_members)?;
-            commands.extend(self.propose(Proposal::JoinsAllowed((msg_id, joins_allowed)))?);
+            commands.extend(
+                self.propose(Proposal::JoinsAllowed((msg_id, joins_allowed)))
+                    .await?,
+            );
         }
         Ok(commands)
     }
 
     // Generate a new section info based on the current set of members and if it differs from the
     // current elders, trigger a DKG.
-    pub(crate) fn promote_and_demote_elders(&mut self) -> Result<Vec<Command>> {
+    pub(crate) async fn promote_and_demote_elders(&self) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
-        for elder_candidates in self.section.promote_and_demote_elders(&self.node.name()) {
+        for elder_candidates in self
+            .section
+            .promote_and_demote_elders(&self.node.name())
+            .await
+        {
             // Send DKG start to all candidates
             let recipients: Vec<_> = elder_candidates.peers().collect();
-            commands.extend(self.send_dkg_start(elder_candidates, &recipients)?);
+            commands.extend(self.send_dkg_start(elder_candidates, &recipients).await?);
         }
 
         Ok(commands)
@@ -268,5 +278,6 @@ impl Core {
             node_state: NodeState::joined(peer, previous_name),
             dst_key,
         })
+        .await
     }
 }
