@@ -652,7 +652,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_validate_name_with_slash() -> Result<()> {
         let nrs_name = "name/with/slash";
-        match validate_nrs_name(&nrs_name) {
+        match validate_nrs_name(nrs_name) {
             Ok(_) => Err(anyhow!(
                 "Unexpectedly validated nrs name with slashes {}",
                 nrs_name
