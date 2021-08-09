@@ -10,17 +10,17 @@ use std::net::SocketAddr;
 
 use qp2p::IncomingMessages;
 use tracing::{debug, error, info, trace, warn};
-use xor_name::XorName;
 
+use super::Session;
+use crate::client::connections::messaging::send_message;
 use crate::client::Error;
+use crate::messaging::data::Error as DataError;
+use crate::messaging::data::ServiceError;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
-    MessageId, MessageType, WireMsg,
+    DstLocation, MessageId, MessageType, MsgKind, WireMsg,
 };
-use crate::types::PublicKey;
-
-use super::Session;
 
 impl Session {
     // Listen for incoming messages on a connection
@@ -58,8 +58,7 @@ impl Session {
             trace!("Incoming message from {:?}", &src);
             match message_type {
                 MessageType::SectionInfo { msg, .. } => {
-                    if let Err(error) = self.handle_section_info_msg(msg, src, self.client_pk).await
-                    {
+                    if let Err(error) = self.handle_section_info_msg(msg).await {
                         error!("Error handling network info message: {:?}", error);
                     }
                 }
@@ -76,46 +75,18 @@ impl Session {
         }
     }
 
-    // Private helpers
+    // =================== Private helpers ===================
 
     // Handle received network info messages
-    async fn handle_section_info_msg(
-        &mut self,
-        msg: SectionInfoMsg,
-        src: SocketAddr,
-        client_pk: PublicKey,
-    ) -> Result<(), Error> {
+    async fn handle_section_info_msg(&mut self, msg: SectionInfoMsg) -> Result<(), Error> {
         trace!("Handling network info message {:?}", msg);
 
         match &msg {
-            SectionInfoMsg::GetSectionResponse(GetSectionResponse::Success(sap)) => {
+            SectionInfoMsg::GetSectionResponse(GetSectionResponse::Success(sap))
+            | SectionInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(sap)) => {
                 debug!("GetSectionResponse::Success!");
-                let _ = self.network.insert(sap.clone());
+                let _ = self.network.write().await.insert(sap.clone());
                 Ok(())
-            }
-            SectionInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(sap)) => {
-                trace!("GetSectionResponse::Redirect, re-bootstrapping with provided peers");
-                if self.is_connecting_to_new_elders {
-                    // Disconnect from peer that sent us the redirect, connect to the new elders provided and
-                    // request the section info again.
-                    self.disconnect_from_peers(vec![src]).await?;
-                    let endpoint = self.endpoint()?.clone();
-                    let new_elders_addrs: Vec<SocketAddr> =
-                        sap.elders.iter().map(|(_, addr)| *addr).collect();
-                    self.qp2p
-                        .update_bootstrap_contacts(new_elders_addrs.as_slice());
-                    let boostrapped_peer = self
-                        .qp2p
-                        .rebootstrap(&endpoint, new_elders_addrs.as_slice())
-                        .await?;
-                    self.send_get_section_query(XorName::from(client_pk), &boostrapped_peer)
-                        .await?;
-
-                    Ok(())
-                } else {
-                    let _ = self.network.insert(sap.clone());
-                    Ok(())
-                }
             }
             SectionInfoMsg::GetSectionQuery { .. } => Err(Error::UnexpectedMessageOnJoin(format!(
                 "bootstrapping failed since an invalid response ({:?}) was received",
@@ -125,10 +96,13 @@ impl Session {
     }
 
     // Handle messages intended for client consumption (re: queries + commands)
-    async fn handle_client_msg(&self, msg_id: MessageId, msg: ServiceMsg, src: SocketAddr) {
+    async fn handle_client_msg(&mut self, msg_id: MessageId, msg: ServiceMsg, src: SocketAddr) {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = self.pending_queries.clone();
         let error_sender = self.incoming_err_sender.clone();
+        let network = self.network.clone();
+        let client_pk = self.client_pk;
+        let endpoint = self.endpoint.clone();
 
         let _ = tokio::spawn(async move {
             debug!("Thread spawned to handle this client message");
@@ -174,6 +148,97 @@ impl Session {
                         CmdError::Data(_error) => {
                             // do nothing just yet
                         }
+                    }
+                }
+                ServiceMsg::ServiceError(ServiceError {
+                    reason: Some(DataError::WrongDestination),
+                    sap: Some(section_auth),
+                    source_message: Some(message),
+                }) => {
+                    {
+                        // Update our network knowledge
+                        let _ = network.write().await.insert(section_auth);
+                    }
+                    // We need to deserialize to check if the original message was tampered
+                    // and verify the ServiceAuth.
+                    if let Ok(the_original_message) = WireMsg::deserialize(message.clone()) {
+                        match the_original_message {
+                            MessageType::Service {
+                                msg_id, msg, auth, ..
+                            } => {
+                                // Verify that the authority has not changed
+                                if let Ok(serialized_cmd) = WireMsg::serialize_msg_payload(&msg) {
+                                    if client_pk == auth.public_key
+                                        && client_pk
+                                            .verify(&auth.signature, serialized_cmd.clone())
+                                            .is_ok()
+                                    {
+                                        // In case of queries, we do not expect a response right here. It will be handled at the
+                                        // original caller `send_query`.
+                                        if let Some(dst_address) = msg.dst_address() {
+                                            if let Some((elders, section_pk)) =
+                                                network.read().await.get_matching(&dst_address).map(
+                                                    |sap| {
+                                                        (
+                                                            sap.elders
+                                                                .values()
+                                                                .cloned()
+                                                                .collect::<Vec<SocketAddr>>(),
+                                                            sap.public_key_set.public_key(),
+                                                        )
+                                                    },
+                                                )
+                                            {
+                                                // Let's rebuild the message with the updated destination details
+                                                if let Ok(wire_msg) = WireMsg::new_msg(
+                                                    msg_id,
+                                                    serialized_cmd,
+                                                    MsgKind::ServiceMsg(auth.into_inner()),
+                                                    DstLocation::Section {
+                                                        name: dst_address,
+                                                        section_pk,
+                                                    },
+                                                ) {
+                                                    if let Ok(msg_bytes) = wire_msg.serialize() {
+                                                        if let Some(endpoint) = endpoint {
+                                                            if let Err(e) = send_message(
+                                                                elders,
+                                                                msg_bytes,
+                                                                endpoint.clone(),
+                                                                msg_id,
+                                                            )
+                                                            .await
+                                                            {
+                                                                error!("Error on resending ServiceMsg w/id {:?}: {:?}. Restart the flow", msg_id, e)
+                                                                //     TODO: Remove pending_query channels on query failure.
+                                                            }
+                                                        } else {
+                                                            error!("AE: No endpoint found");
+                                                        }
+                                                    } else {
+                                                        error!("AE: Error serializing wire_msg on resending message");
+                                                    }
+                                                } else {
+                                                    error!("AE: Error rebuilding wire_msg on resending message");
+                                                }
+                                            }
+                                        } else {
+                                            error!("No Dst_Address found on the received rebounded ServiceError. Only Commands and Queries have destination address");
+                                        }
+                                    } else {
+                                        warn!("Failed to prove authenticity of the original message w/id {:?} on AE resend", msg_id);
+                                    }
+                                } else {
+                                    error!(
+                                        "Error serializing ServiceMsg w/id {:?} on AE checks.",
+                                        msg_id
+                                    );
+                                }
+                            }
+                            _ => error!("Received invalid MessageType for ServiceError"),
+                        }
+                    } else {
+                        error!("Error deserializing received ServiceError's source message");
                     }
                 }
                 msg => {

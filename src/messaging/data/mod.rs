@@ -27,13 +27,15 @@ pub use self::{
     register::{RegisterCmd, RegisterRead, RegisterWrite},
 };
 
-use crate::messaging::{data::Error as ErrorMessage, MessageId};
+use crate::messaging::{data::Error as ErrorMessage, MessageId, SectionAuthorityProvider};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     Chunk, DataAddress, PublicKey,
 };
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, convert::TryFrom};
+use xor_name::XorName;
 
 /// Derivable Id of an operation. Query/Response should return the same id for simple tracking purposes.
 /// TODO: make uniquer per requester for some operations
@@ -47,10 +49,13 @@ pub struct ServiceError {
     ///
     /// This can be used to handle the error.
     pub reason: Option<Error>,
+    /// Optional `messaging::sap::SectionAuthorityProvider` for resending
+    /// the source message
+    pub sap: Option<SectionAuthorityProvider>,
     /// Message that triggered this error.
     ///
     /// This could be used to retry the message if the error could be handled.
-    pub source_message: Option<Box<ServiceMsg>>,
+    pub source_message: Option<Bytes>,
 }
 
 /// Network service messages that clients or nodes send in order to use the services,
@@ -90,6 +95,17 @@ pub enum ServiceMsg {
     },
     /// A message indicating that an error occurred as a node was handling a client's message.
     ServiceError(ServiceError),
+}
+
+impl ServiceMsg {
+    /// Returns the destination address for Commands and Queries only.
+    pub fn dst_address(&self) -> Option<XorName> {
+        match self {
+            Self::Cmd(cmd) => Some(cmd.dst_name()),
+            Self::Query(query) => Some(query.dst_name()),
+            _ => None,
+        }
+    }
 }
 
 /// An error response to a [`Cmd`].
@@ -256,10 +272,9 @@ try_from!(Permissions, GetRegisterUserPermissions);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ChunkAddress, DataAddress, Keypair, PrivateChunk};
+    use crate::types::{Keypair, PrivateChunk};
     use eyre::{eyre, Result};
     use std::convert::{TryFrom, TryInto};
-    use xor_name::XorName;
 
     fn gen_keypairs() -> Vec<Keypair> {
         let mut rng = rand::thread_rng();
@@ -290,40 +305,6 @@ mod tests {
         } else {
             Err(eyre!("Could not generate public key"))
         }
-    }
-
-    #[test]
-    fn generate_service_error() {
-        let msg = ServiceMsg::Query(DataQuery::Chunk(ChunkRead::Get(ChunkAddress::Private(
-            XorName::random(),
-        ))));
-        let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
-        let lazy_error = ServiceError {
-            reason: Some(Error::DataNotFound(random_addr.clone())),
-            source_message: Some(Box::new(msg)),
-        };
-
-        assert!(format!("{:?}", lazy_error).contains("Chunk(Get(Private"));
-        assert!(format!("{:?}", lazy_error).contains("ServiceError"));
-        assert!(format!("{:?}", lazy_error).contains(&format!("DataNotFound({:?})", random_addr)));
-    }
-
-    #[test]
-    fn debug_format_service_error() {
-        let chunk_addr = ChunkAddress::Public(XorName::random());
-        let random_addr = DataAddress::Chunk(chunk_addr);
-        let errored_response = ServiceError {
-            reason: Some(Error::DataNotFound(random_addr.clone())),
-            source_message: Some(Box::new(ServiceMsg::Query(DataQuery::Chunk(
-                ChunkRead::Get(chunk_addr),
-            )))),
-        };
-
-        assert!(format!("{:?}", errored_response).contains("Chunk(Get(Public"));
-        assert!(format!("{:?}", errored_response).contains("ServiceError"));
-        assert!(
-            format!("{:?}", errored_response).contains(&format!("DataNotFound({:?})", random_addr))
-        );
     }
 
     #[test]

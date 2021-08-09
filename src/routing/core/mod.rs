@@ -28,8 +28,6 @@ pub(crate) use register_storage::RegisterStorage;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 use capacity::Capacity;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
-pub use signature_aggregator::Error as AggregatorError;
-pub(crate) use signature_aggregator::SignatureAggregator;
 use std::{collections::BTreeMap, path::PathBuf};
 
 pub(crate) use chunk_store::ChunkStore;
@@ -37,10 +35,8 @@ pub(crate) use chunk_store::ChunkStore;
 use self::split_barrier::SplitBarrier;
 use crate::messaging::{
     node::{Proposal, Section},
-    MessageId,
-    node::{Network, NodeMsg, Proposal, Section, SectionAuth},
     signature_aggregator::SignatureAggregator,
-    MessageId, MessageId, SectionAuthorityProvider,
+    MessageId,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
@@ -58,7 +54,6 @@ use resource_proof::ResourceProof;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use std::path::PathBuf;
 use xor_name::{Prefix, XorName};
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;

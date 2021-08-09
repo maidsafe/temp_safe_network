@@ -42,11 +42,11 @@ pub use self::{
 };
 pub(crate) use self::{
     core::ChunkStore,
-    core::RegisterStorage,
     core::SignatureAggregator,
-    core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
+    core::MIN_LEVEL_WHEN_FULL,
     section::section_keys::SectionKeyShare,
 };
+pub(crate) use self::{core::ChunkStore, core::RegisterStorage, core::CHUNK_COPY_COUNT};
 
 pub use qp2p::{Config as TransportConfig, SendStream};
 

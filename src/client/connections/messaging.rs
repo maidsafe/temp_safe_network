@@ -19,16 +19,13 @@ use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
-    signature_aggregator::Error as AggregatorError,
-    DataSigned, MessageId, SectionAuthorityProvider, ServiceAuth, WireMsg,
+    DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::messaging::{DstLocation, MsgKind};
 use crate::types::{Chunk, PrivateChunk, PublicChunk};
-use rand::prelude::SliceRandom;
-use rand::rngs::OsRng;
 
 use super::{QueryResult, Session};
 use bls::SecretKey;
+use qp2p::Endpoint;
 use tokio::time::sleep;
 
 // Number of attempts when retrying to send a message to a node
@@ -60,7 +57,7 @@ impl Session {
             .await?;
 
         // Bootstrap and send a handshake request to the bootstrapped peer
-        while !self.network.iter().count() == 1 {
+        while !self.network.read().await.iter().count() == 1 {
             // This means that the peer we bootstrapped to
             // has responded with a SectionInfo Message
             match timeout(
@@ -97,27 +94,32 @@ impl Session {
     /// Send a `ServiceMsg` to the network without awaiting for a response.
     pub(crate) async fn send_cmd(
         &self,
-        dst_address: XorName,
+        data_name: XorName,
         auth: ServiceAuth,
         payload: Bytes,
         targets: usize,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint()?.clone();
-        let data_name = cmd.dst_address();
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
         let (elders, section_pk) = self
             .network
+            .read()
+            .await
             .get_matching(&data_name)
             .map(|sap| {
                 (
-                    sap.elders.values().cloned().collect::<Vec<SocketAddr>>(),
+                    sap.elders
+                        .values()
+                        .cloned()
+                        .take(targets)
+                        .collect::<Vec<SocketAddr>>(),
                     sap.public_key_set.public_key(),
                 )
             })
             .ok_or(Error::NotBootstrapped)?;
-
         let msg_id = MessageId::new();
+
         debug!(
             "Sending command w/id {:?}, from {}, to {} Elders",
             msg_id,
@@ -128,7 +130,7 @@ impl Session {
         trace!(
             "Sending (from {}) dst {:?} w/ id: {:?}",
             endpoint.socket_addr(),
-            dst_address,
+            data_name,
             msg_id
         );
 
@@ -141,41 +143,7 @@ impl Session {
         let priority = wire_msg.msg_kind().priority();
         let msg_bytes = wire_msg.serialize()?;
 
-        // Send message to all Elders concurrently
-        let mut tasks = Vec::default();
-
-        // clone elders as we want to update them in this process
-        for socket in elders {
-            let msg_bytes_clone = msg_bytes.clone();
-            let endpoint = endpoint.clone();
-            let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
-                trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
-                endpoint.connect_to(&socket).await?;
-                endpoint
-                    .send_message(msg_bytes_clone, &socket, priority)
-                    .await?;
-
-                trace!("Sent cmd with MsgId {:?}to {:?}", msg_id, &socket);
-                Ok(())
-            });
-            tasks.push(task_handle);
-        }
-
-        // Let's await for all messages to be sent
-        let results = join_all(tasks).await;
-
-        let mut failures = 0;
-        results.iter().for_each(|res| {
-            if res.is_err() {
-                failures += 1;
-            }
-        });
-
-        if failures > 0 {
-            error!("Sending the message to {} Elders failed", failures);
-        }
-
-        Ok(())
+        send_message(elders, msg_bytes, endpoint, msg_id, priority).await
     }
 
     /// Send a `ServiceMsg` to the network awaiting for the response.
@@ -184,6 +152,7 @@ impl Session {
         query: DataQuery,
         auth: ServiceAuth,
         payload: Bytes,
+        msg_id: MessageId,
     ) -> Result<QueryResult, Error> {
         let endpoint = self.endpoint()?.clone();
         let pending_queries = self.pending_queries.clone();
@@ -194,11 +163,13 @@ impl Session {
             None
         };
 
-        let data_name = query.dst_address();
+        let data_name = query.dst_name();
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
         let (elders, section_pk) = self
             .network
+            .read()
+            .await
             .get_matching(&data_name)
             .map(|sap| (sap.elders.clone(), sap.public_key_set.public_key()))
             .ok_or(Error::NotBootstrapped)?;
@@ -211,7 +182,6 @@ impl Session {
             .map(|(_, addr)| addr)
             .collect::<Vec<SocketAddr>>();
 
-        let msg_id = MessageId::new();
         let wire_msg = WireMsg::new_msg(
             msg_id,
             payload,
@@ -221,6 +191,7 @@ impl Session {
                 section_pk,
             },
         )?;
+        let priority = wire_msg.msg_kind().priority();
         let msg_bytes = wire_msg.serialize()?;
 
         let elders_len = chosen_elders.len();
@@ -260,15 +231,6 @@ impl Session {
         }
 
         let discarded_responses = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
-
-        let dst_location = DstLocation::Section {
-            name: data_name,
-            section_pk,
-        };
-        let msg_kind = MsgKind::ServiceMsg(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
-        let priority = wire_msg.msg_kind().priority();
-        let msg_bytes = wire_msg.serialize()?;
 
         // Set up response listeners
         for socket in chosen_elders {
@@ -372,7 +334,7 @@ impl Session {
                 }
                 // Erring on the side of positivity. \
                 // Saving error, but not returning until we have more responses in
-                // (note, this will overwrite prior errors, so we'll just return whicever was last received)
+                // (note, this will overwrite prior errors, so we'll just return whichever was last received)
                 (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
                 | (response @ Some(QueryResponse::GetRegister((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterPolicy((Err(_), _))), None)
@@ -471,6 +433,7 @@ impl Session {
         Ok(())
     }
 
+    #[allow(unused)]
     pub(crate) async fn disconnect_from_peers(&self, peers: Vec<SocketAddr>) -> Result<(), Error> {
         for elder in peers {
             self.endpoint()?.disconnect_from(&elder).await?;
@@ -478,4 +441,48 @@ impl Session {
 
         Ok(())
     }
+}
+
+pub(crate) async fn send_message(
+    elders: Vec<SocketAddr>,
+    msg_bytes: Bytes,
+    endpoint: Endpoint,
+    msg_id: MessageId,
+    priority: i32,
+) -> Result<(), Error> {
+    // Send message to all Elders concurrently
+    let mut tasks = Vec::default();
+
+    // clone elders as we want to update them in this process
+    for socket in elders {
+        let msg_bytes_clone = msg_bytes.clone();
+        let endpoint = endpoint.clone();
+        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
+            trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
+            endpoint.connect_to(&socket).await?;
+            endpoint
+                .send_message(msg_bytes_clone, &socket, priority)
+                .await?;
+
+            trace!("Sent cmd with MsgId {:?}to {:?}", msg_id, &socket);
+            Ok(())
+        });
+        tasks.push(task_handle);
+    }
+
+    // Let's await for all messages to be sent
+    let results = join_all(tasks).await;
+
+    let mut failures = 0;
+    results.iter().for_each(|res| {
+        if res.is_err() {
+            failures += 1;
+        }
+    });
+
+    if failures > 0 {
+        error!("Sending the message to {} Elders failed", failures);
+    }
+
+    Ok(())
 }

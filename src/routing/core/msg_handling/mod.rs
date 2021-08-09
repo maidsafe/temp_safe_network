@@ -48,13 +48,29 @@ impl Core {
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
         // Deserialize the payload of the incoming message
+
+        // WE DO NOT RELAY ANYMORE BUT REDIRECT THE CLIENT TO THE DESTINATION VIA AE
+        /*
+        // Make sure the message is for us, unless it's a client msg
+        // in which case we'll handle/forward it after signature check.
+        if !wire_msg.is_client_msg_kind()
+            && !dst_location.contains(&self.node.name(), self.section.prefix())
+        {
+            // Message is not for us
+            info!("Relay message {} closer to the destination", msg_id);
+            let cmd = self.relay_message(wire_msg).await?;
+            return Ok(vec![cmd]);
+        }
+         */
+
+        // We can now deserialize the payload of the incoming message
         let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
         let message_type = match wire_msg.into_message() {
             Ok(message_type) => message_type,
             Err(error) => {
                 error!(
-                    "Failed to deserialize message payload ({:?}): {}",
+                    "Failed to deserialize message payload ({:?}): {:?}",
                     msg_id, error
                 );
                 return Ok(vec![]);

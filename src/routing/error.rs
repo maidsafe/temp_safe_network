@@ -8,7 +8,6 @@
 
 use super::Prefix;
 use crate::messaging::data::Error as ErrorMessage;
-pub use crate::messaging::signature_aggregator::Error as AggregatorError;
 pub use crate::routing::dkg::proposal::ProposalError;
 use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};
 use qp2p::Error as Qp2pError;
