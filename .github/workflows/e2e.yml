@@ -129,7 +129,7 @@ jobs:
 
       - name: Run example of split and chunk check
         shell: bash
-        run: timeout 15m cargo run --release  --features=always-joinable,test-utils --example network_split
+        run: timeout 40m cargo run --release  --features=always-joinable,test-utils --example network_split
       
       - name: Was there a section split?
         run: ./scripts/has_split.sh
