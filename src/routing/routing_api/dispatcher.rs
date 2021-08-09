@@ -109,6 +109,17 @@ impl Dispatcher {
 
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
+            Command::HandleDkgMessage {
+                sender,
+                dkg_key,
+                message,
+            } => {
+                self.core
+                    .get()
+                    .await
+                    .handle_dkg_message_cmd(dkg_key, message, sender)
+                    .await
+            }
             Command::HandleMessage { sender, wire_msg } => {
                 self.core.get().await.handle_message(sender, wire_msg).await
             }

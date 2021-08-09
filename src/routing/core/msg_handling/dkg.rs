@@ -11,7 +11,7 @@ use crate::routing::{
     dkg::{DkgFailChecker, DkgFailureSigSetUtils},
     error::{Error, Result},
     routing_api::command::Command,
-    section::{SectionLogic, SectionPeersLogic},
+    section::{KeyHolder, SectionKeyShare, SectionLogic, SectionPeersLogic},
     SectionAuthorityProviderUtils,
 };
 use crate::{
@@ -22,6 +22,7 @@ use crate::{
     routing::dkg::SectionDkgOutcome,
 };
 use bls_dkg::key_gen::message::Message as DkgMessage;
+use std::sync::Arc;
 use std::{collections::BTreeSet, slice};
 use xor_name::XorName;
 
@@ -42,12 +43,14 @@ impl Core {
             .await
     }
 
-    pub(crate) async fn handle_dkg_message(
+    pub(crate) async fn handle_dkg_message_cmd(
         &self,
         dkg_key: DkgKey,
         message: DkgMessage,
         sender: XorName,
     ) -> Result<Vec<Command>> {
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
         trace!("handle DKG message {:?} from {}", message, sender);
 
         self.dkg_voter
@@ -130,25 +133,36 @@ impl Core {
     pub(crate) async fn handle_dkg_outcome(
         &self,
         section_auth: SectionAuthorityProvider,
-        key_share: SectionDkgOutcome,
+        dkg_outcome: SectionDkgOutcome,
     ) -> Result<Vec<Command>> {
         let proposal = Proposal::SectionInfo(section_auth);
         let recipients: Vec<_> = self.section.authority_provider().await.peers().collect();
+        let public_key = dkg_outcome.public_key_set.public_key();
 
-        let public_key = key_share.public_key();
+        self.section_keys
+            .get()
+            .await
+            .insert_dkg_outcome(dkg_outcome.clone());
 
-        self.section_keys.get().await.insert_dkg_outcome(key_share);
+        let section_keys = self.section_keys.get().await;
+
+        let signing_key_share = SectionKeyShare {
+            public_key_set: dkg_outcome.public_key_set,
+            index: dkg_outcome.index,
+            signer: KeyHolder {
+                secret_key_share: Arc::new(dkg_outcome.secret_key_share),
+            },
+        };
+
+        let result = self
+            .send_proposal_with(&recipients, proposal, signing_key_share)
+            .await;
 
         if self.section.has_key(&public_key).await {
-            let section_keys = self.section_keys.get().await;
             section_keys.finalise_dkg(&public_key);
-            let key_share = section_keys.key_share()?;
-            self.send_proposal_with(&recipients, proposal, key_share)
-                .await
-        } else {
-            // sign using pending key internally in section_keys
-            unimplemented!()
         }
+
+        result
     }
 
     pub(crate) async fn handle_dkg_failure(

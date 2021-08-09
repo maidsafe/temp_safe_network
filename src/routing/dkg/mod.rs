@@ -24,15 +24,15 @@ pub(super) use section_signed::SectionAuthUtils;
 use serde::Serialize;
 
 /// All the key material needed to sign or combine signature for our section key.
-#[derive(custom_debug::Debug)]
+#[derive(custom_debug::Debug, Clone)]
 pub(crate) struct SectionDkgOutcome {
     /// Public key set to verify threshold signatures and combine shares.
-    public_key_set: bls::PublicKeySet,
+    pub(crate) public_key_set: bls::PublicKeySet,
     /// Index of the owner of this key share within the set of all section elders.
-    index: usize,
+    pub(crate) index: usize,
     /// Secret Key share.
     #[debug(skip)]
-    secret_key_share: bls::SecretKeyShare,
+    pub(crate) secret_key_share: bls::SecretKeyShare,
 }
 
 impl SectionDkgOutcome {

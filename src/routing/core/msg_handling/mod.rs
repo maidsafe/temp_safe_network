@@ -326,7 +326,12 @@ impl Core {
                 self.handle_dkg_start(dkg_key, elder_candidates).await
             }
             NodeMsg::DkgMessage { dkg_key, message } => {
-                self.handle_dkg_message(dkg_key, message, src_name).await
+                // Return another command direct to work on another thread straight away
+                Ok(vec![Command::HandleDkgMessage {
+                    dkg_key,
+                    message,
+                    sender: src_name,
+                }])
             }
             NodeMsg::DkgFailureObservation {
                 dkg_key,

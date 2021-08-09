@@ -9,11 +9,13 @@
 use crate::{
     messaging::{
         data::ServiceMsg,
-        node::{DkgFailureSigSet, KeyedSig, Proposal, SectionDto},
-        AuthorityProof, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth, WireMsg,
+        node::{DkgFailureSigSet, DkgKey, KeyedSig, NodeMsg, Proposal, SectionDto},
+        AuthorityProof, DstLocation, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth,
+        WireMsg,
     },
     routing::{dkg::SectionDkgOutcome, node::Node, routing_api::Peer, XorName},
 };
+use bls_dkg::key_gen::message::Message as DkgMessage;
 
 use std::{
     net::SocketAddr,
@@ -25,6 +27,13 @@ use std::{
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Command {
+    /// Handle `message` from `sender`.
+    /// holding the WireMsg that has been received from the network,
+    HandleDkgMessage {
+        dkg_key: DkgKey,
+        message: DkgMessage,
+        sender: XorName,
+    },
     /// Handle `message` from `sender`.
     /// holding the WireMsg that has been received from the network,
     HandleMessage {

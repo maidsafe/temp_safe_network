@@ -75,12 +75,14 @@ impl SectionKeysProvider {
         self.cache.has_key_share()
     }
 
-    pub(crate) fn insert_dkg_outcome(&self, share: SectionDkgOutcome) {
-        let public_key = share.public_key();
-        let _ = self.pending.insert(public_key, share);
+    pub(crate) fn insert_dkg_outcome(&self, outcome: SectionDkgOutcome) {
+        let public_key = outcome.public_key();
+        let _ = self.pending.insert(public_key, outcome);
     }
 
     pub(crate) fn finalise_dkg(&self, public_key: &bls::PublicKey) {
+        trace!("Finalise the DKG round.");
+
         if let Some((_, share)) = self.pending.remove(public_key) {
             if let Some(evicted) = self.cache.add(share) {
                 trace!("evicted old key from cache: {:?}", evicted);
@@ -91,9 +93,9 @@ impl SectionKeysProvider {
 }
 
 #[derive(custom_debug::Debug)]
-struct KeyHolder {
+pub(crate) struct KeyHolder {
     #[debug(skip)]
-    secret_key_share: Arc<bls::SecretKeyShare>,
+    pub(crate) secret_key_share: Arc<bls::SecretKeyShare>,
 }
 
 impl Signer for KeyHolder {
