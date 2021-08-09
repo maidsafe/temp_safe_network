@@ -189,6 +189,17 @@ impl Dispatcher {
             Command::PrepareNodeMsgToSend { msg, dst } => {
                 self.core.get().await.prepare_node_msg(msg, dst).await
             }
+            Command::HandleDkgMessage {
+                sender,
+                dkg_key,
+                message,
+            } => {
+                self.core
+                    .get()
+                    .await
+                    .handle_dkg_message_cmd(dkg_key, message, sender)
+                    .await
+            }
             Command::HandleMessage { sender, wire_msg } => {
                 self.core.get().await.handle_message(sender, wire_msg).await
             }

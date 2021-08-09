@@ -8,12 +8,13 @@
 
 use crate::{
     messaging::{
-        node::{DkgFailureSigSet, KeyedSig, NodeMsg, Peer, Proposal, SectionDto},
+        node::{DkgFailureSigSet, DkgKey, KeyedSig, NodeMsg, Peer, Proposal, SectionDto},
         DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
     },
     routing::{dkg::SectionDkgOutcome, node::Node},
 };
 use bls::PublicKey as BlsPublicKey;
+use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use custom_debug::Debug;
 use std::{
@@ -27,8 +28,14 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Command {
+    /// Handling dkg msg,
+    HandleDkgMessage {
+        dkg_key: DkgKey,
+        message: DkgMessage,
+        sender: XorName,
+    },
     /// Handle `message` from `sender`.
-    /// Holding the WireMsg that has been received from the network,
+    /// holding the WireMsg that has been received from the network,
     HandleMessage {
         sender: SocketAddr,
         wire_msg: WireMsg,

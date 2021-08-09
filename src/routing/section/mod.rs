@@ -14,7 +14,7 @@ mod section_peers;
 #[cfg(test)]
 pub(crate) use self::section_authority_provider::test_utils;
 
-pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider, Signer};
+pub(super) use self::section_keys::{KeyHolder, SectionKeyShare, SectionKeysProvider, Signer};
 use self::section_peers::SectionPeers;
 
 use super::dkg::SectionDkgOutcome;

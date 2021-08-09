@@ -89,10 +89,7 @@ where
 
     ///
     pub async fn insert(&self, key: K, item: V) -> Option<Arc<V>> {
-        match self.states.insert(key, Arc::new(item)) {
-            Some(v) => Some(v),
-            None => None,
-        }
+        self.states.insert(key, Arc::new(item))
     }
 
     ///
