@@ -138,21 +138,13 @@ impl NetworkUtils for Network {
             )));
         }
 
-        // Make sure the proof chain can be trusted,
-        // i.e. check each key is signed by its parent/predecesor key.
-        if !proof_chain.self_verify() {
-            return Err(Error::UntrustedProofChain(format!(
-                "invalid signature: {:?}",
-                proof_chain
-            )));
-        }
-
-        // Check the SAP's key is the last key of the proof chain
-        if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
+        // Check if SAP's section key matches SAP signature's key
+        if signed_section_auth.sig.public_key
+            != signed_section_auth.value.public_key_set.public_key()
+        {
             return Err(Error::UntrustedSectionAuthProvider(format!(
-                "SAP's key ({:?}) doesn't match proof chain last key ({:?})",
-                signed_section_auth.value.public_key_set.public_key(),
-                proof_chain.last_key()
+                "section key doesn't match signature's key: {:?}",
+                signed_section_auth.value
             )));
         }
 
@@ -187,6 +179,24 @@ impl NetworkUtils for Network {
                     )));
                 }
             }
+        }
+
+        // Make sure the proof chain can be trusted,
+        // i.e. check each key is signed by its parent/predecesor key.
+        if !proof_chain.self_verify() {
+            return Err(Error::UntrustedProofChain(format!(
+                "invalid proof chain: {:?}",
+                proof_chain
+            )));
+        }
+
+        // Check the SAP's key is the last key of the proof chain
+        if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
+            return Err(Error::UntrustedSectionAuthProvider(format!(
+                "section key ({:?}) doesn't match proof chain last key ({:?})",
+                signed_section_auth.value.public_key_set.public_key(),
+                proof_chain.last_key()
+            )));
         }
 
         // We can now update our knowledge of the remote section's SAP.
@@ -280,14 +290,14 @@ mod tests {
         let mut map = Network::new();
 
         let mut chain01 = chain.clone();
-        let section_auth_01 = gen_section_auth(&bls::SecretKey::random(), p01)?;
+        let section_auth_01 = gen_section_auth(p01)?;
         let pk01 = section_auth_01.value.public_key_set.public_key();
         let sig01 = bincode::serialize(&pk01).map(|bytes| genesis_sk.sign(&bytes))?;
         chain01.insert(&genesis_pk, pk01, sig01)?;
         let _ = map.update_remote_section_sap(section_auth_01, &chain01, &chain);
 
         let mut chain10 = chain.clone();
-        let section_auth_10 = gen_section_auth(&bls::SecretKey::random(), p10)?;
+        let section_auth_10 = gen_section_auth(p10)?;
         let pk10 = section_auth_10.value.public_key_set.public_key();
         let sig10 = bincode::serialize(&pk10).map(|bytes| genesis_sk.sign(&bytes))?;
         chain10.insert(&genesis_pk, pk10, sig10)?;
@@ -305,11 +315,10 @@ mod tests {
         Ok(())
     }
 
-    fn gen_section_auth(
-        sk: &bls::SecretKey,
-        prefix: Prefix,
-    ) -> Result<SectionAuth<SectionAuthorityProvider>> {
-        let (section_auth, _, _) = section::test_utils::gen_section_authority_provider(prefix, 5);
-        dkg::test_utils::section_signed(sk, section_auth).context("Failed to generate SAP")
+    fn gen_section_auth(prefix: Prefix) -> Result<SectionAuth<SectionAuthorityProvider>> {
+        let (section_auth, _, secret_key_set) =
+            section::test_utils::gen_section_authority_provider(prefix, 5);
+        dkg::test_utils::section_signed(secret_key_set.secret_key(), section_auth)
+            .context("Failed to generate SAP")
     }
 }

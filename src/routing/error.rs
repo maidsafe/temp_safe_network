@@ -48,10 +48,10 @@ pub enum Error {
     },
     #[error("The node is not in a state to handle the action.")]
     InvalidState,
-    #[error("Invalid source location.")]
+    #[error("Invalid source location")]
     InvalidSrcLocation,
-    #[error("Invalid destination location.")]
-    InvalidDstLocation,
+    #[error("Invalid destination location: {0}")]
+    InvalidDstLocation(String),
     #[error("Content of a received message is inconsistent.")]
     InvalidMessage,
     #[error("A signature share is invalid.")]

@@ -24,7 +24,7 @@ use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use std::{cmp::Ordering, net::SocketAddr};
+use std::net::SocketAddr;
 use xor_name::XorName;
 
 impl Core {
@@ -37,7 +37,10 @@ impl Core {
         sender: SocketAddr,
         src_name: XorName,
     ) -> Result<Vec<Command>> {
-        info!("Anti-Entropy: retry message received from peer: {}", sender);
+        info!(
+            "Anti-Entropy: retry message received from peer: {} ({})",
+            src_name, sender
+        );
 
         match self.network.update_remote_section_sap(
             SectionAuth {
@@ -161,8 +164,14 @@ impl Core {
             _ => match dst_location.section_pk() {
                 None => Ok(None),
                 Some(dst_section_pk) => {
-                    self.check_dest_section_pk(node_msg, src_location, &dst_section_pk, sender)
-                        .await
+                    self.check_dest_section_pk(
+                        node_msg,
+                        src_location,
+                        &dst_section_pk,
+                        dst_location.name(),
+                        sender,
+                    )
+                    .await
                 }
             },
         }
@@ -175,14 +184,10 @@ impl Core {
         node_msg: &NodeMsg,
         src_location: &SrcLocation,
         dst_section_pk: &BlsPublicKey,
+        dst_name: Option<XorName>,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
-        if self
-            .section
-            .chain()
-            .cmp_by_position(dst_section_pk, self.section.chain().last_key())
-            != Ordering::Less
-        {
+        if dst_section_pk == self.section.chain().last_key() {
             // Destination section key matches our current section key
             return Ok(None);
         }
@@ -212,13 +217,11 @@ impl Core {
                     sender
                 );
 
-                // Let's try to find a section closer to the destination section key,
+                // Let's try to find a section closer to the destination,
                 // otherwise we just drop the message.
-                let name = XorName::from(PublicKey::Bls(*dst_section_pk));
+                let name = dst_name.ok_or_else(|| Error::InvalidDstLocation(format!("DirectAndUnrouted destination with section key ({:?}) not found in our section chain", dst_section_pk)))?;
                 match self.network.closest(&name) {
-                    Some(section_auth)
-                        if &section_auth.value != self.section.authority_provider() =>
-                    {
+                    Some(section_auth) => {
                         // Redirect to the closest section
                         NodeMsg::AntiEntropyRedirect {
                             section_auth: section_auth.value.clone(),
@@ -226,7 +229,7 @@ impl Core {
                             bounced_msg: Box::new(node_msg.clone()),
                         }
                     }
-                    Some(_) | None => {
+                    None => {
                         // TODO: instead of just dropping the message, don't we actually need
                         // to get up to date info from other Elders in our section as it may be
                         // a section key we are not aware of yet?
@@ -277,7 +280,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_everything_up_to_date() -> Result<()> {
-        let env = Env::new(1).await?;
+        let env = Env::new().await?;
 
         let (node_msg, src_location) = env.create_message(
             env.core.section().prefix(),
@@ -288,7 +291,7 @@ mod tests {
 
         let command = env
             .core
-            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, sender)
+            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, None, sender)
             .await?;
 
         assert!(command.is_none());
@@ -298,7 +301,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_redirect_to_other_section() -> Result<()> {
-        let mut env = Env::new(2).await?;
+        let mut env = Env::new().await?;
 
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();
@@ -306,11 +309,12 @@ mod tests {
         let (node_msg, src_location) = env.create_message(&env.other_prefix, other_pk)?;
         let sender = env.core.node().addr;
 
-        // since it's not aware of the other prefix, it shall fail
+        // since it's not aware of the other prefix, it shall fail with NoMatchingSection
         let dst_section_pk = other_pk;
+        let dst_name = Some(env.other_prefix.name());
         match env
             .core
-            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, sender)
+            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, dst_name, sender)
             .await
         {
             Err(Error::NoMatchingSection) => {}
@@ -326,7 +330,7 @@ mod tests {
         // with the SAP we inserted for other prefix
         let command = env
             .core
-            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, sender)
+            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, dst_name, sender)
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
@@ -346,7 +350,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
-        let env = Env::new(2).await?;
+        let env = Env::new().await?;
 
         let (node_msg, src_location) = env.create_message(
             env.core.section().prefix(),
@@ -357,7 +361,7 @@ mod tests {
 
         let command = env
             .core
-            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, sender)
+            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, None, sender)
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
@@ -382,17 +386,21 @@ mod tests {
     }
 
     impl Env {
-        async fn new(chain_len: usize) -> Result<Self> {
+        async fn new() -> Result<Self> {
             let prefix0 = Prefix::default().pushed(false);
             let prefix1 = Prefix::default().pushed(true);
 
-            let (chain, our_sk) =
-                create_chain(chain_len).context("failed to create section chain")?;
-
-            let (section_auth, mut nodes, _) = gen_section_authority_provider(prefix0, ELDER_SIZE);
+            let (section_auth, mut nodes, secret_key_set) =
+                gen_section_authority_provider(prefix0, ELDER_SIZE);
             let node = nodes.remove(0);
+            let sap_secret_key = secret_key_set.secret_key();
+            let signed_section_auth = section_signed(sap_secret_key, section_auth)?;
 
-            let signed_section_auth = section_signed(&our_sk, section_auth)?;
+            let chain = create_chain(
+                sap_secret_key,
+                signed_section_auth.value.public_key_set.public_key(),
+            )
+            .context("failed to create section chain")?;
             let section = Section::new(*chain.root_key(), chain, signed_section_auth)
                 .context("failed to create section")?;
 
@@ -433,21 +441,22 @@ mod tests {
         }
     }
 
-    fn create_chain(len: usize) -> Result<(SecuredLinkedList, bls::SecretKey)> {
-        let mut sk = bls::SecretKey::random();
-        let mut chain = SecuredLinkedList::new(sk.public_key());
+    // Creates a section chain with three blocks
+    fn create_chain(sap_sk: &bls::SecretKey, last_key: BlsPublicKey) -> Result<SecuredLinkedList> {
+        // create chain with random genesis key
+        let genesis_sk = bls::SecretKey::random();
+        let genesis_pk = genesis_sk.public_key();
+        let mut chain = SecuredLinkedList::new(genesis_pk);
 
-        for _ in 1..len {
-            let old_pk = *chain.last_key();
+        // insert second key which is the PK derived from SAP's SK
+        let sap_pk = sap_sk.public_key();
+        let sig = genesis_sk.sign(&bincode::serialize(&sap_pk)?);
+        chain.insert(&genesis_pk, sap_pk, sig)?;
 
-            let new_sk = bls::SecretKey::random();
-            let new_pk = new_sk.public_key();
-            let new_signature = sk.sign(&bincode::serialize(&new_pk)?);
+        // insert third key which is provided `last_key`
+        let last_sig = sap_sk.sign(&bincode::serialize(&last_key)?);
+        chain.insert(&sap_pk, last_key, last_sig)?;
 
-            chain.insert(&old_pk, new_pk, new_signature)?;
-            sk = new_sk
-        }
-
-        Ok((chain, sk))
+        Ok(chain)
     }
 }

@@ -206,7 +206,10 @@ impl Core {
         } else {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
-            debug!("Ignoring Proposal::SectionInfo since prefix doesn't match ours.");
+            debug!(
+                "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
+                section_auth
+            );
             Ok(vec![])
         }
     }
@@ -231,7 +234,10 @@ impl Core {
             } else {
                 // We shouln't be receiving or updating a SAP for
                 // a remote section here, that's done with a AE msg response.
-                debug!("Ignoring Proposal::OurElders since prefix doesn't match ours.");
+                debug!(
+                    "Ignoring Proposal::OurElders since prefix doesn't match ours: {:?}",
+                    section_auth
+                );
             }
         }
 

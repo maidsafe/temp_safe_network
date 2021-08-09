@@ -124,8 +124,10 @@ impl SectionUtils for Section {
     ) -> Result<Self, Error> {
         if section_auth.sig.public_key != *chain.last_key() {
             error!("can't create section: section_auth signed with incorrect key");
-            // TODO: consider more specific error here.
-            return Err(Error::InvalidMessage);
+            return Err(Error::UntrustedSectionAuthProvider(format!(
+                "section key doesn't match last key in proof chain: {:?}",
+                section_auth.value
+            )));
         }
 
         Ok(Self {
