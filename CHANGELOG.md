@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.3](https://github.com/maidsafe/safe_network/compare/v0.25.2...v0.25.3) (2021-08-09)
+
+
+### Bug Fixes
+
+* remove un-necessary disconnection handler ([2266a41](https://github.com/maidsafe/safe_network/commit/2266a41c3aa44f3a20dfa54c2814e04c7b91dabe))
+
 ### [0.25.2](https://github.com/maidsafe/safe_network/compare/v0.25.1...v0.25.2) (2021-08-09)
 
 
