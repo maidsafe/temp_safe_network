@@ -14,7 +14,7 @@ use super::{
     register::{Entry, EntryHash},
     Safe, XorName,
 };
-pub use super::{SafeContentType, SafeDataType, SafeUrl, XorUrlBase};
+pub use super::{ContentType, DataType, NativeUrl, XorUrlBase};
 use crate::{Error, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -38,7 +38,7 @@ pub enum SafeData {
         type_tag: u64,
         version: VersionHash,
         files_map: FilesMap,
-        data_type: SafeDataType,
+        data_type: DataType,
         resolved_from: String,
     },
     PublicBlob {
@@ -56,7 +56,7 @@ pub enum SafeData {
         type_tag: u64,
         version: VersionHash,
         nrs_map: NrsMap,
-        data_type: SafeDataType,
+        data_type: DataType,
         resolved_from: String,
     },
     Multimap {
@@ -243,7 +243,7 @@ impl Safe {
 
     async fn resolve_one_indirection(
         &self,
-        mut the_xor: SafeUrl,
+        mut the_xor: NativeUrl,
         metadata: Option<FileItem>,
         retrieve_data: bool,
         range: Range,
@@ -253,7 +253,7 @@ impl Safe {
         let xorurl = the_xor.to_xorurl_string();
         debug!("Going into a new step in the URL resolution for {}, content type: {:?}, data type: {:?}", xorurl, the_xor.content_type(), the_xor.data_type());
         match the_xor.content_type() {
-            SafeContentType::FilesContainer => {
+            ContentType::FilesContainer => {
                 if !the_xor.sub_names_vec().is_empty() {
                     let msg = format!(
                         "Cannot resolve FilesContainer URL as it contains subnames: {}",
@@ -281,7 +281,7 @@ impl Safe {
                                 if FileMeta::filetype_is_file(file_type) {
                                     match file_item.get("link") {
                                         Some(link) => {
-                                            let new_target_xorurl = SafeUrl::from_url(link)?;
+                                            let new_target_xorurl = NativeUrl::from_url(link)?;
                                             let mut metadata = (*file_item).clone();
                                             Path::new(&path).file_name().map(|name| {
                                                 name.to_str().map(|str| {
@@ -332,7 +332,7 @@ impl Safe {
 
                 Ok((safe_data, next))
             }
-            SafeContentType::NrsMapContainer => {
+            ContentType::NrsMapContainer => {
                 let (version, nrs_map) = self
                     .nrs_map_container_get(&xorurl)
                     .await
@@ -384,7 +384,7 @@ impl Safe {
 
                 Ok((nrs_map_container, Some((target_safe_url, None))))
             }
-            SafeContentType::Multimap => {
+            ContentType::Multimap => {
                 let data = if retrieve_data {
                     // TODO: pass the hash of the URL to grab a single element
                     self.fetch_multimap_values(&the_xor).await?
@@ -402,7 +402,7 @@ impl Safe {
 
                 Ok((safe_data, None))
             }
-            SafeContentType::Raw => {
+            ContentType::Raw => {
                 if !the_xor.sub_names_vec().is_empty() {
                     let msg = format!(
                         "Cannot resolve URL targetting raw content as it contains subnames: {}",
@@ -413,7 +413,7 @@ impl Safe {
                 }
 
                 match the_xor.data_type() {
-                    SafeDataType::SafeKey => {
+                    DataType::SafeKey => {
                         let safe_data = SafeData::SafeKey {
                             xorurl,
                             xorname: the_xor.xorname(),
@@ -421,11 +421,11 @@ impl Safe {
                         };
                         Ok((safe_data, None))
                     }
-                    SafeDataType::PublicBlob => {
+                    DataType::Blob => {
                         self.retrieve_blob(&the_xor, retrieve_data, None, &metadata, range)
                             .await
                     }
-                    SafeDataType::PublicRegister => {
+                    DataType::Register => {
                         let data = if retrieve_data {
                             // TODO: use the content hash in the URL to grab a single element if it exists
                             self.fetch_register_entries(&the_xor).await?
@@ -443,31 +443,9 @@ impl Safe {
 
                         Ok((safe_data, None))
                     }
-                    SafeDataType::PrivateRegister => {
-                        let data = if retrieve_data {
-                            // TODO: use the content hash in the URL to grab a single element if it exists
-                            self.fetch_register_entries(&the_xor).await?
-                        } else {
-                            BTreeSet::new()
-                        };
-
-                        let safe_data = SafeData::PrivateRegister {
-                            xorurl,
-                            xorname: the_xor.xorname(),
-                            type_tag: the_xor.type_tag(),
-                            data,
-                            resolved_from: url.to_string(),
-                        };
-
-                        Ok((safe_data, None))
-                    }
-                    other => Err(Error::ContentError(format!(
-                        "Data type '{:?}' not supported yet",
-                        other
-                    ))),
                 }
             }
-            SafeContentType::MediaType(media_type_str) => {
+            ContentType::MediaType(media_type_str) => {
                 if !the_xor.sub_names_vec().is_empty() {
                     let msg = format!(
                         "Cannot resolve URL targetting raw content as it contains subnames: {}",
@@ -478,7 +456,7 @@ impl Safe {
                 }
 
                 match the_xor.data_type() {
-                    SafeDataType::PublicBlob => {
+                    DataType::Blob => {
                         self.retrieve_blob(
                             &the_xor,
                             retrieve_data,
@@ -494,7 +472,7 @@ impl Safe {
                     ))),
                 }
             }
-            SafeContentType::Wallet { .. } => Err(Error::EmptyContent(
+            ContentType::Wallet { .. } => Err(Error::EmptyContent(
                 "Temporarily disabled feature".to_string(),
             )),
         }
@@ -502,7 +480,7 @@ impl Safe {
 
     async fn retrieve_blob(
         &self,
-        the_xor: &SafeUrl,
+        the_xor: &NativeUrl,
         retrieve_data: bool,
         media_type: Option<String>,
         metadata: &Option<FileItem>,
@@ -562,12 +540,12 @@ fn gen_filtered_filesmap(urlpath: &str, files_map: &FilesMap, xorurl: &str) -> R
 }
 // // This contains information for the next step to be made
 // // in each iteration of the resolution process
-type NextStepInfo = (SafeUrl, Option<FileItem>);
+type NextStepInfo = (NativeUrl, Option<FileItem>);
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{app::test_helpers::new_safe_instance, retry_loop, SafeUrl};
+    use crate::{app::test_helpers::new_safe_instance, retry_loop, NativeUrl, Scope};
     use anyhow::{anyhow, bail, Context, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use std::io::Read;
@@ -579,7 +557,7 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
 
-        let safe_url = SafeUrl::from_url(&xorurl)?;
+        let safe_url = NativeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
@@ -591,7 +569,7 @@ mod tests {
                     type_tag: 1_100,
                     version: version0,
                     files_map,
-                    data_type: SafeDataType::PublicRegister,
+                    data_type: DataType::Register,
                     resolved_from: xorurl.clone(),
                 }
         );
@@ -623,7 +601,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
-        let mut safe_url = SafeUrl::from_url(&xorurl)?;
+        let mut safe_url = NativeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
             .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
@@ -650,7 +628,7 @@ mod tests {
                 assert_eq!(*xorname, safe_url.xorname());
                 assert_eq!(*type_tag, 1_100);
                 assert_eq!(*version, version0);
-                assert_eq!(*data_type, SafeDataType::PublicRegister);
+                assert_eq!(*data_type, DataType::Register);
                 assert_eq!(*files_map, the_files_map);
 
                 // let's also compare it with the result from inspecting the URL
@@ -674,7 +652,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
-        let mut safe_url = SafeUrl::from_url(&xorurl)?;
+        let mut safe_url = NativeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let files_container_url = safe_url.to_string();
         let _ = safe
@@ -712,7 +690,7 @@ mod tests {
             .files_store_public_blob(data, Some("text/plain"), false)
             .await?;
 
-        let safe_url = SafeUrl::from_url(&xorurl)?;
+        let safe_url = NativeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
@@ -788,7 +766,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
-        let mut safe_url = SafeUrl::from_url(&xorurl)?;
+        let mut safe_url = NativeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
             .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
@@ -837,58 +815,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_unsupported() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let xorname = rand::random();
-        let type_tag = 575_756_443;
-        let xorurl = SafeUrl::encode(
-            xorname,
-            None,
-            type_tag,
-            SafeDataType::PrivateBlob,
-            SafeContentType::Raw,
-            None,
-            None,
-            None,
-            None,
-            None,
-            XorUrlBase::Base32z,
-        )?;
-
-        match safe.fetch(&xorurl, None).await {
-            Ok(c) => {
-                bail!("Unxpected fetched content: {:?}", c)
-            }
-            Err(Error::ContentError(msg)) => {
-                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string())
-            }
-            other => bail!("Error returned is not the expected one: {:?}", other),
-        };
-
-        match safe.inspect(&xorurl).await {
-            Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
-            Err(Error::ContentError(msg)) => {
-                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string());
-                Ok(())
-            }
-            other => Err(anyhow!(
-                "Error returned is not the expected one: {:?}",
-                other
-            )),
-        }
-    }
-
-    #[tokio::test]
     async fn test_fetch_unsupported_with_media_type() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let xorname = rand::random();
         let type_tag = 575_756_443;
-        let xorurl = SafeUrl::encode(
+        let xorurl = NativeUrl::encode(
             xorname,
             None,
             type_tag,
-            SafeDataType::PrivateBlob,
-            SafeContentType::MediaType("text/html".to_string()),
+            Scope::Private,
+            DataType::Register,
+            ContentType::MediaType("text/html".to_string()),
             None,
             None,
             None,
@@ -902,7 +839,7 @@ mod tests {
                 bail!("Unxpected fetched content: {:?}", c)
             }
             Err(Error::ContentError(msg)) => {
-                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string())
+                assert_eq!(msg, "Data type 'Register' not supported yet".to_string())
             }
             other => bail!("Error returned is not the expected one: {:?}", other),
         };
@@ -910,7 +847,7 @@ mod tests {
         match safe.inspect(&xorurl).await {
             Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
             Err(Error::ContentError(msg)) => {
-                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string());
+                assert_eq!(msg, "Data type 'Register' not supported yet".to_string());
                 Ok(())
             }
             other => Err(anyhow!(
@@ -926,7 +863,7 @@ mod tests {
         let data = b"Something super immutable";
         let xorurl = safe.files_store_public_blob(data, None, false).await?;
 
-        let mut safe_url = SafeUrl::from_url(&xorurl)?;
+        let mut safe_url = NativeUrl::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
         safe_url.set_path(path);
         match safe.fetch(&safe_url.to_string(), None).await {
@@ -945,7 +882,7 @@ mod tests {
             .files_store_public_blob(data, Some("text/plain"), false)
             .await?;
 
-        let mut safe_url = SafeUrl::from_url(&xorurl)?;
+        let mut safe_url = NativeUrl::from_url(&xorurl)?;
         safe_url.set_path("/some_relative_filepath");
         let url_with_path = safe_url.to_string();
         match safe.fetch(&url_with_path, None).await {

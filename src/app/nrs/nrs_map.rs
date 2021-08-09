@@ -10,7 +10,7 @@
 use crate::{
     app::{
         consts::{PREDICATE_CREATED, PREDICATE_LINK, PREDICATE_MODIFIED},
-        fetch::{SafeContentType, SafeDataType},
+        fetch::{ContentType, DataType},
         helpers::gen_timestamp_secs,
         Safe,
     },
@@ -305,16 +305,14 @@ pub(crate) fn validate_nrs_link(link: &str) -> Result<()> {
     if link_encoder.content_version().is_none() {
         let content_type = link_encoder.content_type();
         let data_type = link_encoder.data_type();
-        if content_type == SafeContentType::FilesContainer
-            || content_type == SafeContentType::NrsMapContainer
+        if content_type == ContentType::FilesContainer
+            || content_type == ContentType::NrsMapContainer
         {
             return Err(Error::InvalidInput(format!(
                 "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: \"{}\"",
                 content_type, link
             )));
-        } else if data_type == SafeDataType::PublicRegister
-            || data_type == SafeDataType::PrivateRegister
-        {
+        } else if data_type == DataType::Register {
             return Err(Error::InvalidInput(format!(
                 "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: \"{}\"",
                 data_type, link

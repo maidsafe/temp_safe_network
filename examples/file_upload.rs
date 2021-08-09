@@ -8,7 +8,7 @@
 // Software.
 
 use anyhow::Result;
-use sn_api::{fetch::SafeData, BootstrapConfig, Safe, SafeUrl};
+use sn_api::{fetch::SafeData, BootstrapConfig, NativeUrl, Safe};
 use std::{env::temp_dir, fs::File, io::Write, path::PathBuf};
 
 const FILE_TO_UPLOAD: &str = "file_to_upload.rs";
@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
     // Using the FilesContainer XOR-URL we can construct the Safe-URL of
     // the file by post fixing it with its path name,
     // i.e. safe://<FilesContainer XOR-URL>/<file name>
-    let mut url = SafeUrl::from_url(&xorurl)?;
+    let mut url = NativeUrl::from_url(&xorurl)?;
     url.set_path(FILE_TO_UPLOAD);
     println!("\nRetrieving file from {} ...\n", url);
 

@@ -10,7 +10,7 @@
 use super::register::EntryHash;
 use crate::{Error, Result, Safe};
 use log::debug;
-use safe_network::url::{SafeContentType, SafeUrl, XorUrl};
+use safe_network::url::{ContentType, NativeUrl, Scope, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -35,12 +35,17 @@ impl Safe {
             .store_register(name, type_tag, None, private)
             .await?;
 
-        let xorurl = SafeUrl::encode_register(
+        let scope = if private {
+            Scope::Private
+        } else {
+            Scope::Public
+        };
+        let xorurl = NativeUrl::encode_register(
             xorname,
             type_tag,
-            SafeContentType::Multimap,
+            scope,
+            ContentType::Multimap,
             self.xorurl_base,
-            private,
         )?;
 
         Ok(xorurl)
@@ -67,10 +72,10 @@ impl Safe {
     }
 
     // Return the value (by a provided key) of a Multimap on
-    // the network without resolving the SafeUrl
+    // the network without resolving the NativeUrl
     pub(crate) async fn fetch_multimap_value_by_key(
         &self,
-        safeurl: &SafeUrl,
+        safeurl: &NativeUrl,
         key: &[u8],
     ) -> Result<MultimapKeyValues> {
         let entries = self.fetch_multimap_values(safeurl).await?;
@@ -121,11 +126,11 @@ impl Safe {
     }
 
     // Crate's helper to return the value of a Multimap on
-    // the network without resolving the SafeUrl,
+    // the network without resolving the NativeUrl,
     // optionally filtering by hash and/or key.
     pub(crate) async fn fetch_multimap_values(
         &self,
-        safeurl: &SafeUrl,
+        safeurl: &NativeUrl,
     ) -> Result<MultimapKeyValues> {
         let entries = match self.fetch_register_entries(safeurl).await {
             Ok(data) => {
@@ -156,11 +161,11 @@ impl Safe {
     }
 
     // Crate's helper to return the value of a Multimap on
-    // the network without resolving the SafeUrl,
+    // the network without resolving the NativeUrl,
     // optionally filtering by hash and/or key.
     pub(crate) async fn fetch_multimap_value_by_hash(
         &self,
-        safeurl: &SafeUrl,
+        safeurl: &NativeUrl,
         hash: EntryHash,
     ) -> Result<Option<MultimapKeyValue>> {
         let entry = match self.fetch_register_entry(safeurl, hash).await {

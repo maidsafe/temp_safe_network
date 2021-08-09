@@ -43,10 +43,7 @@ pub struct Safe {
 
 impl Default for Safe {
     fn default() -> Self {
-        Self::new(
-            Some(DEFAULT_XORURL_BASE),
-            Duration::from_secs(DEFAULT_QUERY_TIMEOUT),
-        )
+        Self::new(Some(DEFAULT_XORURL_BASE), DEFAULT_QUERY_TIMEOUT)
     }
 }
 

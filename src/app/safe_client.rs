@@ -11,7 +11,7 @@ use super::fetch::Range;
 use crate::{ipc::BootstrapConfig, Error, Result};
 use hex::encode;
 use log::{debug, info};
-use safe_network::client::{Client, Error as ClientError};
+use safe_network::client::{Client, Config, Error as ClientError};
 use safe_network::types::{
     register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
     ChunkAddress, Error as SafeNdError, Keypair,
@@ -75,14 +75,13 @@ impl SafeAppClient {
             "Bootstrap contacts list set to: {:?}",
             self.bootstrap_config
         );
-        let client = Client::new(
-            app_keypair,
+        let config = Config::new(
             self.config_path.as_deref(),
             self.bootstrap_config.clone(),
-            self.timeout.as_secs(),
+            Some(self.timeout),
         )
-        .await
-        .map_err(|err| {
+        .await;
+        let client = Client::new(app_keypair, config).await.map_err(|err| {
             Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
         })?;
 

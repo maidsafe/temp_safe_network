@@ -11,7 +11,7 @@ pub use safe_network::types::register::{Entry, EntryHash};
 
 use crate::{Error, Result, Safe};
 use log::debug;
-use safe_network::url::{SafeContentType, SafeUrl, XorUrl};
+use safe_network::url::{ContentType, NativeUrl, Scope, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -28,12 +28,17 @@ impl Safe {
             .store_register(name, type_tag, None, private)
             .await?;
 
-        let xorurl = SafeUrl::encode_register(
+        let scope = if private {
+            Scope::Private
+        } else {
+            Scope::Public
+        };
+        let xorurl = NativeUrl::encode_register(
             xorname,
             type_tag,
-            SafeContentType::Raw,
+            scope,
+            ContentType::Raw,
             self.xorurl_base,
-            private,
         )?;
 
         Ok(xorurl)
@@ -55,12 +60,12 @@ impl Safe {
         self.fetch_register_entry(&safeurl, hash).await
     }
 
-    /// Fetch a Register from a SafeUrl without performing any type of URL resolution
+    /// Fetch a Register from a NativeUrl without performing any type of URL resolution
     /// Supports version hashes:
     /// e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
     pub(crate) async fn fetch_register_entries(
         &self,
-        safeurl: &SafeUrl,
+        safeurl: &NativeUrl,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
         let result = match safeurl.content_version() {
             Some(v) => {
@@ -94,13 +99,13 @@ impl Safe {
         }
     }
 
-    /// Fetch a Register from a SafeUrl without performing any type of URL resolution
+    /// Fetch a Register from a NativeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_register_entry(
         &self,
-        safeurl: &SafeUrl,
+        safeurl: &NativeUrl,
         hash: EntryHash,
     ) -> Result<Entry> {
-        // TODO: allow to specify the hash with the SafeUrl as well: safeurl.content_hash(),
+        // TODO: allow to specify the hash with the NativeUrl as well: safeurl.content_hash(),
         // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
         let address = safeurl.register_address()?;
 

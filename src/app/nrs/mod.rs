@@ -17,7 +17,7 @@ use crate::{
         consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
         Safe,
     },
-    Error, Result, SafeUrl, XorUrl,
+    Error, NativeUrl, Result, XorUrl,
 };
 use log::{debug, info, warn};
 use std::collections::{BTreeMap, BTreeSet};
@@ -31,19 +31,19 @@ const ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
 pub type ProcessedEntries = BTreeMap<String, (String, String)>;
 
 impl Safe {
-    pub fn parse_url(url: &str) -> Result<SafeUrl> {
-        let safe_url = SafeUrl::from_url(&sanitised_url(url))?;
+    pub fn parse_url(url: &str) -> Result<NativeUrl> {
+        let safe_url = NativeUrl::from_url(&sanitised_url(url))?;
         Ok(safe_url)
     }
 
-    // Parses a safe:// URL and returns all the info in a SafeUrl instance.
-    // It also returns a second SafeUrl if the URL was resolved from an NRS-URL,
-    // this second SafeUrl instance contains the information of the parsed NRS-URL.
+    // Parses a safe:// URL and returns all the info in a NativeUrl instance.
+    // It also returns a second NativeUrl if the URL was resolved from an NRS-URL,
+    // this second NativeUrl instance contains the information of the parsed NRS-URL.
     // *Note* this is not part of the public API, but an internal helper function used by API impl.
     pub(crate) async fn parse_and_resolve_url(
         &self,
         url: &str,
-    ) -> Result<(SafeUrl, Option<SafeUrl>)> {
+    ) -> Result<(NativeUrl, Option<NativeUrl>)> {
         let safe_url = Safe::parse_url(url)?;
         let orig_path = safe_url.path_decoded()?;
 
@@ -62,8 +62,8 @@ impl Safe {
             .pop()
             .ok_or_else(|| Error::ContentNotFound(format!("Failed to resolve {}", url)))?;
 
-        // Set the original path so we return the SafeUrl with it
-        let mut safe_url = SafeUrl::from_url(&safe_data.xorurl())?;
+        // Set the original path so we return the NativeUrl with it
+        let mut safe_url = NativeUrl::from_url(&safe_data.xorurl())?;
         safe_url.set_path(&orig_path);
 
         // If there is still one item in the chain, the first item is the NRS Map Container
@@ -71,7 +71,7 @@ impl Safe {
         if resolution_chain.is_empty() {
             Ok((safe_url, None))
         } else {
-            let nrsmap_xorul_encoder = SafeUrl::from_url(&resolution_chain[0].resolved_from())?;
+            let nrsmap_xorul_encoder = NativeUrl::from_url(&resolution_chain[0].resolved_from())?;
             Ok((safe_url, Some(nrsmap_xorul_encoder)))
         }
     }
@@ -159,7 +159,7 @@ impl Safe {
             return Ok(("".to_string(), processed_entries, nrs_map));
         }
 
-        let nrs_xorname = SafeUrl::from_nrsurl(&nrs_url)?.xorname();
+        let nrs_xorname = NativeUrl::from_nrsurl(&nrs_url)?.xorname();
         debug!("XorName for \"{:?}\" is \"{:?}\"", &nrs_url, &nrs_xorname);
 
         // Store the serialised NrsMap in a Public Blob
@@ -285,7 +285,7 @@ impl Safe {
             ))
         })?;
         debug!("Deserialised NrsMap XOR-URL: {}", url);
-        let nrs_map_xorurl = SafeUrl::from_url(&url)?;
+        let nrs_map_xorurl = NativeUrl::from_url(&url)?;
 
         // Using the NrsMap XOR-URL we can now fetch the NrsMap and deserialise it
         let serialised_nrs_map = self.fetch_public_blob(&nrs_map_xorurl, None).await?;
@@ -322,7 +322,7 @@ impl Safe {
     }
 }
 
-fn validate_nrs_name(name: &str) -> Result<(SafeUrl, String)> {
+fn validate_nrs_name(name: &str) -> Result<(NativeUrl, String)> {
     // validate no slashes in name.
     if name.find('/').is_some() {
         let msg = "The NRS name/subname cannot contain a slash".to_string();
@@ -392,7 +392,7 @@ mod tests {
                 nrs_map.get_default()?,
                 &DefaultRdf::OtherRdf(def_data.clone())
             );
-            let decoder = SafeUrl::from_url(&xor_url)?;
+            let decoder = NativeUrl::from_url(&xor_url)?;
             assert_eq!(nrs_xorname, decoder.xorname());
             Ok(())
         } else {
