@@ -54,7 +54,7 @@ pub enum Error {
     /// Node failed to delete the requested data for some reason.
     #[error("Failed to delete requested data")]
     FailedToDelete,
-    /// Error is not valid for operation id generation. This should not absolve a black eye
+    /// Error is not valid for operation id generation. This should not absolve a pending (and thus far unfulfilled) operation
     #[error(
         "Could not generation operation id for chunk retrieval. Error was not 'DataNotFound'."
     )]

@@ -22,32 +22,30 @@ const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
 /// Some reproducible xorname derived from the operation. Which can be re-derived from the appropriate response when received (to remove from tracking)
 type NodeIdentifier = XorName;
 
-/// Something the node in question is yet to do
-type BlackMark = OperationId;
-
 #[derive(Clone, Debug)]
 pub(crate) struct Liveness {
-    black_marks: Arc<DashMap<NodeIdentifier, DashSet<BlackMark>>>,
+    /// One of (potentially many) different ways of assessing unresponsiveness of nodes.
+    unfulfilled_requests: Arc<DashMap<NodeIdentifier, DashSet<OperationId>>>,
     closest_nodes_to: Arc<DashMap<XorName, Vec<XorName>>>,
 }
 
 impl Liveness {
     pub(crate) fn new() -> Self {
         Self {
-            black_marks: Arc::new(DashMap::new()),
+            unfulfilled_requests: Arc::new(DashMap::new()),
             closest_nodes_to: Arc::new(DashMap::new()),
         }
     }
 
-    // Inserts a black eye, and is deemed as such until we get the appropriate response from the node
+    // Inserts a pending_operation, and is deemed as such until we get the appropriate response from the node
     // Returns false if the operation already existed.
-    pub(crate) fn is_fresh_black_mark(
+    pub(crate) fn is_already_a_pending_request_operation(
         &self,
         node_id: NodeIdentifier,
         operation_id: OperationId,
     ) -> bool {
         let new_operation = self
-            .black_marks
+            .unfulfilled_requests
             .entry(node_id)
             .or_default()
             .insert(operation_id.to_string());
@@ -71,7 +69,7 @@ impl Liveness {
 
         for key in &all_keys {
             if !current_members.contains(key) {
-                let _ = self.black_marks.remove(key);
+                let _ = self.unfulfilled_requests.remove(key);
                 let _ = self.closest_nodes_to.remove(key);
             }
         }
@@ -79,12 +77,20 @@ impl Liveness {
         self.recompute_closest_nodes();
     }
 
-    /// Removes a black eye from the node liveness records
-    pub(crate) fn remove_black_mark(&self, node_id: &NodeIdentifier, operation_id: OperationId) {
-        trace!("Attempting black eye {:?} op: {:?}", node_id, operation_id);
+    /// Removes a pending_operation from the node liveness records
+    pub(crate) fn request_operation_fulfilled(
+        &self,
+        node_id: &NodeIdentifier,
+        operation_id: OperationId,
+    ) {
+        trace!(
+            "Attempting to remove pending_operation {:?} op: {:?}",
+            node_id,
+            operation_id
+        );
 
-        if let Some(black_marks) = self.black_marks.get_mut(node_id) {
-            let _ = black_marks.remove(&operation_id);
+        if let Some(pending_operations) = self.unfulfilled_requests.get_mut(node_id) {
+            let _ = pending_operations.remove(&operation_id);
             trace!(
                 "Black eye removed for node: {:?} op: {:?}",
                 node_id,
@@ -121,31 +127,31 @@ impl Liveness {
             if let Some(max_pending_by_neighbours) = neighbours
                 .iter()
                 .map(|neighbour| {
-                    self.black_marks
+                    self.unfulfilled_requests
                         .get(neighbour)
                         .map(|entry| entry.value().len())
                         .unwrap_or(0)
                 })
                 .max()
             {
-                let black_marks_count = self
-                    .black_marks
+                let pending_operations_count = self
+                    .unfulfilled_requests
                     .get(&node)
                     .map(|entry| entry.value().len())
                     .unwrap_or(0);
 
-                if black_marks_count > MIN_PENDING_OPS
+                if pending_operations_count > MIN_PENDING_OPS
                     && max_pending_by_neighbours > MIN_PENDING_OPS
-                    && black_marks_count as f64 * PENDING_OP_TOLERANCE_RATIO
+                    && pending_operations_count as f64 * PENDING_OP_TOLERANCE_RATIO
                         > max_pending_by_neighbours as f64
                 {
                     tracing::info!(
                         "Pending ops for {}: {} Neighbour max: {}",
                         node,
-                        black_marks_count,
+                        pending_operations_count,
                         max_pending_by_neighbours
                     );
-                    unresponsive_nodes.push((node, black_marks_count));
+                    unresponsive_nodes.push((node, pending_operations_count));
                 }
             }
         }

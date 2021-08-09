@@ -179,7 +179,7 @@ impl Core {
         for target in targets {
             if self
                 .liveness
-                .is_fresh_black_mark(target, read.operation_id()?)
+                .is_already_a_pending_request_operation(target, read.operation_id()?)
             {
                 let _ = fresh_targets.insert(target);
             } else {
