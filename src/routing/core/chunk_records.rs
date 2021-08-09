@@ -179,7 +179,7 @@ impl Core {
         for target in targets {
             if self
                 .liveness
-                .is_fresh_black_eye(target, read.operation_id()?)
+                .is_fresh_black_mark(target, read.operation_id()?)
             {
                 let _ = fresh_targets.insert(target);
             } else {
