@@ -120,7 +120,7 @@ impl Dispatcher {
             trace!(?command);
 
             self.try_handle_command(command).await.map_err(|error| {
-                error!("Error encountered when handling command: {}", error);
+                error!("Error encountered when handling command: {:?}", error);
                 error
             })
         }

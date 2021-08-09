@@ -13,11 +13,12 @@ use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
 use crate::client::Error;
+use crate::messaging::data::OperationId;
 use crate::messaging::{
     data::{CmdError, QueryResponse},
     node::SigShare,
     signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-    MessageId, SectionAuthorityProvider,
+    SectionAuthorityProvider,
 };
 use crate::types::{PrefixMap, PublicKey};
 use xor_name::XorName;
@@ -37,15 +38,19 @@ pub(crate) struct QueryResult {
 
 #[derive(Clone, Debug)]
 pub(super) struct Session {
+    // PublicKey of the client
     client_pk: PublicKey,
+    // Qp2p objects
     qp2p: QuicP2p<XorName>,
-    pending_queries: PendingQueryResponses,
-    incoming_err_sender: Arc<Sender<CmdError>>,
     endpoint: Option<Endpoint<XorName>>,
+    // Channels for sending responses to upper layers
+    pending_queries: PendingQueryResponses,
+    // Channels for sending errors to upper layer
+    incoming_err_sender: Arc<Sender<CmdError>>,
     /// All elders we know about from SectionInfo messages
-    network: PrefixMap<SectionAuthorityProvider>,
+    network: Arc<RwLock<PrefixMap<SectionAuthorityProvider>>>,
+    /// BLS Signature aggregator for aggregating network messages
     aggregator: Arc<RwLock<SignatureAggregator>>,
-    is_connecting_to_new_elders: bool,
 }
 
 impl Session {
@@ -64,16 +69,20 @@ impl Session {
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
             endpoint: None,
-            network: PrefixMap::new(),
+            network: Arc::new(RwLock::new(PrefixMap::new())),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
-            is_connecting_to_new_elders: false,
         })
     }
 
     /// Get the count of elders we have knowledge of
     #[allow(unused)]
     pub(super) async fn known_elders_count(&self) -> usize {
-        self.network.iter().map(|sap| sap.elders.len()).sum()
+        self.network
+            .read()
+            .await
+            .iter()
+            .map(|sap| sap.elders.len())
+            .sum()
     }
 
     pub(super) fn endpoint(&self) -> Result<&Endpoint<XorName>, Error> {

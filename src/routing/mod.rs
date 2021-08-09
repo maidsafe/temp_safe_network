@@ -40,10 +40,7 @@ pub use self::{
         section_authority_provider::SectionAuthorityProviderUtils,
     },
 };
-pub(crate) use self::{
-    core::ChunkStore, core::RegisterStorage, core::SignatureAggregator, core::CHUNK_COPY_COUNT,
-    section::section_keys::SectionKeyShare,
-};
+pub(crate) use self::{core::ChunkStore, core::RegisterStorage, core::CHUNK_COPY_COUNT};
 
 pub use qp2p::{Config as TransportConfig, SendStream};
 

@@ -34,9 +34,9 @@ pub(crate) use chunk_store::ChunkStore;
 
 use self::{enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
 use crate::messaging::{
-    node::{Network, NodeMsg, Proposal, Section, SectionAuth},
+    node::{Network, NodeMsg, Proposal, Section},
     signature_aggregator::SignatureAggregator,
-    MessageId, MessageId, SectionAuthorityProvider,
+    MessageId,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
@@ -53,9 +53,9 @@ use itertools::Itertools;
 use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use std::path::PathBuf;
 use xor_name::{Prefix, XorName};
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
