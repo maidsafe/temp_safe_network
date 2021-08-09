@@ -115,4 +115,13 @@ impl Session {
             Err(e) => Err(Error::Aggregation(e.to_string())),
         }
     }
+
+    #[cfg(test)]
+    pub(crate) async fn has_bootstrapped(&self) -> bool {
+        self.network
+            .read()
+            .await
+            .get_matching(&xor_name::XorName::random())
+            .is_some()
+    }
 }

@@ -46,5 +46,10 @@ pub async fn create_test_client_with(
     let config = Config::new(None, Some(contact_info), timeout).await;
     let client = Client::new(optional_keypair.clone(), config).await?;
 
+    while !client.has_bootstrapped().await {
+        // Wait for the client to bootstrap to the network
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+
     Ok(client)
 }

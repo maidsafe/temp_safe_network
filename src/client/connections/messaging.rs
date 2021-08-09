@@ -12,7 +12,7 @@ use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
 use tokio::{sync::mpsc::channel, task::JoinHandle, time::timeout};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
 use crate::client::Error;
@@ -53,7 +53,7 @@ impl Session {
             .into_iter()
             .collect::<BTreeSet<_>>();
 
-        self.send_get_section_query(client_pk, &bootstrapped_peer)
+        self.send_get_section_query(XorName::from(self.client_pk), &bootstrapped_peer)
             .await?;
 
         // Bootstrap and send a handshake request to the bootstrapped peer
