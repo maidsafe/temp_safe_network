@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.2](https://github.com/maidsafe/safe_network/compare/v0.25.1...v0.25.2) (2021-08-09)
+
+
+### Bug Fixes
+
+* self_update bump to fix tracing bug ([12a4741](https://github.com/maidsafe/safe_network/commit/12a4741d62bced045b9592ca6c1dc4d8cd051873))
+
 ### [0.25.1](https://github.com/maidsafe/safe_network/compare/v0.25.0...v0.25.1) (2021-08-06)
 
 
