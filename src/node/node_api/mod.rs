@@ -238,7 +238,7 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
     match ctx {
         None => {
             error!(
-                    "Erroring when processing a message without a msg context, we cannot report it to the sender: {:?}", err
+                    "Error when processing a message without a msg context, we cannot report it to the sender: {:?}", err
                 );
             NodeDuty::NoOp
         }

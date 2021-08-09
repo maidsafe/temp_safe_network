@@ -57,6 +57,19 @@ impl Storage for BlobStorage {
         }
     }
 
+    async fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Result<(), SelfEncryptionError> {
+        let chunk: Chunk = if self.public {
+            PublicChunk::new(data).into()
+        } else {
+            PrivateChunk::new(data, self.client.public_key()).into()
+        };
+        trace!("Self encrypt invoked StoreChunk({:?})", &chunk);
+        self.client
+            .store_chunk_on_network(chunk)
+            .await
+            .map_err(|err| SelfEncryptionError::Generic(format!("{:?}", err)))
+    }
+
     async fn delete(&mut self, name: &[u8]) -> Result<(), SelfEncryptionError> {
         if name.len() != XOR_NAME_LEN {
             return Err(SelfEncryptionError::Generic(
@@ -83,19 +96,6 @@ impl Storage for BlobStorage {
             Ok(_) => Ok(()),
             Err(error) => Err(SelfEncryptionError::Generic(format!("{:?}", error))),
         }
-    }
-
-    async fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Result<(), SelfEncryptionError> {
-        let chunk: Chunk = if self.public {
-            PublicChunk::new(data).into()
-        } else {
-            PrivateChunk::new(data, self.client.public_key()).into()
-        };
-        trace!("Self encrypt invoked StoreChunk({:?})", &chunk);
-        self.client
-            .store_chunk_on_network(chunk)
-            .await
-            .map_err(|err| SelfEncryptionError::Generic(format!("{:?}", err)))
     }
 
     async fn generate_address(&self, data: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {

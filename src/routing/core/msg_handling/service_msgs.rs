@@ -8,16 +8,19 @@
 
 use super::Core;
 use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
-use crate::messaging::data::ServiceMsg;
-use crate::messaging::NodeAuth;
+use crate::messaging::data::{ServiceError, ServiceMsg};
 use crate::messaging::{
     data::{ChunkRead, CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite},
     node::{NodeMsg, NodeQueryResponse},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
+use crate::messaging::{NodeAuth, SectionAuthorityProvider};
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;
 use crate::routing::peer::PeerUtils;
-use crate::routing::{error::Result, routing_api::command::Command, section::SectionUtils};
+use crate::routing::{
+    error::Result, routing_api::command::Command, section::SectionUtils,
+    SectionAuthorityProviderUtils,
+};
 use crate::types::PublicKey;
 use itertools::Itertools;
 use std::collections::BTreeSet;
@@ -50,7 +53,7 @@ impl Core {
         Ok(vec![command])
     }
 
-    /// Handle regsiter commands
+    /// Handle register commands
     pub(crate) async fn handle_register_write(
         &self,
         msg_id: MessageId,
@@ -318,6 +321,21 @@ impl Core {
             );
             return Ok(vec![]);
         }
+        let data_name = match msg.dst_address() {
+            Some(name) => name,
+            None => {
+                warn!("Dropping client message as there is no valid destination.");
+                return Ok(vec![]);
+            }
+        };
+
+        let received_section_pk = match dst_location.section_pk() {
+            Some(section_pk) => section_pk,
+            None => {
+                warn!("Dropping client message as there is no valid dst section_pk.");
+                return Ok(vec![]);
+            }
+        };
 
         let user = match self.comm.get_connection_id(&sender).await {
             Some(name) => EndUser(name),
@@ -330,7 +348,70 @@ impl Core {
             }
         };
 
+        if let Some(return_sap) = self.check_entropy_for_client(&data_name, &received_section_pk) {
+            // AE triggered! Send back the message with SAP of actual destination section
+            let service_msg = ServiceMsg::ServiceError(ServiceError {
+                reason: Some(crate::messaging::data::Error::WrongDestination),
+                sap: Some(return_sap),
+                source_message: Some(payload),
+            });
+
+            let payload = match WireMsg::serialize_msg_payload(&service_msg) {
+                Ok(payload) => payload,
+                Err(e) => {
+                    error!(
+                        "Error: `{:?}` on serializing AE message to client {:?}",
+                        e, user
+                    );
+                    return Ok(vec![]);
+                }
+            };
+
+            let wire_msg = match WireMsg::new_msg(
+                MessageId::new(),
+                payload,
+                MsgKind::ServiceMsg(auth.into_inner()),
+                DstLocation::EndUser(user),
+            ) {
+                Ok(wire_msg) => wire_msg,
+                Err(e) => {
+                    error!(
+                        "Error: `{:?}` on generating AE wire_msg message for client {:?}",
+                        e, user
+                    );
+                    return Ok(vec![]);
+                }
+            };
+
+            return Ok(vec![Command::ParseAndSendWireMsg(wire_msg)]);
+        }
         self.handle_service_msg_received(msg_id, msg, user, auth)
             .await
+    }
+
+    fn check_entropy_for_client(
+        &self,
+        data_name: &XorName,
+        received_section_pk: &bls::PublicKey,
+    ) -> Option<SectionAuthorityProvider> {
+        let our_section = &self.section.section_auth;
+        let actual_section_auth = self
+            .network()
+            .sections
+            .get_matching(data_name)
+            .unwrap_or(our_section);
+
+        if actual_section_auth != our_section {
+            // Update the client of the actual destination section
+            Some(actual_section_auth.value.clone())
+        } else {
+            // Check if client has latest knowledge of our section
+            if received_section_pk != &our_section.value.section_key() {
+                // Client is lagging on knowledge of our section, update them
+                Some(our_section.value.clone())
+            } else {
+                None
+            }
+        }
     }
 }

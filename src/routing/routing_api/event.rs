@@ -122,6 +122,8 @@ pub enum Event {
         /// Its xorname is derived from the client public key,
         /// and the socket_id maps against the actual socketaddr
         user: EndUser,
+        /// DstLocation for the message
+        dst_location: DstLocation,
     },
     /// Notify the current list of adult nodes, in case of churning.
     AdultsChanged {

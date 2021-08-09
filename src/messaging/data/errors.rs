@@ -59,4 +59,7 @@ pub enum Error {
         "Could not generation operation id for chunk retrieval. Error was not 'DataNotFound'."
     )]
     InvalidQueryResponseErrorForOperationId,
+    /// Destination is either outdated or incorrect
+    #[error("Destination is either outdated or wrong")]
+    WrongDestination,
 }
