@@ -217,7 +217,7 @@ impl Core {
         match query_response.operation_id() {
             Ok(op_id) => {
                 let node_id = XorName::from(sending_nodes_pk);
-                self.liveness.remove_black_eye(&node_id, &op_id)
+                self.liveness.remove_black_eye(&node_id, op_id)
             }
             Err(error) => {
                 warn!("Node problems noted when retrieving data: {:?}", error)

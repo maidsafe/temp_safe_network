@@ -46,13 +46,13 @@ impl Liveness {
     pub(crate) fn is_fresh_black_eye(
         &self,
         node_id: NodeIdentifier,
-        operation_id: &OperationId,
+        operation_id: OperationId,
     ) -> bool {
         let new_operation = self
             .black_eyes
             .entry(node_id)
             .or_default()
-            .insert(operation_id.clone());
+            .insert(operation_id.to_string());
 
         if new_operation {
             trace!(
@@ -82,11 +82,11 @@ impl Liveness {
     }
 
     /// Removes a black eye from the node liveness records
-    pub(crate) fn remove_black_eye(&self, node_id: &NodeIdentifier, operation_id: &OperationId) {
+    pub(crate) fn remove_black_eye(&self, node_id: &NodeIdentifier, operation_id: OperationId) {
         trace!("Attempting black eye {:?} op: {:?}", node_id, operation_id);
 
         if let Some(black_eyes) = self.black_eyes.get_mut(node_id) {
-            let _ = black_eyes.remove(operation_id);
+            let _ = black_eyes.remove(&operation_id);
             trace!(
                 "Black eye removed for node: {:?} op: {:?}",
                 node_id,
