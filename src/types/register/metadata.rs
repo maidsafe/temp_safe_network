@@ -8,8 +8,11 @@
 // Software.
 
 use super::super::{utils, Result, XorName};
+use crate::url::NativeUrl;
+use crdts::merkle_reg::Sha3Hash;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
+use tiny_keccak::{Hasher, Sha3};
 
 /// An action on Register data type.
 #[derive(Clone, Debug, Copy, Eq, PartialEq)]
@@ -21,9 +24,18 @@ pub enum Action {
 }
 
 /// An entry in a Register.
-pub type Entry = Vec<u8>;
+pub type Entry = NativeUrl;
 
-/// Address of a Register.
+impl Eq for Entry {}
+
+impl Sha3Hash for Entry {
+    fn hash(&self, hasher: &mut Sha3) {
+        hasher.update(self.to_string().as_bytes());
+    }
+}
+
+/// Address of a Register, different from
+/// a ChunkAddress in that it also includes a tag.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub enum Address {
     /// Public namespace.
@@ -46,30 +58,30 @@ impl Address {
     /// Constructs a new `Address` given `kind`, `name`, and `tag`.
     pub fn from_kind(kind: Kind, name: XorName, tag: u64) -> Self {
         match kind {
-            Kind::Public => Address::Public { name, tag },
-            Kind::Private => Address::Private { name, tag },
+            Kind::Public => Self::Public { name, tag },
+            Kind::Private => Self::Private { name, tag },
         }
     }
 
     /// Returns the kind.
     pub fn kind(&self) -> Kind {
         match self {
-            Address::Public { .. } => Kind::Public,
-            Address::Private { .. } => Kind::Private,
+            Self::Public { .. } => Kind::Public,
+            Self::Private { .. } => Kind::Private,
         }
     }
 
     /// Returns the name.
     pub fn name(&self) -> &XorName {
         match self {
-            Address::Public { ref name, .. } | Address::Private { ref name, .. } => name,
+            Self::Public { ref name, .. } | Self::Private { ref name, .. } => name,
         }
     }
 
     /// Returns the tag.
     pub fn tag(&self) -> u64 {
         match self {
-            Address::Public { tag, .. } | Address::Private { tag, .. } => *tag,
+            Self::Public { tag, .. } | Self::Private { tag, .. } => *tag,
         }
     }
 
