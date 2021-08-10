@@ -310,7 +310,7 @@ impl Dispatcher {
                     debug!("Sending client msg to {:?}", socket_addr);
 
                     let recipients = vec![(*xorname, socket_addr)];
-                    wire_msg.set_dst_section_pk(*core.section_chain().await.clone().last_key());
+                    wire_msg.set_dst_section_pk(*core.section_chain().await.last_key());
 
                     let command = Command::SendMessage {
                         recipients,

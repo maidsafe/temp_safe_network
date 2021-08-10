@@ -58,7 +58,7 @@ impl Core {
                     // Otherwise redirect to our elders.
                     let network = self.network.get().await;
                     let section_auth = match network.closest(&name).await {
-                        Some(section_auth) => section_auth.clone(),
+                        Some(section_auth) => section_auth,
                         None => self.section.authority_provider().await,
                     };
                     GetSectionResponse::Redirect(section_auth)

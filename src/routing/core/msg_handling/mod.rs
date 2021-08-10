@@ -388,16 +388,13 @@ impl Core {
             }
             NodeMsg::JoinAsRelocatedResponse(join_response) => {
                 if let Some(status) = self.relocation_state.get() {
-                    match status.as_ref() {
-                        RelocationStatus::InProgress(joining_as_relocated) => {
-                            if let Some(cmd) = joining_as_relocated
-                                .handle_join_response(*join_response, sender)
-                                .await?
-                            {
-                                return Ok(vec![cmd]);
-                            }
+                    if let RelocationStatus::InProgress(joining_as_relocated) = status.as_ref() {
+                        if let Some(cmd) = joining_as_relocated
+                            .handle_join_response(*join_response, sender)
+                            .await?
+                        {
+                            return Ok(vec![cmd]);
                         }
-                        _ => (),
                     }
                 }
                 // if let Some(RelocationStatus::InProgress(joining_as_relocated)) =

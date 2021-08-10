@@ -20,6 +20,15 @@ where
     states: DashMap<K, CFValue<V>>,
 }
 
+impl<K, V> Default for CFMap<K, V>
+where
+    K: Eq + Hash,
+{
+    fn default() -> CFMap<K, V> {
+        CFMap::new()
+    }
+}
+
 impl<K, V> CFMap<K, V>
 where
     K: Eq + Hash,
@@ -66,6 +75,11 @@ where
     ///
     pub fn len(&self) -> usize {
         self.states.len()
+    }
+
+    ///
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
     }
 
     ///

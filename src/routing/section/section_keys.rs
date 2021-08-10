@@ -99,8 +99,7 @@ struct KeyHolder {
 impl Signer for KeyHolder {
     /// One-off sign, then dropping self.
     fn sign<M: AsRef<[u8]>>(self, msg: M) -> bls::SignatureShare {
-        let sig = self.secret_key_share.sign(msg);
-        sig
+        self.secret_key_share.sign(msg)
     }
 }
 

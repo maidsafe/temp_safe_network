@@ -116,7 +116,7 @@ impl Core {
         } else if peer.age() != MIN_ADULT_AGE {
             // After section split, new node has to join with age of MIN_ADULT_AGE.
             let node_msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                self.section.authority_provider().await.clone(),
+                self.section.authority_provider().await,
             )));
             trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
@@ -193,7 +193,7 @@ impl Core {
                 ))
             } else {
                 NodeMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                    self.section.authority_provider().await.clone(),
+                    self.section.authority_provider().await,
                 )))
             };
 
@@ -217,7 +217,7 @@ impl Core {
             );
 
             let node_msg = NodeMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::Retry(self.section.authority_provider().await.clone()),
+                JoinAsRelocatedResponse::Retry(self.section.authority_provider().await),
             ));
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![

@@ -56,7 +56,7 @@ impl SectionDkgOutcome {
         Self {
             public_key_set,
             index,
-            secret_key_share: secret_key_share,
+            secret_key_share,
         }
     }
 

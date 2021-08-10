@@ -178,11 +178,7 @@ impl Core {
 
                 // Sending SectionKnowledge to other sections for new SAP.
                 // TODO: remoev all this messaging once we have Anti-Entropy fully implemented.
-                let signed_sap = self
-                    .section
-                    .section_signed_authority_provider()
-                    .await
-                    .clone();
+                let signed_sap = self.section.section_signed_authority_provider().await;
                 let node_msg = NodeMsg::SectionKnowledge {
                     src_info: (signed_sap, self.section.chain_clone().await),
                     msg: None,

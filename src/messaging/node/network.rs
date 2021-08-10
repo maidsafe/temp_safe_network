@@ -17,6 +17,12 @@ pub struct NetworkDto {
     pub sections: PrefixMap<SectionAuth<SectionAuthorityProvider>>,
 }
 
+impl Default for NetworkDto {
+    fn default() -> Self {
+        NetworkDto::new()
+    }
+}
+
 impl NetworkDto {
     ///
     pub fn new() -> Self {

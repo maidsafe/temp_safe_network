@@ -103,7 +103,7 @@ impl DkgFailChecker {
                 .sigs
                 .values()
                 .into_iter()
-                .map(|s| s.as_ref().clone())
+                .map(|s| *s.as_ref())
                 .collect(),
             failed_participants: self
                 .failed_participants

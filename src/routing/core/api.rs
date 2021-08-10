@@ -117,13 +117,7 @@ impl Core {
 
     /// Returns the current BLS public key set
     pub(crate) async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        Ok(self
-            .section_keys
-            .get()
-            .await
-            .key_share()?
-            .public_key_set
-            .clone())
+        Ok(self.section_keys.get().await.key_share()?.public_key_set)
     }
 
     /// Returns the info about the section matching the name.
@@ -132,7 +126,7 @@ impl Core {
         name: &XorName,
     ) -> Result<SectionAuthorityProvider> {
         if self.section.prefix().await.matches(name) {
-            Ok(self.section.authority_provider().await.clone())
+            Ok(self.section.authority_provider().await)
         } else {
             self.network.get().await.section_by_name(name).await
         }

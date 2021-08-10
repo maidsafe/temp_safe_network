@@ -161,7 +161,7 @@ impl Core {
             .await
             .filter(|peer| peer.name() != &self.node.name())
             .map(|peer| (*peer.name(), *peer.addr()))
-            .partition(|(name, _)| section.is_elder(&name));
+            .partition(|(name, _)| section.is_elder(name));
 
         // Send the trimmed state to non-elders. The trimmed state contains only the knowledge of
         // own section.
@@ -250,11 +250,8 @@ impl Core {
     pub(crate) async fn return_relocate_promise(&self) -> Option<Command> {
         // TODO: keep sending this periodically until we get relocated.
         if let Some(status) = self.relocation_state.get() {
-            match status.as_ref() {
-                RelocationStatus::Delayed(msg) => {
-                    return self.send_message_to_our_elders(msg.clone()).await.ok()
-                }
-                _ => (),
+            if let RelocationStatus::Delayed(msg) = status.as_ref() {
+                return self.send_message_to_our_elders(msg.clone()).await.ok();
             }
         }
         None

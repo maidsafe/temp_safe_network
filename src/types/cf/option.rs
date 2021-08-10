@@ -16,6 +16,12 @@ pub struct CFOption<V> {
     states: DashMap<usize, Arc<V>>,
 }
 
+impl<T> Default for CFOption<T> {
+    fn default() -> Self {
+        CFOption::new()
+    }
+}
+
 impl<V> CFOption<V> {
     ///
     pub fn new() -> Self {

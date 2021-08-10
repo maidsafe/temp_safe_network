@@ -361,8 +361,9 @@ impl SectionLogic for Section {
         self.chain.read().await.check_trust(trusted_keys)
     }
 
+    #[allow(clippy::needless_collect)]
     async fn keys(&self) -> Box<dyn DoubleEndedIterator<Item = bls::PublicKey>> {
-        let keys: Vec<_> = self.chain.read().await.keys().map(|c| *c).collect();
+        let keys: Vec<_> = self.chain.read().await.keys().copied().collect();
         Box::new(keys.into_iter())
     }
 
@@ -431,7 +432,7 @@ impl SectionLogic for Section {
 
     // Prefix of our section.
     async fn prefix(&self) -> Prefix {
-        self.authority_provider().await.prefix.clone()
+        self.authority_provider().await.prefix
     }
 
     fn members(&self) -> &SectionPeers {

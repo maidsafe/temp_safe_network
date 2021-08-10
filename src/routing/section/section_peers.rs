@@ -111,7 +111,7 @@ impl SectionPeersLogic for SectionPeers {
                 .values()
                 .await
                 .into_iter()
-                .map(|info| info.value.clone()),
+                .map(|info| info.value),
         )
     }
 
@@ -122,7 +122,7 @@ impl SectionPeersLogic for SectionPeers {
                 .values()
                 .await
                 .into_iter()
-                .map(|info| info.value.clone())
+                .map(|info| info.value)
                 .filter(|member| member.state == MembershipState::Joined),
         )
     }
@@ -139,7 +139,7 @@ impl SectionPeersLogic for SectionPeers {
 
     /// Get info for the member with the given name.
     async fn get(&self, name: &XorName) -> Option<NodeState> {
-        self.members.get(name).await.map(|info| info.value.clone())
+        self.members.get(name).await.map(|info| info.value)
     }
 
     /// Get section_signed info for the member with the given name.

@@ -17,6 +17,12 @@ pub struct CFSet<T> {
     states: DashMap<usize, Arc<T>>,
 }
 
+impl<T> Default for CFSet<T> {
+    fn default() -> Self {
+        CFSet::new()
+    }
+}
+
 impl<T> CFSet<T> {
     ///
     pub fn new() -> Self {
@@ -39,6 +45,11 @@ impl<T> CFSet<T> {
     ///
     pub fn len(&self) -> usize {
         self.states.len()
+    }
+
+    ///
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
     }
 
     ///
@@ -82,7 +93,6 @@ impl<T> CFSet<T> {
         self.states
             .iter()
             .map(|r| r.value().clone())
-            .map(|v| v)
             .filter(predicate)
             .count()
     }
