@@ -98,7 +98,7 @@ impl Safe {
 
         if dry_run {
             return Err(Error::NotImplementedError(
-                "No dry run for nrs_map_container_add (missing version info)".to_string(),
+                "No dry run for nrs_map_container_add. Version info cannot be determined. (Register operations need this functionality implemented first.)".to_string(),
             ));
         }
 
@@ -203,7 +203,7 @@ impl Safe {
 
         if dry_run {
             return Err(Error::NotImplementedError(
-                "No dry run for nrs_map_container_remove (missing version info)".to_string(),
+                "No dry run for nrs_map_container_remove. Version info cannot be determined. (Register operations need this functionality implemented first.)".to_string(),
             ));
         }
 
@@ -262,7 +262,7 @@ impl Safe {
 
         // take the 1st entry (TODO Multiple entries)
         if entries.len() > 1 {
-            return Err(Error::NotImplementedError("Multiple NRS map entries not managed, this happends when 2 clients write concurrently to a NRS map".to_string()));
+            return Err(Error::MultimapFork("Multiple NRS map entries not managed, this happends when 2 clients write concurrently to a NRS map".to_string()));
         }
         let first_entry = entries.iter().next();
         let (version, nrs_map_xorurl_bytes);

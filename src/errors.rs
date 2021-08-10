@@ -98,4 +98,7 @@ pub enum Error {
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),
+    /// MultimapFork
+    #[error("MultimapFork: {0}")]
+    MultimapFork(String),
 }
