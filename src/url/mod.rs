@@ -98,7 +98,7 @@ impl XorUrlBase {
 
 /// We encode the content type that a XOR-URL is targetting, this allows the consumer/user to
 /// treat the content in particular ways when the content requires it.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
 pub enum ContentType {
     #[allow(missing_docs)]
     Raw,
@@ -152,7 +152,7 @@ impl ContentType {
 /// We also encode the native SAFE data type where the content is being stored on the SAFE Network,
 /// this allows us to fetch the targetted data using the corresponding API, regardless of the
 /// data that is being held which is identified by the ContentType instead.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
 pub enum DataType {
     #[allow(missing_docs)]
     SafeKey = 0x00,
@@ -169,7 +169,7 @@ impl std::fmt::Display for DataType {
 }
 
 /// We also encode the data scope - i.e. accessibility on the SAFE Network.
-#[derive(Debug, Copy, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
 pub enum Scope {
     #[allow(missing_docs)]
     Public = 0x00,
@@ -181,7 +181,7 @@ pub enum Scope {
 ///
 /// This is the type of safe url itself,
 /// not the content it points to.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum NativeUrlType {
     #[allow(missing_docs)]
     XorUrl,
@@ -228,7 +228,7 @@ impl NativeUrlType {
 ///   public_name()   --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
 ///   top_name() --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
 ///   sub_names()   --> None
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Ord, PartialOrd)]
 pub struct NativeUrl {
     encoding_version: u64,      // currently only v1 supported
     xor_name: XorName,          // applies to nrsurl and xorurl
