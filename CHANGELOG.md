@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.26.0](https://github.com/maidsafe/safe_network/compare/v0.25.3...v0.26.0) (2021-08-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* this use new xor_name::PrefixMap which currently may impact some of the messaging defs/format.
+
+* necessary change to upgrade xor_name to v2.0.0 and bls_dkg to v0.5.3 ([6586a50](https://github.com/maidsafe/safe_network/commit/6586a50d8d26617d908d1f70e862f48d4f5654f4))
+
 ### [0.25.3](https://github.com/maidsafe/safe_network/compare/v0.25.2...v0.25.3) (2021-08-09)
 
 
