@@ -51,3 +51,12 @@ pub mod node;
 pub mod routing;
 pub mod types;
 pub mod url;
+
+#[cfg(test)]
+#[ctor::ctor]
+fn test_setup() {
+    // If you look down the call stack for `color_eyre::install`, the only error can come from
+    // `OnceCell::set` if it's called twice. We could ignore the error, but it would be better to
+    // ensure we only call it once.
+    color_eyre::install().expect("color_eyre::install can only be called once");
+}
