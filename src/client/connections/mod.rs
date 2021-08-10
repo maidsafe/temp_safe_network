@@ -40,10 +40,10 @@ pub(crate) struct QueryResult {
 #[derive(Clone, Debug)]
 pub(super) struct Session {
     pub(super) section_key_set: Arc<RwLock<Option<PublicKeySet>>>,
-    qp2p: QuicP2p,
+    qp2p: QuicP2p<XorName>,
     pending_queries: PendingQueryResponses,
     incoming_err_sender: Arc<Sender<CmdError>>,
-    endpoint: Option<Endpoint>,
+    endpoint: Option<Endpoint<XorName>>,
     /// elders we've managed to connect to
     connected_elders: Arc<RwLock<BTreeMap<SocketAddr, XorName>>>,
     /// all elders we know about from SectionInfo messages
@@ -78,7 +78,7 @@ impl Session {
         self.all_known_elders.read().await.len()
     }
 
-    pub(super) fn endpoint(&self) -> Result<&Endpoint, Error> {
+    pub(super) fn endpoint(&self) -> Result<&Endpoint<XorName>, Error> {
         match self.endpoint.borrow() {
             Some(endpoint) => Ok(endpoint),
             None => {

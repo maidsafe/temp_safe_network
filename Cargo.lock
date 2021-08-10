@@ -1785,9 +1785,8 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.12.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "768bfcd6d3eef1f4ef9716f321f13edd5bb3eac9cb1efee31f07444a4f29ec49"
+version = "0.14.0"
+source = "git+https://github.com/connec/qp2p?branch=connection-errors#3efa3d409b32789185e3cac9c70ad3b37c75f22e"
 dependencies = [
  "backoff",
  "base64 0.12.3",
@@ -1797,15 +1796,18 @@ dependencies = [
  "futures",
  "igd",
  "quinn",
+ "quinn-proto",
  "rcgen",
  "rustls",
  "serde",
  "serde_json",
  "structopt",
  "thiserror",
+ "tiny-keccak 2.0.2",
  "tokio",
  "tracing",
  "webpki",
+ "xor_name",
 ]
 
 [[package]]

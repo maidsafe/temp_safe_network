@@ -18,8 +18,8 @@ use xor_name::XorName;
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
 pub(crate) struct Comm {
-    quic_p2p: QuicP2p,
-    endpoint: Endpoint,
+    quic_p2p: QuicP2p<XorName>,
+    endpoint: Endpoint<XorName>,
 }
 
 impl Drop for Comm {
@@ -128,7 +128,7 @@ impl Comm {
             ..Default::default()
         };
 
-        let qp2p = QuicP2p::with_config(Some(qp2p_config), &[], false)
+        let qp2p: QuicP2p<XorName> = QuicP2p::with_config(Some(qp2p_config), &[], false)
             .map_err(|err| Error::InvalidConfig { err })?;
         let (connectivity_endpoint, _, _, _) = qp2p
             .new_endpoint()
@@ -202,9 +202,7 @@ impl Comm {
                 .send_message(msg_bytes, &recipient.1)
                 .await
                 .map_err(|err| match err {
-                    qp2p::Error::Connection(qp2p::ConnectionError::LocallyClosed) => {
-                        Error::ConnectionClosed
-                    }
+                    qp2p::Error::ConnectionClosed(qp2p::Close::Local) => Error::ConnectionClosed,
                     _ => {
                         trace!("during sending, received error {:?}", err);
                         Error::AddressNotReachable { err }
@@ -472,7 +470,8 @@ mod tests {
         let (tx, _rx) = mpsc::channel(1);
         let send_comm = Comm::new(transport_config(), tx).await?;
 
-        let recv_transport = QuicP2p::with_config(Some(transport_config()), &[], false)?;
+        let recv_transport: QuicP2p<XorName> =
+            QuicP2p::with_config(Some(transport_config()), &[], false)?;
         let (recv_endpoint, _, mut incoming_msgs, _) = recv_transport.new_endpoint().await?;
         let recv_addr = recv_endpoint.socket_addr();
         let name = XorName::random();
@@ -585,7 +584,8 @@ mod tests {
 
     impl Peer {
         async fn new() -> Result<Self> {
-            let transport = QuicP2p::with_config(Some(transport_config()), &[], false)?;
+            let transport: QuicP2p<XorName> =
+                QuicP2p::with_config(Some(transport_config()), &[], false)?;
 
             let (endpoint, incoming_connections, mut incoming_messages, disconnections) =
                 transport.new_endpoint().await?;
