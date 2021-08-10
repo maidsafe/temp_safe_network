@@ -174,7 +174,7 @@ impl Client {
             .get(hash, None)?
             .ok_or_else(|| Error::from(crate::types::Error::NoSuchEntry))?;
 
-        Ok(entry.to_vec())
+        Ok(entry.to_owned())
     }
 
     //----------------------
@@ -225,15 +225,18 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{
-        utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff},
-        Error,
-    };
     use crate::messaging::data::Error as ErrorMessage;
     use crate::retry_loop_for_pattern;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         Error as DtError, PublicKey,
+    };
+    use crate::{
+        client::{
+            utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff},
+            Error,
+        },
+        url::NativeUrl,
     };
     use eyre::{bail, eyre, Result};
     use std::{
@@ -260,12 +263,14 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
+        let value_1 = random_url()?;
+
         for i in 0..1000_usize {
             let now = Instant::now();
 
             // write to the register
             let _value1_hash = run_w_backoff(
-                || client.write_to_register(address, b"VALUE1".to_vec(), BTreeSet::new()),
+                || client.write_to_register(address, value_1.clone(), BTreeSet::new()),
                 10,
             )
             .await?;
@@ -418,9 +423,11 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
+        let value_1 = random_url()?;
+
         // write to the register
         let value1_hash = run_w_backoff(
-            || client.write_to_register(address, b"VALUE1".to_vec(), BTreeSet::new()),
+            || client.write_to_register(address, value_1.clone(), BTreeSet::new()),
             10,
         )
         .await?;
@@ -430,29 +437,30 @@ mod tests {
 
         assert_eq!(1, hashes.len());
         let current = hashes.iter().next();
-        assert_eq!(current, Some(&(value1_hash, b"VALUE1".to_vec())));
+        assert_eq!(current, Some(&(value1_hash, value_1.clone())));
+
+        let value_2 = random_url()?;
 
         // write to the register
         let value2_hash = run_w_backoff(
-            || client.write_to_register(address, b"VALUE2".to_vec(), BTreeSet::new()),
+            || client.write_to_register(address, value_2.clone(), BTreeSet::new()),
             10,
         )
         .await?;
 
-        // and then lets check last entry
+        // and then lets check all entries are returned
+        // NB: these will not be ordered according to insertion order, but according to the hashes of the values.
         let hashes =
             retry_loop_for_pattern!(client.read_register(address), Ok(hashes) if hashes.len() > 1)?;
 
         assert_eq!(2, hashes.len());
-        let current = hashes.iter().next();
-        assert_eq!(current, Some(&(value2_hash, b"VALUE2".to_vec())));
 
         // get_register_entry
-        let value1 = client.get_register_entry(address, value1_hash).await?;
-        assert_eq!(std::str::from_utf8(&value1)?, "VALUE1");
+        let retrieved_value_1 = client.get_register_entry(address, value1_hash).await?;
+        assert_eq!(retrieved_value_1, value_1);
 
-        let value2 = client.get_register_entry(address, value2_hash).await?;
-        assert_eq!(std::str::from_utf8(&value2)?, "VALUE2");
+        let retrieved_value_2 = client.get_register_entry(address, value2_hash).await?;
+        assert_eq!(retrieved_value_2, value_2);
 
         // Requesting a hash which desn't exist throws an error
         match client
@@ -559,5 +567,30 @@ mod tests {
         assert!(register.is_public());
 
         Ok(())
+    }
+
+    fn random_url() -> Result<NativeUrl> {
+        use crate::url::*;
+        let xor_name = XorName::random();
+        let url = match NativeUrl::encode_blob(
+            xor_name,
+            Scope::Public,
+            ContentType::Raw,
+            XorUrlBase::Base32z,
+        ) {
+            Ok(url) => url,
+            Err(e) => bail!(
+                "Unexpected error returned when attempting to encode blob: {}",
+                e
+            ),
+        };
+
+        match NativeUrl::from_url(&url) {
+            Ok(url) => Ok(url),
+            Err(e) => bail!(
+                "Unexpected error returned when attempting to parse url string: {}",
+                e
+            ),
+        }
     }
 }

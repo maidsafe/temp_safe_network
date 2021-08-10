@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{register::Address, PublicKey};
+use super::{register::Address as RegisterAddress, PublicKey};
 use crate::messaging::data::Error as ErrorMessage;
 
 use std::{
@@ -18,7 +18,7 @@ use std::{
 
 use thiserror::Error;
 
-/// A specialised `Result` type for safecoin.
+/// A specialised `Result` type for types crate.
 pub type Result<T> = result::Result<T, Error>;
 
 /// Error debug struct
@@ -103,7 +103,7 @@ pub enum Error {
     CrdtUnexpectedState,
     /// The CRDT operation cannot be applied as it targets a different content address.
     #[error("The CRDT operation cannot be applied as it targets a different content address.")]
-    CrdtWrongAddress(Address),
+    CrdtWrongAddress(RegisterAddress),
 }
 
 pub(crate) fn convert_bincode_error(err: bincode::Error) -> Error {
