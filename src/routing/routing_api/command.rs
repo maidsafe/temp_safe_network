@@ -9,9 +9,8 @@
 use crate::{
     messaging::{
         data::ServiceMsg,
-        node::{DkgFailureSigSet, DkgKey, KeyedSig, NodeMsg, Proposal, SectionDto},
-        AuthorityProof, DstLocation, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth,
-        WireMsg,
+        node::{DkgFailureSigSet, DkgKey, KeyedSig, Proposal, SectionDto},
+        AuthorityProof, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth, WireMsg,
     },
     routing::{dkg::SectionDkgOutcome, node::Node, routing_api::Peer, XorName},
 };
