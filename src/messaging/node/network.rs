@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::agreement::SectionAuth;
-use crate::{messaging::SectionAuthorityProvider, types::PrefixMap};
+use crate::messaging::SectionAuthorityProvider;
 use serde::{Deserialize, Serialize};
+use xor_name::PrefixMap;
 
 /// Container for storing information about other sections in the network.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

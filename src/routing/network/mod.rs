@@ -17,10 +17,9 @@ use crate::messaging::{
     node::{Network, Peer, SectionAuth},
     SectionAuthorityProvider,
 };
-use crate::types::PrefixMap;
 use secured_linked_list::SecuredLinkedList;
 use std::iter;
-use xor_name::{Prefix, XorName};
+use xor_name::{Prefix, PrefixMap, XorName};
 
 pub(super) trait NetworkUtils {
     fn new() -> Self;
@@ -80,20 +79,25 @@ impl NetworkUtils for Network {
 
     /// Returns iterator over all known sections.
     fn all(&self) -> Box<dyn Iterator<Item = &SectionAuthorityProvider> + '_> {
-        Box::new(self.sections.iter().map(|section_auth| &section_auth.value))
+        Box::new(
+            self.sections
+                .iter()
+                .map(|(_, section_auth)| &section_auth.value),
+        )
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
     fn get(&self, prefix: &Prefix) -> Option<&SectionAuthorityProvider> {
         self.sections
             .get(prefix)
-            .map(|section_auth| &section_auth.value)
+            .map(|(_, section_auth)| &section_auth.value)
     }
 
     /// Returns a `Peer` of an elder from a known section.
     fn get_elder(&self, name: &XorName) -> Option<Peer> {
         self.sections
             .get_matching(name)?
+            .1
             .value
             .get_addr(name)
             .map(|addr| {
@@ -109,9 +113,9 @@ impl NetworkUtils for Network {
     fn merge(&mut self, other: Network, section_chain: &SecuredLinkedList) {
         // FIXME: these operations are not commutative:
 
-        for entry in other.sections {
-            if entry.verify(section_chain) {
-                let _ = self.sections.insert(entry);
+        for (prefix, sap) in other.sections.iter() {
+            if sap.verify(section_chain) {
+                let _ = self.sections.insert(*prefix, sap.clone());
             }
         }
     }
@@ -166,7 +170,7 @@ impl NetworkUtils for Network {
         // is part of the proof chain received.
         let prefix = signed_section_auth.value.prefix;
         match self.sections.get(&prefix) {
-            Some(sap) if sap == &signed_section_auth => {
+            Some((_, sap)) if sap == &signed_section_auth => {
                 // It's the same SAP we are already aware of
                 warn!(
                     "Anti-Entropy: Skip update remote section knowledge, SAP received is the same as the one we already are aware of: {:?}",
@@ -174,7 +178,7 @@ impl NetworkUtils for Network {
                 );
                 return false;
             }
-            Some(sap) => {
+            Some((_, sap)) => {
                 // We are then aware of the prefix, let's just verify the new SAP can
                 // be trusted based on the SAP we aware of and the proof chain provided.
                 if !proof_chain.has_key(&sap.value.public_key_set.public_key()) {
@@ -201,7 +205,7 @@ impl NetworkUtils for Network {
         // We can now update our knowledge of the remote section's SAP.
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
-        let _ = self.sections.insert(signed_section_auth);
+        let _ = self.sections.insert(prefix, signed_section_auth);
         info!(
             "Anti-Entropy: Remote section knowledge updated: {:?}",
             prefix
@@ -213,9 +217,9 @@ impl NetworkUtils for Network {
     /// Returns the known section keys.
     fn keys(&self) -> Box<dyn Iterator<Item = (Prefix, bls::PublicKey)> + '_> {
         Box::new(
-            self.sections
-                .iter()
-                .map(|section_auth| (section_auth.value.prefix, section_auth.value.section_key())),
+            self.sections.iter().map(|(_, section_auth)| {
+                (section_auth.value.prefix, section_auth.value.section_key())
+            }),
         )
     }
 
@@ -224,7 +228,7 @@ impl NetworkUtils for Network {
         self.sections
             .get_matching(name)
             .ok_or(Error::NoMatchingSection)
-            .map(|section_auth| section_auth.value.section_key())
+            .map(|(_, section_auth)| section_auth.value.section_key())
     }
 
     /// Returns the section_auth and the latest known key for the prefix that matches `name`,
@@ -233,18 +237,19 @@ impl NetworkUtils for Network {
         self.sections
             .get_matching(name)
             .ok_or(Error::NoMatchingSection)
-            .map(|section_auth| section_auth.value.clone())
+            .map(|(_, section_auth)| section_auth.value.clone())
     }
 
     /// Returns network statistics.
     fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
         // Let's compute an estimate of the total number of elders in the network
         // from the size of our routing table.
-        let known_prefixes = iter::once(&our.prefix).chain(
-            self.sections
-                .iter()
-                .map(|section_auth| &section_auth.value.prefix),
-        );
+        let known_prefixes = self
+            .sections
+            .iter()
+            .map(|(prefix, _)| prefix)
+            .chain(iter::once(&our.prefix));
+
         let total_elders_exact = Prefix::default().is_covered_by(known_prefixes.clone());
 
         // Estimated fraction of the network that we have in our RT.
@@ -256,7 +261,7 @@ impl NetworkUtils for Network {
         let network_elders_count: usize = self
             .sections
             .iter()
-            .map(|info| info.value.elder_count())
+            .map(|(_, info)| info.value.elder_count())
             .sum();
         let known = our.elder_count() + network_elders_count;
         let total = known as f64 / network_fraction;
