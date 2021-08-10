@@ -8,14 +8,9 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    data::{ServiceError, ServiceMsg},
-    AuthorityProof, DstLocation, EndUser, MessageId, ServiceAuth, SrcLocation,
+    data::ServiceMsg, AuthorityProof, DstLocation, EndUser, MessageId, ServiceAuth, SrcLocation,
 };
-use crate::node::{
-    error::convert_to_error_message,
-    node_ops::{MsgType, NodeDuty, OutgoingMsg},
-    Error,
-};
+use crate::node::node_ops::{MsgType, NodeDuty, OutgoingMsg};
 
 pub(super) fn map_client_msg(
     msg_id: MessageId,
@@ -69,22 +64,11 @@ fn map_client_service_msg(
             NodeDuty::Send(outgoing_msg)
         }
         _ => {
-            let error_data = convert_to_error_message(Error::InvalidMessage(
-                msg_id,
-                format!("Unknown user msg: {:?}", service_msg),
-            ));
-            let src = SrcLocation::EndUser(origin);
-            let id = MessageId::in_response_to(&msg_id);
-
-            NodeDuty::Send(OutgoingMsg {
-                id,
-                msg: MsgType::Client(ServiceMsg::ServiceError(ServiceError {
-                    reason: Some(error_data),
-                    source_message: Some(Box::new(service_msg)),
-                })),
-                dst: src.to_dst(),
-                aggregation: false,
-            })
+            warn!(
+                "Dropping unexpected received user msg ({}), origin {:?}, service msg: {:?}",
+                msg_id, origin, service_msg
+            );
+            NodeDuty::NoOp
         }
     }
 }
