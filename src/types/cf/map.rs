@@ -7,7 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::value::CFValue;
 use dashmap::{mapref::entry::Entry, DashMap};
 use std::{collections::BTreeMap, hash::Hash, sync::Arc};
 
@@ -17,7 +16,7 @@ pub struct CFMap<K, V>
 where
     K: Eq + Hash,
 {
-    states: DashMap<K, CFValue<V>>,
+    states: DashMap<K, Arc<V>>,
 }
 
 impl<K, V> Default for CFMap<K, V>
@@ -44,7 +43,7 @@ where
     pub fn from(map: BTreeMap<K, V>) -> Self {
         let states = DashMap::new();
         for (k, v) in map {
-            let _ = states.insert(k, CFValue::new(v));
+            let _ = states.insert(k, Arc::new(v));
         }
         Self { states }
     }
@@ -58,7 +57,7 @@ where
         let mut map = BTreeMap::new();
         for pair in self.states.iter() {
             let key = pair.key().clone();
-            let value = pair.value().clone().await;
+            let value = pair.value().as_ref().clone();
             let _ = map.insert(key, value);
         }
         map
@@ -66,10 +65,7 @@ where
 
     ///
     pub async fn get(&self, key: &K) -> Option<Arc<V>> {
-        match self.states.get(key) {
-            Some(r) => Some(r.value().get().await),
-            None => None,
-        }
+        self.states.get(key).map(|r| r.value().clone())
     }
 
     ///
@@ -86,15 +82,15 @@ where
     pub async fn values(&self) -> Vec<Arc<V>> {
         let mut values = vec![];
         for pair in self.states.iter() {
-            values.push(pair.value().get().await)
+            values.push(pair.value().clone())
         }
         values
     }
 
     ///
     pub async fn insert(&self, key: K, item: V) -> Option<Arc<V>> {
-        match self.states.insert(key, CFValue::new(item)) {
-            Some(v) => Some(v.get().await),
+        match self.states.insert(key, Arc::new(item)) {
+            Some(v) => Some(v),
             None => None,
         }
     }
@@ -102,16 +98,16 @@ where
     ///
     pub async fn insert_if<FOcc>(&self, key: K, item: V, mut condition: FOcc) -> bool
     where
-        FOcc: FnMut((Arc<V>, &V)) -> bool,
+        FOcc: FnMut((&Arc<V>, &V)) -> bool,
     {
         match self.states.entry(key) {
             Entry::Vacant(entry) => {
-                let _ = entry.insert(CFValue::new(item));
+                let _ = entry.insert(Arc::new(item));
             }
             Entry::Occupied(mut entry) => {
-                let e = entry.get().get().await;
+                let e = entry.get();
                 if condition((e, &item)) {
-                    let _ = entry.insert(CFValue::new(item));
+                    let _ = entry.insert(Arc::new(item));
                 } else {
                     return false;
                 }
@@ -129,11 +125,11 @@ where
     pub async fn any<F>(&self, mut f: F) -> bool
     where
         Self: Sized,
-        F: FnMut((&K, Arc<V>)) -> bool,
+        F: FnMut((&K, &Arc<V>)) -> bool,
     {
         let mut any = false;
         for pair in self.states.iter() {
-            let value = pair.value().get().await;
+            let value = pair.value();
             if f((pair.key(), value)) {
                 any = true;
                 break;
@@ -147,11 +143,11 @@ where
     pub async fn any_value<F>(&self, mut f: F) -> bool
     where
         Self: Sized,
-        F: FnMut(Arc<V>) -> bool,
+        F: FnMut(&Arc<V>) -> bool,
     {
         let mut any = false;
         for pair in self.states.iter() {
-            let value = pair.value().get().await;
+            let value = pair.value();
             if f(value) {
                 any = true;
                 break;
@@ -165,11 +161,11 @@ where
     pub async fn all<F>(&self, mut f: F) -> bool
     where
         Self: Sized,
-        F: FnMut(Arc<V>) -> bool,
+        F: FnMut(&Arc<V>) -> bool,
     {
         let mut all = true;
         for pair in self.states.iter() {
-            let value = pair.value().get().await;
+            let value = pair.value();
             if !f(value) {
                 all = false;
                 break;
@@ -183,11 +179,11 @@ where
     pub async fn count<P>(&self, mut predicate: P) -> usize
     where
         Self: Sized,
-        P: FnMut(Arc<V>) -> bool,
+        P: FnMut(&Arc<V>) -> bool,
     {
         let mut count = 0;
         for pair in self.states.iter() {
-            let value = pair.value().get().await;
+            let value = pair.value();
             if predicate(value) {
                 count += 1;
                 break;
