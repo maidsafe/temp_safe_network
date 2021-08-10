@@ -171,7 +171,7 @@ fn fmt_sync_network(network: &Network, f: &mut fmt::Formatter) -> fmt::Result {
                 network
                     .sections
                     .iter()
-                    .map(|section_auth| section_auth.value.prefix)
+                    .map(|(_, section_auth)| section_auth.value.prefix)
                     .format(", ")
             ),
         )
