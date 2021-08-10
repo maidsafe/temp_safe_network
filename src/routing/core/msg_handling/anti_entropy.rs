@@ -324,7 +324,11 @@ mod tests {
         // now let's insert a SAP to make it aware of the other prefix
         let (some_other_auth, _, _) = gen_section_authority_provider(env.other_prefix, ELDER_SIZE);
         let some_other_sap = section_signed(&other_sk, some_other_auth)?;
-        let _ = env.core.network.sections.insert(some_other_sap.clone());
+        let _ = env
+            .core
+            .network
+            .sections
+            .insert(some_other_sap.value.prefix, some_other_sap.clone());
 
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix

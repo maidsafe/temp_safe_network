@@ -30,7 +30,7 @@ use rand::rngs::OsRng;
 use crate::routing::{
     core::AggregatorError,
     error::{Error, Result},
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    messages::NodeMsgAuthorityUtils,
     network::NetworkUtils,
     relocation::RelocateState,
     routing_api::command::Command,
@@ -49,21 +49,9 @@ impl Core {
         sender: SocketAddr,
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
-        // Make sure the message is for us, unless it's a client msg
-        // in which case we'll handle/forward it after signature check.
-        let dst_location = wire_msg.dst_location();
-        let msg_id = wire_msg.msg_id();
-        if !wire_msg.is_client_msg_kind()
-            && !dst_location.contains(&self.node.name(), self.section.prefix())
-        {
-            // Message is not for us
-            info!("Relay message {} closer to the destination", msg_id);
-            let cmd = self.relay_message(wire_msg).await?;
-            return Ok(vec![cmd]);
-        }
-
-        // We can now deserialize the payload of the incoming message
+        // Deserialize the payload of the incoming message
         let payload = wire_msg.payload.clone();
+        let msg_id = wire_msg.msg_id();
         let message_type = match wire_msg.into_message() {
             Ok(message_type) => message_type,
             Err(error) => {
