@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.34.0](https://github.com/maidsafe/sn_api/compare/v0.33.0...v0.34.0) (2021-08-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove Sequences completely, replaced with Multimap (NRS) and Register (File Containers), use VersionHash instead of u64 versions
+
+### Features
+
+* multimap nrs ([dc608d5](https://github.com/maidsafe/sn_api/commit/dc608d5dc5db1640ff0f1435b676a9ad1639fcd8))
+* multimap NRS and Register file containers ([fce7ab8](https://github.com/maidsafe/sn_api/commit/fce7ab867e15ed8b1c5e62e4f9e525ef99486e50))
+* remove sequence type and replace with multimaps ([0252fc6](https://github.com/maidsafe/sn_api/commit/0252fc6e8faddc532231140a1a381702d32ea053))
+* replace multimap with registers for file containers ([9ec11e1](https://github.com/maidsafe/sn_api/commit/9ec11e16a8e96f17d100c01e4e7d5df149869ca0))
+* replace sequence NRS with multimap NRS (register) ([64011df](https://github.com/maidsafe/sn_api/commit/64011dfb22266060d9fb19c63608ded6dcadcbc6))
+
+
+### Bug Fixes
+
+* adapt to new getter api ([f428353](https://github.com/maidsafe/sn_api/commit/f428353d57affbe05677244eaf0f72ae4d59cca1))
+* missing unimplemented dry_runs and version ([c7640ee](https://github.com/maidsafe/sn_api/commit/c7640ee0c33cff1879df0b3a334a97a0c8be06eb))
+* NRS sync version forks ([cda5241](https://github.com/maidsafe/sn_api/commit/cda524171e18cdf9cef725b001ddbb67a40d4389))
+* nrs unit tests ([d2b45fe](https://github.com/maidsafe/sn_api/commit/d2b45fe282643a9971b74d32e960ef69858fdd81))
+* PR comments, stop ignoring client url versions ([b204627](https://github.com/maidsafe/sn_api/commit/b204627308bd3a9defa3dafc7e98d66518786498))
+* ref compilation err and clippy ([cb745fd](https://github.com/maidsafe/sn_api/commit/cb745fd8fdef3019a12ee273a26c6120a3d4a831))
+* return default for empty file containers ([b58093b](https://github.com/maidsafe/sn_api/commit/b58093b99c381652edfe2568130d4e6203470de3))
+* test version zero error ([2c22b80](https://github.com/maidsafe/sn_api/commit/2c22b806b1bedbb97a5ab13e0ec600a0d78717cf))
+* tweak unit tests to ignore version ([873e067](https://github.com/maidsafe/sn_api/commit/873e067043b1837e56c94618dda4b0b9d118d276))
+
 ## [0.33.0](https://github.com/maidsafe/sn_api/compare/v0.32.4...v0.33.0) (2021-07-20)
 
 
