@@ -449,10 +449,11 @@ mod tests {
         assert_eq!(current, Some(&(value2_hash, b"VALUE2".to_vec())));
 
         // get_register_entry
-        let value1 = client.get_register_entry(address, value1_hash).await?;
+        let value1 = run_w_backoff(|| client.get_register_entry(address, value1_hash), 10).await?;
         assert_eq!(std::str::from_utf8(&value1)?, "VALUE1");
 
-        let value2 = client.get_register_entry(address, value2_hash).await?;
+        let value2 = run_w_backoff(|| client.get_register_entry(address, value2_hash), 10).await?;
+
         assert_eq!(std::str::from_utf8(&value2)?, "VALUE2");
 
         // Requesting a hash which desn't exist throws an error
