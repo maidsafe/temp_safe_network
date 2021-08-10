@@ -309,7 +309,7 @@ impl Dispatcher {
                     // Send a message to a client peer.
                     // Messages sent to a client are not signed
                     // or validated as part of the routing library.
-                    debug!("Sending client msg to {:?}", socket_addr);
+                    debug!("Sending client msg to {:?}: {:?}", socket_addr, wire_msg);
 
                     let recipients = vec![(*xorname, socket_addr)];
                     wire_msg.set_dst_section_pk(
@@ -322,14 +322,17 @@ impl Dispatcher {
                     };
                     return Ok(vec![command]);
                 } else {
-                    debug!(
-                        "Could not find socketaddr corresponding to socket_id {:?}",
-                        socket_id
+                    error!(
+                        "End user msg dropped. Could not find socketaddr corresponding to socket_id {:?}: {:?}",
+                        socket_id, wire_msg
                     );
-                    debug!("Relaying user message instead.. (Command::RelayMessage)");
+                    return Ok(vec![]);
                 }
             } else {
-                debug!("Relaying message with sending user message (Command::RelayMessage)");
+                debug!(
+                    "Relaying end user message (Command::RelayMessage): {:?}",
+                    wire_msg
+                );
             }
         }
 
