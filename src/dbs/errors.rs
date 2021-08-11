@@ -49,9 +49,12 @@ pub enum Error {
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwner(PublicKey),
-    /// Logic error.
-    #[error("Logic error: {0}")]
-    Logic(String),
+    /// Invalid store found
+    #[error("A KV store was loaded, but found to be invalid")]
+    InvalidStore,
+    /// Data owner provided is invalid.
+    #[error("Provided PublicKey could not validate signature {0:?}")]
+    InvalidSignature(PublicKey),
     /// Serialization error
     #[error("Serialization error: {0}")]
     Serialize(String),
