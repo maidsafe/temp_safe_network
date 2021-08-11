@@ -12,14 +12,16 @@ use qp2p::IncomingMessages;
 use tracing::{debug, error, info, trace, warn};
 
 use super::Session;
-use crate::client::connections::messaging::send_message;
+use crate::client::connections::messaging::{
+    rebuild_message_for_ae_resend, send_message, verify_bounced_off_message_integrity,
+};
 use crate::client::Error;
 use crate::messaging::data::Error as DataError;
 use crate::messaging::data::ServiceError;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DstLocation, MessageId, MessageType, MsgKind, WireMsg,
+    MessageId, MessageType, WireMsg,
 };
 
 impl Session {
@@ -158,86 +160,29 @@ impl Session {
                             .await
                             .insert(section_auth.prefix, section_auth);
                     }
-                    // We need to deserialize to check if the original message was tampered
-                    // and verify the ServiceAuth.
-                    if let Ok(the_original_message) = WireMsg::deserialize(message.clone()) {
-                        match the_original_message {
-                            MessageType::Service {
-                                msg_id, msg, auth, ..
-                            } => {
-                                // Verify that the authority has not changed
-                                if let Ok(serialized_cmd) = WireMsg::serialize_msg_payload(&msg) {
-                                    if client_pk == auth.public_key
-                                        && client_pk
-                                            .verify(&auth.signature, serialized_cmd.clone())
-                                            .is_ok()
-                                    {
-                                        // In case of queries, we do not expect a response right here. It will be handled at the
-                                        // original caller `send_query`.
-                                        if let Some(dst_address) = msg.dst_address() {
-                                            if let Some((elders, section_pk)) =
-                                                network.read().await.get_matching(&dst_address).map(
-                                                    |(_, sap)| {
-                                                        (
-                                                            sap.elders
-                                                                .values()
-                                                                .cloned()
-                                                                .collect::<Vec<SocketAddr>>(),
-                                                            sap.public_key_set.public_key(),
-                                                        )
-                                                    },
-                                                )
-                                            {
-                                                // Let's rebuild the message with the updated destination details
-                                                if let Ok(wire_msg) = WireMsg::new_msg(
-                                                    msg_id,
-                                                    serialized_cmd,
-                                                    MsgKind::ServiceMsg(auth.into_inner()),
-                                                    DstLocation::Section {
-                                                        name: dst_address,
-                                                        section_pk,
-                                                    },
-                                                ) {
-                                                    if let Ok(msg_bytes) = wire_msg.serialize() {
-                                                        if let Some(endpoint) = endpoint {
-                                                            if let Err(e) = send_message(
-                                                                elders,
-                                                                msg_bytes,
-                                                                endpoint.clone(),
-                                                                msg_id,
-                                                            )
-                                                            .await
-                                                            {
-                                                                error!("Error on resending ServiceMsg w/id {:?}: {:?}. Restart the flow", msg_id, e)
-                                                                //     TODO: Remove pending_query channels on query failure.
-                                                            }
-                                                        } else {
-                                                            error!("AE: No endpoint found");
-                                                        }
-                                                    } else {
-                                                        error!("AE: Error serializing wire_msg on resending message");
-                                                    }
-                                                } else {
-                                                    error!("AE: Error rebuilding wire_msg on resending message");
-                                                }
-                                            }
-                                        } else {
-                                            error!("No Dst_Address found on the received rebounded ServiceError. Only Commands and Queries have destination address");
-                                        }
-                                    } else {
-                                        warn!("Failed to prove authenticity of the original message w/id {:?} on AE resend", msg_id);
-                                    }
-                                } else {
-                                    error!(
-                                        "Error serializing ServiceMsg w/id {:?} on AE checks.",
-                                        msg_id
-                                    );
-                                }
+                    if let Some((id, serialised_cmd, dst_address, auth)) =
+                        verify_bounced_off_message_integrity(client_pk, &message)
+                    {
+                        if let Some((wire_msg, elders)) = rebuild_message_for_ae_resend(
+                            id,
+                            serialised_cmd,
+                            auth,
+                            dst_address,
+                            network,
+                        )
+                        .await
+                        {
+                            if let Err(e) =
+                                send_message(elders, wire_msg, endpoint.clone(), msg_id).await
+                            {
+                                error!("AE: Error on resending ServiceMsg w/id {:?}: {:?}. Restart the flow", msg_id, e)
+                                //     TODO: Remove pending_query channels on query failure.
                             }
-                            _ => error!("Received invalid MessageType for ServiceError"),
+                        } else {
+                            error!("AE: Error rebuilding message for resending");
                         }
                     } else {
-                        error!("Error deserializing received ServiceError's source message");
+                        error!("AE: Error verifying bounced off message integrity. Content/Signature tampered");
                     }
                 }
                 msg => {
