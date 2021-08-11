@@ -11,22 +11,25 @@ use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio::{sync::mpsc::channel, task::JoinHandle, time::timeout};
 use tracing::{debug, error, trace, warn};
-use xor_name::XorName;
 
 use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
-    DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
+    DstLocation, MessageId, MessageType, MsgKind, SectionAuthorityProvider, ServiceAuth, WireMsg,
 };
-use crate::types::{Chunk, PrivateChunk, PublicChunk};
+use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
 
 use super::{QueryResult, Session};
+use crate::routing::XorName;
 use bls::SecretKey;
 use qp2p::Endpoint;
 use tokio::time::sleep;
+use xor_name::PrefixMap;
 
 // Number of attempts when retrying to send a message to a node
 const NUMBER_OF_RETRIES: usize = 3;
@@ -141,9 +144,8 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let priority = wire_msg.msg_kind().priority();
-        let msg_bytes = wire_msg.serialize()?;
 
-        send_message(elders, msg_bytes, endpoint, msg_id, priority).await
+        send_message(elders, wire_msg, self.endpoint.clone(), msg_id, priority).await
     }
 
     /// Send a `ServiceMsg` to the network awaiting for the response.
@@ -445,11 +447,17 @@ impl Session {
 
 pub(crate) async fn send_message(
     elders: Vec<SocketAddr>,
-    msg_bytes: Bytes,
-    endpoint: Endpoint<XorName>,
+    wire_msg: WireMsg,
+    endpoint: Option<Endpoint<XorName>>,
     msg_id: MessageId,
     priority: i32,
 ) -> Result<(), Error> {
+    let msg_bytes = wire_msg.serialize()?;
+    let endpoint = match endpoint {
+        Some(ep) => ep,
+        None => return Err(Error::NotBootstrapped),
+    };
+
     // Send message to all Elders concurrently
     let mut tasks = Vec::default();
 
@@ -485,4 +493,78 @@ pub(crate) async fn send_message(
     }
 
     Ok(())
+}
+
+pub(crate) fn verify_bounced_off_message_integrity(
+    client_pk: PublicKey,
+    message: &Bytes,
+) -> Option<(MessageId, Bytes, Option<XorName>, ServiceAuth)> {
+    // We need to deserialize to check if the original message was tampered
+    // and verify the ServiceAuth.
+    if let Ok(the_original_message) = WireMsg::deserialize(message.clone()) {
+        match the_original_message {
+            MessageType::Service {
+                msg_id, msg, auth, ..
+            } => {
+                // Verify that the authority has not changed
+                if let Ok(serialized_cmd) = WireMsg::serialize_msg_payload(&msg) {
+                    if client_pk == auth.public_key
+                        && client_pk
+                            .verify(&auth.signature, serialized_cmd.clone())
+                            .is_ok()
+                    {
+                        return Some((
+                            msg_id,
+                            serialized_cmd,
+                            msg.dst_address(),
+                            auth.into_inner(),
+                        ));
+                    }
+                }
+            }
+            _ => error!("Received invalid MessageType for ServiceError"),
+        }
+    }
+    None
+}
+
+pub(crate) async fn rebuild_message_for_ae_resend(
+    msg_id: MessageId,
+    serialized_cmd: Bytes,
+    auth: ServiceAuth,
+    dst_address: Option<XorName>,
+    network: Arc<RwLock<PrefixMap<SectionAuthorityProvider>>>,
+) -> Option<(WireMsg, Vec<SocketAddr>)> {
+    if let Some(dst_address) = dst_address {
+        if let Some((elders, section_pk)) =
+            network
+                .read()
+                .await
+                .get_matching(&dst_address)
+                .map(|(_, sap)| {
+                    (
+                        sap.elders.values().cloned().collect::<Vec<SocketAddr>>(),
+                        sap.public_key_set.public_key(),
+                    )
+                })
+        {
+            // Let's rebuild the message with the updated destination details
+            if let Ok(wire_msg) = WireMsg::new_msg(
+                msg_id,
+                serialized_cmd,
+                MsgKind::ServiceMsg(auth),
+                DstLocation::Section {
+                    name: dst_address,
+                    section_pk,
+                },
+            ) {
+                return Some((wire_msg, elders));
+            } else {
+                error!("Error generating WireMsg on resending");
+            }
+        } else {
+            error!("Error fetching latest elders for resending AE message");
+        }
+    }
+    None
 }
