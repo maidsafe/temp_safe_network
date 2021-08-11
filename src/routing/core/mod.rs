@@ -56,7 +56,9 @@ use itertools::Itertools;
 use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::collections::BTreeSet;
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use tokio::sync::{mpsc, RwLock};
+
 use xor_name::{Prefix, XorName};
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
@@ -70,7 +72,7 @@ pub(crate) struct Core {
     section: Section,
     network: Network,
     section_keys_provider: SectionKeysProvider,
-    message_aggregator: SignatureAggregator,
+    message_aggregator: Arc<RwLock<SignatureAggregator>>,
     proposal_aggregator: ProposalAggregator,
     split_barrier: SplitBarrier,
     // Voter for Dkg
@@ -122,7 +124,7 @@ impl Core {
             section_keys_provider,
             proposal_aggregator: ProposalAggregator::default(),
             split_barrier: SplitBarrier::new(),
-            message_aggregator: SignatureAggregator::default(),
+            message_aggregator: Arc::new(RwLock::new(SignatureAggregator::default())),
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
             event_tx,

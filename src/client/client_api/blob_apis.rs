@@ -484,7 +484,6 @@ mod tests {
 
         while client.read_blob(priv_address, None, None).await.is_ok() {
             client.clear_blob_cache().await;
-
             tokio::time::sleep(tokio::time::Duration::from_millis(4000)).await;
             if attempts == 0 {
                 bail!("The private chunk was not deleted: {:?}", priv_address);

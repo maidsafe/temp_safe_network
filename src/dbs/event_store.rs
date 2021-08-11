@@ -60,10 +60,7 @@ where
     pub(crate) fn append(&mut self, event: TEvent) -> Result<()> {
         let key = &self.tree.len().to_string();
         if self.tree.get(key)?.is_some() {
-            return Err(Error::InvalidOperation(format!(
-                "Key exists: {}. Event: {:?}",
-                key, event
-            )));
+            return Err(Error::DataExists);
         }
 
         let event = serialise(&event)?;

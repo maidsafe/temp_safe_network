@@ -19,6 +19,12 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[non_exhaustive]
 /// Node error variants.
 pub enum Error {
+    /// Db key conversion failed
+    #[error("Could not convert the Db key")]
+    CouldNotConvertDbKey,
+    /// Db key conversion failed
+    #[error("Could not decode the Db key: {0:?}")]
+    CouldNotDecodeDbKey(String),
     /// Not enough space to store the value.
     #[error("Not enough space")]
     NotEnoughSpace,
@@ -31,6 +37,9 @@ pub enum Error {
     /// Data id not found.
     #[error("Data id not found: {0:?}")]
     DataIdNotFound(DataAddress),
+    /// Cannot delete public data
+    #[error("Cannot delete public data {0:?}")]
+    CannotDeletePublicData(DataAddress),
     /// Data not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),
@@ -40,9 +49,12 @@ pub enum Error {
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwner(PublicKey),
-    /// Logic error.
-    #[error("Logic error: {0}")]
-    Logic(String),
+    /// Invalid store found
+    #[error("A KV store was loaded, but found to be invalid")]
+    InvalidStore,
+    /// Data owner provided is invalid.
+    #[error("Provided PublicKey could not validate signature {0:?}")]
+    InvalidSignature(PublicKey),
     /// Serialization error
     #[error("Serialization error: {0}")]
     Serialize(String),
@@ -67,12 +79,12 @@ pub enum Error {
     /// Sled error.
     #[error("Sled error:: {0}")]
     Sled(#[from] sled::Error),
+    /// There were Error(s) while batching for Sled operations.
+    #[error("Errors found when batching for Sled")]
+    SledBatching,
     /// NetworkData error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] crate::types::Error),
-    /// Operation is invalid, eg signing validation
-    #[error("Invalid operation: {0}")]
-    InvalidOperation(String),
 }
 
 /// Convert db error to messaging error message for sending over the network.

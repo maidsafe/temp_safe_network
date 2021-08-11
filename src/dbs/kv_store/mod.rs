@@ -21,7 +21,6 @@ use super::{
     deserialise, Subdir,
     {encoding::serialise, Error, Result},
 };
-use itertools::Itertools;
 use serde::de::DeserializeOwned;
 use sled::Db;
 use std::{marker::PhantomData, path::Path};
@@ -96,16 +95,23 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
     ///
     /// If a value with the same id already exists, it will be overwritten.
     pub(crate) async fn store(&self, value: &V) -> Result<()> {
-        info!("Writing value");
+        debug!("Writing value to KV store");
+
+        let key = value.key().to_db_key()?;
+        let exists = self.db.contains_key(key.clone()).map_err(Error::from)?;
+
+        trace!(">> Does this entry exist; {:?}: {:?}", key, exists);
 
         let serialised_value = serialise(value)?.to_vec();
+        // FIXME: We're not considering overwriting here. So the space isn't necessarily all 'consumed'
+        // if we overwrite same value eg, or it's only 5 bytes longer/shorter etc
         let consumed_space = serialised_value.len() as u64;
+
         info!("consumed space: {:?}", consumed_space);
         if !self.used_space.can_consume(consumed_space).await {
             return Err(Error::NotEnoughSpace);
         }
 
-        let key = value.key().to_db_key()?;
         let res = self.db.insert(key, serialised_value);
 
         match res {
@@ -134,7 +140,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
         type KvPairResults = Vec<Result<KvPair>>;
 
         let mut batch = sled::Batch::default();
-        let (ok, err): (KvPairResults, KvPairResults) = values
+        let (ok, err_results): (KvPairResults, KvPairResults) = values
             .par_iter()
             .map(|value| {
                 let serialised_value = serialise(value)?.to_vec();
@@ -143,9 +149,12 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
             })
             .partition(|r| r.is_err());
 
-        if !err.is_empty() {
-            let res = err.into_iter().map(|e| format!("{:?}", e)).join(",");
-            return Err(Error::InvalidOperation(res));
+        if !err_results.is_empty() {
+            for e in err_results {
+                error!("{:?}", e);
+            }
+
+            return Err(Error::SledBatching);
         }
 
         let consumed_space = ok
@@ -224,7 +233,6 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
 }
 
 pub(crate) fn convert<T: DeserializeOwned>(key: sled::IVec) -> Result<T> {
-    let db_key =
-        &String::from_utf8(key.to_vec()).map_err(|e| Error::InvalidOperation(e.to_string()))?;
+    let db_key = &String::from_utf8(key.to_vec()).map_err(|_| Error::CouldNotConvertDbKey)?;
     to_db_key::from_db_key(db_key)
 }

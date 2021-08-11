@@ -107,9 +107,7 @@ impl RegisterStorage {
                     op.auth.clone(),
                     ServiceMsg::Cmd(DataCmd::Register(op.write.clone())),
                 )
-                .map_err(|_| {
-                    Error::Logic("Received register operation signature is invalid".to_string())
-                })?;
+                .map_err(|_| Error::InvalidSignature(op.auth.public_key))?;
                 let _ = self.apply(op, auth)?;
             }
         }
@@ -167,9 +165,9 @@ impl RegisterStorage {
                         let (_, cache) = entry.pair_mut();
                         if let Some(entry) = cache {
                             if entry.state.address().is_public() {
-                                return Err(Error::InvalidOperation(
-                                    "Cannot delete public Register".to_string(),
-                                ));
+                                return Err(Error::CannotDeletePublicData(DataAddress::Register(
+                                    address,
+                                )));
                             }
                             // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
                             // register.check_permission(action, Some(auth.public_key))?;
@@ -394,9 +392,7 @@ impl RegisterStorage {
         }
 
         reg.take()
-            .ok_or_else(|| {
-                Error::Logic("A store was found, but its contents were invalid.".to_string())
-            })
+            .ok_or(Error::InvalidStore)
             .map(|state| StateEntry { state, store })
     }
 }

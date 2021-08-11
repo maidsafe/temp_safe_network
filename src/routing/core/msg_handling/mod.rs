@@ -45,7 +45,7 @@ use xor_name::XorName;
 // Message handling
 impl Core {
     pub(crate) async fn handle_message(
-        &mut self,
+        &self,
         sender: SocketAddr,
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
@@ -66,33 +66,35 @@ impl Core {
         match message_type {
             MessageType::SectionInfo {
                 dst_location, msg, ..
-            } => Ok(self
-                .handle_section_info_msg(sender, dst_location, msg)
-                .await),
+            } => Ok(self.handle_section_info_msg(sender, dst_location, msg)),
             MessageType::Node {
                 msg_id,
                 msg_authority,
                 dst_location,
                 msg,
-            } => {
-                self.handle_node_message(sender, msg_id, msg_authority, dst_location, msg, payload)
-                    .await
-            }
+            } => Ok(vec![Command::HandleNodeMessage {
+                sender,
+                msg_id,
+                auth: msg_authority,
+                dst_location,
+                msg,
+                payload,
+            }]),
             MessageType::Service {
                 msg_id,
                 auth,
                 msg,
                 dst_location,
             } => {
+                // this directly returns one of two commands.
                 self.handle_service_message(sender, msg_id, auth, msg, dst_location, payload)
-                    .await
             }
         }
     }
 
     // Handler for all node messages
-    async fn handle_node_message(
-        &mut self,
+    pub(crate) async fn handle_node_message(
+        &self,
         sender: SocketAddr,
         msg_id: MessageId,
         mut msg_authority: NodeMsgAuthority,
@@ -140,30 +142,46 @@ impl Core {
             msg_id
         );
 
+        let mut commands = vec![];
+
         // We assume to be aggregated if it contains a BLS Share sig as authority.
-        match self.aggregate_message_and_stop(&mut msg_authority, payload) {
-            Ok(false) => {
-                self.handle_verified_node_message(
-                    sender,
-                    msg_id,
-                    msg_authority,
-                    dst_location,
-                    node_msg,
-                    &known_keys,
-                )
-                .await
-            }
+        match self
+            .aggregate_message_and_stop(&mut msg_authority, payload)
+            .await
+        {
+            Ok(false) => match node_msg {
+                NodeMsg::NodeCmd(_) | NodeMsg::NodeQuery(_) | NodeMsg::NodeQueryResponse { .. } => {
+                    commands.push(Command::HandleVerifiedNodeDataMessage {
+                        msg_id,
+                        msg: node_msg,
+                        auth: msg_authority,
+                        dst_location,
+                    });
+                }
+                _ => {
+                    commands.push(Command::HandleVerifiedNodeNonDataMessage {
+                        sender,
+                        msg_id,
+                        msg: node_msg,
+                        auth: msg_authority,
+                        dst_location,
+                        known_keys,
+                    });
+                }
+            },
             Err(Error::InvalidSignatureShare) => {
                 let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
-                Ok(vec![cmd])
+                commands.push(cmd);
             }
-            Ok(true) | Err(_) => Ok(vec![]),
+            Ok(true) | Err(_) => {}
         }
+
+        Ok(commands)
     }
 
     // Hanlder for node messages which have successfully
     // passed all signature checks and msg verifications
-    async fn handle_verified_node_message(
+    pub(crate) async fn handle_verified_non_data_node_message(
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,
@@ -370,6 +388,42 @@ impl Core {
 
                 Ok(vec![])
             }
+            NodeMsg::NodeMsgError {
+                error,
+                correlation_id,
+            } => {
+                self.send_event(Event::MessageReceived {
+                    msg_id,
+                    src: msg_authority.src_location(),
+                    dst: dst_location,
+                    msg: Box::new(MessageReceived::NodeMsgError {
+                        error,
+                        correlation_id,
+                    }),
+                })
+                .await;
+                Ok(vec![])
+            }
+            _ => {
+                warn!(
+                    "!!! Unexpected NodeMsg handled at verified NON DATA nodemsg handling: {:?}",
+                    node_msg
+                );
+                Ok(vec![])
+            }
+        }
+    }
+
+    // Hanlder for node messages which have successfully
+    // passed all signature checks and msg verifications
+    pub(crate) async fn handle_verified_data_message(
+        &self,
+        msg_id: MessageId,
+        msg_authority: NodeMsgAuthority,
+        dst_location: DstLocation,
+        node_msg: NodeMsg,
+    ) -> Result<Vec<Command>> {
+        match node_msg {
             // The following type of messages are all handled by upper sn_node layer.
             // TODO: In the future the sn-node layer won't be receiving Events but just
             // plugging in msg handlers.
@@ -470,20 +524,12 @@ impl Core {
                 )
                 .await
             }
-            NodeMsg::NodeMsgError {
-                error,
-                correlation_id,
-            } => {
-                self.send_event(Event::MessageReceived {
-                    msg_id,
-                    src: msg_authority.src_location(),
-                    dst: dst_location,
-                    msg: Box::new(MessageReceived::NodeMsgError {
-                        error,
-                        correlation_id,
-                    }),
-                })
-                .await;
+            _ => {
+                warn!(
+                    "Non data message provided to data message handler {:?}",
+                    node_msg
+                );
+                // do nothing
                 Ok(vec![])
             }
         }
@@ -565,8 +611,8 @@ impl Core {
     // Convert the provided NodeMsgAuthority to be a `Section` message
     // authority on successful accumulation. Also return 'true' if
     // current message shall not be processed any further.
-    fn aggregate_message_and_stop(
-        &mut self,
+    async fn aggregate_message_and_stop(
+        &self,
         msg_authority: &mut NodeMsgAuthority,
         payload: Bytes,
     ) -> Result<bool> {
@@ -577,10 +623,12 @@ impl Core {
         };
 
         match SectionAuth::try_authorize(
-            &mut self.message_aggregator,
+            self.message_aggregator.clone(),
             bls_share_auth.clone().into_inner(),
             &payload,
-        ) {
+        )
+        .await
+        {
             Ok(section_auth) => {
                 *msg_authority = NodeMsgAuthority::Section(section_auth);
                 Ok(false)
