@@ -13,6 +13,7 @@ use crate::messaging::{
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
+use custom_debug::Debug;
 use std::{
     net::SocketAddr,
     sync::atomic::{AtomicU64, Ordering},
@@ -37,6 +38,7 @@ pub(crate) enum Command {
         msg: NodeMsg,
         auth: NodeMsgAuthority,
         dst_location: DstLocation,
+        #[debug(skip)]
         payload: Bytes,
     },
     /// Handle verified node message after aggregation either directly or notify via event listener
