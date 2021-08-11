@@ -20,8 +20,8 @@ use crate::messaging::{
     signature_aggregator::{Error as AggregatorError, SignatureAggregator},
     SectionAuthorityProvider,
 };
-use crate::types::{PrefixMap, PublicKey};
-use xor_name::XorName;
+use crate::types::PublicKey;
+use xor_name::{PrefixMap, XorName};
 
 mod listeners;
 mod messaging;
@@ -81,7 +81,7 @@ impl Session {
             .read()
             .await
             .iter()
-            .map(|sap| sap.elders.len())
+            .map(|(_, sap)| sap.elders.len())
             .sum()
     }
 
