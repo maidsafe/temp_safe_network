@@ -227,13 +227,16 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         })),
         section_key,
     )?;
-    let mut commands = dispatcher
-        .handle_command(Command::HandleMessage {
+
+    let mut commands = get_internal_commands(
+        Command::HandleMessage {
             sender: new_node.addr,
             wire_msg,
-        })
-        .await?
-        .into_iter();
+        },
+        &dispatcher,
+    )
+    .await?
+    .into_iter();
 
     let response_wire_msg = assert_matches!(
         commands.next(),
@@ -297,13 +300,14 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         section_key,
     )?;
 
-    let commands = dispatcher
-        .handle_command(Command::HandleMessage {
+    let commands = get_internal_commands(
+        Command::HandleMessage {
             sender: new_node.addr,
             wire_msg,
-        })
-        .await?
-        .into_iter();
+        },
+        &dispatcher,
+    )
+    .await?;
 
     let mut test_connectivity = false;
     for command in commands {
@@ -398,30 +402,16 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let mut propose_cmd_returned = false;
 
-    let commands = dispatcher
-        .handle_command(Command::HandleMessage {
+    let inner_commands = get_internal_commands(
+        Command::HandleMessage {
             sender: relocated_node.addr,
             wire_msg,
-        })
-        .await?;
+        },
+        &dispatcher,
+    )
+    .await?;
 
-    let mut node_msg_handling = vec![];
-    let mut non_data_handling = vec![];
-
-    for command in commands {
-        // first pass gets us into node msg handling
-        let commands = dispatcher.handle_command(command).await?;
-        node_msg_handling.extend(commands);
-    }
-
-    for command in node_msg_handling {
-        // second pass gets us into non-data handling
-
-        let commands = dispatcher.handle_command(command).await?;
-        non_data_handling.extend(commands);
-    }
-
-    for command in non_data_handling {
+    for command in inner_commands {
         // third pass should now be handled and return propose
         if let Command::ProposeOnline {
             peer,
@@ -479,12 +469,15 @@ async fn aggregate_proposals() -> Result<()> {
             section_auth.section_key(),
         )?;
 
-        let commands = dispatcher
-            .handle_command(Command::HandleMessage {
+        let commands = get_internal_commands(
+            Command::HandleMessage {
                 sender: node.addr,
                 wire_msg,
-            })
-            .await?;
+            },
+            &dispatcher,
+        )
+        .await?;
+
         assert!(commands.is_empty());
     }
 
@@ -502,13 +495,16 @@ async fn aggregate_proposals() -> Result<()> {
         },
         section_auth.section_key(),
     )?;
-    let mut commands = dispatcher
-        .handle_command(Command::HandleMessage {
+
+    let mut commands = get_internal_commands(
+        Command::HandleMessage {
             sender: nodes[THRESHOLD].addr,
             wire_msg,
-        })
-        .await?
-        .into_iter();
+        },
+        &dispatcher,
+    )
+    .await?
+    .into_iter();
 
     assert_matches!(
         commands.next(),
@@ -965,6 +961,7 @@ async fn handle_untrusted_accumulated_message() -> Result<()> {
     handle_untrusted_message(UntrustedMessageSource::Accumulation).await
 }
 
+#[derive(PartialEq)]
 enum UntrustedMessageSource {
     Peer,
     Accumulation,
@@ -1036,13 +1033,30 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     };
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst_location)?;
 
-    let commands = dispatcher
-        .handle_command(Command::HandleMessage { sender, wire_msg })
-        .await?;
+    let commands = if source == UntrustedMessageSource::Accumulation {
+        // here we go only one level deep
+        let commands = dispatcher
+            .handle_command(Command::HandleMessage { sender, wire_msg })
+            .await?;
+
+        let mut node_msg_handling = vec![];
+
+        for command in commands {
+            // first pass gets us into node msg handling
+            let commands = dispatcher.handle_command(command).await?;
+            node_msg_handling.extend(commands);
+        }
+
+        node_msg_handling
+    } else {
+        // and here two levels deep
+        get_internal_commands(Command::HandleMessage { sender, wire_msg }, &dispatcher).await?
+    };
 
     let mut bounce_sent = false;
 
     for command in commands {
+        println!("COMMAND: {:?}", command);
         let (recipients, wire_msg) = if let Command::SendMessage {
             recipients,
             wire_msg,
@@ -1137,12 +1151,14 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         pk0,
     )?;
 
-    let commands = dispatcher
-        .handle_command(Command::HandleMessage {
+    let commands = get_internal_commands(
+        Command::HandleMessage {
             sender: other_node.addr,
             wire_msg: bounced_wire_msg,
-        })
-        .await?;
+        },
+        &dispatcher,
+    )
+    .await?;
 
     let mut message_resent = false;
 
@@ -1242,13 +1258,14 @@ async fn handle_sync() -> Result<()> {
         *new_section.chain().last_key(),
     )?;
 
-    // Handle the wire_msg.
-    let _ = dispatcher
-        .handle_command(Command::HandleMessage {
+    let _ = get_internal_commands(
+        Command::HandleMessage {
             sender: old_node.addr,
             wire_msg,
-        })
-        .await?;
+        },
+        &dispatcher,
+    )
+    .await?;
 
     // Verify our `Section` got updated.
     assert_matches!(
@@ -1319,12 +1336,14 @@ async fn handle_untrusted_sync() -> Result<()> {
         *new_section.chain().last_key(),
     )?;
 
-    let commands = dispatcher
-        .handle_command(Command::HandleMessage {
+    let commands = get_internal_commands(
+        Command::HandleMessage {
             sender: sender.addr,
             wire_msg,
-        })
-        .await?;
+        },
+        &dispatcher,
+    )
+    .await?;
 
     let mut bounce_sent = false;
 
@@ -1416,16 +1435,18 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
         bls::SecretKey::random().public_key(),
     )?;
 
-    let commands = dispatcher
-        .handle_command(Command::HandleMessage {
+    let inner_commands = get_internal_commands(
+        Command::HandleMessage {
             sender: sender.addr,
             wire_msg: bounced_wire_msg,
-        })
-        .await?;
+        },
+        &dispatcher,
+    )
+    .await?;
 
     let mut message_resent = false;
 
-    for command in commands {
+    for command in inner_commands {
         let (recipients, wire_msg) = match command {
             Command::SendMessage {
                 recipients,
@@ -1451,6 +1472,29 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
     assert!(message_resent);
 
     Ok(())
+}
+
+/// helper to get through first command layers used for concurrency, to commands we can analyse in a useful fashion for testing
+async fn get_internal_commands(command: Command, dispatcher: &Dispatcher) -> Result<Vec<Command>> {
+    let commands = dispatcher.handle_command(command).await?;
+
+    let mut node_msg_handling = vec![];
+    let mut inner_handling = vec![];
+
+    for command in commands {
+        // first pass gets us into node msg handling
+        let commands = dispatcher.handle_command(command).await?;
+        node_msg_handling.extend(commands);
+    }
+
+    for command in node_msg_handling {
+        // second pass gets us into non-data handling
+
+        let commands = dispatcher.handle_command(command).await?;
+        inner_handling.extend(commands);
+    }
+
+    Ok(inner_handling)
 }
 
 #[tokio::test(flavor = "multi_thread")]
