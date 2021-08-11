@@ -25,6 +25,7 @@ use crate::messaging::{
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
     ServiceAuth, WireMsg,
 };
+use crate::routing::messages::WireMsgUtils;
 use crate::routing::{
     core::AggregatorError,
     error::{Error, Result},

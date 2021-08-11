@@ -87,6 +87,9 @@ impl Core {
             register_storage: self.register_storage.clone(),
             root_storage_dir: self.root_storage_dir.clone(),
             used_space: self.used_space.clone(),
+            capacity: self.capacity.clone(),
+            chunk_storage: self.chunk_storage.clone(),
+            liveness: self.liveness.clone(),
         })
     }
 
