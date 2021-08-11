@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.2](https://github.com/maidsafe/safe_network/compare/v0.26.1...v0.26.2) (2021-08-11)
+
+### [0.26.1](https://github.com/maidsafe/safe_network/compare/v0.26.0...v0.26.1) (2021-08-11)
+
+
+### Bug Fixes
+
+* **routing:** do not relay end user msg if socket_id is not found but the node is in the correct destination prefix ([b85f22f](https://github.com/maidsafe/safe_network/commit/b85f22f4b5d49f254746a3f3f912de7d416aee2a))
+* **sn_node:** drop service msgs which are unexpected instead of returning an InvalidOperation error msg back ([b3ed0a1](https://github.com/maidsafe/safe_network/commit/b3ed0a10ae29ea74c59c9db9ebb2164eda654b22))
+
 ## [0.26.0](https://github.com/maidsafe/safe_network/compare/v0.25.3...v0.26.0) (2021-08-10)
 
 
