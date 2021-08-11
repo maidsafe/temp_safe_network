@@ -433,7 +433,7 @@ impl Core {
             .sections
             .get_matching(data_name)
             .map(|(_, sap)| &sap.value)
-            .unwrap_or(&our_section);
+            .unwrap_or(our_section);
 
         if actual_section_auth != our_section {
             // Update the client of the actual destination section
