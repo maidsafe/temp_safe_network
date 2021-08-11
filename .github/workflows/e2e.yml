@@ -84,11 +84,11 @@ jobs:
           RUST_LOG: "safe_network=trace"
           NODE_COUNT: 11
 
-      - name: extra wait for CI split
-        run: sleep 220
+      # - name: extra wait for CI split
+      #   run: sleep 220
 
-      - name: Have we had a section split?
-        run: ./scripts/has_split.sh
+      # - name: Have we had a section split?
+      #   run: ./scripts/has_split.sh
       
         # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initital client tests...
@@ -108,31 +108,31 @@ jobs:
         shell: bash
         run: timeout 40m cargo run --release  --features=always-joinable,test-utils --example client_blob
       
-      - name: Kill the current network (next test doesnt need it)
-        if: matrix.os != 'windows-latest'
-        run: killall sn_node
-        shell: bash
+      # - name: Kill the current network (next test doesnt need it)
+      #   if: matrix.os != 'windows-latest'
+      #   run: killall sn_node
+      #   shell: bash
 
-      - name: Kill the current network (next test doesnt need it)
-        if: matrix.os == 'windows-latest'
-        run: taskkill /IM sn_node.exe /F
-        shell: cmd
+      # - name: Kill the current network (next test doesnt need it)
+      #   if: matrix.os == 'windows-latest'
+      #   run: taskkill /IM sn_node.exe /F
+      #   shell: cmd
 
-      - name: Remove node dir and logs fo next test
-        if: matrix.os == 'windows-latest'
-        run: rd /s /q %USERPROFILE%\.safe\node
-        shell: cmd
+      # - name: Remove node dir and logs fo next test
+      #   if: matrix.os == 'windows-latest'
+      #   run: rd /s /q %USERPROFILE%\.safe\node
+      #   shell: cmd
 
-      - name: Remove node dir and logs fo next test
-        if: matrix.os != 'windows-latest'
-        run: rm -rf ~/.safe/node
+      # - name: Remove node dir and logs fo next test
+      #   if: matrix.os != 'windows-latest'
+      #   run: rm -rf ~/.safe/node
 
-      - name: Run example of split and chunk check
-        shell: bash
-        run: timeout 40m cargo run --release  --features=always-joinable,test-utils --example network_split
+      # - name: Run example of split and chunk check
+      #   shell: bash
+      #   run: timeout 40m cargo run --release  --features=always-joinable,test-utils --example network_split
       
-      - name: Was there a section split?
-        run: ./scripts/has_split.sh
+      # - name: Was there a section split?
+      #   run: ./scripts/has_split.sh
 
       - name: Node Logs
         if: failure() && matrix.os != 'windows-latest'
