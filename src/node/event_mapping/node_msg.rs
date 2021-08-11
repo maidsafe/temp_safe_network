@@ -153,12 +153,20 @@ fn match_node_msg(msg_id: MessageId, msg: MessageReceived, origin: SrcLocation) 
             correlation_id,
             src: origin.name(),
         },
-        _ => send_error(
-            msg_id,
-            origin,
-            Error::InvalidMessage(msg_id, format!("Invalid dst: {:?}", msg)),
-            true,
-        ),
+        MessageReceived::NodeMsgError {
+            error,
+            correlation_id,
+        } => {
+            // TODO: Consider handling the incoming error.
+            trace!(
+                "Received error msg from {:?}({:?}), {:?} - {:?}",
+                origin,
+                msg_id,
+                correlation_id,
+                error
+            );
+            NodeDuty::NoOp
+        }
     }
 }
 

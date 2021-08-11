@@ -426,16 +426,35 @@ impl Core {
                 error,
                 correlation_id,
             } => {
-                self.send_event(Event::MessageReceived {
-                    msg_id,
-                    src: msg_authority.src_location(),
-                    dst: dst_location,
-                    msg: Box::new(MessageReceived::NodeMsgError {
-                        error,
-                        correlation_id,
-                    }),
-                })
-                .await;
+                // When the dstination is not targeting Section or Node, the node layer map_node_msg
+                // function will directly convert this into an error message and send it back.
+                // Which actually causing a looping of message.
+                // TODO: consider handling the error message targeting other desitination type.
+                match dst_location {
+                    DstLocation::Node { .. } | DstLocation::Section { .. } => {
+                        self.send_event(Event::MessageReceived {
+                            msg_id,
+                            src: msg_authority.src_location(),
+                            dst: dst_location,
+                            msg: Box::new(MessageReceived::NodeMsgError {
+                                error,
+                                correlation_id,
+                            }),
+                        })
+                        .await
+                    }
+                    _ => {
+                        trace!(
+                            "Ignoring NodeMsgError from {:?}({:?}) targeting {:?}, {:?} - {:?}",
+                            msg_authority.src_location(),
+                            msg_id,
+                            dst_location,
+                            correlation_id,
+                            error
+                        );
+                    }
+                }
+
                 Ok(vec![])
             }
         }
