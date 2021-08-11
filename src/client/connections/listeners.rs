@@ -157,13 +157,11 @@ impl Session {
                     sap: Some(section_auth),
                     source_message: Some(message),
                 }) => {
-                    {
-                        // Update our network knowledge
-                        let _ = network
-                            .write()
-                            .await
-                            .insert(section_auth.prefix, section_auth);
-                    }
+                    // Update our network knowledge
+                    let _ = network
+                        .write()
+                        .await
+                        .insert(section_auth.prefix, section_auth);
                     if let Some((id, serialised_cmd, dst_address, auth)) =
                         verify_bounced_off_message_integrity(client_pk, &message)
                     {
