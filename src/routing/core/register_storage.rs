@@ -392,7 +392,7 @@ impl RegisterStorage {
         }
 
         reg.take()
-            .ok_or_else(|| Error::InvalidStore)
+            .ok_or(Error::InvalidStore)
             .map(|state| StateEntry { state, store })
     }
 }

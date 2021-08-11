@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    super::Subdir, Error, Key, KvStore, Result as KvStoreResult, Result, ToDbKey, UsedSpace, Value,
+    super::Subdir, Error, Key, KvStore, Result as KvStoreResult, ToDbKey, UsedSpace, Value,
 };
+use eyre::{eyre, Result};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, u64};
 use tempfile::{tempdir, TempDir};
-
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct TestData {
     id: Id,
@@ -197,12 +197,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
 
     match db.store(&data).await {
         Err(Error::NotEnoughSpace) => (),
-        x => {
-            return Err(super::Error::InvalidOperation(format!(
-                "Unexpected: {:?}",
-                x
-            )))
-        }
+        x => return Err(eyre!(format!("Unexpected: {:?}", x))),
     }
 
     Ok(())
@@ -311,12 +306,7 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let id = Id(new_rng().gen());
     match db.get(&id) {
         Err(Error::KeyNotFound(_)) => (),
-        x => {
-            return Err(super::Error::InvalidOperation(format!(
-                "Unexpected {:?}",
-                x
-            )))
-        }
+        x => return Err(eyre!(format!("Unexpected {:?}", x))),
     }
 
     Ok(())
