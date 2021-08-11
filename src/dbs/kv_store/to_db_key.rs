@@ -24,7 +24,7 @@ pub(crate) trait ToDbKey: Serialize {
 }
 
 pub(crate) fn from_db_key<T: DeserializeOwned>(key: &str) -> Result<T> {
-    let decoded = hex::decode(key).map_err(|e| Error::InvalidOperation(e.to_string()))?;
+    let decoded = hex::decode(key).map_err(|_| Error::CouldNotDecodeDbKey(key.to_string()))?;
     deserialise(&decoded)
 }
 

@@ -19,6 +19,12 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[non_exhaustive]
 /// Node error variants.
 pub enum Error {
+    /// Db key conversion failed
+    #[error("Could not convert the Db key")]
+    CouldNotConvertDbKey,
+    /// Db key conversion failed
+    #[error("Could not decode the Db key: {0:?}")]
+    CouldNotDecodeDbKey(String),
     /// Not enough space to store the value.
     #[error("Not enough space")]
     NotEnoughSpace,
@@ -31,6 +37,9 @@ pub enum Error {
     /// Data id not found.
     #[error("Data id not found: {0:?}")]
     DataIdNotFound(DataAddress),
+    /// Cannot delete public data
+    #[error("Cannot delete public data {0:?}")]
+    CannotDeletePublicData(DataAddress),
     /// Data not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),
@@ -67,12 +76,12 @@ pub enum Error {
     /// Sled error.
     #[error("Sled error:: {0}")]
     Sled(#[from] sled::Error),
+    /// There were Error(s) while batching for Sled operations.
+    #[error("Errors found when batching for Sled")]
+    SledBatchingError,
     /// NetworkData error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] crate::types::Error),
-    /// Operation is invalid, eg signing validation
-    #[error("Invalid operation: {0}")]
-    InvalidOperation(String),
 }
 
 /// Convert db error to messaging error message for sending over the network.

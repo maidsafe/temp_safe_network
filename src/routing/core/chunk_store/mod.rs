@@ -98,9 +98,7 @@ impl ChunkStore {
                     if req_kind.is_public() {
                         Ok(chunk)
                     } else {
-                        Err(Error::InvalidOperation(
-                            "Public chunk retrieved for Private read...".to_string(),
-                        ))
+                        Err(Error::DataIdNotFound(DataAddress::Chunk(*address)))
                     }
                 }
             },
@@ -139,11 +137,7 @@ impl ChunkStore {
                             write.dst_address()
                         );
 
-                        Err(Error::InvalidOperation(format!(
-                            "{}: Invalid DeletePrivate(Chunk::Public) encountered: {:?}",
-                            self,
-                            write.dst_name()
-                        )))
+                        Err(Error::NoSuchData(DataAddress::Chunk(*head_address)))
                     }
                     _ => Ok(()),
                 }?;

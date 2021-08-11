@@ -167,9 +167,9 @@ impl RegisterStorage {
                         let (_, cache) = entry.pair_mut();
                         if let Some(entry) = cache {
                             if entry.state.address().is_public() {
-                                return Err(Error::InvalidOperation(
-                                    "Cannot delete public Register".to_string(),
-                                ));
+                                return Err(Error::CannotDeletePublicData(DataAddress::Register(
+                                    address,
+                                )));
                             }
                             // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
                             // register.check_permission(action, Some(auth.public_key))?;

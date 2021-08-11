@@ -21,7 +21,6 @@ use super::{
     deserialise, Subdir,
     {encoding::serialise, Error, Result},
 };
-use itertools::Itertools;
 use serde::de::DeserializeOwned;
 use sled::Db;
 use std::{marker::PhantomData, path::Path};
@@ -141,7 +140,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
         type KvPairResults = Vec<Result<KvPair>>;
 
         let mut batch = sled::Batch::default();
-        let (ok, err): (KvPairResults, KvPairResults) = values
+        let (ok, err_results): (KvPairResults, KvPairResults) = values
             .par_iter()
             .map(|value| {
                 let serialised_value = serialise(value)?.to_vec();
@@ -150,9 +149,12 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
             })
             .partition(|r| r.is_err());
 
-        if !err.is_empty() {
-            let res = err.into_iter().map(|e| format!("{:?}", e)).join(",");
-            return Err(Error::InvalidOperation(res));
+        if !err_results.is_empty() {
+            for e in err_results {
+                error!("{:?}", e);
+            }
+
+            return Err(Error::SledBatchingError);
         }
 
         let consumed_space = ok
@@ -231,7 +233,6 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
 }
 
 pub(crate) fn convert<T: DeserializeOwned>(key: sled::IVec) -> Result<T> {
-    let db_key =
-        &String::from_utf8(key.to_vec()).map_err(|e| Error::InvalidOperation(e.to_string()))?;
+    let db_key = &String::from_utf8(key.to_vec()).map_err(|_| Error::CouldNotConvertDbKey)?;
     to_db_key::from_db_key(db_key)
 }
