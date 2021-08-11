@@ -57,7 +57,8 @@ impl Session {
     ) -> Result<Self, Error> {
         debug!("QP2p config: {:?}", qp2p_config);
 
-        let qp2p = qp2p::QuicP2p::<XorName>::with_config(Some(qp2p_config), Default::default(), true)?;
+        let qp2p =
+            qp2p::QuicP2p::<XorName>::with_config(Some(qp2p_config), Default::default(), true)?;
         Ok(Self {
             qp2p,
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
