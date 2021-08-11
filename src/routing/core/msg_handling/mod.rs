@@ -186,7 +186,7 @@ impl Core {
         sender: SocketAddr,
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
-        dst_location: DstLocation,
+        _dst_location: DstLocation,
         node_msg: NodeMsg,
         known_keys: &[BlsPublicKey],
     ) -> Result<Vec<Command>> {
@@ -373,16 +373,13 @@ impl Core {
                 error,
                 correlation_id,
             } => {
-                self.send_event(Event::MessageReceived {
+                trace!(
+                    "From {:?}({:?}), received error {:?} correlated to {:?}",
+                    msg_authority.src_location(),
                     msg_id,
-                    src: msg_authority.src_location(),
-                    dst: dst_location,
-                    msg: Box::new(MessageReceived::NodeMsgError {
-                        error,
-                        correlation_id,
-                    }),
-                })
-                .await;
+                    error,
+                    correlation_id
+                );
                 Ok(vec![])
             }
             _ => {
@@ -504,6 +501,20 @@ impl Core {
                     sending_nodes_pk,
                 )
                 .await
+            }
+            NodeMsg::NodeMsgError {
+                error,
+                correlation_id,
+            } => {
+                trace!(
+                    "From {:?}({:?}), received error {:?} correlated to {:?}, targeting {:?}",
+                    msg_authority.src_location(),
+                    msg_id,
+                    error,
+                    correlation_id,
+                    dst_location
+                );
+                Ok(vec![])
             }
             _ => {
                 warn!(
