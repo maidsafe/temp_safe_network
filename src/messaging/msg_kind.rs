@@ -46,3 +46,16 @@ pub enum MsgKind {
     // FIXME: find an example.
     SectionAuthMsg(SectionAuth),
 }
+
+impl MsgKind {
+    /// The priority of the message, when handled by lower level comms.
+    pub fn priority(&self) -> i32 {
+        match self {
+            Self::SectionAuthMsg(_) => 2,
+            Self::NodeBlsShareAuthMsg(_) => 1,
+            Self::NodeAuthMsg(_) => 0,
+            Self::SectionInfoMsg => -1,
+            Self::ServiceMsg(_) => -2,
+        }
+    }
+}

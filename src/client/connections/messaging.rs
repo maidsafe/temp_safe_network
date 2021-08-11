@@ -139,7 +139,7 @@ impl Session {
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
-
+        let priority = wire_msg.msg_kind().priority();
         let msg_bytes = wire_msg.serialize()?;
 
         // Send message to all Elders concurrently
@@ -152,7 +152,9 @@ impl Session {
             let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
                 trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
                 endpoint.connect_to(&socket).await?;
-                endpoint.send_message(msg_bytes_clone, &socket).await?;
+                endpoint
+                    .send_message(msg_bytes_clone, &socket, priority)
+                    .await?;
 
                 trace!("Sent cmd with MsgId {:?}to {:?}", msg_id, &socket);
                 Ok(())
@@ -258,6 +260,7 @@ impl Session {
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let priority = wire_msg.msg_kind().priority();
         let msg_bytes = wire_msg.serialize()?;
 
         // Set up response listeners
@@ -273,7 +276,10 @@ impl Session {
                 for attempt in 0..NUMBER_OF_RETRIES + 1 {
                     let msg_bytes_clone = msg_bytes.clone();
 
-                    if let Err(err) = endpoint.send_message(msg_bytes_clone, &socket).await {
+                    if let Err(err) = endpoint
+                        .send_message(msg_bytes_clone, &socket, priority)
+                        .await
+                    {
                         error!(
                             "Try #{:?} @ {:?}, failed sending query message: {:?}",
                             attempt + 1,
@@ -444,6 +450,7 @@ impl Session {
             section_pk: random_section_pk,
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let priority = wire_msg.msg_kind().priority();
         let msg_bytes = wire_msg.serialize()?;
 
         debug!(
@@ -455,7 +462,7 @@ impl Session {
         );
 
         self.endpoint()?
-            .send_message(msg_bytes, bootstrapped_peer)
+            .send_message(msg_bytes, bootstrapped_peer, priority)
             .await?;
 
         Ok(())
