@@ -396,6 +396,8 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         section_key,
     )?;
 
+    let mut propose_cmd_returned = false;
+
     let commands = dispatcher
         .handle_command(Command::HandleMessage {
             sender: relocated_node.addr,
@@ -403,9 +405,24 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         })
         .await?;
 
-    let mut propose_cmd_returned = false;
+    let mut node_msg_handling = vec![];
+    let mut non_data_handling = vec![];
 
     for command in commands {
+        // first pass gets us into node msg handling
+        let commands = dispatcher.handle_command(command).await?;
+        node_msg_handling.extend(commands);
+    }
+
+    for command in node_msg_handling {
+        // second pass gets us into non-data handling
+
+        let commands = dispatcher.handle_command(command).await?;
+        non_data_handling.extend(commands);
+    }
+
+    for command in non_data_handling {
+        // third pass should now be handled and return propose
         if let Command::ProposeOnline {
             peer,
             previous_name,
