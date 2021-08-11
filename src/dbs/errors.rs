@@ -81,7 +81,7 @@ pub enum Error {
     Sled(#[from] sled::Error),
     /// There were Error(s) while batching for Sled operations.
     #[error("Errors found when batching for Sled")]
-    SledBatchingError,
+    SledBatching,
     /// NetworkData error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] crate::types::Error),

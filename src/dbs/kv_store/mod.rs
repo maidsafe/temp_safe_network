@@ -154,7 +154,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
                 error!("{:?}", e);
             }
 
-            return Err(Error::SledBatchingError);
+            return Err(Error::SledBatching);
         }
 
         let consumed_space = ok
