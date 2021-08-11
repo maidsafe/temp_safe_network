@@ -1795,9 +1795,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.12.11"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "768bfcd6d3eef1f4ef9716f321f13edd5bb3eac9cb1efee31f07444a4f29ec49"
+checksum = "26cbbfcf54607f4b3259fcd7e127e7bbf70dab72ee685deddde174d9a51bb022"
 dependencies = [
  "backoff",
  "base64 0.12.3",
@@ -1813,9 +1813,11 @@ dependencies = [
  "serde_json",
  "structopt",
  "thiserror",
+ "tiny-keccak 2.0.2",
  "tokio",
  "tracing",
  "webpki",
+ "xor_name",
 ]
 
 [[package]]
