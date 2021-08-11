@@ -427,21 +427,22 @@ impl Core {
         data_name: &XorName,
         received_section_pk: &bls::PublicKey,
     ) -> Option<SectionAuthorityProvider> {
-        let our_section = &self.section.section_auth;
+        let our_section = &self.section.section_auth.value;
         let actual_section_auth = self
             .network()
             .sections
             .get_matching(data_name)
-            .unwrap_or(our_section);
+            .map(|(_, sap)| &sap.value)
+            .unwrap_or(&our_section);
 
         if actual_section_auth != our_section {
             // Update the client of the actual destination section
-            Some(actual_section_auth.value.clone())
+            Some(actual_section_auth.clone())
         } else {
             // Check if client has latest knowledge of our section
-            if received_section_pk != &our_section.value.section_key() {
+            if received_section_pk != &our_section.section_key() {
                 // Client is lagging on knowledge of our section, update them
-                Some(our_section.value.clone())
+                Some(our_section.clone())
             } else {
                 None
             }

@@ -34,7 +34,7 @@ pub(crate) use chunk_store::ChunkStore;
 
 use self::{enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
 use crate::messaging::{
-    node::{Network, NodeMsg, Proposal, Section},
+    node::{Network, Proposal, Section},
     signature_aggregator::SignatureAggregator,
     MessageId,
 };

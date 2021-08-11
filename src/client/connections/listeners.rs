@@ -85,7 +85,7 @@ impl Session {
             SectionInfoMsg::GetSectionResponse(GetSectionResponse::Success(sap))
             | SectionInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(sap)) => {
                 debug!("GetSectionResponse::Success!");
-                let _ = self.network.write().await.insert(sap.clone());
+                let _ = self.network.write().await.insert(sap.prefix, sap.clone());
                 Ok(())
             }
             SectionInfoMsg::GetSectionQuery { .. } => Err(Error::UnexpectedMessageOnJoin(format!(
@@ -153,7 +153,10 @@ impl Session {
                 }) => {
                     {
                         // Update our network knowledge
-                        let _ = network.write().await.insert(section_auth);
+                        let _ = network
+                            .write()
+                            .await
+                            .insert(section_auth.prefix, section_auth);
                     }
                     // We need to deserialize to check if the original message was tampered
                     // and verify the ServiceAuth.
@@ -174,7 +177,7 @@ impl Session {
                                         if let Some(dst_address) = msg.dst_address() {
                                             if let Some((elders, section_pk)) =
                                                 network.read().await.get_matching(&dst_address).map(
-                                                    |sap| {
+                                                    |(_, sap)| {
                                                         (
                                                             sap.elders
                                                                 .values()
