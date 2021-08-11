@@ -148,12 +148,4 @@ pub enum MessageReceived {
         /// ID of causing query.
         correlation_id: MessageId,
     },
-    /// The returned error, from any msg handling on recipient node.
-    NodeMsgError {
-        /// The error.
-        // TODO: return node::Error instead
-        error: crate::messaging::data::Error,
-        /// ID of causing cmd.
-        correlation_id: MessageId,
-    },
 }
