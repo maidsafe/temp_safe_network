@@ -74,7 +74,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         env:
           RUST_LOG: "safe_network=trace"
-          NODE_COUNT: "43" # this should be a split section
+          NODE_COUNT: "11" # FIXME: make this 43 again to test splits. (this should be a split section)
 
       # TODO: windows with split section network has been failing w/ SO.
       # when we have that sorted we can reenable the full networks
