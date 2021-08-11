@@ -28,9 +28,7 @@ pub use section::Peer;
 pub use section::{Section, SectionPeers};
 pub use signed::{KeyedSig, SigShare};
 
-use crate::messaging::{
-    data::ServiceMsg, EndUser, MessageId, SectionAuthorityProvider, ServiceAuth,
-};
+use crate::messaging::{EndUser, MessageId, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use itertools::Itertools;
@@ -67,15 +65,6 @@ pub enum NodeMsg {
         section_signed: KeyedSig,
         /// Message bounced that shall be resent by the peer.
         bounced_msg: Box<NodeMsg>,
-    },
-    /// Forward a data message.
-    ForwardServiceMsg {
-        /// The msg
-        msg: ServiceMsg,
-        /// The origin
-        user: EndUser,
-        /// Signature provided by the requester.
-        auth: ServiceAuth,
     },
     /// Message sent to all members to update them about the state of our section.
     Sync {

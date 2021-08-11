@@ -100,7 +100,7 @@ impl Core {
                 elder_candidates
             );
 
-            self.send_dkg_start_to(elder_candidates, slice::from_ref(sender))
+            self.send_dkg_start(elder_candidates, slice::from_ref(sender))
         } else {
             // The DKG failure is regarding failed_participants, i.e. potential unresponsive node.
             trace!(

@@ -9,21 +9,21 @@
 mod agreement;
 mod anti_entropy;
 mod bad_msgs;
-mod data_msgs;
 mod dkg;
 mod join;
 mod proposals;
 mod relocation;
 mod resource_proof;
 mod section_info;
+mod service_msgs;
 mod sync;
 
 use super::Core;
 use crate::messaging::{
     data::{DataCmd, DataQuery, ServiceMsg},
     node::{NodeCmd, NodeMsg, NodeQuery, Proposal},
-    AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
-    ServiceAuth, WireMsg,
+    DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth, ServiceAuth,
+    WireMsg,
 };
 use crate::routing::messages::WireMsgUtils;
 use crate::routing::{
@@ -86,8 +86,8 @@ impl Core {
                 msg,
                 dst_location,
             } => {
-                // this directly returns one of two commands.
-                self.handle_service_message(sender, msg_id, auth, msg, dst_location, payload)
+                self.handle_service_message(sender, msg_id, auth, msg, dst_location)
+                    .await
             }
         }
     }
@@ -221,25 +221,6 @@ impl Core {
                     sender,
                 )
                 .await
-            }
-            NodeMsg::ForwardServiceMsg { msg, user, auth } => {
-                // If elder, always handle Forward
-                if self.is_not_elder() {
-                    return Ok(vec![]);
-                }
-
-                // Check the client authority is valid
-                // TODO: preserve the source bytes so we don't need to serialize again here,
-                // or else verify earlier.
-                let payload = WireMsg::serialize_msg_payload(&msg)?;
-                let auth = AuthorityProof::verify(auth, &payload)?;
-
-                Ok(vec![Command::HandleServiceMessage {
-                    msg_id,
-                    msg,
-                    user,
-                    auth,
-                }])
             }
             NodeMsg::Sync {
                 ref section,
