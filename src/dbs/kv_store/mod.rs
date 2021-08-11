@@ -104,7 +104,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
         trace!(">> Does this entry exist; {:?}: {:?}", key, exists);
 
         let serialised_value = serialise(value)?.to_vec();
-        // FIXME: We're not considering overwriting here. So the space isn't necessarily all 'consumed' 
+        // FIXME: We're not considering overwriting here. So the space isn't necessarily all 'consumed'
         // if we overwrite same value eg, or it's only 5 bytes longer/shorter etc
         let consumed_space = serialised_value.len() as u64;
 

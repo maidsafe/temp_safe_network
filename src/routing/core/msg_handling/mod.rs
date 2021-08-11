@@ -403,9 +403,12 @@ impl Core {
                 })
                 .await;
                 Ok(vec![])
-            },
+            }
             _ => {
-                warn!("!!! Unexpected NodeMsg handled at verified NON DATA nodemsg handling: {:?}", node_msg);
+                warn!(
+                    "!!! Unexpected NodeMsg handled at verified NON DATA nodemsg handling: {:?}",
+                    node_msg
+                );
                 Ok(vec![])
             }
         }
