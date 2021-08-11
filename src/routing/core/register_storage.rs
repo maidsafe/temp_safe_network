@@ -107,9 +107,7 @@ impl RegisterStorage {
                     op.auth.clone(),
                     ServiceMsg::Cmd(DataCmd::Register(op.write.clone())),
                 )
-                .map_err(|_| {
-                    Error::Logic("Received register operation signature is invalid".to_string())
-                })?;
+                .map_err(|_| Error::InvalidSignature(op.auth.public_key))?;
                 let _ = self.apply(op, auth)?;
             }
         }
@@ -394,9 +392,7 @@ impl RegisterStorage {
         }
 
         reg.take()
-            .ok_or_else(|| {
-                Error::Logic("A store was found, but its contents were invalid.".to_string())
-            })
+            .ok_or_else(|| Error::InvalidStore)
             .map(|state| StateEntry { state, store })
     }
 }
