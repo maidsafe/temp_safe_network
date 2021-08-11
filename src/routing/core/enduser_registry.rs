@@ -28,17 +28,13 @@ impl EndUserRegistry {
     }
 
     pub(crate) fn get_enduser_by_addr(&self, socketaddr: &SocketAddr) -> Option<EndUser> {
-        match self.clients.get(socketaddr) {
-            Some(entry) => Some(entry.value().clone()),
-            None => None,
-        }
+        self.clients.get(socketaddr).map(|entry| *entry.value())
     }
 
     pub(crate) fn get_socket_addr(&self, socket_id: SocketId) -> Option<SocketAddr> {
-        match self.socket_id_mapping.get(&socket_id) {
-            Some(entry) => Some(entry.value().clone()),
-            None => None,
-        }
+        self.socket_id_mapping
+            .get(&socket_id)
+            .map(|entry| *entry.value())
     }
 
     pub(crate) fn try_add(&self, sender: SocketAddr, section_prefix: &Prefix) -> Result<EndUser> {
