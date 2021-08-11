@@ -130,7 +130,7 @@ impl Dispatcher {
 
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
-            // Non-data node msg that requires more locking
+            // Data node msg that requires no locking
             Command::HandleVerifiedNodeDataMessage {
                 msg_id,
                 auth,
@@ -149,7 +149,7 @@ impl Dispatcher {
                     )
                     .await
             }
-            // Non-data node msg that requires more locking
+            // Non-data node msg that requires locking
             Command::HandleVerifiedNodeNonDataMessage {
                 sender,
                 msg_id,
