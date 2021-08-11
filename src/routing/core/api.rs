@@ -22,7 +22,9 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionKeyShare, SectionKeysProvider, SectionUtils},
+    section::{
+        ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionKeysProvider, SectionUtils,
+    },
     Error, Event,
 };
 use resource_proof::ResourceProof;
@@ -192,8 +194,8 @@ impl Core {
             .handle_timeout(&self.node, token, *self.section_chain().last_key())
     }
 
-    // Send message over the network.
-    pub(crate) fn relay_message(&self, mut wire_msg: WireMsg) -> Result<Command> {
+    // Send message to peers on the network.
+    pub(crate) fn send_msg_to_peers(&self, mut wire_msg: WireMsg) -> Result<Command> {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
@@ -261,8 +263,10 @@ impl Core {
     pub(crate) fn promote_and_demote_elders(&mut self) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
-        for info in self.section.promote_and_demote_elders(&self.node.name()) {
-            commands.extend(self.send_dkg_start(info)?);
+        for elder_candidates in self.section.promote_and_demote_elders(&self.node.name()) {
+            // Send DKG start to all candidates
+            let recipients: Vec<_> = elder_candidates.peers().collect();
+            commands.extend(self.send_dkg_start(elder_candidates, &recipients)?);
         }
 
         Ok(commands)

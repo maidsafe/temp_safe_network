@@ -195,18 +195,6 @@ impl Dispatcher {
                     .handle_message(sender, wire_msg)
                     .await
             }
-            Command::HandleServiceMessage {
-                msg_id,
-                user,
-                msg,
-                auth,
-            } => {
-                self.core
-                    .read()
-                    .await
-                    .handle_service_msg_received(msg_id, msg, user, auth)
-                    .await
-            }
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
             Command::HandleAgreement { proposal, sig } => {
                 self.core
@@ -249,10 +237,6 @@ impl Dispatcher {
                     .await
             }
             Command::ParseAndSendWireMsg(wire_msg) => self.send_wire_message(wire_msg).await,
-            Command::RelayMessage(wire_msg) => {
-                let cmd = self.core.read().await.relay_message(wire_msg)?;
-                Ok(vec![cmd])
-            }
             Command::ScheduleTimeout { duration, token } => Ok(self
                 .handle_schedule_timeout(duration, token)
                 .await
@@ -380,11 +364,11 @@ impl Dispatcher {
         Ok(cmds)
     }
 
-    /// Send a message.
-    /// Messages sent here, either section to section or node to node.
+    /// Send a message, either section to section, node to node, or to an end user.
     pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
         if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
-            if self.core.read().await.section().prefix().matches(xorname) {
+            let our_prefix = *self.core.read().await.section().prefix();
+            if our_prefix.matches(xorname) {
                 let addr = self.core.read().await.get_socket_addr(*socket_id);
 
                 if let Some(socket_addr) = addr {
@@ -402,23 +386,27 @@ impl Dispatcher {
                         recipients,
                         wire_msg,
                     };
-                    return Ok(vec![command]);
+
+                    Ok(vec![command])
                 } else {
                     error!(
                         "End user msg dropped. Could not find socketaddr corresponding to socket_id {:?}: {:?}",
                         socket_id, wire_msg
                     );
-                    return Ok(vec![]);
+                    Ok(vec![])
                 }
             } else {
-                debug!(
-                    "Relaying end user message (Command::RelayMessage): {:?}",
-                    wire_msg
+                error!(
+                    "End user msg dropped. Xorname doesn't match our prefix ({:?}): {:?}",
+                    our_prefix, wire_msg
                 );
+                Ok(vec![])
             }
+        } else {
+            // This message is not for an end user, then send it to peer/s over the network
+            let cmd = self.core.read().await.send_msg_to_peers(wire_msg)?;
+            Ok(vec![cmd])
         }
-
-        Ok(vec![Command::RelayMessage(wire_msg)])
     }
 
     async fn handle_schedule_timeout(&self, duration: Duration, token: u64) -> Option<Command> {

@@ -7,10 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::ServiceMsg,
     node::{DkgFailureSigSet, KeyedSig, NodeMsg, Proposal, Section},
-    AuthorityProof, DstLocation, EndUser, MessageId, NodeMsgAuthority, SectionAuthorityProvider,
-    ServiceAuth, WireMsg,
+    DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
 use bls::PublicKey as BlsPublicKey;
@@ -26,17 +24,10 @@ use std::{
 #[derive(Debug)]
 pub(crate) enum Command {
     /// Handle `message` from `sender`.
-    /// holding the WireMsg that has been received from the network,
+    /// Holding the WireMsg that has been received from the network,
     HandleMessage {
         sender: SocketAddr,
         wire_msg: WireMsg,
-    },
-    /// Handle ServiceMsg, either directly or notify via event listener
-    HandleServiceMessage {
-        msg_id: MessageId,
-        msg: ServiceMsg,
-        user: EndUser,
-        auth: AuthorityProof<ServiceAuth>,
     },
     // TODO: rename this as/when this is all node for clarity
     /// Handle Node, either directly or notify via event listener
@@ -95,8 +86,6 @@ pub(crate) enum Command {
         delivery_group_size: usize,
         wire_msg: WireMsg,
     },
-    /// Relay a message according to its destination.
-    RelayMessage(WireMsg),
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
     /// command is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },

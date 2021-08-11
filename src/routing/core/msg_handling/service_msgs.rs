@@ -17,13 +17,8 @@ use crate::messaging::{
 };
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;
 use crate::routing::peer::PeerUtils;
-use crate::routing::{
-    error::Result, messages::WireMsgUtils, routing_api::command::Command, section::SectionUtils,
-    SectionAuthorityProviderUtils,
-};
-// use bls::PublicKey;
+use crate::routing::{error::Result, routing_api::command::Command, section::SectionUtils};
 use crate::types::PublicKey;
-use bytes::Bytes;
 use itertools::Itertools;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
@@ -314,43 +309,29 @@ impl Core {
             .collect::<BTreeSet<_>>()
     }
 
-    /// Handle incoming data msgs, determining if they should be handled at this node or fowrwarded
-    // TODO: streamline this as full AE for direct messaging is included.
-    pub(crate) fn handle_service_message(
+    /// Handle incoming data msgs.
+    // TODO: streamline this as full AE for direct messaging.
+    pub(crate) async fn handle_service_message(
         &self,
         sender: SocketAddr,
         msg_id: MessageId,
         auth: AuthorityProof<ServiceAuth>,
         msg: ServiceMsg,
         dst_location: DstLocation,
-        payload: Bytes,
     ) -> Result<Vec<Command>> {
-        trace!("Service msg being handled");
-        let is_in_destination = match dst_location.name() {
-            Some(dst_name) => {
-                let is_in_destination = self.section().prefix().matches(&dst_name);
-                if is_in_destination {
-                    if let DstLocation::EndUser(EndUser { socket_id, xorname }) = dst_location {
-                        if let Some(addr) = self.get_socket_addr(socket_id) {
-                            let wire_msg = WireMsg::new_msg(
-                                msg_id,
-                                payload,
-                                MsgKind::ServiceMsg(auth.into_inner()),
-                                dst_location,
-                            )?;
+        trace!("Service msg received being handled: {:?}", msg);
+        // TODO:
+        // Currently clients perform AE msg exchange using `SectionInfoMsg`, that
+        // msg type shall be gone in favour of AE-Retry/Redirect responses which
+        // shall be sent by the AE checks logic earlier on in the main msg handling flow.
 
-                            return Ok(vec![Command::SendMessage {
-                                recipients: vec![(xorname, addr)],
-                                wire_msg,
-                            }]);
-                        }
-                    }
-                }
-
-                is_in_destination
-            }
-            None => true, // it's a DirectAndUnrouted dst
-        };
+        if let DstLocation::EndUser(_) = dst_location {
+            warn!(
+                "Service msg has been dropped as its destination location ({:?}) is invalid: {:?}",
+                dst_location, msg
+            );
+            return Ok(vec![]);
+        }
 
         let user = match self.get_enduser_by_addr(&sender) {
             Some(end_user) => {
@@ -382,49 +363,7 @@ impl Core {
             }
         };
 
-        if is_in_destination {
-            trace!("In the destination for this msg");
-
-            // We send this message to be handled by the upper Node layer
-            // through the public event stream API
-            // This is returned as a command to be handled via spawning
-            Ok(vec![Command::HandleServiceMessage {
-                msg_id,
-                msg,
-                user,
-                auth,
-            }])
-        } else {
-            // Let's relay the client message then
-            let node_msg = NodeMsg::ForwardServiceMsg {
-                msg,
-                user,
-                auth: auth.into_inner(),
-            };
-
-            let wire_msg = match WireMsg::single_src(
-                &self.node,
-                dst_location,
-                node_msg,
-                self.section.authority_provider().section_key(),
-            ) {
-                Ok(mut wire_msg) => {
-                    wire_msg.set_msg_id(msg_id);
-                    wire_msg
-                }
-                Err(err) => {
-                    error!("Failed create node msg {:?}", err);
-                    return Ok(vec![]);
-                }
-            };
-
-            match self.relay_message(wire_msg) {
-                Ok(cmd) => return Ok(vec![cmd]),
-                Err(err) => {
-                    error!("Failed to relay msg {:?}", err);
-                }
-            }
-            Ok(vec![])
-        }
+        self.handle_service_msg_received(msg_id, msg, user, auth)
+            .await
     }
 }

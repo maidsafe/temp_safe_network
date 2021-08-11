@@ -22,7 +22,7 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionKeyShare, SectionUtils},
+    section::{SectionKeyShare, SectionUtils},
     SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -224,13 +224,7 @@ impl Core {
         }
     }
 
-    pub(crate) fn send_dkg_start(&self, elder_candidates: ElderCandidates) -> Result<Vec<Command>> {
-        // Send to all participants.
-        let recipients: Vec<_> = elder_candidates.peers().collect();
-        self.send_dkg_start_to(elder_candidates, &recipients)
-    }
-
-    pub(crate) fn send_dkg_start_to(
+    pub(crate) fn send_dkg_start(
         &self,
         elder_candidates: ElderCandidates,
         recipients: &[Peer],
