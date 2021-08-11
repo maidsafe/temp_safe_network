@@ -1795,9 +1795,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.14.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26cbbfcf54607f4b3259fcd7e127e7bbf70dab72ee685deddde174d9a51bb022"
+checksum = "f131e0cdf6741d656821f761d566c2002aed0fdd78bfae556e54fbb0e616ef9c"
 dependencies = [
  "backoff",
  "base64 0.12.3",
@@ -1807,6 +1807,7 @@ dependencies = [
  "futures",
  "igd",
  "quinn",
+ "quinn-proto",
  "rcgen",
  "rustls",
  "serde",
