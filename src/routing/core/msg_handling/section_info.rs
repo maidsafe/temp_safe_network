@@ -16,7 +16,6 @@ use crate::routing::{
     SectionAuthorityProviderUtils,
 };
 use std::net::SocketAddr;
-use xor_name::XorName;
 
 // Message handling
 impl Core {
@@ -37,6 +36,7 @@ impl Core {
                     let section_auth = self
                         .network
                         .closest(&name)
+                        .map(|sap| &sap.value)
                         .unwrap_or_else(|| self.section.authority_provider());
                     GetSectionResponse::Success(section_auth.clone())
                 } else if let (true, Ok(pk_set)) =

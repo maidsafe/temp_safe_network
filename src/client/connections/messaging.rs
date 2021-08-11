@@ -107,7 +107,7 @@ impl Session {
             .read()
             .await
             .get_matching(&data_name)
-            .map(|sap| {
+            .map(|(_, sap)| {
                 (
                     sap.elders
                         .values()
@@ -171,7 +171,7 @@ impl Session {
             .read()
             .await
             .get_matching(&data_name)
-            .map(|sap| (sap.elders.clone(), sap.public_key_set.public_key()))
+            .map(|(_, sap)| (sap.elders.clone(), sap.public_key_set.public_key()))
             .ok_or(Error::NotBootstrapped)?;
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
@@ -446,7 +446,7 @@ impl Session {
 pub(crate) async fn send_message(
     elders: Vec<SocketAddr>,
     msg_bytes: Bytes,
-    endpoint: Endpoint,
+    endpoint: Endpoint<XorName>,
     msg_id: MessageId,
     priority: i32,
 ) -> Result<(), Error> {
