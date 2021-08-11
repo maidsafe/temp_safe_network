@@ -101,8 +101,10 @@ impl Comm {
             wire_msg.set_dst_xorname(*name);
             let bytes = wire_msg.serialize()?;
 
+            let priority = wire_msg.msg_kind().priority();
+
             self.endpoint
-                .try_send_message(bytes, addr)
+                .try_send_message(bytes, addr, priority)
                 .await
                 .map_err(|err| {
                     error!(
@@ -185,6 +187,7 @@ impl Comm {
         }
 
         let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
+        let priority = wire_msg.msg_kind().priority();
 
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
@@ -199,12 +202,10 @@ impl Comm {
 
             let result = self
                 .endpoint
-                .send_message(msg_bytes, &recipient.1)
+                .send_message(msg_bytes, &recipient.1, priority)
                 .await
                 .map_err(|err| match err {
-                    qp2p::Error::Connection(qp2p::ConnectionError::LocallyClosed) => {
-                        Error::ConnectionClosed
-                    }
+                    qp2p::Error::ConnectionClosed(qp2p::Close::Local) => Error::ConnectionClosed,
                     _ => {
                         trace!("during sending, received error {:?}", err);
                         Error::AddressNotReachable { err }
