@@ -10,9 +10,9 @@
 use super::{Error, Result};
 use tracing::debug;
 use uhttp_uri::HttpUri;
-use url::Url;
+use url::Url as RustUrl;
 
-const SAFE_URL_SCHEME: &str = "safe";
+const URL_SCHEME: &str = "safe";
 
 // URL labels must be 63 characters or less.
 // See https://www.ietf.org/rfc/rfc1035.txt
@@ -66,7 +66,7 @@ const INVALID_NRS_CHARS: [char; 30] = [
 //
 // This is kept internal to the parent module.
 #[derive(Debug, Clone)]
-pub(super) struct NativeUrlParts {
+pub(super) struct UrlParts {
     pub(super) scheme: String,
     pub(super) public_name: String, // "a.b.name" in "a.b.name"
     pub(super) top_name: String,    // "name"     in "a.b.name"
@@ -77,7 +77,7 @@ pub(super) struct NativeUrlParts {
     pub(super) fragment: String,
 }
 
-impl NativeUrlParts {
+impl UrlParts {
     // parses a URL into its component parts, performing basic validation.
     pub(super) fn parse(url: &str, ignore_labels_size: bool) -> Result<Self> {
         // detect any invalid url chars before parsing
@@ -87,18 +87,15 @@ impl NativeUrlParts {
         // (see below) we use a different parser to avoid normalization.
         // Parsing twice is inefficient, so there is room for improvement
         // later to standardize on a single parser.
-        let parsing_url = Url::parse(url).map_err(|parse_err| {
+        let parsing_url = RustUrl::parse(url).map_err(|parse_err| {
             let msg = format!("Problem parsing the URL \"{}\": {}", url, parse_err);
             Error::InvalidXorUrl(msg)
         })?;
 
         // Validate the url scheme is 'safe'
         let scheme = parsing_url.scheme().to_string();
-        if scheme != SAFE_URL_SCHEME {
-            let msg = format!(
-                "invalid scheme: '{}'. expected: '{}'",
-                scheme, SAFE_URL_SCHEME
-            );
+        if scheme != URL_SCHEME {
+            let msg = format!("invalid scheme: '{}'. expected: '{}'", scheme, URL_SCHEME);
             return Err(Error::InvalidXorUrl(msg));
         }
 
@@ -228,7 +225,7 @@ mod tests {
     use eyre::{eyre, Result};
 
     #[test]
-    fn test_native_url_validate_url_chars_with_whitespace() -> Result<()> {
+    fn test_url_validate_url_chars_with_whitespace() -> Result<()> {
         let urls = vec![
             // tests for
             // https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt
@@ -260,7 +257,7 @@ mod tests {
             "safe://ideographic\u{3000}space",
         ];
         for url in urls {
-            match NativeUrlParts::parse(url, false) {
+            match UrlParts::parse(url, false) {
                 Ok(_) => {
                     return Err(eyre!("Unexpectedly validated url with whitespace {}", url));
                 }
@@ -276,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_validate_url_chars_with_control_characters() -> Result<()> {
+    fn test_url_validate_url_chars_with_control_characters() -> Result<()> {
         let urls = vec![
             // tests for
             // https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Basic_ASCII_control_codes
@@ -346,7 +343,7 @@ mod tests {
             "safe://application\u{009F}programcommand",
         ];
         for url in urls {
-            match NativeUrlParts::parse(url, false) {
+            match UrlParts::parse(url, false) {
                 Ok(_) => {
                     return Err(eyre!(
                         "Unexpectedly validated url with control character {}",
@@ -365,7 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_validate_url_chars_with_invalid_characters() -> Result<()> {
+    fn test_url_validate_url_chars_with_invalid_characters() -> Result<()> {
         let urls = vec![
             // values from
             // INVALID_NRS_CHARS const
@@ -401,7 +398,7 @@ mod tests {
             "safe://nominal\u{206F}digitshapes",
         ];
         for url in urls {
-            match NativeUrlParts::parse(url, false) {
+            match UrlParts::parse(url, false) {
                 Ok(_) => {
                     return Err(eyre!(
                         "Unexpectedly validated url with invalid character {}",
