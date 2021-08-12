@@ -7,7 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{DstLocation, Error, MessageId, MsgKind, Result};
+use bincode::{
+    config::{BigEndian, FixintEncoding, WithOtherEndian, WithOtherIntEncoding},
+    Options,
+};
 use bytes::Bytes;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{io::Write, mem::size_of};
 
@@ -37,13 +42,34 @@ pub struct MsgEnvelope {
     pub dst_location: DstLocation,
 }
 
-// Bytes length in the header for the 'header_size' field
-const HDR_SIZE_BYTES_LEN: usize = size_of::<u16>();
+// The first two fields in the header. This is not part of the public interface.
+#[derive(Debug, Deserialize, Serialize)]
+struct HeaderMeta {
+    header_len: u16,
+    version: u16,
+}
 
-// Bytes index and size in the header for the 'version' field
-const HDR_VERSION_BYTES_START: usize = HDR_SIZE_BYTES_LEN;
-const HDR_VERSION_BYTES_LEN: usize = size_of::<u16>();
-const HDR_VERSION_BYTES_END: usize = HDR_VERSION_BYTES_START + HDR_VERSION_BYTES_LEN;
+impl HeaderMeta {
+    const SIZE: usize = size_of::<Self>();
+
+    fn header_len(&self) -> usize {
+        self.header_len.into()
+    }
+}
+
+lazy_static! {
+    // Options used for all bincode encoding.
+    static ref BINCODE_OPTIONS: WithOtherIntEncoding<
+        WithOtherEndian<bincode::DefaultOptions, BigEndian>,
+        FixintEncoding,
+    > = {
+        bincode::DefaultOptions::new()
+                    // This choice is arbitrary, and maintained for backwards compatibility.
+                    .with_big_endian()
+                    // We want known sizes in our wire format.
+                    .with_fixint_encoding()
+    };
+}
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
@@ -64,40 +90,29 @@ impl WireMsgHeader {
     // correspond to the message payload. The caller shall then take care of
     // deserializing the payload using the information provided in the `WireMsgHeader`.
     pub fn from(mut bytes: Bytes) -> Result<(Self, Bytes)> {
-        // Let's make sure there is a minimum number of bytes to parse the header size part.
-        let length = bytes.len();
-        if length < HDR_SIZE_BYTES_LEN {
-            return Err(Error::FailedToParse(format!(
-                "not enough bytes received ({}) to even read the wire message header length field",
-                length
-            )));
-        }
+        let bytes_len = bytes.len();
 
-        // Let's read the bytes which gives us the header size
-        let mut header_size_bytes = [0; HDR_SIZE_BYTES_LEN];
-        header_size_bytes[0..].copy_from_slice(&bytes[0..HDR_SIZE_BYTES_LEN]);
-        let header_size = u16::from_be_bytes(header_size_bytes);
+        // Parse the leading metadata
+        let meta: HeaderMeta = BINCODE_OPTIONS
+            .allow_trailing_bytes()
+            .deserialize(&bytes)
+            .map_err(|err| Error::FailedToParse(format!("invalid message header: {}", err)))?;
 
-        // We check that at least we have the minimum number of bytes
-        // for the header of any kind of message to be deserialised.
-        if length < header_size.into() {
+        // We check that we have at least the claimed number of header bytes.
+        if meta.header_len() > bytes_len {
             return Err(Error::FailedToParse(format!(
                 "not enough bytes received ({}) to deserialize wire message header",
-                length
+                bytes_len
             )));
         }
 
-        // ...now let's read the serialization protocol version bytes
-        let mut version_bytes = [0; HDR_VERSION_BYTES_LEN];
-        version_bytes[0..].copy_from_slice(&bytes[HDR_VERSION_BYTES_START..HDR_VERSION_BYTES_END]);
-        let version = u16::from_be_bytes(version_bytes);
         // Make sure we support this version
-        if version != MESSAGING_PROTO_VERSION {
-            return Err(Error::UnsupportedVersion(version));
+        if meta.version != MESSAGING_PROTO_VERSION {
+            return Err(Error::UnsupportedVersion(meta.version));
         }
 
         // ...finally, we read the message envelope bytes
-        let msg_envelope_bytes = &bytes[HDR_VERSION_BYTES_END..header_size.into()];
+        let msg_envelope_bytes = &bytes[HeaderMeta::SIZE..meta.header_len()];
         let msg_envelope: MsgEnvelope =
             rmp_serde::from_slice(msg_envelope_bytes).map_err(|err| {
                 Error::FailedToParse(format!(
@@ -108,12 +123,12 @@ impl WireMsgHeader {
 
         let header = Self {
             //header_size,
-            version,
+            version: meta.version,
             msg_envelope,
         };
 
         // Get a slice for the payload bytes, i.e. the bytes after the header bytes
-        let payload_bytes = bytes.split_off(header_size.into());
+        let payload_bytes = bytes.split_off(meta.header_len());
 
         Ok((header, payload_bytes))
     }
@@ -127,26 +142,18 @@ impl WireMsgHeader {
             ))
         })?;
 
-        // real header size based on the length of serialised msg envelope
-        let header_size =
-            (HDR_SIZE_BYTES_LEN + HDR_VERSION_BYTES_LEN + msg_envelope_vec.len()) as u16;
+        let meta = HeaderMeta {
+            // real header size based on the length of serialised msg envelope
+            header_len: (HeaderMeta::SIZE + msg_envelope_vec.len()) as u16,
+            version: self.version,
+        };
 
-        // Let's write the header size first
-        buffer
-            .write_all(&header_size.to_be_bytes())
+        // Write the leading metadata
+        BINCODE_OPTIONS
+            .serialize_into(&mut buffer, &meta)
             .map_err(|err| {
                 Error::Serialisation(format!(
-                    "header size value couldn't be serialized into the header: {}",
-                    err
-                ))
-            })?;
-
-        // Now let's write the serialisation protocol version bytes
-        buffer
-            .write_all(&self.version.to_be_bytes())
-            .map_err(|err| {
-                Error::Serialisation(format!(
-                    "version field couldn't be serialized into the header: {}",
+                    "header metadata couldn't be serialized into the header: {}",
                     err
                 ))
             })?;
@@ -159,13 +166,13 @@ impl WireMsgHeader {
             ))
         })?;
 
-        Ok((buffer, header_size))
+        Ok((buffer, meta.header_len))
     }
 
-    // Maximum size in bytes a WireMsgHeader can occupied when serialized.
+    // Message Pack uses type tags, but also variable length encoding, so we expect that serialized
+    // `MsgEnvelope`s size will typically be ≤ their in-memory size. This should only be relied on
+    // as a 'ballpark' estimate.
     pub fn max_size() -> u16 {
-        // We don't use 'std::mem::size_of' since we don't necesserally
-        // serialise them in the same way as they are represented in this struct.
-        (HDR_SIZE_BYTES_LEN + HDR_VERSION_BYTES_LEN + size_of::<MsgEnvelope>()) as u16
+        (HeaderMeta::SIZE + size_of::<MsgEnvelope>()) as u16
     }
 }
