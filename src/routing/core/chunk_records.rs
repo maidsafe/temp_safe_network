@@ -177,18 +177,10 @@ impl Core {
 
         let mut fresh_targets = BTreeSet::new();
         for target in targets {
-            if self
+            let _ = self
                 .liveness
-                .is_already_a_pending_request_operation(target, read.operation_id()?)
-            {
-                let _ = fresh_targets.insert(target);
-            } else {
-                info!(
-                    "Operation to get {:?} from {:?} is already in progress; not resending",
-                    address.name(),
-                    target
-                );
-            }
+                .add_a_pending_request_operation(target, read.operation_id()?);
+            let _ = fresh_targets.insert(target);
         }
 
         let msg = NodeMsg::NodeQuery(NodeQuery::Chunks {
