@@ -35,10 +35,9 @@ impl Core {
                 let response = if !is_bootstrapping {
                     let section_auth = self
                         .network
-                        .closest(&name)
-                        .map(|sap| &sap.value)
-                        .unwrap_or_else(|| self.section.authority_provider());
-                    GetSectionResponse::Success(section_auth.clone())
+                        .section_by_name(&name)
+                        .unwrap_or_else(|_| self.section.authority_provider().clone());
+                    GetSectionResponse::Success(section_auth)
                 } else if let (true, Ok(pk_set)) =
                     (self.section.prefix().matches(&name), self.public_key_set())
                 {

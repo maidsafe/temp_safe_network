@@ -59,6 +59,7 @@ impl Core {
             }
         }
 
-        self.update_state(snapshot).await
+        self.update_state(section.section_auth.clone(), snapshot)
+            .await
     }
 }

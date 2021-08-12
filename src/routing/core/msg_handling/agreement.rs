@@ -229,7 +229,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let updates =
             self.split_barrier
-                .process(self.section.prefix(), signed_section_auth, key_sig);
+                .process(self.section.prefix(), signed_section_auth.clone(), key_sig);
         if updates.is_empty() {
             return Ok(vec![]);
         }
@@ -249,6 +249,6 @@ impl Core {
             }
         }
 
-        self.update_state(snapshot).await
+        self.update_state(signed_section_auth, snapshot).await
     }
 }
