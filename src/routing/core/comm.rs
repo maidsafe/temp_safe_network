@@ -32,9 +32,10 @@ impl Drop for Comm {
 impl Comm {
     pub(crate) async fn new(
         transport_config: qp2p::Config,
+        local_addr: SocketAddr,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> Result<Self> {
-        let quic_p2p = QuicP2p::<XorName>::with_config(Some(transport_config), &[], true)
+        let quic_p2p = QuicP2p::<XorName>::with_config(transport_config)
             .map_err(|err| Error::InvalidConfig { err })?;
 
         // Don't bootstrap, just create an endpoint to listen to
@@ -42,7 +43,7 @@ impl Comm {
         // This also returns the a channel where we can listen for
         // disconnection events.
         let (endpoint, _incoming_connections, incoming_messages, disconnections) = quic_p2p
-            .new_endpoint()
+            .new_endpoint(local_addr)
             .await
             .map_err(|err| Error::CannotConnectEndpoint { err })?;
 
@@ -61,16 +62,18 @@ impl Comm {
 
     pub(crate) async fn bootstrap(
         transport_config: qp2p::Config,
+        local_addr: SocketAddr,
+        bootstrap_nodes: Vec<SocketAddr>,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> Result<(Self, SocketAddr)> {
-        let quic_p2p = QuicP2p::<XorName>::with_config(Some(transport_config), &[], true)
+        let quic_p2p = QuicP2p::<XorName>::with_config(transport_config)
             .map_err(|err| Error::InvalidConfig { err })?;
 
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
         let (endpoint, _incoming_connections, incoming_messages, disconnections, bootstrap_addr) =
             quic_p2p
-                .bootstrap()
+                .bootstrap(local_addr, bootstrap_nodes)
                 .await
                 .map_err(|err| Error::CannotConnectEndpoint { err })?;
 
@@ -124,16 +127,14 @@ impl Comm {
     /// Tests whether the peer is reachable.
     pub(crate) async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
         let qp2p_config = qp2p::Config {
-            local_ip: Some(self.endpoint.local_addr().ip()),
-            local_port: Some(0),
             forward_port: false,
             ..Default::default()
         };
 
-        let qp2p = QuicP2p::<XorName>::with_config(Some(qp2p_config), &[], false)
+        let qp2p = QuicP2p::<XorName>::with_config(qp2p_config)
             .map_err(|err| Error::InvalidConfig { err })?;
         let (connectivity_endpoint, _, _, _) = qp2p
-            .new_endpoint()
+            .new_endpoint((self.endpoint.local_addr().ip(), 0).into())
             .await
             .map_err(|err| Error::CannotConnectEndpoint { err })?;
 
@@ -314,7 +315,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn successful_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::new(transport_config(), tx).await?;
+        let comm = Comm::new(Config::default(), local_addr(), tx).await?;
 
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
@@ -345,7 +346,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn successful_send_to_subset() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::new(transport_config(), tx).await?;
+        let comm = Comm::new(Config::default(), local_addr(), tx).await?;
 
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
@@ -380,8 +381,9 @@ mod tests {
             Config {
                 // This makes this test faster.
                 idle_timeout_msec: Some(1),
-                ..transport_config()
+                ..Config::default()
             },
+            local_addr(),
             tx,
         )
         .await?;
@@ -409,8 +411,9 @@ mod tests {
         let comm = Comm::new(
             Config {
                 idle_timeout_msec: Some(1),
-                ..transport_config()
+                ..Config::default()
             },
+            local_addr(),
             tx,
         )
         .await?;
@@ -439,8 +442,9 @@ mod tests {
         let comm = Comm::new(
             Config {
                 idle_timeout_msec: Some(1),
-                ..transport_config()
+                ..Config::default()
             },
+            local_addr(),
             tx,
         )
         .await?;
@@ -471,10 +475,11 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn send_after_reconnect() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        let send_comm = Comm::new(transport_config(), tx).await?;
+        let send_comm = Comm::new(Config::default(), local_addr(), tx).await?;
 
-        let recv_transport = QuicP2p::<XorName>::with_config(Some(transport_config()), &[], false)?;
-        let (recv_endpoint, _, mut incoming_msgs, _) = recv_transport.new_endpoint().await?;
+        let recv_transport = QuicP2p::<XorName>::with_config(Config::default())?;
+        let (recv_endpoint, _, mut incoming_msgs, _) =
+            recv_transport.new_endpoint(local_addr()).await?;
         let recv_addr = recv_endpoint.socket_addr();
         let name = XorName::random();
 
@@ -529,11 +534,11 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn incoming_connection_lost() -> Result<()> {
         let (tx, mut rx0) = mpsc::channel(1);
-        let comm0 = Comm::new(transport_config(), tx).await?;
+        let comm0 = Comm::new(Config::default(), local_addr(), tx).await?;
         let addr0 = comm0.our_connection_info();
 
         let (tx, _rx) = mpsc::channel(1);
-        let comm1 = Comm::new(transport_config(), tx).await?;
+        let comm1 = Comm::new(Config::default(), local_addr(), tx).await?;
         let addr1 = comm1.our_connection_info();
 
         // Send a message to establish the connection
@@ -557,11 +562,8 @@ mod tests {
         Ok(())
     }
 
-    fn transport_config() -> Config {
-        Config {
-            local_ip: Some(Ipv4Addr::LOCALHOST.into()),
-            ..Default::default()
-        }
+    fn local_addr() -> SocketAddr {
+        (Ipv4Addr::LOCALHOST, 0).into()
     }
 
     fn new_section_info_message() -> Result<WireMsg> {
@@ -586,10 +588,10 @@ mod tests {
 
     impl Peer {
         async fn new() -> Result<Self> {
-            let transport = QuicP2p::<XorName>::with_config(Some(transport_config()), &[], false)?;
+            let transport = QuicP2p::<XorName>::with_config(Config::default())?;
 
             let (endpoint, incoming_connections, mut incoming_messages, disconnections) =
-                transport.new_endpoint().await?;
+                transport.new_endpoint(local_addr()).await?;
             let addr = endpoint.socket_addr();
 
             let (tx, rx) = mpsc::channel(1);

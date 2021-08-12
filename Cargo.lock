@@ -1796,8 +1796,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d709dbd167d64d0c29f539eb04b97a2185c05aa81499fc1c94f0f7a2cdf5d65"
+source = "git+https://github.com/connec/qp2p?branch=rip-bootstrap-cache#6f0ea7dac70fc8d21730656d4521cbb47463b608"
 dependencies = [
  "backoff",
  "base64 0.12.3",

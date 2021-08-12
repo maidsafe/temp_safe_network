@@ -97,15 +97,10 @@ impl Session {
                 // Disconnect from peer that sent us the redirect, connect to the new elders provided and
                 // request the section info again.
                 self.disconnect_from_peers(vec![src]).await?;
-                let endpoint = self.endpoint()?.clone();
+                let endpoint = self.endpoint()?;
                 let new_elders_addrs: Vec<SocketAddr> =
                     sap.elders.iter().map(|(_, addr)| *addr).collect();
-                self.qp2p
-                    .update_bootstrap_contacts(new_elders_addrs.as_slice());
-                let boostrapped_peer = self
-                    .qp2p
-                    .rebootstrap(&endpoint, new_elders_addrs.as_slice())
-                    .await?;
+                let boostrapped_peer = endpoint.connect_to_any(new_elders_addrs.as_slice()).await?;
                 self.send_get_section_query(client_pk, &boostrapped_peer)
                     .await?;
 
@@ -160,7 +155,6 @@ impl Session {
         if original_known_elders != received_elders {
             debug!("Connecting to new set of Elders: {:?}", received_elders);
             let new_elder_addresses = received_elders.keys().cloned().collect::<BTreeSet<_>>();
-            let updated_contacts = new_elder_addresses.iter().cloned().collect::<Vec<_>>();
             let old_elders = original_known_elders
                 .iter()
                 .filter_map(|(peer_addr, _)| {
@@ -172,7 +166,6 @@ impl Session {
                 })
                 .collect::<Vec<_>>();
             self.disconnect_from_peers(old_elders).await?;
-            self.qp2p.update_bootstrap_contacts(&updated_contacts);
             self.connect_to_elders().await
         } else {
             Ok(())

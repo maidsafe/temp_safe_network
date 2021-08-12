@@ -95,14 +95,7 @@ async fn main() -> Result<()> {
             config.local_addr
         );
     } else {
-        assert_eq!(
-            file_config.network_config.local_ip,
-            config.local_addr.map(|addr| addr.ip())
-        );
-        assert_eq!(
-            file_config.network_config.local_port,
-            config.local_addr.map(|addr| addr.port())
-        );
+        assert_eq!(file_config.local_addr, config.local_addr);
     }
 
     if command_line_args.public_addr.is_some() {
@@ -126,24 +119,21 @@ async fn main() -> Result<()> {
     if !command_line_args.hard_coded_contacts.is_empty() {
         assert_eq!(
             command_line_args.hard_coded_contacts,
-            config.network_config.hard_coded_contacts
+            config.hard_coded_contacts
         )
     } else {
-        assert_eq!(
-            file_config.network_config.hard_coded_contacts,
-            config.network_config.hard_coded_contacts
-        )
+        assert_eq!(file_config.hard_coded_contacts, config.hard_coded_contacts)
     }
 
     if command_line_args.max_msg_size_allowed.is_some() {
         assert_eq!(
             command_line_args.max_msg_size_allowed,
-            config.network_config.max_msg_size_allowed
+            config.max_msg_size_allowed
         )
     } else {
         assert_eq!(
-            file_config.network_config.max_msg_size_allowed,
-            config.network_config.max_msg_size_allowed
+            file_config.max_msg_size_allowed,
+            config.max_msg_size_allowed
         )
     }
 
@@ -174,13 +164,10 @@ async fn main() -> Result<()> {
     if command_line_args.bootstrap_cache_dir.is_some() {
         assert_eq!(
             command_line_args.bootstrap_cache_dir,
-            config.network_config.bootstrap_cache_dir
+            config.bootstrap_cache_dir
         )
     } else {
-        assert_eq!(
-            file_config.network_config.bootstrap_cache_dir,
-            config.network_config.bootstrap_cache_dir
-        )
+        assert_eq!(file_config.bootstrap_cache_dir, config.bootstrap_cache_dir)
     }
 
     if command_line_args.upnp_lease_duration.is_some() {

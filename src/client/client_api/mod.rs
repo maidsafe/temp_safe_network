@@ -17,7 +17,7 @@ use crate::messaging::data::{CmdError, DataCmd};
 use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
 use lru::LruCache;
 use rand::rngs::OsRng;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{mpsc::Receiver, RwLock},
     time::Duration,
@@ -81,7 +81,13 @@ impl Client {
         // Bootstrap to the network, connecting to the section responsible
         // for our client public key
         debug!("Bootstrapping to the network...");
-        attempt_bootstrap(&mut session, client_pk).await?;
+        attempt_bootstrap(
+            &mut session,
+            config.local_addr,
+            config.bootstrap_nodes,
+            client_pk,
+        )
+        .await?;
 
         let client = Self {
             keypair,
@@ -130,10 +136,18 @@ impl Client {
 
 /// Utility function that bootstraps a client to the network. If there is a failure then it retries.
 /// After a maximum of three attempts if the boostrap process still fails, then an error is returned.
-async fn attempt_bootstrap(session: &mut Session, client_pk: PublicKey) -> Result<(), Error> {
+async fn attempt_bootstrap(
+    session: &mut Session,
+    local_addr: SocketAddr,
+    bootstrap_nodes: Vec<SocketAddr>,
+    client_pk: PublicKey,
+) -> Result<(), Error> {
     let mut attempts: u8 = 0;
     loop {
-        match session.bootstrap(client_pk).await {
+        match session
+            .bootstrap(local_addr, bootstrap_nodes.clone(), client_pk)
+            .await
+        {
             Ok(()) => return Ok(()),
             Err(err) => {
                 attempts += 1;

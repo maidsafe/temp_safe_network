@@ -8,6 +8,7 @@
 
 use crate::routing::TransportConfig;
 use ed25519_dalek::Keypair;
+use std::net::{Ipv4Addr, SocketAddr};
 
 /// Routing configuration.
 #[derive(Debug)]
@@ -19,6 +20,12 @@ pub struct Config {
     pub keypair: Option<Keypair>,
     /// Configuration for the underlying network transport.
     pub transport_config: TransportConfig,
+    /// The local address to bind to.
+    ///
+    /// This will default to localhost and a random port (e.g. `127.0.0.1:0`).
+    pub local_addr: SocketAddr,
+    /// Nodes to contact on bootstrap.
+    pub bootstrap_nodes: Vec<SocketAddr>,
 }
 
 impl Default for Config {
@@ -27,6 +34,8 @@ impl Default for Config {
             first: false,
             keypair: None,
             transport_config: TransportConfig::default(),
+            local_addr: (Ipv4Addr::LOCALHOST, 0).into(),
+            bootstrap_nodes: Default::default(),
         }
     }
 }

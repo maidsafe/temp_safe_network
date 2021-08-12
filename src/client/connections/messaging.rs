@@ -32,18 +32,22 @@ const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
 impl Session {
     /// Bootstrap to the network maintaining connections to several nodes.
-    pub(crate) async fn bootstrap(&mut self, client_pk: PublicKey) -> Result<(), Error> {
+    pub(crate) async fn bootstrap(
+        &mut self,
+        local_addr: SocketAddr,
+        bootstrap_nodes: Vec<SocketAddr>,
+        client_pk: PublicKey,
+    ) -> Result<(), Error> {
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
             client_pk
         );
 
         let (endpoint, _, mut incoming_messages, _disconnections, mut bootstrapped_peer) =
-            self.qp2p.bootstrap().await?;
-
+            self.qp2p.bootstrap(local_addr, bootstrap_nodes).await?;
         self.endpoint = Some(endpoint.clone());
+
         let mut bootstrap_nodes = endpoint
-            .clone()
             .bootstrap_nodes()
             .to_vec()
             .into_iter()
@@ -67,12 +71,8 @@ impl Session {
             } else {
                 // Remove the unresponsive peer we boostrapped to and bootstrap again
                 let _ = bootstrap_nodes.remove(&bootstrapped_peer);
-                bootstrapped_peer = self
-                    .qp2p
-                    .rebootstrap(
-                        &endpoint,
-                        &bootstrap_nodes.iter().cloned().collect::<Vec<_>>(),
-                    )
+                bootstrapped_peer = endpoint
+                    .connect_to_any(&bootstrap_nodes.iter().cloned().collect::<Vec<_>>())
                     .await?;
             }
         }

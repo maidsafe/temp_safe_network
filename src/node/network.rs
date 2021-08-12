@@ -17,7 +17,12 @@ use crate::types::PublicKey;
 use bls::{PublicKey as BlsPublicKey, PublicKeySet};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use secured_linked_list::SecuredLinkedList;
-use std::{collections::BTreeSet, net::SocketAddr, path::Path, sync::Arc};
+use std::{
+    collections::BTreeSet,
+    net::{Ipv4Addr, SocketAddr},
+    path::Path,
+    sync::Arc,
+};
 use xor_name::{Prefix, XorName};
 
 ///
@@ -36,6 +41,10 @@ impl Network {
         let routing_config = RoutingConfig {
             first: config.is_first(),
             transport_config: config.network_config().clone(),
+            local_addr: config
+                .local_addr
+                .unwrap_or_else(|| (Ipv4Addr::LOCALHOST, 0).into()),
+            bootstrap_nodes: config.hard_coded_contacts.clone().into_iter().collect(),
             keypair: None,
         };
         let (routing, event_stream) =

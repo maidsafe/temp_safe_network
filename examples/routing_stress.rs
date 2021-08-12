@@ -23,7 +23,7 @@ use std::{
     collections::BTreeMap,
     fs::File,
     io::BufWriter,
-    net::{Ipv4Addr, SocketAddr},
+    net::SocketAddr,
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
@@ -41,9 +41,7 @@ use safe_network::routing::create_test_used_space_and_root_storage;
 use safe_network::messaging::{
     data::Error::FailedToWriteFile, node::NodeMsg, DstLocation, MessageId,
 };
-use safe_network::routing::{
-    Cache, Config, Event as RoutingEvent, NodeElderChange, Routing, TransportConfig,
-};
+use safe_network::routing::{Cache, Config, Event as RoutingEvent, NodeElderChange, Routing};
 
 // Minimal delay between two consecutive prints of the network status.
 const MIN_PRINT_DELAY: Duration = Duration::from_millis(500);
@@ -221,11 +219,7 @@ impl Network {
 
         let config = Config {
             first: bootstrap_addrs.is_empty(),
-            transport_config: TransportConfig {
-                hard_coded_contacts: bootstrap_addrs.into_iter().collect(),
-                local_ip: Some(Ipv4Addr::LOCALHOST.into()),
-                ..Default::default()
-            },
+            bootstrap_nodes: bootstrap_addrs,
             ..Default::default()
         };
 

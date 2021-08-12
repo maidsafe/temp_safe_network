@@ -43,7 +43,7 @@ pub async fn create_test_client_with(
     init_logger();
     let timeout = timeout.map(Duration::from_secs);
     let contact_info = read_network_conn_info()?;
-    let config = Config::new(None, Some(contact_info), timeout).await;
+    let config = Config::new(None, None, Some(contact_info), timeout).await;
     let client = Client::new(optional_keypair.clone(), config).await?;
 
     Ok(client)

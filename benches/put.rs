@@ -18,7 +18,7 @@ async fn put_kbs(amount: usize) -> Result<(), Error> {
     let contact_info = read_network_conn_info().unwrap();
     let size = 1024 * amount;
     let data = generate_random_vector(size);
-    let config = Config::new(None, Some(contact_info), None).await;
+    let config = Config::new(None, None, Some(contact_info), None).await;
     let client = Client::new(None, config).await?;
     let address = client.store_public_blob(&data).await?;
 

@@ -1618,10 +1618,8 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let comm = Comm::new(
-        qp2p::Config {
-            local_ip: Some(Ipv4Addr::LOCALHOST.into()),
-            ..Default::default()
-        },
+        qp2p::Config::default(),
+        (Ipv4Addr::LOCALHOST, 0).into(),
         comm_tx,
     )
     .await?;
@@ -1946,14 +1944,7 @@ fn create_node(age: u8, prefix: Option<Prefix>) -> Node {
 
 pub(crate) async fn create_comm() -> Result<Comm> {
     let (tx, _rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    Ok(Comm::new(
-        qp2p::Config {
-            local_ip: Some(Ipv4Addr::LOCALHOST.into()),
-            ..Default::default()
-        },
-        tx,
-    )
-    .await?)
+    Ok(Comm::new(qp2p::Config::default(), (Ipv4Addr::LOCALHOST, 0).into(), tx).await?)
 }
 
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
