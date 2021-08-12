@@ -16,12 +16,14 @@ use crate::messaging::{
 };
 use crate::messaging::{NodeAuth, SectionAuthorityProvider};
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;
+use crate::routing::network::NetworkUtils;
 use crate::routing::peer::PeerUtils;
 use crate::routing::{
     error::Result, routing_api::command::Command, section::SectionUtils,
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
+use bytes::Bytes;
 use itertools::Itertools;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
@@ -320,6 +322,7 @@ impl Core {
         msg_id: MessageId,
         auth: AuthorityProof<ServiceAuth>,
         msg: ServiceMsg,
+        payload: Bytes,
         dst_location: DstLocation,
     ) -> Result<Vec<Command>> {
         trace!("Service msg received being handled: {:?}", msg);
@@ -380,8 +383,9 @@ impl Core {
                 }
             }
         };
-
+        info!("Checking for entropy at Client");
         if let Some(return_sap) = self.check_entropy_for_client(&data_name, &received_section_pk) {
+            info!("Client AE triggered. Seems like client is out of date.");
             // AE triggered! Send back the message with SAP of actual destination section
             let service_msg = ServiceMsg::ServiceError(ServiceError {
                 reason: Some(crate::messaging::data::Error::WrongDestination),
@@ -427,22 +431,23 @@ impl Core {
         data_name: &XorName,
         received_section_pk: &bls::PublicKey,
     ) -> Option<SectionAuthorityProvider> {
-        let our_section = &self.section.section_auth.value;
-        let actual_section_auth = self
+        let our_section = self.section.section_auth.value.clone();
+        let better_sap = self
             .network()
-            .sections
-            .get_matching(data_name)
-            .map(|(_, sap)| &sap.value)
-            .unwrap_or(our_section);
+            .section_by_name(data_name)
+            .unwrap_or_else(|_| our_section.clone());
 
-        if actual_section_auth != our_section {
+        info!("Our SAP: {:?}", our_section);
+        info!("Better SAP: {:?}", better_sap);
+        if better_sap != our_section {
             // Update the client of the actual destination section
-            Some(actual_section_auth.clone())
+            info!("We have a better matched section for the data name");
+            Some(better_sap)
         } else {
             // Check if client has latest knowledge of our section
             if received_section_pk != &our_section.section_key() {
-                // Client is lagging on knowledge of our section, update them
-                Some(our_section.clone())
+                info!("Client is lagging on knowledge of our section, updating them");
+                Some(our_section)
             } else {
                 None
             }

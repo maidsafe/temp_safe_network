@@ -33,10 +33,11 @@ pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub(crate) use chunk_store::ChunkStore;
 
 use self::{enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
+use crate::messaging::node::SectionAuth;
 use crate::messaging::{
     node::{Network, Proposal, Section},
     signature_aggregator::SignatureAggregator,
-    MessageId,
+    MessageId, SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
@@ -150,7 +151,11 @@ impl Core {
         }
     }
 
-    pub(crate) async fn update_state(&mut self, old: StateSnapshot) -> Result<Vec<Command>> {
+    pub(crate) async fn update_state(
+        &mut self,
+        new_section_auth: SectionAuth<SectionAuthorityProvider>,
+        old: StateSnapshot,
+    ) -> Result<Vec<Command>> {
         let mut commands = vec![];
         let new = self.state_snapshot();
 
@@ -159,6 +164,14 @@ impl Core {
 
         if new.prefix != old.prefix {
             info!("Split");
+        }
+
+        if self
+            .network
+            .sections
+            .insert(new_section_auth.value.prefix, new_section_auth)
+        {
+            info!("Updated our section's state in network's PrefixMap");
         }
 
         if new.last_key != old.last_key {

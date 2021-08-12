@@ -22,6 +22,7 @@ use super::Core;
 use crate::messaging::{
     data::{DataCmd, DataQuery, ServiceMsg},
     node::{NodeCmd, NodeMsg, NodeQuery, Proposal},
+    signature_aggregator::Error as AggregatorError,
     DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth, ServiceAuth,
     WireMsg,
 };
@@ -101,7 +102,7 @@ impl Core {
                 msg,
                 dst_location,
             } => {
-                self.handle_service_message(sender, msg_id, auth, msg, dst_location)
+                self.handle_service_message(sender, msg_id, auth, msg, payload, dst_location)
                     .await
             }
         }
@@ -631,7 +632,7 @@ impl Core {
             }
             Err(AggregatorError::NotEnoughShares) => Ok(true),
             Err(err) => {
-                error!("Error accumulating message at dst: {}", err);
+                error!("Error accumulating message at dst: {:?}", err);
                 Err(Error::InvalidSignatureShare)
             }
         }
