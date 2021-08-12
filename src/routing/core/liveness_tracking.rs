@@ -10,10 +10,10 @@ use crate::routing::XorName;
 
 use crate::messaging::data::OperationId;
 use dashmap::DashMap;
-use dashmap::DashSet;
 use itertools::Itertools;
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 const NEIGHBOUR_COUNT: usize = 2;
 const MIN_PENDING_OPS: usize = 10;
@@ -25,7 +25,7 @@ type NodeIdentifier = XorName;
 #[derive(Clone, Debug)]
 pub(crate) struct Liveness {
     /// One of (potentially many) different ways of assessing unresponsiveness of nodes.
-    unfulfilled_requests: Arc<DashMap<NodeIdentifier, DashSet<OperationId>>>,
+    unfulfilled_requests: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>,
     closest_nodes_to: Arc<DashMap<XorName, Vec<XorName>>>,
 }
 
@@ -39,25 +39,21 @@ impl Liveness {
 
     // Inserts a pending_operation, and is deemed as such until we get the appropriate response from the node
     // Returns false if the operation already existed.
-    pub(crate) fn is_already_a_pending_request_operation(
+    pub(crate) async fn add_a_pending_request_operation(
         &self,
         node_id: NodeIdentifier,
         operation_id: OperationId,
-    ) -> bool {
-        let new_operation = self
-            .unfulfilled_requests
-            .entry(node_id)
-            .or_default()
-            .insert(operation_id.to_string());
+    ) {
+        let entry = self.unfulfilled_requests.entry(node_id).or_default();
 
-        if new_operation {
-            trace!(
-                "Black eye added against node: {:?}: for op: {:?}",
-                node_id,
-                operation_id
-            );
-        }
-        new_operation
+        trace!(
+            "Adding pending operation against node: {:?}: for op: {:?}",
+            node_id,
+            &operation_id
+        );
+
+        let v = entry.value();
+        v.write().await.push(operation_id);
     }
 
     pub(crate) fn retain_members_only(&self, current_members: BTreeSet<XorName>) {
@@ -78,7 +74,7 @@ impl Liveness {
     }
 
     /// Removes a pending_operation from the node liveness records
-    pub(crate) fn request_operation_fulfilled(
+    pub(crate) async fn request_operation_fulfilled(
         &self,
         node_id: &NodeIdentifier,
         operation_id: OperationId,
@@ -89,10 +85,21 @@ impl Liveness {
             operation_id
         );
 
-        if let Some(pending_operations) = self.unfulfilled_requests.get_mut(node_id) {
-            let _ = pending_operations.remove(&operation_id);
+        if let Some(entry) = self.unfulfilled_requests.get(node_id) {
+            let v = entry.value();
+            let mut has_removed = false;
+
+            // only remove the first instance from the vec
+            v.write().await.retain(|x| {
+                if has_removed || x != &operation_id {
+                    true
+                } else {
+                    has_removed = true;
+                    false
+                }
+            });
             trace!(
-                "Black eye removed for node: {:?} op: {:?}",
+                "Pending operation removed for node: {:?} op: {:?}",
                 node_id,
                 operation_id
             );
@@ -118,41 +125,45 @@ impl Liveness {
     }
 
     // this is not an exact definition, thus has tolerance for variance due to concurrency
-    pub(crate) fn find_unresponsive_nodes(&self) -> Vec<(XorName, usize)> {
+    pub(crate) async fn find_unresponsive_nodes(&self) -> Vec<(XorName, usize)> {
         let mut unresponsive_nodes = Vec::new();
         for entry in self.closest_nodes_to.iter() {
             let (node, neighbours) = entry.pair();
 
             let node = *node;
-            if let Some(max_pending_by_neighbours) = neighbours
-                .iter()
-                .map(|neighbour| {
-                    self.unfulfilled_requests
-                        .get(neighbour)
-                        .map(|entry| entry.value().len())
-                        .unwrap_or(0)
-                })
-                .max()
-            {
-                let pending_operations_count = self
-                    .unfulfilled_requests
-                    .get(&node)
-                    .map(|entry| entry.value().len())
-                    .unwrap_or(0);
+            let mut max_pending_by_neighbours = 0;
+            // if let Some(max_pending_by_neighbours) =
+            for neighbour in neighbours.iter() {
+                if let Some(entry) = self.unfulfilled_requests.get(neighbour) {
+                    // let (k,v) = entry.pair();
+                    let val = entry.value().read().await.len();
 
-                if pending_operations_count > MIN_PENDING_OPS
-                    && max_pending_by_neighbours > MIN_PENDING_OPS
-                    && pending_operations_count as f64 * PENDING_OP_TOLERANCE_RATIO
-                        > max_pending_by_neighbours as f64
-                {
-                    tracing::info!(
-                        "Pending ops for {}: {} Neighbour max: {}",
-                        node,
-                        pending_operations_count,
-                        max_pending_by_neighbours
-                    );
-                    unresponsive_nodes.push((node, pending_operations_count));
+                    if val > max_pending_by_neighbours {
+                        max_pending_by_neighbours = val
+                    }
                 }
+            }
+
+            let pending_operations_count = if let Some(entry) = self.unfulfilled_requests.get(&node)
+            {
+                // let (k,v) = entry.pair();
+                entry.value().read().await.len()
+            } else {
+                0
+            };
+
+            if pending_operations_count > MIN_PENDING_OPS
+                && max_pending_by_neighbours > MIN_PENDING_OPS
+                && pending_operations_count as f64 * PENDING_OP_TOLERANCE_RATIO
+                    > max_pending_by_neighbours as f64
+            {
+                tracing::info!(
+                    "Pending ops for {}: {} Neighbour max: {}",
+                    node,
+                    pending_operations_count,
+                    max_pending_by_neighbours
+                );
+                unresponsive_nodes.push((node, pending_operations_count));
             }
         }
         unresponsive_nodes

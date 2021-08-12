@@ -212,7 +212,9 @@ impl Core {
         match query_response.operation_id() {
             Ok(op_id) => {
                 let node_id = XorName::from(sending_nodes_pk);
-                self.liveness.request_operation_fulfilled(&node_id, op_id)
+                self.liveness
+                    .request_operation_fulfilled(&node_id, op_id)
+                    .await
             }
             Err(error) => {
                 warn!("Node problems noted when retrieving data: {:?}", error)
@@ -220,7 +222,7 @@ impl Core {
         }
 
         // Check for unresponsive adults here.
-        for (name, count) in self.liveness.find_unresponsive_nodes() {
+        for (name, count) in self.liveness.find_unresponsive_nodes().await {
             warn!(
                 "Node {} has {} pending ops. It might be unresponsive",
                 name, count
