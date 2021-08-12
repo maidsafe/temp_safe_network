@@ -335,33 +335,14 @@ impl Core {
             return Ok(vec![]);
         }
 
-        let user = match self.get_enduser_by_addr(&sender) {
-            Some(end_user) => {
-                debug!(
-                    "Message ({}) from client {}, socket id already exists: {:?}",
-                    msg_id, sender, end_user
-                );
-                end_user
-            }
+        let user = match self.comm.get_connection_id(&sender).await {
+            Some(name) => EndUser(name),
             None => {
-                // This is the first time we receive a message from this client
-                debug!(
-                    "First message ({}) from sender {}, creating a socket id",
-                    msg_id, sender
+                error!(
+                    "Service msg has been dropped since client connection id for {} was not found: {:?}",
+                    sender, msg
                 );
-
-                // TODO: remove the enduser registry and simply encrypt socket
-                // addr with this node's keypair and use that as the socket id
-                match self.try_add_enduser(sender) {
-                    Ok(end_user) => end_user,
-                    Err(err) => {
-                        error!(
-                            "Failed to cache client socket address for message {:?}: {:?}",
-                            msg, err
-                        );
-                        return Ok(vec![]);
-                    }
-                }
+                return Ok(vec![]);
             }
         };
 

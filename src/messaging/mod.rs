@@ -45,7 +45,7 @@ pub use self::{
         AuthorityProof, BlsShareAuth, NodeAuth, SectionAuth, ServiceAuth, VerifyAuthority,
     },
     errors::{Error, Result},
-    location::{DstLocation, EndUser, SocketId, SrcLocation},
+    location::{DstLocation, EndUser, SrcLocation},
     msg_id::{MessageId, MESSAGE_ID_LEN},
     msg_kind::MsgKind,
     sap::SectionAuthorityProvider,
