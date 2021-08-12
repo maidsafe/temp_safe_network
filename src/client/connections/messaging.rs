@@ -143,9 +143,8 @@ impl Session {
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
-        let priority = wire_msg.msg_kind().priority();
 
-        send_message(elders, wire_msg, self.endpoint.clone(), msg_id, priority).await
+        send_message(elders, wire_msg, self.endpoint.clone(), msg_id).await
     }
 
     /// Send a `ServiceMsg` to the network awaiting for the response.
@@ -450,8 +449,8 @@ pub(crate) async fn send_message(
     wire_msg: WireMsg,
     endpoint: Option<Endpoint<XorName>>,
     msg_id: MessageId,
-    priority: i32,
 ) -> Result<(), Error> {
+    let priority = wire_msg.msg_kind().priority();
     let msg_bytes = wire_msg.serialize()?;
     let endpoint = match endpoint {
         Some(ep) => ep,
