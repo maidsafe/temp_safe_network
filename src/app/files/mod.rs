@@ -13,8 +13,8 @@ mod metadata;
 mod realpath;
 
 use crate::{
-    app::consts::*, app::nrs::VersionHash, fetch::Range, ContentType, DataType, Error, NativeUrl,
-    Result, Safe, Scope, XorUrl, hashset,
+    app::consts::*, app::nrs::VersionHash, fetch::Range, hashset, ContentType, DataType, Error,
+    NativeUrl, Result, Safe, Scope, XorUrl,
 };
 use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
 use files_map::add_or_update_file_item;
@@ -107,11 +107,7 @@ impl Safe {
 
             let entry = NativeUrl::from_xorurl(&files_map_xorurl)?;
             let _ = &self
-                .write_to_register(
-                    &xor_url,
-                    entry,
-                    Default::default(),
-                )
+                .write_to_register(&xor_url, entry, Default::default())
                 .await?;
 
             xor_url

@@ -99,8 +99,16 @@ impl Safe {
                 entry, err
             ))
         })?;
-        let entry_xorname = self.safe_client.store_public_blob(&serialised_entry, false).await?;
-        let entry_xorurl = NativeUrl::encode_blob(entry_xorname, Scope::Public, ContentType::Raw, self.xorurl_base)?;
+        let entry_xorname = self
+            .safe_client
+            .store_public_blob(&serialised_entry, false)
+            .await?;
+        let entry_xorurl = NativeUrl::encode_blob(
+            entry_xorname,
+            Scope::Public,
+            ContentType::Raw,
+            self.xorurl_base,
+        )?;
         let entry_ptr = NativeUrl::from_xorurl(&entry_xorurl)?;
         let safeurl = Safe::parse_url(url)?;
         let address = safeurl.register_address()?;
@@ -121,7 +129,11 @@ impl Safe {
         let address = safeurl.register_address()?;
         let hash = self
             .safe_client
-            .write_to_register(address, NativeUrl::from_url(MULTIMAP_REMOVED_MARK)?, to_remove)
+            .write_to_register(
+                address,
+                NativeUrl::from_url(MULTIMAP_REMOVED_MARK)?,
+                to_remove,
+            )
             .await?;
 
         Ok(hash)
@@ -152,7 +164,7 @@ impl Safe {
         // We parse each entry in the Register as a 'MultimapKeyValue'
         let mut multimap_key_vals = MultimapKeyValues::new();
         for (hash, entry_ptr) in entries.iter() {
-            if &entry_ptr.to_string() == MULTIMAP_REMOVED_MARK {
+            if entry_ptr.to_string() == MULTIMAP_REMOVED_MARK {
                 // this is a tombstone entry created to delete some old entries
                 continue;
             }
@@ -187,7 +199,7 @@ impl Safe {
         }?;
 
         // We parse each entry in the Register as a 'MultimapKeyValue'
-        if &entry_ptr.to_string() == MULTIMAP_REMOVED_MARK {
+        if entry_ptr.to_string() == MULTIMAP_REMOVED_MARK {
             Ok(None)
         } else {
             let entry = self.fetch_public_blob(&entry_ptr, None).await?;
