@@ -237,7 +237,7 @@ mod tests {
             utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff_delayed},
             Error,
         },
-        url::NativeUrl,
+        url::Url,
     };
     use eyre::{bail, eyre, Result};
     use std::{
@@ -573,10 +573,10 @@ mod tests {
         Ok(())
     }
 
-    fn random_url() -> Result<NativeUrl> {
+    fn random_url() -> Result<Url> {
         use crate::url::*;
         let xor_name = XorName::random();
-        let url = match NativeUrl::encode_blob(
+        let url = match Url::encode_blob(
             xor_name,
             Scope::Public,
             ContentType::Raw,
@@ -589,7 +589,7 @@ mod tests {
             ),
         };
 
-        match NativeUrl::from_url(&url) {
+        match Url::from_url(&url) {
             Ok(url) => Ok(url),
             Err(e) => bail!(
                 "Unexpected error returned when attempting to parse url string: {}",
