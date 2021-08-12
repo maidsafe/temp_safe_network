@@ -12,9 +12,7 @@ use qp2p::IncomingMessages;
 use tracing::{debug, error, info, trace, warn};
 
 use super::Session;
-use crate::client::connections::messaging::{
-    rebuild_message_for_ae_resend, send_message, verify_bounced_off_message_integrity,
-};
+use crate::client::connections::messaging::{rebuild_message_for_ae_resend, send_message};
 use crate::client::Error;
 use crate::messaging::data::Error as DataError;
 use crate::messaging::data::ServiceError;
@@ -23,6 +21,7 @@ use crate::messaging::{
     section_info::{GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, WireMsg,
 };
+use crate::messaging::{DstLocation, ServiceAuth};
 
 impl Session {
     // Listen for incoming messages on a connection
@@ -64,8 +63,14 @@ impl Session {
                         error!("Error handling network info message: {:?}", error);
                     }
                 }
-                MessageType::Service { msg_id, msg, .. } => {
-                    self.handle_client_msg(msg_id, msg, src).await
+                MessageType::Service {
+                    msg_id,
+                    msg,
+                    auth,
+                    dst_location,
+                } => {
+                    self.handle_client_msg(msg_id, msg, src, auth.into_inner(), dst_location)
+                        .await
                 }
                 msg_type => {
                     warn!("Unexpected message type received: {:?}", msg_type);
@@ -98,12 +103,18 @@ impl Session {
     }
 
     // Handle messages intended for client consumption (re: queries + commands)
-    async fn handle_client_msg(&mut self, msg_id: MessageId, msg: ServiceMsg, src: SocketAddr) {
+    async fn handle_client_msg(
+        &mut self,
+        msg_id: MessageId,
+        msg: ServiceMsg,
+        src: SocketAddr,
+        auth: ServiceAuth,
+        dst_location: DstLocation,
+    ) {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = self.pending_queries.clone();
         let error_sender = self.incoming_err_sender.clone();
         let network = self.network.clone();
-        let client_pk = self.client_pk;
         let endpoint = self.endpoint.clone();
 
         let _ = tokio::spawn(async move {
@@ -162,29 +173,22 @@ impl Session {
                         .write()
                         .await
                         .insert(section_auth.prefix, section_auth);
-                    if let Some((id, serialised_cmd, dst_address, auth)) =
-                        verify_bounced_off_message_integrity(client_pk, &message)
+
+                    if let Some((wire_msg, elders)) = rebuild_message_for_ae_resend(
+                        msg_id,
+                        message,
+                        auth,
+                        dst_location.name(),
+                        network,
+                    )
+                    .await
                     {
-                        if let Some((wire_msg, elders)) = rebuild_message_for_ae_resend(
-                            id,
-                            serialised_cmd,
-                            auth,
-                            dst_address,
-                            network,
-                        )
-                        .await
-                        {
-                            if let Err(e) =
-                                send_message(elders, wire_msg, endpoint.clone(), msg_id).await
-                            {
-                                error!("AE: Error on resending ServiceMsg w/id {:?}: {:?}. Restart the flow", msg_id, e)
-                                //     TODO: Remove pending_query channels on query failure.
-                            }
-                        } else {
-                            error!("AE: Error rebuilding message for resending");
+                        if let Err(e) = send_message(elders, wire_msg, endpoint, msg_id).await {
+                            error!("AE: Error on resending ServiceMsg w/id {:?}: {:?}. Restart the flow", msg_id, e)
+                            //     TODO: Remove pending_query channels on query failure.
                         }
                     } else {
-                        error!("AE: Error verifying bounced off message integrity. Content/Signature tampered");
+                        error!("AE: Error rebuilding message for resending");
                     }
                 }
                 msg => {

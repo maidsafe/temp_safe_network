@@ -20,9 +20,9 @@ use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
     section_info::SectionInfoMsg,
-    DstLocation, MessageId, MessageType, MsgKind, SectionAuthorityProvider, ServiceAuth, WireMsg,
+    DstLocation, MessageId, MsgKind, SectionAuthorityProvider, ServiceAuth, WireMsg,
 };
-use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
+use crate::types::{Chunk, PrivateChunk, PublicChunk};
 
 use super::{QueryResult, Session};
 use crate::routing::XorName;
@@ -492,39 +492,6 @@ pub(crate) async fn send_message(
     }
 
     Ok(())
-}
-
-pub(crate) fn verify_bounced_off_message_integrity(
-    client_pk: PublicKey,
-    message: &Bytes,
-) -> Option<(MessageId, Bytes, Option<XorName>, ServiceAuth)> {
-    // We need to deserialize to check if the original message was tampered
-    // and verify the ServiceAuth.
-    if let Ok(the_original_message) = WireMsg::deserialize(message.clone()) {
-        match the_original_message {
-            MessageType::Service {
-                msg_id, msg, auth, ..
-            } => {
-                // Verify that the authority has not changed
-                if let Ok(serialized_cmd) = WireMsg::serialize_msg_payload(&msg) {
-                    if client_pk == auth.public_key
-                        && client_pk
-                            .verify(&auth.signature, serialized_cmd.clone())
-                            .is_ok()
-                    {
-                        return Some((
-                            msg_id,
-                            serialized_cmd,
-                            msg.dst_address(),
-                            auth.into_inner(),
-                        ));
-                    }
-                }
-            }
-            _ => error!("Received invalid MessageType for ServiceError"),
-        }
-    }
-    None
 }
 
 pub(crate) async fn rebuild_message_for_ae_resend(
