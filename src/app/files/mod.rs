@@ -271,10 +271,8 @@ impl Safe {
         let version = if success_count == 0 {
             current_version
         } else {
-            let mut current_versions_set = HashSet::new();
-            current_versions_set.insert(current_version);
             self.append_version_to_files_container(
-                current_versions_set,
+                hashset!(current_version),
                 &new_files_map,
                 url,
                 safe_url,
