@@ -8,7 +8,7 @@
 // Software.
 
 use super::super::{utils, Result, XorName};
-use crate::url::NativeUrl;
+use crate::url::Url;
 use crdts::merkle_reg::Sha3Hash;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -24,7 +24,7 @@ pub enum Action {
 }
 
 /// An entry in a Register.
-pub type Entry = NativeUrl;
+pub type Entry = Url;
 
 impl Eq for Entry {}
 
