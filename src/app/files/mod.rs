@@ -13,14 +13,15 @@ mod metadata;
 mod realpath;
 
 use crate::{
-    app::consts::*, app::nrs::VersionHash, fetch::Range, hashset, ContentType, DataType, Error,
-    NativeUrl, Result, Safe, Scope, XorUrl,
+    app::consts::*, app::nrs::VersionHash, fetch::Range, ContentType, DataType, Error, NativeUrl,
+    Result, Safe, Scope, XorUrl,
 };
 use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
 use std::collections::{BTreeMap, HashSet};
+use std::iter::FromIterator;
 use std::{fs, path::Path};
 
 pub(crate) use metadata::FileMeta;
@@ -272,7 +273,7 @@ impl Safe {
             current_version
         } else {
             self.append_version_to_files_container(
-                hashset!(current_version),
+                HashSet::from_iter([current_version]),
                 &new_files_map,
                 url,
                 safe_url,
@@ -344,7 +345,7 @@ impl Safe {
             current_version
         } else {
             self.append_version_to_files_container(
-                hashset!(current_version),
+                HashSet::from_iter([current_version]),
                 &new_files_map,
                 url,
                 safe_url,
@@ -397,7 +398,7 @@ impl Safe {
             current_version
         } else {
             self.append_version_to_files_container(
-                hashset!(current_version),
+                HashSet::from_iter([current_version]),
                 &new_files_map,
                 url,
                 safe_url,
@@ -473,7 +474,7 @@ impl Safe {
             current_version
         } else {
             self.append_version_to_files_container(
-                hashset!(current_version),
+                HashSet::from_iter([current_version]),
                 &new_files_map,
                 url,
                 safe_url,
