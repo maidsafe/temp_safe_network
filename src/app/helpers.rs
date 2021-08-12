@@ -22,6 +22,18 @@ const TOKEN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
 /// The maximum amount of safetoken that can be represented by a single `Token`
 const MAX_TOKENS_VALUE: u64 = (u32::max_value() as u64 + 1) * TOKEN_TO_RAW_CONVERSION - 1;
 
+/// a shortcut to create a new HashSet
+#[macro_export]
+macro_rules! hashset {
+ ( $( $item:expr ),* ) => {
+        {
+            let mut s = HashSet::new();
+            $(s.insert($item);)*
+            s
+        }
+    };
+}
+
 #[allow(dead_code)]
 pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
     PublicKey::ed25519_from_hex(hex_str)

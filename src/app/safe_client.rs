@@ -226,20 +226,20 @@ impl SafeAppClient {
                 }
             })?;
 
-        Ok(entry.to_vec())
+        Ok(entry)
     }
 
     pub async fn write_to_register(
         &self,
         address: Address,
-        data: Vec<u8>,
+        entry: Entry,
         parents: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {
         debug!("Writing to Register at {:?}", address);
         let client = self.get_safe_client()?;
 
         client
-            .write_to_register(address, data, parents)
+            .write_to_register(address, entry, parents)
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to write to Register: {:?}", e)))
     }

@@ -14,13 +14,13 @@ mod realpath;
 
 use crate::{
     app::consts::*, app::nrs::VersionHash, fetch::Range, ContentType, DataType, Error, NativeUrl,
-    Result, Safe, Scope, XorUrl,
+    Result, Safe, Scope, XorUrl, hashset,
 };
 use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, HashSet};
 use std::{fs, path::Path};
 
 pub(crate) use metadata::FileMeta;
@@ -105,10 +105,11 @@ impl Safe {
                 self.xorurl_base,
             )?;
 
+            let entry = NativeUrl::from_xorurl(&files_map_xorurl)?;
             let _ = &self
                 .write_to_register(
                     &xor_url,
-                    files_map_xorurl.as_bytes().to_vec(),
+                    entry,
                     Default::default(),
                 )
                 .await?;
@@ -171,7 +172,7 @@ impl Safe {
             return Err(Error::NotImplementedError("Multiple file container entries not managed, this happends when 2 clients write concurrently to a file container".to_string()));
         }
         let first_entry = entries.iter().next();
-        let (version, curr_serialised_files_map) = if let Some((v, m)) = first_entry {
+        let (version, files_map_xorurl) = if let Some((v, m)) = first_entry {
             (v.into(), m.to_owned())
         } else {
             warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
@@ -180,16 +181,6 @@ impl Safe {
 
         debug!("Files map retrieved.... v{:?}", &version);
         // TODO: use RDF format and deserialise it
-        // We first obtain the FilesMap XOR-URL from the Register
-        let files_map_xorurl = NativeUrl::from_url(
-            &String::from_utf8(curr_serialised_files_map).map_err(|err| {
-                Error::ContentError(format!(
-                    "Couldn't parse the FilesMap link stored in the FilesContainer: {:?}",
-                    err
-                ))
-            })?,
-        )?;
-
         // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
         let serialised_files_map = self.fetch_public_blob(&files_map_xorurl, None).await?;
         let files_map = serde_json::from_slice(serialised_files_map.as_slice()).map_err(|err| {
@@ -281,17 +272,21 @@ impl Safe {
             )
             .await?;
 
-        let version = self
-            .append_version_to_files_container(
-                success_count,
-                current_version,
+        let version = if success_count == 0 {
+            current_version
+        } else {
+            let mut current_versions_set = HashSet::new();
+            current_versions_set.insert(current_version);
+            self.append_version_to_files_container(
+                current_versions_set,
                 &new_files_map,
                 url,
                 safe_url,
                 dry_run,
                 update_nrs,
             )
-            .await?;
+            .await?
+        };
 
         Ok((version, processed_files, new_files_map))
     }
@@ -351,17 +346,19 @@ impl Safe {
             .await?
         };
 
-        let version = self
-            .append_version_to_files_container(
-                success_count,
-                current_version,
+        let version = if success_count == 0 {
+            current_version
+        } else {
+            self.append_version_to_files_container(
+                hashset!(current_version),
                 &new_files_map,
                 url,
                 safe_url,
                 dry_run,
                 update_nrs,
             )
-            .await?;
+            .await?
+        };
 
         Ok((version, processed_files, new_files_map))
     }
@@ -401,17 +398,20 @@ impl Safe {
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) =
             files_map_add_link(self, current_files_map, &new_file_xorurl, dest_path, force).await?;
-        let version = self
-            .append_version_to_files_container(
-                success_count,
-                current_version,
+
+        let version = if success_count == 0 {
+            current_version
+        } else {
+            self.append_version_to_files_container(
+                hashset!(current_version),
                 &new_files_map,
                 url,
                 safe_url,
                 dry_run,
                 update_nrs,
             )
-            .await?;
+            .await?
+        };
 
         Ok((version, processed_files, new_files_map))
     }
@@ -475,17 +475,19 @@ impl Safe {
         let (processed_files, new_files_map, success_count) =
             files_map_remove_path(dest_path, files_map, recursive)?;
 
-        let version = self
-            .append_version_to_files_container(
-                success_count,
-                current_version,
+        let version = if success_count == 0 {
+            current_version
+        } else {
+            self.append_version_to_files_container(
+                hashset!(current_version),
                 &new_files_map,
                 url,
                 safe_url,
                 dry_run,
                 update_nrs,
             )
-            .await?;
+            .await?
+        };
 
         Ok((version, processed_files, new_files_map))
     }
@@ -495,49 +497,41 @@ impl Safe {
     #[allow(clippy::too_many_arguments)]
     async fn append_version_to_files_container(
         &mut self,
-        success_count: u64,
-        // current_version: BTreeSet<VersionHash>, // TODO replace multiple versions
-        current_version: VersionHash,
+        current_version: HashSet<VersionHash>,
         new_files_map: &FilesMap,
         url: &str,
         mut safe_url: NativeUrl,
         dry_run: bool,
         update_nrs: bool,
     ) -> Result<VersionHash> {
-        let version = if success_count == 0 {
-            current_version
-        } else if dry_run {
+        if dry_run {
             return Err(Error::NotImplementedError(
                 "No dry run for append_version_to_files_container".to_string(),
             ));
-        } else {
-            // The FilesContainer is updated by adding an entry containing the link to
-            // the Blob with the serialised new version of the FilesMap.
-            let files_map_xorurl = self.store_files_map(new_files_map).await?;
+        }
+        // The FilesContainer is updated by adding an entry containing the link to
+        // the Blob with the serialised new version of the FilesMap.
+        let files_map_xorurl = self.store_files_map(new_files_map).await?;
 
-            // append entry to register
-            let entry = files_map_xorurl.as_bytes().to_vec();
-            let mut replace = BTreeSet::new();
-            replace.insert(current_version.entry_hash());
-            let entry_hash = &self
-                .write_to_register(&safe_url.to_string(), entry, replace)
+        // append entry to register
+        let entry = NativeUrl::from_xorurl(&files_map_xorurl)?;
+        let replace = current_version.iter().map(|e| e.entry_hash()).collect();
+        let entry_hash = &self
+            .write_to_register(&safe_url.to_string(), entry, replace)
+            .await?;
+        let new_version: VersionHash = entry_hash.into();
+
+        if update_nrs {
+            // We need to update the link in the NRS container as well,
+            // to link it to the new new_version of the FilesContainer we just generated
+            safe_url.set_content_version(Some(new_version));
+            let new_link_for_nrs = safe_url.to_string();
+            let _ = self
+                .nrs_map_container_add(url, &new_link_for_nrs, false, true, false)
                 .await?;
-            let new_version: VersionHash = entry_hash.into();
+        }
 
-            if update_nrs {
-                // We need to update the link in the NRS container as well,
-                // to link it to the new new_version of the FilesContainer we just generated
-                safe_url.set_content_version(Some(new_version));
-                let new_link_for_nrs = safe_url.to_string();
-                let _ = self
-                    .nrs_map_container_add(url, &new_link_for_nrs, false, true, false)
-                    .await?;
-            }
-
-            new_version
-        };
-
-        Ok(version)
+        Ok(new_version)
     }
 
     /// # Put a Public Blob

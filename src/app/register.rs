@@ -117,7 +117,7 @@ impl Safe {
     pub async fn write_to_register(
         &self,
         url: &str,
-        data: Vec<u8>,
+        entry: Entry,
         parents: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {
         /*
@@ -135,16 +135,16 @@ impl Safe {
         let (safeurl, _) = self.parse_and_resolve_url(url).await?;
         let address = safeurl.register_address()?;
 
-        // write the data to the Register
+        // write the entry to the Register
         self.safe_client
-            .write_to_register(address, data, parents)
+            .write_to_register(address, entry, parents)
             .await
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{app::test_helpers::new_safe_instance, retry_loop};
+    use crate::{app::test_helpers::new_safe_instance, retry_loop, NativeUrl};
     use anyhow::Result;
 
     #[tokio::test]
@@ -160,19 +160,19 @@ mod tests {
         assert!(received_data.is_empty());
         assert!(received_data_priv.is_empty());
 
-        let initial_data = b"initial data";
+        let initial_data = NativeUrl::from_url("safe://test")?;
         let hash = safe
-            .write_to_register(&xorurl, initial_data.to_vec(), Default::default())
+            .write_to_register(&xorurl, initial_data.clone(), Default::default())
             .await?;
         let hash_priv = safe
-            .write_to_register(&xorurl_priv, initial_data.to_vec(), Default::default())
+            .write_to_register(&xorurl_priv, initial_data.clone(), Default::default())
             .await?;
 
         let received_entry = retry_loop!(safe.register_read_entry(&xorurl, hash));
         let received_entry_priv = retry_loop!(safe.register_read_entry(&xorurl_priv, hash_priv));
 
-        assert_eq!(received_entry, initial_data.to_vec());
-        assert_eq!(received_entry_priv, initial_data.to_vec());
+        assert_eq!(received_entry, initial_data.clone());
+        assert_eq!(received_entry_priv, initial_data);
 
         Ok(())
     }

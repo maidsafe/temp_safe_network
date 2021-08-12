@@ -19,7 +19,7 @@ pub type MultimapValue = Vec<u8>;
 pub type MultimapKeyValue = (MultimapKey, MultimapValue);
 pub type MultimapKeyValues = BTreeSet<(EntryHash, MultimapKeyValue)>;
 
-const MULTIMAP_REMOVED_MARK: &[u8] = b"";
+const MULTIMAP_REMOVED_MARK: &str = "safe://MULTIMAP_REMOVED_MARK";
 
 impl Safe {
     /// Create a Multimap on the network
@@ -99,12 +99,14 @@ impl Safe {
                 entry, err
             ))
         })?;
-
+        let entry_xorname = self.safe_client.store_public_blob(&serialised_entry, false).await?;
+        let entry_xorurl = NativeUrl::encode_blob(entry_xorname, Scope::Public, ContentType::Raw, self.xorurl_base)?;
+        let entry_ptr = NativeUrl::from_xorurl(&entry_xorurl)?;
         let safeurl = Safe::parse_url(url)?;
         let address = safeurl.register_address()?;
 
         self.safe_client
-            .write_to_register(address, serialised_entry, replace)
+            .write_to_register(address, entry_ptr, replace)
             .await
     }
 
@@ -119,7 +121,7 @@ impl Safe {
         let address = safeurl.register_address()?;
         let hash = self
             .safe_client
-            .write_to_register(address, MULTIMAP_REMOVED_MARK.to_vec(), to_remove)
+            .write_to_register(address, NativeUrl::from_url(MULTIMAP_REMOVED_MARK)?, to_remove)
             .await?;
 
         Ok(hash)
@@ -149,12 +151,13 @@ impl Safe {
 
         // We parse each entry in the Register as a 'MultimapKeyValue'
         let mut multimap_key_vals = MultimapKeyValues::new();
-        for (hash, entry) in entries.iter() {
-            if entry == MULTIMAP_REMOVED_MARK {
+        for (hash, entry_ptr) in entries.iter() {
+            if &entry_ptr.to_string() == MULTIMAP_REMOVED_MARK {
                 // this is a tombstone entry created to delete some old entries
                 continue;
             }
-            let key_val = Self::decode_multimap_entry(entry)?;
+            let entry = self.fetch_public_blob(entry_ptr, None).await?;
+            let key_val = Self::decode_multimap_entry(&entry)?;
             multimap_key_vals.insert((*hash, key_val));
         }
         Ok(multimap_key_vals)
@@ -168,7 +171,7 @@ impl Safe {
         safeurl: &NativeUrl,
         hash: EntryHash,
     ) -> Result<Option<MultimapKeyValue>> {
-        let entry = match self.fetch_register_entry(safeurl, hash).await {
+        let entry_ptr = match self.fetch_register_entry(safeurl, hash).await {
             Ok(data) => {
                 debug!("Multimap retrieved...");
                 Ok(data)
@@ -184,9 +187,10 @@ impl Safe {
         }?;
 
         // We parse each entry in the Register as a 'MultimapKeyValue'
-        if entry == MULTIMAP_REMOVED_MARK {
+        if &entry_ptr.to_string() == MULTIMAP_REMOVED_MARK {
             Ok(None)
         } else {
+            let entry = self.fetch_public_blob(&entry_ptr, None).await?;
             let key_val = Self::decode_multimap_entry(&entry)?;
             Ok(Some(key_val))
         }
