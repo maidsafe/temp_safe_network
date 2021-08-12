@@ -205,7 +205,7 @@ mod tests {
         },
         utils, Error, Keypair, Result,
     };
-    use crate::url::NativeUrl;
+    use crate::url::Url;
     use eyre::eyre;
     use proptest::prelude::*;
     use rand::{rngs::OsRng, seq::SliceRandom, thread_rng};
@@ -1159,16 +1159,16 @@ mod tests {
         }
     }
 
-    fn random_url() -> Result<NativeUrl> {
+    fn random_url() -> Result<Url> {
         use crate::url::*;
         let xor_name = XorName::random();
-        let url = NativeUrl::encode_blob(
+        let url = Url::encode_blob(
             xor_name,
             Scope::Public,
             ContentType::Raw,
             XorUrlBase::Base32z,
         )
         .map_err(|e| super::Error::Serialisation(e.to_string()))?;
-        NativeUrl::from_url(&url).map_err(|e| super::Error::FailedToParse(e.to_string()))
+        Url::from_url(&url).map_err(|e| super::Error::FailedToParse(e.to_string()))
     }
 }
