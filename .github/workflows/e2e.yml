@@ -93,6 +93,7 @@ jobs:
           NODE_COUNT: "33" # (this should be a split section)
         run: |
           killall sn_node
+          rm -rf ~/.safe/node
           ./target/release/testnet
           ./scripts/has_split.sh
 
