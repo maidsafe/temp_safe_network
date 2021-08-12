@@ -213,7 +213,7 @@ fn calling_seq_store_and_fetch_with_nrsurl() -> Result<()> {
     let mut safeurl = safeurl_from(&seq_url)?;
     safeurl.set_content_version(Some(0));
     let files_container_v0 = &safeurl.to_string();
-    let nrsurl = format!("safe://{}", get_random_nrs_string());
+    let nrsurl = get_random_nrs_string();
 
     let _ = cmd!(
         env!("CARGO_BIN_EXE_safe"),

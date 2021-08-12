@@ -1,18 +1,21 @@
 #!/bin/bash
 
-set -e -x
+# The intention of this is to exit with a non-zero status code if any of
+# the tests fail, but to allow all of them the opportunity to run, since
+# they're all independent of one another.
+exit=0
 
-function run_cli_tests() {
-    target/debug/safe keys create --test-coins --for-cli
-    cargo test --release --test cli_cat
-    cargo test --release --test cli_dog
-    cargo test --release --test cli_files -- --test-threads=1
-    cargo test --release --test cli_files_get -- --test-threads=1
-    cargo test --release --test cli_keys
-    cargo test --release --test cli_wallet
-    cargo test --release --test cli_nrs
-    cargo test --release --test cli_seq
-    cd -
-}
+export SN_CLI_QUERY_TIMEOUT=15
+export RUST_BACKTRACE=full
+declare -a exit_codes
 
-run_cli_tests
+target/release/safe keys create --test-coins --for-cli || ((exit++))
+cargo test --release --test cli_cat || ((exit++))
+cargo test --release --test cli_dog || ((exit++))
+cargo test --release --test cli_files -- --test-threads=1 || ((exit++))
+cargo test --release --test cli_files_get -- --test-threads=1 || ((exit++))
+cargo test --release --test cli_keys || ((exit++))
+cargo test --release --test cli_nrs || ((exit++))
+cargo test --release --test cli_seq || ((exit++))
+
+exit $exit

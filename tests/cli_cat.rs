@@ -15,7 +15,7 @@ use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::fetch::{SafeContentType, SafeDataType};
 use sn_cmd_test_utilities::util::{
-    create_preload_and_get_keys, get_random_nrs_string, parse_files_container_output,
+    create_and_get_keys, get_random_nrs_string, parse_files_container_output,
     parse_files_put_or_sync_output, safe_cmd_stderr, safe_cmd_stdout, safeurl_from,
     test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
@@ -58,6 +58,7 @@ fn calling_safe_cat() -> Result<()> {
 }
 
 #[test]
+//#[ignore = "test has been identified to be hanging indefinitely"]
 fn calling_safe_cat_subfolders() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -142,6 +143,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
 }
 
 #[test]
+//#[ignore = "test has been identified to be hanging indefinitely"]
 fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -205,7 +207,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     .map_err(|e| eyre!(e.to_string()))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
-    let nrsurl = format!("safe://{}", get_random_nrs_string());
+    let nrsurl = get_random_nrs_string();
     let _ = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "nrs",
@@ -260,7 +262,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
 
 #[test]
 fn calling_safe_cat_safekey() -> Result<()> {
-    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0")?;
+    let (safekey_xorurl, _sk) = create_and_get_keys()?;
 
     let cat_output = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &safekey_xorurl,)
         .read()
@@ -319,7 +321,7 @@ fn calling_cat_symlinks_resolve_infinite_loop() -> Result<()> {
     safeurl.set_path("/sub/infinite_loop");
     let args = ["cat", &safeurl.to_string()];
     let output = safe_cmd_stderr(&args, Some(1))?;
-    assert!(output.contains("ContentNotFound - Too many levels of symbolic links"));
+    assert!(output.contains("ContentNotFound: Too many levels of symbolic links"));
 
     Ok(())
 }
@@ -384,7 +386,7 @@ fn calling_cat_symlinks_resolve_dir_outside() -> Result<()> {
     safeurl.set_path("/dir_outside");
     let args = ["cat", &safeurl.to_string()];
     let output = safe_cmd_stderr(&args, Some(1))?;
-    assert!(output.contains("ContentNotFound - Cannot ascend beyond root directory"));
+    assert!(output.contains("ContentNotFound: Cannot ascend beyond root directory"));
 
     Ok(())
 }
