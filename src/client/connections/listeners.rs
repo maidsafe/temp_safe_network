@@ -189,7 +189,11 @@ impl Session {
             debug!("Thread spawned to handle this client message");
             match msg {
                 ServiceMsg::QueryResponse { response, .. } => {
-                    trace!("The received query response is {:?}", response);
+                    trace!(
+                        "The received query response id is {:?}, msg is {:?}",
+                        response.operation_id(),
+                        response
+                    );
 
                     // Note that this doesn't remove the sender from here since multiple
                     // responses corresponding to the same message ID might arrive.
