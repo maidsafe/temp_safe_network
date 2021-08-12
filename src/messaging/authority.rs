@@ -129,7 +129,7 @@ impl SectionAuth {
 ///
 /// Validation is defined by the [`VerifyAuthority`] impl for `T`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AuthorityProof<T>(T);
+pub struct AuthorityProof<T>(pub(crate) T);
 
 impl<T: VerifyAuthority> AuthorityProof<T> {
     /// Verify the authority of `inner`.

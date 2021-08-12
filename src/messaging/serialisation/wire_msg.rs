@@ -8,8 +8,11 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::ServiceMsg, node::NodeMsg, section_info::SectionInfoMsg, AuthorityProof, DstLocation,
-    Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result, ServiceAuth,
+    data::{ServiceError, ServiceMsg},
+    node::NodeMsg,
+    section_info::SectionInfoMsg,
+    AuthorityProof, DstLocation, Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
+    ServiceAuth,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -130,9 +133,19 @@ impl WireMsg {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
+                let auth = if let ServiceMsg::ServiceError(ServiceError {
+                    source_message: Some(data),
+                    ..
+                }) = &msg
+                {
+                    AuthorityProof::verify(auth, data)?
+                } else {
+                    AuthorityProof(auth)
+                };
+
                 Ok(MessageType::Service {
                     msg_id: self.header.msg_envelope.msg_id,
-                    auth: AuthorityProof::verify(auth, &self.payload)?,
+                    auth,
                     dst_location: self.header.msg_envelope.dst_location,
                     msg,
                 })
