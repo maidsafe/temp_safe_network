@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    delivery_group, enduser_registry::EndUserRegistry, split_barrier::SplitBarrier, Comm, Core,
-    SignatureAggregator, KEY_CACHE_SIZE, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+    delivery_group, split_barrier::SplitBarrier, Comm, Core, SignatureAggregator, KEY_CACHE_SIZE,
+    RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, Section},
-    EndUser, MessageId, SectionAuthorityProvider, SocketId, WireMsg,
+    MessageId, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
@@ -86,7 +86,6 @@ impl Core {
             event_tx: self.event_tx.clone(),
             joins_allowed: true,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
-            end_users: EndUserRegistry::new(),
             register_storage: self.register_storage.clone(),
             root_storage_dir: self.root_storage_dir.clone(),
             used_space: self.used_space.clone(),
@@ -94,19 +93,6 @@ impl Core {
             chunk_storage: self.chunk_storage.clone(),
             liveness: self.liveness.clone(),
         })
-    }
-
-    pub(crate) fn get_enduser_by_addr(&self, sender: &SocketAddr) -> Option<EndUser> {
-        self.end_users.get_enduser_by_addr(sender)
-    }
-
-    pub(crate) fn get_socket_addr(&self, id: SocketId) -> Option<SocketAddr> {
-        self.end_users.get_socket_addr(id)
-    }
-
-    pub(crate) fn try_add_enduser(&self, sender: SocketAddr) -> Result<EndUser> {
-        let section_prefix = self.section.prefix();
-        self.end_users.try_add(sender, section_prefix)
     }
 
     pub(crate) fn node(&self) -> &Node {
