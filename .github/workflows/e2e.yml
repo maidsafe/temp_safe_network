@@ -74,7 +74,7 @@ jobs:
       - run: ./target/release/testnet
         if: matrix.os != 'windows-latest'
         env:
-          NODE_COUNT: "33" # (this should be a split section)
+          NODE_COUNT: "43" # (this should be a split section)
 
       # TODO: windows with split section network has been failing w/ SO.
       # when we have that sorted we can reenable the full networks
