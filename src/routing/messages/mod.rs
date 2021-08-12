@@ -24,9 +24,6 @@ use xor_name::XorName;
 
 // Utilities for WireMsg.
 pub(crate) trait WireMsgUtils {
-    /// Return 'true' if the message kind is MsgKind::ServiceMsg or MsgKind::SectionInfoMsg
-    fn is_client_msg_kind(&self) -> bool;
-
     /// Creates a signed message where signature is assumed valid.
     fn new_signed(
         payload: Bytes,
@@ -53,14 +50,6 @@ pub(crate) trait WireMsgUtils {
 }
 
 impl WireMsgUtils for WireMsg {
-    /// Return 'true' if the message kind is MsgKind::ServiceMsg or MsgKind::SectionInfoMsg
-    fn is_client_msg_kind(&self) -> bool {
-        matches!(
-            self.msg_kind(),
-            MsgKind::ServiceMsg(_) | MsgKind::SectionInfoMsg
-        )
-    }
-
     /// Creates a signed message where signature is known to be valid.
     fn new_signed(
         payload: Bytes,
@@ -68,23 +57,17 @@ impl WireMsgUtils for WireMsg {
         dst: DstLocation,
     ) -> Result<WireMsg, Error> {
         // Create message id from msg authority signature
-        let (id, msg_kind) = match node_msg_authority {
-            NodeMsgAuthority::Node(node_auth) => (
-                MessageId::from_content(&node_auth.signature).unwrap_or_default(),
-                MsgKind::NodeAuthMsg(node_auth.into_inner()),
-            ),
-            NodeMsgAuthority::BlsShare(bls_share_auth) => (
-                MessageId::from_content(&bls_share_auth.sig_share.signature_share.0)
-                    .unwrap_or_default(),
-                MsgKind::NodeBlsShareAuthMsg(bls_share_auth.into_inner()),
-            ),
-            NodeMsgAuthority::Section(section_auth) => (
-                MessageId::from_content(&section_auth.sig.signature).unwrap_or_default(),
-                MsgKind::SectionAuthMsg(section_auth.into_inner()),
-            ),
+        let msg_kind = match node_msg_authority {
+            NodeMsgAuthority::Node(node_auth) => MsgKind::NodeAuthMsg(node_auth.into_inner()),
+            NodeMsgAuthority::BlsShare(bls_share_auth) => {
+                MsgKind::NodeBlsShareAuthMsg(bls_share_auth.into_inner())
+            }
+            NodeMsgAuthority::Section(section_auth) => {
+                MsgKind::SectionAuthMsg(section_auth.into_inner())
+            }
         };
 
-        let msg = WireMsg::new_msg(id, payload, msg_kind, dst)?;
+        let msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst)?;
 
         Ok(msg)
     }

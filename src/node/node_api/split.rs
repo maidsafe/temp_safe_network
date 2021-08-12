@@ -34,8 +34,6 @@ impl Node {
         elder: &ElderRole,
         network_api: &Network,
         our_prefix: Prefix,
-        our_key: PublicKey,
-        sibling_key: PublicKey,
         our_new_elders: BTreeSet<XorName>,
         their_new_elders: BTreeSet<XorName>,
     ) -> Result<NodeDuties> {
@@ -43,12 +41,10 @@ impl Node {
         let mut ops = vec![];
 
         // replicate state to our new elders
-        let msg_id = MessageId::combine(&[our_prefix.name().0, XorName::from(our_key).0]);
-        ops.push(push_state(elder, our_prefix, msg_id, our_new_elders).await?);
+        ops.push(push_state(elder, our_prefix, MessageId::new(), our_new_elders).await?);
 
         // replicate state to our neighbour's new elders
-        let msg_id = MessageId::combine(&[sibling_prefix.name().0, XorName::from(sibling_key).0]);
-        ops.push(push_state(elder, sibling_prefix, msg_id, their_new_elders).await?);
+        ops.push(push_state(elder, sibling_prefix, MessageId::new(), their_new_elders).await?);
 
         let our_adults = network_api.our_adults().await;
         // drop metadata state

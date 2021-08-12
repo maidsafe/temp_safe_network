@@ -51,7 +51,6 @@ pub(super) fn map_node_msg(
 
             Mapping {
                 op: NodeDuty::Send(OutgoingMsg {
-                    id: MessageId::in_response_to(&msg_id),
                     msg: MsgType::Node(NodeMsg::NodeMsgError {
                         error,
                         correlation_id: msg_id,

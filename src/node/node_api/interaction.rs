@@ -27,7 +27,6 @@ impl Node {
         let section_pk = network_api.our_public_key_set().await?.public_key();
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            id: MessageId::new(),
             msg: MsgType::Node(NodeMsg::NodeCmd(NodeCmd::StorageFull {
                 section: node_id.into(),
                 node_id,

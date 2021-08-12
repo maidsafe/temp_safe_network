@@ -46,7 +46,6 @@ use crate::routing::{
     error::Result,
     network::NetworkUtils,
     node::Node,
-    peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
     section::{SectionKeyShare, SectionKeysProvider, SectionUtils},
@@ -175,17 +174,13 @@ impl Core {
 
                 if self.section_keys_provider.has_key_share() {
                     commands.extend(self.promote_and_demote_elders()?);
+
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
-                    let active_members: Vec<XorName> = self
-                        .section
-                        .active_members()
-                        .map(|peer| *peer.name())
-                        .collect();
-                    let msg_id = MessageId::from_content(&active_members)?;
-                    commands.extend(
-                        self.propose(Proposal::JoinsAllowed((msg_id, self.joins_allowed)))?,
-                    );
+                    commands.extend(self.propose(Proposal::JoinsAllowed((
+                        MessageId::new(),
+                        self.joins_allowed,
+                    )))?);
                 }
 
                 self.print_network_stats();

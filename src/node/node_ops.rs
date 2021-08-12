@@ -40,8 +40,6 @@ pub enum NodeDuty {
     EldersChanged {
         /// Our section prefix.
         our_prefix: Prefix,
-        /// Our section public key.
-        our_key: PublicKey,
         /// The new Elders.
         new_elders: BTreeSet<XorName>,
         /// Oldie or newbie?
@@ -121,7 +119,6 @@ impl From<NodeDuty> for NodeDuties {
 
 #[derive(Debug, Clone)]
 pub struct OutgoingMsg {
-    pub id: MessageId,
     pub msg: MsgType,
     pub dst: DstLocation,
     pub aggregation: bool,
