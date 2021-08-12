@@ -83,6 +83,9 @@ jobs:
         env:
           NODE_COUNT: 11
 
+      - name: extra wait for CI split
+        run: sleep 220
+
       - name: Have we had a section split?
         id: splitSection
         run: ./scripts/has_split.sh
@@ -95,6 +98,7 @@ jobs:
           killall sn_node
           rm -rf ~/.safe/node
           ./target/release/testnet
+          sleep 220
           ./scripts/has_split.sh
 
         # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
