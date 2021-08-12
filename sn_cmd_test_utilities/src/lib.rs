@@ -9,7 +9,8 @@
 
 #[allow(dead_code)]
 pub mod util {
-    use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
+    use assert_cmd::Command;
+    use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
     use duct::cmd;
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -26,10 +27,34 @@ pub mod util {
     pub const TEST_SYMLINKS_FOLDER: &str = "./test_symlinks";
     pub const TEST_SYMLINK: &str = "./test_symlinks/file_link";
 
+    pub fn get_directory_len(directory_path: &str) -> Result<u64> {
+        let paths = fs::read_dir(directory_path)
+            .wrap_err(format!("Error reading directory at {}", directory_path))
+            .suggestion(format!(
+                "Verify that {} exists and that the user has read permissions on it",
+                directory_path
+            ))?;
+        let mut len = 0;
+        for path in paths {
+            len += get_file_len(&path?.path().to_str().unwrap())?;
+        }
+        Ok(len)
+    }
+
+    pub fn get_file_len(path: &str) -> Result<u64> {
+        let metadata = std::fs::metadata(path)
+            .wrap_err(format!("Cannot retrieve metadata for: {}", path))
+            .suggestion(format!(
+                "Verify that {} exists and that the user has read permissions on it",
+                path
+            ))?;
+        Ok(metadata.len())
+    }
+
     pub fn get_bin_location() -> String {
         let target_dir = match env::var("CARGO_TARGET_DIR") {
             Ok(target_dir) => target_dir,
-            Err(_) => "../target".to_string(),
+            Err(_) => "target".to_string(),
         };
 
         if cfg!(debug_assertions) {
@@ -39,14 +64,12 @@ pub mod util {
         }
     }
 
-    pub fn create_preload_and_get_keys(preload: &str) -> Result<(String, String)> {
+    pub fn create_and_get_keys() -> Result<(String, String)> {
         let pk_command_result = cmd!(
             get_bin_location(),
             "keys",
             "create",
             "--test-coins",
-            "---preload",
-            preload,
             "--json",
         )
         .read()?;
@@ -55,40 +78,6 @@ pub mod util {
             parse_keys_create_output(&pk_command_result);
 
         Ok((xorurl, sk))
-    }
-
-    pub fn create_wallet_with_balance(
-        preload: &str,
-        balance_name: Option<&str>,
-    ) -> Result<(String, String, String)> {
-        let (_, sk) = create_preload_and_get_keys(&preload)?;
-
-        let wallet_create_result = cmd!(
-            get_bin_location(),
-            "wallet",
-            "create",
-            "--pay-with",
-            &sk,
-            "--preload",
-            preload,
-            "--name",
-            balance_name.unwrap_or("default-balance"),
-            "--json",
-        )
-        .read()?;
-
-        let (wallet_xor, _key_xorurl, key_pair) = parse_wallet_create_output(&wallet_create_result);
-        let unwrapped_key_pair =
-            key_pair.ok_or_else(|| eyre!("Could not parse wallet".to_string()))?;
-
-        Ok((
-            wallet_xor,
-            unwrapped_key_pair.public_key().to_string(),
-            unwrapped_key_pair
-                .secret_key()
-                .wrap_err("Error extracting SecretKey from keypair")?
-                .to_string(),
-        ))
     }
 
     pub fn create_nrs_link(name: &str, link: &str) -> Result<String> {
@@ -337,30 +326,19 @@ pub mod util {
         serde_json::from_str(output).expect("Failed to parse output of `safe keys create`")
     }
 
-    // Executes arbitrary `safe ` commands and returns
-    // output (stdout, stderr, exit code).
-    //
-    // If expect_exit_code is Some, then an Err is returned
-    // if value does not match process exit code.
+    /// Runs safe with the arguments specified, with the option to assert on the exit code.
+    /// This was changed to use the assert_cmd crate because the newer version of this crate
+    /// provides *both* the stdout and stderr if the process doesn't exit as expected. This is
+    /// extremely useful in this test suite because there are lots of commands used to setup the
+    /// context for the tests, and you need to be able to see why those fail too.
     pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process::Output> {
         println!("Executing: safe {}", args.join(" "));
-
-        let output = duct::cmd(get_bin_location(), args)
-            .stdout_capture()
-            .stderr_capture()
-            .unchecked()
-            .run()
-            .wrap_err_with(|| {
-                format!("Failed to run 'safe' command with args: {}", args.join(" "))
-            })?;
-
-        if let Some(ec) = expect_exit_code {
-            match output.status.code() {
-                Some(code) => assert_eq!(ec, code),
-                None => bail!("Command returned no exit code".to_string()),
-            }
+        let mut code = 0;
+        if let Some(c) = expect_exit_code {
+            code = c;
         }
-        Ok(output)
+        let mut cmd = Command::cargo_bin("safe")?;
+        Ok(cmd.args(args).assert().code(code).get_output().to_owned())
     }
 
     // Executes arbitrary `safe ` commands and returns

@@ -9,6 +9,7 @@ repository = "https://github.com/maidsafe/sn_cli"
 edition = "2018"
 
 [dependencies]
+assert_cmd = "~2.0"
 color-eyre = "~0.5"
 rand = "~0.7.3"
 serde = "1.0.123"
