@@ -31,17 +31,16 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
             // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
             // Giving a random sig temporarily
             let (msg_kind, payload) = random_client_signature(&client_msg)?;
-            WireMsg::new_msg(msg.id, payload, msg_kind, msg.dst)?
+            WireMsg::new_msg(MessageId::new(), payload, msg_kind, msg.dst)?
         }
         MsgType::Node(node_msg) => {
-            let mut wire_msg = if msg.aggregation {
+            let wire_msg = if msg.aggregation {
                 network
                     .sign_msg_for_dst_accumulation(node_msg, msg.dst)
                     .await?
             } else {
                 network.sign_single_src_msg(node_msg, msg.dst).await?
             };
-            wire_msg.set_msg_id(msg.id);
             wire_msg
         }
     };

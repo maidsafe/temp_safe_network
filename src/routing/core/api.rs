@@ -20,7 +20,6 @@ use crate::routing::{
     error::Result,
     network::NetworkUtils,
     node::Node,
-    peer::PeerUtils,
     routing_api::command::Command,
     section::{
         ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionKeysProvider, SectionUtils,
@@ -233,13 +232,8 @@ impl Core {
     pub(crate) fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();
         if self.is_elder() && joins_allowed != self.joins_allowed {
-            let active_members: Vec<XorName> = self
-                .section
-                .active_members()
-                .map(|peer| *peer.name())
-                .collect();
-            let msg_id = MessageId::from_content(&active_members)?;
-            commands.extend(self.propose(Proposal::JoinsAllowed((msg_id, joins_allowed)))?);
+            commands
+                .extend(self.propose(Proposal::JoinsAllowed((MessageId::new(), joins_allowed)))?);
         }
         Ok(commands)
     }

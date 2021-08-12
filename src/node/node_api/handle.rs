@@ -21,7 +21,6 @@ use crate::node::{
 use crate::routing::ELDER_SIZE;
 use tokio::task::JoinHandle;
 use tracing::{debug, info};
-use xor_name::XorName;
 
 #[derive(Debug)]
 pub(super) enum NodeTask {
@@ -51,7 +50,6 @@ impl Node {
                 Ok(NodeTask::None)
             }
             NodeDuty::EldersChanged {
-                our_key,
                 our_prefix,
                 new_elders,
                 newbie,
@@ -71,9 +69,9 @@ impl Node {
                     let elder = self.as_elder().await?;
                     let network = self.network_api.clone();
                     let handle = tokio::spawn(async move {
-                        let msg_id =
-                            MessageId::combine(&[our_prefix.name().0, XorName::from(our_key).0]);
-                        let ops = vec![push_state(&elder, our_prefix, msg_id, new_elders).await?];
+                        let ops = vec![
+                            push_state(&elder, our_prefix, MessageId::new(), new_elders).await?,
+                        ];
                         let our_adults = network.our_adults().await;
                         elder
                             .meta_data
@@ -133,8 +131,6 @@ impl Node {
                                 &elder,
                                 &network,
                                 our_prefix,
-                                our_key,
-                                sibling_key,
                                 our_new_elders,
                                 their_new_elders,
                             )

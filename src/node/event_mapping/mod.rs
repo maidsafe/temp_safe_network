@@ -118,7 +118,6 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
                     Mapping {
                         op: NodeDuty::EldersChanged {
                             our_prefix: elders.prefix,
-                            our_key: PublicKey::from(elders.key),
                             new_elders: elders.added,
                             newbie: false,
                         },
@@ -147,7 +146,6 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
                     Mapping {
                         op: NodeDuty::EldersChanged {
                             our_prefix: elders.prefix,
-                            our_key: PublicKey::from(elders.key),
                             new_elders: elders.added,
                             newbie: true,
                         },
