@@ -476,7 +476,7 @@ mod tests {
         client.delete_blob(priv_address).await?;
 
         // Make sure Blob was deleted
-        let mut attempts = 10u8;
+        let mut attempts = 20u8;
         let orignal_timeout = client.query_timeout;
         client.query_timeout = Duration::from_secs(5); // override with a short timeout
                                                        // clear cache first
