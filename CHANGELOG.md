@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.34.1](https://github.com/maidsafe/sn_api/compare/v0.34.0...v0.34.1) (2021-08-13)
+
+
+### Features
+
+* remove multimap_remove and its remove mark ([7d23bec](https://github.com/maidsafe/sn_api/commit/7d23bec5dafd7c0c729e3f26f610c74fdb728d2c))
+* update to register that contain url, enable multi version replacement ([612b473](https://github.com/maidsafe/sn_api/commit/612b4736a0bcb6f1ac6679f9d8b406ed37723ace))
+
 ## [0.34.0](https://github.com/maidsafe/sn_api/compare/v0.33.0...v0.34.0) (2021-08-10)
 
 
