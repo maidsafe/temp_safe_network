@@ -123,7 +123,7 @@ fn calling_seq_store_and_fetch_with_nrsurl() -> Result<()> {
     let nrsurl = get_random_nrs_string();
 
     safe_cmd(
-        &["nrs", "create", &nrsurl, "-l", &files_container_v0],
+        &["nrs", "create", &nrsurl, "-l", files_container_v0],
         Some(0),
     )?;
 

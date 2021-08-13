@@ -255,7 +255,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Resul
     let (_a_sign, another_md_xor) = &file_map["./testdata/another.md"];
     let (_t_sign, test_md_xor) = &file_map["./testdata/test.md"];
 
-    let cat_of_another_raw = safe_cmd_stdout(&["cat", &another_md_xor], Some(0))?;
+    let cat_of_another_raw = safe_cmd_stdout(&["cat", another_md_xor], Some(0))?;
     assert_eq!(cat_of_another_raw, "exists");
 
     safe_cmd(
@@ -264,7 +264,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Resul
             "create",
             &test_name_w_sub,
             "-l",
-            &another_md_xor,
+            another_md_xor,
             "--json",
         ],
         Some(0),
@@ -282,7 +282,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Resul
             "add",
             &test_name_w_new_sub,
             "-l",
-            &test_md_xor,
+            test_md_xor,
             "--json",
             "--default",
         ],
@@ -308,7 +308,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result
     let (_a_sign, another_md_xor) = &file_map["./testdata/another.md"];
     let (_t_sign, test_md_xor) = &file_map["./testdata/test.md"];
 
-    let cat_of_another_raw = safe_cmd_stdout(&["cat", &another_md_xor], Some(0))?;
+    let cat_of_another_raw = safe_cmd_stdout(&["cat", another_md_xor], Some(0))?;
     assert_eq!(cat_of_another_raw, "exists");
 
     safe_cmd(
@@ -317,7 +317,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result
             "create",
             &test_name_w_sub,
             "-l",
-            &another_md_xor,
+            another_md_xor,
             "--json",
         ],
         Some(0),
@@ -328,7 +328,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result
             "add",
             &test_name_w_new_sub,
             "-l",
-            &test_md_xor,
+            test_md_xor,
             "--json",
             "--default",
         ],
@@ -355,7 +355,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
     let (_a_sign, another_md_xor) = &file_map["./testdata/another.md"];
     let (_t_sign, test_md_xor) = &file_map["./testdata/test.md"];
 
-    let cat_of_another_raw = safe_cmd_stdout(&["cat", &another_md_xor], Some(0))?;
+    let cat_of_another_raw = safe_cmd_stdout(&["cat", another_md_xor], Some(0))?;
     assert_eq!(cat_of_another_raw, "exists");
 
     safe_cmd(
@@ -364,7 +364,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
             "create",
             &test_name_w_sub,
             "-l",
-            &another_md_xor,
+            another_md_xor,
             "--json",
         ],
         Some(0),
@@ -375,7 +375,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
             "add",
             &test_name_w_new_sub,
             "-l",
-            &test_md_xor,
+            test_md_xor,
             "--json",
         ],
         Some(0),

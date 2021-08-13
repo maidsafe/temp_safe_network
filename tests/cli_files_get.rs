@@ -7,9 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-#[macro_use]
-extern crate duct;
-
 const TESTDATA: &str = "testdata";
 const NEWNAME: &str = "newname";
 const SUBFOLDER: &str = "subfolder";

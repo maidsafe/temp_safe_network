@@ -7,9 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-#[macro_use]
-extern crate duct;
-
 use assert_cmd::prelude::*;
 use color_eyre::{eyre::eyre, Report, Result};
 use predicates::prelude::*;
@@ -21,7 +18,6 @@ use sn_cmd_test_utilities::util::{
     upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use std::{
-    env,
     fs::{self, OpenOptions},
     io::{prelude::*, Seek, SeekFrom},
     process::Command,
@@ -506,7 +502,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
     let nrsurl = get_random_nrs_string();
 
     safe_cmd(
-        &["nrs", "create", &nrsurl, "-l", &files_container_v0],
+        &["nrs", "create", &nrsurl, "-l", files_container_v0],
         Some(0),
     )?;
 
