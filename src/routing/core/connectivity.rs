@@ -25,11 +25,6 @@ impl Core {
                 "Possible connection loss detected with known peer {:?}",
                 peer
             )
-        } else if let Some(end_user) = self.get_enduser_by_addr(&addr) {
-            debug!(
-                "Possible connection loss detected with known client {:?}",
-                end_user
-            )
         } else {
             debug!("Possible connection loss detected with addr: {:?}", addr);
         }

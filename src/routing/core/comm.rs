@@ -91,6 +91,16 @@ impl Comm {
         self.endpoint.socket_addr()
     }
 
+    /// Get the connection ID (XorName) of an existing connection with the provided socket address
+    pub(crate) async fn get_connection_id(&self, addr: &SocketAddr) -> Option<XorName> {
+        self.endpoint.get_connection_id(addr).await
+    }
+
+    /// Get the SocketAddr of a connection using the connection ID (XorName)
+    pub(crate) async fn get_socket_addr_by_id(&self, xorname: &XorName) -> Option<SocketAddr> {
+        self.endpoint.get_socket_addr_by_id(xorname).await
+    }
+
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
     pub(crate) async fn send_on_existing_connection(
         &self,

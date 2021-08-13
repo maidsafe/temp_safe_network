@@ -366,40 +366,36 @@ impl Dispatcher {
 
     /// Send a message, either section to section, node to node, or to an end user.
     pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
-        if let DstLocation::EndUser(EndUser { socket_id, xorname }) = wire_msg.dst_location() {
-            let our_prefix = *self.core.read().await.section().prefix();
-            if our_prefix.matches(xorname) {
-                let addr = self.core.read().await.get_socket_addr(*socket_id);
+        if let DstLocation::EndUser(EndUser(name)) = wire_msg.dst_location() {
+            let addr = self
+                .core
+                .read()
+                .await
+                .comm
+                .get_socket_addr_by_id(name)
+                .await;
 
-                if let Some(socket_addr) = addr {
-                    // Send a message to a client peer.
-                    // Messages sent to a client are not signed
-                    // or validated as part of the routing library.
-                    debug!("Sending client msg to {:?}: {:?}", socket_addr, wire_msg);
+            if let Some(socket_addr) = addr {
+                // Send a message to a client peer.
+                // Messages sent to a client are not signed
+                // or validated as part of the routing library.
+                debug!("Sending client msg to {:?}: {:?}", socket_addr, wire_msg);
 
-                    let recipients = vec![(*xorname, socket_addr)];
-                    wire_msg.set_dst_section_pk(
-                        *self.core.read().await.section_chain().clone().last_key(),
-                    );
+                let recipients = vec![(*name, socket_addr)];
+                wire_msg
+                    .set_dst_section_pk(*self.core.read().await.section_chain().clone().last_key());
 
-                    let command = Command::SendMessage {
-                        recipients,
-                        wire_msg,
-                    };
+                let command = Command::SendMessage {
+                    recipients,
+                    wire_msg,
+                };
 
-                    Ok(vec![command])
-                } else {
-                    error!(
-                        "End user msg dropped. Could not find socketaddr corresponding to socket_id {:?}: {:?}",
-                        socket_id, wire_msg
-                    );
-                    Ok(vec![])
-                }
+                Ok(vec![command])
             } else {
                 error!(
-                    "End user msg dropped. Xorname doesn't match our prefix ({:?}): {:?}",
-                    our_prefix, wire_msg
-                );
+                        "End user msg dropped. Could not find socketaddr corresponding to xorname {:?}: {:?}",
+                        name, wire_msg
+                    );
                 Ok(vec![])
             }
         } else {

@@ -14,7 +14,6 @@ mod chunk_store;
 mod comm;
 mod connectivity;
 mod delivery_group;
-mod enduser_registry;
 mod liveness_tracking;
 mod messaging;
 mod msg_handling;
@@ -36,7 +35,7 @@ use std::path::PathBuf;
 
 pub(crate) use chunk_store::ChunkStore;
 
-use self::{enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
+use self::split_barrier::SplitBarrier;
 use crate::messaging::{
     node::{Network, Proposal, Section},
     MessageId,
@@ -80,7 +79,6 @@ pub(crate) struct Core {
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: bool,
     resource_proof: ResourceProof,
-    end_users: EndUserRegistry,
     used_space: UsedSpace,
     pub(super) register_storage: RegisterStorage,
     pub(super) chunk_storage: ChunkStore,
@@ -129,7 +127,6 @@ impl Core {
             event_tx,
             joins_allowed: true,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
-            end_users: EndUserRegistry::new(),
             register_storage,
             chunk_storage,
             capacity,
