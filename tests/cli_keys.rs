@@ -7,13 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-#[macro_use]
-extern crate duct;
-
 use assert_cmd::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_cmd_test_utilities::util::{create_and_get_keys, get_random_nrs_string, CLI, SAFE_PROTOCOL};
+use sn_cmd_test_utilities::util::{CLI, SAFE_PROTOCOL};
 use std::process::Command;
 
 const PRETTY_KEYS_CREATION_RESPONSE: &str = "New SafeKey created:";

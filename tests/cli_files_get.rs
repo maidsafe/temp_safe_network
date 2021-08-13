@@ -239,16 +239,10 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
         .as_micros();
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
-    cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "nrs",
-        "create",
-        &nrs_name,
-        "-l",
-        &files_container_xor
-    )
-    .read()
-    .map_err(|e| eyre!("{:#?}", e))?;
+    safe_cmd(
+        &["nrs", "create", &nrs_name, "-l", &files_container_xor],
+        Some(0),
+    )?;
 
     let src = format!("safe://{}", &nrs_name);
     let final_dest = Path::new(".").join(TESTDATA).display().to_string();
@@ -296,16 +290,10 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
         .as_micros();
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
-    cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "nrs",
-        "create",
-        &nrs_name,
-        "-l",
-        &xor_url_with_path
-    )
-    .read()
-    .map_err(|e| eyre!("{:#?}", e))?;
+    safe_cmd(
+        &["nrs", "create", &nrs_name, "-l", &xor_url_with_path],
+        Some(0),
+    )?;
 
     // make safe://nrsname/sub2.md
     let src = format!("safe://{}/{}", &nrs_name, TEST_FILE);
@@ -325,8 +313,6 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 
     let file_src = join_paths(&[TEST_FOLDER, SUBFOLDER, TEST_FILE]);
     assert_eq!(sum_tree(&file_src)?, sum_tree(&final_dest)?);
-
-    remove_dest(&final_dest)?;
 
     Ok(())
 }
@@ -406,16 +392,10 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
     let f = fs::File::create(&src_file).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
-    let files_container = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        &src_dir,
-        "--recursive",
-        "--json"
-    )
-    .read()
-    .map_err(|e| eyre!("{:#?}", e))?;
+    let files_container = safe_cmd_stdout(
+        &["files", "put", &src_dir, "--recursive", "--json"],
+        Some(0),
+    )?;
 
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
 
@@ -460,16 +440,10 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
     let f = fs::File::create(&src_file).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
-    let files_container = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        &src_dir,
-        "--recursive",
-        "--json"
-    )
-    .read()
-    .map_err(|e| eyre!("{:#?}", e))?;
+    let files_container = safe_cmd_stdout(
+        &["files", "put", &src_dir, "--recursive", "--json"],
+        Some(0),
+    )?;
 
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
 

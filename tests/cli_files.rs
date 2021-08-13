@@ -71,15 +71,16 @@ fn calling_safe_files_put_dry_run() -> Result<()> {
     let random_content: String = (0..10).map(|_| rand::random::<char>()).collect();
     fs::write(TEST_FILE_RANDOM_CONTENT, random_content).map_err(|e| eyre!(e.to_string()))?;
 
-    let content = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FILE_RANDOM_CONTENT,
-        "--json",
-        "--dry-run"
-    )
-    .read()?;
+    let content = safe_cmd_stdout(
+        &[
+            "files",
+            "put",
+            TEST_FILE_RANDOM_CONTENT,
+            "--json",
+            "--dry-run",
+        ],
+        Some(0),
+    )?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -104,15 +105,10 @@ fn calling_safe_files_put_recursive() -> Result<()> {
 
 #[test]
 fn calling_safe_files_put_recursive_and_set_dest_path() -> Result<()> {
-    let files_container = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "/aha",
-        "--recursive",
-    )
-    .read()?;
+    let files_container = safe_cmd_stdout(
+        &["files", "put", TEST_FOLDER, "/aha", "--recursive"],
+        Some(0),
+    )?;
 
     let mut lines = files_container.lines();
     let files_container_xor_line = lines
@@ -123,12 +119,12 @@ fn calling_safe_files_put_recursive_and_set_dest_path() -> Result<()> {
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/aha/test.md");
-    let file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let file_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/test.md", TEST_FOLDER))?;
     assert_eq!(file_cat, contents);
 
     safeurl.set_path("/aha/subfolder/subexists.md");
-    let subfile_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let subfile_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
     assert_eq!(subfile_cat, contents);
     Ok(())
@@ -177,14 +173,7 @@ fn calling_safe_files_put_emptyfolder() -> Result<()> {
 
 #[test]
 fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
-    let files_container = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive"
-    )
-    .read()?;
+    let files_container = safe_cmd_stdout(&["files", "put", TEST_FOLDER, "--recursive"], Some(0))?;
 
     let mut lines = files_container.lines();
     let files_container_xor_line = lines
@@ -195,13 +184,13 @@ fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/test.md");
-    let file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let file_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/test.md", TEST_FOLDER))?;
     assert_eq!(file_cat, contents);
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/subfolder/subexists.md");
-    let subfile_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let subfile_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
     assert_eq!(subfile_cat, contents);
     Ok(())
@@ -209,14 +198,10 @@ fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
 
 #[test]
 fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
-    let files_container = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER_NO_TRAILING_SLASH,
-        "--recursive"
-    )
-    .read()?;
+    let files_container = safe_cmd_stdout(
+        &["files", "put", TEST_FOLDER_NO_TRAILING_SLASH, "--recursive"],
+        Some(0),
+    )?;
 
     let mut lines = files_container.lines();
     let files_container_xor_line = lines
@@ -227,13 +212,13 @@ fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/testdata/test.md");
-    let file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let file_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/test.md", TEST_FOLDER))?;
     assert_eq!(file_cat, contents);
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/testdata/subfolder/subexists.md");
-    let subfile_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let subfile_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
     assert_eq!(subfile_cat, contents);
     Ok(())
@@ -241,14 +226,7 @@ fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
 
 #[test]
 fn calling_safe_files_sync() -> Result<()> {
-    let files_container = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive"
-    )
-    .read()?;
+    let files_container = safe_cmd_stdout(&["files", "put", TEST_FOLDER, "--recursive"], Some(0))?;
 
     let mut lines = files_container.lines();
     let files_container_xor_line = lines
@@ -257,20 +235,21 @@ fn calling_safe_files_sync() -> Result<()> {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let _ = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "sync",
-        TEST_FOLDER_SUBFOLDER,
-        files_container_xor,
-        "--recursive"
-    )
-    .read()?;
+    safe_cmd(
+        &[
+            "files",
+            "sync",
+            TEST_FOLDER_SUBFOLDER,
+            files_container_xor,
+            "--recursive",
+        ],
+        Some(0),
+    )?;
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/subexists.md");
     safeurl.set_content_version(Some(1));
-    let synced_file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let synced_file_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
     assert_eq!(synced_file_cat, "hello from a subfolder!");
     Ok(())
 }
@@ -376,14 +355,10 @@ fn calling_safe_files_removed_sync() -> Result<()> {
 
 #[test]
 fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -> Result<()> {
-    let files_container = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER_SUBFOLDER,
-        "--recursive"
-    )
-    .read()?;
+    let files_container = safe_cmd_stdout(
+        &["files", "put", TEST_FOLDER_SUBFOLDER, "--recursive"],
+        Some(0),
+    )?;
 
     let file_to_delete = format!("{}/sub2.md", TEST_FOLDER_SUBFOLDER);
     let file_to_modify = format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER);
@@ -409,21 +384,21 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -
     fs::remove_file(&file_to_delete).map_err(|e| eyre!(e.to_string()))?;
 
     // now sync
-    let files_sync_result = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "sync",
-        TEST_FOLDER_SUBFOLDER,
-        files_container_xor,
-        "--recursive",
-        // "--delete"
-    )
-    .read()?;
+    let files_sync_result = safe_cmd_stdout(
+        &[
+            "files",
+            "sync",
+            TEST_FOLDER_SUBFOLDER,
+            files_container_xor,
+            "--recursive",
+        ],
+        Some(0),
+    )?;
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/subexists.md");
     safeurl.set_content_version(None);
-    let file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let file_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
 
     // remove modified lines
     let mut replace_test_md = OpenOptions::new()
@@ -462,15 +437,10 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -
 
 #[test]
 fn calling_files_sync_and_fetch_with_version() -> Result<()> {
-    let files_container_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json"
-    )
-    .read()?;
+    let files_container_output = safe_cmd_stdout(
+        &["files", "put", TEST_FOLDER, "--recursive", "--json"],
+        Some(0),
+    )?;
 
     let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(|e| eyre!(e.to_string()))?;
 
@@ -481,17 +451,18 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
     let mut safeurl = safeurl_from(&files_container_xor)?;
     safeurl.set_content_version(None);
     let files_container_no_version = safeurl.to_string();
-    let sync_cmd_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "sync",
-        &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
-        &files_container_no_version,
-        "--recursive",
-        "--delete",
-        "--json",
-    )
-    .read()?;
+    let sync_cmd_output = safe_cmd_stdout(
+        &[
+            "files",
+            "sync",
+            &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
+            &files_container_no_version,
+            "--recursive",
+            "--delete",
+            "--json",
+        ],
+        Some(0),
+    )?;
 
     // cleanup
     fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
@@ -503,13 +474,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
     assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
     // now all file items should be gone in version 1 of the FilesContainer
-    let cat_container_v1 = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "cat",
-        &files_container_v1,
-        "--json"
-    )
-    .read()?;
+    let cat_container_v1 = safe_cmd_stdout(&["cat", &files_container_v1, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
     assert_eq!(xorurl, files_container_v1);
     assert_eq!(files_map.len(), 0);
@@ -517,13 +482,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
     // but in version 0 of the FilesContainer all files should still be there
     safeurl.set_content_version(Some(0));
     let files_container_v0 = safeurl.to_string();
-    let cat_container_v0 = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "cat",
-        &files_container_v0,
-        "--json"
-    )
-    .read()?;
+    let cat_container_v0 = safe_cmd_stdout(&["cat", &files_container_v0, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v0);
     assert_eq!(xorurl, files_container_v0);
     assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
@@ -532,15 +491,10 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
 
 #[test]
 fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
-    let files_container_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json"
-    )
-    .read()?;
+    let files_container_output = safe_cmd_stdout(
+        &["files", "put", TEST_FOLDER, "--recursive", "--json"],
+        Some(0),
+    )?;
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -551,30 +505,26 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
     let files_container_v0 = &safeurl.to_string();
     let nrsurl = get_random_nrs_string();
 
-    let _ = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "nrs",
-        "create",
-        &nrsurl,
-        "-l",
-        &files_container_v0,
-    )
-    .read()?;
+    safe_cmd(
+        &["nrs", "create", &nrsurl, "-l", &files_container_v0],
+        Some(0),
+    )?;
 
     let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(|e| eyre!(e.to_string()))?;
 
-    let sync_cmd_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "sync",
-        &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
-        &nrsurl,
-        "--recursive",
-        "--delete",
-        "--json",
-        "--update-nrs"
-    )
-    .read()?;
+    let sync_cmd_output = safe_cmd_stdout(
+        &[
+            "files",
+            "sync",
+            &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
+            &nrsurl,
+            "--recursive",
+            "--delete",
+            "--json",
+            "--update-nrs",
+        ],
+        Some(0),
+    )?;
 
     // cleanup
     fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
@@ -586,7 +536,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
 
     // now everything should be gone in version 1
     // since NRS name was updated to link version 1 of the FilesContainer
-    let cat_nrsurl_v1 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json").read()?;
+    let cat_nrsurl_v1 = safe_cmd_stdout(&["cat", &nrsurl, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v1);
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), 0);
@@ -594,7 +544,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
     // but in version 0 of the NRS name it should still link to version 0 of the FilesContainer
     // where all files should still be there
     let nrsurl_v0 = format!("{}?v=0", nrsurl);
-    let cat_nrsurl_v0 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl_v0, "--json").read()?;
+    let cat_nrsurl_v0 = safe_cmd_stdout(&["cat", &nrsurl_v0, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v0);
     assert_eq!(xorurl, nrsurl_v0);
     assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
@@ -603,15 +553,10 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
 
 #[test]
 fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
-    let files_container_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json"
-    )
-    .read()?;
+    let files_container_output = safe_cmd_stdout(
+        &["files", "put", TEST_FOLDER, "--recursive", "--json"],
+        Some(0),
+    )?;
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -621,29 +566,25 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
     let files_container_v0 = safeurl.to_string();
     let nrsurl = get_random_nrs_string();
 
-    let _ = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "nrs",
-        "create",
-        &nrsurl,
-        "-l",
-        &files_container_v0,
-    )
-    .read()?;
+    safe_cmd(
+        &["nrs", "create", &nrsurl, "-l", &files_container_v0],
+        Some(0),
+    )?;
 
     let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(|e| eyre!(e.to_string()))?;
 
-    let sync_cmd_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "sync",
-        emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
-        &nrsurl,
-        "--recursive",
-        "--delete",
-        "--json",
-    )
-    .read()?;
+    let sync_cmd_output = safe_cmd_stdout(
+        &[
+            "files",
+            "sync",
+            &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
+            &nrsurl,
+            "--recursive",
+            "--delete",
+            "--json",
+        ],
+        Some(0),
+    )?;
 
     // cleanup
     fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
@@ -656,20 +597,14 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
     let mut safeurl = safeurl_from(&files_container_xor)?;
     safeurl.set_content_version(Some(1));
     let files_container_v1 = safeurl.to_string();
-    let cat_container_v1 = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "cat",
-        &files_container_v1,
-        "--json"
-    )
-    .read()?;
+    let cat_container_v1 = safe_cmd_stdout(&["cat", &files_container_v1, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
     assert_eq!(xorurl, files_container_v1);
     assert_eq!(files_map.len(), 0);
 
     // but the NRS name should still link to version 0 of the FilesContainer
     // where all files should still be there
-    let cat_nrsurl = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json").read()?;
+    let cat_nrsurl = safe_cmd_stdout(&["cat", &nrsurl, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl);
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
@@ -678,32 +613,28 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
 
 #[test]
 fn calling_safe_files_add() -> Result<()> {
-    let files_container_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json",
-    )
-    .read()?;
+    let files_container_output = safe_cmd_stdout(
+        &["files", "put", TEST_FOLDER, "--recursive", "--json"],
+        Some(0),
+    )?;
 
     let (files_container_xor, _processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
 
     let mut safeurl = safeurl_from(&files_container_xor)?;
     safeurl.set_content_version(None);
-    let _ = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "add",
-        TEST_FILE,
-        &format!("{}/new_test.md", safeurl),
-    )
-    .read()?;
+    safe_cmd(
+        &[
+            "files",
+            "add",
+            TEST_FILE,
+            &format!("{}/new_test.md", safeurl),
+        ],
+        Some(0),
+    )?;
 
     safeurl.set_path("/new_test.md");
-    let synced_file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let synced_file_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
     assert_eq!(synced_file_cat, "hello tests!");
     Ok(())
 }
@@ -739,15 +670,10 @@ fn calling_safe_files_add_dry_run() -> Result<(), Report> {
 
 #[test]
 fn calling_safe_files_add_a_url() -> Result<()> {
-    let files_container_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json"
-    )
-    .read()?;
+    let files_container_output = safe_cmd_stdout(
+        &["files", "put", TEST_FOLDER, "--recursive", "--json"],
+        Some(0),
+    )?;
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -755,17 +681,18 @@ fn calling_safe_files_add_a_url() -> Result<()> {
     let mut safeurl = safeurl_from(&files_container_xor)?;
     safeurl.set_content_version(None);
     safeurl.set_path("/new_test.md");
-    let _ = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "add",
-        &processed_files[TEST_FILE].1,
-        &safeurl.to_string(),
-        "--json"
-    )
-    .read()?;
+    safe_cmd(
+        &[
+            "files",
+            "add",
+            &processed_files[TEST_FILE].1,
+            &safeurl.to_string(),
+            "--json",
+        ],
+        Some(0),
+    )?;
 
-    let synced_file_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", safeurl.to_string()).read()?;
+    let synced_file_cat = safe_cmd_stdout(&["cat", &safeurl.to_string()], Some(0))?;
     assert_eq!(synced_file_cat, "hello tests!");
     Ok(())
 }
@@ -884,14 +811,7 @@ fn calling_files_ls_on_single_file() -> Result<()> {
     safeurl.set_path("/subfolder/subexists.md");
     let single_file_url = safeurl.to_string();
 
-    let files_ls_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "ls",
-        &single_file_url,
-        "--json"
-    )
-    .read()?;
+    let files_ls_output = safe_cmd_stdout(&["files", "ls", &single_file_url, "--json"], Some(0))?;
 
     let (_xorurl, files_map) = parse_files_container_output(&files_ls_output);
     let subexists_len = get_file_len(&format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
@@ -921,8 +841,7 @@ fn calling_files_ls_on_nrs_with_path() -> Result<()> {
     nrsurl_encoder.set_path("/subfolder");
     let nrsurl = nrsurl_encoder.to_string();
 
-    let files_ls_output =
-        cmd!(env!("CARGO_BIN_EXE_safe"), "files", "ls", &nrsurl, "--json").read()?;
+    let files_ls_output = safe_cmd_stdout(&["files", "ls", &nrsurl, "--json"], Some(0))?;
 
     let (_xorurl, files_map) = parse_files_container_output(&files_ls_output);
     let sub2_len = get_file_len(&format!("{}/sub2.md", TEST_FOLDER_SUBFOLDER))?;
@@ -995,14 +914,10 @@ fn calling_files_tree() -> Result<()> {
     safeurl.set_content_version(None);
     let container_xorurl_no_version = safeurl.to_string();
 
-    let files_tree_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "tree",
-        &container_xorurl_no_version,
-        "--json"
-    )
-    .read()?;
+    let files_tree_output = safe_cmd_stdout(
+        &["files", "tree", &container_xorurl_no_version, "--json"],
+        Some(0),
+    )?;
 
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);
@@ -1019,13 +934,8 @@ fn calling_files_tree() -> Result<()> {
     assert_eq!(root["sub"][5]["sub"][1]["name"], "subexists.md");
     assert_eq!(root["sub"][6]["name"], "test.md");
 
-    let files_tree_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "tree",
-        &container_xorurl_no_version
-    )
-    .read()?;
+    let files_tree_output =
+        safe_cmd_stdout(&["files", "tree", &container_xorurl_no_version], Some(0))?;
 
     let should_match = format!(
         "{}\n{}",
@@ -1047,15 +957,16 @@ fn calling_files_tree() -> Result<()> {
     );
     assert_eq!(files_tree_output, should_match);
 
-    let files_tree_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "tree",
-        &container_xorurl_no_version,
-        "--details",
-        "--json",
-    )
-    .read()?;
+    let files_tree_output = safe_cmd_stdout(
+        &[
+            "files",
+            "tree",
+            &container_xorurl_no_version,
+            "--details",
+            "--json",
+        ],
+        Some(0),
+    )?;
 
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);
@@ -1127,8 +1038,7 @@ fn calling_files_tree_with_symlinks() -> Result<()> {
     ├── hello.md
     └── sub2 -> ../sub2
 
-11 directories, 12 files
-"
+11 directories, 12 files"
     );
     assert_eq!(stdout, should_match);
 

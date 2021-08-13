@@ -7,16 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-#[macro_use]
-extern crate duct;
-
 use assert_cmd::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::fetch::{SafeContentType, SafeDataType};
 use sn_cmd_test_utilities::util::{
     create_and_get_keys, get_random_nrs_string, parse_files_container_output,
-    parse_files_put_or_sync_output, safe_cmd_stderr, safe_cmd_stdout, safeurl_from,
+    parse_files_put_or_sync_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout, safeurl_from,
     test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
@@ -31,15 +28,7 @@ const ANOTHER_FILE_CONTENT: &str = "exists";
 
 #[test]
 fn calling_safe_cat() -> Result<()> {
-    let content = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FILE,
-        "--json"
-    )
-    .read()
-    .map_err(|e| eyre!(e.to_string()))?;
+    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -60,28 +49,14 @@ fn calling_safe_cat() -> Result<()> {
 #[test]
 //#[ignore = "test has been identified to be hanging indefinitely"]
 fn calling_safe_cat_subfolders() -> Result<()> {
-    let content = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_DATA,
-        "--json",
-        "--recursive",
-    )
-    .read()
-    .map_err(|e| eyre!(e.to_string()))?;
+    let content = safe_cmd_stdout(
+        &["files", "put", TEST_DATA, "--json", "--recursive"],
+        Some(0),
+    )?;
 
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
 
-    let content = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "cat",
-        &container_xorurl,
-        "--json",
-    )
-    .read()
-    .map_err(|e| eyre!(e.to_string()))?;
-
+    let content = safe_cmd_stdout(&["cat", &container_xorurl, "--json"], Some(0))?;
     let (_xorurl, filesmap) = parse_files_container_output(&content);
 
     assert_eq!(filesmap["/emptyfolder"]["type"], "inode/directory");
@@ -93,15 +68,7 @@ fn calling_safe_cat_subfolders() -> Result<()> {
 
 #[test]
 fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
-    let content = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FILE,
-        "--json"
-    )
-    .read()
-    .map_err(|e| eyre!(e.to_string()))?;
+    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -116,15 +83,7 @@ fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
 
 #[test]
 fn calling_safe_cat_hexdump() -> Result<()> {
-    let content = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FILE,
-        "--json"
-    )
-    .read()
-    .map_err(|e| eyre!(e.to_string()))?;
+    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -145,15 +104,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
 #[test]
 //#[ignore = "test has been identified to be hanging indefinitely"]
 fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
-    let content = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FILE,
-        "--json"
-    )
-    .read()
-    .map_err(|e| eyre!(e.to_string()))?;
+    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     // let's sync with another file so we get a new version, and a different content in the file
@@ -196,28 +147,14 @@ fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
 
 #[test]
 fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
-    let content = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "put",
-        TEST_FILE,
-        "--json"
-    )
-    .read()
-    .map_err(|e| eyre!(e.to_string()))?;
+    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = get_random_nrs_string();
-    let _ = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "nrs",
-        "create",
-        &nrsurl,
-        "-l",
-        &container_xorurl,
-    )
-    .read()
-    .map_err(|e| eyre!(e.to_string()))?;
+    safe_cmd(
+        &["nrs", "create", &nrsurl, "-l", &container_xorurl],
+        Some(0),
+    )?;
 
     let nrsurl_with_path = format!("{}/test.md", nrsurl);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -263,11 +200,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
 #[test]
 fn calling_safe_cat_safekey() -> Result<()> {
     let (safekey_xorurl, _sk) = create_and_get_keys()?;
-
-    let cat_output = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &safekey_xorurl,)
-        .read()
-        .map_err(|e| eyre!(e.to_string()))?;
-
+    let cat_output = safe_cmd_stdout(&["cat", &safekey_xorurl], Some(0))?;
     assert_eq!(cat_output, "No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
     Ok(())
 }
@@ -297,7 +230,7 @@ fn calling_cat_symlinks_resolve_dir_and_file() -> Result<()> {
     let args = ["cat", &safeurl.to_string()];
     let output = safe_cmd_stdout(&args, Some(0))?;
 
-    assert_eq!(output.trim(), "= Hello =");
+    assert_eq!(output, "= Hello =");
 
     Ok(())
 }
@@ -363,7 +296,7 @@ fn calling_cat_symlinks_resolve_parent_dir() -> Result<()> {
     safeurl.set_path("/dir_link_deep/../readme.md");
     let args = ["cat", &safeurl.to_string()];
     let output = safe_cmd_stdout(&args, Some(0))?;
-    assert_eq!(output.trim(), "= This is a real markdown file. =");
+    assert_eq!(output, "= This is a real markdown file. =");
 
     Ok(())
 }

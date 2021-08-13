@@ -11,7 +11,6 @@
 pub mod util {
     use assert_cmd::Command;
     use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
-    use duct::cmd;
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use sn_api::{fetch::SafeData, files::ProcessedFiles, Keypair, SafeUrl};
@@ -65,14 +64,8 @@ pub mod util {
     }
 
     pub fn create_and_get_keys() -> Result<(String, String)> {
-        let pk_command_result = cmd!(
-            get_bin_location(),
-            "keys",
-            "create",
-            "--test-coins",
-            "--json",
-        )
-        .read()?;
+        let pk_command_result =
+            safe_cmd_stdout(&["keys", "create", "--test-coins", "--json"], Some(0))?;
 
         let (xorurl, (_pk, sk)): (String, (String, String)) =
             parse_keys_create_output(&pk_command_result);
@@ -81,16 +74,8 @@ pub mod util {
     }
 
     pub fn create_nrs_link(name: &str, link: &str) -> Result<String> {
-        let nrs_creation = cmd!(
-            get_bin_location(),
-            "nrs",
-            "create",
-            &name,
-            "-l",
-            &link,
-            "--json"
-        )
-        .read()?;
+        let nrs_creation =
+            safe_cmd_stdout(&["nrs", "create", &name, "-l", &link, "--json"], Some(0))?;
 
         let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
         assert!(nrs_map_xorurl.contains("safe://"));
@@ -348,8 +333,9 @@ pub mod util {
     // if value does not match process exit code.
     pub fn safe_cmd_stdout(args: &[&str], expect_exit_code: Option<i32>) -> Result<String> {
         let output = safe_cmd(&args, expect_exit_code)?;
-        String::from_utf8(output.stdout)
-            .wrap_err("Failed to parse the error output as a UTF-8 string".to_string())
+        let stdout = String::from_utf8(output.stdout)
+            .wrap_err("Failed to parse the error output as a UTF-8 string".to_string())?;
+        Ok(stdout.trim().to_string())
     }
 
     // Executes arbitrary `safe ` commands and returns
