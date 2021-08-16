@@ -68,7 +68,7 @@ impl DkgVoter {
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         if self.sessions.contains_key(&dkg_key) {
-            trace!("DKG for {:?} already in progress", elder_candidates);
+            trace!("DKG already in progress for {:?}", elder_candidates);
             return Ok(vec![]);
         }
 
@@ -77,7 +77,7 @@ impl DkgVoter {
             index
         } else {
             error!(
-                "DKG for {:?} failed to start: {} is not a participant",
+                "DKG failed to start for {:?}: {} is not a participant",
                 elder_candidates, name
             );
             return Ok(vec![]);
@@ -105,7 +105,7 @@ impl DkgVoter {
 
         match KeyGen::initialize(name, threshold, participants) {
             Ok((key_gen, message)) => {
-                trace!("DKG for {:?} starting", elder_candidates);
+                trace!("DKG starting for {:?}", elder_candidates);
 
                 let mut session = Session {
                     key_gen,
@@ -135,7 +135,7 @@ impl DkgVoter {
             }
             Err(error) => {
                 // TODO: return a separate error here.
-                error!("DKG for {:?} failed to start: {}", elder_candidates, error);
+                error!("DKG failed to start for {:?}: {}", elder_candidates, error);
                 Ok(vec![])
             }
         }

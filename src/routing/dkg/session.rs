@@ -134,7 +134,7 @@ impl Session {
             return Ok(vec![]);
         }
 
-        trace!("DKG for {:?} progressing", self.elder_candidates);
+        trace!("DKG progressing for {:?}", self.elder_candidates);
 
         match self.key_gen.timed_phase_transition(&mut rand::thread_rng()) {
             Ok(messages) => {
@@ -147,7 +147,7 @@ impl Session {
                 Ok(commands)
             }
             Err(error) => {
-                trace!("DKG for {:?} failed: {}", self.elder_candidates, error);
+                trace!("DKG failed for {:?}: {}", self.elder_candidates, error);
                 self.report_failure(node, dkg_key, BTreeSet::new(), section_pk)
             }
         }
@@ -177,7 +177,7 @@ impl Session {
         // Less than 100% participation
         if !participants.iter().eq(self.elder_candidates.elders.keys()) {
             trace!(
-                "DKG for {:?} failed: unexpected participants: {:?}",
+                "DKG failed due to unexpected participants for {:?}: {:?}",
                 self.elder_candidates,
                 participants.iter().format(", ")
             );
@@ -208,14 +208,14 @@ impl Session {
             != outcome.secret_key_share.public_key_share()
         {
             trace!(
-                "DKG for {:?} failed: corrupted outcome",
+                "DKG failed due to corrupted outcome for {:?}",
                 self.elder_candidates
             );
             return self.report_failure(node, dkg_key, BTreeSet::new(), section_pk);
         }
 
         trace!(
-            "DKG for {:?} complete: {:?}",
+            "DKG complete for {:?}: {:?}",
             self.elder_candidates,
             outcome.public_key_set.public_key()
         );
