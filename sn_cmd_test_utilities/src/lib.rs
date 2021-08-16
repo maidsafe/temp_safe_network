@@ -26,26 +26,30 @@ pub mod util {
     pub const TEST_SYMLINKS_FOLDER: &str = "./test_symlinks";
     pub const TEST_SYMLINK: &str = "./test_symlinks/file_link";
 
-    pub fn get_directory_len(directory_path: &str) -> Result<u64> {
-        let paths = fs::read_dir(directory_path)
-            .wrap_err(format!("Error reading directory at {}", directory_path))
-            .suggestion(format!(
-                "Verify that {} exists and that the user has read permissions on it",
-                directory_path
-            ))?;
-        let mut len = 0;
-        for path in paths {
-            len += get_file_len(&path?.path().to_str().unwrap())?;
-        }
-        Ok(len)
+    #[ctor::ctor]
+    fn init() {
+        let _ = color_eyre::install();
     }
 
-    pub fn get_file_len(path: &str) -> Result<u64> {
-        let metadata = std::fs::metadata(path)
-            .wrap_err(format!("Cannot retrieve metadata for: {}", path))
+    pub fn get_directory_len(directory_path: impl AsRef<Path>) -> Result<u64> {
+        fs::read_dir(directory_path.as_ref())
+            .wrap_err(format!(
+                "Error reading directory at {}",
+                directory_path.as_ref().display()
+            ))?
+            .map(|entry| get_file_len(entry?.path()))
+            .sum()
+    }
+
+    pub fn get_file_len(path: impl AsRef<Path>) -> Result<u64> {
+        let metadata = std::fs::metadata(&path)
+            .wrap_err(format!(
+                "Cannot retrieve metadata for: {}",
+                &path.as_ref().display()
+            ))
             .suggestion(format!(
                 "Verify that {} exists and that the user has read permissions on it",
-                path
+                &path.as_ref().display()
             ))?;
         Ok(metadata.len())
     }
@@ -65,7 +69,7 @@ pub mod util {
 
     pub fn create_and_get_keys() -> Result<(String, String)> {
         let pk_command_result =
-            safe_cmd_stdout(&["keys", "create", "--test-coins", "--json"], Some(0))?;
+            safe_cmd_stdout(["keys", "create", "--test-coins", "--json"], Some(0))?;
 
         let (xorurl, (_pk, sk)): (String, (String, String)) =
             parse_keys_create_output(&pk_command_result);
@@ -74,8 +78,7 @@ pub mod util {
     }
 
     pub fn create_nrs_link(name: &str, link: &str) -> Result<String> {
-        let nrs_creation =
-            safe_cmd_stdout(&["nrs", "create", &name, "-l", &link, "--json"], Some(0))?;
+        let nrs_creation = safe_cmd_stdout(["nrs", "create", name, "-l", link, "--json"], Some(0))?;
 
         let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
         assert!(nrs_map_xorurl.contains("safe://"));
@@ -93,11 +96,11 @@ pub mod util {
             path.to_string()
         };
 
-        let args = ["files", "put", &final_path, "--recursive", "--json"];
-        let files_container = safe_cmd_stdout(&args, Some(0))?;
-
+        let files_container = safe_cmd_stdout(
+            ["files", "put", &final_path, "--recursive", "--json"],
+            Some(0),
+        )?;
         let (container_xorurl, file_map) = parse_files_put_or_sync_output(&files_container);
-
         Ok((container_xorurl, file_map, final_path))
     }
 
@@ -248,7 +251,7 @@ pub mod util {
         let s_bytes = s.as_bytes();
         let mut hasher = Sha3::v256();
         let mut bytes = [0; 32];
-        hasher.update(&s_bytes);
+        hasher.update(s_bytes);
         hasher.finalize(&mut bytes);
         encode(Base::Base32, bytes)
     }
@@ -288,7 +291,7 @@ pub mod util {
     }
 
     pub fn parse_wallet_create_output(output: &str) -> (String, String, Option<Keypair>) {
-        serde_json::from_str(&output).expect("Failed to parse output of `safe wallet create`")
+        serde_json::from_str(output).expect("Failed to parse output of `safe wallet create`")
     }
 
     pub fn parse_xorurl_output(output: &str) -> Vec<(String, String)> {
@@ -312,16 +315,16 @@ pub mod util {
     }
 
     /// Runs safe with the arguments specified, with the option to assert on the exit code.
+    ///
     /// This was changed to use the assert_cmd crate because the newer version of this crate
     /// provides *both* the stdout and stderr if the process doesn't exit as expected. This is
     /// extremely useful in this test suite because there are lots of commands used to setup the
     /// context for the tests, and you need to be able to see why those fail too.
-    pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process::Output> {
-        println!("Executing: safe {}", args.join(" "));
-        let mut code = 0;
-        if let Some(c) = expect_exit_code {
-            code = c;
-        }
+    pub fn safe_cmd<'a>(
+        args: impl IntoIterator<Item = &'a str>,
+        expect_exit_code: Option<i32>,
+    ) -> Result<process::Output> {
+        let code = expect_exit_code.unwrap_or(0);
         let mut cmd = Command::cargo_bin("safe")?;
         Ok(cmd.args(args).assert().code(code).get_output().to_owned())
     }
@@ -331,8 +334,11 @@ pub mod util {
     //
     // If expect_exit_code is Some, then an Err is returned
     // if value does not match process exit code.
-    pub fn safe_cmd_stdout(args: &[&str], expect_exit_code: Option<i32>) -> Result<String> {
-        let output = safe_cmd(&args, expect_exit_code)?;
+    pub fn safe_cmd_stdout<'a>(
+        args: impl IntoIterator<Item = &'a str>,
+        expect_exit_code: Option<i32>,
+    ) -> Result<String> {
+        let output = safe_cmd(args, expect_exit_code)?;
         let stdout = String::from_utf8(output.stdout)
             .wrap_err("Failed to parse the error output as a UTF-8 string".to_string())?;
         Ok(stdout.trim().to_string())
@@ -343,8 +349,11 @@ pub mod util {
     //
     // If expect_exit_code is Some, then an Err is returned
     // if value does not match process exit code.
-    pub fn safe_cmd_stderr(args: &[&str], expect_exit_code: Option<i32>) -> Result<String> {
-        let output = safe_cmd(&args, expect_exit_code)?;
+    pub fn safe_cmd_stderr<'a>(
+        args: impl IntoIterator<Item = &'a str>,
+        expect_exit_code: Option<i32>,
+    ) -> Result<String> {
+        let output = safe_cmd(args, expect_exit_code)?;
         String::from_utf8(output.stderr)
             .wrap_err("Failed to parse the error output as a UTF-8 string".to_string())
     }

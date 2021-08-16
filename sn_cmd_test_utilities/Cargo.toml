@@ -11,6 +11,7 @@ edition = "2018"
 [dependencies]
 assert_cmd = "~2.0"
 color-eyre = "~0.5"
+ctor = "~0.1"
 rand = "~0.7.3"
 serde = "1.0.123"
 serde_json = "1.0.62"

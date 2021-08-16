@@ -43,10 +43,10 @@ fn calling_safe_seq_store_pretty() -> Result<()> {
 #[test]
 fn calling_safe_seq_store_and_cat() -> Result<()> {
     let content = "first item";
-    let seq_store = safe_cmd_stdout(&["seq", "store", content, "--json"], Some(0))?;
+    let seq_store = safe_cmd_stdout(["seq", "store", content, "--json"], Some(0))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
-    let seq_cat = safe_cmd_stdout(&["cat", &seq_url, "--json"], Some(0))?;
+    let seq_cat = safe_cmd_stdout(["cat", &seq_url, "--json"], Some(0))?;
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content.as_bytes());
     Ok(())
@@ -55,9 +55,9 @@ fn calling_safe_seq_store_and_cat() -> Result<()> {
 #[test]
 fn calling_safe_seq_store_priv_and_cat() -> Result<()> {
     let content = "first item";
-    let seq_store = safe_cmd_stdout(&["seq", "store", content, "--private", "--json"], Some(0))?;
+    let seq_store = safe_cmd_stdout(["seq", "store", content, "--private", "--json"], Some(0))?;
     let seq_url = parse_seq_store_output(&seq_store);
-    let seq_cat = safe_cmd_stdout(&["cat", &seq_url, "--json"], Some(0))?;
+    let seq_cat = safe_cmd_stdout(["cat", &seq_url, "--json"], Some(0))?;
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content.as_bytes());
     Ok(())
@@ -66,20 +66,20 @@ fn calling_safe_seq_store_priv_and_cat() -> Result<()> {
 #[test]
 fn calling_safe_seq_append() -> Result<()> {
     let content_v0 = "first item";
-    let seq_store = safe_cmd_stdout(&["seq", "store", content_v0, "--json"], Some(0))?;
+    let seq_store = safe_cmd_stdout(["seq", "store", content_v0, "--json"], Some(0))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
     let mut safeurl = safeurl_from(&seq_url)?;
 
     let content_v1 = "second item";
-    safe_cmd(&["seq", "append", content_v1, &seq_url, "--json"], Some(0))?;
+    safe_cmd(["seq", "append", content_v1, &seq_url, "--json"], Some(0))?;
 
-    let seq_cat = safe_cmd_stdout(&["cat", &seq_url, "--json"], Some(0))?;
+    let seq_cat = safe_cmd_stdout(["cat", &seq_url, "--json"], Some(0))?;
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v1.as_bytes());
 
     safeurl.set_content_version(Some(0));
-    let seq_cat = safe_cmd_stdout(&["cat", &safeurl.to_string(), "--json"], Some(0))?;
+    let seq_cat = safe_cmd_stdout(["cat", &safeurl.to_string(), "--json"], Some(0))?;
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v0.as_bytes());
     Ok(())
@@ -88,23 +88,20 @@ fn calling_safe_seq_append() -> Result<()> {
 #[test]
 fn calling_safe_seq_priv_append() -> Result<()> {
     let content_v0 = "first item";
-    let seq_store = safe_cmd_stdout(
-        &["seq", "store", content_v0, "--private", "--json"],
-        Some(0),
-    )?;
+    let seq_store = safe_cmd_stdout(["seq", "store", content_v0, "--private", "--json"], Some(0))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
     let mut safeurl = safeurl_from(&seq_url)?;
 
     let content_v1 = "second item";
-    safe_cmd(&["seq", "append", content_v1, &seq_url, "--json"], Some(0))?;
+    safe_cmd(["seq", "append", content_v1, &seq_url, "--json"], Some(0))?;
 
-    let seq_cat = safe_cmd_stdout(&["cat", &seq_url, "--json"], Some(0))?;
+    let seq_cat = safe_cmd_stdout(["cat", &seq_url, "--json"], Some(0))?;
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v1.as_bytes());
 
     safeurl.set_content_version(Some(0));
-    let seq_cat = safe_cmd_stdout(&["cat", &safeurl.to_string(), "--json"], Some(0))?;
+    let seq_cat = safe_cmd_stdout(["cat", &safeurl.to_string(), "--json"], Some(0))?;
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v0.as_bytes());
     Ok(())
@@ -113,7 +110,7 @@ fn calling_safe_seq_priv_append() -> Result<()> {
 #[test]
 fn calling_seq_store_and_fetch_with_nrsurl() -> Result<()> {
     let content = "first item";
-    let seq_store = safe_cmd_stdout(&["seq", "store", content, "--json"], Some(0))?;
+    let seq_store = safe_cmd_stdout(["seq", "store", content, "--json"], Some(0))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
 
@@ -123,11 +120,11 @@ fn calling_seq_store_and_fetch_with_nrsurl() -> Result<()> {
     let nrsurl = get_random_nrs_string();
 
     safe_cmd(
-        &["nrs", "create", &nrsurl, "-l", files_container_v0],
+        ["nrs", "create", &nrsurl, "-l", files_container_v0],
         Some(0),
     )?;
 
-    let cat_nrsurl_v1 = safe_cmd_stdout(&["cat", &nrsurl, "--json"], Some(0))?;
+    let cat_nrsurl_v1 = safe_cmd_stdout(["cat", &nrsurl, "--json"], Some(0))?;
     let (xorurl, data) = parse_cat_seq_output(&cat_nrsurl_v1);
     assert_eq!(xorurl, nrsurl);
     assert_eq!(data, content.as_bytes());

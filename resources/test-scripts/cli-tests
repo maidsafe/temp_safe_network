@@ -7,7 +7,6 @@ exit=0
 
 export SN_CLI_QUERY_TIMEOUT=15
 export RUST_BACKTRACE=full
-declare -a exit_codes
 
 target/release/safe keys create --test-coins --for-cli || ((exit++))
 cargo test --release --test cli_cat || ((exit++))

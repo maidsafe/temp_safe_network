@@ -28,7 +28,7 @@ const ANOTHER_FILE_CONTENT: &str = "exists";
 
 #[test]
 fn calling_safe_cat() -> Result<()> {
-    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
+    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -50,13 +50,13 @@ fn calling_safe_cat() -> Result<()> {
 //#[ignore = "test has been identified to be hanging indefinitely"]
 fn calling_safe_cat_subfolders() -> Result<()> {
     let content = safe_cmd_stdout(
-        &["files", "put", TEST_DATA, "--json", "--recursive"],
+        ["files", "put", TEST_DATA, "--json", "--recursive"],
         Some(0),
     )?;
 
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
 
-    let content = safe_cmd_stdout(&["cat", &container_xorurl, "--json"], Some(0))?;
+    let content = safe_cmd_stdout(["cat", &container_xorurl, "--json"], Some(0))?;
     let (_xorurl, filesmap) = parse_files_container_output(&content);
 
     assert_eq!(filesmap["/emptyfolder"]["type"], "inode/directory");
@@ -68,7 +68,7 @@ fn calling_safe_cat_subfolders() -> Result<()> {
 
 #[test]
 fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
-    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
+    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -83,7 +83,7 @@ fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
 
 #[test]
 fn calling_safe_cat_hexdump() -> Result<()> {
-    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
+    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -104,7 +104,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
 #[test]
 //#[ignore = "test has been identified to be hanging indefinitely"]
 fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
-    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
+    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     // let's sync with another file so we get a new version, and a different content in the file
@@ -147,14 +147,11 @@ fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
 
 #[test]
 fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
-    let content = safe_cmd_stdout(&["files", "put", TEST_FILE, "--json"], Some(0))?;
+    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = get_random_nrs_string();
-    safe_cmd(
-        &["nrs", "create", &nrsurl, "-l", &container_xorurl],
-        Some(0),
-    )?;
+    safe_cmd(["nrs", "create", &nrsurl, "-l", &container_xorurl], Some(0))?;
 
     let nrsurl_with_path = format!("{}/test.md", nrsurl);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -200,7 +197,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
 #[test]
 fn calling_safe_cat_safekey() -> Result<()> {
     let (safekey_xorurl, _sk) = create_and_get_keys()?;
-    let cat_output = safe_cmd_stdout(&["cat", &safekey_xorurl], Some(0))?;
+    let cat_output = safe_cmd_stdout(["cat", &safekey_xorurl], Some(0))?;
     assert_eq!(cat_output, "No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
     Ok(())
 }
@@ -227,11 +224,8 @@ fn calling_cat_symlinks_resolve_dir_and_file() -> Result<()> {
     let mut safeurl = safeurl_from(&url)?;
     safeurl.set_path("/dir_link_link/parent_dir/dir_link/sibling_dir_file.md");
 
-    let args = ["cat", &safeurl.to_string()];
-    let output = safe_cmd_stdout(&args, Some(0))?;
-
+    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     assert_eq!(output, "= Hello =");
-
     Ok(())
 }
 
@@ -252,8 +246,7 @@ fn calling_cat_symlinks_resolve_infinite_loop() -> Result<()> {
     let mut safeurl = safeurl_from(&url)?;
 
     safeurl.set_path("/sub/infinite_loop");
-    let args = ["cat", &safeurl.to_string()];
-    let output = safe_cmd_stderr(&args, Some(1))?;
+    let output = safe_cmd_stderr(["cat", &safeurl.to_string()], Some(1))?;
     assert!(output.contains("ContentNotFound: Too many levels of symbolic links"));
 
     Ok(())
@@ -294,8 +287,7 @@ fn calling_cat_symlinks_resolve_parent_dir() -> Result<()> {
     let mut safeurl = safeurl_from(&url)?;
 
     safeurl.set_path("/dir_link_deep/../readme.md");
-    let args = ["cat", &safeurl.to_string()];
-    let output = safe_cmd_stdout(&args, Some(0))?;
+    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     assert_eq!(output, "= This is a real markdown file. =");
 
     Ok(())
@@ -317,8 +309,7 @@ fn calling_cat_symlinks_resolve_dir_outside() -> Result<()> {
     let mut safeurl = safeurl_from(&url)?;
 
     safeurl.set_path("/dir_outside");
-    let args = ["cat", &safeurl.to_string()];
-    let output = safe_cmd_stderr(&args, Some(1))?;
+    let output = safe_cmd_stderr(["cat", &safeurl.to_string()], Some(1))?;
     assert!(output.contains("ContentNotFound: Cannot ascend beyond root directory"));
 
     Ok(())

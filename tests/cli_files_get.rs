@@ -237,7 +237,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
     safe_cmd(
-        &["nrs", "create", &nrs_name, "-l", &files_container_xor],
+        ["nrs", "create", &nrs_name, "-l", &files_container_xor],
         Some(0),
     )?;
 
@@ -288,7 +288,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
     safe_cmd(
-        &["nrs", "create", &nrs_name, "-l", &xor_url_with_path],
+        ["nrs", "create", &nrs_name, "-l", &xor_url_with_path],
         Some(0),
     )?;
 
@@ -389,10 +389,8 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
     let f = fs::File::create(&src_file).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
-    let files_container = safe_cmd_stdout(
-        &["files", "put", &src_dir, "--recursive", "--json"],
-        Some(0),
-    )?;
+    let files_container =
+        safe_cmd_stdout(["files", "put", &src_dir, "--recursive", "--json"], Some(0))?;
 
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
 
@@ -437,10 +435,8 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
     let f = fs::File::create(&src_file).map_err(|e| eyre!(e.to_string()))?;
     drop(f); // close file.
 
-    let files_container = safe_cmd_stdout(
-        &["files", "put", &src_dir, "--recursive", "--json"],
-        Some(0),
-    )?;
+    let files_container =
+        safe_cmd_stdout(["files", "put", &src_dir, "--recursive", "--json"], Some(0))?;
 
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
 
@@ -1113,8 +1109,10 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     create_symlink(&new_symlink_target, &new_symlink_path, false).map_err(|e| eyre!("{:?}", e))?;
 
     // sync dir with new symlink to network
-    let args = ["files", "sync", &symlinks_dir, &safeurl.to_string()];
-    let _output = safe_cmd_stdout(&args, Some(0))?;
+    let _output = safe_cmd_stdout(
+        ["files", "sync", &symlinks_dir, &safeurl.to_string()],
+        Some(0),
+    )?;
 
     let src = source_path(&safeurl.to_string(), &[])?;
     let dest = dest_dir(&[NEWNAME]);
@@ -1161,7 +1159,6 @@ fn files_get(
     progress: Option<&str>,
     expect_exit_code: Option<i32>,
 ) -> Result<process::Output, Report> {
-    // arg/option with empty string are filtered out.
     let args: Vec<String> = vec![
         "files".to_string(),
         "get".to_string(),
@@ -1173,9 +1170,8 @@ fn files_get(
     .into_iter()
     .filter(|a| !a.is_empty())
     .collect();
-
-    let slice: Vec<&str> = args.iter().map(|x| &**x).collect();
-    safe_cmd(&slice, expect_exit_code)
+    let args: Vec<&str> = args.iter().map(|x| &**x).collect();
+    safe_cmd(args, expect_exit_code)
 }
 
 // For dynamically generating cmd args.
@@ -1190,7 +1186,7 @@ fn cmd_arg(val: Option<&str>) -> String {
 //
 // generates an "--option=value" string, or "" if
 // val is None
-fn cmd_option(name: &str, val: Option<&str>) -> String {
+fn cmd_option<'a>(name: &'a str, val: Option<&'a str>) -> String {
     match val {
         Some(v) => format!("--{}={}", name, v),
         None => "".to_string(),
