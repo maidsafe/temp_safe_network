@@ -12,13 +12,13 @@ use super::{
 };
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    node::{Network, NodeState, Peer, Proposal, Section},
+    node::{NodeState, Peer, Proposal, Section},
     MessageId, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
-    network::NetworkUtils,
+    network::Network,
     node::Node,
     routing_api::command::Command,
     section::{

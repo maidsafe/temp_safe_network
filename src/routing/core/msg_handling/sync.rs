@@ -7,18 +7,21 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::node::{Network, Section};
-use crate::routing::{
-    error::Result, network::NetworkUtils, peer::PeerUtils, routing_api::command::Command,
-    section::SectionUtils, Event,
+use crate::messaging::{
+    node::{Section, SectionAuth},
+    SectionAuthorityProvider,
 };
-use std::collections::BTreeSet;
+use crate::routing::{
+    error::Result, peer::PeerUtils, routing_api::command::Command, section::SectionUtils, Event,
+};
+use std::collections::{BTreeMap, BTreeSet};
+use xor_name::Prefix;
 
 impl Core {
     pub(crate) async fn handle_sync(
         &mut self,
         section: &Section,
-        network: &Network,
+        network: &BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
     ) -> Result<Vec<Command>> {
         let old_adults: BTreeSet<_> = self
             .section
@@ -34,7 +37,7 @@ impl Core {
             section.members()
         );
         self.section.merge(section.clone())?;
-        self.network.merge(network.clone(), self.section.chain());
+        self.network.merge(network.iter(), self.section.chain());
 
         if self.is_not_elder() {
             let current_adults: BTreeSet<_> = self

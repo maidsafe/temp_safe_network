@@ -9,62 +9,25 @@
 mod stats;
 
 use self::stats::NetworkStats;
+use crate::messaging::{
+    node::{Peer, SectionAuth},
+    SectionAuthorityProvider,
+};
 use crate::routing::{
     dkg::SectionAuthUtils, peer::PeerUtils, Error, Result, SectionAuthorityProviderUtils,
-};
-
-use crate::messaging::{
-    node::{Network, Peer, SectionAuth},
-    SectionAuthorityProvider,
 };
 use secured_linked_list::SecuredLinkedList;
 use std::iter;
 use xor_name::{Prefix, PrefixMap, XorName};
 
-pub(super) trait NetworkUtils {
-    fn new() -> Self;
-
-    fn closest(&self, name: &XorName) -> Option<&SectionAuth<SectionAuthorityProvider>>;
-
-    /// Returns iterator over all known sections.
-    fn all(&self) -> Box<dyn Iterator<Item = &SectionAuthorityProvider> + '_>;
-
-    /// Get `SectionAuthorityProvider` of a known section with the given prefix.
-    fn get(&self, prefix: &Prefix) -> Option<&SectionAuthorityProvider>;
-
-    /// Returns a `Peer` of an elder from a known section.
-    fn get_elder(&self, name: &XorName) -> Option<Peer>;
-
-    /// Merge two `Network`s into one.
-    /// TODO: make this operation commutative, associative and idempotent (CRDT)
-    /// TODO: return bool indicating whether anything changed.
-    fn merge(&mut self, other: Network, section_chain: &SecuredLinkedList);
-
-    /// Update our knowledge of a remote section's SAP only
-    /// if it's verifiable with the provided proof chain.
-    fn update_remote_section_sap(
-        &mut self,
-        signed_section_auth: SectionAuth<SectionAuthorityProvider>,
-        proof_chain: &SecuredLinkedList,
-        our_section_chain: &SecuredLinkedList,
-    ) -> Result<bool>;
-
-    /// Returns the known section keys.
-    fn keys(&self) -> Box<dyn Iterator<Item = (Prefix, bls::PublicKey)> + '_>;
-
-    /// Returns the latest known key for the prefix that matches `name`.
-    fn key_by_name(&self, name: &XorName) -> Result<bls::PublicKey>;
-
-    /// Returns the section authority provider for the prefix that matches `name`,
-    /// excluding self section.
-    fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider>;
-
-    /// Returns network statistics.
-    fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats;
+/// Container for storing information about other sections in the network.
+pub(crate) struct Network {
+    /// Map of sections prefixes to their latest signed section authority providers.
+    pub(crate) sections: PrefixMap<SectionAuth<SectionAuthorityProvider>>,
 }
 
-impl NetworkUtils for Network {
-    fn new() -> Self {
+impl Network {
+    pub(crate) fn new() -> Self {
         Self {
             sections: PrefixMap::new(),
         }
@@ -72,7 +35,7 @@ impl NetworkUtils for Network {
 
     /// Returns the known section that is closest to the given name, regardless of whether `name`
     /// belongs in that section or not.
-    fn closest(&self, name: &XorName) -> Option<&SectionAuth<SectionAuthorityProvider>> {
+    pub(crate) fn closest(&self, name: &XorName) -> Option<&SectionAuth<SectionAuthorityProvider>> {
         self.sections
             .iter()
             .min_by(|(lhs_prefix, _), (rhs_prefix, _)| lhs_prefix.cmp_distance(rhs_prefix, name))
@@ -80,7 +43,7 @@ impl NetworkUtils for Network {
     }
 
     /// Returns iterator over all known sections.
-    fn all(&self) -> Box<dyn Iterator<Item = &SectionAuthorityProvider> + '_> {
+    pub(crate) fn all(&self) -> Box<dyn Iterator<Item = &SectionAuthorityProvider> + '_> {
         Box::new(
             self.sections
                 .iter()
@@ -89,14 +52,14 @@ impl NetworkUtils for Network {
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
-    fn get(&self, prefix: &Prefix) -> Option<&SectionAuthorityProvider> {
+    pub(crate) fn get(&self, prefix: &Prefix) -> Option<&SectionAuthorityProvider> {
         self.sections
             .get(prefix)
             .map(|(_, section_auth)| &section_auth.value)
     }
 
     /// Returns a `Peer` of an elder from a known section.
-    fn get_elder(&self, name: &XorName) -> Option<Peer> {
+    pub(crate) fn get_elder(&self, name: &XorName) -> Option<Peer> {
         self.sections
             .get_matching(name)?
             .1
@@ -112,10 +75,14 @@ impl NetworkUtils for Network {
     /// Merge two `Network`s into one.
     /// TODO: make this operation commutative, associative and idempotent (CRDT)
     /// TODO: return bool indicating whether anything changed.
-    fn merge(&mut self, other: Network, section_chain: &SecuredLinkedList) {
+    pub(crate) fn merge<'a>(
+        &mut self,
+        sections_iter: impl Iterator<Item = (&'a Prefix, &'a SectionAuth<SectionAuthorityProvider>)>,
+        section_chain: &SecuredLinkedList,
+    ) {
         // FIXME: these operations are not commutative:
 
-        for (prefix, sap) in other.sections.iter() {
+        for (prefix, sap) in sections_iter {
             if sap.verify(section_chain) {
                 let _ = self.sections.insert(*prefix, sap.clone());
             }
@@ -124,7 +91,7 @@ impl NetworkUtils for Network {
 
     /// Update our knowledge of a remote section's SAP only
     /// if it's verifiable with the provided proof chain.
-    fn update_remote_section_sap(
+    pub(crate) fn update_remote_section_sap(
         &mut self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
@@ -208,7 +175,7 @@ impl NetworkUtils for Network {
     }
 
     /// Returns the known section keys.
-    fn keys(&self) -> Box<dyn Iterator<Item = (Prefix, bls::PublicKey)> + '_> {
+    pub(crate) fn keys(&self) -> Box<dyn Iterator<Item = (Prefix, bls::PublicKey)> + '_> {
         Box::new(
             self.sections.iter().map(|(_, section_auth)| {
                 (section_auth.value.prefix, section_auth.value.section_key())
@@ -217,7 +184,7 @@ impl NetworkUtils for Network {
     }
 
     /// Returns the latest known key for the prefix that matches `name`.
-    fn key_by_name(&self, name: &XorName) -> Result<bls::PublicKey> {
+    pub(crate) fn key_by_name(&self, name: &XorName) -> Result<bls::PublicKey> {
         self.sections
             .get_matching(name)
             .ok_or(Error::NoMatchingSection)
@@ -226,7 +193,7 @@ impl NetworkUtils for Network {
 
     /// Returns the section authority provider for the prefix that matches `name`,
     /// excluding self section.
-    fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
+    pub(crate) fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.sections
             .get_matching(name)
             .ok_or(Error::NoMatchingSection)
@@ -234,7 +201,7 @@ impl NetworkUtils for Network {
     }
 
     /// Returns network statistics.
-    fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
+    pub(crate) fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
         // Let's compute an estimate of the total number of elders in the network
         // from the size of our routing table.
         let known_prefixes = self

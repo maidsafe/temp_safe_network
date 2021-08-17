@@ -9,17 +9,14 @@
 //! Relocation related types and utilities.
 
 use crate::messaging::{
-    node::{
-        Network, NodeMsg, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise,
-        Section,
-    },
+    node::{NodeMsg, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, Section},
     AuthorityProof, SectionAuth,
 };
 use crate::routing::{
     core::JoiningAsRelocated,
     ed25519::{self, Keypair, Verifier},
     error::Error,
-    network::NetworkUtils,
+    network::Network,
     peer::PeerUtils,
     section::{
         section_authority_provider::SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils,

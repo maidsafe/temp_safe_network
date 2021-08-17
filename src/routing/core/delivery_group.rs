@@ -7,12 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{Network, Peer, Section},
+    node::{Peer, Section},
     DstLocation,
 };
 use crate::routing::{
     error::{Error, Result},
-    network::NetworkUtils,
+    network::Network,
     peer::PeerUtils,
     section::{SectionPeersUtils, SectionUtils},
     supermajority, SectionAuthorityProviderUtils, ELDER_SIZE,

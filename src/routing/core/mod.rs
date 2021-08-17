@@ -37,13 +37,13 @@ pub(crate) use chunk_store::ChunkStore;
 
 use self::split_barrier::SplitBarrier;
 use crate::messaging::{
-    node::{Network, Proposal, Section},
+    node::{Proposal, Section},
     MessageId,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
-    network::NetworkUtils,
+    network::Network,
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
@@ -184,7 +184,16 @@ impl Core {
             }
 
             if new.is_elder || old.is_elder {
-                commands.extend(self.send_sync(self.section.clone(), self.network.clone())?);
+                commands.extend(
+                    self.send_sync(
+                        self.section.clone(),
+                        self.network
+                            .sections
+                            .iter()
+                            .map(|(prefix, sap)| (*prefix, sap.clone()))
+                            .collect(),
+                    )?,
+                );
             }
 
             let current: BTreeSet<_> = self.section.authority_provider().names();

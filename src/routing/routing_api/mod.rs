@@ -32,7 +32,6 @@ use crate::routing::{
     ed25519,
     error::Result,
     messages::WireMsgUtils,
-    network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
     section::SectionUtils,

@@ -15,7 +15,6 @@ use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
     messages::WireMsgUtils,
-    network::NetworkUtils,
     routing_api::command::Command,
     section::SectionUtils,
     SectionAuthorityProviderUtils,

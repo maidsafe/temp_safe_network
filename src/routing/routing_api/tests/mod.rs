@@ -12,9 +12,9 @@ use super::{Comm, Command, Core, Dispatcher};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     node::{
-        JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Network,
-        NodeMsg, NodeState, Peer, Proposal, RelocateDetails, RelocatePayload,
-        ResourceProofResponse, Section, SectionAuth,
+        JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, NodeMsg,
+        NodeState, Peer, Proposal, RelocateDetails, RelocatePayload, ResourceProofResponse,
+        Section, SectionAuth,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
@@ -30,7 +30,7 @@ use crate::routing::{
     },
     ed25519,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network::NetworkUtils,
+    network::Network,
     node::Node,
     peer::PeerUtils,
     relocation::{self, RelocatePayloadUtils},
@@ -51,7 +51,7 @@ use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use std::path::Path;
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     iter,
     net::Ipv4Addr,
     ops::Deref,
@@ -1003,7 +1003,7 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     section.chain = unknown_chain;
     let original_node_msg = NodeMsg::Sync {
         section,
-        network: Network::new(),
+        network: BTreeMap::new(),
     };
     let payload = WireMsg::serialize_msg_payload(&original_node_msg)?;
     let expected_recipients = vec![sender];
@@ -1124,7 +1124,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
 
     let original_node_msg = NodeMsg::Sync {
         section: section.clone(),
-        network: Network::new(),
+        network: BTreeMap::new(),
     };
 
     // Create our node.
@@ -1253,7 +1253,7 @@ async fn handle_sync() -> Result<()> {
         DstLocation::DirectAndUnrouted(pk1),
         NodeMsg::Sync {
             section: new_section.clone(),
-            network: Network::new(),
+            network: BTreeMap::new(),
         },
         *new_section.chain().last_key(),
     )?;
@@ -1327,7 +1327,7 @@ async fn handle_untrusted_sync() -> Result<()> {
     let sender = create_node(MIN_ADULT_AGE, None);
     let original_node_msg = NodeMsg::Sync {
         section: new_section.clone(),
-        network: Network::new(),
+        network: BTreeMap::new(),
     };
     let wire_msg = WireMsg::single_src(
         &sender,
@@ -1417,7 +1417,7 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
 
     let original_node_msg = NodeMsg::Sync {
         section: section_full.clone(),
-        network: Network::new(),
+        network: BTreeMap::new(),
     };
 
     let sender = create_node(MIN_ADULT_AGE, None);
