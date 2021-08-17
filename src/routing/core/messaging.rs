@@ -9,16 +9,15 @@
 use super::Core;
 use crate::messaging::{
     node::{
-        DkgKey, ElderCandidates, JoinResponse, Network, NodeMsg, NodeState, Peer, Proposal,
-        RelocateDetails, RelocatePromise, Section, SectionAuth,
+        DkgKey, ElderCandidates, JoinResponse, NodeMsg, NodeState, Peer, Proposal, RelocateDetails,
+        RelocatePromise, Section, SectionAuth,
     },
-    DstLocation, WireMsg,
+    DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     dkg::{DkgKeyUtils, ProposalUtils, SigShare},
     error::Result,
     messages::WireMsgUtils,
-    network::NetworkUtils,
     peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
@@ -26,8 +25,8 @@ use crate::routing::{
     SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
-use std::{net::SocketAddr, slice};
-use xor_name::XorName;
+use std::{collections::BTreeMap, net::SocketAddr, slice};
+use xor_name::{Prefix, XorName};
 
 impl Core {
     // Send proposal to all our elders.
@@ -97,16 +96,23 @@ impl Core {
             && public_key != *self.section.chain().last_key()
         {
             // The key is recognized as non-last, indicating the peer is lagging.
-            Ok(Some(self.send_direct_message(
-                peer,
-                // TODO: consider sending only those parts of section that are new
-                // since `public_key` was the latest key.
-                NodeMsg::Sync {
-                    section: self.section.clone(),
-                    network: self.network.clone(),
-                },
-                sig_share.public_key_set.public_key(),
-            )?))
+            Ok(Some(
+                self.send_direct_message(
+                    peer,
+                    // TODO: consider sending only those parts of section that are new
+                    // since `public_key` was the latest key.
+                    NodeMsg::Sync {
+                        section: self.section.clone(),
+                        network: self
+                            .network
+                            .sections
+                            .iter()
+                            .map(|(prefix, sap)| (*prefix, sap.clone()))
+                            .collect(),
+                    },
+                    sig_share.public_key_set.public_key(),
+                )?,
+            ))
         } else {
             Ok(None)
         }
@@ -136,7 +142,11 @@ impl Core {
         Ok(cmd)
     }
 
-    pub(crate) fn send_sync(&mut self, section: Section, network: Network) -> Result<Vec<Command>> {
+    pub(crate) fn send_sync(
+        &mut self,
+        section: Section,
+        network: BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
+    ) -> Result<Vec<Command>> {
         let (elders, non_elders): (Vec<_>, _) = section
             .active_members()
             .filter(|peer| peer.name() != &self.node.name())
@@ -148,7 +158,7 @@ impl Core {
         let dst_section_pk = *self.section_chain().last_key();
         let node_msg = NodeMsg::Sync {
             section: section.clone(),
-            network: Network::new(),
+            network: BTreeMap::new(),
         };
 
         let cmd = self.send_direct_message_to_nodes(non_elders, node_msg, dst_section_pk)?;
@@ -173,7 +183,7 @@ impl Core {
 
         let node_msg = NodeMsg::Sync {
             section: self.section.clone(),
-            network: Network::new(),
+            network: BTreeMap::new(),
         };
 
         let dst_section_pk = *self.section_chain().last_key();

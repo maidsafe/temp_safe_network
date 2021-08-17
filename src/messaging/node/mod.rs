@@ -9,7 +9,6 @@
 mod agreement;
 mod join;
 mod join_as_relocated;
-mod network;
 mod node_msgs;
 mod relocation;
 mod section;
@@ -18,7 +17,6 @@ mod signed;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
-pub use network::Network;
 pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::ElderCandidates;
@@ -34,8 +32,11 @@ use bls_dkg::key_gen::message::Message as DkgMessage;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt};
-use xor_name::XorName;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
+use xor_name::{Prefix, XorName};
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -71,9 +72,10 @@ pub enum NodeMsg {
         /// Information about our section.
         #[debug(with = "fmt_sync_section")]
         section: Section,
-        /// Information about the rest of the network that we know of.
+        /// Information about the rest of the network that we know of, mapping
+        /// section prefixes to their latest signed section authority providers.
         #[debug(with = "fmt_sync_network")]
-        network: Network,
+        network: BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
     },
     /// Send from a section to the node to be immediately relocated.
     Relocate(RelocateDetails),
@@ -163,18 +165,15 @@ fn fmt_sync_section(section: &Section, f: &mut fmt::Formatter) -> fmt::Result {
         .finish()
 }
 
-fn fmt_sync_network(network: &Network, f: &mut fmt::Formatter) -> fmt::Result {
-    f.debug_struct("Network")
-        .field(
-            "sections",
-            &format_args!(
-                "({:b})",
-                network
-                    .sections
-                    .iter()
-                    .map(|(_, section_auth)| section_auth.value.prefix)
-                    .format(", ")
-            ),
-        )
-        .finish()
+fn fmt_sync_network(
+    network: &BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
+    f: &mut fmt::Formatter,
+) -> fmt::Result {
+    f.write_fmt(format_args!(
+        "Network ({:b})",
+        network
+            .iter()
+            .map(|(_, section_auth)| section_auth.value.prefix)
+            .format(", ")
+    ))
 }

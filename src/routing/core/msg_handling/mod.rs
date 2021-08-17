@@ -30,7 +30,6 @@ use crate::routing::{
     core::AggregatorError,
     error::{Error, Result},
     messages::NodeMsgAuthorityUtils,
-    network::NetworkUtils,
     relocation::RelocateState,
     routing_api::command::Command,
     section::SectionUtils,

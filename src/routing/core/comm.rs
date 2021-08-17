@@ -118,7 +118,7 @@ impl Comm {
                 .await
                 .map_err(|err| {
                     error!(
-                        "Sending message (msg_id: {}) to {:?} (name {:?}) failed with {}",
+                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed with {}",
                         wire_msg.msg_id(),
                         addr,
                         name,
@@ -178,7 +178,7 @@ impl Comm {
     ) -> Result<SendStatus> {
         let msg_id = wire_msg.msg_id();
         trace!(
-            "Sending message (msg_id: {}) to {} of {:?}",
+            "Sending message (msg_id: {:?}) to {} of {:?}",
             msg_id,
             delivery_group_size,
             recipients
@@ -206,7 +206,7 @@ impl Comm {
         // succeeds or if there are no more recipients to pick.
         let send = |recipient: (XorName, SocketAddr), msg_bytes: Bytes| async move {
             trace!(
-                "Sending message ({} bytes, msg_id: {}) to {} of delivery group size {}",
+                "Sending message ({} bytes, msg_id: {:?}) to {} of delivery group size {}",
                 msg_bytes.len(),
                 msg_id,
                 recipient.1,

@@ -186,7 +186,12 @@ impl Core {
             if !sync_recipients.is_empty() {
                 let node_msg = NodeMsg::Sync {
                     section: self.section.clone(),
-                    network: self.network.clone(),
+                    network: self
+                        .network
+                        .sections
+                        .iter()
+                        .map(|(prefix, sap)| (*prefix, sap.clone()))
+                        .collect(),
                 };
                 let cmd =
                     self.send_direct_message_to_nodes(sync_recipients, node_msg, sig.public_key)?;

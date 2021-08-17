@@ -12,7 +12,7 @@ use crate::messaging::{
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
-    network::NetworkUtils, peer::PeerUtils, routing_api::command::Command, section::SectionUtils,
+    peer::PeerUtils, routing_api::command::Command, section::SectionUtils,
     SectionAuthorityProviderUtils,
 };
 use std::net::SocketAddr;
