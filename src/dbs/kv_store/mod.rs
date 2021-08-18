@@ -132,7 +132,6 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
     /// an IO error, it returns `Error::Io`.
     ///
     /// If a value with the same id already exists, it will be overwritten.
-    #[allow(unused)] // the use of this is anticipated to be implemented shortly
     pub(crate) async fn store_batch(&self, values: &[V]) -> Result<()> {
         info!("Writing batch");
         use rayon::prelude::*;
@@ -147,11 +146,11 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
                 let key = value.key().to_db_key()?;
                 Ok((key, serialised_value))
             })
-            .partition(|r| r.is_err());
+            .partition(|r| r.is_ok());
 
         if !err_results.is_empty() {
             for e in err_results {
-                error!("{:?}", e);
+                println!("{:?}", e);
             }
 
             return Err(Error::SledBatching);
@@ -175,11 +174,11 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
 
         match res {
             Ok(_) => {
-                info!("Writing batch succeeded!");
+                println!("Writing batch succeeded!");
                 Ok(())
             }
             Err(e) => {
-                info!("Writing batch failed!");
+                println!("Writing batch failed!");
                 Err(Error::Sled(e))
             }
         }

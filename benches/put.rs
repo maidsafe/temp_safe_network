@@ -8,22 +8,23 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use eyre::Result;
-use safe_network::client::utils::generate_random_vector;
+use safe_network::client::utils::random_bytes;
 use safe_network::client::utils::test_utils::{read_network_conn_info, run_w_backoff_delayed};
 use safe_network::client::{Client, Config, Error};
+use safe_network::url::Scope;
 use tokio::runtime::Runtime;
 
 /// This bench requires a network already set up
 async fn put_kbs(amount: usize) -> Result<(), Error> {
     let contact_info = read_network_conn_info().unwrap().into_iter().collect();
     let size = 1024 * amount;
-    let data = generate_random_vector(size);
+    let data = random_bytes(size);
     let config = Config::new(None, Some(contact_info), None, None).await;
     let client = Client::new(None, config).await?;
-    let address = client.store_public_blob(&data).await?;
+    let address = client.write_to_network(data.clone(), Scope::Public).await?;
 
     // let's make sure the public chunk is stored
-    let received_data = run_w_backoff_delayed(|| client.read_blob(address, None, None), 10).await?;
+    let received_data = run_w_backoff_delayed(|| client.read_blob(address), 10).await?;
 
     assert_eq!(received_data, data);
 

@@ -27,6 +27,7 @@ pub(crate) struct AdultRole {
 }
 
 impl AdultRole {
+    #[allow(clippy::mutable_key_type)]
     pub(crate) async fn reorganize_chunks(
         &self,
         our_name: XorName,

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::{convert_to_error_message, Error, Key, KvStore, Result, Subdir, UsedSpace, Value};
+use crate::dbs::{convert_to_error_message, Error, KvStore, Result, Subdir, UsedSpace};
 use crate::messaging::data::StorageLevel;
 use crate::types::{Chunk, ChunkAddress, ChunkKind, PublicKey};
 use crate::{
@@ -37,16 +37,6 @@ impl Subdir for Db {
 pub(crate) struct ChunkStore {
     db: Db,
     last_recorded_level: Arc<RwLock<StorageLevel>>,
-}
-
-impl Key for ChunkAddress {}
-
-impl Value for Chunk {
-    type Key = ChunkAddress;
-
-    fn key(&self) -> &Self::Key {
-        self.address()
-    }
 }
 
 impl ChunkStore {

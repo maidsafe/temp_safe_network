@@ -17,6 +17,7 @@ use super::super::{Error, Result};
 use super::super::{PublicKey, SecretKey, Signature, SignatureShare};
 
 use bls::{self, serde_impl::SerdeSecret, PublicKeySet};
+use bytes::Bytes;
 use ed25519_dalek::Signer;
 use rand::{CryptoRng, Rng};
 use serde::{Deserialize, Serialize};
@@ -83,6 +84,16 @@ pub trait Signing {
     fn sign<T: Serialize>(&self, data: &T) -> Result<Signature>;
     ///
     fn verify<T: Serialize>(&self, sig: &Signature, data: &T) -> bool;
+}
+
+/// Ability to encrypt and decrypt bytes
+pub trait Encryption: Sync + Send {
+    ///
+    fn public_key(&self) -> &PublicKey;
+    ///
+    fn encrypt(&self, bytes: Bytes) -> Result<Bytes>;
+    ///
+    fn decrypt(&self, encrypted_data: Bytes) -> Result<Bytes>;
 }
 
 impl Signing for Keypair {

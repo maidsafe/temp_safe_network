@@ -8,9 +8,9 @@
 
 use super::{
     super::encoding::{deserialise, serialise},
-    Error, Result,
+    Error, Key, Result, Value,
 };
-use crate::types::{register::Address, ChunkAddress, Keypair, PublicKey};
+use crate::types::{register::Address, Chunk, ChunkAddress, Keypair, PublicKey};
 use serde::{de::DeserializeOwned, Serialize};
 use xor_name::XorName;
 
@@ -33,6 +33,16 @@ impl ToDbKey for Keypair {}
 impl ToDbKey for ChunkAddress {}
 impl ToDbKey for PublicKey {}
 impl ToDbKey for XorName {}
+
+impl Key for ChunkAddress {}
+
+impl Value for Chunk {
+    type Key = ChunkAddress;
+
+    fn key(&self) -> &Self::Key {
+        self.address()
+    }
+}
 
 #[cfg(test)]
 mod test {
