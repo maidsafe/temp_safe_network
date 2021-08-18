@@ -324,6 +324,11 @@ impl Dispatcher {
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
+        match wire_msg.clone().into_message() {
+            Ok(message_type) => info!("==============SENDING: {:?}", message_type),
+            Err(err) => info!("==============SENDING ERROR: {:?}", err),
+        }
+
         let cmds = match wire_msg.msg_kind() {
             MsgKind::NodeAuthMsg(_)
             | MsgKind::NodeBlsShareAuthMsg(_)
