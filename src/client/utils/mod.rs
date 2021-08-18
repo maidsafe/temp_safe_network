@@ -10,10 +10,44 @@
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 
+use crate::types::{Encryption, PublicKey, Result};
+use crate::url::Scope;
+
+use bytes::Bytes;
 use rand::distributions::Alphanumeric;
 use rand::rngs::OsRng;
 use rand::{self, Rng};
 use rayon::current_num_threads;
+
+struct DummyEncryption {
+    public_key: PublicKey,
+}
+
+impl DummyEncryption {
+    pub(crate) fn new(public_key: PublicKey) -> Self {
+        Self { public_key }
+    }
+}
+
+impl Encryption for DummyEncryption {
+    fn public_key(&self) -> &PublicKey {
+        &self.public_key
+    }
+    fn encrypt(&self, data: Bytes) -> Result<Bytes> {
+        Ok(data)
+    }
+    fn decrypt(&self, encrypted_data: Bytes) -> Result<Bytes> {
+        Ok(encrypted_data)
+    }
+}
+
+///
+pub fn encryption(scope: Scope, public_key: PublicKey) -> Option<impl Encryption> {
+    match scope {
+        Scope::Public => None,
+        Scope::Private => Some(DummyEncryption::new(public_key)),
+    }
+}
 
 /// Generates a `String` from `length` random UTF-8 `char`s.  Note that the NULL character will be
 /// excluded to allow conversion to a `CString` if required, and that the actual `len()` of the
@@ -38,7 +72,7 @@ pub fn generate_readable_string(length: usize) -> String {
 }
 
 /// Generates a random vector using provided `length`.
-pub fn generate_random_vector(length: usize) -> Vec<u8> {
+pub fn random_bytes(length: usize) -> Bytes {
     use rayon::prelude::*;
     let threads = current_num_threads();
 
@@ -66,7 +100,7 @@ pub fn generate_random_vector(length: usize) -> Vec<u8> {
 
     bytes.extend(vec![0u8; remainder]);
 
-    bytes
+    Bytes::from(bytes)
 }
 
 /// Convert binary data to a diplay-able format
@@ -112,12 +146,12 @@ mod tests {
         assert_eq!(str2.chars().count(), SIZE);
     }
 
-    // Test `generate_random_vector` and that the results are not repeated.
+    // Test `random_bytes` and that the results are not repeated.
     #[test]
     fn random_vector() {
-        let vec0 = generate_random_vector(SIZE);
-        let vec1 = generate_random_vector(SIZE);
-        let vec2 = generate_random_vector(SIZE);
+        let vec0 = random_bytes(SIZE);
+        let vec1 = random_bytes(SIZE);
+        let vec2 = random_bytes(SIZE);
 
         assert_ne!(vec0, vec1);
         assert_ne!(vec0, vec2);

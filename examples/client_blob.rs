@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use bytes::Bytes;
 use eyre::{Context, Result};
 use safe_network::{
     client::{utils::test_utils::read_network_conn_info, Client, Config},
@@ -33,9 +34,11 @@ async fn main() -> Result<()> {
 
     let random_num: u64 = rand::random();
     let raw_data = format!("Hello Safe World #{}", random_num);
-    println!("Storing data on Blob: {}", raw_data);
+    println!("Storing data: {}", raw_data);
 
-    let address = client.store_public_blob(raw_data.as_bytes()).await?;
+    let address = client
+        .write_to_network(Bytes::from(raw_data), Scope::Public)
+        .await?;
     let xorurl = Url::encode_blob(
         *address.name(),
         Scope::Public,
@@ -49,7 +52,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_secs(delay)).await;
 
     println!("...fetching Blob from the network now...");
-    let data = client.read_blob(address, None, None).await?;
+    let data = client.read_blob(address).await?;
     println!("Blob read from {:?}:", address);
     stdout()
         .write_all(&data)

@@ -6,151 +6,53 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Client;
-use crate::types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
+use crate::{
+    client::{Error, Result},
+    types::Chunk,
+};
 use async_trait::async_trait;
-use self_encryption::{SelfEncryptionError, Storage};
-use tracing::trace;
-use xor_name::{XorName, XOR_NAME_LEN};
+use bincode::serialize;
+use futures::future::join_all;
 
-/// Network storage is the concrete type which self_encryption crate will use
-/// to put or get data from the network.
-#[derive(Clone)]
-pub(super) struct BlobStorage {
-    client: Client,
-    public: bool,
-}
-
-impl BlobStorage {
-    /// Create a new BlobStorage instance.
-    pub(super) fn new(client: Client, public: bool) -> Self {
-        Self { client, public }
-    }
+pub(crate) struct ChunkUploader<U: Uploader> {
+    uploader: U,
 }
 
 #[async_trait]
-impl Storage for BlobStorage {
-    async fn get(&mut self, name: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {
-        if name.len() != XOR_NAME_LEN {
-            return Err(SelfEncryptionError::Generic(
-                "Requested `name` is incorrect size.".to_owned(),
-            ));
-        }
-
-        let name = {
-            let mut temp = [0_u8; XOR_NAME_LEN];
-            temp.clone_from_slice(name);
-            XorName(temp)
-        };
-
-        let address = if self.public {
-            ChunkAddress::Public(name)
-        } else {
-            ChunkAddress::Private(name)
-        };
-
-        trace!("Self encrypt invoked GetChunk({:?})", &address);
-
-        match self.client.fetch_blob_from_network(address, true).await {
-            Ok(data) => Ok(data.value().clone()),
-            Err(error) => Err(SelfEncryptionError::Generic(format!("{:?}", error))),
-        }
-    }
-
-    async fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Result<(), SelfEncryptionError> {
-        let chunk: Chunk = if self.public {
-            PublicChunk::new(data).into()
-        } else {
-            PrivateChunk::new(data, self.client.public_key()).into()
-        };
-        trace!("Self encrypt invoked StoreChunk({:?})", &chunk);
-        self.client
-            .store_chunk_on_network(chunk)
-            .await
-            .map_err(|err| SelfEncryptionError::Generic(format!("{:?}", err)))
-    }
-
-    async fn delete(&mut self, name: &[u8]) -> Result<(), SelfEncryptionError> {
-        if name.len() != XOR_NAME_LEN {
-            return Err(SelfEncryptionError::Generic(
-                "Requested `name` is incorrect size.".to_owned(),
-            ));
-        }
-
-        let name = {
-            let mut temp = [0_u8; XOR_NAME_LEN];
-            temp.clone_from_slice(name);
-            XorName(temp)
-        };
-
-        let address = if self.public {
-            return Err(SelfEncryptionError::Generic(
-                "Cannot delete on a public storage".to_owned(),
-            ));
-        } else {
-            ChunkAddress::Private(name)
-        };
-        trace!("Self encrypt invoked DeleteBlob({:?})", &address);
-
-        match self.client.delete_chunk_from_network(address).await {
-            Ok(_) => Ok(()),
-            Err(error) => Err(SelfEncryptionError::Generic(format!("{:?}", error))),
-        }
-    }
-
-    async fn generate_address(&self, data: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {
-        let chunk: Chunk = if self.public {
-            PublicChunk::new(data.to_vec()).into()
-        } else {
-            PrivateChunk::new(data.to_vec(), self.client.public_key()).into()
-        };
-        Ok(chunk.name().0.to_vec())
-    }
+pub(crate) trait Uploader: Clone {
+    async fn upload(&self, bytes: &[u8]) -> Result<()>;
 }
 
-/// Network storage is the concrete type which self_encryption crate will use
-/// to put or get data from the network.
-#[derive(Clone)]
-pub(super) struct BlobStorageDryRun {
-    privately_owned: Option<PublicKey>,
-}
-
-impl BlobStorageDryRun {
-    /// Create a new BlobStorage instance.
-    pub(super) fn new(privately_owned: Option<PublicKey>) -> Self {
-        Self { privately_owned }
-    }
-}
-
-#[async_trait]
-impl Storage for BlobStorageDryRun {
-    async fn get(&mut self, _name: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {
-        trace!("Self encrypt invoked GetChunk dry run.");
-        Err(SelfEncryptionError::Generic(
-            "Cannot get from storage since it's a dry run.".to_owned(),
-        ))
+impl<U: Uploader + Send + Sync + 'static> ChunkUploader<U> {
+    pub(crate) fn new(uploader: U) -> Self {
+        Self { uploader }
     }
 
-    async fn put(&mut self, _: Vec<u8>, _data: Vec<u8>) -> Result<(), SelfEncryptionError> {
-        trace!("Self encrypt invoked StoreChunk dry run.");
-        // We do nothing here just return ok so self_encrpytion can finish
-        // and generate chunk addresses and datamap if required
-        Ok(())
-    }
+    pub(crate) async fn store(&self, chunks: Vec<Chunk>) -> Result<()> {
+        let handles =
+            chunks
+                .into_iter()
+                .map(|c| (c, self.uploader.clone()))
+                .map(|(chunk, uploader)| {
+                    tokio::spawn(async move {
+                        let serialized_chunk = serialize(&chunk)?;
+                        uploader.upload(&serialized_chunk).await
+                    })
+                });
 
-    async fn delete(&mut self, _name: &[u8]) -> Result<(), SelfEncryptionError> {
-        trace!("Self encrypt invoked DeleteChunk dry run.");
+        let results = join_all(handles).await;
+
+        for res1 in results {
+            match res1 {
+                Ok(res2) => {
+                    if res2.is_err() {
+                        return res2;
+                    }
+                }
+                Err(e) => return Err(Error::Generic(e.to_string())),
+            }
+        }
 
         Ok(())
-    }
-
-    async fn generate_address(&self, data: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {
-        let chunk: Chunk = if let Some(owner) = self.privately_owned {
-            PrivateChunk::new(data.to_vec(), owner).into()
-        } else {
-            PublicChunk::new(data.to_vec()).into()
-        };
-
-        Ok(chunk.name().0.to_vec())
     }
 }

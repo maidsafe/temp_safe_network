@@ -270,6 +270,7 @@ try_from!(Permissions, GetRegisterUserPermissions);
 mod tests {
     use super::*;
     use crate::types::{Keypair, PrivateChunk};
+    use bytes::Bytes;
     use eyre::{eyre, Result};
     use std::convert::{TryFrom, TryInto};
 
@@ -314,7 +315,7 @@ mod tests {
 
         let owner = PublicKey::Bls(bls::SecretKey::random().public_key());
 
-        let i_data = Chunk::Private(PrivateChunk::new(vec![1, 3, 1, 4], owner));
+        let i_data = Chunk::Private(PrivateChunk::new(Bytes::from(vec![1, 3, 1, 4]), owner));
         let e = Error::AccessDenied(key);
         assert_eq!(
             i_data,
