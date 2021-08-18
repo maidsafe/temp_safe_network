@@ -16,7 +16,7 @@ mod relocation;
 mod resource_proof;
 mod section_info;
 mod service_msgs;
-mod sync;
+//mod sync;
 
 use super::Core;
 use crate::messaging::{
@@ -221,26 +221,6 @@ impl Core {
                 )
                 .await
             }
-            NodeMsg::Sync {
-                ref section,
-                ref network,
-            } => {
-                // Ignore `Sync` not for our section.
-                if !section.prefix().matches(&self.node.name()) {
-                    return Ok(vec![]);
-                }
-
-                if section.chain().check_trust(known_keys.iter()) {
-                    self.handle_sync(section, network).await
-                } else {
-                    debug!(
-                        "Untrusted Sync message from {:?} and section: {:?} ",
-                        sender, section
-                    );
-                    let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
-                    Ok(vec![cmd])
-                }
-            }
             NodeMsg::Relocate(ref details) => {
                 if let NodeMsgAuthority::Section(section_signed) = msg_authority {
                     Ok(self
@@ -342,8 +322,6 @@ impl Core {
                 }
 
                 let mut commands = vec![];
-
-                commands.extend(self.check_lagging((src_name, sender), sig_share)?);
 
                 let result = self.handle_proposal(content.clone(), sig_share.clone())?;
                 commands.extend(result);

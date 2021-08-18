@@ -12,8 +12,7 @@ use crate::messaging::{
     NodeMsgAuthority,
 };
 use crate::routing::{
-    messages::NodeMsgAuthorityUtils, peer::PeerUtils, routing_api::command::Command,
-    section::SectionUtils, Error, Result,
+    messages::NodeMsgAuthorityUtils, peer::PeerUtils, routing_api::command::Command, Result,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;
@@ -49,27 +48,9 @@ impl Core {
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();
 
-        let new_node_msg = match bounced_msg {
-            NodeMsg::Sync { section, network } => {
-                // `Sync` messages are handled specially, because they don't carry a signed chain.
-                // Instead we use the section chain that's part of the included `Section` struct.
-                // Problem is we can't extend that chain as it would invalidate the signature. We
-                // must construct a new message instead.
-                let section = section
-                    .extend_chain(&dst_section_key, self.section.chain())
-                    .map_err(|err| {
-                        error!("extending section chain failed: {:?}", err);
-                        Error::InvalidMessage // TODO: more specific error
-                    })?;
-
-                NodeMsg::Sync { section, network }
-            }
-            bounced_msg => bounced_msg,
-        };
-
         let cmd = self.send_direct_message(
             (*sender.name(), *sender.addr()),
-            new_node_msg,
+            bounced_msg,
             dst_section_key,
         )?;
 

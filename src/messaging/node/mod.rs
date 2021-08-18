@@ -29,14 +29,10 @@ pub use signed::{KeyedSig, SigShare};
 use crate::messaging::{EndUser, MessageId, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt,
-};
-use xor_name::{Prefix, XorName};
+use std::collections::BTreeSet;
+use xor_name::XorName;
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -66,16 +62,6 @@ pub enum NodeMsg {
         section_signed: KeyedSig,
         /// Message bounced that shall be resent by the peer.
         bounced_msg: Box<NodeMsg>,
-    },
-    /// Message sent to all members to update them about the state of our section.
-    Sync {
-        /// Information about our section.
-        #[debug(with = "fmt_sync_section")]
-        section: Section,
-        /// Information about the rest of the network that we know of, mapping
-        /// section prefixes to their latest signed section authority providers.
-        #[debug(with = "fmt_sync_network")]
-        network: BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
     },
     /// Send from a section to the node to be immediately relocated.
     Relocate(RelocateDetails),
@@ -156,24 +142,4 @@ pub enum NodeMsg {
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
-}
-
-fn fmt_sync_section(section: &Section, f: &mut fmt::Formatter) -> fmt::Result {
-    f.debug_struct("Section")
-        .field("section_auth", &section.section_auth.value)
-        .field("key", &section.chain.last_key())
-        .finish()
-}
-
-fn fmt_sync_network(
-    network: &BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
-    f: &mut fmt::Formatter,
-) -> fmt::Result {
-    f.write_fmt(format_args!(
-        "Network ({:b})",
-        network
-            .iter()
-            .map(|(_, section_auth)| section_auth.value.prefix)
-            .format(", ")
-    ))
 }

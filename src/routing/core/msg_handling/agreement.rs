@@ -9,7 +9,7 @@
 use std::cmp;
 
 use crate::messaging::{
-    node::{KeyedSig, MembershipState, NodeMsg, NodeState, Proposal, SectionAuth},
+    node::{KeyedSig, MembershipState, NodeState, Proposal, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -107,7 +107,8 @@ impl Core {
 
         let result = self.promote_and_demote_elders()?;
         if result.is_empty() {
-            commands.extend(self.send_sync_to_adults()?);
+            // unimplemented!();
+            //    commands.extend(self.send_sync_to_adults()?);
         }
 
         commands.extend(result);
@@ -142,7 +143,8 @@ impl Core {
 
         let result = self.promote_and_demote_elders()?;
         if result.is_empty() {
-            commands.extend(self.send_sync_to_adults()?);
+            // unimplemented!();
+            //    commands.extend(self.send_sync_to_adults()?);
         }
 
         commands.extend(result);
@@ -166,15 +168,21 @@ impl Core {
 
         if equal_or_extension {
             // Our section or sub-section
-            let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
+            let signed_section_auth = SectionAuth::new(section_auth, sig);
             let infos = self.section.promote_and_demote_elders(&self.node.name());
             if !infos.contains(&signed_section_auth.value.elder_candidates()) {
                 // SectionInfo out of date, ignore.
                 return Ok(vec![]);
             }
 
+            let mut commands = vec![];
+            // *******************************
+            // unimplemented!();
+            // FIXME: prevent from needing to send a Sync
+
             // Send a `Sync` message to all the to-be-promoted members so they have the full
             // section and network data.
+            /*
             let sync_recipients: Vec<_> = infos
                 .iter()
                 .flat_map(|info| info.peers())
@@ -182,7 +190,6 @@ impl Core {
                 .map(|peer| (*peer.name(), *peer.addr()))
                 .collect();
 
-            let mut commands = vec![];
             if !sync_recipients.is_empty() {
                 let node_msg = NodeMsg::Sync {
                     section: self.section.clone(),
@@ -198,6 +205,8 @@ impl Core {
 
                 commands.push(cmd);
             }
+            */
+            // ***************************
 
             // Send the `OurElder` proposal to all of the to-be-elders so it's aggregated by them.
             let our_elders_recipients: Vec<_> =

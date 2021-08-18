@@ -72,23 +72,6 @@ impl Network {
             })
     }
 
-    /// Merge two `Network`s into one.
-    /// TODO: make this operation commutative, associative and idempotent (CRDT)
-    /// TODO: return bool indicating whether anything changed.
-    pub(crate) fn merge<'a>(
-        &mut self,
-        sections_iter: impl Iterator<Item = (&'a Prefix, &'a SectionAuth<SectionAuthorityProvider>)>,
-        section_chain: &SecuredLinkedList,
-    ) {
-        // FIXME: these operations are not commutative:
-
-        for (prefix, sap) in sections_iter {
-            if sap.verify(section_chain) {
-                let _ = self.sections.insert(*prefix, sap.clone());
-            }
-        }
-    }
-
     /// Update our knowledge of a remote section's SAP only
     /// if it's verifiable with the provided proof chain.
     pub(crate) fn update_remote_section_sap(

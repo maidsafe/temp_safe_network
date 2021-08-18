@@ -37,7 +37,7 @@ impl Core {
             section.members()
         );
         self.section.merge(section.clone())?;
-        self.network.merge(network.iter(), self.section.chain());
+        //self.network.merge(network.iter(), self.section.chain());
 
         if self.is_not_elder() {
             let current_adults: BTreeSet<_> = self

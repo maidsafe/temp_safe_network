@@ -183,6 +183,9 @@ impl Core {
                 self.print_network_stats();
             }
 
+            // *********************
+            // FIXME:
+            /*
             if new.is_elder || old.is_elder {
                 commands.extend(
                     self.send_sync(
@@ -195,6 +198,8 @@ impl Core {
                     )?,
                 );
             }
+            */
+            // **********************
 
             let current: BTreeSet<_> = self.section.authority_provider().names();
             let added = current.difference(&old.elders).copied().collect();
