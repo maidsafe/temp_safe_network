@@ -114,7 +114,7 @@ pub enum Error {
     MessagingProtocol(#[from] MessagingError),
     /// self_enryption errors
     #[error(transparent)]
-    SelfEncryption(#[from] self_encryption::SelfEncryptionError),
+    SelfEncryption(#[from] self_encryption::Error),
     /// Other types errors
     #[error(transparent)]
     ConfigError(#[from] serde_json::Error),
@@ -136,6 +136,9 @@ pub enum Error {
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::dbs::Error),
+    /// Generic Error
+    #[error("Generic error")]
+    Generic(String),
 }
 
 impl From<(CmdError, OperationId)> for Error {

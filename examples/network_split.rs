@@ -24,9 +24,7 @@ use tiny_keccak::{Hasher, Sha3};
 
 use eyre::{eyre, Context, Result};
 use safe_network::{
-    client::{
-        utils::generate_random_vector, utils::test_utils::read_network_conn_info, Client, Config,
-    },
+    client::{utils::random_bytes, utils::test_utils::read_network_conn_info, Client, Config},
     types::ChunkAddress,
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
@@ -192,14 +190,14 @@ pub async fn run_split() -> Result<()> {
 
     for (address, hash) in all_data_put {
         println!("...fetching Blob at address {:?} ...", address);
-        let mut data = client.read_blob(address, None, None).await;
+        let mut data = client.read_blob(address).await;
 
         let mut attempts = 0;
         while data.is_err() && attempts < 10 {
             attempts += 1;
             // do some retries to ensure we're not just timing out by chance
             sleep(Duration::from_secs(1)).await;
-            data = client.read_blob(address, None, None).await;
+            data = client.read_blob(address).await;
         }
 
         let data = data?;
@@ -230,7 +228,7 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
     let config = Config::new(None, Some(bootstrap_contacts), None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(None, config).await?;
 
-    let raw_data = generate_random_vector(1024 * 1024);
+    let raw_data = random_bytes(1024 * 1024);
 
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];
@@ -239,7 +237,7 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
 
     println!("Storing data w/ hash {:?}", output);
 
-    let address = client.store_public_blob(&raw_data).await?;
+    let address = client.write_to_network(raw_data, Scope::Public).await?;
     let xorurl = Url::encode_blob(
         *address.name(),
         Scope::Public,
@@ -253,14 +251,14 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
     sleep(Duration::from_secs(delay)).await;
 
     println!("...fetching Blob from the network now...");
-    let mut data = client.read_blob(address, None, None).await;
+    let mut data = client.read_blob(address).await;
 
     let mut attempts = 0;
     while data.is_err() && attempts < 10 {
         attempts += 1;
         // do some retries to ensure we're not just timing out by chance
         sleep(Duration::from_secs(1)).await;
-        data = client.read_blob(address, None, None).await;
+        data = client.read_blob(address).await;
     }
 
     let _data = data?;

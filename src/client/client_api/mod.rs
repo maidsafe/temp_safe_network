@@ -9,6 +9,7 @@
 mod blob_apis;
 mod blob_storage;
 mod commands;
+mod data;
 mod queries;
 mod register_apis;
 
@@ -131,7 +132,11 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::utils::test_utils::{create_test_client, create_test_client_with};
+    use crate::{
+        client::utils::test_utils::{create_test_client, create_test_client_with},
+        url::Scope,
+    };
+    use bytes::Bytes;
     use eyre::Result;
     use std::{
         collections::HashSet,
@@ -174,9 +179,8 @@ mod tests {
     async fn long_lived_connection_survives() -> Result<()> {
         let client = create_test_client(None).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
-
-        let _ = client.store_private_blob(&[0, 1, 2, 3, 4]).await?;
-
+        let data = Bytes::from(vec![0, 1, 2, 3, 4]);
+        let _ = client.write_to_network(data, Scope::Public).await?;
         Ok(())
     }
 

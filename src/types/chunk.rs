@@ -9,6 +9,7 @@
 
 use super::{utils, Error, PublicKey, XorName};
 use bincode::serialized_size;
+use bytes::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::u64;
 
@@ -24,15 +25,18 @@ pub struct PrivateChunk {
     address: Address,
     /// Contained chunk.
     #[debug(skip)]
-    value: Vec<u8>,
+    value: Bytes,
     /// Contains a set of owners of this chunk.
     owner: PublicKey,
 }
 
 impl PrivateChunk {
     /// Creates a new instance of `PrivateChunk`.
-    pub fn new(value: Vec<u8>, owner: PublicKey) -> Self {
-        let address = Address::Private(XorName::from_content_parts(&[&value, &owner.to_bytes()]));
+    pub fn new(value: Bytes, owner: PublicKey) -> Self {
+        let address = Address::Private(XorName::from_content_parts(&[
+            value.as_ref(),
+            &owner.to_bytes(),
+        ]));
 
         Self {
             address,
@@ -42,7 +46,7 @@ impl PrivateChunk {
     }
 
     /// Returns the value.
-    pub fn value(&self) -> &Vec<u8> {
+    pub fn value(&self) -> &Bytes {
         &self.value
     }
 
@@ -103,20 +107,20 @@ pub struct PublicChunk {
     address: Address,
     /// Contained chunk.
     #[debug(skip)]
-    value: Vec<u8>,
+    value: Bytes,
 }
 
 impl PublicChunk {
     /// Creates a new instance of `Chunk`.
-    pub fn new(value: Vec<u8>) -> Self {
+    pub fn new(value: Bytes) -> Self {
         Self {
-            address: Address::Public(XorName::from_content(&value)),
+            address: Address::Public(XorName::from_content(value.as_ref())),
             value,
         }
     }
 
     /// Returns the value.
-    pub fn value(&self) -> &Vec<u8> {
+    pub fn value(&self) -> &Bytes {
         &self.value
     }
 
@@ -155,7 +159,7 @@ impl Serialize for PublicChunk {
 impl<'de> Deserialize<'de> for PublicChunk {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value: Vec<u8> = Deserialize::deserialize(deserializer)?;
-        Ok(PublicChunk::new(value))
+        Ok(PublicChunk::new(Bytes::from(value)))
     }
 }
 
@@ -290,7 +294,7 @@ impl Chunk {
     }
 
     /// Returns the value.
-    pub fn value(&self) -> &Vec<u8> {
+    pub fn value(&self) -> &Bytes {
         match self {
             Chunk::Private(chunk) => chunk.value(),
             Chunk::Public(chunk) => chunk.value(),
@@ -331,6 +335,7 @@ mod tests {
     use super::{super::Result, utils, Error};
     use super::{Address, PrivateChunk, PublicChunk, PublicKey, XorName};
     use bls::SecretKey;
+    use bytes::Bytes;
     use hex::encode;
     use rand::{self, Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
@@ -338,8 +343,8 @@ mod tests {
 
     #[test]
     fn deterministic_name() {
-        let chunk1 = b"Hello".to_vec();
-        let chunk2 = b"Goodbye".to_vec();
+        let chunk1 = Bytes::from(b"Hello".to_vec());
+        let chunk2 = Bytes::from(b"Goodbye".to_vec());
 
         let owner1 = PublicKey::Bls(SecretKey::random().public_key());
         let owner2 = PublicKey::Bls(SecretKey::random().public_key());
@@ -358,7 +363,7 @@ mod tests {
 
     #[test]
     fn deterministic_address() -> Result<()> {
-        let chunk1 = b"Hello".to_vec();
+        let chunk1 = Bytes::from(b"Hello".to_vec());
 
         let owner1 = PublicKey::Bls(SecretKey::random().public_key());
 
@@ -389,7 +394,7 @@ mod tests {
 
     #[test]
     fn deterministic_test() {
-        let value = "immutable chunk value".to_owned().into_bytes();
+        let value = Bytes::from(b"immutable chunk value".to_vec());
         let chunk = PublicChunk::new(value);
         let chunk_name = encode(chunk.name().0.as_ref());
         let expected_name = "920f9a03bc90af3a7bfaf50c03abd5ff5b1579bd4006ba28eebcf240d4922519";

@@ -25,7 +25,7 @@ pub use chunk::{
 };
 pub use errors::{convert_dt_error_to_error_message, Error, Result};
 pub use keys::{
-    keypair::{BlsKeypairShare, Keypair, OwnerType, Signing},
+    keypair::{BlsKeypairShare, Encryption, Keypair, OwnerType, Signing},
     node_keypairs::NodeKeypairs,
     public_key::PublicKey,
     secret_key::SecretKey,
