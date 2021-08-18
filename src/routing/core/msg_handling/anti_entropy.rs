@@ -92,10 +92,9 @@ impl Core {
             sender
         );
 
-        // We retrieve from our records a SAP we know of and trust, to send the redirect msg,
-        // if we don't have one, we'll then send the msg with the genesis key so we provoke
-        // an AE-Retry msg to be sent back with a proof chain we can verify the SAP with.
-        let (dst_elders, dst_section_pk) = match self
+        // When there is elders exist in both the local and incoming SAPs, send msg to the elder
+        // closest to the dest section key. Otherwise, stop the flow.
+        let (local_dst_elders, dst_section_pk) = match self
             .network
             .section_by_name(&section_auth.prefix.name())
         {
@@ -104,10 +103,12 @@ impl Core {
                 // We verify SAP signature although we cannot trust it
                 // without a proof chain anyways.
                 let section_signed = SectionAuth {
-                    value: section_auth,
+                    value: section_auth.clone(),
                     sig: section_signed,
                 };
 
+                // In case we don't have the knowledge of that neighbour locally,
+                // have to trust the incoming SAP when it's self verifable.
                 if section_signed.self_verify() {
                     (section_signed.value.elders, *self.section.genesis_key())
                 } else {
@@ -123,14 +124,20 @@ impl Core {
         // We send the msg to the Elder closest to the dest section key,
         // just to pick one of them in a random but deterministic fashion.
         let name = XorName::from(PublicKey::Bls(dst_section_pk));
-        let chosen_dst_elder = dst_elders
+        let chosen_dst_elder = local_dst_elders
             .iter()
+            .filter(|(local_elder, _)| section_auth.elders.contains_key(local_elder))
             .sorted_by(|lhs, rhs| name.cmp_distance(lhs.0, rhs.0))
             .next();
 
         if let Some((name, addr)) = chosen_dst_elder {
             let cmd = self.send_direct_message((*name, *addr), *bounced_msg, dst_section_pk)?;
             return Ok(vec![cmd]);
+        } else {
+            warn!(
+                "Anti-Entropy: no trust-worthy elder among incoming SAP {:?} and local elders {:?}",
+                section_auth, local_dst_elders
+            );
         }
 
         Ok(vec![])
