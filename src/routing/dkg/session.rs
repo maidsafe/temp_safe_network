@@ -102,7 +102,12 @@ impl Session {
 
         let recipients = self.recipients();
         if !recipients.is_empty() {
-            trace!("broadcasting DKG message {:?} to {:?}", message, recipients);
+            trace!(
+                "DKG broadcasting {:?} - {:?} to {:?}",
+                message,
+                dkg_key,
+                recipients
+            );
             let node_msg = NodeMsg::DkgMessage {
                 dkg_key: *dkg_key,
                 message: message.clone(),

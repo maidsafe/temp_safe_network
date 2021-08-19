@@ -198,6 +198,7 @@ impl Core {
                 proof_chain,
                 bounced_msg,
             } => {
+                trace!("Handling msg: AE-Retry from {}", sender);
                 self.handle_anti_entropy_retry_msg(
                     section_auth,
                     section_signed,
@@ -213,6 +214,7 @@ impl Core {
                 section_signed,
                 bounced_msg,
             } => {
+                trace!("Handling msg: AE-Redirect from {}", sender);
                 self.handle_anti_entropy_redirect_msg(
                     section_auth,
                     section_signed,
@@ -225,6 +227,7 @@ impl Core {
                 ref section,
                 ref network,
             } => {
+                trace!("Handling msg: Sync from {}", sender);
                 // Ignore `Sync` not for our section.
                 if !section.prefix().matches(&self.node.name()) {
                     return Ok(vec![]);
@@ -242,6 +245,7 @@ impl Core {
                 }
             }
             NodeMsg::Relocate(ref details) => {
+                trace!("Handling msg: Relocate from {}", sender);
                 if let NodeMsgAuthority::Section(section_signed) = msg_authority {
                     Ok(self
                         .handle_relocate(details.clone(), node_msg, section_signed)
@@ -253,9 +257,11 @@ impl Core {
                 }
             }
             NodeMsg::RelocatePromise(promise) => {
+                trace!("Handling msg: RelocatePromise from {}", sender);
                 self.handle_relocate_promise(promise, node_msg).await
             }
             NodeMsg::StartConnectivityTest(name) => {
+                trace!("Handling msg: StartConnectivityTest from {}", sender);
                 if self.is_not_elder() {
                     return Ok(vec![]);
                 }
@@ -263,10 +269,12 @@ impl Core {
                 Ok(vec![Command::TestConnectivity(name)])
             }
             NodeMsg::JoinRequest(join_request) => {
+                trace!("Handling msg: JoinRequest from {}", sender);
                 self.handle_join_request(msg_authority.peer(sender)?, *join_request)
                     .await
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
+                trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
                 if self.is_not_elder()
                     && join_request.section_key == *self.section.chain().last_key()
                 {
@@ -283,15 +291,20 @@ impl Core {
             NodeMsg::BouncedUntrustedMessage {
                 msg: bounced_msg,
                 dst_section_pk,
-            } => Ok(vec![self.handle_bounced_untrusted_message(
-                msg_authority.peer(sender)?,
-                dst_section_pk,
-                *bounced_msg,
-            )?]),
+            } => {
+                trace!("Handling msg: BouncedUntrustedMessage from {}", sender);
+
+                Ok(vec![self.handle_bounced_untrusted_message(
+                    msg_authority.peer(sender)?,
+                    dst_section_pk,
+                    *bounced_msg,
+                )?])
+            }
             NodeMsg::DkgStart {
                 dkg_key,
                 elder_candidates,
             } => {
+                trace!("Handling msg: Dkg-Start from {}", sender);
                 if !elder_candidates.elders.contains_key(&self.node.name()) {
                     return Ok(vec![]);
                 }
@@ -299,20 +312,31 @@ impl Core {
                 self.handle_dkg_start(dkg_key, elder_candidates)
             }
             NodeMsg::DkgMessage { dkg_key, message } => {
+                trace!(
+                    "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
+                    dkg_key,
+                    message,
+                    sender
+                );
                 self.handle_dkg_message(dkg_key, message, src_name)
             }
             NodeMsg::DkgFailureObservation {
                 dkg_key,
                 sig,
                 failed_participants,
-            } => self.handle_dkg_failure_observation(dkg_key, &failed_participants, sig),
+            } => {
+                trace!("Handling msg: Dkg-FailureObservation from {}", sender);
+                self.handle_dkg_failure_observation(dkg_key, &failed_participants, sig)
+            }
             NodeMsg::DkgFailureAgreement(sig_set) => {
+                trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
                 self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
             NodeMsg::Propose {
                 ref content,
                 ref sig_share,
             } => {
+                trace!("Handling msg: Propose from {}", sender);
                 // Any other proposal than SectionInfo needs to be signed by a known key.
                 match content {
                     Proposal::SectionInfo(ref section_auth) => {
@@ -355,6 +379,7 @@ impl Core {
                 Ok(vec![])
             }
             NodeMsg::JoinAsRelocatedResponse(join_response) => {
+                trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(RelocateState::InProgress(ref mut joining_as_relocated)) =
                     self.relocate_state.as_mut()
                 {
