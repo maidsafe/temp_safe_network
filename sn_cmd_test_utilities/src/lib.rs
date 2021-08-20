@@ -16,7 +16,7 @@ pub mod util {
     use sn_api::{fetch::SafeData, files::ProcessedFiles, Keypair, SafeUrl};
     use std::{collections::BTreeMap, env, fs, path::Path, process};
     use tiny_keccak::{Hasher, Sha3};
-    use walkdir::{DirEntry, WalkDir};
+    use walkdir::WalkDir;
 
     pub const CLI: &str = "safe";
     pub const SAFE_PROTOCOL: &str = "safe://";
@@ -87,13 +87,13 @@ pub mod util {
     }
 
     pub fn upload_path(
-        path: &str,
+        path: impl AsRef<Path>,
         add_trailing_slash: bool,
     ) -> Result<(String, ProcessedFiles, String)> {
         let final_path = if add_trailing_slash {
-            format!("{}/", path)
+            format!("{}/", path.as_ref().display())
         } else {
-            path.to_string()
+            String::from(path.as_ref().to_str().unwrap())
         };
 
         let files_container = safe_cmd_stdout(
@@ -123,10 +123,13 @@ pub mod util {
         upload_path(TEST_SYMLINKS_FOLDER, trailing_slash)
     }
 
-    // Creates a tmp
-    fn create_tmp_absolute_symlinks_folder() -> Result<(String, String)> {
-        let paths = mk_emptyfolder("abs_symlinks")?;
-        let symlinks = Path::new(&paths.1);
+    /// Creates a temporary directory at the specified path and populates it with absolute
+    /// symlinks.
+    ///
+    /// The purpose of passing in the directory is to allow the test to have control over where the
+    /// temporary directory is created.
+    pub fn create_absolute_symlinks_directory(path: impl AsRef<Path>) -> Result<()> {
+        let symlinks = path.as_ref();
 
         let subdir = symlinks.join("subdir");
         fs::create_dir(&subdir)
@@ -152,7 +155,7 @@ pub mod util {
             filepath.display()
         ))?;
 
-        Ok(paths)
+        Ok(())
     }
 
     #[cfg(unix)]
@@ -187,28 +190,18 @@ pub mod util {
         ))
     }
 
-    pub fn create_and_upload_test_absolute_symlinks_folder(
-        trailing_slash: bool,
-    ) -> Result<(String, ProcessedFiles, String, String)> {
-        let paths = create_tmp_absolute_symlinks_folder()?;
-        let d = upload_path(&paths.1, trailing_slash)?;
-        Ok((d.0, d.1, paths.0, paths.1))
-    }
-
-    // generates a sha3_256 digest/hash of a directory tree.
-    //
-    // Note: hidden files or directories are not included.
-    //  this is necessary for comparing ./testdata with
-    //  dest dir since `safe files put` presently ignores hidden
-    //  files.  The hidden files can be included once
-    //  'safe files put' is fixed to include them.
+    /// Generates a sha3_256 digest/hash of a directory tree, for the purposes of comparing it to
+    /// another tree.
+    ///
+    /// This function was originally written to ignore 'hidden' files, because safe didn't upload
+    /// those. Safe does upload these now, so it's been modified to take that into account. We also
+    /// need this modification because `assert_fs` prefixes the directories it creates with '.', so
+    /// it was skipping those.
     pub fn sum_tree(path: &str) -> Result<String> {
         let paths = WalkDir::new(path)
-            .min_depth(1) // ignore top/root directory
             .follow_links(false)
             .sort_by(|a, b| a.path().cmp(b.path()))
             .into_iter()
-            .filter_entry(|e| not_hidden_or_empty(e, 20))
             .filter_map(|v| v.ok());
 
         let mut digests = String::new();
@@ -235,15 +228,6 @@ pub mod util {
             }
         }
         Ok(str_to_sha3_256(&digests))
-    }
-
-    // callback for WalkDir::new() in sum_tree()
-    fn not_hidden_or_empty(entry: &DirEntry, max_depth: usize) -> bool {
-        entry
-            .file_name()
-            .to_str()
-            .map(|s| entry.depth() <= max_depth && (entry.depth() == 0 || !s.starts_with('.')))
-            .unwrap_or(false)
     }
 
     // returns sha3_256 hash of input string as a string.
@@ -324,9 +308,25 @@ pub mod util {
         args: impl IntoIterator<Item = &'a str>,
         expect_exit_code: Option<i32>,
     ) -> Result<process::Output> {
+        safe_cmd_at(args, env::current_dir()?, expect_exit_code)
+    }
+
+    pub fn safe_cmd_at<'a>(
+        args: impl IntoIterator<Item = &'a str>,
+        working_directory: impl AsRef<Path>,
+        expect_exit_code: Option<i32>,
+    ) -> Result<process::Output> {
+        let args: Vec<&str> = args.into_iter().collect();
+        println!("Executing: safe {}", args.join(" "));
         let code = expect_exit_code.unwrap_or(0);
         let mut cmd = Command::cargo_bin("safe")?;
-        Ok(cmd.args(args).assert().code(code).get_output().to_owned())
+        Ok(cmd
+            .args(args)
+            .current_dir(working_directory)
+            .assert()
+            .code(code)
+            .get_output()
+            .to_owned())
     }
 
     // Executes arbitrary `safe ` commands and returns

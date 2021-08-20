@@ -85,6 +85,7 @@ self-update = [ "reqwest", "self_update" ]
 
 [dev-dependencies]
 assert_cmd = "~2.0"
+assert_fs = "~1.0"
 ctor = "~0.1"
 duct = "~0.12"
 predicates = "~2.0"
