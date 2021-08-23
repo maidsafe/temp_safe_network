@@ -254,7 +254,7 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            data::{ChunkRead, DataQuery, ServiceMsg},
+            data::{ChunkRead, DataQuery, ServiceMsg, StorageLevel},
             node::{NodeCmd, NodeMsg},
             AuthorityProof, MessageId, NodeAuth, ServiceAuth,
         },
@@ -365,9 +365,10 @@ mod tests {
         let msg_id = MessageId::new();
         let pk = crate::types::PublicKey::Bls(dst_section_pk);
 
-        let node_msg = NodeMsg::NodeCmd(NodeCmd::StorageFull {
+        let node_msg = NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
             node_id: pk,
             section: pk.into(),
+            level: StorageLevel::zero(),
         });
 
         let payload = WireMsg::serialize_msg_payload(&node_msg)?;

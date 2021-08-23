@@ -6,149 +6,152 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod adult_storage_info;
-
-use crate::routing::{Prefix, XorName};
-pub(super) use adult_storage_info::AdultsStorageInfo;
-use std::collections::BTreeSet;
+use crate::{
+    messaging::data::StorageLevel,
+    routing::{Prefix, XorName},
+};
+use itertools::Itertools;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
+use tokio::sync::RwLock;
 
 // The number of separate copies of a chunk which should be maintained.
 pub(crate) const CHUNK_COPY_COUNT: usize = 4;
+pub(crate) const MIN_LEVEL_WHEN_FULL: u8 = 9; // considered full when >= 90 %.
 
 /// A util for sharing the
 /// info on data capacity among the
 /// chunk storing nodes in the section.
 #[derive(Clone)]
 pub(crate) struct Capacity {
-    reader: CapacityReader,
-    writer: CapacityWriter,
+    adult_levels: Arc<RwLock<BTreeMap<XorName, Arc<RwLock<StorageLevel>>>>>,
 }
 
 impl Capacity {
-    /// Pass in adult_storage_info with info on chunk holders.
-    pub(super) fn new(reader: CapacityReader, writer: CapacityWriter) -> Self {
-        Self { reader, writer }
+    /// Pass in adult_levels with info on used adult storage capacity.
+    pub(super) fn new(adult_levels: BTreeMap<XorName, StorageLevel>) -> Self {
+        let adult_levels = adult_levels
+            .into_iter()
+            .map(|(adult, level)| (adult, Arc::new(RwLock::new(level))))
+            .collect();
+        Self {
+            adult_levels: Arc::new(RwLock::new(adult_levels)),
+        }
     }
 
-    /// Whether the adult is recorded as full
-    pub(super) async fn is_full(&self, adult: XorName) -> bool {
-        self.reader.is_full(&adult).await
-    }
-
-    /// Number of full chunk storing nodes in the section.
-    pub(super) async fn full_adults_count(&self) -> u8 {
-        self.reader.full_adults_count().await
-    }
-
-    /// Full chunk storing nodes in the section.
-    pub(super) async fn full_adults(&self) -> BTreeSet<XorName> {
-        self.reader.full_adults().await
-    }
-
-    /// Number of full chunk storing nodes in the section.
-    pub(super) async fn full_adults_matching(&self, prefix: Prefix) -> BTreeSet<XorName> {
-        self.reader.full_adults_matching(prefix).await
-    }
-
-    pub(super) async fn insert_full_adults(&self, full_adults: BTreeSet<XorName>) {
-        self.writer.insert_full_adults(full_adults).await
-    }
-
-    pub(super) async fn remove_full_adults(&self, full_adults: BTreeSet<XorName>) {
-        self.writer.remove_full_adults(full_adults).await
-    }
-
-    /// Registered holders not present in provided list of members
-    /// will be removed from adult_storage_info and no longer tracked for liveness.
-    pub(super) async fn retain_members_only(&self, members: &BTreeSet<XorName>) {
-        self.writer.retain_members_only(members).await
-    }
-}
-
-#[derive(Clone)]
-pub(super) struct CapacityReader {
-    adult_storage_info: AdultsStorageInfo,
-}
-
-#[derive(Clone)]
-pub(super) struct CapacityWriter {
-    adult_storage_info: AdultsStorageInfo,
-}
-
-impl CapacityReader {
-    /// Pass in adult_storage_info with info on chunk holders.
-    pub(super) fn new(adult_storage_info: AdultsStorageInfo, //, reader: AdultReader
-    ) -> Self {
-        Self { adult_storage_info }
-    }
-
-    /// Whether the adult is recorded as full
+    /// Whether the adult is considered full.
+    /// This happens when it has reported at least `MIN_LEVEL_WHEN_FULL`.
     pub(super) async fn is_full(&self, adult: &XorName) -> bool {
-        self.adult_storage_info
-            .full_adults
-            .read()
-            .await
-            .contains(adult)
+        match self.adult_levels.read().await.get(adult) {
+            Some(level) => level.read().await.value() >= MIN_LEVEL_WHEN_FULL,
+            None => todo!(),
+        }
     }
 
-    /// Number of full chunk storing nodes in the section.
-    pub(super) async fn full_adults_count(&self) -> u8 {
-        self.adult_storage_info.full_adults.read().await.len() as u8
+    /// Avg usage by nodes in the section, a value between 0 and 10.
+    pub(super) async fn avg_usage(&self) -> u8 {
+        let mut total = 0_usize;
+        let levels = self.adult_levels.read().await;
+        // not sure if necessary, but now we'll be working with an isolated snapshot:
+        let levels = levels.values().collect_vec();
+        let num_adults = levels.len();
+        if num_adults == 0 {
+            return 0; // avoid divide by zero
+        }
+        for v in levels {
+            total += v.read().await.value() as usize;
+        }
+        (total / num_adults) as u8
     }
 
-    /// Number of full chunk storing nodes in the section.
-    pub(super) async fn full_adults_matching(&self, prefix: Prefix) -> BTreeSet<XorName> {
-        self.adult_storage_info
-            .full_adults
-            .read()
+    /// Storage levels of nodes in the section.
+    pub(super) async fn levels(&self) -> BTreeMap<XorName, StorageLevel> {
+        let mut map = BTreeMap::new();
+        for (name, level) in self.adult_levels.read().await.iter() {
+            let _ = map.insert(*name, *level.read().await);
+        }
+        map
+    }
+
+    /// Nodes and storage levels of nodes matching the prefix.
+    pub(super) async fn levels_matching(&self, prefix: Prefix) -> BTreeMap<XorName, StorageLevel> {
+        self.levels()
             .await
             .iter()
-            .filter(|name| prefix.matches(name))
-            .copied()
+            .filter(|(name, _)| prefix.matches(name))
+            .map(|(name, level)| (*name, *level))
             .collect()
     }
 
-    /// Get full adults.
+    /// Full chunk storing nodes in the section (considered full when at >= `MIN_LEVEL_WHEN_FULL`).
     pub(super) async fn full_adults(&self) -> BTreeSet<XorName> {
-        self.adult_storage_info.full_adults.read().await.clone()
+        let mut set = BTreeSet::new();
+        for (name, level) in self.adult_levels.read().await.iter() {
+            if level.read().await.value() >= MIN_LEVEL_WHEN_FULL {
+                let _ = set.insert(*name);
+            }
+        }
+        set
     }
-}
 
-impl CapacityWriter {
-    /// Pass in adult_storage_info with info on chunk holders.
-    pub(super) fn new(adult_storage_info: AdultsStorageInfo) -> Self {
-        Self { adult_storage_info }
-    }
-
-    pub(super) async fn insert_full_adults(&self, full_adults: BTreeSet<XorName>) {
-        let mut orig_full_adults = self.adult_storage_info.full_adults.write().await;
-
-        for adult in full_adults {
-            let _ = orig_full_adults.insert(adult);
+    pub(super) async fn set_adult_levels(&self, levels: BTreeMap<XorName, StorageLevel>) {
+        for (name, level) in levels {
+            let _ = self.set_adult_level(name, level).await;
         }
     }
 
-    pub(super) async fn remove_full_adults(&self, full_adults: BTreeSet<XorName>) {
-        let mut orig_full_adults = self.adult_storage_info.full_adults.write().await;
+    /// Returns whether the level changed or not.
+    pub(super) async fn set_adult_level(&self, adult: XorName, new_level: StorageLevel) -> bool {
+        {
+            let all_levels = self.adult_levels.read().await;
+            if let Some(level) = all_levels.get(&adult) {
+                let current_level = { level.read().await.value() };
+                info!("Current level: {}", current_level);
+                if new_level.value() > current_level {
+                    *level.write().await = new_level;
+                    info!("Old value overwritten.");
+                    return true; // value changed
+                }
+                return false; // no change
+            }
+        }
 
-        for adult in full_adults {
-            let _ = orig_full_adults.remove(&adult);
+        info!("No current level, aqcuiring top level write lock..");
+        // locks to prevent racing
+        let mut all_levels = self.adult_levels.write().await;
+        info!("Top level write lock aqcuired.");
+        // checking the value again, if there was a concurrent insert..
+        if let Some(level) = all_levels.get(&adult) {
+            info!("Oh wait, a value was just recorded..");
+            let current_level = { level.read().await.value() };
+            info!("Current level: {}", current_level);
+            if new_level.value() > current_level {
+                *level.write().await = new_level;
+                info!("Old value overwritten.");
+                return true; // value changed
+            }
+            false // no change
+        } else {
+            let _ = all_levels.insert(adult, Arc::new(RwLock::new(new_level)));
+            info!("New value inserted.");
+            true // value changed
         }
     }
 
     /// Registered holders not present in provided list of members
-    /// will be removed from adult_storage_info and no longer tracked for liveness.
+    /// will be removed from adult_levels and no longer tracked for liveness.
     pub(super) async fn retain_members_only(&self, members: &BTreeSet<XorName>) {
-        // full adults
-        let mut full_adults = self.adult_storage_info.full_adults.write().await;
-        let absent_adults = full_adults
+        let mut adult_levels = self.adult_levels.write().await;
+        let absent_adults: Vec<_> = adult_levels
             .iter()
-            .filter(|&key| !members.contains(key))
-            .cloned()
-            .collect::<Vec<_>>();
+            .filter(|(key, _)| !members.contains(key))
+            .map(|(key, _)| *key)
+            .collect();
 
         for adult in &absent_adults {
-            let _ = full_adults.remove(adult);
+            let _ = adult_levels.remove(adult);
         }
     }
 }

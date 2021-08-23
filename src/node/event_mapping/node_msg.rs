@@ -72,8 +72,8 @@ fn match_node_msg(msg: MessageReceived) -> NodeDuty {
         }
         //
         // ------ system cmd ------
-        MessageReceived::NodeCmd(NodeCmd::StorageFull { node_id, .. }) => {
-            NodeDuty::IncrementFullNodeCount { node_id }
+        MessageReceived::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
+            NodeDuty::SetStorageLevel { node_id, level }
         }
         _ => {
             error!("Unexpected message received at the node (should probably be handled in routing: {:?}" , msg);

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::RegisterCmd;
-use crate::types::{ChunkAddress, PublicKey};
+use crate::types::{ChunkAddress, Error, PublicKey, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
@@ -41,10 +41,57 @@ pub struct DataExchange {
 /// Chunk data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChunkDataExchange {
-    /// Full adults.
-    pub full_adults: BTreeSet<XorName>,
+    /// Adult storage levels.
+    pub adult_levels: BTreeMap<XorName, StorageLevel>,
 }
 
 /// Register data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RegisterDataExchange(pub BTreeMap<XorName, Vec<RegisterCmd>>);
+
+/// The degree to which storage has been used.
+/// Expressed in values between 0-10, where each unit represents 10-percentage points.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct StorageLevel(u8);
+
+///
+impl StorageLevel {
+    /// The maximum level (100%).
+    pub const MAX: u8 = 10;
+
+    /// Creates a new instance with level 0.
+    pub fn zero() -> Self {
+        Self(0)
+    }
+
+    /// Creates a new instance with provided level.
+    /// Returns an OutOfRange error if the value is above StorageLevel::MAX.
+    pub fn from(value: u8) -> Result<Self> {
+        if value > Self::MAX {
+            Err(Error::OutOfRange)
+        } else {
+            Ok(Self(value))
+        }
+    }
+
+    /// The next level.
+    /// Returns an OutOfRange error if called on an instance with StorageLevel::MAX value.
+    pub fn next(&self) -> Result<StorageLevel> {
+        StorageLevel::from(self.0 + 1)
+    }
+
+    /// The previous level.
+    /// Returns an OutOfRange error if called on a StorageLevel with value 0.
+    pub fn previous(&self) -> Result<StorageLevel> {
+        if self.0 == 0 {
+            Err(Error::OutOfRange)
+        } else {
+            StorageLevel::from(self.0 - 1)
+        }
+    }
+
+    /// The current value.
+    pub fn value(&self) -> u8 {
+        self.0
+    }
+}

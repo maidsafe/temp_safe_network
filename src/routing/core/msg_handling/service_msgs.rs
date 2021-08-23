@@ -12,7 +12,7 @@ use crate::messaging::data::ServiceMsg;
 use crate::messaging::NodeAuth;
 use crate::messaging::{
     data::{ChunkRead, CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite},
-    node::{NodeCmd, NodeMsg, NodeQueryResponse},
+    node::{NodeMsg, NodeQueryResponse},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;
@@ -140,25 +140,6 @@ impl Core {
     ) -> Result<Vec<Command>> {
         trace!("Handling chunk read at adult");
         let mut commands = vec![];
-        if self.chunk_storage.is_storage_getting_full().await {
-            let section_pk = self.public_key_set()?.public_key();
-            let node_id = self.node().keypair.public;
-
-            let node_xorname = XorName::from(PublicKey::from(node_id));
-
-            // we should notify the section about this
-            let msg = NodeMsg::NodeCmd(NodeCmd::StorageFull {
-                section: node_xorname,
-                node_id: PublicKey::from(self.node().keypair.public),
-            });
-
-            let dst = DstLocation::Section {
-                name: node_xorname,
-                section_pk,
-            };
-
-            commands.push(Command::PrepareNodeMsgToSend { msg, dst });
-        }
 
         match self.chunk_storage.read(&query, requester) {
             Ok(response) => {
@@ -233,7 +214,10 @@ impl Core {
         // Send response if one is warrented
         if query_response.failed_with_data_not_found()
             || (!query_response.is_success()
-                && self.capacity.is_full(XorName::from(sending_nodes_pk)).await)
+                && self
+                    .capacity
+                    .is_full(&XorName::from(sending_nodes_pk))
+                    .await)
         {
             // we don't return data not found errors.
             trace!("Node {:?}, reported data not found", sending_nodes_pk);

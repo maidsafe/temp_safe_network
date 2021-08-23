@@ -22,16 +22,16 @@ mod signature_aggregator;
 mod split_barrier;
 
 use crate::dbs::UsedSpace;
-pub(crate) use capacity::CHUNK_COPY_COUNT;
+pub(crate) use capacity::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL};
 pub(crate) use register_storage::RegisterStorage;
 // use chunk_records::ChunkRecords;
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
-use capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter};
+use capacity::Capacity;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub use signature_aggregator::Error as AggregatorError;
 pub(crate) use signature_aggregator::SignatureAggregator;
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf};
 
 pub(crate) use chunk_store::ChunkStore;
 
@@ -106,11 +106,7 @@ impl Core {
         let register_storage = RegisterStorage::new(&root_storage_dir, used_space.clone())?;
         let chunk_storage = ChunkStore::new(&root_storage_dir, used_space.clone())?;
 
-        let adult_storage_info = AdultsStorageInfo::new();
-        let capacity_reader = CapacityReader::new(adult_storage_info.clone());
-        let capacity_writer = CapacityWriter::new(adult_storage_info);
-        let capacity = Capacity::new(capacity_reader, capacity_writer);
-
+        let capacity = Capacity::new(BTreeMap::new());
         let adult_liveness = Liveness::new();
 
         Ok(Self {

@@ -8,7 +8,7 @@
 
 use super::{Command, Event};
 use crate::messaging::{
-    data::ChunkDataExchange,
+    data::{ChunkDataExchange, StorageLevel},
     node::{NodeMsg, Section},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
@@ -71,11 +71,12 @@ impl Dispatcher {
         self.core.read().await.get_data_of(prefix).await
     }
 
-    pub(super) async fn increase_full_node_count(&self, node_id: &PublicKey) {
+    /// Returns whether the level changed or not.
+    pub(super) async fn set_storage_level(&self, node_id: &PublicKey, level: StorageLevel) -> bool {
         self.core
             .read()
             .await
-            .increase_full_node_count(node_id)
+            .set_storage_level(node_id, level)
             .await
     }
 

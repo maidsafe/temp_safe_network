@@ -8,37 +8,13 @@
 
 use crate::messaging::{
     node::{NodeCmd, NodeMsg},
-    DstLocation, MessageId,
+    MessageId,
 };
-use crate::node::{
-    network::Network,
-    node_ops::{MsgType, NodeDuty, OutgoingMsg},
-    Node, Result,
-};
+use crate::node::{node_ops::NodeDuty, Result};
 use crate::routing::{Prefix, XorName};
-use crate::types::PublicKey;
 use std::collections::BTreeSet;
 
 use super::role::ElderRole;
-
-impl Node {
-    pub(crate) async fn notify_section_of_our_storage(network_api: &Network) -> Result<NodeDuty> {
-        let node_id = PublicKey::from(network_api.public_key().await);
-        let section_pk = network_api.our_public_key_set().await?.public_key();
-
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Node(NodeMsg::NodeCmd(NodeCmd::StorageFull {
-                section: node_id.into(),
-                node_id,
-            })),
-            dst: DstLocation::Section {
-                name: node_id.into(),
-                section_pk,
-            },
-            aggregation: false,
-        }))
-    }
-}
 
 /// Push our state to the given dst
 pub(crate) async fn push_state(

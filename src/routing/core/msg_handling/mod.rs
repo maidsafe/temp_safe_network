@@ -20,7 +20,7 @@ mod sync;
 
 use super::Core;
 use crate::messaging::{
-    data::{DataCmd, DataQuery, ServiceMsg},
+    data::{DataCmd, DataQuery, ServiceMsg, StorageLevel},
     node::{NodeCmd, NodeMsg, NodeQuery, Proposal},
     DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth, ServiceAuth,
     WireMsg,
@@ -432,19 +432,18 @@ impl Core {
             NodeMsg::NodeCmd(node_cmd) => {
                 match node_cmd {
                     NodeCmd::Chunks { cmd, auth, .. } => {
-                        info!(
-                            "Processing storing chunk command with MessageId: {:?}",
-                            msg_id
-                        );
+                        info!("Processing chunk write with MessageId: {:?}", msg_id);
                         let verified = WireMsg::verify_sig(
                             auth,
                             ServiceMsg::Cmd(DataCmd::Chunk(cmd.clone())),
                         )?;
-                        self.chunk_storage.write(&cmd, verified.public_key).await?
+                        let level_report =
+                            self.chunk_storage.write(&cmd, verified.public_key).await?;
+                        return Ok(self.record_if_any(level_report).await);
                     }
                     NodeCmd::ReplicateChunk(chunk) => {
                         info!(
-                            "Processing replicate chunk command with MessageId: {:?}",
+                            "Processing replicate chunk cmd with MessageId: {:?}",
                             msg_id
                         );
 
@@ -454,7 +453,9 @@ impl Core {
                             // We are an adult here, so just store away!
 
                             // TODO: should this be a cmd returned for threading?
-                            self.chunk_storage.store_for_replication(chunk).await?;
+                            let level_report =
+                                self.chunk_storage.store_for_replication(chunk).await?;
+                            return Ok(self.record_if_any(level_report).await);
                         }
                     }
                     NodeCmd::RepublishChunk(chunk) => {
@@ -549,6 +550,30 @@ impl Core {
                 Ok(vec![])
             }
         }
+    }
+
+    async fn record_if_any(&self, level: Option<StorageLevel>) -> Vec<Command> {
+        let mut cmds = vec![];
+        if let Some(level) = level {
+            info!("Storage has now passed {} % used.", 10 * level.value());
+            let node_id = PublicKey::from(self.node().keypair.public);
+            let node_xorname = XorName::from(node_id);
+
+            // we ask the section to record the new level reached
+            let msg = NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+                section: node_xorname,
+                node_id,
+                level,
+            });
+
+            let dst = DstLocation::Section {
+                name: node_xorname,
+                section_pk: self.section.section_auth.value.section_key(),
+            };
+
+            cmds.push(Command::PrepareNodeMsgToSend { msg, dst });
+        }
+        cmds
     }
 
     // Locate ideal chunk holders for this chunk, line up wiremsgs for those to instruct them to store the chunk

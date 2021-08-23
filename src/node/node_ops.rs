@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{DataExchange, ServiceError, ServiceMsg},
+    data::{DataExchange, ServiceError, ServiceMsg, StorageLevel},
     node::NodeMsg,
     DstLocation, MessageId,
 };
@@ -81,12 +81,12 @@ pub enum NodeDuty {
         name: XorName,
         age: u8,
     },
-    /// Storage reaching max capacity.
-    ReachingMaxCapacity,
     /// Increment count of full nodes in the network
-    IncrementFullNodeCount {
-        /// Node ID of node that reached max capacity.
+    SetStorageLevel {
+        /// Node ID of node that is reporting capacity.
         node_id: PublicKey,
+        /// The storage level the node claims to be at.
+        level: StorageLevel,
     },
     /// Sets joining allowed to true or false.
     SetNodeJoinsAllowed(bool),

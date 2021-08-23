@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::dbs::UsedSpace;
+use crate::messaging::data::StorageLevel;
 use crate::messaging::{data::ChunkDataExchange, node::NodeMsg, DstLocation, WireMsg};
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
@@ -15,7 +16,6 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::{PublicKey as BlsPublicKey, PublicKeySet};
-use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::Path, sync::Arc};
 use xor_name::{Prefix, XorName};
@@ -63,9 +63,12 @@ impl Network {
     pub(crate) async fn get_chunk_data_of(&self, prefix: &Prefix) -> ChunkDataExchange {
         self.routing.get_chunk_data_of(prefix).await
     }
-    pub(crate) async fn increase_full_node_count(&self, node_id: &PublicKey) {
-        self.routing.increase_full_node_count(node_id).await
+
+    /// Returns whether the level changed or not.
+    pub(crate) async fn set_storage_level(&self, node_id: &PublicKey, level: StorageLevel) -> bool {
+        self.routing.set_storage_level(node_id, level).await
     }
+
     pub(crate) async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
         self.routing
             .retain_members_only(members)
@@ -75,10 +78,6 @@ impl Network {
 
     pub(crate) async fn age(&self) -> u8 {
         self.routing.age().await
-    }
-
-    pub(crate) async fn public_key(&self) -> Ed25519PublicKey {
-        self.routing.public_key().await
     }
 
     pub(crate) async fn update_chunks(&self, chunks: ChunkDataExchange) {
