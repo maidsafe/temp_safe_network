@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::dbs::{convert_to_error_message, Error, Key, KvStore, Result, Subdir, UsedSpace, Value};
+use crate::messaging::data::StorageLevel;
 use crate::types::{Chunk, ChunkAddress, ChunkKind, PublicKey};
 use crate::{
     messaging::{
@@ -15,15 +16,14 @@ use crate::{
     },
     types::DataAddress,
 };
+use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
 };
+use tokio::sync::RwLock;
 use tracing::info;
-/// At 50% full, the node will report that it's reaching full capacity.
-pub(super) const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;
 
-// #[derive(Clone)]
 type Db = KvStore<ChunkAddress, Chunk>;
 
 impl Subdir for Db {
@@ -36,6 +36,7 @@ impl Subdir for Db {
 #[derive(Clone)]
 pub(crate) struct ChunkStore {
     db: Db,
+    last_recorded_level: Arc<RwLock<StorageLevel>>,
 }
 
 impl Key for ChunkAddress {}
@@ -52,6 +53,7 @@ impl ChunkStore {
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             db: Db::new(path, used_space)?,
+            last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
         })
     }
 
@@ -110,7 +112,11 @@ impl ChunkStore {
         ))
     }
 
-    pub(super) async fn write(&self, write: &ChunkWrite, requester: PublicKey) -> Result<()> {
+    pub(super) async fn write(
+        &self,
+        write: &ChunkWrite,
+        requester: PublicKey,
+    ) -> Result<Option<StorageLevel>> {
         match &write {
             ChunkWrite::New(data) => self.try_store(data).await,
             ChunkWrite::DeletePrivate(head_address) => {
@@ -119,15 +125,25 @@ impl ChunkStore {
                         "{}: Immutable chunk doesn't exist: {:?}",
                         self, head_address
                     );
-                    return Ok(());
+                    return Ok(None);
                 }
 
                 match self.db.get(head_address) {
                     Ok(Chunk::Private(data)) => {
                         if data.owner() == &requester {
-                            self.db.delete(head_address)
+                            self.db.delete(head_address)?;
+                            // if we have dropped 10 %-points in usage, then we'll report that to Elders
+                            let last_recorded_level = { *self.last_recorded_level.read().await };
+                            if let Ok(previous_level) = last_recorded_level.previous() {
+                                let used_space = self.db.used_space_ratio().await;
+                                // every level represents 10 percentage points
+                                if previous_level.value() > (10.0 * used_space) as u8 {
+                                    *self.last_recorded_level.write().await = previous_level;
+                                    return Ok(Some(previous_level));
+                                }
+                            }
                         } else {
-                            Err(Error::InvalidOwner(requester))
+                            return Err(Error::InvalidOwner(requester));
                         }
                     }
                     Ok(_) => {
@@ -136,18 +152,17 @@ impl ChunkStore {
                             self,
                             write.dst_address()
                         );
-
-                        Err(Error::NoSuchData(DataAddress::Chunk(*head_address)))
+                        return Err(Error::NoSuchData(DataAddress::Chunk(*head_address)));
                     }
-                    _ => Ok(()),
-                }?;
+                    _ => (),
+                };
 
-                Ok(())
+                Ok(None)
             }
         }
     }
 
-    async fn try_store(&self, data: &Chunk) -> Result<()> {
+    async fn try_store(&self, data: &Chunk) -> Result<Option<StorageLevel>> {
         if self.db.has(data.address())? {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
@@ -155,30 +170,32 @@ impl ChunkStore {
                 data.address()
             );
             // Nothing more to do here
-            return Ok(());
+            return Ok(None);
         }
         self.db.store(data).await?;
 
-        Ok(())
-    }
+        let last_recorded_level = { *self.last_recorded_level.read().await };
+        if let Ok(next_level) = last_recorded_level.next() {
+            let used_space = self.db.used_space_ratio().await;
+            // every level represents 10 percentage points
+            if (10.0 * used_space) as u8 >= next_level.value() {
+                *self.last_recorded_level.write().await = next_level;
+                return Ok(Some(next_level));
+            }
+        }
 
-    // TODO: this is redundant, see if it can be omitted
-    pub(crate) async fn is_storage_getting_full(&self) -> bool {
-        info!("Checking used storage");
-        self.db.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO
+        Ok(None)
     }
 
     /// Stores a chunk that Elders sent to it for replication.
     /// Chunk should already have network authority
     /// TODO: define what authority is needed here...
-    pub(crate) async fn store_for_replication(&self, chunk: Chunk) -> Result<()> {
+    pub(crate) async fn store_for_replication(&self, chunk: Chunk) -> Result<Option<StorageLevel>> {
         debug!(
             "Trying to store for replication of chunk: {:?}",
             chunk.address()
         );
-        self.try_store(&chunk).await?;
-
-        Ok(())
+        self.try_store(&chunk).await
     }
 }
 

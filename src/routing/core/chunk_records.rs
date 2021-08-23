@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::btree_set;
 use crate::messaging::{
-    data::{ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, Error as ErrorMessage},
+    data::{
+        ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, Error as ErrorMessage, StorageLevel,
+    },
     node::{NodeCmd, NodeMsg, NodeQuery},
     AuthorityProof, EndUser, MessageId, ServiceAuth,
 };
@@ -32,13 +33,13 @@ impl Core {
 
     pub(crate) async fn get_data_of(&self, prefix: &Prefix) -> ChunkDataExchange {
         // Prepare full_adult details
-        let full_adults = self.capacity.full_adults_matching(*prefix).await;
-        ChunkDataExchange { full_adults }
+        let adult_levels = self.capacity.levels_matching(*prefix).await;
+        ChunkDataExchange { adult_levels }
     }
 
     pub(crate) async fn update_chunks(&self, chunk_data: ChunkDataExchange) {
-        let ChunkDataExchange { full_adults } = chunk_data;
-        self.capacity.insert_full_adults(full_adults).await
+        let ChunkDataExchange { adult_levels } = chunk_data;
+        self.capacity.set_adult_levels(adult_levels).await
     }
 
     /// Registered holders not present in provided list of members
@@ -68,25 +69,21 @@ impl Core {
         }
     }
 
-    /// Adds a given node to the list of full nodes.
-    pub(crate) async fn increase_full_node_count(&self, node_id: &PublicKey) {
-        let full_adults = self.capacity.full_adults_count().await;
-        info!("No. of full Adults: {:?}", full_adults);
-        info!("Increasing full Adults count");
-        self.capacity
-            .insert_full_adults(btree_set!(XorName::from(*node_id)))
+    /// Set storage level of a given node.
+    /// Returns whether the level changed or not.
+    pub(crate) async fn set_storage_level(&self, node_id: &PublicKey, level: StorageLevel) -> bool {
+        info!("Setting new storage level..");
+        let changed = self
+            .capacity
+            .set_adult_level(XorName::from(*node_id), level)
             .await;
-    }
-
-    /// Removes a given node from the list of full nodes.
-    #[allow(unused)] // TODO: Remove node from full list at 50% ?
-    async fn decrease_full_adults_count_if_present(&mut self, node_name: XorName) {
-        let full_adults = self.capacity.full_adults_count().await;
-        info!("No. of full Adults: {:?}", full_adults);
-        info!("Checking if {:?} is present as full_node", node_name);
-        self.capacity
-            .remove_full_adults(btree_set!(node_name))
-            .await;
+        let avg_usage = self.capacity.avg_usage().await;
+        info!(
+            "Avg storage usage among Adults is between {}-{} %",
+            avg_usage * 10,
+            (avg_usage + 1) * 10
+        );
+        changed
     }
 
     pub(crate) async fn full_adults(&self) -> BTreeSet<XorName> {

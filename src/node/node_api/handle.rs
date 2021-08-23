@@ -11,12 +11,12 @@ use super::{
     messaging::{send, send_error, send_to_nodes},
     role::{AdultRole, ElderRole, Role},
 };
-use crate::messaging::MessageId;
 use crate::node::{
     event_mapping::MsgContext,
     node_ops::{NodeDuties, NodeDuty},
     Node, Result,
 };
+use crate::{messaging::MessageId, routing::MIN_LEVEL_WHEN_FULL};
 
 use crate::routing::ELDER_SIZE;
 use tokio::task::JoinHandle;
@@ -173,28 +173,25 @@ impl Node {
                 });
                 Ok(NodeTask::None)
             }
-            NodeDuty::ReachingMaxCapacity => {
-                let network_api = self.network_api.clone();
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(vec![
-                        Self::notify_section_of_our_storage(&network_api).await?,
-                    ]))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
             //
             // ------- Misc ------------
-            NodeDuty::IncrementFullNodeCount { node_id } => {
+            NodeDuty::SetStorageLevel { node_id, level } => {
                 let elder = self.as_elder().await?;
                 let handle = tokio::spawn(async move {
-                    elder
+                    let changed = elder
                         .meta_data
                         .read()
                         .await
-                        .increase_full_node_count(node_id)
+                        .set_storage_level(node_id, level)
                         .await;
-                    // Accept a new node in place for the full node.
-                    Ok(NodeTask::from(vec![NodeDuty::SetNodeJoinsAllowed(true)]))
+
+                    // if the value changed and the node is now considered full..
+                    if changed && level.value() == MIN_LEVEL_WHEN_FULL {
+                        // ..then we accept a new node in place of the full node
+                        Ok(NodeTask::from(vec![NodeDuty::SetNodeJoinsAllowed(true)]))
+                    } else {
+                        Ok(NodeTask::None)
+                    }
                 });
                 Ok(NodeTask::Thread(handle))
             }

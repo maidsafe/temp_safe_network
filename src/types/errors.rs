@@ -95,6 +95,9 @@ pub enum Error {
     /// Expected data size exceeded.
     #[error("Size of the structure exceeds the limit")]
     ExceededSize,
+    /// Number out of expected range.
+    #[error("The provided number is out of the expected range")]
+    OutOfRange,
     /// The operation has not been signed by an actor PK and so cannot be validated.
     #[error("CRDT operation missing actor signature")]
     CrdtMissingOpSignature,

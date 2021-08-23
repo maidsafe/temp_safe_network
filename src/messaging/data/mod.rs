@@ -20,6 +20,7 @@ pub use self::{
     cmd::DataCmd,
     data_exchange::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, RegisterDataExchange,
+        StorageLevel,
     },
     errors::{Error, Result},
     query::DataQuery,

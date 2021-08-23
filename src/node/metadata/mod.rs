@@ -8,7 +8,7 @@
 
 mod elder_stores;
 
-use crate::messaging::data::DataExchange;
+use crate::messaging::data::{DataExchange, StorageLevel};
 use crate::node::{network::Network, Result};
 use crate::routing::Prefix;
 use crate::types::PublicKey;
@@ -43,11 +43,12 @@ impl Metadata {
         Ok(())
     }
 
-    /// Adds a given node to the list of full nodes.
-    pub(crate) async fn increase_full_node_count(&self, node_id: PublicKey) {
+    /// Sets the storage level of a given node.
+    /// Returns whether the level changed or not.
+    pub(crate) async fn set_storage_level(&self, node_id: PublicKey, level: StorageLevel) -> bool {
         self.elder_stores
             .network
-            .increase_full_node_count(&node_id)
+            .set_storage_level(&node_id, level)
             .await
     }
 

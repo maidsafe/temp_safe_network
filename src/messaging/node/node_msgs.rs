@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{ChunkRead, ChunkWrite, DataCmd, DataExchange, DataQuery, Result},
+    data::{ChunkRead, ChunkWrite, DataCmd, DataExchange, DataQuery, Result, StorageLevel},
     EndUser, ServiceAuth,
 };
 use crate::types::{Chunk, PublicKey};
@@ -37,11 +37,13 @@ pub enum NodeCmd {
         origin: EndUser,
     },
     /// Notify Elders on nearing max capacity
-    StorageFull {
+    RecordStorageLevel {
         /// Node Id
         node_id: PublicKey,
         /// Section to which the message needs to be sent to. (NB: this is the section of the node id).
         section: XorName,
+        /// The storage level reported by the node.
+        level: StorageLevel,
     },
     /// Replicate a given chunk at an Adult (sent from elders on receipt of RepublishChunk)
     ReplicateChunk(Chunk),

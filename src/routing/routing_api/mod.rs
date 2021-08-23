@@ -24,6 +24,7 @@ use self::{
     event_stream::EventStream,
 };
 use crate::messaging::{
+    data::StorageLevel,
     node::{NodeMsg, Peer},
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
@@ -175,8 +176,14 @@ impl Routing {
     pub(crate) async fn get_chunk_data_of(&self, prefix: &Prefix) -> ChunkDataExchange {
         self.dispatcher.get_chunk_data_of(prefix).await
     }
-    pub(crate) async fn increase_full_node_count(&self, node_id: &DtPublicKey) {
-        self.dispatcher.increase_full_node_count(node_id).await
+
+    /// Returns whether the level changed or not.
+    pub(crate) async fn set_storage_level(
+        &self,
+        node_id: &DtPublicKey,
+        level: StorageLevel,
+    ) -> bool {
+        self.dispatcher.set_storage_level(node_id, level).await
     }
     pub(crate) async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
         self.dispatcher.retain_members_only(members).await

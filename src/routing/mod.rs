@@ -41,7 +41,10 @@ pub use self::{
     },
 };
 pub(crate) use self::{
-    core::ChunkStore, core::RegisterStorage, core::SignatureAggregator, core::CHUNK_COPY_COUNT,
+    core::ChunkStore,
+    core::RegisterStorage,
+    core::SignatureAggregator,
+    core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
     section::section_keys::SectionKeyShare,
 };
 
