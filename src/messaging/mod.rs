@@ -22,8 +22,6 @@
 pub mod data;
 /// Messages that nodes can exchange on the network.
 pub mod node;
-/// Queries and responses for section information.
-pub mod section_info;
 /// The wire format and message (de)serialization API.
 pub mod serialisation;
 /// BLS Signature aggregator

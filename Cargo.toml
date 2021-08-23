@@ -10,8 +10,8 @@ readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
 version = "0.26.2"
 
-[profile.release]
-incremental = true
+#[profile.release]
+#incremental = true
 
 [[bench]]
 name = "put"

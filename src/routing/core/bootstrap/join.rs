@@ -300,7 +300,7 @@ impl<'a> Join<'a> {
             let (join_response, sender, src_name) = match event {
                 ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
-                        MsgKind::ServiceMsg(_) | MsgKind::SectionInfoMsg => continue,
+                        MsgKind::ServiceMsg(_) => continue,
                         MsgKind::NodeBlsShareAuthMsg(_) | MsgKind::SectionAuthMsg(_) => {
                             trace!(
                                 "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
@@ -317,7 +317,6 @@ impl<'a> Join<'a> {
                             }) => (*resp, sender, msg_authority.src_location().name()),
                             Ok(
                                 MessageType::Service { msg_id, .. }
-                                | MessageType::SectionInfo { msg_id, .. }
                                 | MessageType::Node { msg_id, .. },
                             ) => {
                                 trace!(
@@ -327,14 +326,27 @@ impl<'a> Join<'a> {
                                 );
                                 continue;
                             }
+                            #[cfg(test)]
+                            Ok(MessageType::TestMessage(_)) => {
+                                error!(
+                                    "TestMessage received on bootstrapping from sender: {:?}",
+                                    sender,
+                                );
+                                continue;
+                            }
                             Err(err) => {
-                                debug!("Failed to deserialize message payload: {}", err);
+                                debug!("Failed to deserialize message payload: {:?}", err);
                                 continue;
                             }
                         },
+                        #[cfg(test)]
+                        MsgKind::TestMessage => {
+                            debug!("Received MsgKind::TestMessage wrongly on joining");
+                            continue;
+                        }
                     },
                     Err(err) => {
-                        debug!("Failed to deserialize message: {}", err);
+                        debug!("Failed to deserialize message: {:?}", err);
                         continue;
                     }
                 },

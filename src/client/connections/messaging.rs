@@ -6,27 +6,24 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
+use std::net::SocketAddr;
 
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
-use itertools::Itertools;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio::{sync::mpsc::channel, task::JoinHandle, time::timeout};
+use tokio::{sync::mpsc::channel, task::JoinHandle};
 use tracing::{debug, error, trace, warn};
 
 use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
-    section_info::SectionInfoMsg,
     DstLocation, MessageId, MsgKind, SectionAuthorityProvider, ServiceAuth, WireMsg,
 };
 use crate::types::{Chunk, PrivateChunk, PublicChunk};
 
 use super::{QueryResult, Session};
 use crate::routing::XorName;
-use bls::SecretKey;
 use qp2p::Endpoint;
 use tokio::time::sleep;
 use xor_name::PrefixMap;
@@ -45,44 +42,11 @@ impl Session {
             self.client_pk
         );
 
-        let (endpoint, _, mut incoming_messages, _disconnections, mut bootstrapped_peer) =
+        let (endpoint, _, incoming_messages, _disconnections, bootstrap_peer) =
             self.qp2p.bootstrap().await?;
 
         self.endpoint = Some(endpoint.clone());
-        let mut bootstrap_nodes = endpoint
-            .clone()
-            .bootstrap_nodes()
-            .to_vec()
-            .into_iter()
-            .collect::<BTreeSet<_>>();
-
-        self.send_get_section_query(XorName::from(self.client_pk), &bootstrapped_peer)
-            .await?;
-
-        // Bootstrap and send a handshake request to the bootstrapped peer
-        while !self.network.read().await.iter().count() == 1 {
-            // This means that the peer we bootstrapped to
-            // has responded with a SectionInfo Message
-            match timeout(
-                Duration::from_secs(30),
-                self.process_incoming_message(&mut incoming_messages),
-            )
-            .await
-            {
-                Ok(Ok(true)) => {}
-                _ => {
-                    // Remove the unresponsive peer we bootstrapped to and bootstrap again
-                    let _ = bootstrap_nodes.remove(&bootstrapped_peer);
-                    bootstrapped_peer = self
-                        .qp2p
-                        .rebootstrap(
-                            &endpoint,
-                            &bootstrap_nodes.iter().cloned().collect::<Vec<_>>(),
-                        )
-                        .await?;
-                }
-            }
-        }
+        self.bootstrap_peer = Some(bootstrap_peer);
 
         self.spawn_message_listener_thread(incoming_messages).await;
 
@@ -104,7 +68,7 @@ impl Session {
     ) -> Result<(), Error> {
         let endpoint = self.endpoint()?.clone();
 
-        // Get DataSection elders details. Resort to own section if DataSection is not available.
+        // Get DataSection elders details.
         let (elders, section_pk) = self
             .network
             .read()
@@ -120,7 +84,13 @@ impl Session {
                     sap.public_key_set.public_key(),
                 )
             })
+            .or_else(|| {
+                // Send message to our bootstrap peer with a random section PK.
+                self.bootstrap_peer
+                    .map(|addr| (vec![addr], bls::SecretKey::random().public_key()))
+            })
             .ok_or(Error::NotBootstrapped)?;
+
         let msg_id = MessageId::new();
 
         debug!(
@@ -172,15 +142,24 @@ impl Session {
             .read()
             .await
             .get_matching(&data_name)
-            .map(|(_, sap)| (sap.elders.clone(), sap.public_key_set.public_key()))
+            .map(|(_, sap)| {
+                (
+                    sap.elders.values().cloned().collect::<Vec<SocketAddr>>(),
+                    sap.public_key_set.public_key(),
+                )
+            })
+            .or_else(|| {
+                // Send message to our bootstrap peer with a random section PK.
+                self.bootstrap_peer
+                    .map(|addr| (vec![addr], bls::SecretKey::random().public_key()))
+            })
             .ok_or(Error::NotBootstrapped)?;
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders = elders
             .into_iter()
-            .sorted_by(|(lhs_name, _), (rhs_name, _)| data_name.cmp_distance(lhs_name, rhs_name))
+            // .sorted_by(|(lhs_name, _), (rhs_name, _)| data_name.cmp_distance(lhs_name, rhs_name)) // FIXME: uncomment once we have PrefixMap read from disk
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-            .map(|(_, addr)| addr)
             .collect::<Vec<SocketAddr>>();
 
         let wire_msg = WireMsg::new_msg(
@@ -196,13 +175,13 @@ impl Session {
         let msg_bytes = wire_msg.serialize()?;
 
         let elders_len = chosen_elders.len();
-        if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES {
-            error!(
-                "Not enough Elder connections: {}, minimum required: {}",
-                elders_len, NUM_OF_ELDERS_SUBSET_FOR_QUERIES
-            );
-            return Err(Error::InsufficientElderConnections(elders_len));
-        }
+        // if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES {
+        //     error!(
+        //         "Not enough Elder connections: {}, minimum required: {}",
+        //         elders_len, NUM_OF_ELDERS_SUBSET_FOR_QUERIES
+        //     );
+        //     return Err(Error::InsufficientElderConnections(elders_len));
+        // }
 
         let msg_id = MessageId::new();
 
@@ -387,51 +366,6 @@ impl Session {
             }
             None => Err(Error::NoResponse),
         }
-    }
-
-    // Get section info from the peer we have bootstrapped with.
-    pub(crate) async fn send_get_section_query(
-        &self,
-        name: XorName,
-        bootstrapped_peer: &SocketAddr,
-    ) -> Result<(), Error> {
-        trace!(
-            "Querying for section info from bootstrapped node: {:?}",
-            bootstrapped_peer
-        );
-
-        let msg_id = MessageId::new();
-        let query = SectionInfoMsg::GetSectionQuery {
-            name,
-            is_bootstrapping: true,
-        };
-
-        let payload = WireMsg::serialize_msg_payload(&query)?;
-
-        // Random section PK since we have no knowledge in the beginning
-        let random_section_pk = SecretKey::random().public_key();
-
-        let dst_location = DstLocation::Section {
-            name,
-            section_pk: random_section_pk,
-        };
-        let wire_msg = WireMsg::new_msg(msg_id, payload, MsgKind::SectionInfoMsg, dst_location)?;
-        let priority = wire_msg.msg_kind().priority();
-        let msg_bytes = wire_msg.serialize()?;
-
-        debug!(
-            "Sending query message {:?}, msg_id {}, from {}, to bootstrapped node {} ",
-            query,
-            msg_id,
-            self.endpoint()?.socket_addr(),
-            bootstrapped_peer
-        );
-
-        self.endpoint()?
-            .send_message(msg_bytes, bootstrapped_peer, priority)
-            .await?;
-
-        Ok(())
     }
 
     #[allow(unused)]

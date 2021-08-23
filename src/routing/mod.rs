@@ -23,10 +23,9 @@
 // ############################################################################
 // Public API
 // ############################################################################
-pub use self::error::ProposalError;
-pub(crate) use self::section::section_keys::SectionKeyShare;
 pub use self::{
     cache::Cache,
+    error::ProposalError,
     error::{Error, Result},
     peer::PeerUtils,
     routing_api::{
@@ -40,9 +39,9 @@ pub use self::{
         section_authority_provider::SectionAuthorityProviderUtils,
     },
 };
-pub(crate) use self::{core::ChunkStore, core::RegisterStorage, core::CHUNK_COPY_COUNT};
+
 pub(crate) use self::{
-    core::ChunkStore, core::SignatureAggregator, core::MIN_LEVEL_WHEN_FULL,
+    core::{ChunkStore, RegisterStorage, CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
     section::section_keys::SectionKeyShare,
 };
 
@@ -77,7 +76,7 @@ mod section;
 pub const RECOMMENDED_SECTION_SIZE: usize = 2 * ELDER_SIZE;
 
 /// Number of elders per section.
-pub const ELDER_SIZE: usize = 7;
+pub const ELDER_SIZE: usize = 3;
 
 /// SuperMajority of a given group (i.e. > 2/3)
 #[inline]

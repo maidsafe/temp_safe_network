@@ -14,7 +14,6 @@ mod join;
 mod proposals;
 mod relocation;
 mod resource_proof;
-mod section_info;
 mod service_msgs;
 mod sync;
 
@@ -79,9 +78,6 @@ impl Core {
         };
 
         match message_type {
-            MessageType::SectionInfo {
-                dst_location, msg, ..
-            } => Ok(self.handle_section_info_msg(sender, dst_location, msg)),
             MessageType::Node {
                 msg_id,
                 msg_authority,
@@ -104,6 +100,8 @@ impl Core {
                 self.handle_service_message(sender, msg_id, auth, msg, payload, dst_location)
                     .await
             }
+            #[cfg(test)]
+            MessageType::TestMessage(_) => Ok(vec![]),
         }
     }
 

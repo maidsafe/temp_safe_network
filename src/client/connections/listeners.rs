@@ -18,7 +18,6 @@ use crate::messaging::data::Error as DataError;
 use crate::messaging::data::ServiceError;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
-    section_info::{GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, WireMsg,
 };
 use crate::messaging::{DstLocation, ServiceAuth};
@@ -58,11 +57,6 @@ impl Session {
             let message_type = WireMsg::deserialize(message)?;
             trace!("Incoming message from {:?}", &src);
             match message_type {
-                MessageType::SectionInfo { msg, .. } => {
-                    if let Err(error) = self.handle_section_info_msg(msg).await {
-                        error!("Error handling network info message: {:?}", error);
-                    }
-                }
                 MessageType::Service {
                     msg_id,
                     msg,
@@ -79,26 +73,6 @@ impl Session {
             Ok(true)
         } else {
             Ok(false)
-        }
-    }
-
-    // =================== Private helpers ===================
-
-    // Handle received network info messages
-    async fn handle_section_info_msg(&mut self, msg: SectionInfoMsg) -> Result<(), Error> {
-        trace!("Handling network info message {:?}", msg);
-
-        match &msg {
-            SectionInfoMsg::GetSectionResponse(GetSectionResponse::Success(sap))
-            | SectionInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(sap)) => {
-                debug!("GetSectionResponse::Success!");
-                let _ = self.network.write().await.insert(sap.prefix, sap.clone());
-                Ok(())
-            }
-            SectionInfoMsg::GetSectionQuery { .. } => Err(Error::UnexpectedMessageOnJoin(format!(
-                "bootstrapping failed since an invalid response ({:?}) was received",
-                msg
-            ))),
         }
     }
 
