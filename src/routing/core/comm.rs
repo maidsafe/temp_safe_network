@@ -118,7 +118,7 @@ impl Comm {
                 .await
                 .map_err(|err| {
                     error!(
-                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed with {}",
+                        "Sending message (msg_id: {}) to {:?} (name {:?}) failed with {:?}",
                         wire_msg.msg_id(),
                         addr,
                         name,
@@ -151,7 +151,7 @@ impl Comm {
             .is_reachable(peer)
             .await
             .map_err(|err| {
-                info!("Peer {} is NOT externally reachable: {}", peer, err);
+                info!("Peer {} is NOT externally reachable: {:?}", peer, err);
                 Error::AddressNotReachable { err }
             })
             .map(|()| {
@@ -313,8 +313,7 @@ pub(crate) enum SendStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{section_info::SectionInfoMsg, DstLocation, WireMsg};
-    use crate::types::PublicKey;
+    use crate::messaging::{DstLocation, MessageId, MsgKind};
     use assert_matches::assert_matches;
     use eyre::Result;
     use futures::future;
@@ -332,7 +331,7 @@ mod tests {
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
 
-        let original_message = new_section_info_message()?;
+        let original_message = new_test_message()?;
 
         let status = comm
             .send(
@@ -363,7 +362,7 @@ mod tests {
         let mut peer0 = Peer::new().await?;
         let mut peer1 = Peer::new().await?;
 
-        let original_message = new_section_info_message()?;
+        let original_message = new_test_message()?;
         let status = comm
             .send(
                 &[(peer0._name, peer0.addr), (peer1._name, peer1.addr)],
@@ -401,11 +400,7 @@ mod tests {
         let invalid_addr = get_invalid_addr().await?;
 
         let status = comm
-            .send(
-                &[(XorName::random(), invalid_addr)],
-                1,
-                new_section_info_message()?,
-            )
+            .send(&[(XorName::random(), invalid_addr)], 1, new_test_message()?)
             .await?;
 
         assert_matches!(
@@ -431,7 +426,7 @@ mod tests {
         let invalid_addr = get_invalid_addr().await?;
         let name = XorName::random();
 
-        let message = new_section_info_message()?;
+        let message = new_test_message()?;
         let _ = comm
             .send(
                 &[(name, invalid_addr), (peer._name, peer.addr)],
@@ -461,7 +456,7 @@ mod tests {
         let invalid_addr = get_invalid_addr().await?;
         let name = XorName::random();
 
-        let message = new_section_info_message()?;
+        let message = new_test_message()?;
         let status = comm
             .send(
                 &[(name, invalid_addr), (peer._name, peer.addr)],
@@ -491,17 +486,7 @@ mod tests {
         let recv_addr = recv_endpoint.socket_addr();
         let name = XorName::random();
 
-        // Send the first message.
-        let key0 = bls::SecretKey::random().public_key();
-        let query = SectionInfoMsg::GetSectionQuery {
-            name: XorName::from(PublicKey::Bls(key0)),
-            is_bootstrapping: true,
-        };
-        let dst_location = DstLocation::Node {
-            name,
-            section_pk: key0,
-        };
-        let msg0 = WireMsg::new_section_info_msg(&query, dst_location)?;
+        let msg0 = new_test_message()?;
         let _ = send_comm
             .send(&[(name, recv_addr)], 1, msg0.clone())
             .await?;
@@ -518,17 +503,7 @@ mod tests {
             assert!(msg0_received);
         }
 
-        // Send the second message.
-        let key1 = bls::SecretKey::random().public_key();
-        let query = SectionInfoMsg::GetSectionQuery {
-            name: XorName::from(PublicKey::Bls(key1)),
-            is_bootstrapping: true,
-        };
-        let dst_location = DstLocation::Node {
-            name,
-            section_pk: key1,
-        };
-        let msg1 = WireMsg::new_section_info_msg(&query, dst_location)?;
+        let msg1 = new_test_message()?;
         let _ = send_comm
             .send(&[(name, recv_addr)], 1, msg1.clone())
             .await?;
@@ -557,11 +532,7 @@ mod tests {
 
         // Send a message to establish the connection
         let _ = comm1
-            .send(
-                &[(XorName::random(), addr0)],
-                1,
-                new_section_info_message()?,
-            )
+            .send(&[(XorName::random(), addr0)], 1, new_test_message()?)
             .await?;
 
         assert_matches!(rx0.recv().await, Some(ConnectionEvent::Received(_)));
@@ -583,18 +554,15 @@ mod tests {
         }
     }
 
-    fn new_section_info_message() -> Result<WireMsg> {
-        let random_bls_pk = bls::SecretKey::random().public_key();
-        let query = SectionInfoMsg::GetSectionQuery {
-            name: XorName::from(PublicKey::Bls(random_bls_pk)),
-            is_bootstrapping: true,
-        };
+    fn new_test_message() -> Result<WireMsg> {
         let dst_location = DstLocation::Node {
             name: XorName::random(),
             section_pk: bls::SecretKey::random().public_key(),
         };
 
-        let wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
+        let bytes = WireMsg::serialize_msg_payload(&"test_string".to_string())?;
+        let wire_msg =
+            WireMsg::new_msg(MessageId::new(), bytes, MsgKind::TestMessage, dst_location)?;
         Ok(wire_msg)
     }
 

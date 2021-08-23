@@ -329,27 +329,10 @@ impl Dispatcher {
             MsgKind::NodeAuthMsg(_)
             | MsgKind::NodeBlsShareAuthMsg(_)
             | MsgKind::SectionAuthMsg(_) => {
-                let status = self
-                    .core
-                    .read()
-                    .await
-                    .comm
-                    .send(recipients, delivery_group_size, wire_msg)
-                    .await?;
-
-                match status {
-                    SendStatus::MinDeliveryGroupSizeReached(failed_recipients)
-                    | SendStatus::MinDeliveryGroupSizeFailed(failed_recipients) => {
-                        Ok(failed_recipients
-                            .into_iter()
-                            .map(Command::HandlePeerLost)
-                            .collect())
-                    }
-                    _ => Ok(vec![]),
-                }
-                .map_err(|e: Error| e)?
+                self.deliver_messages(recipients, delivery_group_size, wire_msg)
+                    .await?
             }
-            MsgKind::ServiceMsg(_) | MsgKind::SectionInfoMsg => {
+            MsgKind::ServiceMsg(_) => {
                 let _ = self
                     .core
                     .read()
@@ -360,9 +343,39 @@ impl Dispatcher {
 
                 vec![]
             }
+            #[cfg(test)]
+            MsgKind::TestMessage => {
+                self.deliver_messages(recipients, delivery_group_size, wire_msg)
+                    .await?
+            }
         };
 
         Ok(cmds)
+    }
+
+    async fn deliver_messages(
+        &self,
+        recipients: &[(XorName, SocketAddr)],
+        delivery_group_size: usize,
+        wire_msg: WireMsg,
+    ) -> Result<Vec<Command>> {
+        let status = self
+            .core
+            .read()
+            .await
+            .comm
+            .send(recipients, delivery_group_size, wire_msg)
+            .await?;
+
+        match status {
+            SendStatus::MinDeliveryGroupSizeReached(failed_recipients)
+            | SendStatus::MinDeliveryGroupSizeFailed(failed_recipients) => Ok(failed_recipients
+                .into_iter()
+                .map(Command::HandlePeerLost)
+                .collect()),
+            _ => Ok(vec![]),
+        }
+        .map_err(|e: Error| e)
     }
 
     /// Send a message, either section to section, node to node, or to an end user.

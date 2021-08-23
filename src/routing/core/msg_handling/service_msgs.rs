@@ -16,7 +16,6 @@ use crate::messaging::{
 };
 use crate::messaging::{NodeAuth, SectionAuthorityProvider};
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;
-use crate::routing::network::NetworkUtils;
 use crate::routing::peer::PeerUtils;
 use crate::routing::{
     error::Result, routing_api::command::Command, section::SectionUtils,
@@ -64,7 +63,10 @@ impl Core {
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         match self.register_storage.write(register_write, auth).await {
-            Ok(_) => Ok(vec![]),
+            Ok(_) => {
+                info!("Successfully wrote Register from Message: {:?}", msg_id);
+                Ok(vec![])
+            }
             Err(error) => {
                 trace!("Problem on writing Register! {:?}", error);
                 let error = convert_db_error_to_error_message(error);

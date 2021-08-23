@@ -11,8 +11,8 @@ mod wire_msg_header;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    data::ServiceMsg, node::NodeMsg, section_info::SectionInfoMsg, AuthorityProof, BlsShareAuth,
-    DstLocation, MessageId, NodeAuth, SectionAuth, ServiceAuth,
+    data::ServiceMsg, node::NodeMsg, AuthorityProof, BlsShareAuth, DstLocation, MessageId,
+    NodeAuth, SectionAuth, ServiceAuth,
 };
 
 /// Type of message.
@@ -21,15 +21,6 @@ use super::{
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
-    /// Message about infrastructure
-    SectionInfo {
-        /// Message ID
-        msg_id: MessageId,
-        /// Message destination location
-        dst_location: DstLocation,
-        /// the message
-        msg: SectionInfoMsg,
-    },
     /// Service message
     Service {
         /// Message ID
@@ -52,6 +43,9 @@ pub enum MessageType {
         /// the message
         msg: NodeMsg,
     },
+    #[cfg(test)]
+    /// A proxy message for testing
+    TestMessage(String),
 }
 
 /// Authority of a NodeMsg.

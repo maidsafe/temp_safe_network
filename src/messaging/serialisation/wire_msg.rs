@@ -10,7 +10,6 @@ use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::{ServiceError, ServiceMsg},
     node::NodeMsg,
-    section_info::SectionInfoMsg,
     AuthorityProof, DstLocation, Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
     ServiceAuth,
 };
@@ -63,19 +62,6 @@ impl WireMsg {
         })
     }
 
-    /// Convenience function to create a new 'SectionInfoMsg'.
-    /// This function serializes the payload and assumes there is no need of a message authority.
-    pub fn new_section_info_msg(query: &SectionInfoMsg, dst_location: DstLocation) -> Result<Self> {
-        let payload = Self::serialize_msg_payload(query)?;
-
-        Self::new_msg(
-            MessageId::new(),
-            payload,
-            MsgKind::SectionInfoMsg,
-            dst_location,
-        )
-    }
-
     /// Attempts to create an instance of WireMsg by deserialising the bytes provided.
     /// To succeed, the bytes should contain at least a valid WireMsgHeader.
     pub fn from(bytes: Bytes) -> Result<Self> {
@@ -114,20 +100,6 @@ impl WireMsg {
     /// Deserialize the payload from this WireMsg returning a MessageType instance.
     pub fn into_message(self) -> Result<MessageType> {
         match self.header.msg_envelope.msg_kind {
-            MsgKind::SectionInfoMsg => {
-                let msg: SectionInfoMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!(
-                        "Section info message payload as Msgpack: {}",
-                        err
-                    ))
-                })?;
-
-                Ok(MessageType::SectionInfo {
-                    msg_id: self.header.msg_envelope.msg_id,
-                    dst_location: self.header.msg_envelope.dst_location,
-                    msg,
-                })
-            }
             MsgKind::ServiceMsg(auth) => {
                 let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
@@ -201,6 +173,16 @@ impl WireMsg {
                     msg,
                 })
             }
+            #[cfg(test)]
+            MsgKind::TestMessage => {
+                let string = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                    Error::FailedToParse(format!(
+                        "Node message payload (section signed) as Msgpack: {}",
+                        err
+                    ))
+                })?;
+                Ok(MessageType::TestMessage(string))
+            }
         }
     }
 
@@ -265,7 +247,6 @@ impl WireMsg {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::PublicKey;
     use crate::{
         messaging::{
             data::{ChunkRead, DataQuery, ServiceMsg, StorageLevel},
@@ -278,95 +259,6 @@ mod tests {
     use eyre::Result;
     use rand::rngs::OsRng;
     use xor_name::XorName;
-
-    #[test]
-    fn serialisation_section_info_msg() -> Result<()> {
-        let dst_name = XorName::random();
-        let dst_section_pk = SecretKey::random().public_key();
-        let dst_location = DstLocation::Node {
-            name: dst_name,
-            section_pk: dst_section_pk,
-        };
-
-        let query = SectionInfoMsg::GetSectionQuery {
-            name: XorName::from(PublicKey::from(dst_section_pk)),
-            is_bootstrapping: true,
-        };
-
-        let wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
-        let serialized = wire_msg.serialize()?;
-
-        // test deserialisation of header
-        let deserialized = WireMsg::from(serialized)?;
-        assert_eq!(deserialized, wire_msg);
-        assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
-        assert_eq!(deserialized.dst_location(), &dst_location);
-        assert_eq!(deserialized.dst_section_pk(), Some(dst_section_pk));
-        assert_eq!(deserialized.src_section_pk(), None);
-
-        // test deserialisation of payload
-        assert_eq!(
-            deserialized.into_message()?,
-            MessageType::SectionInfo {
-                msg_id: wire_msg.msg_id(),
-                dst_location,
-                msg: query,
-            }
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn serialisation_and_update_dst_location_section_info_msg() -> Result<()> {
-        let dst_name = XorName::random();
-        let dst_section_pk = SecretKey::random().public_key();
-        let dst_location = DstLocation::Node {
-            name: dst_name,
-            section_pk: dst_section_pk,
-        };
-        let query = SectionInfoMsg::GetSectionQuery {
-            name: XorName::from(PublicKey::from(dst_section_pk)),
-            is_bootstrapping: true,
-        };
-
-        let mut wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
-        let serialized = wire_msg.serialize()?;
-
-        let new_wire_msg = wire_msg.clone();
-        let new_xorname = XorName::random();
-        let new_dst_section_pk = SecretKey::random().public_key();
-        let new_dst_location = DstLocation::Node {
-            name: new_xorname,
-            section_pk: new_dst_section_pk,
-        };
-        wire_msg.set_dst_xorname(new_xorname);
-        wire_msg.set_dst_section_pk(new_dst_section_pk);
-
-        let serialised_new_dst_location = wire_msg.serialize()?;
-
-        // test deserialisation of header
-        let deserialized = WireMsg::from(serialised_new_dst_location.clone())?;
-
-        assert_ne!(serialized, serialised_new_dst_location);
-        assert_ne!(new_wire_msg, wire_msg);
-        assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
-        assert_eq!(deserialized.dst_location(), &new_dst_location);
-        assert_eq!(deserialized.dst_section_pk(), Some(new_dst_section_pk));
-        assert_eq!(deserialized.src_section_pk(), None);
-
-        // test deserialisation of payload
-        assert_eq!(
-            deserialized.into_message()?,
-            MessageType::SectionInfo {
-                msg_id: wire_msg.msg_id(),
-                dst_location: new_dst_location,
-                msg: query,
-            }
-        );
-
-        Ok(())
-    }
 
     #[test]
     fn serialisation_node_msg() -> Result<()> {

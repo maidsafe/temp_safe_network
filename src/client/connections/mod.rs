@@ -21,6 +21,7 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::types::PublicKey;
+use std::net::SocketAddr;
 use xor_name::{PrefixMap, XorName};
 
 mod listeners;
@@ -47,8 +48,10 @@ pub(super) struct Session {
     pending_queries: PendingQueryResponses,
     // Channels for sending errors to upper layer
     incoming_err_sender: Arc<Sender<CmdError>>,
-    /// All elders we know about from SectionInfo messages
+    /// All elders we know about from AE messages
     network: Arc<RwLock<PrefixMap<SectionAuthorityProvider>>>,
+    /// Our initial bootstrap node
+    bootstrap_peer: Option<SocketAddr>,
     /// BLS Signature aggregator for aggregating network messages
     aggregator: Arc<RwLock<SignatureAggregator>>,
 }
@@ -70,6 +73,7 @@ impl Session {
             incoming_err_sender: Arc::new(err_sender),
             endpoint: None,
             network: Arc::new(RwLock::new(PrefixMap::new())),
+            bootstrap_peer: None,
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
         })
     }

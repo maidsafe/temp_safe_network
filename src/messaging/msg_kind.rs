@@ -18,13 +18,6 @@ use serde::{Deserialize, Serialize};
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgKind {
-    /// A section information message, which doesn't have any message authority.
-    ///
-    /// Section information messages can be sent by any network peer (client or node), without any
-    /// need for them to prove their authority. This is because section information messages are
-    /// read-only, and section information is public across the network.
-    SectionInfoMsg,
-
     /// A data message, with the requesting peer's authority.
     ///
     /// Authority is needed to access private data, such as reading or writing a private file.
@@ -45,6 +38,9 @@ pub enum MsgKind {
     /// A message from an Elder node with authority of its whole section.
     // FIXME: find an example.
     SectionAuthMsg(SectionAuth),
+    /// A proxy message for testing
+    #[cfg(test)]
+    TestMessage,
 }
 
 impl MsgKind {
@@ -54,8 +50,9 @@ impl MsgKind {
             Self::SectionAuthMsg(_) => 2,
             Self::NodeBlsShareAuthMsg(_) => 1,
             Self::NodeAuthMsg(_) => 0,
-            Self::SectionInfoMsg => -1,
             Self::ServiceMsg(_) => -2,
+            #[cfg(test)]
+            Self::TestMessage => 0,
         }
     }
 }
