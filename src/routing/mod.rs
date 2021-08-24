@@ -76,7 +76,7 @@ mod section;
 pub const RECOMMENDED_SECTION_SIZE: usize = 2 * ELDER_SIZE;
 
 /// Number of elders per section.
-pub const ELDER_SIZE: usize = 3;
+pub const ELDER_SIZE: usize = 7;
 
 /// SuperMajority of a given group (i.e. > 2/3)
 #[inline]
