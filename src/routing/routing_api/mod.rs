@@ -348,7 +348,6 @@ impl Routing {
             .await
             .network()
             .all()
-            .cloned()
             .collect()
     }
 

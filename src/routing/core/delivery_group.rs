@@ -76,8 +76,9 @@ fn section_candidates(
     network: &Network,
 ) -> Result<(Vec<Peer>, usize)> {
     // Find closest section to `target_name` out of the ones we know (including our own)
+    let network_sections:Vec<_> = network.all().collect();
     let info = iter::once(section.authority_provider())
-        .chain(network.all())
+        .chain(network_sections.iter())
         .min_by(|lhs, rhs| lhs.prefix.cmp_distance(&rhs.prefix, target_name))
         .unwrap_or_else(|| section.authority_provider());
 
@@ -102,8 +103,9 @@ fn candidates(
     network: &Network,
 ) -> Result<(Vec<Peer>, usize)> {
     // All sections we know (including our own), sorted by distance to `target_name`.
+    let network_sections:Vec<_> = network.all().collect();
     let sections = iter::once(section.authority_provider())
-        .chain(network.all())
+        .chain(network_sections.iter())
         .sorted_by(|lhs, rhs| lhs.prefix.cmp_distance(&rhs.prefix, target_name))
         .map(|info| (&info.prefix, info.elder_count(), info.peers()));
 

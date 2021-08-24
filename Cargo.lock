@@ -252,9 +252,8 @@ checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
 name = "bls_dkg"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13e8e1bab924426b27775f9fe57b576cef138255aeae43fe14db8cc3e08d20a1"
+version = "0.6.0"
+source = "git+https://github.com/grumbach/bls_dkg?branch=update_xorname#5f8668058fb2b4e844b1a6be59f03235d41fa6f4"
 dependencies = [
  "aes",
  "bincode",
@@ -663,6 +662,7 @@ checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
 dependencies = [
  "cfg-if",
  "num_cpus",
+ "serde",
 ]
 
 [[package]]
@@ -1796,8 +1796,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d709dbd167d64d0c29f539eb04b97a2185c05aa81499fc1c94f0f7a2cdf5d65"
+source = "git+https://github.com/grumbach/qp2p?branch=update_xorname#7ca0519e67c69395837ccf3e7029a902c9da018e"
 dependencies = [
  "backoff",
  "base64 0.12.3",
@@ -3294,9 +3293,9 @@ dependencies = [
 
 [[package]]
 name = "xor_name"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b96e12687409134d5e3a785002b40b2ea4c566a86ee0847a3170ec96cb27979"
+checksum = "4687b6d260f34b138ef094a0446c652fdcb3cdbca88b3a318a33eea4c4b712ba"
 dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod stats;
+mod prefix_map;
 
 use self::stats::NetworkStats;
 use crate::messaging::{
@@ -18,7 +19,8 @@ use crate::routing::{
 };
 use secured_linked_list::SecuredLinkedList;
 use std::iter;
-use xor_name::{Prefix, PrefixMap, XorName};
+use xor_name::{Prefix, XorName};
+use prefix_map::PrefixMap;
 
 /// Container for storing information about other sections in the network.
 pub(crate) struct Network {
@@ -35,27 +37,24 @@ impl Network {
 
     /// Returns the known section that is closest to the given name, regardless of whether `name`
     /// belongs in that section or not.
-    pub(crate) fn closest(&self, name: &XorName) -> Option<&SectionAuth<SectionAuthorityProvider>> {
-        self.sections
-            .iter()
-            .min_by(|(lhs_prefix, _), (rhs_prefix, _)| lhs_prefix.cmp_distance(rhs_prefix, name))
-            .map(|(_, sap)| sap)
+    pub(crate) fn closest(&self, name: &XorName) -> Option<SectionAuth<SectionAuthorityProvider>> {
+        self.sections.try_get_matching(name).map(|(_, sap)| sap)
     }
 
     /// Returns iterator over all known sections.
-    pub(crate) fn all(&self) -> Box<dyn Iterator<Item = &SectionAuthorityProvider> + '_> {
+    pub(crate) fn all(&self) -> Box<dyn Iterator<Item = SectionAuthorityProvider> + '_> {
         Box::new(
             self.sections
                 .iter()
-                .map(|(_, section_auth)| &section_auth.value),
+                .map(|e| e.value().value.clone()),
         )
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
-    pub(crate) fn get(&self, prefix: &Prefix) -> Option<&SectionAuthorityProvider> {
+    pub(crate) fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
         self.sections
             .get(prefix)
-            .map(|(_, section_auth)| &section_auth.value)
+            .map(|(_, section_auth)| section_auth.value.clone())
     }
 
     /// Returns a `Peer` of an elder from a known section.
@@ -122,7 +121,7 @@ impl Network {
         // is part of the proof chain received.
         let prefix = signed_section_auth.value.prefix;
         match self.sections.get(&prefix) {
-            Some((_, sap)) if sap == &signed_section_auth => {
+            Some((_, sap)) if sap == signed_section_auth => {
                 // It's the same SAP we are already aware of
                 return Ok(false);
             }
@@ -177,8 +176,8 @@ impl Network {
     /// Returns the known section keys.
     pub(crate) fn keys(&self) -> Box<dyn Iterator<Item = (Prefix, bls::PublicKey)> + '_> {
         Box::new(
-            self.sections.iter().map(|(_, section_auth)| {
-                (section_auth.value.prefix, section_auth.value.section_key())
+            self.sections.iter().map(|e| {
+                (e.value().value.prefix, e.value().value.section_key())
             }),
         )
     }
@@ -204,10 +203,13 @@ impl Network {
     pub(crate) fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
         // Let's compute an estimate of the total number of elders in the network
         // from the size of our routing table.
-        let known_prefixes = self
+        let section_prefixes: Vec<Prefix> = self
             .sections
             .iter()
-            .map(|(prefix, _)| prefix)
+            .map(|e| *e.key())
+            .collect();
+        let known_prefixes = section_prefixes
+            .iter()
             .chain(iter::once(&our.prefix));
 
         let total_elders_exact = Prefix::default().is_covered_by(known_prefixes.clone());
@@ -221,7 +223,7 @@ impl Network {
         let network_elders_count: usize = self
             .sections
             .iter()
-            .map(|(_, info)| info.value.elder_count())
+            .map(|e| e.value().value.elder_count())
             .sum();
         let known = our.elder_count() + network_elders_count;
         let total = known as f64 / network_fraction;

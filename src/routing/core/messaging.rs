@@ -107,7 +107,10 @@ impl Core {
                             .network
                             .sections
                             .iter()
-                            .map(|(prefix, sap)| (*prefix, sap.clone()))
+                            .map(|e| {
+                                let (prefix, sap) = e.pair();
+                                (*prefix, sap.clone())
+                            })
                             .collect(),
                     },
                     sig_share.public_key_set.public_key(),
