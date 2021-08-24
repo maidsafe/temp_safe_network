@@ -227,7 +227,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use crate::client::{
-        utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff},
+        utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff_delayed},
         Error,
     };
     use crate::messaging::data::Error as ErrorMessage;
@@ -265,7 +265,7 @@ mod tests {
             let now = Instant::now();
 
             // write to the register
-            let _value1_hash = run_w_backoff(
+            let _value1_hash = run_w_backoff_delayed(
                 || client.write_to_register(address, b"VALUE1".to_vec(), BTreeSet::new()),
                 10,
             )
@@ -298,7 +298,7 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff(|| client.get_register(address), 10).await?;
+        let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
 
         assert!(register.is_private());
         assert_eq!(*register.name(), name);
@@ -313,7 +313,7 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff(|| client.get_register(address), 10).await?;
+        let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
 
         assert!(register.is_public());
         assert_eq!(*register.name(), name);
@@ -336,11 +336,11 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff(|| client.get_register(address), 10).await?;
+        let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
 
         assert_eq!(register.size(None)?, 0);
 
-        let permissions = run_w_backoff(
+        let permissions = run_w_backoff_delayed(
             || client.get_register_permissions_for_user(address, owner),
             10,
         )
@@ -378,7 +378,7 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let permissions = run_w_backoff(
+        let permissions = run_w_backoff_delayed(
             || client.get_register_permissions_for_user(address, owner),
             10,
         )
@@ -420,7 +420,7 @@ mod tests {
             .await?;
 
         // write to the register
-        let value1_hash = run_w_backoff(
+        let value1_hash = run_w_backoff_delayed(
             || client.write_to_register(address, b"VALUE1".to_vec(), BTreeSet::new()),
             10,
         )
@@ -434,7 +434,7 @@ mod tests {
         assert_eq!(current, Some(&(value1_hash, b"VALUE1".to_vec())));
 
         // write to the register
-        let value2_hash = run_w_backoff(
+        let value2_hash = run_w_backoff_delayed(
             || client.write_to_register(address, b"VALUE2".to_vec(), BTreeSet::new()),
             10,
         )
@@ -449,10 +449,12 @@ mod tests {
         assert_eq!(current, Some(&(value2_hash, b"VALUE2".to_vec())));
 
         // get_register_entry
-        let value1 = run_w_backoff(|| client.get_register_entry(address, value1_hash), 10).await?;
+        let value1 =
+            run_w_backoff_delayed(|| client.get_register_entry(address, value1_hash), 10).await?;
         assert_eq!(std::str::from_utf8(&value1)?, "VALUE1");
 
-        let value2 = run_w_backoff(|| client.get_register_entry(address, value2_hash), 10).await?;
+        let value2 =
+            run_w_backoff_delayed(|| client.get_register_entry(address, value2_hash), 10).await?;
 
         assert_eq!(std::str::from_utf8(&value2)?, "VALUE2");
 
@@ -482,7 +484,8 @@ mod tests {
             .await?;
 
         // Assert that the data is stored.
-        let current_owner = run_w_backoff(|| client.get_register_owner(address), 10).await?;
+        let current_owner =
+            run_w_backoff_delayed(|| client.get_register_owner(address), 10).await?;
 
         assert_eq!(owner, current_owner);
 
@@ -503,7 +506,7 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff(|| client.get_register(address), 10).await?;
+        let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
 
         assert!(register.is_private());
 
@@ -519,7 +522,7 @@ mod tests {
         match res {
             Err(Error::NoResponse) => Ok(()),
             Err(err) => Err(eyre!(
-                "Unexpected error returned when deleting a nonexisting Private Register: {}",
+                "Unexpected error returned when deleting a nonexisting Private Register: {:?}",
                 err
             )),
             Ok(_data) => Err(eyre!("Unexpectedly retrieved a deleted Private Register!",)),
@@ -541,7 +544,7 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff(|| client.get_register(address), 10).await?;
+        let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
         assert!(register.is_public());
 
         match client.delete_register(address).await {
