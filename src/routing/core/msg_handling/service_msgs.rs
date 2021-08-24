@@ -303,7 +303,6 @@ impl Core {
     }
 
     /// Handle incoming data msgs.
-    // TODO: streamline this as full AE for direct messaging.
     pub(crate) async fn handle_service_message(
         &self,
         sender: SocketAddr,
@@ -314,11 +313,6 @@ impl Core {
         dst_location: DstLocation,
     ) -> Result<Vec<Command>> {
         trace!("Service msg received being handled: {:?}", msg);
-        // TODO:
-        // Currently clients perform AE msg exchange using `SectionInfoMsg`, that
-        // msg type shall be gone in favour of AE-Retry/Redirect responses which
-        // shall be sent by the AE checks logic earlier on in the main msg handling flow.
-
         if let DstLocation::EndUser(_) = dst_location {
             warn!(
                 "Service msg has been dropped as its destination location ({:?}) is invalid: {:?}",
