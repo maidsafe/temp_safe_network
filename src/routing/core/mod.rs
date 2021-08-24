@@ -180,14 +180,18 @@ impl Core {
             }
 
             if new.is_elder || old.is_elder {
+                let network = self.network
+                    .sections
+                    .iter()
+                    .map(|e| {
+                        let (prefix, sap) = e.pair();
+                        (*prefix, sap.clone())
+                    })
+                    .collect();
                 commands.extend(
                     self.send_sync(
                         self.section.clone(),
-                        self.network
-                            .sections
-                            .iter()
-                            .map(|(prefix, sap)| (*prefix, sap.clone()))
-                            .collect(),
+                        network,
                     )?,
                 );
             }
