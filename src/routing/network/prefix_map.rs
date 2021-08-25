@@ -8,10 +8,10 @@
 
 //! Container that acts as a map whose keys are Prefixes.
 
-use xor_name::{Prefix, XorName};
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use serde::{Deserialize, Serialize};
 use std::iter::Iterator;
+use xor_name::{Prefix, XorName};
 
 /// Container that acts as a map whose keys are prefixes.
 ///
@@ -85,8 +85,7 @@ where
         {
             Some((prefix, t))
         } else {
-            self
-                .iter()
+            self.iter()
                 .filter(|e| e.key().matches(&name.with_bit(0, !name.bit(0))))
                 .max_by_key(|e| e.key().bit_count())
                 .map(|e| {
@@ -127,7 +126,7 @@ where
             {
                 let descendants: Vec<_> = self.descendants(&prefix).collect();
                 let descendant_prefixes: Vec<&Prefix> =
-                descendants.iter().map(|item| item.key()).collect();
+                    descendants.iter().map(|item| item.key()).collect();
                 if prefix.is_covered_by(descendant_prefixes) {
                     let _ = self.0.remove(&prefix);
                 }
@@ -187,10 +186,7 @@ impl<T> IntoIterator for PrefixMap<T> {
 ///
 /// This struct is created by [`PrefixMap::into_iter`].
 #[derive(custom_debug::Debug)]
-pub struct PrefixMapIterator<T>(
-    #[debug(skip)]
-    dashmap::iter::OwningIter<Prefix, T>
-);
+pub struct PrefixMapIterator<T>(#[debug(skip)] dashmap::iter::OwningIter<Prefix, T>);
 
 impl<T> Iterator for PrefixMapIterator<T> {
     type Item = T;
@@ -238,26 +234,23 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let mut map = PrefixMap::new();
-        let _ = map.insert(prefix("0"), 1).await;
+        let _ = map.insert(prefix("0"), 1);
 
         // There are no matching prefixes, so return None.
         assert_eq!(
-            map.get_matching(&prefix("1").substituted_in(rng.gen()))
-                .await,
+            map.get_matching(&prefix("1").substituted_in(rng.gen())),
             None
         );
 
         // There are no matching prefixes, so return an opposite prefix.
         assert_eq!(
-            map.try_get_matching(&prefix("1").substituted_in(rng.gen()))
-                .await,
+            map.try_get_matching(&prefix("1").substituted_in(rng.gen())),
             Some((prefix("0"), 1))
         );
 
-        let _ = map.insert(prefix("1"), 1).await;
+        let _ = map.insert(prefix("1"), 1);
         assert_eq!(
-            map.try_get_matching(&prefix("1").substituted_in(rng.gen()))
-                .await,
+            map.try_get_matching(&prefix("1").substituted_in(rng.gen())),
             Some((prefix("1"), 1))
         );
     }

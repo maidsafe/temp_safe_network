@@ -342,13 +342,7 @@ impl Routing {
 
     /// Returns the info about other sections in the network known to us.
     pub async fn other_sections(&self) -> Vec<SectionAuthorityProvider> {
-        self.dispatcher
-            .core
-            .read()
-            .await
-            .network()
-            .all()
-            .collect()
+        self.dispatcher.core.read().await.network().all().collect()
     }
 
     /// Returns the info about the section matching the name.
