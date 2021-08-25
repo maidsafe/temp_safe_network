@@ -38,7 +38,10 @@ impl Network {
     /// Returns the known section that is closest to the given name, regardless of whether `name`
     /// belongs in that section or not.
     pub(crate) fn closest(&self, name: &XorName) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        self.sections.try_get_matching(name).map(|(_, sap)| sap)
+        self.sections
+            .iter()
+            .min_by(|lhs, rhs| lhs.key().cmp_distance(rhs.key(), name))
+            .map(|e| e.value().clone())
     }
 
     /// Returns iterator over all known sections.
@@ -50,7 +53,7 @@ impl Network {
     pub(crate) fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
         self.sections
             .get(prefix)
-            .map(|(_, section_auth)| section_auth.value.clone())
+            .map(|(_, section_auth)| section_auth.value)
     }
 
     /// Returns a `Peer` of an elder from a known section.
@@ -192,7 +195,7 @@ impl Network {
         self.sections
             .get_matching(name)
             .ok_or(Error::NoMatchingSection)
-            .map(|(_, section_auth)| section_auth.value.clone())
+            .map(|(_, section_auth)| section_auth.value)
     }
 
     /// Returns network statistics.

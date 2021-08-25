@@ -242,7 +242,7 @@ impl Core {
                         // Redirect to the closest section
                         NodeMsg::AntiEntropyRedirect {
                             section_auth: section_auth.value.clone(),
-                            section_signed: section_auth.sig.clone(),
+                            section_signed: section_auth.sig,
                             bounced_msg: Box::new(node_msg.clone()),
                         }
                     }
