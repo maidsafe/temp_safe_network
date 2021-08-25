@@ -29,7 +29,7 @@ where
     T: Clone,
 {
     /// Create empty `PrefixMap`.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
@@ -39,7 +39,7 @@ where
     /// Does not insert anything if any descendant of the prefix of `entry` is already present in
     /// the map.
     /// Returns a boolean indicating whether anything changed.
-    pub fn insert(&mut self, prefix: Prefix, entry: T) -> bool {
+    pub(crate) fn insert(&mut self, prefix: Prefix, entry: T) -> bool {
         // Don't insert if any descendant is already present in the map.
         if self.descendants(&prefix).next().is_some() {
             return false;
@@ -53,7 +53,7 @@ where
     }
 
     /// Get the entry at `prefix`, if any.
-    pub fn get(&self, prefix: &Prefix) -> Option<(Prefix, T)> {
+    pub(crate) fn get(&self, prefix: &Prefix) -> Option<(Prefix, T)> {
         self.0
             .get(prefix)
             .map(|entry| (*entry.key(), entry.value().clone()))
@@ -61,7 +61,7 @@ where
 
     /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
     /// one with the longest prefix.
-    pub fn get_matching(&self, name: &XorName) -> Option<(Prefix, T)> {
+    pub(crate) fn get_matching(&self, name: &XorName) -> Option<(Prefix, T)> {
         let max = self
             .0
             .iter()
@@ -73,7 +73,7 @@ where
     /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
     /// one with the longest prefix. If there are no prefixes matching the given `name`, return
     /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
-    pub fn try_get_matching(&self, name: &XorName) -> Option<(Prefix, T)> {
+    pub(crate) fn try_get_matching(&self, name: &XorName) -> Option<(Prefix, T)> {
         if let Some((prefix, t)) = self
             .iter()
             .filter(|e| e.key().matches(name))
@@ -97,18 +97,18 @@ where
 
     /// Get the entry at the prefix that matches `prefix`. In case of multiple matches, returns the
     /// one with the longest prefix.
-    pub fn get_matching_prefix(&self, prefix: &Prefix) -> Option<(Prefix, T)> {
+    pub(crate) fn get_matching_prefix(&self, prefix: &Prefix) -> Option<(Prefix, T)> {
         self.get_matching(&prefix.name())
     }
 
     /// Returns an owning iterator over the entries
-    pub fn iter(&self) -> impl Iterator<Item = RefMulti<'_, Prefix, T>> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = RefMulti<'_, Prefix, T>> {
         self.0.iter()
     }
 
     /// Returns an iterator over all entries whose prefixes are descendants (extensions) of
     /// `prefix`.
-    pub fn descendants<'a>(
+    pub(crate) fn descendants<'a>(
         &'a self,
         prefix: &'a Prefix,
     ) -> impl Iterator<Item = RefMulti<'a, Prefix, T>> + 'a {
@@ -119,7 +119,7 @@ where
 
     /// Remove `prefix` and any of its ancestors if they are covered by their descendants.
     /// For example, if `(00)` and `(01)` are both in the map, we can remove `(0)` and `()`.
-    pub fn prune(&self, mut prefix: Prefix) {
+    pub(crate) fn prune(&self, mut prefix: Prefix) {
         // TODO: can this be optimized?
 
         loop {
