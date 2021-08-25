@@ -252,8 +252,9 @@ checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
 name = "bls_dkg"
-version = "0.6.0"
-source = "git+https://github.com/grumbach/bls_dkg?branch=update_xorname#5f8668058fb2b4e844b1a6be59f03235d41fa6f4"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba070e1297fad108058b0b43162715e5f3d445bf23d12e99e5dd0cd958f01769"
 dependencies = [
  "aes",
  "bincode",
@@ -1795,8 +1796,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.15.2"
-source = "git+https://github.com/grumbach/qp2p?branch=update_xorname#7ca0519e67c69395837ccf3e7029a902c9da018e"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0198422621e8a49d5432f9c1effa331d09334645145d42b2c824e4162b35ff95"
 dependencies = [
  "backoff",
  "base64 0.12.3",
