@@ -49,7 +49,7 @@ impl Core {
                     // If we are elder, we should know a section that is closer to `name` that us.
                     // Otherwise redirect to our elders.
                     let section_auth = match self.network.closest(&name) {
-                        Some(section_auth) => section_auth.value.clone(),
+                        Some(section_auth) => section_auth.value,
                         None => self.section.authority_provider().clone(),
                     };
 
