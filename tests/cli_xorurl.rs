@@ -13,7 +13,7 @@ extern crate duct;
 use assert_cmd::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::SafeUrl;
+use sn_api::Url;
 use sn_cmd_test_utilities::util::{parse_xorurl_output, safeurl_from, CLI, SAFE_PROTOCOL};
 use std::process::Command;
 
@@ -64,7 +64,7 @@ fn calling_safe_xorurl_decode() -> Result<()> {
     .read()
     .map_err(|e| eyre!(e.to_string()))?;
 
-    let decoded_obj: SafeUrl = serde_json::from_str(&xorurl_decoded)
+    let decoded_obj: Url = serde_json::from_str(&xorurl_decoded)
         .expect("Failed to parse output of `safe xorurl decode`");
 
     assert_eq!(safeurl, decoded_obj);

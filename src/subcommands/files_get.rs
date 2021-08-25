@@ -19,7 +19,7 @@ use sn_api::{
     fetch::Range,
     fetch::SafeData,
     files::{FilesMap, GetAttr, ProcessedFiles},
-    Result as ApiResult, Safe, SafeDataType, SafeUrl, XorUrl,
+    DataType, Result as ApiResult, Safe, Url, XorUrl,
 };
 use std::{
     fs,
@@ -415,17 +415,22 @@ async fn files_container_get_files(
     url: &str,
     dirpath: &str,
     callback: impl FnMut(&FilesGetStatus) -> bool,
-) -> Result<(u64, ProcessedFiles)> {
+) -> Result<(String, ProcessedFiles)> {
+    // Rather than returning a VersionHash, a String is returned, because there doesn't seem to be
+    // a representation of an empty VersionHash just now. Not sure that it makes sense here to
+    // generate a new one, since the version that's returned by this function is not used by the
+    // caller. Previously we were returning 0 or a number, so it seems reasonable to return either
+    // "0" or the VersionHash as a string (it implements the Display trait).
     debug!("Getting files in container {:?}", url);
     let (version, files_map) = match safe.fetch(url, None).await? {
         SafeData::FilesContainer {
             version, files_map, ..
-        } => (version, files_map),
+        } => (version.to_string(), files_map),
         SafeData::PublicBlob { metadata, .. } => {
             if let Some(file_item) = metadata {
                 let mut files_map = FilesMap::new();
                 files_map.insert("".to_string(), file_item);
-                (0, files_map)
+                ("0".to_string(), files_map)
             } else {
                 // TODO: support it even if no stats are shown of the file being downloaded
                 bail!(
@@ -439,7 +444,7 @@ async fn files_container_get_files(
     // Todo: This test will need to be modified once we support empty directories.
     let is_single_file = files_map.len() == 1;
 
-    let safeurl = SafeUrl::from_url(url)?;
+    let safeurl = Url::from_url(url)?;
     let urlpath = safeurl.path_decoded()?;
 
     let root = find_root_path(dirpath, &urlpath, is_single_file)?;
@@ -787,12 +792,12 @@ async fn files_get_private_blob(_safe: &Safe, _url: &str, _range: Range) -> Resu
 /// # Get Public or Private Blob
 /// Get immutable data blobs from the network.
 pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
-    match SafeUrl::from_url(url)?.data_type() {
-        SafeDataType::PublicBlob => {
+    match Url::from_url(url)?.data_type() {
+        DataType::PublicBlob => {
             let pub_blob = safe.files_get_public_blob(url, range).await?;
             Ok(pub_blob)
         }
-        SafeDataType::PrivateBlob => files_get_private_blob(safe, url, range).await,
+        DataType::PrivateBlob => files_get_private_blob(safe, url, range).await,
         _ => Err(eyre!("URL target is not immutable data")),
     }
 }

@@ -12,7 +12,7 @@ use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::{
     fetch::{SafeContentType, SafeDataType},
-    SafeUrl, XorUrlBase,
+    Url, XorUrlBase,
 };
 use sn_cmd_test_utilities::util::{
     get_random_nrs_string, parse_nrs_create_output, safe_cmd, safe_cmd_stdout, safeurl_from,
@@ -25,7 +25,7 @@ const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";
 
 fn gen_fake_target() -> Result<String> {
     let xorname = XorName(*b"12345678901234567890123456789012");
-    SafeUrl::encode(
+    Url::encode(
         xorname,
         None,
         0x00a5_3cde,

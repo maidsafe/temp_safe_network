@@ -12,7 +12,7 @@ use super::{
     OutputFmt,
 };
 use color_eyre::{eyre::eyre, Result};
-use sn_api::{PublicKey, Safe, SafeUrl, XorName};
+use sn_api::{PublicKey, Safe, Url, XorName};
 use structopt::StructOpt;
 
 // Defines subcommands of 'xorurl'
@@ -42,14 +42,14 @@ pub async fn xorurl_commander(
     match cmd {
         Some(XorurlSubCommands::Decode { xorurl }) => {
             let url = get_from_arg_or_stdin(xorurl, Some("...awaiting XOR-URL from stdin"))?;
-            let safeurl = SafeUrl::from_url(&url)?;
+            let safeurl = Url::from_url(&url)?;
             if OutputFmt::Pretty == output_fmt {
                 let (urltype, public_name) = if safeurl.is_nrsurl() {
                     ("NRS-URL", safeurl.public_name())
                 } else {
                     ("XOR-URL", "<unknown>")
                 };
-                println!("Information decoded from SafeUrl: {}", url);
+                println!("Information decoded from Url: {}", url);
                 println!("UrlType: {}", urltype);
                 println!("Xorname: {}", xorname_to_hex(&safeurl.xorname()));
                 println!("Public Name: {}", public_name);
@@ -80,7 +80,7 @@ pub async fn xorurl_commander(
                 .map_err(|_| eyre!("Invalid (Ed25519/BLS) public key bytes: {}", pk))?;
 
             let xorname = XorName::from(public_key);
-            let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
+            let xorurl = Url::encode_safekey(xorname, safe.xorurl_base)?;
 
             // Now let's just print out the SafeKey xorurl
             if OutputFmt::Pretty == output_fmt {

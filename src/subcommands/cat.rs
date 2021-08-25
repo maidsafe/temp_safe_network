@@ -105,38 +105,6 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
         SafeData::SafeKey { .. } => {
             println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
         }
-        SafeData::PublicSequence { data, version, .. } => {
-            if OutputFmt::Pretty == output_fmt {
-                println!("Public Sequence (version {}) at \"{}\":", version, url);
-                if cmd.hexdump {
-                    // Render hex representation of Sequence content
-                    println!("{}", pretty_hex::pretty_hex(data));
-                } else {
-                    // Render Sequence content
-                    io::stdout()
-                        .write_all(data)
-                        .context("Failed to print out the content of the file")?;
-                }
-            } else {
-                println!("{}", serialise_output(&(url, data), output_fmt));
-            }
-        }
-        SafeData::PrivateSequence { data, version, .. } => {
-            if OutputFmt::Pretty == output_fmt {
-                println!("Private Sequence (version {}) at \"{}\":", version, url);
-                if cmd.hexdump {
-                    // Render hex representation of Sequence content
-                    println!("{}", pretty_hex::pretty_hex(data));
-                } else {
-                    // Render Sequence content
-                    io::stdout()
-                        .write_all(data)
-                        .context("Failed to print out the content of the file")?
-                }
-            } else {
-                println!("{}", serialise_output(&(url, data), output_fmt));
-            }
-        }
         SafeData::Multimap { .. }
         | SafeData::PrivateRegister { .. }
         | SafeData::PublicRegister { .. } => unimplemented!(),

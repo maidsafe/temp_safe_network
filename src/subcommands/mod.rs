@@ -18,7 +18,6 @@ pub mod networks;
 pub mod node;
 pub mod nrs;
 pub mod safe_id;
-pub mod seq;
 pub mod setup;
 pub mod update;
 pub mod xorurl;
@@ -130,16 +129,6 @@ pub enum SubCommands {
         #[structopt(short = "l", long = "follow-links")]
         follow_links: bool,
     },
-    #[structopt(
-        name = "seq",
-        no_version,
-        global_settings(&[AppSettings::DisableVersion]),
-    )]
-    /// Manage Sequences on the Safe Network
-    Seq(seq::SeqSubCommands),
-    // #[structopt(name = "safe-id")]
-    // /// Manage identities on the Safe Network
-    // SafeId(safe_id::SafeIdSubCommands),
     #[structopt(
         name = "update",
         no_version,

@@ -13,7 +13,7 @@ pub mod util {
     use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use sn_api::{fetch::SafeData, files::ProcessedFiles, Keypair, SafeUrl};
+    use sn_api::{fetch::SafeData, files::ProcessedFiles, Keypair, Url};
     use std::{collections::BTreeMap, env, fs, path::Path, process};
     use tiny_keccak::{Hasher, Sha3};
     use walkdir::WalkDir;
@@ -251,8 +251,8 @@ pub mod util {
         thread_rng().sample_iter(&Alphanumeric).take(15).collect()
     }
 
-    pub fn safeurl_from(url: &str) -> Result<SafeUrl> {
-        SafeUrl::from_url(url).map_err(|e| eyre!("Failed to parse URL: {}", e))
+    pub fn safeurl_from(url: &str) -> Result<Url> {
+        Url::from_url(url).map_err(|e| eyre!("Failed to parse URL: {}", e))
     }
 
     pub fn parse_files_container_output(

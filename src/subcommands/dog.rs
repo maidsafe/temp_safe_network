@@ -14,8 +14,8 @@ use super::{
 use color_eyre::Result;
 use log::debug;
 use sn_api::{
-    fetch::{SafeContentType, SafeData},
-    Safe, SafeUrl,
+    fetch::{ContentType, SafeData},
+    Safe, Url,
 };
 use structopt::StructOpt;
 
@@ -58,8 +58,8 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
-                    let mut safeurl = SafeUrl::from_url(xorurl)?;
-                    safeurl.set_content_type(SafeContentType::Raw)?;
+                    let mut safeurl = Url::from_url(xorurl)?;
+                    safeurl.set_content_type(ContentType::Raw)?;
                     println!("Native data XOR-URL: {}", safeurl.to_string());
                     print_nrs_map(nrs_map, public_name);
                 }
@@ -79,8 +79,8 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
-                    let mut safeurl = SafeUrl::from_url(xorurl)?;
-                    safeurl.set_content_type(SafeContentType::Raw)?;
+                    let mut safeurl = Url::from_url(xorurl)?;
+                    safeurl.set_content_type(ContentType::Raw)?;
                     println!("Native data XOR-URL: {}", safeurl.to_string());
                 }
                 SafeData::PublicBlob {
@@ -110,42 +110,6 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     println!("XOR-URL: {}", xorurl);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: SafeKey");
-                }
-                SafeData::PublicSequence {
-                    xorurl,
-                    xorname,
-                    type_tag,
-                    version,
-                    resolved_from,
-                    ..
-                } => {
-                    if resolved_from != xorurl {
-                        println!("Resolved from: {}", resolved_from);
-                    }
-                    println!("= Sequence =");
-                    println!("XOR-URL: {}", xorurl);
-                    println!("Version: {}", version);
-                    println!("Type tag: {}", type_tag);
-                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: PublicSequence");
-                }
-                SafeData::PrivateSequence {
-                    xorurl,
-                    xorname,
-                    type_tag,
-                    version,
-                    resolved_from,
-                    ..
-                } => {
-                    if resolved_from != xorurl {
-                        println!("Resolved from: {}", resolved_from);
-                    }
-                    println!("= Sequence =");
-                    println!("XOR-URL: {}", xorurl);
-                    println!("Version: {}", version);
-                    println!("Type tag: {}", type_tag);
-                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: PrivateSequence");
                 }
                 SafeData::Multimap { .. }
                 | SafeData::PrivateRegister { .. }

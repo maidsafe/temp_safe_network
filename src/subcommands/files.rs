@@ -23,7 +23,8 @@ use serde::Serialize;
 use sn_api::{
     fetch::SafeData,
     files::{FilesMap, ProcessedFiles},
-    Safe, SafeUrl, XorUrl,
+    nrs::VersionHash,
+    Safe, Url, XorUrl,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -243,7 +244,7 @@ pub async fn files_commander(
                 }
                 table.printstd();
             } else {
-                print_serialized_output(files_container_xorurl, 0, processed_files, output_fmt);
+                print_serialized_output(files_container_xorurl, None, processed_files, output_fmt);
             }
 
             Ok(())
@@ -277,7 +278,7 @@ pub async fn files_commander(
             if OutputFmt::Pretty == output_fmt {
                 let (table, success_count) = gen_processed_files_table(&processed_files, true);
                 if success_count > 0 {
-                    let url = match SafeUrl::from_url(&target) {
+                    let url = match Url::from_url(&target) {
                         Ok(mut safeurl) => {
                             safeurl.set_content_version(Some(version));
                             safeurl.set_path("");
@@ -301,7 +302,7 @@ pub async fn files_commander(
                     println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
                 }
             } else {
-                print_serialized_output(target, version, processed_files, output_fmt);
+                print_serialized_output(target, Some(version), processed_files, output_fmt);
             }
             Ok(())
         }
@@ -337,7 +338,7 @@ pub async fn files_commander(
                 };
 
             // Now let's just print out a list of the files synced/processed
-            output_processed_files_list(output_fmt, processed_files, version, target_url);
+            output_processed_files_list(output_fmt, processed_files, Some(version), target_url);
             Ok(())
         }
         FilesSubCommands::Rm {
@@ -358,7 +359,7 @@ pub async fn files_commander(
                 .await?;
 
             // Now let's just print out a list of the files removed
-            output_processed_files_list(output_fmt, processed_files, version, target_url);
+            output_processed_files_list(output_fmt, processed_files, Some(version), target_url);
             Ok(())
         }
         FilesSubCommands::Ls { target } => {
@@ -474,13 +475,13 @@ async fn process_tree_command(
 
 fn print_serialized_output(
     xorurl: XorUrl,
-    version: u64,
+    version: Option<VersionHash>,
     processed_files: BTreeMap<String, (String, String)>,
     output_fmt: OutputFmt,
 ) {
-    let url = match SafeUrl::from_url(&xorurl) {
+    let url = match Url::from_url(&xorurl) {
         Ok(mut safeurl) => {
-            safeurl.set_content_version(Some(version));
+            safeurl.set_content_version(version);
             safeurl.to_string()
         }
         Err(_) => xorurl,
@@ -491,33 +492,39 @@ fn print_serialized_output(
 fn output_processed_files_list(
     output_fmt: OutputFmt,
     processed_files: ProcessedFiles,
-    version: u64,
+    version: Option<VersionHash>,
     target_url: String,
 ) {
     if OutputFmt::Pretty == output_fmt {
         let (table, success_count) = gen_processed_files_table(&processed_files, true);
         if success_count > 0 {
-            let url = match SafeUrl::from_url(&target_url) {
+            let url = match Url::from_url(&target_url) {
                 Ok(mut safeurl) => {
-                    safeurl.set_content_version(Some(version));
+                    safeurl.set_content_version(version);
                     safeurl.set_path("");
                     safeurl.to_string()
                 }
                 Err(_) => target_url,
             };
 
-            println!("FilesContainer updated (version {}): \"{}\"", version, url);
+            println!(
+                "FilesContainer updated (version {}): \"{}\"",
+                version.map_or_else(|| 0.to_string(), |v| v.to_string()),
+                url
+            );
             table.printstd();
         } else if !processed_files.is_empty() {
             println!(
                 "No changes were made to FilesContainer (version {}) at \"{}\"",
-                version, target_url
+                version.map_or_else(|| 0.to_string(), |v| v.to_string()),
+                target_url
             );
             table.printstd();
         } else {
             println!(
                 "No changes were made to the FilesContainer (version {}) at: \"{}\"",
-                version, target_url
+                version.map_or_else(|| 0.to_string(), |v| v.to_string()),
+                target_url
             );
         }
     } else {
@@ -713,7 +720,7 @@ fn format_symlink(name: &str, fd: &FileDetails) -> String {
 }
 
 // A function to print a FilesMap in human-friendly table format.
-fn print_files_map(files_map: &FilesMap, total_files: u64, version: u64, target_url: &str) {
+fn print_files_map(files_map: &FilesMap, total_files: u64, version: VersionHash, target_url: &str) {
     println!(
         "Files of FilesContainer (version {}) at \"{}\":",
         version, target_url

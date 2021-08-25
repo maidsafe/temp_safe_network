@@ -12,7 +12,7 @@ use crate::operations::auth_and_connect::{create_credentials_file, read_credenti
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use hex::encode;
 use sn_api::{
-    fetch::{SafeData, SafeUrl},
+    fetch::{SafeData, Url},
     sk_to_hex, Keypair, PublicKey, Safe, XorName,
 };
 use std::io::Write;
@@ -84,7 +84,7 @@ pub async fn key_commander(
                 match read_credentials()? {
                     (file_path, Some(keypair)) => {
                         let xorname = XorName::from(keypair.public_key());
-                        let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
+                        let xorurl = Url::encode_safekey(xorname, safe.xorurl_base)?;
                         let (pk_hex, sk_hex) = keypair_to_hex_strings(&keypair)?;
 
                         println!("Current CLI's SafeKey found at {}:", file_path.display());
@@ -174,7 +174,7 @@ pub async fn create_new_key(safe: &mut Safe) -> Result<(String, Keypair)> {
     let key_pair = safe.generate_random_ed_keypair();
 
     let xorname = XorName::from(key_pair.public_key());
-    let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
+    let xorurl = Url::encode_safekey(xorname, safe.xorurl_base)?;
     // // TODO: support Wallet XOR-URL, we now support only secret key
     // // If the --pay-with is not provided the API will use the application's default wallet/sk
     // let (xorurl, key_pair) = match pay_with {
