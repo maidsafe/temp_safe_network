@@ -180,7 +180,8 @@ impl Core {
             }
 
             if new.is_elder || old.is_elder {
-                let network = self.network
+                let network = self
+                    .network
                     .sections
                     .iter()
                     .map(|e| {
@@ -188,12 +189,7 @@ impl Core {
                         (*prefix, sap.clone())
                     })
                     .collect();
-                commands.extend(
-                    self.send_sync(
-                        self.section.clone(),
-                        network,
-                    )?,
-                );
+                commands.extend(self.send_sync(self.section.clone(), network)?);
             }
 
             let current: BTreeSet<_> = self.section.authority_provider().names();

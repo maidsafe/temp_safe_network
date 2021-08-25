@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod stats;
 mod prefix_map;
+mod stats;
 
 use self::stats::NetworkStats;
 use crate::messaging::{
@@ -17,10 +17,10 @@ use crate::messaging::{
 use crate::routing::{
     dkg::SectionAuthUtils, peer::PeerUtils, Error, Result, SectionAuthorityProviderUtils,
 };
+use prefix_map::PrefixMap;
 use secured_linked_list::SecuredLinkedList;
 use std::iter;
 use xor_name::{Prefix, XorName};
-use prefix_map::PrefixMap;
 
 /// Container for storing information about other sections in the network.
 pub(crate) struct Network {
@@ -43,11 +43,7 @@ impl Network {
 
     /// Returns iterator over all known sections.
     pub(crate) fn all(&self) -> Box<dyn Iterator<Item = SectionAuthorityProvider> + '_> {
-        Box::new(
-            self.sections
-                .iter()
-                .map(|e| e.value().value.clone()),
-        )
+        Box::new(self.sections.iter().map(|e| e.value().value.clone()))
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
@@ -176,9 +172,9 @@ impl Network {
     /// Returns the known section keys.
     pub(crate) fn keys(&self) -> Box<dyn Iterator<Item = (Prefix, bls::PublicKey)> + '_> {
         Box::new(
-            self.sections.iter().map(|e| {
-                (e.value().value.prefix, e.value().value.section_key())
-            }),
+            self.sections
+                .iter()
+                .map(|e| (e.value().value.prefix, e.value().value.section_key())),
         )
     }
 
@@ -203,14 +199,8 @@ impl Network {
     pub(crate) fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
         // Let's compute an estimate of the total number of elders in the network
         // from the size of our routing table.
-        let section_prefixes: Vec<Prefix> = self
-            .sections
-            .iter()
-            .map(|e| *e.key())
-            .collect();
-        let known_prefixes = section_prefixes
-            .iter()
-            .chain(iter::once(&our.prefix));
+        let section_prefixes: Vec<Prefix> = self.sections.iter().map(|e| *e.key()).collect();
+        let known_prefixes = section_prefixes.iter().chain(iter::once(&our.prefix));
 
         let total_elders_exact = Prefix::default().is_covered_by(known_prefixes.clone());
 
@@ -277,9 +267,9 @@ mod tests {
         let n10 = p10.substituted_in(rng.gen());
         let n11 = p11.substituted_in(rng.gen());
 
-        assert_eq!(map.closest(&n01).map(|i| &i.value.prefix), Some(&p01));
-        assert_eq!(map.closest(&n10).map(|i| &i.value.prefix), Some(&p10));
-        assert_eq!(map.closest(&n11).map(|i| &i.value.prefix), Some(&p10));
+        assert_eq!(map.closest(&n01).map(|i| i.value.prefix), Some(p01));
+        assert_eq!(map.closest(&n10).map(|i| i.value.prefix), Some(p10));
+        assert_eq!(map.closest(&n11).map(|i| i.value.prefix), Some(p10));
 
         Ok(())
     }
