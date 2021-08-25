@@ -186,7 +186,11 @@ impl<T> IntoIterator for PrefixMap<T> {
 /// An owning iterator over a [`PrefixMap`].
 ///
 /// This struct is created by [`PrefixMap::into_iter`].
-pub struct PrefixMapIterator<T>(dashmap::iter::OwningIter<Prefix, T>);
+#[derive(custom_debug::Debug)]
+pub struct PrefixMapIterator<T>(
+    #[debug(skip)]
+    dashmap::iter::OwningIter<Prefix, T>
+);
 
 impl<T> Iterator for PrefixMapIterator<T> {
     type Item = T;
