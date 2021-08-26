@@ -22,7 +22,7 @@ use xor_name::{Prefix, XorName};
 ///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct PrefixMap<T>(DashMap<Prefix, T>);
+pub(crate) struct PrefixMap<T>(DashMap<Prefix, T>);
 
 impl<T> PrefixMap<T>
 where
@@ -185,8 +185,7 @@ impl<T> IntoIterator for PrefixMap<T> {
 /// An owning iterator over a [`PrefixMap`].
 ///
 /// This struct is created by [`PrefixMap::into_iter`].
-#[derive(custom_debug::Debug)]
-pub struct PrefixMapIterator<T>(#[debug(skip)] dashmap::iter::OwningIter<Prefix, T>);
+pub(crate) struct PrefixMapIterator<T>(dashmap::iter::OwningIter<Prefix, T>);
 
 impl<T> Iterator for PrefixMapIterator<T> {
     type Item = T;
