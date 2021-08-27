@@ -107,18 +107,19 @@ impl Core {
 
         // When there are elders exist in both the local and incoming SAPs, send msg to the elder
         // closest to the dest section key.
-        let local_dst_elders = match self.network.section_by_name(&section_auth.prefix.name()) {
-            Ok(trusted_sap) => trusted_sap.elders,
-            Err(_) => {
-                // In case we don't have the knowledge of that neighbour locally,
-                // have to trust the incoming SAP when it's self verifable.
-                section_signed.value.elders
-            }
-        };
+        // The dst_section_pk is set to be local knowledge or genesis_key when no local knowledge.
+        let (local_dst_elders, dst_section_pk) =
+            match self.network.section_by_name(&section_auth.prefix.name()) {
+                Ok(trusted_sap) => (trusted_sap.elders, trusted_sap.public_key_set.public_key()),
+                Err(_) => {
+                    // In case we don't have the knowledge of that neighbour locally,
+                    // have to trust the incoming SAP when it's self verifable.
+                    (section_signed.value.elders, *self.section.genesis_key())
+                }
+            };
 
         // We send the msg to the Elder closest to the dest section key,
         // just to pick one of them in a random but deterministic fashion.
-        let dst_section_pk = section_auth.public_key_set.public_key();
         let name = XorName::from(PublicKey::Bls(dst_section_pk));
         let chosen_dst_elder = local_dst_elders
             .iter()
