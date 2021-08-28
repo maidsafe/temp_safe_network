@@ -257,10 +257,10 @@ async fn process_files(
 //     loop {
 //         let public = chunk.is_public();
 //         match deserialize(chunk.value())? {
-//             DataMapLevel::Root(data_map) => {
+//             SecretKeyLevel::Root(data_map) => {
 //                 return Ok(data_map);
 //             }
-//             DataMapLevel::Child(data_map) => {
+//             SecretKeyLevel::Child(data_map) => {
 //                 let serialized_chunk = self
 //                     .read_all(data_map, public)
 //                     .await?;

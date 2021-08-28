@@ -19,7 +19,7 @@ mod update_section;
 
 use super::Core;
 use crate::messaging::{
-    data::{DataCmd, DataQuery, ServiceMsg, StorageLevel},
+    data::{ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
     system::{NodeCmd, NodeQuery, Proposal, SystemMsg},
     DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
@@ -501,14 +501,10 @@ impl Core {
             // plugging in msg handlers.
             SystemMsg::NodeCmd(node_cmd) => {
                 match node_cmd {
-                    NodeCmd::Chunks { cmd, auth, .. } => {
+                    NodeCmd::StoreChunk { chunk, .. } => {
                         info!("Processing chunk write with MessageId: {:?}", msg_id);
-                        let verified = WireMsg::verify_sig(
-                            auth,
-                            ServiceMsg::Cmd(DataCmd::Chunk(cmd.clone())),
-                        )?;
-                        let level_report =
-                            self.chunk_storage.write(&cmd, verified.public_key).await?;
+                        // There is no point in verifying a sig from a sender A or B here.
+                        let level_report = self.chunk_storage.store(&chunk).await?;
                         return Ok(self.record_if_any(level_report).await);
                     }
                     NodeCmd::ReplicateChunk(chunk) => {
@@ -553,17 +549,10 @@ impl Core {
             SystemMsg::NodeQuery(node_query) => {
                 match node_query {
                     // A request from EndUser - via elders - for locally stored chunk
-                    NodeQuery::Chunks {
-                        origin,
-                        query,
-                        auth,
-                    } => {
-                        let verified = WireMsg::verify_sig(
-                            auth,
-                            ServiceMsg::Query(DataQuery::Chunk(query.clone())),
-                        )?;
+                    NodeQuery::GetChunk { origin, address } => {
+                        // There is no point in verifying a sig from a sender A or B here.
                         // Send back response to our Elders
-                        self.handle_chunk_query_at_adult(msg_id, query, verified.public_key, origin)
+                        self.handle_get_chunk_at_adult(msg_id, address, origin)
                             .await
                     }
                     _ => {

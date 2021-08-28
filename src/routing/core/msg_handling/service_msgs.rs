@@ -8,17 +8,16 @@
 
 use super::Core;
 use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
-use crate::messaging::data::ServiceMsg;
-use crate::messaging::NodeAuth;
 use crate::messaging::{
-    data::{ChunkRead, CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite},
+    data::{CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},
-    AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
+    AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, NodeAuth, ServiceAuth, WireMsg,
 };
-use crate::routing::core::capacity::CHUNK_COPY_COUNT;
-use crate::routing::peer::PeerUtils;
-use crate::routing::{error::Result, routing_api::command::Command, section::SectionUtils};
-use crate::types::PublicKey;
+use crate::routing::{
+    core::capacity::CHUNK_COPY_COUNT, error::Result, peer::PeerUtils,
+    routing_api::command::Command, section::SectionUtils,
+};
+use crate::types::{ChunkAddress, PublicKey};
 use itertools::Itertools;
 use std::{cmp::Ordering, collections::BTreeSet};
 use xor_name::XorName;
@@ -137,17 +136,16 @@ impl Core {
     }
 
     /// Handle chunk read
-    pub(crate) async fn handle_chunk_query_at_adult(
+    pub(crate) async fn handle_get_chunk_at_adult(
         &self,
         msg_id: MessageId,
-        query: ChunkRead,
-        requester: PublicKey,
+        address: ChunkAddress,
         user: EndUser,
     ) -> Result<Vec<Command>> {
         trace!("Handling chunk read at adult");
         let mut commands = vec![];
 
-        match self.chunk_storage.read(&query, requester) {
+        match self.chunk_storage.get(&address) {
             Ok(response) => {
                 let msg = SystemMsg::NodeQueryResponse {
                     response,
@@ -158,7 +156,7 @@ impl Core {
                 // Setup node authority on this response and send this back to our elders
                 let section_pk = *self.section().chain().last_key();
                 let dst = DstLocation::Section {
-                    name: query.dst_name(),
+                    name: *address.name(),
                     section_pk,
                 };
 
@@ -269,14 +267,12 @@ impl Core {
             }
             // These will only be received at elders.
             // These reads/writes are for adult nodes...
-            ServiceMsg::Cmd(DataCmd::Chunk(chunk_write)) => {
-                self.write_chunk_to_adults(chunk_write, msg_id, auth, user)
-                    .await
+            ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => {
+                self.send_chunk_to_adults(chunk, msg_id, auth, user).await
             }
-            ServiceMsg::Query(DataQuery::Chunk(read)) => {
-                self.read_chunk_from_adults(&read, msg_id, auth, user).await
+            ServiceMsg::Query(DataQuery::GetChunk(address)) => {
+                self.read_chunk_from_adults(address, msg_id, user).await
             }
-
             _ => {
                 warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
                 Ok(vec![])

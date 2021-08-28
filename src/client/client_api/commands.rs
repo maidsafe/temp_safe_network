@@ -52,8 +52,8 @@ impl Client {
         // So it's no more than 2 with 7 Elders.
         // With 3 we are "guaranteed" 1 correctly functioning Elder.
         let targets = match &cmd {
-            DataCmd::Chunk(_) => 3, // stored at Adults, so only 1 correctly functioning Elder need to relay
-            DataCmd::Register(_) => 7, // only stored at Elders, all need a copy
+            DataCmd::StoreChunk(_) => 3, // stored at Adults, so only 1 correctly functioning Elder need to relay
+            DataCmd::Register(_) => 7,   // only stored at Elders, all need a copy
         };
 
         let serialised_cmd = {

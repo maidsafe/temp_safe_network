@@ -11,10 +11,10 @@ use super::{
     data::get_data_chunks,
     Client,
 };
-use crate::messaging::data::{ChunkRead, ChunkWrite, DataCmd, DataQuery, QueryResponse};
+use crate::messaging::data::{DataCmd, DataQuery, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, Encryption};
 use crate::{
-    client::{client_api::data::DataMapLevel, utils::encryption, Error, Result},
+    client::{client_api::data::SecretKeyLevel, utils::encryption, Error, Result},
     url::Scope,
 };
 
@@ -23,9 +23,9 @@ use bincode::deserialize;
 use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
-use self_encryption::{self, overlapped_chunks, ChunkKey, DataMap, EncryptedChunk};
+use self_encryption::{self, ChunkKey, EncryptedChunk, SecretKey};
 use tokio::task;
-use tracing::{info, trace};
+use tracing::trace;
 
 #[derive(Clone)]
 pub(crate) struct UploaderImpl {}
@@ -54,9 +54,9 @@ impl Client {
 
         let chunk = self.fetch_chunk_from_network(head_address, false).await?;
         let public = head_address.is_public();
-        let data_map = self.unpack(chunk).await?;
+        let secret_key = self.unpack(chunk).await?;
 
-        let raw_data = self.read_all(data_map, public).await?;
+        let raw_data = self.read_all(secret_key, public).await?;
 
         Ok(raw_data)
     }
@@ -91,11 +91,9 @@ impl Client {
 
         let chunk = self.fetch_chunk_from_network(head_address, false).await?;
         let public = head_address.is_public();
-        let data_map = self.unpack(chunk).await?;
+        let secret_key = self.unpack(chunk).await?;
 
-        let raw_data = self
-            .seek_with_data_map(data_map, public, position, length)
-            .await?;
+        let raw_data = self.seek(secret_key, public, position, length).await?;
 
         Ok(raw_data)
     }
@@ -112,9 +110,7 @@ impl Client {
             }
         }
 
-        let res = self
-            .send_query(DataQuery::Chunk(ChunkRead::Get(head_address)))
-            .await?;
+        let res = self.send_query(DataQuery::GetChunk(head_address)).await?;
 
         let operation_id = res.operation_id;
         let chunk: Chunk = match res.response {
@@ -140,13 +136,6 @@ impl Client {
         self.blob_cache.write().await.clear()
     }
 
-    pub(crate) async fn delete_chunk_from_network(&self, address: ChunkAddress) -> Result<()> {
-        let cmd = DataCmd::Chunk(ChunkWrite::DeletePrivate(address));
-        self.pay_and_send_data_command(cmd).await?;
-
-        Ok(())
-    }
-
     // Private function that actually stores the given chunk on the network.
     // Self Encryption is NOT APPLIED ON the chunk that is passed to this function.
     // Clients should not call this function directly.
@@ -155,47 +144,10 @@ impl Client {
         if !chunk.validate_size() {
             return Err(Error::NetworkDataError(crate::types::Error::ExceededSize));
         }
-        let cmd = DataCmd::Chunk(ChunkWrite::New(chunk));
+        let cmd = DataCmd::StoreChunk(chunk);
         self.pay_and_send_data_command(cmd).await?;
         Ok(())
     }
-
-    /// Delete blob can only be performed on private chunks. But on those private chunks this will remove the data
-    /// from the network.
-    ///
-    /// # Examples
-    ///
-    /// TODO: update once data types are crdt compliant
-    ///
-    pub async fn delete_blob(&self, head_chunk: ChunkAddress) -> Result<()> {
-        info!("Deleting blob at given address: {:?}", head_chunk);
-
-        let mut chunk = self.fetch_chunk_from_network(head_chunk, false).await?;
-        self.delete_chunk_from_network(head_chunk).await?;
-
-        loop {
-            match deserialize(chunk.value())? {
-                DataMapLevel::Final(data_map) => {
-                    self.delete_using_data_map(data_map).await?;
-                    return Ok(());
-                }
-                DataMapLevel::Additional(data_map) => {
-                    let serialized_chunk = self.read_all(data_map.clone(), false).await?;
-                    self.delete_using_data_map(data_map).await?;
-                    chunk = deserialize(&serialized_chunk)?;
-                }
-            }
-        }
-    }
-
-    // /// Uses self_encryption to generate an encrypted Blob serialized data map,
-    // /// without connecting and/or writing to the network.
-    // pub fn encrypt_blob(
-    //     data: Bytes,
-    //     owner: Option<impl Encryption>,
-    // ) -> Result<(DataMap, Vec<Chunk>)> {
-    //     get_data_chunks(data, owner)
-    // }
 
     /// Writes raw data to the network
     /// in the form of immutable self encrypted chunks.
@@ -214,31 +166,33 @@ impl Client {
     // --------------------------------------------
 
     // This function reads all raw data of a data map from the network.
-    async fn read_all(&self, data_map: DataMap, public: bool) -> Result<Bytes> {
+    async fn read_all(&self, secret_key: SecretKey, public: bool) -> Result<Bytes> {
         let encrypted_chunks =
-            Self::get_chunks(self.clone(), public, data_map.keys()?.into_iter()).await;
-        self_encryption::decrypt_full_set(&encrypted_chunks).map_err(Error::SelfEncryption)
+            Self::get_chunks(self.clone(), public, secret_key.keys().into_iter()).await;
+        self_encryption::decrypt_full_set(&secret_key, &encrypted_chunks)
+            .map_err(Error::SelfEncryption)
     }
 
     // This function reads a subset of the raw data of the data map from the network,
-    // starting at given `position` of original file, reading `length` bytes.
-    async fn seek_with_data_map(
+    // starting at given `pos` of original file, reading `len` bytes.
+    async fn seek(
         &self,
-        data_map: DataMap,
+        secret_key: SecretKey,
         public: bool,
-        position: usize,
-        length: usize,
+        pos: usize,
+        len: usize,
     ) -> Result<Bytes> {
-        let (start, end) = overlapped_chunks(data_map.file_size(), position, length);
-        let all_keys = data_map.sorted_keys().map_err(Error::SelfEncryption)?;
+        let info = self_encryption::seek_info(secret_key.file_size(), pos, len);
+
+        let all_keys = secret_key.keys();
         let encrypted_chunks = Self::get_chunks(
             self.clone(),
             public,
-            (start..end).map(|i| all_keys[i].clone()),
+            info.index_range.map(|i| all_keys[i].clone()),
         )
         .await;
 
-        self_encryption::decrypt_range(all_keys.as_slice(), &encrypted_chunks, length)
+        self_encryption::decrypt_range(&secret_key, &encrypted_chunks, info.relative_pos, len)
             .map_err(Error::SelfEncryption)
     }
 
@@ -257,8 +211,8 @@ impl Client {
             task::spawn(async move {
                 let chunk = reader.fetch_chunk_from_network(address, false).await?;
                 Ok::<EncryptedChunk, Error>(EncryptedChunk {
+                    index: key.index,
                     content: chunk.value().clone(),
-                    key,
                 })
             })
         });
@@ -271,41 +225,26 @@ impl Client {
             .collect_vec()
     }
 
-    async fn delete_using_data_map(&self, _data_map: DataMap) -> Result<()> {
-        // let blob_storage = BlobStorage::new(self.clone(), false);
-        // let self_encryptor =
-        //     SelfEncryptor::new(blob_storage, data_map).map_err(Error::SelfEncryption)?;
-
-        // match self_encryptor.delete().await {
-        //     Ok(_) => Ok(()),
-        //     Err(error) => Err(Error::SelfEncryption(error)),
-        // }
-        todo!()
-    }
-
-    // /// Takes the "Root data map" and returns a chunk that is acceptable by the network
-    // ///
-    // /// If the root data map chunk is too big, it is self-encrypted and the resulting data map is put into a chunk.
-    // /// The above step is repeated as many times as required until the chunk size is valid.
-
     /// Takes a chunk and fetches the data map from it.
     /// If the data map is not the root data map of the user's contents,
     /// the process repeats itself until it obtains the root data map.
-    async fn unpack(&self, mut chunk: Chunk) -> Result<DataMap> {
+    async fn unpack(&self, mut chunk: Chunk) -> Result<SecretKey> {
         loop {
             let (public, bytes) = if chunk.is_public() {
                 (true, chunk.value().clone())
             } else {
-                let owner = encryption(Scope::Public, self.public_key()).unwrap();
+                let owner = encryption(Scope::Public, self.public_key()).ok_or_else(|| {
+                    Error::Generic("Could not get an encryption object.".to_string())
+                })?;
                 (false, owner.decrypt(chunk.value().clone())?)
             };
 
             match deserialize(&bytes)? {
-                DataMapLevel::Final(data_map) => {
-                    return Ok(data_map);
+                SecretKeyLevel::First(secret_key) => {
+                    return Ok(secret_key);
                 }
-                DataMapLevel::Additional(data_map) => {
-                    let serialized_chunk = self.read_all(data_map, public).await?;
+                SecretKeyLevel::Additional(secret_key) => {
+                    let serialized_chunk = self.read_all(secret_key, public).await?;
                     chunk = deserialize(&serialized_chunk)?;
                 }
             }
@@ -315,7 +254,7 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use super::{ChunkAddress, DataMapLevel};
+    use super::ChunkAddress;
     use crate::{
         client::utils::{
             random_bytes,
@@ -323,8 +262,7 @@ mod tests {
         },
         url::Scope,
     };
-    use bincode::deserialize;
-    use eyre::{bail, Result};
+    use eyre::Result;
     use futures::future::join_all;
     use tokio::time::{Duration, Instant};
 
@@ -402,15 +340,12 @@ mod tests {
         Ok(())
     }
 
-    // Test storing, getting, and deleting private chunk.
+    // Test storing, and getting private chunk.
     #[tokio::test(flavor = "multi_thread")]
     async fn private_blob_test() -> Result<()> {
-        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
+        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let blob = random_bytes(10);
-
-        // let owner = client.public_key();
-        // let (_, expected_address) = Client::encrypt_blob(value.clone(), Some(owner)).await?;
 
         // Store Blob
         let private_address = client
@@ -435,73 +370,7 @@ mod tests {
         let fetched_data = run_w_backoff_delayed(|| client.read_blob(public_address), 10).await?;
         assert_eq!(blob, fetched_data);
 
-        // Delete Blob
-        client.delete_blob(private_address).await?;
-
-        // Make sure Blob was deleted
-        let mut attempts = 20u8;
-        let orignal_timeout = client.query_timeout;
-        client.query_timeout = Duration::from_secs(5); // override with a short timeout
-                                                       // clear cache first
-        client.clear_blob_cache().await;
-
-        while client.read_blob(private_address).await.is_ok() {
-            client.clear_blob_cache().await;
-            tokio::time::sleep(tokio::time::Duration::from_millis(4000)).await;
-            if attempts == 0 {
-                bail!("The private chunk was not deleted: {:?}", private_address);
-            } else {
-                attempts -= 1;
-            }
-        }
-
-        client.query_timeout = orignal_timeout; // reset override
-
-        // Test storing private chunk with the same value again. Should not conflict.
-        let new_address = client
-            .write_to_network(blob.clone(), Scope::Private)
-            .await?;
-        assert_eq!(new_address, private_address);
-
-        // Assert that the Blob is stored again.
-        let fetched_data = run_w_backoff_delayed(|| client.read_blob(private_address), 10).await?;
-        assert_eq!(blob, fetched_data);
-
         Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn private_delete_large() -> Result<()> {
-        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-
-        let blob = random_bytes(1024 * 1024);
-        let address = client.write_to_network(blob, Scope::Private).await?;
-
-        // let's make sure we have all chunks stored on the network
-        let _ = run_w_backoff_delayed(|| client.read_blob(address), 10).await?;
-
-        let fetched_data =
-            run_w_backoff_delayed(|| client.fetch_chunk_from_network(address, false), 10).await?;
-
-        let final_data_map = match deserialize(fetched_data.value())? {
-            DataMapLevel::Final(data_map) => data_map,
-            DataMapLevel::Additional(data_map) => bail!(
-                "A DataMapLevel::Additional data-map was unexpectedly returned: {:?}",
-                data_map
-            ),
-        };
-
-        client.delete_blob(address).await?;
-        client.clear_blob_cache().await;
-
-        client.query_timeout = Duration::from_secs(5); // override with a short timeout
-
-        let result = client.read_all(final_data_map, false).await;
-
-        assert!(result.is_err());
-
-        Ok(())
-        // let _ = retry_err_loop!(
     }
 
     // Test creating and retrieving a 1kb blob.
