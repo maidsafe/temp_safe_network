@@ -10,11 +10,11 @@
 use super::{
     files::{FileItem, FileMeta, FilesMap, RealPath},
     multimap::MultimapKeyValues,
-    nrs::{NrsMap, VersionHash},
+    nrs::NrsMap,
     register::{Entry, EntryHash},
     Safe, XorName,
 };
-pub use super::{ContentType, DataType, Url, XorUrlBase};
+pub use super::{ContentType, DataType, Scope, Url, VersionHash, XorUrlBase};
 use crate::{Error, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
