@@ -46,9 +46,7 @@ pub(crate) use self::{
     core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
     section::section_keys::SectionKeyShare,
 };
-
-pub use qp2p::{Config as TransportConfig, SendStream};
-
+pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
 #[cfg(any(test, feature = "test-utils"))]

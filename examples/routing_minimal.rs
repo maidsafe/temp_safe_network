@@ -128,7 +128,7 @@ async fn start_single_node(
     ip: Option<IpAddr>,
     port: Option<u16>,
 ) -> Result<JoinHandle<()>> {
-    let (_contact, handle) = start_node(0, first, contacts.into_iter().collect(), ip, port).await?;
+    let (_contact, handle) = start_node(0, first, contacts, ip, port).await?;
     Ok(handle)
 }
 
@@ -145,8 +145,7 @@ async fn start_multiple_nodes(
 ) -> Result<Vec<JoinHandle<()>>> {
     let mut handles = Vec::new();
     let first_index = if first {
-        let (first_contact, first_handle) =
-            start_node(0, true, Vec::default(), ip, base_port).await?;
+        let (first_contact, first_handle) = start_node(0, true, vec![], ip, base_port).await?;
         contacts.push(first_contact);
         handles.push(first_handle);
         1
@@ -179,14 +178,14 @@ async fn start_node(
                 .and_then(|offset| base_port.checked_add(offset))
                 .expect("port out of range")
         })
-        .unwrap_or_default();
+        .unwrap_or_else(rand::random);
 
     info!("Node #{} starting...", index);
 
     let config = Config {
         first,
         local_addr: SocketAddr::new(ip, local_port),
-        bootstrap_nodes,
+        bootstrap_nodes: bootstrap_nodes.into_iter().collect(),
         ..Default::default()
     };
 

@@ -54,7 +54,7 @@ pub async fn create_node(mut config: Config) -> Result<(Routing, EventStream)> {
 
 pub fn config_with_contact(contact: SocketAddr) -> Config {
     let mut config = Config::default();
-    config.transport_config.hard_coded_contacts = iter::once(contact).collect();
+    config.transport_config.bootstrap_nodes = iter::once(contact).collect();
     config
 }
 

@@ -172,10 +172,7 @@ mod tests {
     use crate::routing::{
         dkg::test_utils::section_signed,
         ed25519,
-        section::{
-            test_utils::{gen_addr, gen_section_authority_provider},
-            NodeStateUtils,
-        },
+        section::{test_utils::gen_section_authority_provider, NodeStateUtils},
         SectionAuthorityProviderUtils, MIN_ADULT_AGE,
     };
     use eyre::{ContextCompat, Result};
@@ -215,7 +212,7 @@ mod tests {
 
         let name = ed25519::gen_name_with_age(MIN_ADULT_AGE);
         let dst_name = section.prefix().substituted_in(name);
-        let peer = Peer::new(dst_name, gen_addr());
+        let peer = Peer::new(dst_name, crate::gen_addr());
         let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(&sk, node_state)?;
         assert!(section.update_member(node_state));

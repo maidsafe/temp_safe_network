@@ -89,7 +89,7 @@ tracing-subscriber = "~0.2.15"
 uhttp_uri = "~0.5"
 url = "2.2.0"
 urlencoding = "1.1.1"
-xor_name = "3.0.0"
+xor_name = "3.1.0"
 
 [dependencies.self_update]
 version = "0.26.0"

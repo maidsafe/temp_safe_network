@@ -23,11 +23,11 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     println!("Reading network bootstrap information...");
-    let bootstrap_contacts = read_network_conn_info()?.into_iter().collect();
+    let bootstrap_nodes = read_network_conn_info()?;
 
-    println!("Creating a Client to connect to {:?}", bootstrap_contacts);
-    let config = Config::new(None, Some(bootstrap_contacts), None, None).await;
-    let client = Client::new(None, config).await?;
+    println!("Creating a Client to connect to {:?}", bootstrap_nodes);
+    let config = Config::new(None, None, None).await;
+    let client = Client::new(config, bootstrap_nodes, None).await?;
 
     let pk = client.public_key();
     println!("Client Public Key: {}", pk);

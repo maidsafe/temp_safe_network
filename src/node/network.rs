@@ -7,8 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::dbs::UsedSpace;
-use crate::messaging::data::StorageLevel;
-use crate::messaging::{data::ChunkDataExchange, system::SystemMsg, DstLocation, WireMsg};
+use crate::messaging::{
+    data::{ChunkDataExchange, StorageLevel},
+    system::SystemMsg,
+    DstLocation, WireMsg,
+};
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
     ChunkStore, Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils,
@@ -42,9 +45,9 @@ impl Network {
             first: config.is_first(),
             local_addr: config
                 .local_addr
-                .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::LOCALHOST, 0))),
-            bootstrap_nodes: config.hard_coded_contacts.iter().copied().collect(),
-            transport_config: config.network_config().clone(),
+                .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::LOCALHOST, rand::random()))),
+            bootstrap_nodes: config.bootstrap_nodes.clone(),
+            network_config: config.network_config().clone(),
             keypair: None,
         };
         let (routing, event_stream) =

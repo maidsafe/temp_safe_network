@@ -31,7 +31,7 @@ impl Drop for Comm {
 impl Comm {
     pub(crate) async fn new(
         local_addr: SocketAddr,
-        transport_config: qp2p::Config,
+        config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> Result<Self> {
         // Don't bootstrap, just create an endpoint to listen to
@@ -39,7 +39,7 @@ impl Comm {
         // This also returns the a channel where we can listen for
         // disconnection events.
         let (endpoint, _incoming_connections, incoming_messages, disconnections, _) =
-            Endpoint::new(local_addr, Default::default(), transport_config).await?;
+            Endpoint::new(local_addr, Default::default(), config).await?;
 
         let _ = task::spawn(handle_incoming_messages(
             incoming_messages,
@@ -57,13 +57,13 @@ impl Comm {
     pub(crate) async fn bootstrap(
         local_addr: SocketAddr,
         bootstrap_nodes: &[SocketAddr],
-        transport_config: qp2p::Config,
+        config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> Result<(Self, SocketAddr)> {
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
-        let (endpoint, _incoming_connections, incoming_messages, disconnections, bootstrap_addr) =
-            Endpoint::new(local_addr, bootstrap_nodes, transport_config).await?;
+        let (endpoint, _, incoming_messages, disconnections, bootstrap_addr) =
+            Endpoint::new(local_addr, bootstrap_nodes, config).await?;
         let bootstrap_addr = bootstrap_addr.ok_or(Error::BootstrapFailed)?;
 
         let _ = task::spawn(handle_incoming_messages(
@@ -110,7 +110,7 @@ impl Comm {
                 .await
                 .map_err(|err| {
                     error!(
-                        "Sending message (msg_id: {}) to {:?} (name {:?}) failed with {:?}",
+                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed with {:?}",
                         wire_msg.msg_id(),
                         addr,
                         name,
