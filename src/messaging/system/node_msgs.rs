@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{ChunkRead, ChunkWrite, DataCmd, DataExchange, DataQuery, Result, StorageLevel},
+    data::{DataCmd, DataExchange, DataQuery, Result, StorageLevel},
     EndUser, ServiceAuth,
 };
-use crate::types::{Chunk, PublicKey};
+use crate::types::{Chunk, ChunkAddress, PublicKey};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -27,10 +27,10 @@ pub enum NodeCmd {
         /// Message source
         origin: EndUser,
     },
-    /// Chunks are handled by Adults
-    Chunks {
-        /// The contianed command
-        cmd: ChunkWrite,
+    /// Chunks are stored by Adults
+    StoreChunk {
+        /// The chunk
+        chunk: Chunk,
         /// Requester pk and signature
         auth: ServiceAuth,
         /// Message source
@@ -70,11 +70,9 @@ pub enum NodeQuery {
         origin: EndUser,
     },
     /// Chunks are handled by Adults
-    Chunks {
-        /// The actual query message
-        query: ChunkRead,
-        /// Client signature
-        auth: ServiceAuth,
+    GetChunk {
+        /// The chunk address
+        address: ChunkAddress,
         /// The user that has initiated this query
         origin: EndUser,
     },

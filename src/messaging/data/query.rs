@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{chunk::ChunkRead, register::RegisterRead, Error, OperationId, QueryResponse, Result};
-use xor_name::XorName;
-
+use super::{operation_id, register::RegisterRead, Error, OperationId, QueryResponse, Result};
+use crate::types::ChunkAddress;
 use serde::{Deserialize, Serialize};
+use xor_name::XorName;
 
 /// Data queries - retrieving data and inspecting their structure.
 ///
@@ -20,10 +20,12 @@ use serde::{Deserialize, Serialize};
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum DataQuery {
-    /// [`Chunk`] read operation.
+    /// Retrieve a [`Chunk`] at the given address.
     ///
+    /// This should eventually lead to a [`GetChunk`] response.
     /// [`Chunk`]: crate::types::Chunk
-    Chunk(ChunkRead),
+    /// [`GetChunk`]: QueryResponse::GetChunk
+    GetChunk(ChunkAddress),
     /// [`Register`] read operation.
     ///
     /// [`Register`]: crate::types::register::Register
@@ -36,7 +38,7 @@ impl DataQuery {
     pub fn error(&self, error: Error) -> Result<QueryResponse> {
         use DataQuery::*;
         match self {
-            Chunk(q) => Ok(q.error(error)),
+            GetChunk(_) => Ok(QueryResponse::GetChunk(Err(error))),
             Register(q) => q.error(error),
         }
     }
@@ -45,7 +47,7 @@ impl DataQuery {
     pub fn dst_name(&self) -> XorName {
         use DataQuery::*;
         match self {
-            Chunk(q) => q.dst_name(),
+            GetChunk(address) => *address.name(),
             Register(q) => q.dst_name(),
         }
     }
@@ -56,7 +58,7 @@ impl DataQuery {
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
     pub fn operation_id(&self) -> Result<OperationId> {
         match self {
-            DataQuery::Chunk(read) => read.operation_id(),
+            DataQuery::GetChunk(address) => operation_id(address),
             DataQuery::Register(read) => read.operation_id(),
         }
     }

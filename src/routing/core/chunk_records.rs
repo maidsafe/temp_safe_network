@@ -6,25 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Core;
+use super::{capacity::CHUNK_COPY_COUNT, Command, Core, Prefix, Result};
 use crate::messaging::{
-    data::{
-        ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, Error as ErrorMessage, StorageLevel,
-    },
+    data::{operation_id, ChunkDataExchange, CmdError, Error as ErrorMessage, StorageLevel},
     system::{NodeCmd, NodeQuery, SystemMsg},
     AuthorityProof, EndUser, MessageId, ServiceAuth,
 };
-
-use super::Command;
-use super::{capacity::CHUNK_COPY_COUNT, Prefix, Result};
-use crate::routing::error::convert_to_error_message;
-use crate::routing::section::SectionUtils;
+use crate::routing::{error::convert_to_error_message, section::SectionUtils, Error};
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use std::collections::BTreeSet;
 use tracing::info;
 use xor_name::XorName;
-
-use crate::routing::Error;
 
 impl Core {
     pub(crate) fn get_copy_count(&self) -> usize {
@@ -54,21 +46,6 @@ impl Core {
         Ok(())
     }
 
-    pub(super) async fn write_chunk_to_adults(
-        &self,
-        write: ChunkWrite,
-        msg_id: MessageId,
-        auth: AuthorityProof<ServiceAuth>,
-        origin: EndUser,
-    ) -> Result<Vec<Command>> {
-        trace!("Init of sending. ChunkWrite to adults {:?}", write);
-        use ChunkWrite::*;
-        match write {
-            New(data) => self.store(data, msg_id, auth, origin).await,
-            DeletePrivate(address) => self.delete_chunk(address, auth, origin, msg_id).await,
-        }
-    }
-
     /// Set storage level of a given node.
     /// Returns whether the level changed or not.
     pub(crate) async fn set_storage_level(&self, node_id: &PublicKey, level: StorageLevel) -> bool {
@@ -90,21 +67,19 @@ impl Core {
         self.capacity.full_adults().await
     }
 
-    async fn store(
+    pub(super) async fn send_chunk_to_adults(
         &self,
         chunk: Chunk,
         msg_id: MessageId,
         auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<Vec<Command>> {
-        if let Err(error) = validate_chunk_owner(&chunk, &auth.public_key) {
-            return self.send_error(error, msg_id, origin).await;
-        }
+        trace!("Sending chunk to adults {:?}", chunk);
 
         let target = *chunk.name();
 
-        let msg = SystemMsg::NodeCmd(NodeCmd::Chunks {
-            cmd: ChunkWrite::New(chunk),
+        let msg = SystemMsg::NodeCmd(NodeCmd::StoreChunk {
+            chunk,
             auth: auth.into_inner(),
             origin,
         });
@@ -133,37 +108,14 @@ impl Core {
         self.send_cmd_error_response(error, origin, msg_id)
     }
 
-    async fn delete_chunk(
-        &self,
-        address: ChunkAddress,
-        auth: AuthorityProof<ServiceAuth>,
-        origin: EndUser,
-        _msg_id: MessageId,
-    ) -> Result<Vec<Command>> {
-        trace!("Handling delete at elders, forwarding to adults");
-        let targets = self.get_chunk_holder_adults(address.name()).await;
-
-        let msg = SystemMsg::NodeCmd(NodeCmd::Chunks {
-            cmd: ChunkWrite::DeletePrivate(address),
-            auth: auth.into_inner(),
-            origin,
-        });
-
-        let aggregation = false;
-
-        self.send_node_msg_to_targets(msg, targets, aggregation)
-    }
-
     pub(super) async fn read_chunk_from_adults(
         &self,
-        read: &ChunkRead,
+        address: ChunkAddress,
         msg_id: MessageId,
-        auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<Vec<Command>> {
-        trace!("setting up ChunkRead for adults, {:?}", read.dst_address());
+        trace!("preparing to query adults for chunk at {:?}", address);
 
-        let ChunkRead::Get(address) = read;
         let targets = self.get_chunk_holder_adults(address.name()).await;
 
         if targets.is_empty() {
@@ -176,35 +128,13 @@ impl Core {
         for target in targets {
             let _ = self
                 .liveness
-                .add_a_pending_request_operation(target, read.operation_id()?);
+                .add_a_pending_request_operation(target, operation_id(&address)?);
             let _ = fresh_targets.insert(target);
         }
 
-        let msg = SystemMsg::NodeQuery(NodeQuery::Chunks {
-            query: ChunkRead::Get(*address),
-            auth: auth.into_inner(),
-            origin,
-        });
-
+        let msg = SystemMsg::NodeQuery(NodeQuery::GetChunk { address, origin });
         let aggregation = false;
 
         self.send_node_msg_to_targets(msg, fresh_targets, aggregation)
-    }
-}
-
-fn validate_chunk_owner(chunk: &Chunk, requester: &PublicKey) -> Result<()> {
-    if chunk.is_private() {
-        chunk
-            .owner()
-            .ok_or_else(|| Error::InvalidOwner(*requester))
-            .and_then(|chunk_owner| {
-                if chunk_owner != requester {
-                    Err(Error::InvalidOwner(*requester))
-                } else {
-                    Ok(())
-                }
-            })
-    } else {
-        Ok(())
     }
 }

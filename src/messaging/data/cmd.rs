@@ -6,11 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{chunk::ChunkWrite, register::RegisterWrite, CmdError, Error};
-use crate::types::PublicKey;
-use xor_name::XorName;
-
+use super::{register::RegisterWrite, CmdError, Error};
+use crate::types::Chunk;
 use serde::{Deserialize, Serialize};
+use xor_name::XorName;
 
 /// Data commands - creating, updating, or removing data.
 ///
@@ -24,7 +23,7 @@ pub enum DataCmd {
     /// [`Chunk`] write operation.
     ///
     /// [`Chunk`]: crate::types::Chunk
-    Chunk(ChunkWrite),
+    StoreChunk(Chunk),
     /// [`Register`] write operation.
     ///
     /// [`Register`]: crate::types::register::Register
@@ -37,7 +36,7 @@ impl DataCmd {
     pub fn error(&self, error: Error) -> CmdError {
         use DataCmd::*;
         match self {
-            Chunk(c) => c.error(error),
+            StoreChunk(_) => CmdError::Data(error),
             Register(c) => c.error(error),
         }
     }
@@ -46,16 +45,8 @@ impl DataCmd {
     pub fn dst_name(&self) -> XorName {
         use DataCmd::*;
         match self {
-            Chunk(c) => c.dst_name(),
+            StoreChunk(c) => *c.name(),
             Register(c) => c.dst_name(),
-        }
-    }
-
-    /// Returns the owner of the data.
-    pub fn owner(&self) -> Option<PublicKey> {
-        match self {
-            Self::Chunk(write) => write.owner(),
-            Self::Register(write) => write.owner(),
         }
     }
 }
