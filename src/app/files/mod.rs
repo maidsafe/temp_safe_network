@@ -13,8 +13,8 @@ mod metadata;
 mod realpath;
 
 use crate::{
-    app::consts::*, app::nrs::VersionHash, fetch::Range, ContentType, DataType, Error, NativeUrl,
-    Result, Safe, Scope, XorUrl,
+    app::consts::*, app::nrs::VersionHash, fetch::Range, ContentType, DataType, Error, Result,
+    Safe, Scope, Url, XorUrl,
 };
 use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
 use files_map::add_or_update_file_item;
@@ -98,7 +98,7 @@ impl Safe {
                 .store_register(None, FILES_CONTAINER_TYPE_TAG, None, false)
                 .await?;
 
-            let xor_url = NativeUrl::encode_register(
+            let xor_url = Url::encode_register(
                 xorname,
                 FILES_CONTAINER_TYPE_TAG,
                 Scope::Public,
@@ -106,7 +106,7 @@ impl Safe {
                 self.xorurl_base,
             )?;
 
-            let entry = NativeUrl::from_xorurl(&files_map_xorurl)?;
+            let entry = Url::from_xorurl(&files_map_xorurl)?;
             let _ = &self
                 .write_to_register(&xor_url, entry, Default::default())
                 .await?;
@@ -140,10 +140,10 @@ impl Safe {
         self.fetch_files_container(&safe_url).await
     }
 
-    /// Fetch a FilesContainer from a NativeUrl without performing any type of URL resolution
+    /// Fetch a FilesContainer from a Url without performing any type of URL resolution
     pub(crate) async fn fetch_files_container(
         &self,
-        safe_url: &NativeUrl,
+        safe_url: &Url,
     ) -> Result<(VersionHash, FilesMap)> {
         // fetch register entries and wrap errors
         let entries = self
@@ -495,7 +495,7 @@ impl Safe {
         current_version: HashSet<VersionHash>,
         new_files_map: &FilesMap,
         url: &str,
-        mut safe_url: NativeUrl,
+        mut safe_url: Url,
         dry_run: bool,
         update_nrs: bool,
     ) -> Result<VersionHash> {
@@ -509,7 +509,7 @@ impl Safe {
         let files_map_xorurl = self.store_files_map(new_files_map).await?;
 
         // append entry to register
-        let entry = NativeUrl::from_xorurl(&files_map_xorurl)?;
+        let entry = Url::from_xorurl(&files_map_xorurl)?;
         let replace = current_version.iter().map(|e| e.entry_hash()).collect();
         let entry_hash = &self
             .write_to_register(&safe_url.to_string(), entry, replace)
@@ -554,7 +554,7 @@ impl Safe {
         let content_type = media_type.map_or_else(
             || Ok(ContentType::Raw),
             |media_type_str| {
-                if NativeUrl::is_media_type_supported(media_type_str) {
+                if Url::is_media_type_supported(media_type_str) {
                     Ok(ContentType::MediaType(media_type_str.to_string()))
                 } else {
                     Err(Error::InvalidMediaType(format!(
@@ -568,8 +568,7 @@ impl Safe {
         // TODO: do we want ownership from other PKs yet?
         let xorname = self.safe_client.store_public_blob(data, dry_run).await?;
 
-        let xorurl =
-            NativeUrl::encode_blob(xorname, Scope::Public, content_type, self.xorurl_base)?;
+        let xorurl = Url::encode_blob(xorname, Scope::Public, content_type, self.xorurl_base)?;
 
         Ok(xorurl)
     }
@@ -596,12 +595,8 @@ impl Safe {
         self.fetch_public_blob(&safe_url, range).await
     }
 
-    /// Fetch an Blob from a NativeUrl without performing any type of URL resolution
-    pub(crate) async fn fetch_public_blob(
-        &self,
-        safe_url: &NativeUrl,
-        range: Range,
-    ) -> Result<Vec<u8>> {
+    /// Fetch an Blob from a Url without performing any type of URL resolution
+    pub(crate) async fn fetch_public_blob(&self, safe_url: &Url, range: Range) -> Result<Vec<u8>> {
         self.safe_client
             .get_public_blob(safe_url.xorname(), range)
             .await
@@ -634,7 +629,7 @@ async fn validate_files_add_params(
     source_file: &str,
     url: &str,
     update_nrs: bool,
-) -> Result<(NativeUrl, VersionHash, FilesMap)> {
+) -> Result<(Url, VersionHash, FilesMap)> {
     let safe_url = Safe::parse_url(url)?;
     if safe_url.content_version().is_some() {
         return Err(Error::InvalidInput(format!(
@@ -923,7 +918,7 @@ async fn files_map_add_link(
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
     let mut processed_files = ProcessedFiles::new();
     let mut success_count = 0;
-    match NativeUrl::from_url(file_link) {
+    match Url::from_url(file_link) {
         Err(err) => {
             processed_files.insert(
                 file_link.to_string(),
@@ -1181,8 +1176,8 @@ mod tests {
     async fn test_files_map_create() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let mut processed_files = ProcessedFiles::new();
-        let first_xorurl = NativeUrl::from_url("safe://top_xorurl")?.to_xorurl_string();
-        let second_xorurl = NativeUrl::from_url("safe://second_xorurl")?.to_xorurl_string();
+        let first_xorurl = Url::from_url("safe://top_xorurl")?.to_xorurl_string();
+        let second_xorurl = Url::from_url("safe://second_xorurl")?.to_xorurl_string();
 
         processed_files.insert(
             "../testdata/test.md".to_string(),
@@ -1859,7 +1854,7 @@ mod tests {
             .await?;
 
         let nrsurl = random_nrs_name();
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(None);
         let unversioned_link = safe_url.to_string();
         match safe
@@ -1934,7 +1929,7 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         let nrsurl = random_nrs_name();
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let (nrs_xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
             &nrsurl,
@@ -1960,7 +1955,7 @@ mod tests {
         retry_loop_for_pattern!(safe
             .files_container_get(&safe_url.to_string()), Ok((version, _)) if *version == version1)?;
 
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version1));
         let (new_link, _) = retry_loop!(safe.parse_and_resolve_url(&nrsurl));
         // NRS points to the v0: check if different from v1 url
@@ -1978,7 +1973,7 @@ mod tests {
 
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_path("path/when/sync");
         let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_sync(
             "../testdata/subfolder",
@@ -2048,7 +2043,7 @@ mod tests {
 
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_path("/path/when/sync/");
         let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_sync(
             "../testdata/subfolder",
@@ -2149,7 +2144,7 @@ mod tests {
         ));
         assert_ne!(version1, version0);
 
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(None);
         let (version, _) = retry_loop_for_pattern!(safe
             .files_container_get(&safe_url.to_string()), Ok((version, _)) if *version == version1)?;
@@ -2179,7 +2174,7 @@ mod tests {
             ));
 
         // let's fetch version 0
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let (version, v0_files_map) = retry_loop!(safe.files_container_get(&safe_url.to_string()));
 
@@ -2264,7 +2259,7 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         let nrsurl = random_nrs_name();
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let (nrs_xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
             &nrsurl,

@@ -14,7 +14,7 @@ use super::{
     register::{Entry, EntryHash},
     Safe, XorName,
 };
-pub use super::{ContentType, DataType, NativeUrl, XorUrlBase};
+pub use super::{ContentType, DataType, Url, XorUrlBase};
 use crate::{Error, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -243,7 +243,7 @@ impl Safe {
 
     async fn resolve_one_indirection(
         &self,
-        mut the_xor: NativeUrl,
+        mut the_xor: Url,
         metadata: Option<FileItem>,
         retrieve_data: bool,
         range: Range,
@@ -281,7 +281,7 @@ impl Safe {
                                 if FileMeta::filetype_is_file(file_type) {
                                     match file_item.get("link") {
                                         Some(link) => {
-                                            let new_target_xorurl = NativeUrl::from_url(link)?;
+                                            let new_target_xorurl = Url::from_url(link)?;
                                             let mut metadata = (*file_item).clone();
                                             Path::new(&path).file_name().map(|name| {
                                                 name.to_str().map(|str| {
@@ -480,7 +480,7 @@ impl Safe {
 
     async fn retrieve_blob(
         &self,
-        the_xor: &NativeUrl,
+        the_xor: &Url,
         retrieve_data: bool,
         media_type: Option<String>,
         metadata: &Option<FileItem>,
@@ -540,12 +540,12 @@ fn gen_filtered_filesmap(urlpath: &str, files_map: &FilesMap, xorurl: &str) -> R
 }
 // // This contains information for the next step to be made
 // // in each iteration of the resolution process
-type NextStepInfo = (NativeUrl, Option<FileItem>);
+type NextStepInfo = (Url, Option<FileItem>);
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{app::test_helpers::new_safe_instance, retry_loop, NativeUrl, Scope};
+    use crate::{app::test_helpers::new_safe_instance, retry_loop, Scope, Url};
     use anyhow::{anyhow, bail, Context, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use std::io::Read;
@@ -557,7 +557,7 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
 
-        let safe_url = NativeUrl::from_url(&xorurl)?;
+        let safe_url = Url::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
@@ -601,7 +601,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
             .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
@@ -652,7 +652,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let files_container_url = safe_url.to_string();
         let _ = safe
@@ -690,7 +690,7 @@ mod tests {
             .files_store_public_blob(data, Some("text/plain"), false)
             .await?;
 
-        let safe_url = NativeUrl::from_url(&xorurl)?;
+        let safe_url = Url::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
@@ -766,7 +766,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
             .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
@@ -819,7 +819,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let xorname = rand::random();
         let type_tag = 575_756_443;
-        let xorurl = NativeUrl::encode(
+        let xorurl = Url::encode(
             xorname,
             None,
             type_tag,
@@ -863,7 +863,7 @@ mod tests {
         let data = b"Something super immutable";
         let xorurl = safe.files_store_public_blob(data, None, false).await?;
 
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
         safe_url.set_path(path);
         match safe.fetch(&safe_url.to_string(), None).await {
@@ -882,7 +882,7 @@ mod tests {
             .files_store_public_blob(data, Some("text/plain"), false)
             .await?;
 
-        let mut safe_url = NativeUrl::from_url(&xorurl)?;
+        let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_path("/some_relative_filepath");
         let url_with_path = safe_url.to_string();
         match safe.fetch(&url_with_path, None).await {

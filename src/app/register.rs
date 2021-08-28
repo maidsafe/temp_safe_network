@@ -11,7 +11,7 @@ pub use safe_network::types::register::{Entry, EntryHash};
 
 use crate::{Error, Result, Safe};
 use log::debug;
-use safe_network::url::{ContentType, NativeUrl, Scope, XorUrl};
+use safe_network::url::{ContentType, Scope, Url, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -33,13 +33,8 @@ impl Safe {
         } else {
             Scope::Public
         };
-        let xorurl = NativeUrl::encode_register(
-            xorname,
-            type_tag,
-            scope,
-            ContentType::Raw,
-            self.xorurl_base,
-        )?;
+        let xorurl =
+            Url::encode_register(xorname, type_tag, scope, ContentType::Raw, self.xorurl_base)?;
 
         Ok(xorurl)
     }
@@ -60,12 +55,12 @@ impl Safe {
         self.fetch_register_entry(&safeurl, hash).await
     }
 
-    /// Fetch a Register from a NativeUrl without performing any type of URL resolution
+    /// Fetch a Register from a Url without performing any type of URL resolution
     /// Supports version hashes:
     /// e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
     pub(crate) async fn fetch_register_entries(
         &self,
-        safeurl: &NativeUrl,
+        safeurl: &Url,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
         let result = match safeurl.content_version() {
             Some(v) => {
@@ -99,13 +94,13 @@ impl Safe {
         }
     }
 
-    /// Fetch a Register from a NativeUrl without performing any type of URL resolution
+    /// Fetch a Register from a Url without performing any type of URL resolution
     pub(crate) async fn fetch_register_entry(
         &self,
-        safeurl: &NativeUrl,
+        safeurl: &Url,
         hash: EntryHash,
     ) -> Result<Entry> {
-        // TODO: allow to specify the hash with the NativeUrl as well: safeurl.content_hash(),
+        // TODO: allow to specify the hash with the Url as well: safeurl.content_hash(),
         // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
         let address = safeurl.register_address()?;
 
@@ -144,7 +139,7 @@ impl Safe {
 
 #[cfg(test)]
 mod tests {
-    use crate::{app::test_helpers::new_safe_instance, retry_loop, NativeUrl};
+    use crate::{app::test_helpers::new_safe_instance, retry_loop, Url};
     use anyhow::Result;
 
     #[tokio::test]
@@ -160,7 +155,7 @@ mod tests {
         assert!(received_data.is_empty());
         assert!(received_data_priv.is_empty());
 
-        let initial_data = NativeUrl::from_url("safe://test")?;
+        let initial_data = Url::from_url("safe://test")?;
         let hash = safe
             .write_to_register(&xorurl, initial_data.clone(), Default::default())
             .await?;

@@ -10,7 +10,7 @@
 use super::register::EntryHash;
 use crate::{Error, Result, Safe};
 use log::debug;
-use safe_network::url::{ContentType, NativeUrl, Scope, XorUrl};
+use safe_network::url::{ContentType, Url, Scope, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -38,7 +38,7 @@ impl Safe {
         } else {
             Scope::Public
         };
-        let xorurl = NativeUrl::encode_register(
+        let xorurl = Url::encode_register(
             xorname,
             type_tag,
             scope,
@@ -70,10 +70,10 @@ impl Safe {
     }
 
     // Return the value (by a provided key) of a Multimap on
-    // the network without resolving the NativeUrl
+    // the network without resolving the Url
     pub(crate) async fn fetch_multimap_value_by_key(
         &self,
-        safeurl: &NativeUrl,
+        safeurl: &Url,
         key: &[u8],
     ) -> Result<MultimapKeyValues> {
         let entries = self.fetch_multimap_values(safeurl).await?;
@@ -101,13 +101,13 @@ impl Safe {
             .safe_client
             .store_public_blob(&serialised_entry, false)
             .await?;
-        let entry_xorurl = NativeUrl::encode_blob(
+        let entry_xorurl = Url::encode_blob(
             entry_xorname,
             Scope::Public,
             ContentType::Raw,
             self.xorurl_base,
         )?;
-        let entry_ptr = NativeUrl::from_xorurl(&entry_xorurl)?;
+        let entry_ptr = Url::from_xorurl(&entry_xorurl)?;
         let safeurl = Safe::parse_url(url)?;
         let address = safeurl.register_address()?;
 
@@ -117,11 +117,11 @@ impl Safe {
     }
 
     // Crate's helper to return the value of a Multimap on
-    // the network without resolving the NativeUrl,
+    // the network without resolving the Url,
     // optionally filtering by hash and/or key.
     pub(crate) async fn fetch_multimap_values(
         &self,
-        safeurl: &NativeUrl,
+        safeurl: &Url,
     ) -> Result<MultimapKeyValues> {
         let entries = match self.fetch_register_entries(safeurl).await {
             Ok(data) => {
@@ -149,11 +149,11 @@ impl Safe {
     }
 
     // Crate's helper to return the value of a Multimap on
-    // the network without resolving the NativeUrl,
+    // the network without resolving the Url,
     // optionally filtering by hash and/or key.
     pub(crate) async fn fetch_multimap_value_by_hash(
         &self,
-        safeurl: &NativeUrl,
+        safeurl: &Url,
         hash: EntryHash,
     ) -> Result<MultimapKeyValue> {
         let entry_ptr = match self.fetch_register_entry(safeurl, hash).await {

@@ -9,7 +9,7 @@
 
 use super::ipc::IpcError;
 use safe_network::client::Error as ClientError;
-use safe_network::url::Error as NativeUrlError;
+use safe_network::url::Error as UrlError;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -92,9 +92,9 @@ pub enum Error {
     /// FileSystemError
     #[error("FileSystemError: {0}")]
     FileSystemError(String),
-    /// NativeUrlError
-    #[error("NativeUrlError: {0}")]
-    NativeUrlError(#[from] NativeUrlError),
+    /// UrlError
+    #[error("UrlError: {0}")]
+    UrlError(#[from] UrlError),
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),
