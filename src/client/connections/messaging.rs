@@ -10,17 +10,29 @@ use super::{QueryResult, Session};
 
 use crate::client::Error;
 use crate::messaging::{
-    data::{DataQuery, QueryResponse},
+    data::{CmdError, DataQuery, QueryResponse},
+    signature_aggregator::SignatureAggregator,
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::types::{Chunk, PrivateChunk, PublicChunk};
+use crate::prefix_map::NetworkPrefixMap;
+use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
 
+use async_recursion::async_recursion;
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
-use qp2p::Endpoint;
-use std::{collections::BTreeMap, net::SocketAddr};
-use tokio::{sync::mpsc::channel, task::JoinHandle, time::sleep};
+use qp2p::{Config as QuicP2pConfig, Endpoint};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    net::SocketAddr,
+    sync::Arc,
+};
+use tokio::{
+    sync::mpsc::{channel, Sender},
+    sync::RwLock,
+    task::JoinHandle,
+    time::sleep,
+};
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
@@ -28,8 +40,101 @@ use xor_name::XorName;
 const NUMBER_OF_RETRIES: usize = 3;
 // Number of Elders subset to send queries to
 const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
+// Number of attempts to make when trying to bootstrap to a section
+const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
 
 impl Session {
+    /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
+    pub(crate) async fn bootstrap(
+        client_pk: PublicKey,
+        qp2p_config: QuicP2pConfig,
+        err_sender: Sender<CmdError>,
+        bootstrap_nodes: BTreeSet<SocketAddr>,
+        local_addr: SocketAddr,
+    ) -> Result<Session, Error> {
+        trace!(
+            "Trying to bootstrap to the network with public_key: {:?}",
+            client_pk
+        );
+        debug!("QP2p config: {:?}", qp2p_config);
+
+        let (endpoint, incoming_messages, _) = Endpoint::new_client(local_addr, qp2p_config)?;
+        let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
+        let bootstrap_peer = endpoint
+            .connect_to_any(&bootstrap_nodes)
+            .await
+            .ok_or(Error::NotBootstrapped)?;
+
+        // *****************************************************
+        // FIXME: receive the network's genesis pk from the user
+        let genesis_pk = bls::SecretKey::random().public_key();
+        // *****************************************************
+
+        let session = Session {
+            client_pk,
+            pending_queries: Arc::new(RwLock::new(HashMap::default())),
+            incoming_err_sender: Arc::new(err_sender),
+            endpoint,
+            network: Arc::new(NetworkPrefixMap::new(genesis_pk)),
+            aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
+            bootstrap_peer,
+            genesis_pk,
+        };
+
+        Self::spawn_message_listener_thread(session.clone(), incoming_messages).await;
+
+        Ok(session)
+    }
+
+    /// Utility function that bootstraps a client to a section. If there is a failure then it retries.
+    /// After a maximum of three attempts if the boostrap process still fails, then an error is returned.
+    #[async_recursion]
+    pub(crate) async fn attempt_bootstrap(
+        client_pk: PublicKey,
+        qp2p_config: qp2p::Config,
+        mut bootstrap_nodes: BTreeSet<SocketAddr>,
+        local_addr: SocketAddr,
+        err_sender: Sender<CmdError>,
+        attempts: u8,
+    ) -> Result<Session, Error> {
+        match Session::bootstrap(
+            client_pk,
+            qp2p_config.clone(),
+            err_sender.clone(),
+            bootstrap_nodes.clone(),
+            local_addr,
+        )
+        .await
+        {
+            Ok(session) => Ok(session),
+            Err(err) => {
+                let attempts = attempts + 1;
+                if let Error::BootstrapToPeerFailed(failed_peer) = err {
+                    // Remove the unresponsive peer we boostrapped to and bootstrap again
+                    let _ = bootstrap_nodes.remove(&failed_peer);
+                }
+                if attempts < NUM_OF_BOOTSTRAPPING_ATTEMPTS {
+                    trace!(
+                        "Error connecting to network! {:?}\nRetrying... ({})",
+                        err,
+                        attempts
+                    );
+                    Self::attempt_bootstrap(
+                        client_pk,
+                        qp2p_config,
+                        bootstrap_nodes,
+                        local_addr,
+                        err_sender,
+                        attempts,
+                    )
+                    .await
+                } else {
+                    Err(err)
+                }
+            }
+        }
+    }
+
     /// Send a `ServiceMsg` to the network without awaiting for a response.
     pub(crate) async fn send_cmd(
         &self,
@@ -39,6 +144,8 @@ impl Session {
         targets: usize,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint.clone();
+
+        // TODO: Consider other approach: Keep a session per section!
 
         // Get DataSection elders details.
         let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
@@ -324,7 +431,6 @@ impl Session {
         for elder in peers {
             self.endpoint.disconnect_from(&elder).await;
         }
-
         Ok(())
     }
 }

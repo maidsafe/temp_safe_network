@@ -6,10 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::net::SocketAddr;
+// use super::Session;
+// use crate::{
+//     client::{
+//         connections::messaging::{rebuild_message_for_ae_resend, send_message},
+//         Error,
+//     },
+//     messaging::{
+//         data::{CmdError, ServiceMsg},
+//         system::{SectionAuth, SystemMsg},
+//         MessageId, MessageType, WireMsg,
+//     },
+// };
 
 use qp2p::IncomingMessages;
-use tracing::{debug, error, info, trace, warn};
+use std::net::SocketAddr;
+// use tracing::{debug, error, info, trace, warn};
 
 use super::Session;
 use crate::client::{connections::messaging::send_message, Error};
@@ -26,90 +38,117 @@ use xor_name::XorName;
 impl Session {
     // Listen for incoming messages on a connection
     pub(crate) async fn spawn_message_listener_thread(
-        &self,
+        mut session: Session,
         mut incoming_messages: IncomingMessages,
     ) {
         debug!("Listening for incoming messages");
-        let mut session = self.clone();
         let _ = tokio::spawn(async move {
             loop {
-                match session
-                    .process_incoming_message(&mut incoming_messages)
-                    .await
-                {
-                    Ok(true) => (),
-                    Ok(false) => {
+                session = match Self::get_incoming_message(&mut incoming_messages).await {
+                    Ok((src, msg)) => match Self::take_msg(msg, src, session.clone()).await {
+                        Ok(session) => session,
+                        Err(err) => {
+                            error!("Error while processing incoming message: {:?}. Listening for next message...", err);
+                            session
+                        }
+                    },
+                    Err(Error::Generic(_)) => {
+                        // TODO: FIX error type
                         info!("IncomingMessages listener has closed.");
                         break;
                     }
                     Err(err) => {
-                        error!("Error while processing incoming message: {:?}. Listening for next message...", err);
+                        error!("Error while getting incoming message: {:?}. Listening for next message...", err);
+                        session
                     }
                 }
             }
         });
     }
 
-    pub(crate) async fn process_incoming_message(
-        &mut self,
+    pub(crate) async fn get_incoming_message(
         incoming_messages: &mut IncomingMessages,
-    ) -> Result<bool, Error> {
+    ) -> Result<(SocketAddr, MessageType), Error> {
         if let Some((src, message)) = incoming_messages.next().await {
-            let message_type = WireMsg::deserialize(message)?;
+            let msg_type = WireMsg::deserialize(message)?;
             trace!("Incoming message from {:?}", &src);
-            match message_type {
-                MessageType::Service { msg_id, msg, .. } => {
-                    self.handle_client_msg(msg_id, msg, src).await;
-                }
-                MessageType::System {
-                    msg:
-                        SystemMsg::AntiEntropyRedirect {
-                            section_auth,
-                            section_signed,
-                            bounced_msg,
-                        },
-                    ..
-                } => {
-                    if let Err(err) = self
-                        .handle_ae_redirect_msg(section_auth, section_signed, bounced_msg, src)
-                        .await
-                    {
-                        warn!("Failed to handle AE-Redirect msg: {:?}", err);
-                    }
-                }
-                MessageType::System {
-                    msg:
-                        SystemMsg::AntiEntropyRetry {
-                            section_auth,
-                            section_signed,
-                            bounced_msg,
-                            proof_chain,
-                        },
-                    ..
-                } => {
-                    if let Err(err) = self
-                        .handle_ae_retry_msg(section_auth, section_signed, bounced_msg, proof_chain)
-                        .await
-                    {
-                        warn!("Failed to handle AE-Retry msg: {:?}", err);
-                    }
-                }
-                msg_type => {
-                    warn!("Unexpected message type received: {:?}", msg_type);
-                }
-            }
-
-            Ok(true)
+            Ok((src, msg_type))
         } else {
-            Ok(false)
+            Err(Error::Generic("Nothing..".to_string())) // TODO: FIX error type
+        }
+    }
+
+    pub(crate) async fn take_msg(
+        msg: MessageType,
+        src: SocketAddr,
+        session: Session,
+    ) -> Result<Session, Error> {
+        match msg {
+            MessageType::Service { msg_id, msg, .. } => {
+                Self::handle_client_msg(session, msg_id, msg, src).await
+            }
+            MessageType::System {
+                msg:
+                    SystemMsg::AntiEntropyRedirect {
+                        section_auth,
+                        section_signed,
+                        bounced_msg,
+                    },
+                ..
+            } => {
+                let result = Self::handle_ae_redirect_msg(
+                    session,
+                    section_auth,
+                    section_signed,
+                    bounced_msg,
+                    src,
+                )
+                .await;
+                if result.is_err() {
+                    warn!("Failed to handle AE-Redirect");
+                }
+                result
+            }
+            MessageType::System {
+                msg:
+                    SystemMsg::AntiEntropyRetry {
+                        section_auth,
+                        section_signed,
+                        bounced_msg,
+                        proof_chain,
+                    },
+                ..
+            } => {
+                let result = Self::handle_ae_retry_msg(
+                    session,
+                    section_auth,
+                    section_signed,
+                    bounced_msg,
+                    proof_chain,
+                )
+                .await;
+                if result.is_err() {
+                    warn!("Failed to handle AE-Retry msg");
+                }
+                result
+            }
+            msg_type => {
+                warn!("Unexpected message type received: {:?}", msg_type);
+                Ok(session)
+            }
         }
     }
 
     // Handle messages intended for client consumption (re: queries + commands)
-    async fn handle_client_msg(&mut self, msg_id: MessageId, msg: ServiceMsg, src: SocketAddr) {
+    async fn handle_client_msg(
+        session: Session,
+        msg_id: MessageId,
+        msg: ServiceMsg,
+        src: SocketAddr,
+    ) -> Result<Session, Error> {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
-        let queries = self.pending_queries.clone();
-        let error_sender = self.incoming_err_sender.clone();
+        let queries = session.pending_queries.clone();
+        let error_sender = session.incoming_err_sender.clone();
 
         let _ = tokio::spawn(async move {
             debug!("Thread spawned to handle this client message");
@@ -162,16 +201,18 @@ impl Session {
                 }
             };
         });
+
+        Ok(session)
     }
 
     // Handle Anti-Entropy Redirect messages
     async fn handle_ae_redirect_msg(
-        &self,
+        session: Session,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         bounced_msg: Bytes,
         sender: SocketAddr,
-    ) -> Result<(), Error> {
+    ) -> Result<Session, Error> {
         // Check if SAP signature is valid
         if !bincode::serialize(&section_auth)
             .map(|bytes| section_signed.verify(&bytes))
@@ -181,7 +222,7 @@ impl Session {
                 "Signature returned with SAP in AE-Redirect response is invalid: {:?}",
                 section_auth
             );
-            return Ok(());
+            return Ok(session);
         }
 
         let (msg_id, service_msg, auth) = match WireMsg::deserialize(bounced_msg)? {
@@ -193,7 +234,7 @@ impl Session {
                     "Unexpected non-serviceMsg returned in AE-Redirect response: {:?}",
                     other
                 );
-                return Ok(());
+                return Ok(session);
             }
         };
         debug!(
@@ -229,21 +270,23 @@ impl Session {
             },
         )?;
 
-        send_message(elders, wire_msg, self.endpoint.clone(), msg_id).await
+        send_message(elders, wire_msg, session.endpoint.clone(), msg_id).await?;
+
+        Ok(session)
     }
 
     // Handle Anti-Entropy Retry messages
     async fn handle_ae_retry_msg(
-        &self,
+        session: Session,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         bounced_msg: Bytes,
         proof_chain: SecuredLinkedList,
-    ) -> Result<(), Error> {
+    ) -> Result<Session, Error> {
         debug!("Received AE-Retry with new SAP: {:?}", section_auth);
         // Update our network knowledge making sure proof chain
         // validates the new SAP based on currently known remote section SAP.
-        match self.network.update(
+        match session.network.update(
             SectionAuth {
                 value: section_auth.clone(),
                 sig: section_signed,
@@ -265,7 +308,7 @@ impl Session {
             }
             Err(err) => {
                 warn!("Anti-Entropy: failed to update remote section SAP, bounced msg dropped: {:?}, {:?}", bounced_msg, err);
-                return Ok(());
+                return Ok(session);
             }
         }
 
@@ -282,7 +325,7 @@ impl Session {
                     "Unexpected non-serviceMsg returned in AE response: {:?}",
                     other
                 );
-                return Ok(());
+                return Ok(session);
             }
         };
 
@@ -307,6 +350,8 @@ impl Session {
             dst_location,
         )?;
 
-        send_message(elders, wire_msg, self.endpoint.clone(), msg_id).await
+        send_message(elders, wire_msg, session.endpoint.clone(), msg_id).await?;
+
+        Ok(session)
     }
 }

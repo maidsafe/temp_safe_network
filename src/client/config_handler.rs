@@ -10,12 +10,12 @@ use crate::client::Error;
 use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
 use std::{
+    //collections::BTreeSet,
     net::{Ipv4Addr, SocketAddr},
     path::Path,
     time::Duration,
 };
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use tokio::{fs::File, io::AsyncReadExt};
 use tracing::{debug, warn};
 
 const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::LOCALHOST, 0);
@@ -28,13 +28,10 @@ pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(90);
 pub struct Config {
     /// The local address to bind to.
     pub local_addr: SocketAddr,
-
-    /// Initial network contacts.
-    pub bootstrap_nodes: Vec<SocketAddr>,
-
+    // /// Initial network contacts.
+    // pub bootstrap_nodes: BTreeSet<SocketAddr>,
     /// QuicP2p options.
     pub qp2p: QuicP2pConfig,
-
     /// The amount of time to wait for responses to queries before giving up and returning an error.
     pub query_timeout: Duration,
 }
@@ -52,7 +49,7 @@ impl Config {
     /// If `query_timeout` is not specified, [`DEFAULT_QUERY_TIMEOUT`] will be used.
     pub async fn new(
         local_addr: Option<SocketAddr>,
-        bootstrap_nodes: Option<Vec<SocketAddr>>,
+        // bootstrap_nodes: Option<BTreeSet<SocketAddr>>,
         config_file_path: Option<&Path>,
         query_timeout: Option<Duration>,
     ) -> Self {
@@ -65,7 +62,7 @@ impl Config {
 
         Self {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
-            bootstrap_nodes: bootstrap_nodes.unwrap_or_default(),
+            // bootstrap_nodes: bootstrap_nodes.unwrap_or_default(),
             qp2p,
             query_timeout: query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT),
         }
@@ -76,7 +73,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             local_addr: SocketAddr::from(DEFAULT_LOCAL_ADDR),
-            bootstrap_nodes: Default::default(),
+            // bootstrap_nodes: Default::default(),
             qp2p: Default::default(),
             query_timeout: Default::default(),
         }
@@ -117,7 +114,6 @@ mod tests {
     // 3. Assert that `Config::new()` reads the default config written to disk.
     // 4. Verify that `Config::new()` returns the correct default config when no path is provided.
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore]
     async fn custom_config_path() -> Result<()> {
         init_logger();
 
@@ -127,7 +123,7 @@ mod tests {
 
         // In the absence of a config file, the config handler
         // should initialize bootstrap_cache_dir only
-        let config = Config::new(None, None, Some(&config_filepath), None).await;
+        let config = Config::new(None, Some(&config_filepath), None).await;
         // convert to string for assert
         let mut str_path = path
             .to_str()
@@ -140,7 +136,7 @@ mod tests {
 
         let expected_config = Config {
             local_addr: (Ipv4Addr::LOCALHOST, 0).into(),
-            bootstrap_nodes: vec![],
+            // bootstrap_nodes: BTreeSet::new(),
             qp2p: QuicP2pConfig::default(),
             query_timeout: DEFAULT_QUERY_TIMEOUT,
         };
@@ -153,10 +149,10 @@ mod tests {
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = Config::new(None, None, Some(&config_filepath), None).await;
+        let read_cfg = Config::new(None, Some(&config_filepath), None).await;
         assert_eq!(config_on_disk, read_cfg);
 
-        let default_cfg = Config::new(None, None, None, None).await;
+        let default_cfg = Config::new(None, None, None).await;
         assert_eq!(Config::default(), default_cfg);
 
         Ok(())

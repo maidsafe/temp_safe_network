@@ -36,9 +36,9 @@ pub enum Error {
     #[error("Could not connect to any bootstrap contact")]
     BootstrapFailed,
     // #[error("The config is invalid: {err}")]
-    // InvalidConfig {
+    // InvalidQp2pConfig {
     //     #[source]
-    //     err: Qp2pError,
+    //     err: InternalConfigError,
     // },
     #[error("Cannot connect to the endpoint: {err}")]
     CannotConnectEndpoint {
@@ -50,6 +50,8 @@ pub enum Error {
         #[from]
         err: qp2p::RpcError,
     },
+    #[error("No contact was made.")]
+    CouldNotBootstrap,
     #[error("The node is not in a state to handle the action.")]
     InvalidState,
     #[error("Invalid source location")]
@@ -85,11 +87,9 @@ pub enum Error {
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::dbs::Error),
-
     /// Not enough in the section to perform Chunk operation
     #[error("Not enough Adults available in Section({0:?}) to perform operation")]
     NoAdults(Prefix),
-
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing")]
     NoSectionPublicKey,
@@ -144,7 +144,6 @@ pub enum Error {
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
-
     /// Configuration error.
     #[error("Invalid node authority received for a QueryResponse message")]
     InvalidQueryResponseAuthority,

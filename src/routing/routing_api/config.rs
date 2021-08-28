@@ -6,9 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::routing::TransportConfig;
+use crate::routing::NetworkConfig;
 use ed25519_dalek::Keypair;
-use std::net::{Ipv4Addr, SocketAddr};
+use std::{
+    collections::BTreeSet,
+    net::{Ipv4Addr, SocketAddr},
+};
 
 /// Routing configuration.
 #[derive(Debug)]
@@ -21,9 +24,9 @@ pub struct Config {
     /// The local address to bind to.
     pub local_addr: SocketAddr,
     /// Initial network contacts.
-    pub bootstrap_nodes: Vec<SocketAddr>,
+    pub bootstrap_nodes: BTreeSet<SocketAddr>,
     /// Configuration for the underlying network transport.
-    pub transport_config: TransportConfig,
+    pub network_config: NetworkConfig,
 }
 
 impl Default for Config {
@@ -32,8 +35,8 @@ impl Default for Config {
             first: false,
             keypair: None,
             local_addr: SocketAddr::from((Ipv4Addr::LOCALHOST, 0)),
-            bootstrap_nodes: Default::default(),
-            transport_config: TransportConfig::default(),
+            bootstrap_nodes: BTreeSet::new(),
+            network_config: NetworkConfig::default(),
         }
     }
 }

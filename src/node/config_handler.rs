@@ -7,18 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{Error, Result};
-use crate::routing::TransportConfig as NetworkConfig;
+use crate::routing::NetworkConfig;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashSet,
+    collections::BTreeSet,
     io::{self},
     net::SocketAddr,
     path::PathBuf,
     time::Duration,
 };
 use structopt::StructOpt;
-use tokio::fs::{self, File};
-use tokio::io::AsyncWriteExt;
+use tokio::{
+    fs::{self, File},
+    io::AsyncWriteExt,
+};
 use tracing::{debug, Level};
 
 const CONFIG_FILE: &str = "node.config";
@@ -96,7 +98,7 @@ pub struct Config {
         default_value = "[]",
         parse(try_from_str = serde_json::from_str)
     )]
-    pub hard_coded_contacts: HashSet<SocketAddr>,
+    pub bootstrap_nodes: BTreeSet<SocketAddr>,
     /// This is the maximum message size we'll allow the peer to send to us. Any bigger message and
     /// we'll error out probably shutting down the connection to the peer. If none supplied we'll
     /// default to the documented constant.
@@ -145,10 +147,10 @@ impl Config {
             command_line_args.local_addr = Some(socket_addr);
         }
 
-        if command_line_args.hard_coded_contacts.is_empty() {
+        if command_line_args.bootstrap_nodes.is_empty() {
             debug!("Using node connection config file as no hard coded contacts were passed in");
             if let Ok(info) = read_conn_info_from_file().await {
-                command_line_args.hard_coded_contacts = info;
+                command_line_args.bootstrap_nodes = info;
             }
         }
 
@@ -230,8 +232,8 @@ impl Config {
 
         self.network_config.forward_port = !config.skip_igd;
 
-        if !config.hard_coded_contacts.is_empty() {
-            self.hard_coded_contacts = config.hard_coded_contacts;
+        if !config.bootstrap_nodes.is_empty() {
+            self.bootstrap_nodes = config.bootstrap_nodes;
         }
 
         if let Some(max_msg_size) = config.max_msg_size_allowed {
@@ -239,12 +241,11 @@ impl Config {
         }
 
         if let Some(idle_timeout) = config.idle_timeout_msec {
-            self.network_config.idle_timeout = Some(Duration::from_millis(idle_timeout));
+            self.idle_timeout_msec = Some(idle_timeout);
         }
 
         if let Some(keep_alive) = config.keep_alive_interval_msec {
-            self.network_config.keep_alive_interval =
-                Some(Duration::from_millis(keep_alive.into()));
+            self.keep_alive_interval_msec = Some(keep_alive);
         }
 
         if let Some(bootstrap_cache_dir) = config.bootstrap_cache_dir {
@@ -253,7 +254,7 @@ impl Config {
 
         if let Some(upnp_lease_duration) = config.upnp_lease_duration {
             self.network_config.upnp_lease_duration =
-                Some(Duration::from_millis(upnp_lease_duration.into()));
+                Some(Duration::from_millis(upnp_lease_duration as u64));
         }
     }
 
@@ -389,19 +390,18 @@ pub async fn set_connection_info(contact: SocketAddr) -> Result<()> {
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
 pub async fn add_connection_info(contact: SocketAddr) -> Result<()> {
-    let hard_coded_contacts = if let Ok(mut hard_coded_contacts) = read_conn_info_from_file().await
-    {
-        let _ = hard_coded_contacts.insert(contact);
-        hard_coded_contacts
+    let bootstrap_nodes = if let Ok(mut bootstrap_nodes) = read_conn_info_from_file().await {
+        let _ = bootstrap_nodes.insert(contact);
+        bootstrap_nodes
     } else {
         vec![contact].into_iter().collect()
     };
 
-    write_file(CONNECTION_INFO_FILE, &hard_coded_contacts).await
+    write_file(CONNECTION_INFO_FILE, &bootstrap_nodes).await
 }
 
 /// Reads the default node config file.
-async fn read_conn_info_from_file() -> Result<HashSet<SocketAddr>> {
+async fn read_conn_info_from_file() -> Result<BTreeSet<SocketAddr>> {
     let path = project_dirs()?.join(CONNECTION_INFO_FILE);
 
     match fs::read(&path).await {
@@ -450,6 +450,7 @@ fn smoke() {
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
     let expected_size = 456;
+    //let expected_size = 432;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }

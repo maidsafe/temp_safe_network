@@ -61,3 +61,14 @@ fn test_setup() {
     // ensure we only call it once.
     color_eyre::install().expect("color_eyre::install can only be called once");
 }
+
+/// Generate unique SocketAddr for testing purposes
+pub fn gen_addr() -> std::net::SocketAddr {
+    thread_local! {
+        static NEXT_PORT: std::cell::Cell<u16>  = std::cell::Cell::new(rand::random());
+    }
+
+    let port = NEXT_PORT.with(|cell| cell.replace(cell.get().wrapping_add(1)));
+
+    ([192, 0, 2, 0], port).into()
+}
