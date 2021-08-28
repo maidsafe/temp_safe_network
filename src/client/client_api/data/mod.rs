@@ -15,7 +15,7 @@ mod upload;
 #[allow(unused)]
 pub(crate) use batching::{Batch, BatchingConfig};
 #[allow(unused)]
-pub(crate) use pac_man::{get_data_chunks, get_file_chunks, DataMapLevel};
+pub(crate) use pac_man::{get_data_chunks, get_file_chunks, SecretKeyLevel};
 
 use crate::dbs::{KvStore, ToDbKey};
 

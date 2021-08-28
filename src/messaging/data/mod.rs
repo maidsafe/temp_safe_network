@@ -8,7 +8,6 @@
 
 //! Data messages and their possible responses.
 
-mod chunk;
 mod cmd;
 mod data_exchange;
 mod errors;
@@ -16,7 +15,6 @@ mod query;
 mod register;
 
 pub use self::{
-    chunk::{ChunkRead, ChunkWrite},
     cmd::DataCmd,
     data_exchange::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, RegisterDataExchange,
@@ -30,7 +28,7 @@ pub use self::{
 use crate::messaging::{data::Error as ErrorMessage, MessageId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
-    Chunk, DataAddress, PublicKey,
+    Chunk, ChunkAddress, DataAddress, PublicKey,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -40,6 +38,13 @@ use xor_name::XorName;
 /// Derivable Id of an operation. Query/Response should return the same id for simple tracking purposes.
 /// TODO: make uniquer per requester for some operations
 pub type OperationId = String;
+
+/// Return operation Id of a chunk
+pub fn operation_id(address: &ChunkAddress) -> Result<OperationId> {
+    address
+        .encode_to_zbase32()
+        .map_err(|_| Error::NoOperationId)
+}
 
 /// A message indicating that an error occurred as a node was handling a client's message.
 #[allow(clippy::large_enum_variant)]
@@ -313,9 +318,7 @@ mod tests {
             None => return Err(eyre!("Could not generate public key")),
         };
 
-        let owner = PublicKey::Bls(bls::SecretKey::random().public_key());
-
-        let i_data = Chunk::Private(PrivateChunk::new(Bytes::from(vec![1, 3, 1, 4]), owner));
+        let i_data = Chunk::Private(PrivateChunk::new(Bytes::from(vec![1, 3, 1, 4])));
         let e = Error::AccessDenied(key);
         assert_eq!(
             i_data,

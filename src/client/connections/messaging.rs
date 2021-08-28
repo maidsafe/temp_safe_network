@@ -10,7 +10,7 @@ use super::{QueryResult, Session};
 
 use crate::client::Error;
 use crate::messaging::{
-    data::{ChunkRead, DataQuery, QueryResponse},
+    data::{DataQuery, QueryResponse},
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::types::{Chunk, PrivateChunk, PublicChunk};
@@ -93,7 +93,7 @@ impl Session {
         let endpoint = self.endpoint.clone();
         let pending_queries = self.pending_queries.clone();
 
-        let chunk_addr = if let DataQuery::Chunk(ChunkRead::Get(address)) = query {
+        let chunk_addr = if let DataQuery::GetChunk(address) = query {
             Some(address)
         } else {
             None
@@ -246,8 +246,7 @@ impl Session {
 
                     let xorname = match &chunk {
                         Chunk::Private(priv_chunk) => {
-                            *PrivateChunk::new(priv_chunk.value().clone(), *priv_chunk.owner())
-                                .name()
+                            *PrivateChunk::new(priv_chunk.value().clone()).name()
                         }
                         Chunk::Public(pub_chunk) => {
                             *PublicChunk::new(pub_chunk.value().clone()).name()

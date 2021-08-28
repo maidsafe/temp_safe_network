@@ -7,19 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::dbs::{convert_to_error_message, Error, KvStore, Result, Subdir, UsedSpace};
-use crate::messaging::data::StorageLevel;
-use crate::types::{Chunk, ChunkAddress, ChunkKind, PublicKey};
-use crate::{
-    messaging::{
-        data::{ChunkRead, ChunkWrite},
-        system::NodeQueryResponse,
-    },
-    types::DataAddress,
-};
-use std::sync::Arc;
+use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
+use crate::types::{Chunk, ChunkAddress, DataAddress};
+
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
+    sync::Arc,
 };
 use tokio::sync::RwLock;
 use tracing::info;
@@ -69,90 +63,13 @@ impl ChunkStore {
     }
 
     // Read chunk from local store and return NodeQueryResponse
-    pub(crate) fn read(&self, read: &ChunkRead, requester: PublicKey) -> Result<NodeQueryResponse> {
-        let ChunkRead::Get(address) = read;
-        let req_kind = address.kind();
-
-        let result = match self.get_chunk(address) {
-            Ok(chunk) => match chunk.kind() {
-                ChunkKind::Private => {
-                    if let Some(owner) = chunk.owner() {
-                        if req_kind.is_private() && owner == &requester {
-                            Ok(chunk)
-                        } else {
-                            Err(Error::InvalidOwner(requester))
-                        }
-                    } else {
-                        Err(Error::InvalidOwner(requester))
-                    }
-                }
-                ChunkKind::Public => {
-                    if req_kind.is_public() {
-                        Ok(chunk)
-                    } else {
-                        Err(Error::DataIdNotFound(DataAddress::Chunk(*address)))
-                    }
-                }
-            },
-            error => error,
-        };
-
+    pub(crate) fn get(&self, address: &ChunkAddress) -> Result<NodeQueryResponse> {
         Ok(NodeQueryResponse::GetChunk(
-            result.map_err(convert_to_error_message),
+            self.get_chunk(address).map_err(convert_to_error_message),
         ))
     }
 
-    pub(super) async fn write(
-        &self,
-        write: &ChunkWrite,
-        requester: PublicKey,
-    ) -> Result<Option<StorageLevel>> {
-        match &write {
-            ChunkWrite::New(data) => self.try_store(data).await,
-            ChunkWrite::DeletePrivate(head_address) => {
-                if !self.db.has(head_address)? {
-                    info!(
-                        "{}: Immutable chunk doesn't exist: {:?}",
-                        self, head_address
-                    );
-                    return Ok(None);
-                }
-
-                match self.db.get(head_address) {
-                    Ok(Chunk::Private(data)) => {
-                        if data.owner() == &requester {
-                            self.db.delete(head_address)?;
-                            // if we have dropped 10 %-points in usage, then we'll report that to Elders
-                            let last_recorded_level = { *self.last_recorded_level.read().await };
-                            if let Ok(previous_level) = last_recorded_level.previous() {
-                                let used_space = self.db.used_space_ratio().await;
-                                // every level represents 10 percentage points
-                                if previous_level.value() > (10.0 * used_space) as u8 {
-                                    *self.last_recorded_level.write().await = previous_level;
-                                    return Ok(Some(previous_level));
-                                }
-                            }
-                        } else {
-                            return Err(Error::InvalidOwner(requester));
-                        }
-                    }
-                    Ok(_) => {
-                        error!(
-                            "{}: Invalid DeletePrivate(Chunk::Public) encountered: {:?}",
-                            self,
-                            write.dst_address()
-                        );
-                        return Err(Error::NoSuchData(DataAddress::Chunk(*head_address)));
-                    }
-                    _ => (),
-                };
-
-                Ok(None)
-            }
-        }
-    }
-
-    async fn try_store(&self, data: &Chunk) -> Result<Option<StorageLevel>> {
+    pub(super) async fn store(&self, data: &Chunk) -> Result<Option<StorageLevel>> {
         if self.db.has(data.address())? {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
@@ -185,7 +102,7 @@ impl ChunkStore {
             "Trying to store for replication of chunk: {:?}",
             chunk.address()
         );
-        self.try_store(&chunk).await
+        self.store(&chunk).await
     }
 }
 

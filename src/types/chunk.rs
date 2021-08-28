@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{utils, Error, PublicKey, XorName};
+use super::{utils, Error, XorName};
 use bincode::serialized_size;
 use bytes::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -26,33 +26,20 @@ pub struct PrivateChunk {
     /// Contained chunk.
     #[debug(skip)]
     value: Bytes,
-    /// Contains a set of owners of this chunk.
-    owner: PublicKey,
 }
 
 impl PrivateChunk {
     /// Creates a new instance of `PrivateChunk`.
-    pub fn new(value: Bytes, owner: PublicKey) -> Self {
-        let address = Address::Private(XorName::from_content_parts(&[
-            value.as_ref(),
-            &owner.to_bytes(),
-        ]));
-
+    pub fn new(value: Bytes) -> Self {
         Self {
-            address,
+            address: Address::Private(XorName::from_content(value.as_ref())),
             value,
-            owner,
         }
     }
 
     /// Returns the value.
     pub fn value(&self) -> &Bytes {
         &self.value
-    }
-
-    /// Returns the set of owners.
-    pub fn owner(&self) -> &PublicKey {
-        &self.owner
     }
 
     /// Returns the address.
@@ -72,30 +59,26 @@ impl PrivateChunk {
 
     /// Returns size of this chunk after serialisation.
     pub fn serialised_size(&self) -> u64 {
-        serialized_size(&self.serialised_structure()).unwrap_or(u64::MAX)
+        serialized_size(&self.value).unwrap_or(u64::MAX)
     }
 
     /// Returns `true` if the size is valid.
     pub fn validate_size(&self) -> bool {
         self.serialised_size() <= MAX_CHUNK_SIZE_IN_BYTES
     }
-
-    fn serialised_structure(&self) -> (&[u8], &PublicKey) {
-        (&self.value, &self.owner)
-    }
 }
 
 impl Serialize for PrivateChunk {
     fn serialize<S: Serializer>(&self, serialiser: S) -> Result<S::Ok, S::Error> {
         // Address is omitted since it's derived from value + owner
-        self.serialised_structure().serialize(serialiser)
+        self.value.serialize(serialiser)
     }
 }
 
 impl<'de> Deserialize<'de> for PrivateChunk {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let (value, owner) = Deserialize::deserialize(deserializer)?;
-        Ok(Self::new(value, owner))
+        let value = Deserialize::deserialize(deserializer)?;
+        Ok(Self::new(value))
     }
 }
 
@@ -163,7 +146,7 @@ impl<'de> Deserialize<'de> for PublicChunk {
     }
 }
 
-/// Kind of an Chunk.
+/// The kind of Chunk.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub enum Kind {
     /// Private.
@@ -226,12 +209,12 @@ impl Address {
         }
     }
 
-    /// Returns true if published.
+    /// Returns true if public.
     pub fn is_public(&self) -> bool {
         self.kind().is_public()
     }
 
-    /// Returns true if unpublished.
+    /// Returns true if private.
     pub fn is_private(&self) -> bool {
         self.kind().is_private()
     }
@@ -247,7 +230,7 @@ impl Address {
     }
 }
 
-/// Object storing an Chunk variant.
+/// Holds a Chunk variant.
 #[derive(Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Debug)]
 pub enum Chunk {
     /// Private Chunk.
@@ -270,25 +253,17 @@ impl Chunk {
         self.address().name()
     }
 
-    /// Returns the owner if private chunk.
-    pub fn owner(&self) -> Option<&PublicKey> {
-        match self {
-            Chunk::Private(chunk) => Some(chunk.owner()),
-            _ => None,
-        }
-    }
-
     /// Returns the kind.
     pub fn kind(&self) -> Kind {
         self.address().kind()
     }
 
-    /// Returns true if published.
+    /// Returns true if public.
     pub fn is_public(&self) -> bool {
         self.kind().is_public()
     }
 
-    /// Returns true if unpublished.
+    /// Returns true if private.
     pub fn is_private(&self) -> bool {
         self.kind().is_private()
     }
@@ -333,8 +308,7 @@ impl From<PublicChunk> for Chunk {
 #[cfg(test)]
 mod tests {
     use super::{super::Result, utils, Error};
-    use super::{Address, PrivateChunk, PublicChunk, PublicKey, XorName};
-    use bls::SecretKey;
+    use super::{Address, PrivateChunk, PublicChunk, XorName};
     use bytes::Bytes;
     use hex::encode;
     use rand::{self, Rng, SeedableRng};
@@ -346,36 +320,30 @@ mod tests {
         let chunk1 = Bytes::from(b"Hello".to_vec());
         let chunk2 = Bytes::from(b"Goodbye".to_vec());
 
-        let owner1 = PublicKey::Bls(SecretKey::random().public_key());
-        let owner2 = PublicKey::Bls(SecretKey::random().public_key());
+        let public_chunk1 = PublicChunk::new(chunk1.clone());
+        let private_chunk1 = PrivateChunk::new(chunk1);
+        let public_chunk2 = PublicChunk::new(chunk2.clone());
+        let private_chunk2 = PrivateChunk::new(chunk2);
 
-        let ichunk1 = PrivateChunk::new(chunk1.clone(), owner1);
-        let ichunk2 = PrivateChunk::new(chunk1, owner2);
-        let ichunk3 = PrivateChunk::new(chunk2.clone(), owner1);
-        let ichunk3_clone = PrivateChunk::new(chunk2, owner1);
+        assert_eq!(public_chunk1.name(), private_chunk1.name());
+        assert_eq!(public_chunk2.name(), private_chunk2.name());
 
-        assert_eq!(ichunk3, ichunk3_clone);
-
-        assert_ne!(ichunk1.name(), ichunk2.name());
-        assert_ne!(ichunk1.name(), ichunk3.name());
-        assert_ne!(ichunk2.name(), ichunk3.name());
+        assert_ne!(public_chunk1.name(), public_chunk2.name());
+        assert_ne!(private_chunk1.name(), private_chunk2.name());
     }
 
     #[test]
     fn deterministic_address() -> Result<()> {
         let chunk1 = Bytes::from(b"Hello".to_vec());
 
-        let owner1 = PublicKey::Bls(SecretKey::random().public_key());
-
-        let ichunk1 = PrivateChunk::new(chunk1.clone(), owner1);
+        let ichunk1 = PrivateChunk::new(chunk1.clone());
         let ichunk2 = PublicChunk::new(chunk1.clone());
-
-        let ichunk3 = PrivateChunk::new(chunk1, owner1);
+        let ichunk3 = PrivateChunk::new(chunk1);
 
         assert_eq!(ichunk1.name(), ichunk3.name());
         assert_eq!(ichunk1.address(), ichunk3.address());
 
-        assert_ne!(ichunk1.name(), ichunk2.name());
+        assert_eq!(ichunk1.name(), ichunk2.name());
         assert_ne!(ichunk1.address(), ichunk2.address());
 
         println!("{:?}", ichunk1.address());
