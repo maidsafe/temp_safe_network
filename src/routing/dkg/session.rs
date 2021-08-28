@@ -377,8 +377,8 @@ mod tests {
     use crate::messaging::MessageType;
     use crate::routing::{
         dkg::voter::DkgVoter, dkg::DkgKeyUtils, ed25519, node::test_utils::arbitrary_unique_nodes,
-        node::Node, section::section_authority_provider::ElderCandidatesUtils,
-        section::test_utils::gen_addr, ELDER_SIZE, MIN_ADULT_AGE,
+        node::Node, section::section_authority_provider::ElderCandidatesUtils, ELDER_SIZE,
+        MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};
@@ -396,7 +396,7 @@ mod tests {
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            gen_addr(),
+            crate::gen_addr(),
         );
         let elder_candidates = ElderCandidates::new(iter::once(node.peer()), Prefix::default());
         let dkg_key = DkgKey::new(&elder_candidates, 0);

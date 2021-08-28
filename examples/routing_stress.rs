@@ -22,7 +22,7 @@ use rand::{
 };
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::File,
     io::BufWriter,
     net::SocketAddr,
@@ -213,7 +213,7 @@ impl Network {
 
     // Create new node and let it join the network.
     async fn create_node(&mut self, event_tx: Sender<Event>) {
-        let bootstrap_nodes = self.get_bootstrap_addrs().await;
+        let bootstrap_nodes = self.get_bootstrap_nodes().await;
 
         let id = self.new_node_id();
         let _ = self.nodes.insert(id, Node::Joining);
@@ -382,7 +382,7 @@ impl Network {
     }
 
     // Returns the socket addresses to bootstrap against.
-    async fn get_bootstrap_addrs(&self) -> Vec<SocketAddr> {
+    async fn get_bootstrap_nodes(&self) -> BTreeSet<SocketAddr> {
         // Number of bootstrap contacts to use. Use more than one to increase the chance of
         // successful bootstrap in case some of the bootstrap nodes get dropped.
         //
@@ -391,7 +391,7 @@ impl Network {
         const COUNT: usize = 1;
 
         // Use the oldest nodes in the network as the bootstrap contacts.
-        let mut nodes = vec![];
+        let mut nodes = BTreeSet::new();
         for (node, _) in self
             .nodes
             .values()
@@ -402,7 +402,7 @@ impl Network {
             .sorted_by(|(_, lhs_age), (_, rhs_age)| lhs_age.cmp(rhs_age).reverse())
             .take(COUNT)
         {
-            nodes.push(node.our_connection_info().await);
+            let _ = nodes.insert(node.our_connection_info().await);
         }
 
         nodes

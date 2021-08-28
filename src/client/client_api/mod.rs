@@ -16,14 +16,17 @@ mod register_apis;
 use crate::client::{connections::Session, errors::Error, Config};
 use crate::messaging::data::{CmdError, DataCmd};
 use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
+
 use lru::LruCache;
 use rand::rngs::OsRng;
+use std::collections::BTreeSet;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::{
     sync::{mpsc::Receiver, RwLock},
     time::Duration,
 };
-use tracing::info;
+use tracing::{debug, info};
 
 const BLOB_CACHE_CAP: usize = 150;
 
@@ -51,7 +54,11 @@ impl Client {
     ///
     /// TODO: update once data types are crdt compliant
     ///
-    pub async fn new(optional_keypair: Option<Keypair>, config: Config) -> Result<Self, Error> {
+    pub async fn new(
+        config: Config,
+        bootstrap_nodes: BTreeSet<SocketAddr>,
+        optional_keypair: Option<Keypair>,
+    ) -> Result<Self, Error> {
         let mut rng = OsRng;
 
         let keypair = match optional_keypair {
@@ -74,13 +81,17 @@ impl Client {
 
         let client_pk = keypair.public_key();
 
-        // Create the session with the network
-        let session = Session::new(
+        // Bootstrap to the network, connecting to a section based
+        // on a public key of our choice.
+        debug!("Bootstrapping to the network...");
+        // Create a session with the network
+        let session = Session::attempt_bootstrap(
             client_pk,
-            config.local_addr,
-            &config.bootstrap_nodes,
             config.qp2p,
+            bootstrap_nodes.clone(),
+            config.local_addr,
             err_sender,
+            0,
         )
         .await?;
 

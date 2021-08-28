@@ -47,6 +47,7 @@ use rand::rngs::OsRng;
 use rand::{distributions::Alphanumeric, Rng};
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
+use std::net::SocketAddr;
 use std::path::Path;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -140,7 +141,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let new_node = Node::new(
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
-        gen_addr(),
+        crate::gen_addr(),
     );
     let section_key = *dispatcher.core.read().await.section().chain().last_key();
 
@@ -231,7 +232,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let relocated_node_old_name = ed25519::name(&relocated_node_old_keypair.public);
     let relocated_node = Node::new(
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_AGE + 2),
-        gen_addr(),
+        crate::gen_addr(),
     );
 
     let relocate_details = RelocateDetails {
@@ -975,7 +976,7 @@ async fn check_we_send_ae_update_when_msg_bounced_as_untrusted() -> Result<()> {
     // Create the original message whose bounce we want to test.
     let other_node = Node::new(
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-        gen_addr(),
+        crate::gen_addr(),
     );
 
     // Create our node.
@@ -1681,14 +1682,14 @@ async fn handle_demote_during_split() -> Result<()> {
 
 fn create_peer(age: u8) -> Peer {
     let name = ed25519::gen_name_with_age(age);
-    let mut peer = Peer::new(name, gen_addr());
+    let mut peer = Peer::new(name, crate::gen_addr());
     peer.set_reachable(true);
     peer
 }
 
 fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> Peer {
     let name = ed25519::gen_name_with_age(age);
-    let mut peer = Peer::new(prefix.substituted_in(name), gen_addr());
+    let mut peer = Peer::new(prefix.substituted_in(name), crate::gen_addr());
     peer.set_reachable(true);
     peer
 }
@@ -1696,7 +1697,7 @@ fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> Peer {
 fn create_node(age: u8, prefix: Option<Prefix>) -> Node {
     Node::new(
         ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
-        gen_addr(),
+        crate::gen_addr(),
     )
 }
 

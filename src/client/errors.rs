@@ -12,7 +12,7 @@ use crate::messaging::{
     Error as MessagingError,
 };
 use crate::types::Error as DtError;
-use std::io;
+use std::{io, net::SocketAddr};
 use thiserror::Error;
 
 /// Specialisation of `std::Result` for Client.
@@ -139,6 +139,9 @@ pub enum Error {
     /// Generic Error
     #[error("Generic error")]
     Generic(String),
+    /// Could not bootstrap to an unresponsive peer
+    #[error("Could not bootstrap to an unresponsive peer {0}")]
+    BootstrapToPeerFailed(SocketAddr),
 }
 
 impl From<(CmdError, OperationId)> for Error {

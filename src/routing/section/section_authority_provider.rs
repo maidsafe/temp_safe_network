@@ -209,19 +209,7 @@ pub(crate) mod test_utils {
     use crate::routing::routing_api::tests::SecretKeySet;
     use crate::routing::{ed25519, node::Node, MIN_ADULT_AGE, MIN_AGE};
     use itertools::Itertools;
-    use std::{cell::Cell, net::SocketAddr};
     use xor_name::Prefix;
-
-    // Generate unique SocketAddr for testing purposes
-    pub(crate) fn gen_addr() -> SocketAddr {
-        thread_local! {
-            static NEXT_PORT: Cell<u16> = Cell::new(1000);
-        }
-
-        let port = NEXT_PORT.with(|cell| cell.replace(cell.get().wrapping_add(1)));
-
-        ([192, 0, 2, 0], port).into()
-    }
 
     // Create `count` Nodes sorted by their names.
     // The `age_diff` flag is used to trigger nodes being generated with different age pattern.
@@ -237,7 +225,7 @@ pub(crate) mod test_utils {
                 };
                 Node::new(
                     ed25519::gen_keypair(&prefix.range_inclusive(), age),
-                    gen_addr(),
+                    crate::gen_addr(),
                 )
             })
             .sorted_by_key(|node| node.name())

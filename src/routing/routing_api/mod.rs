@@ -94,7 +94,7 @@ impl Routing {
 
             let comm = Comm::new(
                 config.local_addr,
-                config.transport_config,
+                config.network_config,
                 connection_event_tx,
             )
             .await?;
@@ -128,8 +128,13 @@ impl Routing {
 
             let (comm, bootstrap_addr) = Comm::bootstrap(
                 config.local_addr,
-                &config.bootstrap_nodes,
-                config.transport_config,
+                config
+                    .bootstrap_nodes
+                    .iter()
+                    .copied()
+                    .collect_vec()
+                    .as_slice(),
+                config.network_config,
                 connection_event_tx,
             )
             .await?;
