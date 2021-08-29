@@ -12,10 +12,13 @@ mod commands;
 mod data;
 mod queries;
 mod register_apis;
+mod stash;
 
+use self::data::{Batch, Batching, BatchingConfig};
 use crate::client::{connections::Session, errors::Error, Config};
-use crate::messaging::data::{CmdError, DataCmd};
+use crate::messaging::data::CmdError;
 use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
+use crate::UsedSpace;
 
 use lru::LruCache;
 use rand::rngs::OsRng;
@@ -37,6 +40,7 @@ pub struct Client {
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
     blob_cache: Arc<RwLock<LruCache<ChunkAddress, Chunk>>>,
+    batching: Batching<stash::Stash>,
     pub(crate) query_timeout: Duration,
 }
 
@@ -95,12 +99,25 @@ impl Client {
         )
         .await?;
 
+        let used_space = UsedSpace::new(config.payment.max_local_space);
+        used_space.add_dir(&config.payment.db_root);
+
+        let batching_cfg = BatchingConfig {
+            pool_count: config.payment.op_batching.pool_count,
+            pool_limit: config.payment.op_batching.pool_limit,
+            root: config.payment.db_root,
+            used_space,
+        };
+
+        let batching = Batching::new(batching_cfg, stash::Stash {})?;
+
         let client = Self {
             keypair,
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: config.query_timeout,
             blob_cache: Arc::new(RwLock::new(LruCache::new(BLOB_CACHE_CAP))),
+            batching,
         };
 
         Ok(client)
@@ -128,10 +145,10 @@ impl Client {
         self.keypair().public_key()
     }
 
-    // Private helper to obtain payment proof for a data command, send it to the network,
-    // and also apply the payment to local replica actor.
-    async fn pay_and_send_data_command(&self, cmd: DataCmd) -> Result<(), Error> {
-        self.send_cmd(cmd).await
+    /// Push a batch of operations on to the pools for
+    /// batching of payments and uploads to network.
+    pub fn push_batch(&self, batch: Batch) {
+        self.batching.push(batch)
     }
 
     #[cfg(test)]

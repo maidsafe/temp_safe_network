@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
     let bootstrap_nodes = read_network_conn_info()?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_nodes);
-    let config = Config::new(None, None, None).await;
+    let config = Config::new(None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     let pk = client.public_key();
