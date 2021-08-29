@@ -48,16 +48,27 @@ use tokio::{
 /// It is up to client how many
 /// entries it wants to batch at a time.
 /// It could push a single entry, or thousands of them, in every batch.
-#[allow(unused)]
-pub(crate) struct Batch {
-    // files on disk
-    pub(crate) files: BTreeMap<ItemKey, (PathBuf, Scope)>, // becomes chunks
-    // values from memory
-    pub(crate) values: BTreeMap<ItemKey, (Bytes, Scope)>, // becomes chunks
-    // register ops
-    pub(crate) reg_ops: BTreeMap<ItemKey, RegisterWrite>, // reg entry
-    // quotas for ephemeral messaging
-    pub(crate) msg_quotas: BTreeMap<ItemKey, u64>, // ..
+#[derive(Debug)]
+pub struct Batch {
+    /// files on disk
+    pub files: BTreeMap<ItemKey, (PathBuf, Scope)>, // becomes chunks
+    /// values from memory
+    pub values: BTreeMap<ItemKey, (Bytes, Scope)>, // becomes chunks
+    /// register ops
+    pub reg_ops: BTreeMap<ItemKey, RegisterWrite>, // reg entry
+    /// quotas for ephemeral messaging
+    pub msg_quotas: BTreeMap<ItemKey, u64>, // ..
+}
+
+impl Default for Batch {
+    fn default() -> Self {
+        Self {
+            files: Default::default(),
+            values: Default::default(),
+            reg_ops: Default::default(),
+            msg_quotas: Default::default(),
+        }
+    }
 }
 
 type BatchTasks = FuturesUnordered<JoinHandle<()>>;
@@ -67,12 +78,12 @@ type PaymentJob = DashSet<ItemKey>;
 type Pools = Arc<RwLock<DashMap<u8, PaymentJob>>>;
 type ChunkDb = Db<ChunkAddress, Chunk>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Dbs {
     chunks: ChunkDb,
 }
 
-#[allow(unused)]
+#[derive(Clone, Debug)]
 pub(crate) struct Batching<S: Stash> {
     dbs: Dbs,
     pools: Pools,
@@ -80,16 +91,19 @@ pub(crate) struct Batching<S: Stash> {
     stash: S,
 }
 
-#[allow(unused)]
+///
 pub(crate) struct BatchingConfig {
+    ///
     pub(crate) pool_count: u8,
+    ///
     pub(crate) pool_limit: usize,
+    ///
     pub(crate) root: PathBuf,
+    ///
     pub(crate) used_space: UsedSpace,
 }
 
 impl<S: Stash> Batching<S> {
-    #[allow(unused)]
     pub(crate) fn new(config: BatchingConfig, stash: S) -> Result<Self> {
         let pools = DashMap::new();
         for i in 0..config.pool_count {

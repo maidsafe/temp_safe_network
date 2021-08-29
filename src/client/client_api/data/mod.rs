@@ -6,18 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::Token;
-
 mod batching;
 mod pac_man;
 mod upload;
 
 #[allow(unused)]
-pub(crate) use batching::{Batch, BatchingConfig};
+pub(crate) use batching::{Batch, Batching, BatchingConfig};
 #[allow(unused)]
 pub(crate) use pac_man::{get_data_chunks, get_file_chunks, SecretKeyLevel};
 
 use crate::dbs::{KvStore, ToDbKey};
+use crate::types::Token;
 
 pub(crate) type ItemKey = String;
 pub(crate) type Db<K, V> = KvStore<K, V>;
@@ -31,20 +30,18 @@ pub(crate) trait Stash: Clone {
     fn take(&self, value: Token) -> Vec<Dbc>;
 }
 
-#[allow(unused)]
-pub(crate) struct Dbc {}
+pub(crate) struct Dbc {
+    #[allow(unused)]
+    pub(crate) value: Token,
+}
 
 #[cfg(test)]
 mod tests {
-    use super::batching::Batching;
-    use super::{Batch, BatchingConfig, Stash};
-    use crate::client::utils::random_bytes;
-    use crate::client::Result;
+    use super::{Batch, Batching, BatchingConfig, Stash};
+    use crate::client::{utils::random_bytes, Result};
     use crate::url::Scope;
     use crate::UsedSpace;
-    use std::collections::BTreeMap;
-    use std::iter::FromIterator;
-    use std::path::PathBuf;
+    use std::{collections::BTreeMap, env::temp_dir, iter::FromIterator};
     use tokio::time::{sleep, Duration};
 
     //
@@ -53,7 +50,7 @@ mod tests {
         let cfg = BatchingConfig {
             pool_count: 4,
             pool_limit: 10,
-            root: PathBuf::new(),
+            root: temp_dir(),
             used_space: UsedSpace::new(u64::MAX),
         };
         let b = Batching::new(cfg, TestStash {})?;

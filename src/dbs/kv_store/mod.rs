@@ -32,7 +32,7 @@ const DB_DIR: &str = "db";
 
 /// `KvStore` is a store of keys and values into a Sled db, while maintaining a maximum disk
 /// usage to restrict storage.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct KvStore<K, V> {
     // tracks space used.
     used_space: UsedSpace,

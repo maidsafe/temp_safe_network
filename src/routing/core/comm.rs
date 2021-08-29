@@ -130,8 +130,10 @@ impl Comm {
             ..Default::default()
         };
 
-        let (connectivity_endpoint, _, _) =
-            Endpoint::<XorName>::new_client((self.endpoint.local_addr().ip(), 0), qp2p_config)?;
+        let (connectivity_endpoint, _, _) = Endpoint::<XorName>::new_client(
+            (self.endpoint.local_addr().ip(), rand::random()),
+            qp2p_config,
+        )?;
 
         let result = connectivity_endpoint
             .is_reachable(peer)
