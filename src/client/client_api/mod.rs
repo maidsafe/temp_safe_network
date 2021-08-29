@@ -105,7 +105,7 @@ impl Client {
         let batching_cfg = BatchingConfig {
             pool_count: config.payment.op_batching.pool_count,
             pool_limit: config.payment.op_batching.pool_limit,
-            root: config.payment.db_root,
+            root_dir: config.payment.db_root,
             used_space,
         };
 

@@ -92,8 +92,8 @@ pub(crate) const fn supermajority(group_size: usize) -> usize {
 mod test_utils {
     use crate::dbs::UsedSpace;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use std::env::temp_dir;
     use std::path::{Path, PathBuf};
+    use tempfile::tempdir;
 
     const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
 
@@ -102,8 +102,8 @@ mod test_utils {
         let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
         let random_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let tmp = temp_dir();
-        let storage_dir = Path::new(&tmp).join(random_filename);
+        let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
+        let storage_dir = Path::new(root_dir.path()).join(random_filename);
 
         Ok((used_space, storage_dir))
     }

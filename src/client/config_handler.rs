@@ -190,8 +190,8 @@ mod tests {
     use crate::client::utils::test_utils::init_logger;
     use eyre::Result;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use std::env::temp_dir;
     use std::fs::File;
+    use tempfile::tempdir;
     use tokio::fs::create_dir_all;
 
     // 1. Verify that `Config::new()` generates the correct default config
@@ -204,7 +204,8 @@ mod tests {
     async fn custom_config_path() -> Result<()> {
         init_logger();
 
-        let root_dir = temp_dir();
+        let temp_dir = tempdir().map_err(|e| Error::Generic(e.to_string()))?;
+        let root_dir = temp_dir.path().to_path_buf();
         let cfg_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
         let config_filepath = root_dir.join(&cfg_filename);
 

@@ -38,19 +38,22 @@ pub(crate) struct Dbc {
 #[cfg(test)]
 mod tests {
     use super::{Batch, Batching, BatchingConfig, Stash};
-    use crate::client::{utils::random_bytes, Result};
+    use crate::client::{utils::random_bytes, Error, Result};
     use crate::url::Scope;
     use crate::UsedSpace;
-    use std::{collections::BTreeMap, env::temp_dir, iter::FromIterator};
+    use std::{collections::BTreeMap, iter::FromIterator};
+    use tempfile::tempdir;
     use tokio::time::{sleep, Duration};
 
     //
     #[tokio::test(flavor = "multi_thread")]
     async fn basic() -> Result<()> {
+        let temp_dir = tempdir().map_err(|e| Error::Generic(e.to_string()))?;
+        let root_dir = temp_dir.path().to_path_buf();
         let cfg = BatchingConfig {
             pool_count: 4,
             pool_limit: 10,
-            root: temp_dir(),
+            root_dir,
             used_space: UsedSpace::new(u64::MAX),
         };
         let b = Batching::new(cfg, TestStash {})?;

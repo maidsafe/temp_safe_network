@@ -140,6 +140,11 @@ impl Config {
 
         let mut config = Config::default();
 
+        if cfg!(feature = "test-utils") {
+            println!("skipping igd");
+            config.skip_igd = true;
+        }
+
         let mut command_line_args = Config::from_args();
         command_line_args.validate()?;
 
