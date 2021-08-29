@@ -183,7 +183,7 @@ pub async fn run_split() -> Result<()> {
     let bootstrap_nodes =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
-    let config = Config::new(None, None, Some(QUERY_TIMEOUT)).await;
+    let config = Config::new(None, None, None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     for (address, hash) in all_data_put {
@@ -221,7 +221,7 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_nodes);
-    let config = Config::new(None, None, Some(QUERY_TIMEOUT)).await;
+    let config = Config::new(None, None, None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     let raw_data = random_bytes(1024 * 1024);

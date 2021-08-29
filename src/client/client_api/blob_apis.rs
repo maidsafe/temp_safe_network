@@ -6,12 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::{collections::BTreeMap, iter::FromIterator, path::PathBuf};
+
 use super::{
     blob_storage::{ChunkUploader, Uploader},
-    data::get_data_chunks,
+    data::{get_data_chunks, Batch},
     Client,
 };
-use crate::messaging::data::{DataCmd, DataQuery, QueryResponse};
+use crate::messaging::data::{DataQuery, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, Encryption};
 use crate::{
     client::{client_api::data::SecretKeyLevel, utils::encryption, Error, Result},
@@ -136,19 +138,6 @@ impl Client {
         self.blob_cache.write().await.clear()
     }
 
-    // Private function that actually stores the given chunk on the network.
-    // Self Encryption is NOT APPLIED ON the chunk that is passed to this function.
-    // Clients should not call this function directly.
-    #[allow(unused)]
-    pub(crate) async fn store_chunk_on_network(&self, chunk: Chunk) -> Result<()> {
-        if !chunk.validate_size() {
-            return Err(Error::NetworkDataError(crate::types::Error::ExceededSize));
-        }
-        let cmd = DataCmd::StoreChunk(chunk);
-        self.pay_and_send_data_command(cmd).await?;
-        Ok(())
-    }
-
     /// Writes raw data to the network
     /// in the form of immutable self encrypted chunks.
     pub async fn write_to_network(&self, data: Bytes, scope: Scope) -> Result<ChunkAddress> {
@@ -161,11 +150,37 @@ impl Client {
         Ok(head_address)
     }
 
+    ///
+    pub fn push_file_to_batch(&self, id: String, path: PathBuf, scope: Scope) {
+        self.push_files_to_batch(BTreeMap::from_iter(vec![(id, (path, scope))]))
+    }
+
+    ///
+    pub fn push_value_to_batch(&self, id: String, value: Bytes, scope: Scope) {
+        self.push_values_to_batch(BTreeMap::from_iter(vec![(id, (value, scope))]))
+    }
+
+    ///
+    pub fn push_files_to_batch(&self, files: BTreeMap<String, (PathBuf, Scope)>) {
+        self.push_batch(Batch {
+            files,
+            ..Default::default()
+        })
+    }
+
+    ///
+    pub fn push_values_to_batch(&self, values: BTreeMap<String, (Bytes, Scope)>) {
+        self.push_batch(Batch {
+            values,
+            ..Default::default()
+        })
+    }
+
     // --------------------------------------------
     // ---------- Private helpers -----------------
     // --------------------------------------------
 
-    // This function reads all raw data of a data map from the network.
+    // Gets and decrypts chunks from the network using nothing else but the secret key, then returns the raw data.
     async fn read_all(&self, secret_key: SecretKey, public: bool) -> Result<Bytes> {
         let encrypted_chunks =
             Self::get_chunks(self.clone(), public, secret_key.keys().into_iter()).await;
@@ -173,8 +188,8 @@ impl Client {
             .map_err(Error::SelfEncryption)
     }
 
-    // This function reads a subset of the raw data of the data map from the network,
-    // starting at given `pos` of original file, reading `len` bytes.
+    // Gets a subset of chunks from the network, decrypts and
+    // reads `len` bytes of the data starting at given `pos` of original file.
     async fn seek(
         &self,
         secret_key: SecretKey,
@@ -233,7 +248,7 @@ impl Client {
             let (public, bytes) = if chunk.is_public() {
                 (true, chunk.value().clone())
             } else {
-                let owner = encryption(Scope::Public, self.public_key()).ok_or_else(|| {
+                let owner = encryption(Scope::Private, self.public_key()).ok_or_else(|| {
                     Error::Generic("Could not get an encryption object.".to_string())
                 })?;
                 (false, owner.decrypt(chunk.value().clone())?)

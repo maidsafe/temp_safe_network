@@ -6,16 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::client::Error;
+use crate::client::{Error, Result};
 use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
 use std::{
-    //collections::BTreeSet,
     net::{Ipv4Addr, SocketAddr},
-    path::Path,
+    path::{Path, PathBuf},
     time::Duration,
 };
-use tokio::{fs::File, io::AsyncReadExt};
+use tokio::{
+    fs::File,
+    io::{self, AsyncReadExt},
+};
 use tracing::{debug, warn};
 
 const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::LOCALHOST, 0);
@@ -23,17 +25,21 @@ const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::LOCALHOST, 0);
 /// Defaul amount of time to wait for responses to queries before giving up and returning an error.
 pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(90);
 
+const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
+
 /// Configuration for sn_client.
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct Config {
     /// The local address to bind to.
     pub local_addr: SocketAddr,
-    // /// Initial network contacts.
-    // pub bootstrap_nodes: BTreeSet<SocketAddr>,
+    /// Path to local storage.
+    pub root_dir: PathBuf,
     /// QuicP2p options.
     pub qp2p: QuicP2pConfig,
     /// The amount of time to wait for responses to queries before giving up and returning an error.
     pub query_timeout: Duration,
+    /// Op and payment options.
+    pub payment: PaymentConfig,
 }
 
 impl Config {
@@ -48,11 +54,14 @@ impl Config {
     ///
     /// If `query_timeout` is not specified, [`DEFAULT_QUERY_TIMEOUT`] will be used.
     pub async fn new(
+        root_dir: Option<&Path>,
         local_addr: Option<SocketAddr>,
-        // bootstrap_nodes: Option<BTreeSet<SocketAddr>>,
         config_file_path: Option<&Path>,
         query_timeout: Option<Duration>,
     ) -> Self {
+        let root_dir = root_dir
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(default_dir);
         // If a config file path was provided we try to read it,
         // otherwise we use default qp2p config.
         let qp2p = match &config_file_path {
@@ -62,8 +71,12 @@ impl Config {
 
         Self {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
-            // bootstrap_nodes: bootstrap_nodes.unwrap_or_default(),
+            root_dir: root_dir.clone(),
             qp2p,
+            payment: PaymentConfig {
+                db_root: root_dir,
+                ..Default::default()
+            },
             query_timeout: query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT),
         }
     }
@@ -73,8 +86,9 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             local_addr: SocketAddr::from(DEFAULT_LOCAL_ADDR),
-            // bootstrap_nodes: Default::default(),
+            root_dir: default_dir(),
             qp2p: Default::default(),
+            payment: Default::default(),
             query_timeout: Default::default(),
         }
     }
@@ -97,6 +111,79 @@ async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
     })
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
+pub struct PaymentConfig {
+    ///
+    pub db_root: PathBuf,
+    /// Configuration for op batching.
+    pub op_batching: OpBatchConfig,
+    /// The max local space allowed to be used.
+    pub max_local_space: u64,
+}
+
+impl Default for PaymentConfig {
+    fn default() -> Self {
+        Self {
+            db_root: default_dir(),
+            op_batching: Default::default(),
+            max_local_space: u64::MAX,
+        }
+    }
+}
+
+impl Default for OpBatchConfig {
+    fn default() -> Self {
+        Self {
+            pool_count: 3,
+            pool_limit: 3,
+        }
+    }
+}
+
+/// Options for operation batching
+///
+/// These options allow tuning of performance
+/// to your needs wrt network interaction patterns.
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
+pub struct OpBatchConfig {
+    /// The higher the number of pools,
+    /// the more obscured your activity is.
+    /// A minimum of 3 is recommended.
+    ///
+    /// The cost of increasing it is that
+    /// the actual move of the ops from local to network can be delayed.
+    /// This can affect synchronisation between devices, and extends the time
+    /// that the ops are kept on the local device.
+    pub pool_count: u8,
+    /// The higher the limit, the higher the throughput
+    /// you can achieve.
+    ///
+    /// The cost of increasing it is that
+    /// the actual move of the ops from local to network can be delayed.
+    /// This can affect synchronisation between devices, and extends the time
+    /// that the ops are kept on the local device.
+    pub pool_limit: usize,
+}
+
+/// Root directory for dbs and cached state. If not set, it defaults to
+/// `DEFAULT_ROOT_DIR_NAME` within the project's data directory (see `Config::root_dir` for the
+/// directories on each platform).
+fn default_dir() -> PathBuf {
+    project_dirs()
+        .unwrap_or_default()
+        .join(DEFAULT_ROOT_DIR_NAME)
+}
+
+fn project_dirs() -> Result<PathBuf> {
+    let mut home_dir = dirs_next::home_dir()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found"))?;
+
+    home_dir.push(".safe");
+    home_dir.push("client");
+
+    Ok(home_dir)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,15 +204,15 @@ mod tests {
     async fn custom_config_path() -> Result<()> {
         init_logger();
 
-        let path = temp_dir();
-        let random_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let config_filepath = path.join(random_filename);
+        let root_dir = temp_dir();
+        let cfg_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let config_filepath = root_dir.join(&cfg_filename);
 
         // In the absence of a config file, the config handler
         // should initialize bootstrap_cache_dir only
-        let config = Config::new(None, Some(&config_filepath), None).await;
+        let config = Config::new(Some(&root_dir), None, Some(&config_filepath), None).await;
         // convert to string for assert
-        let mut str_path = path
+        let mut str_path = root_dir
             .to_str()
             .ok_or(eyre::eyre!("No path for to_str".to_string()))?
             .to_string();
@@ -136,23 +223,27 @@ mod tests {
 
         let expected_config = Config {
             local_addr: (Ipv4Addr::LOCALHOST, 0).into(),
-            // bootstrap_nodes: BTreeSet::new(),
+            root_dir: root_dir.clone(),
             qp2p: QuicP2pConfig::default(),
+            payment: PaymentConfig {
+                db_root: root_dir.clone(),
+                ..Default::default()
+            },
             query_timeout: DEFAULT_QUERY_TIMEOUT,
         };
         assert_eq!(config, expected_config);
 
-        create_dir_all(path).await?;
+        create_dir_all(&root_dir).await?;
         let mut file = File::create(&config_filepath)?;
 
         let config_on_disk = Config::default();
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = Config::new(None, Some(&config_filepath), None).await;
+        let read_cfg = Config::new(None, None, Some(&config_filepath), None).await;
         assert_eq!(config_on_disk, read_cfg);
 
-        let default_cfg = Config::new(None, None, None).await;
+        let default_cfg = Config::new(None, None, None, None).await;
         assert_eq!(Config::default(), default_cfg);
 
         Ok(())

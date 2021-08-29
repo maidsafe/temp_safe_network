@@ -10,6 +10,7 @@ use super::read_network_conn_info;
 use crate::client::{Client, Config};
 use crate::types::Keypair;
 use eyre::Result;
+use std::env::temp_dir;
 use std::{sync::Once, time::Duration};
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -41,9 +42,10 @@ pub async fn create_test_client_with(
     timeout: Option<u64>,
 ) -> Result<Client> {
     init_logger();
+    let root_dir = temp_dir();
     let timeout = timeout.map(Duration::from_secs);
     let bootstrap_nodes = read_network_conn_info()?;
-    let config = Config::new(None, None, timeout).await;
+    let config = Config::new(Some(&root_dir), None, None, timeout).await;
     let client = Client::new(config, bootstrap_nodes, optional_keypair.clone()).await?;
 
     Ok(client)
