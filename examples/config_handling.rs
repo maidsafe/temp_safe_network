@@ -22,7 +22,7 @@ use tokio::{fs::remove_file, io};
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create some config and write it to disk
-    let file_config = Config::default();
+    let file_config = Config::new().await?;
 
     // TODO: Uncomment the below lines once we enable reading config from disk
     // file_config.network_config.local_ip = Some(

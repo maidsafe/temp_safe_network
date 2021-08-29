@@ -53,7 +53,7 @@ pub async fn create_node(mut config: Config) -> Result<(Routing, EventStream)> {
 }
 
 pub fn config_with_contact(contact: SocketAddr) -> Config {
-    let mut config = Config::default();
+    let mut config = Config::new();
     config.transport_config.bootstrap_nodes = iter::once(contact).collect();
     config
 }
@@ -97,6 +97,7 @@ pub async fn create_connected_nodes(count: usize) -> Result<Vec<(Routing, EventS
     // Create the first node
     let (node, mut event_stream) = create_node(Config {
         first: true,
+        skip_igd: true,
         ..Default::default()
     })
     .await?;

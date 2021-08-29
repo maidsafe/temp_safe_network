@@ -98,7 +98,7 @@ pub(crate) struct BatchingConfig {
     ///
     pub(crate) pool_limit: usize,
     ///
-    pub(crate) root: PathBuf,
+    pub(crate) root_dir: PathBuf,
     ///
     pub(crate) used_space: UsedSpace,
 }
@@ -111,7 +111,7 @@ impl<S: Stash> Batching<S> {
         }
         let pools = Arc::new(RwLock::new(pools));
         let dbs = Dbs {
-            chunks: KvStore::new(config.root, config.used_space)?,
+            chunks: KvStore::new(config.root_dir, config.used_space)?,
         };
         Ok(Self {
             dbs,
