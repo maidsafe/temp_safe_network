@@ -15,7 +15,7 @@ use crate::messaging::{
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey};
+use crate::types::PublicKey;
 
 use async_recursion::async_recursion;
 use bytes::Bytes;
@@ -357,16 +357,7 @@ impl Session {
                     // matches its xorname, if so, we don't need to await for more responses
                     debug!("Chunk QueryResponse received is: {:#?}", chunk);
 
-                    let xorname = match &chunk {
-                        Chunk::Private(priv_chunk) => {
-                            *PrivateChunk::new(priv_chunk.value().clone()).name()
-                        }
-                        Chunk::Public(pub_chunk) => {
-                            *PublicChunk::new(pub_chunk.value().clone()).name()
-                        }
-                    };
-
-                    if *chunk_addr.name() == xorname {
+                    if chunk_addr.name() == chunk.name() {
                         trace!("Valid Chunk received for {}", msg_id);
                         break Some(QueryResponse::GetChunk(Ok(chunk)));
                     } else {

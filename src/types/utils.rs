@@ -9,7 +9,11 @@
 
 use super::errors::convert_bincode_error;
 use super::{Error, Result};
+use bytes::Bytes;
 use multibase::{self, Base};
+use rand::rngs::OsRng;
+use rand::Rng;
+use rayon::current_num_threads;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Wrapper for raw bincode::serialise.
@@ -78,4 +82,36 @@ macro_rules! btree_map {
     ($($key:expr => $value:expr),*,) => {
         btree_map![$($key => $value),*]
     };
+}
+
+/// Generates a random vector using provided `length`.
+pub fn random_bytes(length: usize) -> Bytes {
+    use rayon::prelude::*;
+    let threads = current_num_threads();
+
+    if threads > length {
+        let mut rng = OsRng;
+        return ::std::iter::repeat(())
+            .map(|()| rng.gen::<u8>())
+            .take(length)
+            .collect();
+    }
+
+    let per_thread = length / threads;
+    let remainder = length % threads;
+
+    let mut bytes: Vec<u8> = (0..threads)
+        .par_bridge()
+        .map(|_| vec![0u8; per_thread])
+        .map(|mut bytes| {
+            let bytes = bytes.as_mut_slice();
+            rand::thread_rng().fill(bytes);
+            bytes.to_owned()
+        })
+        .flatten()
+        .collect();
+
+    bytes.extend(vec![0u8; remainder]);
+
+    Bytes::from(bytes)
 }

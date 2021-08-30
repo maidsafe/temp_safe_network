@@ -24,8 +24,8 @@ use tiny_keccak::{Hasher, Sha3};
 
 use eyre::{eyre, Context, Result};
 use safe_network::{
-    client::{utils::random_bytes, utils::test_utils::read_network_conn_info, Client, Config},
-    types::ChunkAddress,
+    client::{client_api::BlobAddress, utils::test_utils::read_network_conn_info, Client, Config},
+    types::utils::random_bytes,
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
 
@@ -154,7 +154,7 @@ pub async fn run_split() -> Result<()> {
 
     let files_to_put: i32 = 12;
     for _i in 0..files_to_put {
-        let (address, hash) = put_data().await?;
+        let (address, hash) = upload_data().await?;
         all_data_put.push((address, hash));
     }
 
@@ -214,8 +214,8 @@ pub async fn run_split() -> Result<()> {
     Ok(())
 }
 
-async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
-    // Now we PUT data.
+async fn upload_data() -> Result<(BlobAddress, [u8; 32])> {
+    // Now we upload the data.
     println!("Reading network bootstrap information...");
     let bootstrap_nodes =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
@@ -236,7 +236,7 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
     let address = client.write_to_network(raw_data, Scope::Public).await?;
     let xorurl = Url::encode_blob(
         *address.name(),
-        Scope::Public,
+        address.scope(),
         ContentType::Raw,
         DEFAULT_XORURL_BASE,
     )?;

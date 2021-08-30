@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use bincode::serialize;
 use futures::future::join_all;
 
+#[allow(unused)]
 pub(crate) struct ChunkUploader<U: Uploader> {
     uploader: U,
 }
@@ -24,10 +25,12 @@ pub(crate) trait Uploader: Clone {
 }
 
 impl<U: Uploader + Send + Sync + 'static> ChunkUploader<U> {
+    #[allow(unused)]
     pub(crate) fn new(uploader: U) -> Self {
         Self { uploader }
     }
 
+    #[allow(unused)]
     pub(crate) async fn store(&self, chunks: Vec<Chunk>) -> Result<()> {
         let handles =
             chunks
