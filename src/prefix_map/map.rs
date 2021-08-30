@@ -9,7 +9,6 @@
 //! Container that acts as a map whose keys are Prefixes.
 
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
-use serde::{Deserialize, Serialize};
 use std::iter::Iterator;
 use xor_name::{Prefix, XorName};
 
@@ -20,16 +19,15 @@ use xor_name::{Prefix, XorName};
 /// prefix (00) and we insert entries with (000) and (001), the (00) prefix becomes fully
 /// covered and is automatically removed.
 ///
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub(crate) struct PrefixMap<T>(DashMap<Prefix, T>);
+#[derive(Debug, Clone)]
+pub(super) struct PrefixMap<T>(DashMap<Prefix, T>);
 
 impl<T> PrefixMap<T>
 where
     T: Clone,
 {
     /// Create empty `PrefixMap`.
-    pub(crate) fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self::default()
     }
 
@@ -39,7 +37,7 @@ where
     /// Does not insert anything if any descendant of the prefix of `entry` is already present in
     /// the map.
     /// Returns a boolean indicating whether anything changed.
-    pub(crate) fn insert(&mut self, prefix: Prefix, entry: T) -> bool {
+    pub(super) fn insert(&mut self, prefix: Prefix, entry: T) -> bool {
         // Don't insert if any descendant is already present in the map.
         if self.descendants(&prefix).next().is_some() {
             return false;
@@ -53,7 +51,7 @@ where
     }
 
     /// Get the entry at `prefix`, if any.
-    pub(crate) fn get(&self, prefix: &Prefix) -> Option<(Prefix, T)> {
+    pub(super) fn get(&self, prefix: &Prefix) -> Option<(Prefix, T)> {
         self.0
             .get(prefix)
             .map(|entry| (*entry.key(), entry.value().clone()))
@@ -61,7 +59,7 @@ where
 
     /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
     /// one with the longest prefix.
-    pub(crate) fn get_matching(&self, name: &XorName) -> Option<(Prefix, T)> {
+    pub(super) fn get_matching(&self, name: &XorName) -> Option<(Prefix, T)> {
         let max = self
             .0
             .iter()
@@ -73,7 +71,7 @@ where
     /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
     /// one with the longest prefix. If there are no prefixes matching the given `name`, return
     /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
-    pub(crate) fn get_matching_or_opposite(&self, name: &XorName) -> Option<(Prefix, T)> {
+    pub(super) fn get_matching_or_opposite(&self, name: &XorName) -> Option<(Prefix, T)> {
         if let Some((prefix, t)) = self
             .iter()
             .filter(|e| e.key().matches(name))
@@ -97,19 +95,18 @@ where
 
     /// Get the entry at the prefix that matches `prefix`. In case of multiple matches, returns the
     /// one with the longest prefix.
-    #[allow(unused)]
-    pub(crate) fn get_matching_prefix(&self, prefix: &Prefix) -> Option<(Prefix, T)> {
+    pub(super) fn get_matching_prefix(&self, prefix: &Prefix) -> Option<(Prefix, T)> {
         self.get_matching(&prefix.name())
     }
 
     /// Returns an owning iterator over the entries
-    pub(crate) fn iter(&self) -> impl Iterator<Item = RefMulti<'_, Prefix, T>> {
+    pub(super) fn iter(&self) -> impl Iterator<Item = RefMulti<'_, Prefix, T>> {
         self.0.iter()
     }
 
     /// Returns an iterator over all entries whose prefixes are descendants (extensions) of
     /// `prefix`.
-    pub(crate) fn descendants<'a>(
+    pub(super) fn descendants<'a>(
         &'a self,
         prefix: &'a Prefix,
     ) -> impl Iterator<Item = RefMulti<'a, Prefix, T>> + 'a {
@@ -120,7 +117,7 @@ where
 
     /// Remove `prefix` and any of its ancestors if they are covered by their descendants.
     /// For example, if `(00)` and `(01)` are both in the map, we can remove `(0)` and `()`.
-    pub(crate) fn prune(&self, mut prefix: Prefix) {
+    pub(super) fn prune(&self, mut prefix: Prefix) {
         // TODO: can this be optimized?
 
         loop {
@@ -146,60 +143,13 @@ where
 // See rust-lang/rust#26925
 impl<T> Default for PrefixMap<T> {
     fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-// Need to impl this manually, because the derived one would use `PartialEq` of `Entry` which
-// compares only the prefixes.
-impl<T> PartialEq for PrefixMap<T>
-where
-    T: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.0.len() == other.0.len()
-            && self
-                .0
-                .iter()
-                .zip(other.0.iter())
-                .all(|(lhs, rhs)| lhs.pair() == rhs.pair())
-    }
-}
-
-impl<T> Eq for PrefixMap<T> where T: Eq {}
-
-impl<T> From<PrefixMap<T>> for DashMap<Prefix, T> {
-    fn from(map: PrefixMap<T>) -> Self {
-        map.0
-    }
-}
-
-impl<T> IntoIterator for PrefixMap<T> {
-    type Item = T;
-    type IntoIter = PrefixMapIterator<T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        PrefixMapIterator(self.0.into_iter())
-    }
-}
-
-/// An owning iterator over a [`PrefixMap`].
-///
-/// This struct is created by [`PrefixMap::into_iter`].
-pub(crate) struct PrefixMapIterator<T>(dashmap::iter::OwningIter<Prefix, T>);
-
-impl<T> Iterator for PrefixMapIterator<T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(_, t)| t)
+        Self(DashMap::new())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use eyre::Result;
     use rand::Rng;
 
     #[test]
@@ -344,21 +294,6 @@ mod tests {
             map.get_matching_prefix(&prefix("101")),
             Some((prefix("10"), 10))
         );
-    }
-
-    #[test]
-    fn serialize_transparent() -> Result<()> {
-        let mut map = PrefixMap::new();
-        let _ = map.insert(prefix("0"), 0);
-        let _ = map.insert(prefix("1"), 1);
-        let _ = map.insert(prefix("10"), 10);
-
-        let copy_map: DashMap<_, _> = map.clone().into();
-        let serialized_copy_map = rmp_serde::to_vec(&copy_map)?;
-
-        assert_eq!(rmp_serde::to_vec(&map)?, serialized_copy_map);
-        let _ = rmp_serde::from_read::<_, PrefixMap<i32>>(&*serialized_copy_map)?;
-        Ok(())
     }
 
     fn prefix(s: &str) -> Prefix {

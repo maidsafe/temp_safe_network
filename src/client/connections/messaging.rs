@@ -6,28 +6,27 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::net::SocketAddr;
-
-use bytes::Bytes;
-use futures::{future::join_all, stream::FuturesUnordered};
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use tokio::{sync::mpsc::channel, task::JoinHandle};
-use tracing::{debug, error, trace, warn};
-
+use super::{QueryResult, Session};
 use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
-    DstLocation, MessageId, MsgKind, SectionAuthorityProvider, ServiceAuth, WireMsg,
+    DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::types::{Chunk, PrefixMap, PrivateChunk, PublicChunk};
-
-use super::{QueryResult, Session};
+use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::XorName;
+use crate::types::{Chunk, PrivateChunk, PublicChunk};
+
+use bytes::Bytes;
+use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
 use qp2p::Endpoint;
-use std::collections::BTreeMap;
-use tokio::time::sleep;
+use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
+use tokio::{
+    sync::{mpsc::channel, RwLock},
+    task::JoinHandle,
+    time::sleep,
+};
+use tracing::{debug, error, trace, warn};
 
 // Number of attempts when retrying to send a message to a node
 const NUMBER_OF_RETRIES: usize = 3;
@@ -69,12 +68,8 @@ impl Session {
         let endpoint = self.endpoint()?.clone();
 
         // Get DataSection elders details.
-        let (elders, section_pk) = self
-            .network
-            .read()
-            .await
-            .get_matching(&dst_address)
-            .map(|(_, sap)| {
+        let (elders, section_pk) =
+            if let Ok(sap) = self.network.read().await.section_by_name(&dst_address) {
                 (
                     sap.elders
                         .values()
@@ -83,13 +78,12 @@ impl Session {
                         .collect::<Vec<SocketAddr>>(),
                     sap.public_key_set.public_key(),
                 )
-            })
-            .or_else(|| {
+            } else {
                 // Send message to our bootstrap peer with a random section PK.
                 self.bootstrap_peer
                     .map(|addr| (vec![addr], bls::SecretKey::random().public_key()))
-            })
-            .ok_or(Error::NotBootstrapped)?;
+                    .ok_or(Error::NotBootstrapped)?
+            };
 
         let msg_id = MessageId::new();
 
@@ -137,21 +131,19 @@ impl Session {
         let data_name = query.dst_name();
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let (elders, section_pk) = self
-            .network
-            .read()
-            .await
-            .get_matching(&data_name)
-            .map(|(_, sap)| (sap.elders.clone(), sap.public_key_set.public_key()))
-            .or_else(|| {
+        let (elders, section_pk) =
+            if let Ok(sap) = self.network.read().await.section_by_name(&data_name) {
+                (sap.elders, sap.public_key_set.public_key())
+            } else {
                 // Send message to our bootstrap peer with a random section PK and addressing adring.
-                self.bootstrap_peer.map(|addr| {
-                    let mut bootstrapped_peer = BTreeMap::new();
-                    let _ = bootstrapped_peer.insert(XorName::random(), addr);
-                    (bootstrapped_peer, bls::SecretKey::random().public_key())
-                })
-            })
-            .ok_or(Error::NotBootstrapped)?;
+                self.bootstrap_peer
+                    .map(|addr| {
+                        let mut bootstrapped_peer = BTreeMap::new();
+                        let _ = bootstrapped_peer.insert(XorName::random(), addr);
+                        (bootstrapped_peer, bls::SecretKey::random().public_key())
+                    })
+                    .ok_or(Error::NotBootstrapped)?
+            };
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders = elders
@@ -432,22 +424,14 @@ pub(crate) async fn rebuild_message_for_ae_resend(
     serialized_cmd: Bytes,
     auth: ServiceAuth,
     dst_address: Option<XorName>,
-    network: Arc<RwLock<PrefixMap<SectionAuthorityProvider>>>,
+    network: Arc<RwLock<NetworkPrefixMap>>,
 ) -> Option<(WireMsg, Vec<SocketAddr>)> {
     info!("Rebuilding message for AE resend");
     if let Some(dst_address) = dst_address {
-        if let Some((elders, section_pk)) =
-            network
-                .read()
-                .await
-                .get_matching(&dst_address)
-                .map(|(_, sap)| {
-                    (
-                        sap.elders.values().cloned().collect::<Vec<SocketAddr>>(),
-                        sap.public_key_set.public_key(),
-                    )
-                })
-        {
+        if let Ok(sap) = network.read().await.section_by_name(&dst_address) {
+            let elders = sap.elders.values().cloned().collect::<Vec<SocketAddr>>();
+            let section_pk = sap.public_key_set.public_key();
+
             // Let's rebuild the message with the updated destination details
             if let Ok(wire_msg) = WireMsg::new_msg(
                 msg_id,

@@ -13,14 +13,12 @@ use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
 use crate::client::Error;
-use crate::messaging::data::OperationId;
 use crate::messaging::{
-    data::{CmdError, QueryResponse},
-    signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-    system::SigShare,
-    SectionAuthorityProvider,
+    data::{CmdError, OperationId, QueryResponse},
+    signature_aggregator::SignatureAggregator,
 };
-use crate::types::{PrefixMap, PublicKey};
+use crate::prefix_map::NetworkPrefixMap;
+use crate::types::PublicKey;
 use std::net::SocketAddr;
 use xor_name::XorName;
 
@@ -49,7 +47,7 @@ pub(super) struct Session {
     // Channels for sending errors to upper layer
     incoming_err_sender: Arc<Sender<CmdError>>,
     /// All elders we know about from AE messages
-    network: Arc<RwLock<PrefixMap<SectionAuthorityProvider>>>,
+    network: Arc<RwLock<NetworkPrefixMap>>,
     /// Our initial bootstrap node
     bootstrap_peer: Option<SocketAddr>,
     /// BLS Signature aggregator for aggregating network messages
@@ -72,21 +70,10 @@ impl Session {
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
             endpoint: None,
-            network: Arc::new(RwLock::new(PrefixMap::new())),
+            network: Arc::new(RwLock::new(NetworkPrefixMap::new())),
             bootstrap_peer: None,
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
         })
-    }
-
-    /// Get the count of elders we have knowledge of
-    #[allow(unused)]
-    pub(super) async fn known_elders_count(&self) -> usize {
-        self.network
-            .read()
-            .await
-            .iter()
-            .map(|entry| entry.value().elders.len())
-            .sum()
     }
 
     pub(super) fn endpoint(&self) -> Result<&Endpoint<XorName>, Error> {
@@ -97,35 +84,5 @@ impl Session {
                 Err(Error::NotBootstrapped)
             }
         }
-    }
-
-    #[allow(unused)]
-    pub(crate) async fn aggregate_incoming_message(
-        &mut self,
-        bytes: Vec<u8>,
-        sig_share: SigShare,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        match self.aggregator.write().await.add(&bytes, sig_share) {
-            Ok(key_sig) => {
-                if key_sig.public_key.verify(&key_sig.signature, &bytes) {
-                    Ok(Some(bytes))
-                } else {
-                    Err(Error::Aggregation(
-                        "Failed to verify aggregated signature".to_string(),
-                    ))
-                }
-            }
-            Err(AggregatorError::NotEnoughShares) => Ok(None),
-            Err(e) => Err(Error::Aggregation(e.to_string())),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn has_bootstrapped(&self) -> bool {
-        self.network
-            .read()
-            .await
-            .get_matching(&xor_name::XorName::random())
-            .is_some()
     }
 }

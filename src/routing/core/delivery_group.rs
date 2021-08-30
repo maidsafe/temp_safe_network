@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::NetworkPrefixMap;
 use crate::messaging::{
     system::{Peer, Section},
     DstLocation,
 };
 use crate::routing::{
     error::{Error, Result},
-    network::Network,
     peer::PeerUtils,
     section::{SectionPeersUtils, SectionUtils},
     supermajority, SectionAuthorityProviderUtils, ELDER_SIZE,
@@ -39,7 +39,7 @@ pub(crate) fn delivery_targets(
     dst: &DstLocation,
     our_name: &XorName,
     section: &Section,
-    network: &Network,
+    network: &NetworkPrefixMap,
 ) -> Result<(Vec<Peer>, usize)> {
     // Adult now having the knowledge of other adults within the own section.
     // Functions of `section_candidates` and `candidates` only take section elder into account.
@@ -73,7 +73,7 @@ fn section_candidates(
     target_name: &XorName,
     our_name: &XorName,
     section: &Section,
-    network: &Network,
+    network: &NetworkPrefixMap,
 ) -> Result<(Vec<Peer>, usize)> {
     // Find closest section to `target_name` out of the ones we know (including our own)
     let network_sections: Vec<_> = network.all().collect();
@@ -100,7 +100,7 @@ fn candidates(
     target_name: &XorName,
     our_name: &XorName,
     section: &Section,
-    network: &Network,
+    network: &NetworkPrefixMap,
 ) -> Result<(Vec<Peer>, usize)> {
     // All sections we know (including our own), sorted by distance to `target_name`.
     let network_sections: Vec<_> = network.all().collect();
@@ -151,7 +151,7 @@ fn candidates(
 }
 
 // Returns a `Peer` for a known node.
-fn get_peer(name: &XorName, section: &Section, network: &Network) -> Option<Peer> {
+fn get_peer(name: &XorName, section: &Section, network: &NetworkPrefixMap) -> Option<Peer> {
     section
         .members()
         .get(name)
@@ -496,7 +496,7 @@ mod tests {
         Ok(())
     }
 
-    fn setup_elder() -> Result<(XorName, Section, Network, bls::SecretKey)> {
+    fn setup_elder() -> Result<(XorName, Section, NetworkPrefixMap, bls::SecretKey)> {
         let prefix0 = Prefix::default().pushed(false);
         let prefix1 = Prefix::default().pushed(true);
 
@@ -518,7 +518,7 @@ mod tests {
             assert!(section.update_member(node_state));
         }
 
-        let mut network = Network::new();
+        let mut network = NetworkPrefixMap::new();
 
         let (section_auth1, _, secret_key_set) =
             gen_section_authority_provider(prefix1, ELDER_SIZE);
@@ -547,7 +547,7 @@ mod tests {
         Ok((our_name, section, network, genesis_sk.clone()))
     }
 
-    fn setup_adult() -> Result<(XorName, Section, Network)> {
+    fn setup_adult() -> Result<(XorName, Section, NetworkPrefixMap)> {
         let prefix0 = Prefix::default().pushed(false);
 
         let (section_auth, _, secret_key_set) = gen_section_authority_provider(prefix0, ELDER_SIZE);
@@ -557,7 +557,7 @@ mod tests {
         let chain = SecuredLinkedList::new(genesis_pk);
         let section = Section::new(genesis_pk, chain, section_auth)?;
 
-        let network = Network::new();
+        let network = NetworkPrefixMap::new();
         let our_name = section.prefix().substituted_in(rand::random());
 
         Ok((our_name, section, network))

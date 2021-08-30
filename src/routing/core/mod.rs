@@ -23,7 +23,6 @@ mod split_barrier;
 use crate::dbs::UsedSpace;
 pub(crate) use capacity::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL};
 pub(crate) use register_storage::RegisterStorage;
-// use chunk_records::ChunkRecords;
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 use capacity::Capacity;
@@ -39,10 +38,10 @@ use crate::messaging::{
     system::{Proposal, Section},
     MessageId, SectionAuthorityProvider,
 };
+use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
-    network::Network,
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
@@ -66,7 +65,7 @@ pub(crate) struct Core {
     pub(crate) comm: Comm,
     node: Node,
     section: Section,
-    network: Network,
+    network: NetworkPrefixMap,
     section_keys_provider: SectionKeysProvider,
     message_aggregator: Arc<RwLock<SignatureAggregator>>,
     proposal_aggregator: ProposalAggregator,
@@ -111,7 +110,7 @@ impl Core {
             comm,
             node,
             section,
-            network: Network::new(),
+            network: NetworkPrefixMap::new(),
             section_keys_provider,
             proposal_aggregator: ProposalAggregator::default(),
             split_barrier: SplitBarrier::new(),
@@ -160,10 +159,9 @@ impl Core {
 
         if self
             .network
-            .sections
             .insert(new_section_auth.value.prefix, new_section_auth)
         {
-            info!("Updated our section's state in network's PrefixMap");
+            info!("Updated our section's state in network's NetworkPrefixMap");
         }
 
         if new.last_key != old.last_key {
@@ -190,16 +188,7 @@ impl Core {
             }
 
             if new.is_elder || old.is_elder {
-                let network = self
-                    .network
-                    .sections
-                    .iter()
-                    .map(|e| {
-                        let (prefix, sap) = e.pair();
-                        (*prefix, sap.clone())
-                    })
-                    .collect();
-                commands.extend(self.send_sync(self.section.clone(), network)?);
+                commands.extend(self.send_sync(self.section.clone(), self.network.dump())?);
             }
 
             let current: BTreeSet<_> = self.section.authority_provider().names();
@@ -220,7 +209,7 @@ impl Core {
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
                 info!("Demoted");
-                self.network = Network::new();
+                self.network = NetworkPrefixMap::new();
                 self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None);
                 NodeElderChange::Demoted
             } else {

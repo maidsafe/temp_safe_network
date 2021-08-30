@@ -48,6 +48,7 @@ pub use dbs::UsedSpace;
 
 pub mod messaging;
 pub mod node;
+pub mod prefix_map;
 pub mod routing;
 pub mod types;
 pub mod url;

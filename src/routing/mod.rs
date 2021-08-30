@@ -23,9 +23,10 @@
 // ############################################################################
 // Public API
 // ############################################################################
+pub use self::error::ProposalError;
 pub use self::{
     cache::Cache,
-    error::ProposalError,
+    dkg::SectionAuthUtils,
     error::{Error, Result},
     peer::PeerUtils,
     routing_api::{
@@ -39,9 +40,10 @@ pub use self::{
         section_authority_provider::SectionAuthorityProviderUtils,
     },
 };
-
 pub(crate) use self::{
-    core::{ChunkStore, RegisterStorage, CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
+    core::ChunkStore,
+    core::RegisterStorage,
+    core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
     section::section_keys::SectionKeyShare,
 };
 
@@ -51,6 +53,11 @@ pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API upd
 
 #[cfg(any(test, feature = "test-utils"))]
 pub use test_utils::*;
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) use dkg::test_utils as dkg_test_utils;
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) use section::test_utils as section_test_utils;
 
 // ############################################################################
 // Private
@@ -62,7 +69,6 @@ mod dkg;
 mod ed25519;
 mod error;
 mod messages;
-mod network;
 mod node;
 mod peer;
 mod relocation;

@@ -11,11 +11,15 @@ use crate::messaging::system::SectionAuth;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 
-pub(crate) trait SectionAuthUtils<T: Serialize> {
+///
+pub trait SectionAuthUtils<T: Serialize> {
+    ///
     fn new(value: T, sig: KeyedSig) -> Self;
 
+    ///
     fn verify(&self, section_chain: &SecuredLinkedList) -> bool;
 
+    ///
     fn self_verify(&self) -> bool;
 }
 

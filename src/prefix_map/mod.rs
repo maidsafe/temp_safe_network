@@ -6,32 +6,43 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+//! This module provides a prefix map which is a container for storing
+//! information about other sections in the network.
+
+mod map;
 mod stats;
 
-use self::stats::NetworkStats;
+use self::{map::PrefixMap, stats::NetworkStats};
 use crate::messaging::{
     system::{Peer, SectionAuth},
     SectionAuthorityProvider,
 };
-use crate::routing::{
-    dkg::SectionAuthUtils, peer::PeerUtils, Error, Result, SectionAuthorityProviderUtils,
-};
-use crate::types::PrefixMap;
+use crate::routing::{Error, PeerUtils, Result, SectionAuthUtils, SectionAuthorityProviderUtils};
 use secured_linked_list::SecuredLinkedList;
-use std::iter;
+use std::{collections::BTreeMap, iter};
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
-pub(crate) struct Network {
+#[derive(Debug, Clone)]
+pub(crate) struct NetworkPrefixMap {
     /// Map of sections prefixes to their latest signed section authority providers.
-    pub(crate) sections: PrefixMap<SectionAuth<SectionAuthorityProvider>>,
+    sections: PrefixMap<SectionAuth<SectionAuthorityProvider>>,
 }
 
-impl Network {
+impl NetworkPrefixMap {
     pub(crate) fn new() -> Self {
         Self {
             sections: PrefixMap::new(),
         }
+    }
+
+    ///
+    pub(crate) fn insert(
+        &mut self,
+        prefix: Prefix,
+        sap: SectionAuth<SectionAuthorityProvider>,
+    ) -> bool {
+        self.sections.insert(prefix, sap)
     }
 
     /// Returns the known section that is closest to the given name, regardless of whether `name`
@@ -82,7 +93,7 @@ impl Network {
             })
     }
 
-    /// Merge two `Network`s into one.
+    /// Merge two `PrefixMap`s into one.
     /// TODO: make this operation commutative, associative and idempotent (CRDT)
     /// TODO: return bool indicating whether anything changed.
     pub(crate) fn merge<'a>(
@@ -97,6 +108,17 @@ impl Network {
                 let _ = self.sections.insert(*prefix, sap.clone());
             }
         }
+    }
+
+    ///
+    pub(crate) fn dump(&self) -> BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>> {
+        self.sections
+            .iter()
+            .map(|e| {
+                let (prefix, sap) = e.pair();
+                (*prefix, sap.clone())
+            })
+            .collect()
     }
 
     /// Update our knowledge of a remote section's SAP only
@@ -246,7 +268,7 @@ impl Network {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::{dkg, section};
+    use crate::routing::{dkg_test_utils, section_test_utils};
     use eyre::{Context, Result};
     use rand::Rng;
 
@@ -261,7 +283,7 @@ mod tests {
         let p11: Prefix = "11".parse().unwrap();
 
         // Create map containing sections (00), (01) and (10)
-        let mut map = Network::new();
+        let mut map = NetworkPrefixMap::new();
 
         let mut chain01 = chain.clone();
         let section_auth_01 = gen_section_auth(p01)?;
@@ -291,8 +313,8 @@ mod tests {
 
     fn gen_section_auth(prefix: Prefix) -> Result<SectionAuth<SectionAuthorityProvider>> {
         let (section_auth, _, secret_key_set) =
-            section::test_utils::gen_section_authority_provider(prefix, 5);
-        dkg::test_utils::section_signed(secret_key_set.secret_key(), section_auth)
+            section_test_utils::gen_section_authority_provider(prefix, 5);
+        dkg_test_utils::section_signed(secret_key_set.secret_key(), section_auth)
             .context("Failed to generate SAP")
     }
 }

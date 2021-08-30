@@ -16,7 +16,7 @@ use crate::client::connections::messaging::{rebuild_message_for_ae_resend, send_
 use crate::client::Error;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
-    system::SystemMsg,
+    system::{SectionAuth, SystemMsg},
     MessageId, MessageType, WireMsg,
 };
 
@@ -62,6 +62,7 @@ impl Session {
                     msg:
                         SystemMsg::AntiEntropyRedirect {
                             section_auth,
+                            section_signed,
                             bounced_msg,
                             ..
                         },
@@ -71,6 +72,7 @@ impl Session {
                     msg:
                         SystemMsg::AntiEntropyRetry {
                             section_auth,
+                            section_signed,
                             bounced_msg,
                             ..
                         },
@@ -78,11 +80,13 @@ impl Session {
                 } => {
                     info!("Received AE-Redirect/retry SAP: {:?}", section_auth);
                     // Update our network knowledge
-                    let _ = self
-                        .network
-                        .write()
-                        .await
-                        .insert(section_auth.prefix, section_auth);
+                    let _ = self.network.write().await.insert(
+                        section_auth.prefix,
+                        SectionAuth {
+                            value: section_auth.clone(),
+                            sig: section_signed,
+                        },
+                    );
                     info!("Updated network knowledge");
 
                     let (msg_id, service_msg, dst_location, auth) =
