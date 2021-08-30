@@ -18,7 +18,9 @@ mod chunk;
 mod errors;
 mod keys;
 mod token;
+mod prefix_map;
 
+pub(crate) use prefix_map::PrefixMap;
 pub use chunk::{
     Address as ChunkAddress, Chunk, Kind as ChunkKind, PrivateChunk, PublicChunk,
     MAX_CHUNK_SIZE_IN_BYTES,
