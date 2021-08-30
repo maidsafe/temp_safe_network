@@ -397,7 +397,7 @@ impl Core {
         let our_section = self.section.section_auth.value.clone();
         let better_sap = self
             .network()
-            .section_by_name(data_name)
+            .get_matching_or_opposite(data_name)
             .unwrap_or_else(|_| our_section.clone());
 
         info!("Our SAP: {:?}", our_section);

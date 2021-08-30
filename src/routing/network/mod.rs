@@ -197,6 +197,19 @@ impl Network {
             .map(|(_, section_auth)| section_auth.value)
     }
 
+    /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
+    /// one with the longest prefix. If there are no prefixes matching the given `name`, return
+    /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
+    pub(crate) fn get_matching_or_opposite(
+        &self,
+        name: &XorName,
+    ) -> Result<SectionAuthorityProvider> {
+        self.sections
+            .get_matching_or_opposite(name)
+            .ok_or(Error::NoMatchingSection)
+            .map(|(_, section_auth)| section_auth.value)
+    }
+
     /// Returns network statistics.
     pub(crate) fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
         // Let's compute an estimate of the total number of elders in the network

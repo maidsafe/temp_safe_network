@@ -20,9 +20,9 @@ use crate::messaging::{
     signature_aggregator::{Error as AggregatorError, SignatureAggregator},
     SectionAuthorityProvider,
 };
-use crate::types::PublicKey;
+use crate::types::{PrefixMap, PublicKey};
 use std::net::SocketAddr;
-use xor_name::{PrefixMap, XorName};
+use xor_name::XorName;
 
 mod listeners;
 mod messaging;
@@ -85,7 +85,7 @@ impl Session {
             .read()
             .await
             .iter()
-            .map(|(_, sap)| sap.elders.len())
+            .map(|entry| entry.value().elders.len())
             .sum()
     }
 
