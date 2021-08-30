@@ -73,7 +73,7 @@ where
     /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
     /// one with the longest prefix. If there are no prefixes matching the given `name`, return
     /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
-    pub(crate) fn try_get_matching(&self, name: &XorName) -> Option<(Prefix, T)> {
+    pub(crate) fn get_matching_or_opposite(&self, name: &XorName) -> Option<(Prefix, T)> {
         if let Some((prefix, t)) = self
             .iter()
             .filter(|e| e.key().matches(name))
@@ -243,13 +243,13 @@ mod tests {
 
         // There are no matching prefixes, so return an opposite prefix.
         assert_eq!(
-            map.try_get_matching(&prefix("1").substituted_in(rng.gen())),
+            map.get_matching_or_opposite(&prefix("1").substituted_in(rng.gen())),
             Some((prefix("0"), 1))
         );
 
         let _ = map.insert(prefix("1"), 1);
         assert_eq!(
-            map.try_get_matching(&prefix("1").substituted_in(rng.gen())),
+            map.get_matching_or_opposite(&prefix("1").substituted_in(rng.gen())),
             Some((prefix("1"), 1))
         );
     }
