@@ -73,6 +73,7 @@ where
     /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
     /// one with the longest prefix. If there are no prefixes matching the given `name`, return
     /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
+    #[allow(unused)]
     pub(crate) fn get_matching_or_opposite(&self, name: &XorName) -> Option<(Prefix, T)> {
         if let Some((prefix, t)) = self
             .iter()
@@ -97,6 +98,7 @@ where
 
     /// Get the entry at the prefix that matches `prefix`. In case of multiple matches, returns the
     /// one with the longest prefix.
+    #[allow(unused)]
     pub(crate) fn get_matching_prefix(&self, prefix: &Prefix) -> Option<(Prefix, T)> {
         self.get_matching(&prefix.name())
     }
