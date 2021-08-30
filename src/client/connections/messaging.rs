@@ -20,7 +20,7 @@ use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
     DstLocation, MessageId, MsgKind, SectionAuthorityProvider, ServiceAuth, WireMsg,
 };
-use crate::types::{Chunk, PrivateChunk, PublicChunk};
+use crate::types::{Chunk, PrefixMap, PrivateChunk, PublicChunk};
 
 use super::{QueryResult, Session};
 use crate::routing::XorName;
@@ -28,7 +28,6 @@ use itertools::Itertools;
 use qp2p::Endpoint;
 use std::collections::BTreeMap;
 use tokio::time::sleep;
-use xor_name::PrefixMap;
 
 // Number of attempts when retrying to send a message to a node
 const NUMBER_OF_RETRIES: usize = 3;
