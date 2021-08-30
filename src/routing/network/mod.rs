@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod prefix_map;
 mod stats;
 
 use self::stats::NetworkStats;
@@ -17,7 +16,7 @@ use crate::messaging::{
 use crate::routing::{
     dkg::SectionAuthUtils, peer::PeerUtils, Error, Result, SectionAuthorityProviderUtils,
 };
-use prefix_map::PrefixMap;
+use crate::types::PrefixMap;
 use secured_linked_list::SecuredLinkedList;
 use std::iter;
 use xor_name::{Prefix, XorName};
