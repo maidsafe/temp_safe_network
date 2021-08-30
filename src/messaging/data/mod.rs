@@ -274,7 +274,7 @@ try_from!(Permissions, GetRegisterUserPermissions);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Keypair, PrivateChunk};
+    use crate::types::{utils::random_bytes, Chunk, Keypair};
     use bytes::Bytes;
     use eyre::{eyre, Result};
     use std::convert::{TryFrom, TryInto};
@@ -318,7 +318,7 @@ mod tests {
             None => return Err(eyre!("Could not generate public key")),
         };
 
-        let i_data = Chunk::Private(PrivateChunk::new(Bytes::from(vec![1, 3, 1, 4])));
+        let i_data = Chunk::new(Bytes::from(vec![1, 3, 1, 4]));
         let e = Error::AccessDenied(key);
         assert_eq!(
             i_data,
@@ -330,6 +330,33 @@ mod tests {
             Err(TryFromError::Response(e.clone())),
             Chunk::try_from(GetChunk(Err(e)))
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn wire_msg_payload() -> Result<()> {
+        use crate::messaging::data::DataCmd;
+        use crate::messaging::data::ServiceMsg;
+        use crate::messaging::WireMsg;
+
+        let chunks = (0..10).map(|_| Chunk::new(random_bytes(3072)));
+
+        for chunk in chunks {
+            let (original_msg, serialised_cmd) = {
+                let msg = ServiceMsg::Cmd(DataCmd::StoreChunk(chunk));
+                let bytes = WireMsg::serialize_msg_payload(&msg)?;
+                (msg, bytes)
+            };
+            let deserialized_msg: ServiceMsg =
+                rmp_serde::from_slice(&serialised_cmd).map_err(|err| {
+                    crate::messaging::Error::FailedToParse(format!(
+                        "Data message payload as Msgpack: {}",
+                        err
+                    ))
+                })?;
+            assert_eq!(original_msg, deserialized_msg);
+        }
 
         Ok(())
     }

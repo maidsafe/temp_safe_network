@@ -14,7 +14,7 @@ version = "0.27.6"
 #incremental = true
 
 [[bench]]
-name = "put"
+name = "upload_bytes"
 harness = false
 required-features = ["test-utils"]
 

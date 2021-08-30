@@ -14,6 +14,7 @@ mod queries;
 mod register_apis;
 mod stash;
 
+pub use self::blob_apis::BlobAddress;
 use self::data::{Batch, Batching, BatchingConfig};
 use crate::client::{connections::Session, errors::Error, Config};
 use crate::messaging::data::CmdError;
