@@ -107,11 +107,13 @@ impl Safe {
             )?;
 
             let entry = Url::from_xorurl(&files_map_xorurl)?;
-            let _ = &self
+            let entry_hash = &self
                 .write_to_register(&xor_url, entry, Default::default())
                 .await?;
 
-            xor_url
+            let mut tmp_url = Url::from_xorurl(&xor_url)?;
+            tmp_url.set_content_version(Some(VersionHash::from(entry_hash)));
+            format!("{}", &tmp_url)
         };
 
         Ok((xorurl, processed_files, files_map))
