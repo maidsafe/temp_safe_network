@@ -42,7 +42,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
             },
             NodeMsgAuthority::Section(section_auth) => SrcLocation::Section {
                 name: section_auth.src_name,
-                section_pk: section_auth.section_pk,
+                section_pk: section_auth.sig.public_key,
             },
         }
     }
@@ -73,7 +73,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
         let section_pk = match &self {
             NodeMsgAuthority::Node(_) => return true,
             NodeMsgAuthority::BlsShare(bls_share_auth) => &bls_share_auth.section_pk,
-            NodeMsgAuthority::Section(section_auth) => &section_auth.section_pk,
+            NodeMsgAuthority::Section(section_auth) => &section_auth.sig.public_key,
         };
         known_keys.iter().any(|key| key == section_pk)
     }

@@ -217,7 +217,7 @@ impl WireMsg {
         match &self.header.msg_envelope.msg_kind {
             MsgKind::NodeAuthMsg(node_signed) => Some(node_signed.section_pk),
             MsgKind::NodeBlsShareAuthMsg(bls_share_signed) => Some(bls_share_signed.section_pk),
-            MsgKind::SectionAuthMsg(section_signed) => Some(section_signed.section_pk),
+            MsgKind::SectionAuthMsg(section_signed) => Some(section_signed.sig.public_key),
             _ => None,
         }
     }

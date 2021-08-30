@@ -245,7 +245,6 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let payload = WireMsg::serialize_msg_payload(&relocate_node_msg)?;
     let signature = sk_set.secret_key().sign(&payload);
     let section_signed = MsgKindSectionAuth {
-        section_pk: section_key,
         src_name: node_name,
         sig: KeyedSig {
             public_key: section_key,
@@ -888,7 +887,6 @@ async fn handle_untrusted_accumulated_message() -> Result<()> {
     let payload = WireMsg::serialize_msg_payload(&original_node_msg)?;
     let expected_recipients = vec![sender];
     let msg_kind = MsgKind::SectionAuthMsg(MsgKindSectionAuth {
-        section_pk: pk1,
         src_name: Prefix::default().name(),
         sig: KeyedSig {
             public_key: pk1,
