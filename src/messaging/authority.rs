@@ -1,3 +1,11 @@
+// Copyright 2021 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use super::{
     system::{KeyedSig, SigShare},
     Error, Result,
@@ -88,8 +96,6 @@ impl BlsShareAuth {
 /// Authority of a whole section.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct SectionAuth {
-    /// Section key of the source.
-    pub section_pk: BlsPublicKey,
     /// Name in the source section.
     pub src_name: XorName,
     /// BLS proof of the message corresponding to the source section.
@@ -115,7 +121,6 @@ impl SectionAuth {
         }
 
         Ok(AuthorityProof(SectionAuth {
-            section_pk: share.section_pk,
             src_name: share.src_name,
             sig,
         }))
@@ -203,7 +208,7 @@ impl sealed::Sealed for BlsShareAuth {}
 
 impl VerifyAuthority for SectionAuth {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
-        if !self.section_pk.verify(&self.sig.signature, payload) {
+        if !self.sig.public_key.verify(&self.sig.signature, payload) {
             return Err(Error::InvalidSignature);
         }
 

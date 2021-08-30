@@ -259,15 +259,15 @@ impl Core {
             WireMsg::serialize_msg_payload(&SystemMsg::Relocate(details.clone()))?;
 
         let payload_section_signed = &relocate_payload.section_signed;
-        let is_signautre_valid = payload_section_signed.section_pk.verify(
+        let is_valid_sig = payload_section_signed.sig.public_key.verify(
             &payload_section_signed.sig.signature,
             serialised_relocate_details,
         );
         let is_key_unknown = !known_keys
             .iter()
-            .any(|key| *key == payload_section_signed.section_pk);
+            .any(|key| *key == payload_section_signed.sig.public_key);
 
-        if !is_signautre_valid || is_key_unknown {
+        if !is_valid_sig || is_key_unknown {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - invalid signature or untrusted src.",
                 peer
