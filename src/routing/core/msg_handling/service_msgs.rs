@@ -404,12 +404,17 @@ impl Core {
         info!("Better SAP: {:?}", better_sap);
         if better_sap != our_section {
             // Update the client of the actual destination section
-            info!("We have a better matched section for the data name");
+            info!(
+                "We have a better matched section for the data name {:?}",
+                data_name
+            );
             Some(better_sap)
         } else {
             // Check if client has latest knowledge of our section
             if received_section_pk != &our_section.section_key() {
                 info!("Client is lagging on knowledge of our section, updating them");
+                info!("Latest Key {:?}", our_section.public_key_set.public_key());
+                info!("Outdated key at client {:?}", received_section_pk);
                 Some(our_section)
             } else {
                 None

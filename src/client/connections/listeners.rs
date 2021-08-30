@@ -142,11 +142,13 @@ impl Session {
                     sap: Some(section_auth),
                     source_message: Some(message),
                 }) => {
+                    info!("Received AE-Redirect SAP: {:?}", section_auth);
                     // Update our network knowledge
                     let _ = network
                         .write()
                         .await
                         .insert(section_auth.prefix, section_auth);
+                    info!("Updated network knowledge");
 
                     if let Some((wire_msg, elders)) = rebuild_message_for_ae_resend(
                         msg_id,
