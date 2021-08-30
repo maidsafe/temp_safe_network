@@ -13,7 +13,7 @@ mod upload;
 #[allow(unused)]
 pub(crate) use batching::{Batch, Batching, BatchingConfig};
 #[allow(unused)]
-pub(crate) use pac_man::{get_data_chunks, get_file_chunks, SecretKeyLevel};
+pub(crate) use pac_man::{get_data_chunks, get_file_chunks, SecretKey};
 
 use crate::dbs::{KvStore, ToDbKey};
 use crate::types::Token;
@@ -38,7 +38,8 @@ pub(crate) struct Dbc {
 #[cfg(test)]
 mod tests {
     use super::{Batch, Batching, BatchingConfig, Stash};
-    use crate::client::{utils::random_bytes, Error, Result};
+    use crate::client::{Error, Result};
+    use crate::types::utils::random_bytes;
     use crate::url::Scope;
     use crate::UsedSpace;
     use std::{collections::BTreeMap, iter::FromIterator};

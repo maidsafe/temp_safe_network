@@ -12,12 +12,8 @@ pub mod test_utils;
 
 use crate::types::{Encryption, PublicKey, Result};
 use crate::url::Scope;
-
 use bytes::Bytes;
-use rand::distributions::Alphanumeric;
-use rand::rngs::OsRng;
-use rand::{self, Rng};
-use rayon::current_num_threads;
+use rand::{self, distributions::Alphanumeric, rngs::OsRng, Rng};
 
 struct DummyEncryption {
     public_key: PublicKey,
@@ -71,38 +67,6 @@ pub fn generate_readable_string(length: usize) -> String {
         .collect()
 }
 
-/// Generates a random vector using provided `length`.
-pub fn random_bytes(length: usize) -> Bytes {
-    use rayon::prelude::*;
-    let threads = current_num_threads();
-
-    if threads > length {
-        let mut rng = OsRng;
-        return ::std::iter::repeat(())
-            .map(|()| rng.gen::<u8>())
-            .take(length)
-            .collect();
-    }
-
-    let per_thread = length / threads;
-    let remainder = length % threads;
-
-    let mut bytes: Vec<u8> = (0..threads)
-        .par_bridge()
-        .map(|_| vec![0u8; per_thread])
-        .map(|mut bytes| {
-            let bytes = bytes.as_mut_slice();
-            rand::thread_rng().fill(bytes);
-            bytes.to_owned()
-        })
-        .flatten()
-        .collect();
-
-    bytes.extend(vec![0u8; remainder]);
-
-    Bytes::from(bytes)
-}
-
 /// Convert binary data to a diplay-able format
 #[inline]
 pub fn bin_data_format(data: &[u8]) -> String {
@@ -126,6 +90,8 @@ pub fn bin_data_format(data: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use crate::types::utils::random_bytes;
+
     use super::*;
 
     const SIZE: usize = 10;

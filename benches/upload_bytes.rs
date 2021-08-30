@@ -8,20 +8,19 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use eyre::Result;
-use safe_network::client::{
-    utils::{
-        random_bytes,
-        test_utils::{read_network_conn_info, run_w_backoff_delayed},
-    },
-    Client, Config, Error,
-};
 use safe_network::url::Scope;
+use safe_network::{
+    client::{
+        utils::test_utils::{read_network_conn_info, run_w_backoff_delayed},
+        Client, Config, Error,
+    },
+    types::utils::random_bytes,
+};
 use tokio::runtime::Runtime;
 
 /// This bench requires a network already set up
-async fn put_kbs(amount: usize) -> Result<(), Error> {
+async fn upload_bytes(size: usize) -> Result<(), Error> {
     let bootstrap_nodes = read_network_conn_info().unwrap();
-    let size = 1024 * amount;
     let data = random_bytes(size);
     let config = Config::new(None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
@@ -36,21 +35,21 @@ async fn put_kbs(amount: usize) -> Result<(), Error> {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("put-sampling");
+    let mut group = c.benchmark_group("upload-sampling");
 
     let runtime = Runtime::new().unwrap();
     group.sample_size(10);
-    group.bench_function("put 1kb", |b| {
+    group.bench_function("upload 3072b", |b| {
         b.to_async(&runtime).iter(|| async {
-            match put_kbs(1).await {
+            match upload_bytes(3072).await {
                 Ok(_) => {}
                 Err(error) => println!("bench failed with {:?}", error),
             }
         });
     });
-    group.bench_function("put 1mb", |b| {
+    group.bench_function("upload 1mb", |b| {
         b.to_async(&runtime).iter(|| async {
-            match put_kbs(1024).await {
+            match upload_bytes(1024 * 1024).await {
                 Ok(_) => {}
                 Err(error) => println!("bench failed with {:?}", error),
             }

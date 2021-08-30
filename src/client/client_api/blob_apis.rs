@@ -9,14 +9,14 @@
 use std::{collections::BTreeMap, iter::FromIterator, path::PathBuf};
 
 use super::{
-    blob_storage::{ChunkUploader, Uploader},
+    blob_storage::Uploader,
     data::{get_data_chunks, Batch},
     Client,
 };
 use crate::messaging::data::{DataQuery, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, Encryption};
 use crate::{
-    client::{client_api::data::SecretKeyLevel, utils::encryption, Error, Result},
+    client::{client_api::data::SecretKey, utils::encryption, Error, Result},
     url::Scope,
 };
 
@@ -25,9 +25,10 @@ use bincode::deserialize;
 use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
-use self_encryption::{self, ChunkKey, EncryptedChunk, SecretKey};
+use self_encryption::{self, ChunkKey, EncryptedChunk, SecretKey as BlobSecretKey};
 use tokio::task;
 use tracing::trace;
+use xor_name::XorName;
 
 #[derive(Clone)]
 pub(crate) struct UploaderImpl {}
@@ -35,7 +36,51 @@ pub(crate) struct UploaderImpl {}
 #[async_trait]
 impl Uploader for UploaderImpl {
     async fn upload(&self, _bytes: &[u8]) -> Result<()> {
-        todo!()
+        Ok(())
+    }
+}
+
+struct HeadChunk {
+    chunk: Chunk,
+    address: BlobAddress,
+}
+
+/// Address of a Blob.
+#[derive(
+    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, serde::Serialize, serde::Deserialize, Debug,
+)]
+pub enum BlobAddress {
+    /// Private namespace.
+    Private(XorName),
+    /// Public namespace.
+    Public(XorName),
+}
+
+impl BlobAddress {
+    /// The xorname.
+    pub fn name(&self) -> &XorName {
+        match self {
+            Self::Public(name) | Self::Private(name) => name,
+        }
+    }
+
+    /// The namespace scope of the Blob
+    pub fn scope(&self) -> Scope {
+        if self.is_public() {
+            Scope::Public
+        } else {
+            Scope::Private
+        }
+    }
+
+    /// Returns true if public.
+    pub fn is_public(self) -> bool {
+        matches!(self, BlobAddress::Public(_))
+    }
+
+    /// Returns true if private.
+    pub fn is_private(self) -> bool {
+        !self.is_public()
     }
 }
 
@@ -48,19 +93,13 @@ impl Client {
     ///
     /// TODO: update once data types are crdt compliant
     ///
-    pub async fn read_blob(&self, head_address: ChunkAddress) -> Result<Bytes>
+    pub async fn read_blob(&self, address: BlobAddress) -> Result<Bytes>
     where
         Self: Sized,
     {
-        trace!("Fetch head chunk of blob at: {:?}", &head_address,);
-
-        let chunk = self.fetch_chunk_from_network(head_address, false).await?;
-        let public = head_address.is_public();
-        let secret_key = self.unpack(chunk).await?;
-
-        let raw_data = self.read_all(secret_key, public).await?;
-
-        Ok(raw_data)
+        let chunk = self.fetch_chunk_from_network(address.name(), false).await?;
+        let secret_key = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
+        self.read_all(secret_key).await
     }
 
     /// Read the contents of a blob from the network. The contents might be spread across
@@ -77,7 +116,7 @@ impl Client {
     ///
     pub async fn read_blob_from(
         &self,
-        head_address: ChunkAddress,
+        address: BlobAddress,
         position: usize,
         length: usize,
     ) -> Result<Bytes>
@@ -85,34 +124,34 @@ impl Client {
         Self: Sized,
     {
         trace!(
-            "Fetch head chunk of blob at: {:?} Position: {:?} Length: {:?}",
-            &head_address,
+            "Reading {:?} bytes of blob at: {:?}, starting from position: {:?}",
+            &length,
+            &address,
             &position,
-            &length
         );
 
-        let chunk = self.fetch_chunk_from_network(head_address, false).await?;
-        let public = head_address.is_public();
-        let secret_key = self.unpack(chunk).await?;
-
-        let raw_data = self.seek(secret_key, public, position, length).await?;
-
-        Ok(raw_data)
+        let chunk = self.fetch_chunk_from_network(address.name(), false).await?;
+        let secret_key = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
+        self.seek(secret_key, position, length).await
     }
 
     pub(crate) async fn fetch_chunk_from_network(
         &self,
-        head_address: ChunkAddress,
+        name: &XorName,
         allow_cache: bool,
     ) -> Result<Chunk> {
+        trace!("Fetching chunk: {:?}", name);
+
+        let address = ChunkAddress(*name);
+
         if allow_cache {
-            if let Some(chunk) = self.blob_cache.write().await.get(&head_address) {
-                trace!("Blob chunk retrieved from cache: {:?}", head_address);
+            if let Some(chunk) = self.blob_cache.write().await.get(&address) {
+                trace!("Chunk retrieved from cache: {:?}", address);
                 return Ok(chunk.clone());
             }
         }
 
-        let res = self.send_query(DataQuery::GetChunk(head_address)).await?;
+        let res = self.send_query(DataQuery::GetChunk(address)).await?;
 
         let operation_id = res.operation_id;
         let chunk: Chunk = match res.response {
@@ -123,11 +162,7 @@ impl Client {
         }?;
 
         if allow_cache {
-            let _ = self
-                .blob_cache
-                .write()
-                .await
-                .put(head_address, chunk.clone());
+            let _ = self.blob_cache.write().await.put(address, chunk.clone());
         }
 
         Ok(chunk)
@@ -138,14 +173,31 @@ impl Client {
         self.blob_cache.write().await.clear()
     }
 
-    /// Writes raw data to the network
-    /// in the form of immutable self encrypted chunks.
-    pub async fn write_to_network(&self, data: Bytes, scope: Scope) -> Result<ChunkAddress> {
+    /// Directly writes raw data to the network
+    /// in the form of immutable self encrypted chunks,
+    /// without any batching.
+    pub async fn write_to_network(&self, data: Bytes, scope: Scope) -> Result<BlobAddress> {
         let owner = encryption(scope, self.public_key());
         let (head_address, all_chunks) = get_data_chunks(data, owner.as_ref())?;
 
-        let uploader = ChunkUploader::new(UploaderImpl {});
-        let _ = uploader.store(all_chunks).await?;
+        use crate::messaging::data::DataCmd;
+
+        if matches!(scope, Scope::Public) {
+            for c in &all_chunks {
+                println!("{:?}", DataCmd::StoreChunk(c.clone()));
+            }
+        }
+
+        let tasks = all_chunks.into_iter().map(|chunk| {
+            let writer = self.clone();
+            task::spawn(async move { writer.send_cmd(DataCmd::StoreChunk(chunk)).await })
+        });
+
+        let _ = join_all(tasks)
+            .await
+            .into_iter()
+            .flatten() // swallows errors
+            .collect_vec();
 
         Ok(head_address)
     }
@@ -181,31 +233,20 @@ impl Client {
     // --------------------------------------------
 
     // Gets and decrypts chunks from the network using nothing else but the secret key, then returns the raw data.
-    async fn read_all(&self, secret_key: SecretKey, public: bool) -> Result<Bytes> {
-        let encrypted_chunks =
-            Self::get_chunks(self.clone(), public, secret_key.keys().into_iter()).await;
+    async fn read_all(&self, secret_key: BlobSecretKey) -> Result<Bytes> {
+        let encrypted_chunks = Self::get_chunks(self.clone(), secret_key.keys().into_iter()).await;
         self_encryption::decrypt_full_set(&secret_key, &encrypted_chunks)
             .map_err(Error::SelfEncryption)
     }
 
     // Gets a subset of chunks from the network, decrypts and
     // reads `len` bytes of the data starting at given `pos` of original file.
-    async fn seek(
-        &self,
-        secret_key: SecretKey,
-        public: bool,
-        pos: usize,
-        len: usize,
-    ) -> Result<Bytes> {
+    async fn seek(&self, secret_key: BlobSecretKey, pos: usize, len: usize) -> Result<Bytes> {
         let info = self_encryption::seek_info(secret_key.file_size(), pos, len);
 
         let all_keys = secret_key.keys();
-        let encrypted_chunks = Self::get_chunks(
-            self.clone(),
-            public,
-            info.index_range.map(|i| all_keys[i].clone()),
-        )
-        .await;
+        let encrypted_chunks =
+            Self::get_chunks(self.clone(), info.index_range.map(|i| all_keys[i].clone())).await;
 
         self_encryption::decrypt_range(&secret_key, &encrypted_chunks, info.relative_pos, len)
             .map_err(Error::SelfEncryption)
@@ -213,18 +254,14 @@ impl Client {
 
     async fn get_chunks(
         reader: Client,
-        public: bool,
         keys: impl Iterator<Item = ChunkKey>,
     ) -> Vec<EncryptedChunk> {
         let tasks = keys.map(|key| {
             let reader = reader.clone();
-            let address = if public {
-                ChunkAddress::Public(key.dst_hash)
-            } else {
-                ChunkAddress::Private(key.dst_hash)
-            };
             task::spawn(async move {
-                let chunk = reader.fetch_chunk_from_network(address, false).await?;
+                let chunk = reader
+                    .fetch_chunk_from_network(&key.dst_hash, false)
+                    .await?;
                 Ok::<EncryptedChunk, Error>(EncryptedChunk {
                     index: key.index,
                     content: chunk.value().clone(),
@@ -236,30 +273,31 @@ impl Client {
             .await
             .into_iter()
             .flatten() // swallows errors
-            .flatten()// swallows errors
+            .flatten() // swallows errors
             .collect_vec()
     }
 
-    /// Takes a chunk and fetches the data map from it.
-    /// If the data map is not the root data map of the user's contents,
-    /// the process repeats itself until it obtains the root data map.
-    async fn unpack(&self, mut chunk: Chunk) -> Result<SecretKey> {
+    /// Extracts a blob secretkey from a head chunk.
+    /// If the secretkey is not the first level mapping directly to the user's contents,
+    /// the process repeats itself until it obtains the first level secretkey.
+    async fn unpack_head_chunk(&self, chunk: HeadChunk) -> Result<BlobSecretKey> {
+        let HeadChunk { mut chunk, address } = chunk;
         loop {
-            let (public, bytes) = if chunk.is_public() {
-                (true, chunk.value().clone())
+            let bytes = if address.is_public() {
+                chunk.value().clone()
             } else {
                 let owner = encryption(Scope::Private, self.public_key()).ok_or_else(|| {
                     Error::Generic("Could not get an encryption object.".to_string())
                 })?;
-                (false, owner.decrypt(chunk.value().clone())?)
+                owner.decrypt(chunk.value().clone())?
             };
 
             match deserialize(&bytes)? {
-                SecretKeyLevel::First(secret_key) => {
+                SecretKey::FirstLevel(secret_key) => {
                     return Ok(secret_key);
                 }
-                SecretKeyLevel::Additional(secret_key) => {
-                    let serialized_chunk = self.read_all(secret_key, public).await?;
+                SecretKey::AdditionalLevel(secret_key) => {
+                    let serialized_chunk = self.read_all(secret_key).await?;
                     chunk = deserialize(&serialized_chunk)?;
                 }
             }
@@ -269,19 +307,15 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use super::ChunkAddress;
-    use crate::{
-        client::utils::{
-            random_bytes,
-            test_utils::{create_test_client, run_w_backoff_delayed},
-        },
-        url::Scope,
-    };
+    use crate::client::utils::test_utils::{create_test_client, run_w_backoff_delayed};
+    use crate::types::utils::random_bytes;
+    use crate::url::Scope;
     use eyre::Result;
     use futures::future::join_all;
-    use tokio::time::{Duration, Instant};
+    use tokio::time::Instant;
 
     const BLOB_TEST_QUERY_TIMEOUT: u64 = 60;
+    const MIN_BLOB_SIZE: usize = 3 * self_encryption::MIN_CHUNK_SIZE;
 
     // Test storing and getting public Blob.
     #[tokio::test(flavor = "multi_thread")]
@@ -293,7 +327,7 @@ mod tests {
             .map(|i| (i, client.clone()))
             .map(|(i, client)| {
                 tokio::spawn(async move {
-                    let value = random_bytes(1000);
+                    let value = random_bytes(MIN_BLOB_SIZE);
                     let _ = client.write_to_network(value, Scope::Public).await?;
                     println!("Iter: {}", i);
                     let res: Result<()> = Ok(());
@@ -322,7 +356,7 @@ mod tests {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         for i in 0..1000_usize {
-            let value = random_bytes(1000);
+            let value = random_bytes(MIN_BLOB_SIZE);
             let now = Instant::now();
             let _ = client.write_to_network(value, Scope::Public).await?;
             let elapsed = now.elapsed();
@@ -337,7 +371,7 @@ mod tests {
     async fn public_blob_test() -> Result<()> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
         // Generate blob
-        let blob = random_bytes(10);
+        let blob = random_bytes(MIN_BLOB_SIZE);
         // Store blob
         let head_address = client.write_to_network(blob.clone(), Scope::Public).await?;
         // // check it's the expected Blob address
@@ -355,12 +389,35 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn deterministic_chunking() -> Result<()> {
+        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
+        let blob = random_bytes(MIN_BLOB_SIZE);
+
+        use crate::client::client_api::data::get_data_chunks;
+        use crate::client::utils::encryption;
+        let owner = encryption(Scope::Private, client.public_key());
+        let (first_address, mut first_chunks) = get_data_chunks(blob.clone(), owner.as_ref())?;
+
+        first_chunks.sort();
+
+        for _ in 0..100 {
+            let owner = encryption(Scope::Private, client.public_key());
+            let (head_address, mut all_chunks) = get_data_chunks(blob.clone(), owner.as_ref())?;
+            assert_eq!(first_address, head_address);
+            all_chunks.sort();
+            assert_eq!(first_chunks, all_chunks);
+        }
+
+        Ok(())
+    }
+
     // Test storing, and getting private chunk.
     #[tokio::test(flavor = "multi_thread")]
     async fn private_blob_test() -> Result<()> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
-        let blob = random_bytes(10);
+        let blob = random_bytes(MIN_BLOB_SIZE);
 
         // Store Blob
         let private_address = client
@@ -392,73 +449,28 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1kb_pub_unencrypted() -> Result<()> {
         let size = 1024;
-        gen_data_then_create_and_retrieve(size, true).await?;
+        gen_data_then_create_and_retrieve(size, Scope::Public).await?;
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1kb_private_unencrypted() -> Result<()> {
         let size = 1024;
-        gen_data_then_create_and_retrieve(size, false).await?;
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn create_and_retrieve_1kb_put_pub_retrieve_private() -> Result<()> {
-        let size = 1024;
-        let data = random_bytes(size);
-
-        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-        let address = client.write_to_network(data, Scope::Public).await?;
-
-        // let's make sure the public chunk is stored
-        let _ = run_w_backoff_delayed(|| client.read_blob(address), 10).await?;
-
-        client.query_timeout = Duration::from_secs(5);
-        // and now trying to read a private chunk with same address should fail
-        let res = client
-            .read_blob(ChunkAddress::Private(*address.name()))
-            .await;
-
-        assert!(res.is_err());
-
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn create_and_retrieve_1kb_put_private_retrieve_pub() -> Result<()> {
-        let size = 1024;
-        let data = random_bytes(size);
-
-        let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-
-        let address = client.write_to_network(data, Scope::Private).await?;
-
-        // let's make sure the private chunk is stored
-        let _ = run_w_backoff_delayed(|| client.read_blob(address), 10).await?;
-
-        client.query_timeout = Duration::from_secs(5);
-
-        // and now trying to read a public chunk with same address should fail (timeout)
-        let res = client
-            .read_blob(ChunkAddress::Public(*address.name()))
-            .await;
-        assert!(res.is_err());
-
+        gen_data_then_create_and_retrieve(size, Scope::Private).await?;
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1mb_public() -> Result<()> {
         let size = 1024 * 1024;
-        gen_data_then_create_and_retrieve(size, true).await?;
+        gen_data_then_create_and_retrieve(size, Scope::Public).await?;
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1mb_private() -> Result<()> {
         let size = 1024 * 1024;
-        gen_data_then_create_and_retrieve(size, false).await?;
+        gen_data_then_create_and_retrieve(size, Scope::Private).await?;
         Ok(())
     }
 
@@ -468,14 +480,14 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_10mb_private() -> Result<()> {
         let size = 1024 * 1024 * 10;
-        gen_data_then_create_and_retrieve(size, false).await?;
+        gen_data_then_create_and_retrieve(size, Scope::Private).await?;
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_10mb_public() -> Result<()> {
         let size = 1024 * 1024 * 10;
-        gen_data_then_create_and_retrieve(size, true).await?;
+        gen_data_then_create_and_retrieve(size, Scope::Public).await?;
         Ok(())
     }
 
@@ -483,13 +495,13 @@ mod tests {
     #[ignore = "too heavy for CI"]
     async fn create_and_retrieve_100mb_public() -> Result<()> {
         let size = 1024 * 1024 * 100;
-        gen_data_then_create_and_retrieve(size, true).await?;
+        gen_data_then_create_and_retrieve(size, Scope::Public).await?;
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn seek_in_data() -> Result<()> {
-        test_seek(1024).await
+        test_seek(MIN_BLOB_SIZE).await
     }
 
     async fn test_seek(size: usize) -> Result<()> {
@@ -517,35 +529,15 @@ mod tests {
         Ok(())
     }
 
-    #[allow(clippy::match_wild_err_arm)]
-    async fn gen_data_then_create_and_retrieve(size: usize, public: bool) -> Result<()> {
+    async fn gen_data_then_create_and_retrieve(size: usize, scope: Scope) -> Result<()> {
         let raw_data = random_bytes(size);
-
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
+        let address = client.write_to_network(raw_data.clone(), scope).await?;
 
-        let address = if public {
-            client
-                .write_to_network(raw_data.clone(), Scope::Public)
-                .await?
-        } else {
-            client
-                .write_to_network(raw_data.clone(), Scope::Private)
-                .await?
-        };
-
-        // now that it was put to the network we should be able to retrieve it
+        // now that it was written to the network we should be able to retrieve it
         let fetched_data = run_w_backoff_delayed(|| client.read_blob(address), 10).await?;
         // then the content should be what we put
         assert_eq!(fetched_data, raw_data);
-
-        // // now let's test Blob data map generation utility returns the correct chunk address
-        // let privately_owned = if public {
-        //     None
-        // } else {
-        //     Some(client.public_key())
-        // };
-        // let (_, head_chunk_address) = Client::encrypt_blob(raw_data, privately_owned).await?;
-        // assert_eq!(head_chunk_address, address);
 
         Ok(())
     }
