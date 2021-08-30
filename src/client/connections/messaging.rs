@@ -24,7 +24,9 @@ use crate::types::{Chunk, PrivateChunk, PublicChunk};
 
 use super::{QueryResult, Session};
 use crate::routing::XorName;
+use itertools::Itertools;
 use qp2p::Endpoint;
+use std::collections::BTreeMap;
 use tokio::time::sleep;
 use xor_name::PrefixMap;
 
@@ -34,8 +36,7 @@ const NUMBER_OF_RETRIES: usize = 3;
 const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
 impl Session {
-    /// Bootstrap to the network, connecting with the closest section to
-    /// the XorName of our PublicKey.
+    /// Bootstrap to the peer provided via Qp2p config.
     pub(crate) async fn bootstrap(&mut self) -> Result<(), Error> {
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
@@ -61,7 +62,7 @@ impl Session {
     /// Send a `ServiceMsg` to the network without awaiting for a response.
     pub(crate) async fn send_cmd(
         &self,
-        data_name: XorName,
+        dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
         targets: usize,
@@ -73,7 +74,7 @@ impl Session {
             .network
             .read()
             .await
-            .get_matching(&data_name)
+            .get_matching(&dst_address)
             .map(|(_, sap)| {
                 (
                     sap.elders
@@ -103,12 +104,12 @@ impl Session {
         trace!(
             "Sending (from {}) dst {:?} w/ id: {:?}",
             endpoint.socket_addr(),
-            data_name,
+            dst_address,
             msg_id
         );
 
         let dst_location = DstLocation::Section {
-            name: data_name,
+            name: dst_address,
             section_pk,
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
@@ -142,23 +143,22 @@ impl Session {
             .read()
             .await
             .get_matching(&data_name)
-            .map(|(_, sap)| {
-                (
-                    sap.elders.values().cloned().collect::<Vec<SocketAddr>>(),
-                    sap.public_key_set.public_key(),
-                )
-            })
+            .map(|(_, sap)| (sap.elders.clone(), sap.public_key_set.public_key()))
             .or_else(|| {
-                // Send message to our bootstrap peer with a random section PK.
-                self.bootstrap_peer
-                    .map(|addr| (vec![addr], bls::SecretKey::random().public_key()))
+                // Send message to our bootstrap peer with a random section PK and addressing adring.
+                self.bootstrap_peer.map(|addr| {
+                    let mut bootstrapped_peer = BTreeMap::new();
+                    let _ = bootstrapped_peer.insert(XorName::random(), addr);
+                    (bootstrapped_peer, bls::SecretKey::random().public_key())
+                })
             })
             .ok_or(Error::NotBootstrapped)?;
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders = elders
             .into_iter()
-            // .sorted_by(|(lhs_name, _), (rhs_name, _)| data_name.cmp_distance(lhs_name, rhs_name)) // FIXME: uncomment once we have PrefixMap read from disk
+            .sorted_by(|(lhs_name, _), (rhs_name, _)| data_name.cmp_distance(lhs_name, rhs_name))
+            .map(|(_, addr)| addr)
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
             .collect::<Vec<SocketAddr>>();
 
@@ -175,13 +175,13 @@ impl Session {
         let msg_bytes = wire_msg.serialize()?;
 
         let elders_len = chosen_elders.len();
-        // if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES {
-        //     error!(
-        //         "Not enough Elder connections: {}, minimum required: {}",
-        //         elders_len, NUM_OF_ELDERS_SUBSET_FOR_QUERIES
-        //     );
-        //     return Err(Error::InsufficientElderConnections(elders_len));
-        // }
+        if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES && elders_len > 1 {
+            error!(
+                "Not enough Elder connections: {}, minimum required: {}",
+                elders_len, NUM_OF_ELDERS_SUBSET_FOR_QUERIES
+            );
+            return Err(Error::InsufficientElderConnections(elders_len));
+        }
 
         let msg_id = MessageId::new();
 
@@ -435,6 +435,7 @@ pub(crate) async fn rebuild_message_for_ae_resend(
     dst_address: Option<XorName>,
     network: Arc<RwLock<PrefixMap<SectionAuthorityProvider>>>,
 ) -> Option<(WireMsg, Vec<SocketAddr>)> {
+    info!("Rebuilding message for AE resend");
     if let Some(dst_address) = dst_address {
         if let Some((elders, section_pk)) =
             network
