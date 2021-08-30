@@ -96,26 +96,16 @@ impl Core {
             && public_key != *self.section.chain().last_key()
         {
             // The key is recognized as non-last, indicating the peer is lagging.
-            Ok(Some(
-                self.send_direct_message(
-                    peer,
-                    // TODO: consider sending only those parts of section that are new
-                    // since `public_key` was the latest key.
-                    SystemMsg::Sync {
-                        section: self.section.clone(),
-                        network: self
-                            .network
-                            .sections
-                            .iter()
-                            .map(|e| {
-                                let (prefix, sap) = e.pair();
-                                (*prefix, sap.clone())
-                            })
-                            .collect(),
-                    },
-                    sig_share.public_key_set.public_key(),
-                )?,
-            ))
+            Ok(Some(self.send_direct_message(
+                peer,
+                // TODO: consider sending only those parts of section that are new
+                // since `public_key` was the latest key.
+                SystemMsg::Sync {
+                    section: self.section.clone(),
+                    network: self.network.dump(),
+                },
+                sig_share.public_key_set.public_key(),
+            )?))
         } else {
             Ok(None)
         }

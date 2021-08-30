@@ -123,11 +123,6 @@ impl Client {
     }
 
     #[cfg(test)]
-    pub async fn has_bootstrapped(&self) -> bool {
-        self.session.has_bootstrapped().await
-    }
-
-    #[cfg(test)]
     pub async fn expect_cmd_error(&mut self) -> Option<CmdError> {
         self.incoming_errors.write().await.recv().await
     }

@@ -126,7 +126,7 @@ impl Core {
         // closest to the dest section key.
         // The dst_section_pk is set to be local knowledge or genesis_key when no local knowledge.
         let (local_dst_elders, dst_section_pk) =
-            match self.network.section_by_name(&section_auth.prefix.name()) {
+            match self.network.section_by_prefix(&section_auth.prefix) {
                 Ok(trusted_sap) => (trusted_sap.elders, trusted_sap.public_key_set.public_key()),
                 Err(_) => {
                     // In case we don't have the knowledge of that neighbour locally,
@@ -415,7 +415,6 @@ mod tests {
         let _ = env
             .core
             .network
-            .sections
             .insert(some_other_sap.value.prefix, some_other_sap.clone());
 
         // and it now shall give us an AE redirect msg

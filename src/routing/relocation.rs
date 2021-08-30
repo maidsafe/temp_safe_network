@@ -14,11 +14,11 @@ use crate::messaging::{
     },
     AuthorityProof, SectionAuth,
 };
+use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     core::JoiningAsRelocated,
     ed25519::{self, Keypair, Verifier},
     error::Error,
-    network::Network,
     peer::PeerUtils,
     section::{
         section_authority_provider::SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils,
@@ -29,7 +29,7 @@ use xor_name::XorName;
 /// Find all nodes to relocate after a churn event and create the relocate actions for them.
 pub(crate) fn actions(
     section: &Section,
-    network: &Network,
+    network: &NetworkPrefixMap,
     churn_name: &XorName,
     churn_signature: &bls::Signature,
 ) -> Vec<(NodeState, RelocateAction)> {
@@ -62,11 +62,11 @@ pub(crate) fn actions(
 /// Details of a relocation: which node to relocate, where to relocate it to and what age it should
 /// get once relocated.
 pub(super) trait RelocateDetailsUtils {
-    fn new(section: &Section, network: &Network, peer: &Peer, dst: XorName) -> Self;
+    fn new(section: &Section, network: &NetworkPrefixMap, peer: &Peer, dst: XorName) -> Self;
 
     fn with_age(
         section: &Section,
-        network: &Network,
+        network: &NetworkPrefixMap,
         peer: &Peer,
         dst: XorName,
         age: u8,
@@ -74,13 +74,13 @@ pub(super) trait RelocateDetailsUtils {
 }
 
 impl RelocateDetailsUtils for RelocateDetails {
-    fn new(section: &Section, network: &Network, peer: &Peer, dst: XorName) -> Self {
+    fn new(section: &Section, network: &NetworkPrefixMap, peer: &Peer, dst: XorName) -> Self {
         Self::with_age(section, network, peer, dst, peer.age().saturating_add(1))
     }
 
     fn with_age(
         section: &Section,
-        network: &Network,
+        network: &NetworkPrefixMap,
         peer: &Peer,
         dst: XorName,
         age: u8,
@@ -178,7 +178,7 @@ pub(crate) enum RelocateAction {
 impl RelocateAction {
     pub(crate) fn new(
         section: &Section,
-        network: &Network,
+        network: &NetworkPrefixMap,
         peer: &Peer,
         churn_name: &XorName,
     ) -> Self {
@@ -316,7 +316,7 @@ mod tests {
             assert!(section.update_member(info));
         }
 
-        let network = Network::new();
+        let network = NetworkPrefixMap::new();
 
         // Simulate a churn event whose signature has the given number of trailing zeros.
         let churn_name = rng.gen();

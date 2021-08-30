@@ -15,10 +15,10 @@ use crate::messaging::{
     system::{NodeState, Peer, Proposal, Section},
     MessageId, SectionAuthorityProvider, WireMsg,
 };
+use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
-    network::Network,
     node::Node,
     routing_api::command::Command,
     section::{
@@ -65,7 +65,7 @@ impl Core {
         let comm = self.comm.clone();
         new_node.addr = comm.our_connection_info();
 
-        let network = Network::new();
+        let network = NetworkPrefixMap::new();
         // TODO: to keep our knowledge of the network and avoid unnecessary AE msgs:
         // - clone self.network instead,
         // - remove the SAP of our new section from the cloned network
@@ -106,7 +106,7 @@ impl Core {
         self.section.chain()
     }
 
-    pub(crate) fn network(&self) -> &Network {
+    pub(crate) fn network(&self) -> &NetworkPrefixMap {
         &self.network
     }
 
