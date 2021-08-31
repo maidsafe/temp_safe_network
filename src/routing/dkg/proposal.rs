@@ -8,8 +8,8 @@
 
 use super::{KeyedSig, SigShare};
 use crate::messaging::{
-    system::Proposal,
     signature_aggregator::{Error as AggregatorError, SignatureAggregator},
+    system::Proposal,
 };
 use crate::routing::error::Result;
 use serde::{Serialize, Serializer};

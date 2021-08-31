@@ -16,8 +16,8 @@ use crate::client::Error;
 use crate::messaging::data::OperationId;
 use crate::messaging::{
     data::{CmdError, QueryResponse},
-    system::SigShare,
     signature_aggregator::{Error as AggregatorError, SignatureAggregator},
+    system::SigShare,
     SectionAuthorityProvider,
 };
 use crate::types::{PrefixMap, PublicKey};
