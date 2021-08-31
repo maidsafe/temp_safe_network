@@ -37,9 +37,20 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, convert::TryFrom};
 use xor_name::XorName;
 
+use super::DstLocation;
+
 /// Derivable Id of an operation. Query/Response should return the same id for simple tracking purposes.
 /// TODO: make uniquer per requester for some operations
 pub type OperationId = String;
+
+/// A message payload along with the destination it was meant for
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct SourceMessage {
+    /// Source message payload
+    pub payload: Bytes,
+    /// The destination it was meant for
+    pub dst_location: DstLocation,
+}
 
 /// A message indicating that an error occurred as a node was handling a client's message.
 #[allow(clippy::large_enum_variant)]
@@ -55,7 +66,7 @@ pub struct ServiceError {
     /// Message that triggered this error.
     ///
     /// This could be used to retry the message if the error could be handled.
-    pub source_message: Option<Bytes>,
+    pub source_message: Option<SourceMessage>,
 }
 
 /// Network service messages that clients or nodes send in order to use the services,

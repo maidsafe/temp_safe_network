@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
-use crate::messaging::data::{ServiceError, ServiceMsg};
+use crate::messaging::data::{ServiceError, ServiceMsg, SourceMessage};
 use crate::messaging::{
     data::{ChunkRead, CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite},
     node::{NodeMsg, NodeQueryResponse},
@@ -353,7 +353,10 @@ impl Core {
             let service_msg = ServiceMsg::ServiceError(ServiceError {
                 reason: Some(crate::messaging::data::Error::WrongDestination),
                 sap: Some(return_sap),
-                source_message: Some(payload),
+                source_message: Some(SourceMessage {
+                    payload,
+                    dst_location,
+                }),
             });
 
             let payload = match WireMsg::serialize_msg_payload(&service_msg) {

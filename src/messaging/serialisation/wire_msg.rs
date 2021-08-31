@@ -8,7 +8,7 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::{ServiceError, ServiceMsg},
+    data::{ServiceError, ServiceMsg, SourceMessage},
     node::NodeMsg,
     AuthorityProof, DstLocation, Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
     ServiceAuth,
@@ -106,11 +106,11 @@ impl WireMsg {
                 })?;
 
                 let auth = if let ServiceMsg::ServiceError(ServiceError {
-                    source_message: Some(data),
+                    source_message: Some(SourceMessage { payload, .. }),
                     ..
                 }) = &msg
                 {
-                    AuthorityProof::verify(auth, data)?
+                    AuthorityProof::verify(auth, payload)?
                 } else {
                     AuthorityProof(auth)
                 };

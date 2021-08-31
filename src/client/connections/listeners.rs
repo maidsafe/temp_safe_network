@@ -152,9 +152,9 @@ impl Session {
 
                     if let Some((wire_msg, elders)) = rebuild_message_for_ae_resend(
                         msg_id,
-                        message,
+                        message.payload,
                         auth,
-                        dst_location.name(),
+                        message.dst_location.name(),
                         network,
                     )
                     .await
