@@ -35,8 +35,8 @@ pub(crate) use chunk_store::ChunkStore;
 use self::split_barrier::SplitBarrier;
 use crate::messaging::system::SectionAuth;
 use crate::messaging::{
-    system::{Proposal, Section},
     signature_aggregator::SignatureAggregator,
+    system::{Proposal, Section},
     MessageId, SectionAuthorityProvider,
 };
 use crate::routing::{
