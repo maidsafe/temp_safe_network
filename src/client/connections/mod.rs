@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
+use qp2p::Endpoint;
 use std::{borrow::Borrow, collections::HashMap, sync::Arc};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -39,8 +39,6 @@ pub(crate) struct QueryResult {
 pub(super) struct Session {
     // PublicKey of the client
     client_pk: PublicKey,
-    // Qp2p objects
-    qp2p: QuicP2p<XorName>,
     endpoint: Option<Endpoint<XorName>>,
     // Channels for sending responses to upper layers
     pending_queries: PendingQueryResponses,
@@ -57,31 +55,38 @@ pub(super) struct Session {
 }
 
 impl Session {
-    pub(super) fn new(
+    pub(super) async fn new(
         client_pk: PublicKey,
-        qp2p_config: QuicP2pConfig,
+        local_addr: SocketAddr,
+        bootstrap_nodes: &[SocketAddr],
+        qp2p_config: qp2p::Config,
         err_sender: Sender<CmdError>,
     ) -> Result<Self, Error> {
         debug!("QP2p config: {:?}", qp2p_config);
-
         // *****************************************************
         // FIXME: receive the network's genesis pk from the user
         let genesis_pk = bls::SecretKey::random().public_key();
         // *****************************************************
 
-        let qp2p =
-            qp2p::QuicP2p::<XorName>::with_config(Some(qp2p_config), Default::default(), true)?;
-        Ok(Self {
+        let (endpoint, incoming_messages, _) = Endpoint::new_client(local_addr, qp2p_config)?;
+        let bootstrap_peer = endpoint.connect_to_any(bootstrap_nodes).await;
+
+        let session = Self {
             client_pk,
-            qp2p,
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
-            endpoint: None,
+            endpoint: Some(endpoint),
             network: Arc::new(NetworkPrefixMap::new(genesis_pk)),
-            bootstrap_peer: None,
+            bootstrap_peer,
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             genesis_pk,
-        })
+        };
+
+        session
+            .spawn_message_listener_thread(incoming_messages)
+            .await;
+
+        Ok(session)
     }
 
     pub(super) fn endpoint(&self) -> Result<&Endpoint<XorName>, Error> {

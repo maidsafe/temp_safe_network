@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{QueryResult, Session};
+
 use crate::client::Error;
 use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
@@ -29,25 +30,6 @@ const NUMBER_OF_RETRIES: usize = 3;
 const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
 impl Session {
-    /// Bootstrap to the peer provided via Qp2p config.
-    pub(crate) async fn bootstrap(&mut self) -> Result<(), Error> {
-        trace!(
-            "Trying to bootstrap to the network with public_key: {:?}",
-            self.client_pk
-        );
-
-        let (endpoint, _, incoming_messages, _disconnections, bootstrap_peer) =
-            self.qp2p.bootstrap().await?;
-        debug!("Successfully bootstrapped to peer: {:?}", bootstrap_peer);
-
-        self.endpoint = Some(endpoint.clone());
-        self.bootstrap_peer = Some(bootstrap_peer);
-
-        self.spawn_message_listener_thread(incoming_messages).await;
-
-        Ok(())
-    }
-
     /// Send a `ServiceMsg` to the network without awaiting for a response.
     pub(crate) async fn send_cmd(
         &self,
@@ -82,13 +64,13 @@ impl Session {
         debug!(
             "Sending command w/id {:?}, from {}, to {} Elders",
             msg_id,
-            endpoint.socket_addr(),
+            endpoint.public_addr(),
             elders.len()
         );
 
         trace!(
             "Sending (from {}) dst {:?} w/ id: {:?}",
-            endpoint.socket_addr(),
+            endpoint.public_addr(),
             dst_address,
             msg_id
         );
@@ -171,7 +153,7 @@ impl Session {
             "Sending query message {:?}, msg_id: {}, from {}, to the {} Elders closest to data name: {:?}",
             query,
             msg_id,
-            endpoint.socket_addr(),
+            endpoint.public_addr(),
             elders_len,
             chosen_elders
         );
@@ -200,8 +182,6 @@ impl Session {
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
             let task_handle = tokio::spawn(async move {
-                endpoint.connect_to(&socket).await?;
-
                 // Retry queries that failed due to connection issues only
                 let mut result = Err(Error::ElderQuery);
                 for attempt in 0..NUMBER_OF_RETRIES + 1 {
@@ -353,7 +333,7 @@ impl Session {
     #[allow(unused)]
     pub(crate) async fn disconnect_from_peers(&self, peers: Vec<SocketAddr>) -> Result<(), Error> {
         for elder in peers {
-            self.endpoint()?.disconnect_from(&elder).await?;
+            self.endpoint()?.disconnect_from(&elder).await;
         }
 
         Ok(())
@@ -382,7 +362,6 @@ pub(crate) async fn send_message(
         let endpoint = endpoint.clone();
         let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
             trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
-            endpoint.connect_to(&socket).await?;
             endpoint
                 .send_message(msg_bytes_clone, &socket, priority)
                 .await?;

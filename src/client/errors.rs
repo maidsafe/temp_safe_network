@@ -12,7 +12,6 @@ use crate::messaging::{
     Error as MessagingError,
 };
 use crate::types::Error as DtError;
-use qp2p::Error as QuicP2pError;
 use std::io;
 use thiserror::Error;
 
@@ -122,9 +121,12 @@ pub enum Error {
     /// Io error.
     #[error(transparent)]
     IoError(#[from] io::Error),
+    /// Endpoint setup error.
+    #[error(transparent)]
+    EndpointSetup(#[from] qp2p::ClientEndpointError),
     /// QuicP2p error.
     #[error(transparent)]
-    QuicP2p(#[from] QuicP2pError),
+    QuicP2p(#[from] qp2p::SendError),
     /// Bincode error
     #[error(transparent)]
     Serialisation(#[from] Box<bincode::ErrorKind>),

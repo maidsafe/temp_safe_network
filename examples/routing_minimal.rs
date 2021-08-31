@@ -36,10 +36,9 @@
 use eyre::Result;
 use futures::future::join_all;
 use safe_network::routing::{
-    create_test_used_space_and_root_storage, Config, Event, EventStream, Routing, TransportConfig,
+    create_test_used_space_and_root_storage, Config, Event, EventStream, Routing,
 };
 use std::{
-    collections::HashSet,
     convert::TryInto,
     iter,
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -167,32 +166,27 @@ async fn start_multiple_nodes(
 async fn start_node(
     index: usize,
     first: bool,
-    contacts: Vec<SocketAddr>,
+    bootstrap_nodes: Vec<SocketAddr>,
     ip: Option<IpAddr>,
     base_port: Option<u16>,
 ) -> Result<(SocketAddr, JoinHandle<()>)> {
     let ip = ip.unwrap_or_else(|| Ipv4Addr::LOCALHOST.into());
-    let local_port = base_port.map(|base_port| {
-        index
-            .try_into()
-            .ok()
-            .and_then(|offset| base_port.checked_add(offset))
-            .expect("port out of range")
-    });
-
-    let contacts: HashSet<_> = contacts.into_iter().collect();
-    let transport_config = TransportConfig {
-        hard_coded_contacts: contacts,
-        local_ip: Some(ip),
-        local_port,
-        ..Default::default()
-    };
+    let local_port = base_port
+        .map(|base_port| {
+            index
+                .try_into()
+                .ok()
+                .and_then(|offset| base_port.checked_add(offset))
+                .expect("port out of range")
+        })
+        .unwrap_or_default();
 
     info!("Node #{} starting...", index);
 
     let config = Config {
         first,
-        transport_config,
+        local_addr: SocketAddr::new(ip, local_port),
+        bootstrap_nodes,
         ..Default::default()
     };
 

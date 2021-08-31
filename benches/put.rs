@@ -15,10 +15,10 @@ use tokio::runtime::Runtime;
 
 /// This bench requires a network already set up
 async fn put_kbs(amount: usize) -> Result<(), Error> {
-    let contact_info = read_network_conn_info().unwrap();
+    let contact_info = read_network_conn_info().unwrap().into_iter().collect();
     let size = 1024 * amount;
     let data = generate_random_vector(size);
-    let config = Config::new(None, Some(contact_info), None).await;
+    let config = Config::new(None, Some(contact_info), None, None).await;
     let client = Client::new(None, config).await?;
     let address = client.store_public_blob(&data).await?;
 

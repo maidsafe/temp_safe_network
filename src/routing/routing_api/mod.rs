@@ -92,7 +92,12 @@ impl Routing {
                 std::process::id()
             );
 
-            let comm = Comm::new(config.transport_config, connection_event_tx).await?;
+            let comm = Comm::new(
+                config.local_addr,
+                config.transport_config,
+                connection_event_tx,
+            )
+            .await?;
             let node = Node::new(keypair, comm.our_connection_info());
             let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir)?;
 
@@ -121,8 +126,13 @@ impl Routing {
             let node_name = ed25519::name(&keypair.public);
             info!("{} Bootstrapping a new node.", node_name);
 
-            let (comm, bootstrap_addr) =
-                Comm::bootstrap(config.transport_config, connection_event_tx).await?;
+            let (comm, bootstrap_addr) = Comm::bootstrap(
+                config.local_addr,
+                &config.bootstrap_nodes,
+                config.transport_config,
+                connection_event_tx,
+            )
+            .await?;
             info!(
                 "{} Joining as a new node (PID: {}) from {} to {}",
                 node_name,
