@@ -59,6 +59,8 @@ struct Cmd {
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    tracing_subscriber::fmt::init();
+
     let path = std::path::Path::new("nodes");
     remove_dir_all(&path).await.unwrap_or(()); // Delete nodes directory if it exists;
     create_dir_all(&path)
