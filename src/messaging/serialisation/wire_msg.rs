@@ -106,11 +106,11 @@ impl WireMsg {
                 })?;
 
                 let auth = if let ServiceMsg::ServiceError(ServiceError {
-                    source_message: Some(data),
+                    source_message: Some(payload),
                     ..
                 }) = &msg
                 {
-                    AuthorityProof::verify(auth, data)?
+                    AuthorityProof::verify(auth, payload)?
                 } else {
                     AuthorityProof(auth)
                 };

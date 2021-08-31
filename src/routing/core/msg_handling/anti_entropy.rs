@@ -9,7 +9,7 @@
 use super::Core;
 use crate::messaging::{
     node::{InfrastructureMsg, KeyedSig, SectionAuth},
-    DstLocation, SectionAuthorityProvider, SrcLocation, WireMsg,
+    DstLocation, MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
     dkg::SectionAuthUtils,
@@ -21,6 +21,7 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
+use bytes::Bytes;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
@@ -32,10 +33,18 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
-        bounced_msg: Box<InfrastructureMsg>,
+        bounced_msg: Bytes,
         sender: SocketAddr,
         src_name: XorName,
     ) -> Result<Vec<Command>> {
+        let bounced_msg = match WireMsg::deserialize(bounced_msg)? {
+            MessageType::Infrastructure { msg, .. } => msg,
+            _ => {
+                warn!("Non Infrastructure MessageType received at Node in AE response. We do not handle any other type yet");
+                return Ok(vec![]);
+            }
+        };
+
         info!(
             "Anti-Entropy: retry message received from peer: {} ({})",
             src_name, sender
@@ -70,7 +79,7 @@ impl Core {
                 // if a sybil/corrupt peer keeps sending us the same AE msg.
                 let dst_section_pk = section_auth.public_key_set.public_key();
                 let cmd =
-                    self.send_direct_message((src_name, sender), *bounced_msg, dst_section_pk)?;
+                    self.send_direct_message((src_name, sender), bounced_msg, dst_section_pk)?;
                 Ok(vec![cmd])
             }
             Err(err) => {
@@ -84,13 +93,21 @@ impl Core {
         &mut self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
-        bounced_msg: Box<InfrastructureMsg>,
+        bounced_msg: Bytes,
         sender: SocketAddr,
     ) -> Result<Vec<Command>> {
         debug!(
             "Anti-Entropy: redirect message received from peer: {}",
             sender
         );
+
+        let bounced_msg = match WireMsg::deserialize(bounced_msg)? {
+            MessageType::Infrastructure { msg, .. } => msg,
+            _ => {
+                warn!("Non Infrastructure MessageType received at Node in AE response. We do not handle any other type yet");
+                return Ok(vec![]);
+            }
+        };
 
         // We verify SAP signature although we cannot trust it without a proof chain anyways.
         let section_signed = SectionAuth {
@@ -128,7 +145,7 @@ impl Core {
             .next();
 
         if let Some((name, addr)) = chosen_dst_elder {
-            let cmd = self.send_direct_message((*name, *addr), *bounced_msg, dst_section_pk)?;
+            let cmd = self.send_direct_message((*name, *addr), bounced_msg, dst_section_pk)?;
             Ok(vec![cmd])
         } else {
             warn!(
@@ -141,7 +158,7 @@ impl Core {
             if let Some((name, addr)) = section_auth.elders.iter().next() {
                 let cmd = self.send_direct_message(
                     (*name, *addr),
-                    *bounced_msg,
+                    bounced_msg,
                     *self.section.genesis_key(),
                 )?;
                 Ok(vec![cmd])
@@ -155,9 +172,10 @@ impl Core {
         }
     }
 
-    pub(crate) async fn check_for_entropy(
+    pub(crate) async fn check_for_entropy_if_needed(
         &self,
-        node_msg: &InfrastructureMsg,
+        wire_msg: &WireMsg,
+        msg: &InfrastructureMsg,
         src_location: &SrcLocation,
         dst_location: &DstLocation,
         sender: SocketAddr,
@@ -168,13 +186,20 @@ impl Core {
             return Ok(None);
         }
 
+        if let Some(pk) = dst_location.section_pk() {
+            if self.dst_is_for_our_section(&pk) {
+                // we're in the right section, no entropy to be checked
+                return Ok(None);
+            }
+        }
+
         // For the case of receiving a join request not matching our prefix,
         // we just let the join request handler to deal with it later on.
         // We also skip AE check on Anti-Entropy messages
         //
         // TODO: consider changing the join and "join as relocated" flows to
         // make use of AntiEntropy retry/redirect responses.
-        match node_msg {
+        match msg {
             InfrastructureMsg::AntiEntropyRetry { .. }
             | InfrastructureMsg::AntiEntropyRedirect { .. }
             | InfrastructureMsg::JoinRequest(_)
@@ -182,8 +207,10 @@ impl Core {
             _ => match dst_location.section_pk() {
                 None => Ok(None),
                 Some(dst_section_pk) => {
-                    self.check_dest_section_pk(
-                        node_msg,
+                    let bounced_bytes = wire_msg.serialize()?;
+
+                    self.check_for_entropy(
+                        &bounced_bytes,
                         src_location,
                         &dst_section_pk,
                         dst_location.name(),
@@ -195,23 +222,30 @@ impl Core {
         }
     }
 
+    /// Tells us if the message has reached the correct section
+    /// If not, we'll need to respond with AE
+    pub(crate) fn dst_is_for_our_section(&self, dst_section_pk: &BlsPublicKey) -> bool {
+        // Destination section key matches our current section key
+        dst_section_pk == self.section.chain().last_key()
+    }
+
     // If entropy is found, determine the msg to send in order to
     // bring the sender's knowledge about us up to date.
-    pub(crate) async fn check_dest_section_pk(
+    pub(crate) async fn check_for_entropy(
         &self,
-        node_msg: &InfrastructureMsg,
+        bounced_msg: &Bytes,
         src_location: &SrcLocation,
         dst_section_pk: &BlsPublicKey,
         dst_name: Option<XorName>,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
-        if dst_section_pk == self.section.chain().last_key() {
+        if self.dst_is_for_our_section(dst_section_pk) {
             // Destination section key matches our current section key
             return Ok(None);
         }
 
         info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
-        let ae_node_msg = match self
+        let ae_msg = match self
             .section
             .chain()
             .get_proof_chain_to_current(dst_section_pk)
@@ -225,7 +259,7 @@ impl Core {
                     section_auth,
                     section_signed,
                     proof_chain,
-                    bounced_msg: Box::new(node_msg.clone()),
+                    bounced_msg: bounced_msg.clone(),
                 }
             }
             Err(_) => {
@@ -244,7 +278,7 @@ impl Core {
                         InfrastructureMsg::AntiEntropyRedirect {
                             section_auth: section_auth.value.clone(),
                             section_signed: section_auth.sig,
-                            bounced_msg: Box::new(node_msg.clone()),
+                            bounced_msg: bounced_msg.clone(),
                         }
                     }
                     None => {
@@ -266,7 +300,7 @@ impl Core {
         let wire_msg = WireMsg::single_src(
             &self.node,
             src_location.to_dst(),
-            ae_node_msg,
+            ae_msg,
             self.section.authority_provider().section_key(),
         )?;
 
@@ -300,7 +334,7 @@ mod tests {
     async fn ae_everything_up_to_date() -> Result<()> {
         let env = Env::new().await?;
 
-        let (node_msg, src_location) = env.create_message(
+        let (_msg, src_location) = env.create_message(
             env.core.section().prefix(),
             *env.core.section_chain().last_key(),
         )?;
@@ -309,7 +343,7 @@ mod tests {
 
         let command = env
             .core
-            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, None, sender)
+            .check_for_entropy(&_msg, &src_location, &dst_section_pk, None, sender)
             .await?;
 
         assert!(command.is_none());
@@ -324,7 +358,7 @@ mod tests {
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();
 
-        let (node_msg, src_location) = env.create_message(&env.other_prefix, other_pk)?;
+        let (_msg, src_location) = env.create_message(&env.other_prefix, other_pk)?;
         let sender = env.core.node().addr;
 
         // since it's not aware of the other prefix, it shall fail with NoMatchingSection
@@ -332,7 +366,7 @@ mod tests {
         let dst_name = Some(env.other_prefix.name());
         match env
             .core
-            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, dst_name, sender)
+            .check_for_entropy(&_msg, &src_location, &dst_section_pk, dst_name, sender)
             .await
         {
             Err(Error::NoMatchingSection) => {}
@@ -352,7 +386,7 @@ mod tests {
         // with the SAP we inserted for other prefix
         let command = env
             .core
-            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, dst_name, sender)
+            .check_for_entropy(&_msg, &src_location, &dst_section_pk, dst_name, sender)
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
@@ -374,7 +408,7 @@ mod tests {
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
         let env = Env::new().await?;
 
-        let (node_msg, src_location) = env.create_message(
+        let (_msg, src_location) = env.create_message(
             env.core.section().prefix(),
             *env.core.section_chain().last_key(),
         )?;
@@ -383,7 +417,7 @@ mod tests {
 
         let command = env
             .core
-            .check_dest_section_pk(&node_msg, &src_location, &dst_section_pk, None, sender)
+            .check_for_entropy(&_msg, &src_location, &dst_section_pk, None, sender)
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
@@ -446,20 +480,22 @@ mod tests {
             &self,
             src_section_prefix: &Prefix,
             src_section_pk: BlsPublicKey,
-        ) -> Result<(InfrastructureMsg, SrcLocation)> {
+        ) -> Result<(Bytes, SrcLocation)> {
             let sender = Node::new(
                 ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );
 
-            let node_msg = InfrastructureMsg::StartConnectivityTest(XorName::random());
+            let _msg = InfrastructureMsg::StartConnectivityTest(XorName::random());
+
+            let bounced_bytes = WireMsg::serialize_msg_payload(&_msg)?;
 
             let src_location = SrcLocation::Node {
                 name: sender.name(),
                 section_pk: src_section_pk,
             };
 
-            Ok((node_msg, src_location))
+            Ok((bounced_bytes, src_location))
         }
     }
 

@@ -27,7 +27,7 @@ pub use self::{
     register::{RegisterCmd, RegisterRead, RegisterWrite},
 };
 
-use crate::messaging::{data::Error as ErrorMessage, MessageId, SectionAuthorityProvider};
+use crate::messaging::{data::Error as ErrorMessage, MessageId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     Chunk, DataAddress, PublicKey,
@@ -49,9 +49,6 @@ pub struct ServiceError {
     ///
     /// This can be used to handle the error.
     pub reason: Option<Error>,
-    /// Optional `messaging::sap::SectionAuthorityProvider` for resending
-    /// the source message
-    pub sap: Option<SectionAuthorityProvider>,
     /// Message that triggered this error.
     ///
     /// This could be used to retry the message if the error could be handled.

@@ -22,8 +22,8 @@ use crate::messaging::{
     data::{DataCmd, DataQuery, ServiceMsg, StorageLevel},
     node::{InfrastructureMsg, NodeCmd, NodeQuery, Proposal},
     signature_aggregator::Error as AggregatorError,
-    DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth, ServiceAuth,
-    WireMsg,
+    DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
+    ServiceAuth, SrcLocation, WireMsg,
 };
 use crate::routing::messages::WireMsgUtils;
 use crate::routing::{
@@ -49,24 +49,10 @@ impl Core {
     ) -> Result<Vec<Command>> {
         // Deserialize the payload of the incoming message
 
-        // WE DO NOT RELAY ANYMORE BUT REDIRECT THE CLIENT TO THE DESTINATION VIA AE
-        /*
-        // Make sure the message is for us, unless it's a client msg
-        // in which case we'll handle/forward it after signature check.
-        if !wire_msg.is_client_msg_kind()
-            && !dst_location.contains(&self.node.name(), self.section.prefix())
-        {
-            // Message is not for us
-            info!("Relay message {} closer to the destination", msg_id);
-            let cmd = self.relay_message(wire_msg).await?;
-            return Ok(vec![cmd]);
-        }
-         */
-
         // We can now deserialize the payload of the incoming message
         let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
-        let message_type = match wire_msg.into_message() {
+        let message_type = match wire_msg.clone().into_message() {
             Ok(message_type) => message_type,
             Err(error) => {
                 error!(
@@ -83,21 +69,113 @@ impl Core {
                 msg_authority,
                 dst_location,
                 msg,
-            } => Ok(vec![Command::HandleInfrastructureMessage {
-                sender,
-                msg_id,
-                auth: msg_authority,
-                dst_location,
-                msg,
-                payload,
-            }]),
+            } => {
+                // First we perform AE checks
+
+                // Let's now verify the section key in the msg authority is trusted
+                // based on our current knowledge of the network and sections chains.
+                let known_keys: Vec<BlsPublicKey> = self
+                    .section
+                    .chain()
+                    .keys()
+                    .copied()
+                    .chain(self.network.keys().map(|(_, key)| key))
+                    .chain(iter::once(*self.section.genesis_key()))
+                    .collect();
+
+                if !msg_authority.verify_src_section_key(&known_keys) {
+                    debug!("Untrusted message from {:?}: {:?} ", sender, msg);
+                    let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
+                    return Ok(vec![cmd]);
+                }
+                trace!(
+                    "Trusted msg authority in message from {:?}: {:?}",
+                    sender,
+                    msg
+                );
+
+                // Let's check for entropy before we proceed further
+                if let Some(ae_command) = self
+                    .check_for_entropy_if_needed(
+                        &wire_msg,
+                        &msg,
+                        &msg_authority.src_location(),
+                        &dst_location,
+                        sender,
+                    )
+                    .await?
+                {
+                    return Ok(vec![ae_command]);
+                }
+
+                trace!(
+                    "Entropy check passed. Handling verified node msg {}",
+                    msg_id
+                );
+
+                Ok(vec![Command::HandleInfrastructureMessage {
+                    sender,
+                    msg_id,
+                    auth: msg_authority,
+                    dst_location,
+                    msg,
+                    payload,
+                }])
+            }
             MessageType::Service {
                 msg_id,
                 auth,
                 msg,
                 dst_location,
             } => {
-                self.handle_service_message(sender, msg_id, auth, msg, payload, dst_location)
+                // First we perform AE checks
+
+                let data_name = match msg.dst_address() {
+                    Some(name) => name,
+                    None => {
+                        warn!("Dropping client message as there is no valid destination.");
+                        return Ok(vec![]);
+                    }
+                };
+
+                let received_section_pk = match dst_location.section_pk() {
+                    Some(section_pk) => section_pk,
+                    None => {
+                        warn!("Dropping service message as there is no valid dst section_pk.");
+                        return Ok(vec![]);
+                    }
+                };
+
+                let user = match self.comm.get_connection_id(&sender).await {
+                    Some(name) => EndUser(name),
+                    None => {
+                        error!(
+                            "Service msg has been dropped since client connection id for {} was not found: {:?}",
+                            sender, msg
+                        );
+                        return Ok(vec![]);
+                    }
+                };
+                if !self.dst_is_for_our_section(&received_section_pk) {
+                    let src_location = SrcLocation::EndUser(user);
+                    let bounced_bytes = wire_msg.serialize()?;
+                    let ae_responses = self
+                        .check_for_entropy(
+                            &bounced_bytes,
+                            &src_location,
+                            &received_section_pk,
+                            Some(data_name),
+                            sender,
+                        )
+                        .await?;
+
+                    if let Some(command) = ae_responses {
+                        // short circuit and send those AE responses
+                        return Ok(vec![command]);
+                    }
+                }
+
+                self.handle_service_message(msg_id, auth, msg, dst_location, user)
                     .await
             }
             #[cfg(test)]
@@ -112,11 +190,11 @@ impl Core {
         msg_id: MessageId,
         mut msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
-        node_msg: InfrastructureMsg,
+        msg: InfrastructureMsg,
         payload: Bytes,
     ) -> Result<Vec<Command>> {
-        // Let's now verify the section key in the msg authority is trusted
-        // based on our current knowledge of the network and sections chains.
+        // // Let's now verify the section key in the msg authority is trusted
+        // // based on our current knowledge of the network and sections chains.
         let known_keys: Vec<BlsPublicKey> = self
             .section
             .chain()
@@ -126,34 +204,24 @@ impl Core {
             .chain(iter::once(*self.section.genesis_key()))
             .collect();
 
-        if !msg_authority.verify_src_section_key(&known_keys) {
-            debug!("Untrusted message from {:?}: {:?} ", sender, node_msg);
-            let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
-            return Ok(vec![cmd]);
-        }
-        trace!(
-            "Trusted msg authority in message from {:?}: {:?}",
-            sender,
-            node_msg
-        );
+        // if !msg_authority.verify_src_section_key(&known_keys) {
+        //     debug!("Untrusted message from {:?}: {:?} ", sender, msg);
+        //     let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
+        //     return Ok(vec![cmd]);
+        // }
+        // trace!(
+        //     "Trusted msg authority in message from {:?}: {:?}",
+        //     sender,
+        //     msg
+        // );
 
-        // Let's check for entropy before we proceed further
-        if let Some(ae_command) = self
-            .check_for_entropy(
-                &node_msg,
-                &msg_authority.src_location(),
-                &dst_location,
-                sender,
-            )
-            .await?
-        {
-            return Ok(vec![ae_command]);
-        }
-
-        trace!(
-            "Entropy check passed. Handling verified node msg {}",
-            msg_id
-        );
+        // // Let's check for entropy before we proceed further
+        // if let Some(ae_command) = self
+        //     .check_for_entropy_if_needed(&msg, &msg_authority.src_location(), &dst_location, sender)
+        //     .await?
+        // {
+        //     return Ok(vec![ae_command]);
+        // }
 
         let mut commands = vec![];
 
@@ -162,13 +230,13 @@ impl Core {
             .aggregate_message_and_stop(&mut msg_authority, payload)
             .await
         {
-            Ok(false) => match node_msg {
+            Ok(false) => match msg {
                 InfrastructureMsg::NodeCmd(_)
                 | InfrastructureMsg::NodeQuery(_)
                 | InfrastructureMsg::NodeQueryResponse { .. } => {
                     commands.push(Command::HandleVerifiedNodeDataMessage {
                         msg_id,
-                        msg: node_msg,
+                        msg,
                         auth: msg_authority,
                         dst_location,
                     });
@@ -177,7 +245,7 @@ impl Core {
                     commands.push(Command::HandleVerifiedNodeNonDataMessage {
                         sender,
                         msg_id,
-                        msg: node_msg,
+                        msg,
                         auth: msg_authority,
                         dst_location,
                         known_keys,
@@ -185,7 +253,7 @@ impl Core {
                 }
             },
             Err(Error::InvalidSignatureShare) => {
-                let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
+                let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
                 commands.push(cmd);
             }
             Ok(true) | Err(_) => {}
