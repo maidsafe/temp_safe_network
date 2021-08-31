@@ -13,11 +13,8 @@ mod map;
 mod stats;
 
 use self::{map::PrefixMap, stats::NetworkStats};
-use crate::messaging::{
-    system::{Peer, SectionAuth},
-    SectionAuthorityProvider,
-};
-use crate::routing::{Error, PeerUtils, Result, SectionAuthUtils, SectionAuthorityProviderUtils};
+use crate::messaging::{system::SectionAuth, SectionAuthorityProvider};
+use crate::routing::{Error, Result, SectionAuthUtils, SectionAuthorityProviderUtils};
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeMap, iter};
 use xor_name::{Prefix, XorName};
@@ -38,7 +35,7 @@ impl NetworkPrefixMap {
 
     ///
     pub(crate) fn insert(
-        &mut self,
+        &self,
         prefix: Prefix,
         sap: SectionAuth<SectionAuthorityProvider>,
     ) -> bool {
@@ -67,10 +64,7 @@ impl NetworkPrefixMap {
             .map(|(_, section_auth)| section_auth)
     }
 
-    /// Returns iterator over all known sections.
-    pub(crate) fn all(&self) -> Box<dyn Iterator<Item = SectionAuthorityProvider> + '_> {
-        Box::new(self.sections.iter().map(|e| e.value().value.clone()))
-    }
+
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
     pub(crate) fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
@@ -79,25 +73,11 @@ impl NetworkPrefixMap {
             .map(|(_, section_auth)| section_auth.value)
     }
 
-    /// Returns a `Peer` of an elder from a known section.
-    pub(crate) fn get_elder(&self, name: &XorName) -> Option<Peer> {
-        self.sections
-            .get_matching(name)?
-            .1
-            .value
-            .get_addr(name)
-            .map(|addr| {
-                let mut peer = Peer::new(*name, addr);
-                peer.set_reachable(true);
-                peer
-            })
-    }
-
-    /// Merge two `PrefixMap`s into one.
+    /// Merge two `NetworkPrefixMap`s into one.
     /// TODO: make this operation commutative, associative and idempotent (CRDT)
     /// TODO: return bool indicating whether anything changed.
     pub(crate) fn merge<'a>(
-        &mut self,
+        &self,
         sections_iter: impl Iterator<Item = (&'a Prefix, &'a SectionAuth<SectionAuthorityProvider>)>,
         section_chain: &SecuredLinkedList,
     ) {
@@ -110,7 +90,7 @@ impl NetworkPrefixMap {
         }
     }
 
-    ///
+    /// Dump a collections with a copy of the prefixes and mapped SAPs.
     pub(crate) fn dump(&self) -> BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>> {
         self.sections
             .iter()
@@ -124,7 +104,7 @@ impl NetworkPrefixMap {
     /// Update our knowledge of a remote section's SAP only
     /// if it's verifiable with the provided proof chain.
     pub(crate) fn update_remote_section_sap(
-        &mut self,
+        &self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
         our_section_chain: &SecuredLinkedList,
@@ -206,21 +186,12 @@ impl NetworkPrefixMap {
         Ok(true)
     }
 
-    /// Returns the known section keys.
-    pub(crate) fn keys(&self) -> Box<dyn Iterator<Item = (Prefix, bls::PublicKey)> + '_> {
-        Box::new(
-            self.sections
-                .iter()
-                .map(|e| (e.value().value.prefix, e.value().value.section_key())),
-        )
-    }
-
-    /// Returns the latest known key for the prefix that matches `name`.
-    pub(crate) fn key_by_name(&self, name: &XorName) -> Result<bls::PublicKey> {
+    /// Returns the known section public keys.
+    pub(crate) fn section_keys(&self) -> Vec<bls::PublicKey> {
         self.sections
-            .get_matching(name)
-            .ok_or(Error::NoMatchingSection)
-            .map(|(_, section_auth)| section_auth.value.section_key())
+            .iter()
+            .map(|e| e.value().value.section_key())
+            .collect()
     }
 
     /// Returns the section authority provider for the prefix that matches `name`,
@@ -283,7 +254,7 @@ mod tests {
         let p11: Prefix = "11".parse().unwrap();
 
         // Create map containing sections (00), (01) and (10)
-        let mut map = NetworkPrefixMap::new();
+        let map = NetworkPrefixMap::new();
 
         let mut chain01 = chain.clone();
         let section_auth_01 = gen_section_auth(p01)?;

@@ -340,15 +340,9 @@ impl Routing {
             .clone()
     }
 
-    /// Returns the info about other sections in the network known to us.
-    pub async fn other_sections(&self) -> Vec<SectionAuthorityProvider> {
-        self.dispatcher.core.read().await.network().all().collect()
-    }
-
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        let core = self.dispatcher.core.read().await;
-        core.matching_section(name)
+        self.dispatcher.core.read().await.matching_section(name)
     }
 
     /// Builds a WireMsg signed by this Node

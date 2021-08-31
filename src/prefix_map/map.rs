@@ -37,7 +37,7 @@ where
     /// Does not insert anything if any descendant of the prefix of `entry` is already present in
     /// the map.
     /// Returns a boolean indicating whether anything changed.
-    pub(super) fn insert(&mut self, prefix: Prefix, entry: T) -> bool {
+    pub(super) fn insert(&self, prefix: Prefix, entry: T) -> bool {
         // Don't insert if any descendant is already present in the map.
         if self.descendants(&prefix).next().is_some() {
             return false;
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn insert_existing_prefix() {
-        let mut map = PrefixMap::new();
+        let map = PrefixMap::new();
         assert!(map.insert(prefix("0"), 1));
         assert!(map.insert(prefix("0"), 2));
         assert_eq!(map.get(&prefix("0")), Some((prefix("0"), 2)));
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn insert_direct_descendants_of_existing_prefix() {
-        let mut map = PrefixMap::new();
+        let map = PrefixMap::new();
         assert!(map.insert(prefix("0"), 0));
 
         // Insert the first sibling. Parent remain in the map.
@@ -183,7 +183,7 @@ mod tests {
     async fn return_opposite_prefix_if_none_matching() {
         let mut rng = rand::thread_rng();
 
-        let mut map = PrefixMap::new();
+        let map = PrefixMap::new();
         let _ = map.insert(prefix("0"), 1);
 
         // There are no matching prefixes, so return None.
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn insert_indirect_descendants_of_existing_prefix() {
-        let mut map = PrefixMap::new();
+        let map = PrefixMap::new();
         assert!(map.insert(prefix("0"), 0));
 
         assert!(map.insert(prefix("000"), 1));
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn insert_ancestor_of_existing_prefix() {
-        let mut map = PrefixMap::new();
+        let map = PrefixMap::new();
         let _ = map.insert(prefix("00"), 1);
 
         assert!(!map.insert(prefix("0"), 2));
@@ -247,7 +247,7 @@ mod tests {
     fn get_matching() {
         let mut rng = rand::thread_rng();
 
-        let mut map = PrefixMap::new();
+        let map = PrefixMap::new();
         let _ = map.insert(prefix("0"), 0);
         let _ = map.insert(prefix("1"), 1);
         let _ = map.insert(prefix("10"), 10);
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn get_matching_prefix() {
-        let mut map = PrefixMap::new();
+        let map = PrefixMap::new();
         let _ = map.insert(prefix("0"), 0);
         let _ = map.insert(prefix("1"), 1);
         let _ = map.insert(prefix("10"), 10);

@@ -25,20 +25,18 @@ use crate::messaging::{
     DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
     ServiceAuth, SrcLocation, WireMsg,
 };
-use crate::routing::messages::WireMsgUtils;
 use crate::routing::{
-    error::{Error, Result},
-    messages::NodeMsgAuthorityUtils,
+    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     relocation::RelocateState,
     routing_api::command::Command,
     section::SectionUtils,
-    Event, MessageReceived, SectionAuthorityProviderUtils,
+    Error, Event, MessageReceived, Result, SectionAuthorityProviderUtils,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use rand::rngs::OsRng;
-use std::{collections::BTreeSet, iter, net::SocketAddr};
+use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 // Message handling
 impl Core {
@@ -74,14 +72,10 @@ impl Core {
 
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
-                let known_keys: Vec<BlsPublicKey> = self
-                    .section
-                    .chain()
-                    .keys()
-                    .copied()
-                    .chain(self.network.keys().map(|(_, key)| key))
-                    .chain(iter::once(*self.section.genesis_key()))
-                    .collect();
+                let mut known_keys: Vec<BlsPublicKey> =
+                    self.section.chain().keys().copied().collect();
+                known_keys.extend(self.network.section_keys());
+                known_keys.push(*self.section.genesis_key());
 
                 if !msg_authority.verify_src_section_key(&known_keys) {
                     debug!("Untrusted message from {:?}: {:?} ", sender, msg);
@@ -183,14 +177,9 @@ impl Core {
     ) -> Result<Vec<Command>> {
         // // Let's now verify the section key in the msg authority is trusted
         // // based on our current knowledge of the network and sections chains.
-        let known_keys: Vec<BlsPublicKey> = self
-            .section
-            .chain()
-            .keys()
-            .copied()
-            .chain(self.network.keys().map(|(_, key)| key))
-            .chain(iter::once(*self.section.genesis_key()))
-            .collect();
+        let mut known_keys: Vec<BlsPublicKey> = self.section.chain().keys().copied().collect();
+        known_keys.extend(self.network.section_keys());
+        known_keys.push(*self.section.genesis_key());
 
         // if !msg_authority.verify_src_section_key(&known_keys) {
         //     debug!("Untrusted message from {:?}: {:?} ", sender, msg);

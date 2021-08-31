@@ -389,7 +389,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_redirect_to_other_section() -> Result<()> {
-        let mut env = Env::new().await?;
+        let env = Env::new().await?;
 
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();

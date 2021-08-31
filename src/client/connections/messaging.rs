@@ -21,11 +21,7 @@ use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
 use qp2p::Endpoint;
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
-use tokio::{
-    sync::{mpsc::channel, RwLock},
-    task::JoinHandle,
-    time::sleep,
-};
+use tokio::{sync::mpsc::channel, task::JoinHandle, time::sleep};
 use tracing::{debug, error, trace, warn};
 
 // Number of attempts when retrying to send a message to a node
@@ -68,22 +64,21 @@ impl Session {
         let endpoint = self.endpoint()?.clone();
 
         // Get DataSection elders details.
-        let (elders, section_pk) =
-            if let Ok(sap) = self.network.read().await.section_by_name(&dst_address) {
-                (
-                    sap.elders
-                        .values()
-                        .cloned()
-                        .take(targets)
-                        .collect::<Vec<SocketAddr>>(),
-                    sap.public_key_set.public_key(),
-                )
-            } else {
-                // Send message to our bootstrap peer with a random section PK.
-                self.bootstrap_peer
-                    .map(|addr| (vec![addr], bls::SecretKey::random().public_key()))
-                    .ok_or(Error::NotBootstrapped)?
-            };
+        let (elders, section_pk) = if let Ok(sap) = self.network.section_by_name(&dst_address) {
+            (
+                sap.elders
+                    .values()
+                    .cloned()
+                    .take(targets)
+                    .collect::<Vec<SocketAddr>>(),
+                sap.public_key_set.public_key(),
+            )
+        } else {
+            // Send message to our bootstrap peer with a random section PK.
+            self.bootstrap_peer
+                .map(|addr| (vec![addr], bls::SecretKey::random().public_key()))
+                .ok_or(Error::NotBootstrapped)?
+        };
 
         let msg_id = MessageId::new();
 
@@ -131,19 +126,18 @@ impl Session {
         let data_name = query.dst_name();
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let (elders, section_pk) =
-            if let Ok(sap) = self.network.read().await.section_by_name(&data_name) {
-                (sap.elders, sap.public_key_set.public_key())
-            } else {
-                // Send message to our bootstrap peer with a random section PK and addressing adring.
-                self.bootstrap_peer
-                    .map(|addr| {
-                        let mut bootstrapped_peer = BTreeMap::new();
-                        let _ = bootstrapped_peer.insert(XorName::random(), addr);
-                        (bootstrapped_peer, bls::SecretKey::random().public_key())
-                    })
-                    .ok_or(Error::NotBootstrapped)?
-            };
+        let (elders, section_pk) = if let Ok(sap) = self.network.section_by_name(&data_name) {
+            (sap.elders, sap.public_key_set.public_key())
+        } else {
+            // Send message to our bootstrap peer with a random section PK and addressing adring.
+            self.bootstrap_peer
+                .map(|addr| {
+                    let mut bootstrapped_peer = BTreeMap::new();
+                    let _ = bootstrapped_peer.insert(XorName::random(), addr);
+                    (bootstrapped_peer, bls::SecretKey::random().public_key())
+                })
+                .ok_or(Error::NotBootstrapped)?
+        };
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders = elders
@@ -424,11 +418,11 @@ pub(crate) async fn rebuild_message_for_ae_resend(
     serialized_cmd: Bytes,
     auth: ServiceAuth,
     dst_address: Option<XorName>,
-    network: Arc<RwLock<NetworkPrefixMap>>,
+    network: Arc<NetworkPrefixMap>,
 ) -> Option<(WireMsg, Vec<SocketAddr>)> {
     info!("Rebuilding message for AE resend");
     if let Some(dst_address) = dst_address {
-        if let Ok(sap) = network.read().await.section_by_name(&dst_address) {
+        if let Ok(sap) = network.section_by_name(&dst_address) {
             let elders = sap.elders.values().cloned().collect::<Vec<SocketAddr>>();
             let section_pk = sap.public_key_set.public_key();
 
