@@ -106,10 +106,6 @@ impl Core {
         self.section.chain()
     }
 
-    pub(crate) fn network(&self) -> &NetworkPrefixMap {
-        &self.network
-    }
-
     /// Is this node an elder?
     pub(crate) fn is_elder(&self) -> bool {
         self.section.is_elder(&self.node.name())

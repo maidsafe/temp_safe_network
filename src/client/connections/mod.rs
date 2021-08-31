@@ -47,7 +47,7 @@ pub(super) struct Session {
     // Channels for sending errors to upper layer
     incoming_err_sender: Arc<Sender<CmdError>>,
     /// All elders we know about from AE messages
-    network: Arc<RwLock<NetworkPrefixMap>>,
+    network: Arc<NetworkPrefixMap>,
     /// Our initial bootstrap node
     bootstrap_peer: Option<SocketAddr>,
     /// BLS Signature aggregator for aggregating network messages
@@ -70,7 +70,7 @@ impl Session {
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
             endpoint: None,
-            network: Arc::new(RwLock::new(NetworkPrefixMap::new())),
+            network: Arc::new(NetworkPrefixMap::new()),
             bootstrap_peer: None,
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
         })

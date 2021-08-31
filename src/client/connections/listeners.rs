@@ -80,7 +80,7 @@ impl Session {
                 } => {
                     info!("Received AE-Redirect/retry SAP: {:?}", section_auth);
                     // Update our network knowledge
-                    let _ = self.network.write().await.insert(
+                    let _ = self.network.insert(
                         section_auth.prefix,
                         SectionAuth {
                             value: section_auth.clone(),

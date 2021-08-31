@@ -76,7 +76,7 @@ fn section_candidates(
     network: &NetworkPrefixMap,
 ) -> Result<(Vec<Peer>, usize)> {
     // Find closest section to `target_name` out of the ones we know (including our own)
-    let network_sections: Vec<_> = network.all().collect();
+    let network_sections = network.all();
     let info = iter::once(section.authority_provider())
         .chain(network_sections.iter())
         .min_by(|lhs, rhs| lhs.prefix.cmp_distance(&rhs.prefix, target_name))
@@ -103,7 +103,7 @@ fn candidates(
     network: &NetworkPrefixMap,
 ) -> Result<(Vec<Peer>, usize)> {
     // All sections we know (including our own), sorted by distance to `target_name`.
-    let network_sections: Vec<_> = network.all().collect();
+    let network_sections = network.all();
     let sections = iter::once(section.authority_provider())
         .chain(network_sections.iter())
         .sorted_by(|lhs, rhs| lhs.prefix.cmp_distance(&rhs.prefix, target_name))
@@ -152,11 +152,18 @@ fn candidates(
 
 // Returns a `Peer` for a known node.
 fn get_peer(name: &XorName, section: &Section, network: &NetworkPrefixMap) -> Option<Peer> {
-    section
-        .members()
-        .get(name)
-        .map(|info| info.peer)
-        .or_else(|| network.get_elder(name))
+    match section.members().get(name) {
+        Some(info) => Some(info.peer),
+        None => network
+            .section_by_name(name)
+            .ok()?
+            .get_addr(name)
+            .map(|addr| {
+                let mut peer = Peer::new(*name, addr);
+                peer.set_reachable(true);
+                peer
+            }),
+    }
 }
 
 #[cfg(test)]
@@ -518,7 +525,7 @@ mod tests {
             assert!(section.update_member(node_state));
         }
 
-        let mut network = NetworkPrefixMap::new();
+        let network = NetworkPrefixMap::new();
 
         let (section_auth1, _, secret_key_set) =
             gen_section_authority_provider(prefix1, ELDER_SIZE);
