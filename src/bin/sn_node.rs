@@ -123,7 +123,7 @@ async fn run_node() -> Result<()> {
     } else {
         println!("Starting logging to stdout");
 
-        tracing_subscriber::fmt().init();
+        tracing_subscriber::fmt::init();
 
         None
     };
