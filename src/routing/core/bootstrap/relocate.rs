@@ -8,8 +8,8 @@
 
 use crate::messaging::{
     node::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, RelocateDetails, RelocatePayload,
-        Section,
+        InfrastructureMsg, JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocateDetails,
+        RelocatePayload, Section,
     },
     AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider, WireMsg,
 };
@@ -36,7 +36,7 @@ pub(crate) struct JoiningAsRelocated {
     genesis_key: BlsPublicKey,
     dst_section_key: BlsPublicKey,
     relocate_details: RelocateDetails,
-    node_msg: NodeMsg,
+    node_msg: InfrastructureMsg,
     node_msg_auth: AuthorityProof<SectionAuth>,
     // Avoid sending more than one request to the same peer.
     used_recipients: HashSet<SocketAddr>,
@@ -48,7 +48,7 @@ impl JoiningAsRelocated {
         node: Node,
         genesis_key: BlsPublicKey,
         relocate_details: RelocateDetails,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         section_auth: AuthorityProof<SectionAuth>,
     ) -> Result<Self> {
         let dst_section_key = relocate_details.dst_key;
@@ -250,7 +250,7 @@ impl JoiningAsRelocated {
 
         info!("Sending {:?} to {:?}", join_request, recipients);
 
-        let node_msg = NodeMsg::JoinAsRelocatedRequest(Box::new(join_request));
+        let node_msg = InfrastructureMsg::JoinAsRelocatedRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted(self.dst_section_key),

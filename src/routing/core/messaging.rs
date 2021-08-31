@@ -9,8 +9,8 @@
 use super::Core;
 use crate::messaging::{
     node::{
-        DkgKey, ElderCandidates, JoinResponse, NodeMsg, NodeState, Peer, Proposal, RelocateDetails,
-        RelocatePromise, Section, SectionAuth,
+        DkgKey, ElderCandidates, InfrastructureMsg, JoinResponse, NodeState, Peer, Proposal,
+        RelocateDetails, RelocatePromise, Section, SectionAuth,
     },
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
@@ -68,7 +68,7 @@ impl Core {
         )?;
 
         // Broadcast the proposal to the rest of the section elders.
-        let node_msg = NodeMsg::Propose {
+        let node_msg = InfrastructureMsg::Propose {
             content: proposal,
             sig_share,
         };
@@ -101,7 +101,7 @@ impl Core {
                     peer,
                     // TODO: consider sending only those parts of section that are new
                     // since `public_key` was the latest key.
-                    NodeMsg::Sync {
+                    InfrastructureMsg::Sync {
                         section: self.section.clone(),
                         network: self
                             .network
@@ -132,7 +132,7 @@ impl Core {
         let addr = *node_state.value.peer.addr();
         let name = *node_state.value.peer.name();
 
-        let node_msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Approval {
+        let node_msg = InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Approval {
             genesis_key: *self.section.genesis_key(),
             section_auth: self.section.section_signed_authority_provider().clone(),
             node_state,
@@ -159,7 +159,7 @@ impl Core {
         // Send the trimmed state to non-elders. The trimmed state contains only the knowledge of
         // own section.
         let dst_section_pk = *self.section_chain().last_key();
-        let node_msg = NodeMsg::Sync {
+        let node_msg = InfrastructureMsg::Sync {
             section: section.clone(),
             network: BTreeMap::new(),
         };
@@ -170,7 +170,7 @@ impl Core {
 
         // Send the full state to elders.
         // The full state contains the whole section chain.
-        let node_msg = NodeMsg::Sync { section, network };
+        let node_msg = InfrastructureMsg::Sync { section, network };
         let cmd = self.send_direct_message_to_nodes(elders, node_msg, dst_section_pk)?;
         commands.push(cmd);
 
@@ -184,7 +184,7 @@ impl Core {
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
 
-        let node_msg = NodeMsg::Sync {
+        let node_msg = InfrastructureMsg::Sync {
             section: self.section.clone(),
             network: BTreeMap::new(),
         };
@@ -205,7 +205,7 @@ impl Core {
             name: details.pub_id,
             section_pk: *self.section.chain().last_key(),
         };
-        let node_msg = NodeMsg::Relocate(details);
+        let node_msg = InfrastructureMsg::Relocate(details);
 
         self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
     }
@@ -223,7 +223,7 @@ impl Core {
             name: promise.name,
             section_pk: *self.section.chain().last_key(),
         };
-        let node_msg = NodeMsg::RelocatePromise(promise);
+        let node_msg = InfrastructureMsg::RelocatePromise(promise);
 
         self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
     }
@@ -253,7 +253,7 @@ impl Core {
             recipients
         );
 
-        let node_msg = NodeMsg::DkgStart {
+        let node_msg = InfrastructureMsg::DkgStart {
             dkg_key,
             elder_candidates,
         };
@@ -270,7 +270,7 @@ impl Core {
         &self,
         src: XorName,
         dst: DstLocation,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         recipients: &[Peer],
     ) -> Result<Vec<Command>> {
         let key_share = self.section_keys_provider.key_share().map_err(|err| {
@@ -346,7 +346,7 @@ impl Core {
     pub(crate) fn send_direct_message(
         &self,
         recipient: (XorName, SocketAddr),
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
@@ -365,7 +365,7 @@ impl Core {
     pub(crate) fn send_direct_message_to_nodes(
         &self,
         recipients: Vec<(XorName, SocketAddr)>,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
@@ -383,7 +383,10 @@ impl Core {
 
     // TODO: consider changing this so it sends only to a subset of the elders
     // (say 1/3 of the ones closest to our name or so)
-    pub(crate) fn send_message_to_our_elders(&self, node_msg: NodeMsg) -> Result<Command> {
+    pub(crate) fn send_message_to_our_elders(
+        &self,
+        node_msg: InfrastructureMsg,
+    ) -> Result<Command> {
         let targets: Vec<_> = self
             .section
             .authority_provider()

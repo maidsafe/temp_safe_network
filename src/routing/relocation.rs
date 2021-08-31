@@ -9,7 +9,10 @@
 //! Relocation related types and utilities.
 
 use crate::messaging::{
-    node::{NodeMsg, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, Section},
+    node::{
+        InfrastructureMsg, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise,
+        Section,
+    },
     AuthorityProof, SectionAuth,
 };
 use crate::routing::{
@@ -99,7 +102,7 @@ impl RelocateDetailsUtils for RelocateDetails {
 
 pub(super) trait RelocatePayloadUtils {
     fn new(
-        details: NodeMsg,
+        details: InfrastructureMsg,
         section_auth: AuthorityProof<SectionAuth>,
         new_name: &XorName,
         old_keypair: &Keypair,
@@ -112,7 +115,7 @@ pub(super) trait RelocatePayloadUtils {
 
 impl RelocatePayloadUtils for RelocatePayload {
     fn new(
-        details: NodeMsg,
+        details: InfrastructureMsg,
         section_auth: AuthorityProof<SectionAuth>,
         new_name: &XorName,
         old_keypair: &Keypair,
@@ -145,7 +148,7 @@ impl RelocatePayloadUtils for RelocatePayload {
     }
 
     fn relocate_details(&self) -> Result<&RelocateDetails, Error> {
-        if let NodeMsg::Relocate(relocate_details) = &self.details {
+        if let InfrastructureMsg::Relocate(relocate_details) = &self.details {
             Ok(relocate_details)
         } else {
             error!("RelocateDetails does not contain a NodeMsg::Relocate");
@@ -159,7 +162,7 @@ pub(crate) enum RelocateState {
     // while being an elder. It must keep fulfilling its duties as elder until its demoted, then it
     // can send the bytes (which are serialized `RelocatePromise` message) back to the elders who
     // will exchange it for an actual `Relocate` message.
-    Delayed(NodeMsg),
+    Delayed(InfrastructureMsg),
     // Relocation in progress.
     InProgress(Box<JoiningAsRelocated>),
 }

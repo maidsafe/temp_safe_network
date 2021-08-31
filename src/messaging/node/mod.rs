@@ -41,7 +41,7 @@ use xor_name::{Prefix, XorName};
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
-pub enum NodeMsg {
+pub enum InfrastructureMsg {
     /// Message sent to a peer when a message with outdated section
     /// information was received, attaching the bounced message so
     /// the peer can resend it with up to date destination information.
@@ -53,7 +53,7 @@ pub enum NodeMsg {
         /// Sender's section chain truncated from the dest section key found in the `bounced_msg`.
         proof_chain: SecuredLinkedList,
         /// Message bounced due to outdated destination section information.
-        bounced_msg: Box<NodeMsg>,
+        bounced_msg: Box<InfrastructureMsg>,
     },
     /// Message sent to a peer when a message needs to be sent to a different
     /// and/or closest section, attaching the bounced message so the peer can
@@ -65,7 +65,7 @@ pub enum NodeMsg {
         /// section the bounced message shall be resent to.
         section_signed: KeyedSig,
         /// Message bounced that shall be resent by the peer.
-        bounced_msg: Box<NodeMsg>,
+        bounced_msg: Box<InfrastructureMsg>,
     },
     /// Message sent to all members to update them about the state of our section.
     Sync {
@@ -95,7 +95,7 @@ pub enum NodeMsg {
     /// source in order for them to provide new proof that the node would trust.
     BouncedUntrustedMessage {
         /// Untrsuted Node message
-        msg: Box<NodeMsg>,
+        msg: Box<InfrastructureMsg>,
         /// Currently known section pk of the source
         dst_section_pk: BlsPublicKey,
     },

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, NodeMsg},
+    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, InfrastructureMsg},
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
@@ -108,7 +108,7 @@ impl Session {
                 dkg_key,
                 recipients
             );
-            let node_msg = NodeMsg::DkgMessage {
+            let node_msg = InfrastructureMsg::DkgMessage {
                 dkg_key: *dkg_key,
                 message: message.clone(),
             };
@@ -260,7 +260,7 @@ impl Session {
             .check_failure_agreement()
             .into_iter()
             .chain(iter::once({
-                let node_msg = NodeMsg::DkgFailureObservation {
+                let node_msg = InfrastructureMsg::DkgFailureObservation {
                     dkg_key: *dkg_key,
                     sig,
                     failed_participants,
@@ -490,8 +490,8 @@ mod tests {
                     recipients,
                     wire_msg,
                 } => match wire_msg.into_message()? {
-                    MessageType::Node {
-                        msg: NodeMsg::DkgMessage { dkg_key, message },
+                    MessageType::Infrastructure {
+                        msg: InfrastructureMsg::DkgMessage { dkg_key, message },
                         ..
                     } => {
                         assert_eq!(dkg_key, *expected_dkg_key);

@@ -8,7 +8,7 @@
 
 use super::super::Core;
 use crate::messaging::{
-    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, NodeMsg, Proposal},
+    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, InfrastructureMsg, Proposal},
     SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -134,7 +134,7 @@ impl Core {
     }
 
     pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Result<Command> {
-        let node_msg = NodeMsg::DkgFailureAgreement(failure_set);
+        let node_msg = InfrastructureMsg::DkgFailureAgreement(failure_set);
         self.send_message_to_our_elders(node_msg)
     }
 }

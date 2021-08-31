@@ -8,7 +8,7 @@
 
 use crate::dbs::UsedSpace;
 use crate::messaging::data::StorageLevel;
-use crate::messaging::{data::ChunkDataExchange, node::NodeMsg, DstLocation, WireMsg};
+use crate::messaging::{data::ChunkDataExchange, node::InfrastructureMsg, DstLocation, WireMsg};
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
     ChunkStore, Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils,
@@ -167,7 +167,7 @@ impl Network {
 
     pub(crate) async fn sign_msg_for_dst_accumulation(
         &self,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         dst: DstLocation,
     ) -> Result<WireMsg> {
         let wire_msg = self
@@ -179,7 +179,7 @@ impl Network {
 
     pub(crate) async fn sign_single_src_msg(
         &self,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         dst: DstLocation,
     ) -> Result<WireMsg> {
         let wire_msg = self.routing.sign_single_src_msg(node_msg, dst).await?;
