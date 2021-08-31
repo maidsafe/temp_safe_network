@@ -8,24 +8,19 @@
 
 use super::Core;
 use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
-use crate::messaging::data::{ServiceError, ServiceMsg};
+use crate::messaging::data::ServiceMsg;
+use crate::messaging::NodeAuth;
 use crate::messaging::{
     data::{ChunkRead, CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite},
     node::{InfrastructureMsg, NodeQueryResponse},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::messaging::{NodeAuth, SectionAuthorityProvider};
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;
 use crate::routing::peer::PeerUtils;
-use crate::routing::{
-    error::Result, routing_api::command::Command, section::SectionUtils,
-    SectionAuthorityProviderUtils,
-};
+use crate::routing::{error::Result, routing_api::command::Command, section::SectionUtils};
 use crate::types::PublicKey;
-use bytes::Bytes;
 use itertools::Itertools;
 use std::collections::BTreeSet;
-use std::net::SocketAddr;
 use xor_name::XorName;
 
 impl Core {
@@ -309,12 +304,11 @@ impl Core {
     /// Handle incoming data msgs.
     pub(crate) async fn handle_service_message(
         &self,
-        sender: SocketAddr,
         msg_id: MessageId,
         auth: AuthorityProof<ServiceAuth>,
         msg: ServiceMsg,
-        payload: Bytes,
         dst_location: DstLocation,
+        user: EndUser,
     ) -> Result<Vec<Command>> {
         trace!("Service msg received being handled: {:?}", msg);
         if let DstLocation::EndUser(_) = dst_location {
@@ -324,105 +318,8 @@ impl Core {
             );
             return Ok(vec![]);
         }
-        let data_name = match msg.dst_address() {
-            Some(name) => name,
-            None => {
-                warn!("Dropping client message as there is no valid destination.");
-                return Ok(vec![]);
-            }
-        };
 
-        let received_section_pk = match dst_location.section_pk() {
-            Some(section_pk) => section_pk,
-            None => {
-                warn!("Dropping client message as there is no valid dst section_pk.");
-                return Ok(vec![]);
-            }
-        };
-
-        let user = match self.comm.get_connection_id(&sender).await {
-            Some(name) => EndUser(name),
-            None => {
-                error!(
-                    "Service msg has been dropped since client connection id for {} was not found: {:?}",
-                    sender, msg
-                );
-                return Ok(vec![]);
-            }
-        };
-        info!("Checking for entropy at Client");
-        if let Some(return_sap) = self.check_entropy_for_client(&data_name, &received_section_pk) {
-            info!("Client AE triggered. Seems like client is out of date.");
-            // AE triggered! Send back the message with SAP of actual destination section
-            let service_msg = ServiceMsg::ServiceError(ServiceError {
-                reason: Some(crate::messaging::data::Error::WrongDestination),
-                sap: Some(return_sap),
-                source_message: Some(payload),
-            });
-
-            let payload = match WireMsg::serialize_msg_payload(&service_msg) {
-                Ok(payload) => payload,
-                Err(e) => {
-                    error!(
-                        "Error: `{:?}` on serializing AE message to client {:?}",
-                        e, user
-                    );
-                    return Ok(vec![]);
-                }
-            };
-
-            let wire_msg = match WireMsg::new_msg(
-                MessageId::new(),
-                payload,
-                MsgKind::ServiceMsg(auth.into_inner()),
-                DstLocation::EndUser(user),
-            ) {
-                Ok(wire_msg) => wire_msg,
-                Err(e) => {
-                    error!(
-                        "Error: `{:?}` on generating AE wire_msg message for client {:?}",
-                        e, user
-                    );
-                    return Ok(vec![]);
-                }
-            };
-
-            return Ok(vec![Command::ParseAndSendWireMsg(wire_msg)]);
-        }
         self.handle_service_msg_received(msg_id, msg, user, auth)
             .await
-    }
-
-    fn check_entropy_for_client(
-        &self,
-        data_name: &XorName,
-        received_section_pk: &bls::PublicKey,
-    ) -> Option<SectionAuthorityProvider> {
-        let our_section = self.section.section_auth.value.clone();
-        let better_sap = self
-            .network()
-            .get_matching_or_opposite(data_name)
-            .unwrap_or_else(|_| our_section.clone());
-
-        info!("Our SAP: {:?}", our_section);
-        info!("Better SAP: {:?}", better_sap);
-        if better_sap != our_section {
-            // Update the client of the actual destination section
-            info!(
-                "We have a better matched section for the data name {:?}",
-                data_name
-            );
-            Some(better_sap)
-        } else {
-            // Check if client has latest knowledge of our section
-            if received_section_pk != &our_section.section_key() {
-                info!("Client is lagging on knowledge of our section, updating them");
-                info!("Latest Key {:?}", our_section.public_key_set.public_key());
-                info!("Outdated key at client {:?}", received_section_pk);
-                Some(our_section)
-            } else {
-                None
-            }
-        }
     }
 }

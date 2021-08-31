@@ -14,13 +14,11 @@ use tracing::{debug, error, info, trace, warn};
 use super::Session;
 use crate::client::connections::messaging::{rebuild_message_for_ae_resend, send_message};
 use crate::client::Error;
-use crate::messaging::data::Error as DataError;
-use crate::messaging::data::ServiceError;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
+    node::InfrastructureMsg,
     MessageId, MessageType, WireMsg,
 };
-use crate::messaging::{DstLocation, ServiceAuth};
 
 impl Session {
     // Listen for incoming messages on a connection
@@ -57,15 +55,76 @@ impl Session {
             let message_type = WireMsg::deserialize(message)?;
             trace!("Incoming message from {:?}", &src);
             match message_type {
-                MessageType::Service {
-                    msg_id,
-                    msg,
-                    auth,
-                    dst_location,
-                } => {
-                    self.handle_client_msg(msg_id, msg, src, auth.into_inner(), dst_location)
-                        .await
+                MessageType::Service { msg_id, msg, .. } => {
+                    self.handle_client_msg(msg_id, msg, src).await
                 }
+                MessageType::Infrastructure {
+                    msg:
+                        InfrastructureMsg::AntiEntropyRedirect {
+                            section_auth,
+                            bounced_msg,
+                            ..
+                        },
+                    ..
+                }
+                | MessageType::Infrastructure {
+                    msg:
+                        InfrastructureMsg::AntiEntropyRetry {
+                            section_auth,
+                            bounced_msg,
+                            ..
+                        },
+                    ..
+                } => {
+                    info!("Received AE-Redirect/retry SAP: {:?}", section_auth);
+                    // Update our network knowledge
+                    let _ = self
+                        .network
+                        .write()
+                        .await
+                        .insert(section_auth.prefix, section_auth);
+                    info!("Updated network knowledge");
+
+                    let (msg_id, service_msg, dst_location, auth) =
+                        match WireMsg::deserialize(bounced_msg)? {
+                            MessageType::Service {
+                                msg_id,
+                                msg,
+                                auth,
+                                dst_location,
+                            } => (msg_id, msg, dst_location, auth),
+                            _ => {
+                                warn!("Unexpected non-serviceMsg returned in AE response.");
+                                return Ok(true);
+                            }
+                        };
+
+                    info!("Prev message retrieved: {:?}", service_msg);
+
+                    let message = WireMsg::serialize_msg_payload(&service_msg)?;
+
+                    info!("Prev message serialized to be resent: {:?}", message.len());
+
+                    if let Some((wire_msg, elders)) = rebuild_message_for_ae_resend(
+                        msg_id,
+                        message,
+                        auth.into_inner(),
+                        dst_location.name(),
+                        self.network.clone(),
+                    )
+                    .await
+                    {
+                        if let Err(e) =
+                            send_message(elders, wire_msg, self.endpoint.clone(), msg_id).await
+                        {
+                            error!("AE: Error on resending ServiceMsg w/id {:?}: {:?}. Restart the flow", msg_id, e)
+                            //     TODO: Remove pending_query channels on query failure.
+                        }
+                    } else {
+                        error!("AE: Error rebuilding message for resending");
+                    }
+                }
+
                 msg_type => {
                     warn!("Unexpected message type received: {:?}", msg_type);
                 }
@@ -77,19 +136,10 @@ impl Session {
     }
 
     // Handle messages intended for client consumption (re: queries + commands)
-    async fn handle_client_msg(
-        &mut self,
-        msg_id: MessageId,
-        msg: ServiceMsg,
-        src: SocketAddr,
-        auth: ServiceAuth,
-        dst_location: DstLocation,
-    ) {
+    async fn handle_client_msg(&mut self, msg_id: MessageId, msg: ServiceMsg, src: SocketAddr) {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = self.pending_queries.clone();
         let error_sender = self.incoming_err_sender.clone();
-        let network = self.network.clone();
-        let endpoint = self.endpoint.clone();
 
         let _ = tokio::spawn(async move {
             debug!("Thread spawned to handle this client message");
@@ -135,36 +185,6 @@ impl Session {
                         CmdError::Data(_error) => {
                             // do nothing just yet
                         }
-                    }
-                }
-                ServiceMsg::ServiceError(ServiceError {
-                    reason: Some(DataError::WrongDestination),
-                    sap: Some(section_auth),
-                    source_message: Some(message),
-                }) => {
-                    info!("Received AE-Redirect SAP: {:?}", section_auth);
-                    // Update our network knowledge
-                    let _ = network
-                        .write()
-                        .await
-                        .insert(section_auth.prefix, section_auth);
-                    info!("Updated network knowledge");
-
-                    if let Some((wire_msg, elders)) = rebuild_message_for_ae_resend(
-                        msg_id,
-                        message,
-                        auth,
-                        dst_location.name(),
-                        network,
-                    )
-                    .await
-                    {
-                        if let Err(e) = send_message(elders, wire_msg, endpoint, msg_id).await {
-                            error!("AE: Error on resending ServiceMsg w/id {:?}: {:?}. Restart the flow", msg_id, e)
-                            //     TODO: Remove pending_query channels on query failure.
-                        }
-                    } else {
-                        error!("AE: Error rebuilding message for resending");
                     }
                 }
                 msg => {

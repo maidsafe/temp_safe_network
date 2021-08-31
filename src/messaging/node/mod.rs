@@ -14,7 +14,12 @@ mod relocation;
 mod section;
 mod signed;
 
+use crate::messaging::{EndUser, MessageId, SectionAuthorityProvider};
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionAuth};
+use bls::PublicKey as BlsPublicKey;
+use bls_dkg::key_gen::message::Message as DkgMessage;
+use bytes::Bytes;
+use itertools::Itertools;
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
@@ -24,14 +29,9 @@ pub use section::MembershipState;
 pub use section::NodeState;
 pub use section::Peer;
 pub use section::{Section, SectionPeers};
-pub use signed::{KeyedSig, SigShare};
-
-use crate::messaging::{EndUser, MessageId, SectionAuthorityProvider};
-use bls::PublicKey as BlsPublicKey;
-use bls_dkg::key_gen::message::Message as DkgMessage;
-use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
+pub use signed::{KeyedSig, SigShare};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -53,7 +53,8 @@ pub enum InfrastructureMsg {
         /// Sender's section chain truncated from the dest section key found in the `bounced_msg`.
         proof_chain: SecuredLinkedList,
         /// Message bounced due to outdated destination section information.
-        bounced_msg: Box<InfrastructureMsg>,
+        #[debug(skip)]
+        bounced_msg: Bytes,
     },
     /// Message sent to a peer when a message needs to be sent to a different
     /// and/or closest section, attaching the bounced message so the peer can
@@ -65,7 +66,8 @@ pub enum InfrastructureMsg {
         /// section the bounced message shall be resent to.
         section_signed: KeyedSig,
         /// Message bounced that shall be resent by the peer.
-        bounced_msg: Box<InfrastructureMsg>,
+        #[debug(skip)]
+        bounced_msg: Bytes,
     },
     /// Message sent to all members to update them about the state of our section.
     Sync {

@@ -25,19 +25,19 @@ impl Core {
     pub(crate) fn handle_untrusted_message(
         &self,
         sender: SocketAddr,
-        node_msg: InfrastructureMsg,
+        infra_msg: InfrastructureMsg,
         msg_authority: NodeMsgAuthority,
     ) -> Result<Command> {
         let src_name = msg_authority.name();
 
         let bounce_dst_section_pk = self.section_key_by_name(&src_name);
 
-        let bounce_node_msg = InfrastructureMsg::BouncedUntrustedMessage {
-            msg: Box::new(node_msg),
+        let bounce_infra_msg = InfrastructureMsg::BouncedUntrustedMessage {
+            msg: Box::new(infra_msg),
             dst_section_pk: bounce_dst_section_pk,
         };
 
-        self.send_direct_message((src_name, sender), bounce_node_msg, bounce_dst_section_pk)
+        self.send_direct_message((src_name, sender), bounce_infra_msg, bounce_dst_section_pk)
     }
 
     pub(crate) fn handle_bounced_untrusted_message(
