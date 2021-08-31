@@ -114,7 +114,7 @@ fn calling_safe_dog_nrs_url_with_subnames() -> Result<()> {
     safeurl.set_sub_names("").map_err(|e| eyre!(e))?;
     let nrs_map_xorurl = safeurl.to_xorurl_string();
 
-    if let SafeData::NrsMapContainer {
+    if let sn_api::fetch::SafeData::NrsMapContainer {
         resolved_from,
         xorurl,
         public_name,
@@ -132,7 +132,7 @@ fn calling_safe_dog_nrs_url_with_subnames() -> Result<()> {
     let dog_output = safe_cmd_stdout(["dog", &nrs_map_xorurl, "--json"], Some(0))?;
     let (url, safe_data_vec) = parse_dog_output(&dog_output);
     assert_eq!(url, *nrs_map_xorurl);
-    if let SafeData::NrsMapContainer {
+    if let sn_api::fetch::SafeData::NrsMapContainer {
         resolved_from,
         xorurl,
         public_name,

@@ -8,19 +8,22 @@
 // Software.
 
 use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Report, Result};
 use predicates::prelude::*;
+use sn_api::{Url, VersionHash};
 use sn_cmd_test_utilities::util::{
-    create_nrs_link, get_directory_len, get_file_len, get_random_nrs_string, mk_emptyfolder,
-    parse_files_container_output, parse_files_put_or_sync_output, parse_files_tree_output,
-    safe_cmd, safe_cmd_stderr, safe_cmd_stdout, safeurl_from, test_symlinks_are_valid,
-    upload_test_symlinks_folder, upload_testfolder_no_trailing_slash,
+    get_directory_file_count, get_directory_len, get_file_len, get_random_nrs_string,
+    mk_emptyfolder, parse_files_container_output, parse_files_put_or_sync_output,
+    parse_files_tree_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout, safeurl_from,
+    test_symlinks_are_valid, upload_path, upload_test_symlinks_folder,
     upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use std::{
     fs::{self, OpenOptions},
     io::{prelude::*, Seek, SeekFrom},
     process::Command,
+    str::FromStr,
 };
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
@@ -116,7 +119,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() -> Result<()> {
     safeurl.set_path("/aha/subfolder/subexists.md");
     let subfile_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
-    assert_eq!(subfile_cat, contents);
+    assert_eq!(subfile_cat, contents.trim());
     Ok(())
 }
 
@@ -182,7 +185,7 @@ fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
     safeurl.set_path("/subfolder/subexists.md");
     let subfile_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
-    assert_eq!(subfile_cat, contents);
+    assert_eq!(subfile_cat, contents.trim());
     Ok(())
 }
 
@@ -210,37 +213,54 @@ fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
     safeurl.set_path("/testdata/subfolder/subexists.md");
     let subfile_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
-    assert_eq!(subfile_cat, contents);
+    assert_eq!(subfile_cat, contents.trim());
     Ok(())
 }
 
 #[test]
 fn calling_safe_files_sync() -> Result<()> {
-    let files_container = safe_cmd_stdout(["files", "put", TEST_FOLDER, "--recursive"], Some(0))?;
-
-    let mut lines = files_container.lines();
-    let files_container_xor_line = lines
-        .next()
-        .ok_or_else(|| eyre!("Could not fetch next line".to_string()))?;
-    let files_container_xor =
-        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
-
-    safe_cmd(
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    tmp_data_dir.copy_from("./testdata", &["**"])?;
+    let output = safe_cmd_stdout(
         [
             "files",
-            "sync",
-            TEST_FOLDER_SUBFOLDER,
-            files_container_xor,
+            "put",
+            tmp_data_dir.path().to_str().unwrap(),
             "--recursive",
         ],
         Some(0),
     )?;
 
-    let mut safeurl = safeurl_from(files_container_xor)?;
-    safeurl.set_path("/subexists.md");
-    safeurl.set_content_version(Some(1));
-    let synced_file_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
-    assert_eq!(synced_file_cat, "hello from a subfolder!");
+    let mut lines = output.lines();
+    let files_container_xor_line = lines
+        .next()
+        .ok_or_else(|| eyre!("Could not fetch next line".to_string()))?;
+    let versioned_xorurl =
+        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
+
+    let mut url = Url::from_url(versioned_xorurl)?;
+    url.set_content_version(None);
+    let subfolder_dir = tmp_data_dir.child("subfolder");
+    safe_cmd(
+        [
+            "files",
+            "sync",
+            &format!("{}/", subfolder_dir.path().to_str().unwrap()),
+            &url.to_string(),
+            "--recursive",
+        ],
+        Some(0),
+    )?;
+
+    // The original content should be overwritten with the sync of the subfolder.
+    let mut url = Url::from_url(versioned_xorurl)?;
+    url.set_path("/subexists.md");
+    url.set_content_version(None);
+    let output = safe_cmd_stdout(["cat", &url.to_string()], Some(0))?;
+
+    let subexists_file = tmp_data_dir.child("subfolder/subexists.md");
+    let subexists_file_contents = std::fs::read_to_string(subexists_file.path())?;
+    assert_eq!(output, subexists_file_contents.trim());
     Ok(())
 }
 
@@ -302,7 +322,9 @@ fn calling_safe_files_removed_sync() -> Result<()> {
         ],
         Some(0),
     )?;
-    safeurl.set_content_version(Some(1));
+    safeurl.set_content_version(Some(VersionHash::from_str(
+        "uuxdihpgutnitqsniozdgfimosfmylfmnqsbvnuozwkgxiirwwyph",
+    )?));
     let files_container_v1 = safeurl.to_string();
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output_dry_run);
     assert_eq!(target, files_container_v1);
@@ -345,168 +367,126 @@ fn calling_safe_files_removed_sync() -> Result<()> {
 
 #[test]
 fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -> Result<()> {
-    let files_container = safe_cmd_stdout(
-        ["files", "put", TEST_FOLDER_SUBFOLDER, "--recursive"],
-        Some(0),
-    )?;
+    let with_trailing_slash = true;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    tmp_data_dir.copy_from("./testdata/subfolder", &["**"])?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let file_to_delete = format!("{}/sub2.md", TEST_FOLDER_SUBFOLDER);
-    let file_to_modify = format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER);
+    let sub2_file = tmp_data_dir.child("sub2.md");
+    sub2_file.write_str("modify content for sub2 file")?;
+    let subexists_file = tmp_data_dir.child("subexists.md");
+    let subexists_file_content = std::fs::read_to_string(subexists_file.path())?;
+    fs::remove_file(subexists_file.path()).map_err(|e| eyre!(e.to_string()))?;
 
-    let mut lines = files_container.lines();
-    let files_container_xor_line = lines
-        .next()
-        .ok_or_else(|| eyre!("Could not fetch next line".to_string()))?;
-    let files_container_xor =
-        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
-
-    //modify file
-    let file_to_modify_write = OpenOptions::new()
-        .append(true)
-        .open(&file_to_modify)
-        .map_err(|e| eyre!(e.to_string()))?;
-
-    if let Err(e) = writeln!(&file_to_modify_write, " with more text!") {
-        eprintln!("Couldn't write to file: {}", e);
-    }
-
-    //remove another
-    fs::remove_file(&file_to_delete).map_err(|e| eyre!(e.to_string()))?;
-
-    // now sync
-    let files_sync_result = safe_cmd_stdout(
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    let output = safe_cmd_stdout(
         [
             "files",
             "sync",
-            TEST_FOLDER_SUBFOLDER,
-            files_container_xor,
+            &format!("{}/", tmp_data_dir.path().to_str().unwrap()),
+            &url.to_string(),
             "--recursive",
         ],
         Some(0),
     )?;
 
-    let mut safeurl = safeurl_from(files_container_xor)?;
-    safeurl.set_path("/subexists.md");
-    safeurl.set_content_version(None);
-    let file_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
+    // Due to the lack of --delete arg on the sync, the subexists file shouldn't have been removed.
+    url.set_path("/subexists.md");
+    let subexists_content = safe_cmd_stdout(["cat", &url.to_string()], Some(0))?;
 
-    // remove modified lines
-    let mut replace_test_md = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(&file_to_modify)
-        .map_err(|e| eyre!(e.to_string()))?;
-
-    replace_test_md
-        .seek(SeekFrom::Start(0))
-        .map_err(|e| eyre!(e.to_string()))?;
-    replace_test_md
-        .write_all(b"hello from a subfolder!")
-        .map_err(|e| eyre!(e.to_string()))?;
-
-    // readd the removed missing file
-    let mut readd_missing_file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(&file_to_delete)
-        .map_err(|e| eyre!(e.to_string()))?;
-
-    readd_missing_file
-        .seek(SeekFrom::Start(0))
-        .map_err(|e| eyre!(e.to_string()))?;
-    readd_missing_file
-        .write_all(b"sub2")
-        .map_err(|e| eyre!(e.to_string()))?;
-
-    // and now the tests...
-    assert_eq!(file_cat, "hello from a subfolder! with more text!");
-    assert!(files_sync_result.contains('*'));
-    assert!(!files_sync_result.contains('+'));
+    assert_eq!(subexists_content, subexists_file_content);
+    assert!(output.contains('*'));
+    assert!(!output.contains('+'));
     Ok(())
 }
 
 #[test]
 fn calling_files_sync_and_fetch_with_version() -> Result<()> {
-    let files_container_output = safe_cmd_stdout(
-        ["files", "put", TEST_FOLDER, "--recursive", "--json"],
-        Some(0),
-    )?;
+    let with_trailing_slash = true;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    tmp_data_dir.copy_from("./testdata", &["**"])?;
+    let (files_container_xor, processed_files, _) =
+        upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(|e| eyre!(e.to_string()))?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    let version = url.content_version().unwrap();
+    let orig_directory_file_count = get_directory_file_count(&tmp_data_dir)?;
+    assert_eq!(processed_files.len(), orig_directory_file_count);
 
-    let (files_container_xor, processed_files) =
-        parse_files_put_or_sync_output(&files_container_output);
-    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
-
-    let mut safeurl = safeurl_from(&files_container_xor)?;
-    safeurl.set_content_version(None);
-    let files_container_no_version = safeurl.to_string();
-    let sync_cmd_output = safe_cmd_stdout(
+    let empty_dir = tmp_data_dir.child("emptyfolder2");
+    empty_dir.create_dir_all()?;
+    url.set_content_version(None);
+    let output = safe_cmd_stdout(
         [
             "files",
             "sync",
-            &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
-            &files_container_no_version,
+            empty_dir.path().to_str().unwrap(),
+            &url.to_string(),
             "--recursive",
             "--delete",
             "--json",
         ],
         Some(0),
     )?;
+    let (files_container_xor, processed_files) = parse_files_put_or_sync_output(&output);
+    assert_eq!(
+        processed_files.len(),
+        get_directory_file_count(&tmp_data_dir)?
+    );
 
-    // cleanup
-    fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
+    // Now the new version of the FilesContainer will only contain the empty folder.
+    let output = safe_cmd_stdout(["cat", &files_container_xor, "--json"], Some(0))?;
+    let (xorurl, files_map) = parse_files_container_output(&output);
+    assert_eq!(xorurl, files_container_xor);
+    assert_eq!(files_map.len(), 1);
 
-    safeurl.set_content_version(Some(1));
-    let files_container_v1 = safeurl.to_string();
-    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
-    assert_eq!(target, files_container_v1);
-    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
-
-    // now all file items should be gone in version 1 of the FilesContainer
-    let cat_container_v1 = safe_cmd_stdout(["cat", &files_container_v1, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
-    assert_eq!(xorurl, files_container_v1);
-    assert_eq!(files_map.len(), 0);
-
-    // but in version 0 of the FilesContainer all files should still be there
-    safeurl.set_content_version(Some(0));
-    let files_container_v0 = safeurl.to_string();
-    let cat_container_v0 = safe_cmd_stdout(["cat", &files_container_v0, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&cat_container_v0);
-    assert_eq!(xorurl, files_container_v0);
-    assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
+    // First version of the FilesContainer should still have the original files.
+    url.set_content_version(Some(version));
+    let output = safe_cmd_stdout(["cat", &url.to_string(), "--json"], Some(0))?;
+    let (xorurl, files_map) = parse_files_container_output(&output);
+    assert_eq!(xorurl, url.to_string());
+    assert_eq!(files_map.len(), orig_directory_file_count);
     Ok(())
 }
 
 #[test]
 fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
-    let files_container_output = safe_cmd_stdout(
-        ["files", "put", TEST_FOLDER, "--recursive", "--json"],
-        Some(0),
-    )?;
+    let with_trailing_slash = true;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    tmp_data_dir.copy_from("./testdata", &["**"])?;
+    let (files_container_xor, processed_files, _) =
+        upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let (files_container_xor, processed_files) =
-        parse_files_put_or_sync_output(&files_container_output);
-    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
+    assert_eq!(
+        processed_files.len(),
+        get_directory_file_count(&tmp_data_dir)?
+    );
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
-    safeurl.set_content_version(Some(0));
-    let files_container_v0 = &safeurl.to_string();
     let nrsurl = get_random_nrs_string();
-
-    safe_cmd(
-        ["nrs", "create", &nrsurl, "-l", files_container_v0],
+    let output = safe_cmd_stdout(
+        [
+            "nrs",
+            "create",
+            &nrsurl,
+            "-l",
+            &files_container_xor,
+            "--json",
+        ],
         Some(0),
     )?;
+    let (nrs_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
+    let url = Url::from_url(&nrs_xorurl)?;
+    let nrs_version = url.content_version().unwrap();
 
-    let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(|e| eyre!(e.to_string()))?;
-
-    let sync_cmd_output = safe_cmd_stdout(
+    let empty_dir = tmp_data_dir.child("emptyfolder2");
+    empty_dir.create_dir_all()?;
+    let output = safe_cmd_stdout(
         [
             "files",
             "sync",
-            &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
+            &empty_dir.path().to_str().unwrap(),
             &nrsurl,
             "--recursive",
             "--delete",
@@ -516,58 +496,60 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         Some(0),
     )?;
 
-    // cleanup
-    fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
-
-    println!("{}", sync_cmd_output);
-    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
+    let (target, processed_files) = parse_files_put_or_sync_output(&output);
     assert_eq!(target, nrsurl);
-    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
+    assert_eq!(
+        processed_files.len(),
+        get_directory_file_count(&tmp_data_dir)?
+    );
 
-    // now everything should be gone in version 1
-    // since NRS name was updated to link version 1 of the FilesContainer
-    let cat_nrsurl_v1 = safe_cmd_stdout(["cat", &nrsurl, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v1);
+    // With the use of --update-nrs, now there will only be the `emptyfolder2` entry.
+    let output = safe_cmd_stdout(["cat", &nrsurl, "--json"], Some(0))?;
+    let (xorurl, files_map) = parse_files_container_output(&output);
     assert_eq!(xorurl, nrsurl);
-    assert_eq!(files_map.len(), 0);
+    assert_eq!(files_map.len(), 1);
 
-    // but in version 0 of the NRS name it should still link to version 0 of the FilesContainer
-    // where all files should still be there
-    let nrsurl_v0 = format!("{}?v=0", nrsurl);
-    let cat_nrsurl_v0 = safe_cmd_stdout(["cat", &nrsurl_v0, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v0);
-    assert_eq!(xorurl, nrsurl_v0);
-    assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
+    //// but in version 0 of the NRS name it should still link to version 0 of the FilesContainer
+    //// where all files should still be there
+    let versioned_nrsurl = format!("{}?v={}", nrsurl, nrs_version.to_string());
+    let output = safe_cmd_stdout(["cat", &versioned_nrsurl, "--json"], Some(0))?;
+    let (xorurl, files_map) = parse_files_container_output(&output);
+    assert_eq!(xorurl, versioned_nrsurl);
+    assert_eq!(files_map.len(), 11);
     Ok(())
 }
 
 #[test]
 fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
-    let files_container_output = safe_cmd_stdout(
-        ["files", "put", TEST_FOLDER, "--recursive", "--json"],
-        Some(0),
-    )?;
+    let with_trailing_slash = true;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    tmp_data_dir.copy_from("./testdata", &["**"])?;
+    let (files_container_xor, processed_files, _) =
+        upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let (files_container_xor, processed_files) =
-        parse_files_put_or_sync_output(&files_container_output);
-    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
-    let mut safeurl = safeurl_from(&files_container_xor)?;
-    safeurl.set_content_version(Some(0));
-    let files_container_v0 = safeurl.to_string();
+    let orig_directory_file_count = get_directory_file_count(&tmp_data_dir)?;
+    assert_eq!(processed_files.len(), orig_directory_file_count);
+
     let nrsurl = get_random_nrs_string();
-
     safe_cmd(
-        ["nrs", "create", &nrsurl, "-l", &files_container_v0],
+        [
+            "nrs",
+            "create",
+            &nrsurl,
+            "-l",
+            &files_container_xor,
+            "--json",
+        ],
         Some(0),
     )?;
 
-    let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(|e| eyre!(e.to_string()))?;
-
-    let sync_cmd_output = safe_cmd_stdout(
+    let empty_dir = tmp_data_dir.child("emptyfolder2");
+    empty_dir.create_dir_all()?;
+    safe_cmd(
         [
             "files",
             "sync",
-            &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
+            &empty_dir.path().to_str().unwrap(),
             &nrsurl,
             "--recursive",
             "--delete",
@@ -576,28 +558,19 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
         Some(0),
     )?;
 
-    // cleanup
-    fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
-
-    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
-    assert_eq!(target, nrsurl);
-    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
-
-    // now all file items should be gone in version 1 of the FilesContainer
-    let mut safeurl = safeurl_from(&files_container_xor)?;
-    safeurl.set_content_version(Some(1));
-    let files_container_v1 = safeurl.to_string();
-    let cat_container_v1 = safe_cmd_stdout(["cat", &files_container_v1, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
-    assert_eq!(xorurl, files_container_v1);
-    assert_eq!(files_map.len(), 0);
+    // The current version should now only have the empty folder entry.
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    let output = safe_cmd_stdout(["cat", &url.to_string(), "--json"], Some(0))?;
+    let (_, files_map) = parse_files_container_output(&output);
+    assert_eq!(files_map.len(), 1);
 
     // but the NRS name should still link to version 0 of the FilesContainer
     // where all files should still be there
-    let cat_nrsurl = safe_cmd_stdout(["cat", &nrsurl, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl);
+    let output = safe_cmd_stdout(["cat", &nrsurl, "--json"], Some(0))?;
+    let (xorurl, files_map) = parse_files_container_output(&output);
     assert_eq!(xorurl, nrsurl);
-    assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
+    assert_eq!(files_map.len(), orig_directory_file_count);
     Ok(())
 }
 
@@ -818,25 +791,34 @@ fn calling_files_ls_on_single_file() -> Result<()> {
 //    expected result: We find the 2 files beneath testdata/subfolder
 #[test]
 fn calling_files_ls_on_nrs_with_path() -> Result<()> {
-    let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
+    let with_trailing_slash = true;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    tmp_data_dir.copy_from("./testdata", &["**"])?;
+    let sub2_file = tmp_data_dir.child("subfolder/sub2.md");
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let mut safeurl = safeurl_from(&files_container_xor).map_err(|e| eyre!(e.to_string()))?;
-    safeurl.set_content_version(Some(0));
-    safeurl.set_path("/testdata");
-    let container_xorurl_v0 = safeurl.to_string();
+    let nrsurl = get_random_nrs_string();
+    safe_cmd(
+        [
+            "nrs",
+            "create",
+            &nrsurl,
+            "-l",
+            &files_container_xor,
+            "--json",
+        ],
+        Some(0),
+    )?;
 
-    let container_nrsurl = create_nrs_link(&get_random_nrs_string(), &container_xorurl_v0)?;
-
-    let mut nrsurl_encoder = safeurl_from(&container_nrsurl).map_err(|e| eyre!(e.to_string()))?;
-    nrsurl_encoder.set_path("/subfolder");
-    let nrsurl = nrsurl_encoder.to_string();
-
-    let files_ls_output = safe_cmd_stdout(["files", "ls", &nrsurl, "--json"], Some(0))?;
-
-    let (_xorurl, files_map) = parse_files_container_output(&files_ls_output);
-    let sub2_len = get_file_len(&format!("{}/sub2.md", TEST_FOLDER_SUBFOLDER))?;
-    assert_eq!(files_map.len(), 2);
-    assert_eq!(files_map["sub2.md"]["size"], sub2_len.to_string());
+    let output = safe_cmd_stdout(
+        ["files", "ls", &format!("{}/subfolder", nrsurl), "--json"],
+        Some(0),
+    )?;
+    let (_xorurl, files_map) = parse_files_container_output(&output);
+    let sub2_len: u64 = files_map["sub2.md"]["size"].parse()?;
+    assert_eq!(files_map.len(), 2); // 2 files in the subfolder
+    assert_eq!(sub2_len, sub2_file.metadata()?.len());
 
     Ok(())
 }

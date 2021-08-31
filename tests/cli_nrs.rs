@@ -11,8 +11,8 @@ use assert_cmd::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::{
-    fetch::{SafeContentType, SafeDataType},
-    Url, XorUrlBase,
+    fetch::{ContentType, DataType},
+    Scope, Url, XorUrlBase,
 };
 use sn_cmd_test_utilities::util::{
     get_random_nrs_string, parse_nrs_create_output, safe_cmd, safe_cmd_stdout, safeurl_from,
@@ -29,13 +29,14 @@ fn gen_fake_target() -> Result<String> {
         xorname,
         None,
         0x00a5_3cde,
-        SafeDataType::PublicBlob,
-        SafeContentType::Raw,
+        Scope::Public,
+        DataType::Blob,
+        ContentType::Raw,
         None,
         None,
         None,
         None,
-        Some(5),
+        None,
         XorUrlBase::Base32,
     )
     .map_err(|e| eyre!("Failed to encode URL: {}", e))
@@ -78,42 +79,44 @@ fn calling_safe_nrs_twice_w_name_fails() -> Result<()> {
 
 #[test]
 fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
-    let test_name = get_random_nrs_string();
-
     let (container_xorurl, _map) = upload_test_folder(true)?;
+    let container_url = Url::from_url(&container_xorurl)?;
+    let mut nrs_url = Url::from_nrsurl(&format!("safe://{}", &get_random_nrs_string()))?;
 
-    let cat_of_filesmap = safe_cmd_stdout(["cat", &container_xorurl], Some(0))?;
-    assert!(cat_of_filesmap.contains("safe://"));
-
-    let nrs_creation = safe_cmd_stdout(
+    let output = safe_cmd_stdout(
         [
             "nrs",
             "create",
-            &test_name,
+            &nrs_url.public_name(),
             "-l",
-            &container_xorurl,
+            &container_url.to_string(),
             "--json",
         ],
         Some(0),
     )?;
 
-    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
+    assert!(output.contains("safe://"));
+    assert!(output.contains('+'));
+    assert!(output.contains(&nrs_url.public_name()));
 
-    assert!(nrs_map_xorurl.contains("safe://"));
-    let cat_of_nrs_map_url = safe_cmd_stdout(["cat", &nrs_map_xorurl], Some(0))?;
+    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&output);
+    let version = container_url.content_version().unwrap();
 
-    // does our resolvable map exist?
-    assert!(cat_of_nrs_map_url.contains("safe://"));
-    assert!(cat_of_nrs_map_url.contains("another.md"));
-    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 0)"));
+    let output = safe_cmd_stdout(["cat", &nrs_map_xorurl], Some(0))?;
 
-    assert!(nrs_creation.contains("safe://"));
-    assert!(nrs_creation.contains('+'));
-    assert!(nrs_creation.contains(&test_name));
+    assert!(output.contains("safe://"));
+    assert!(output.contains("another.md"));
+    assert!(output.contains(&format!(
+        "Files of FilesContainer (version {})",
+        version.to_string()
+    )));
 
-    let another_file = format!("{}/another.md", &test_name);
-    let cat_of_new_url = safe_cmd_stdout(["cat", &another_file], Some(0))?;
-    assert_eq!(cat_of_new_url, "exists");
+    nrs_url.set_path("another.md");
+
+    let output = safe_cmd_stdout(["cat", &nrs_url.to_string()], Some(0))?;
+
+    assert_eq!(output, "exists");
+
     Ok(())
 }
 
@@ -147,65 +150,57 @@ fn calling_safe_nrs_put_no_top_default_fetch() -> Result<()> {
 #[test]
 fn calling_safe_nrs_put_folder_and_fetch_from_subname() -> Result<()> {
     let (container_xorurl, _map) = upload_test_folder(true)?;
+    let container_xorurl = Url::from_url(&container_xorurl)?;
+    let mut nrs_url = Url::from_nrsurl(&format!("safe://subname.{}", &get_random_nrs_string()))?;
 
-    let test_name = get_random_nrs_string();
-    let test_name_w_sub = format!("subname.{}", &test_name);
-
-    let cat_of_filesmap = safe_cmd_stdout(["cat", &container_xorurl], Some(0))?;
-    assert!(cat_of_filesmap.contains("safe://"));
-
-    let nrs_creation = safe_cmd_stdout(
+    let output = safe_cmd_stdout(
         [
             "nrs",
             "create",
-            &test_name_w_sub,
+            &nrs_url.public_name(),
             "-l",
-            &container_xorurl,
+            &container_xorurl.to_string(),
             "--json",
         ],
         Some(0),
     )?;
 
-    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
-    assert!(nrs_map_xorurl.contains("safe://"));
-    let cat_of_nrs_map_url = safe_cmd_stdout(["cat", &nrs_map_xorurl], Some(0))?;
-    // does our resolvable map exist?
-    assert!(cat_of_nrs_map_url.contains("safe://"));
-    assert!(cat_of_nrs_map_url.contains("another.md"));
-    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 0)"));
+    assert!(output.contains("safe://"));
+    assert!(output.contains("subname"));
+    assert!(output.contains('+'));
+    assert!(output.contains(&nrs_url.public_name()));
 
-    assert!(nrs_creation.contains("safe://"));
-    assert!(nrs_creation.contains("subname"));
-    assert!(nrs_creation.contains('+'));
-    assert!(nrs_creation.contains(&test_name_w_sub));
+    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&output);
+    let version = container_xorurl.content_version().unwrap();
 
-    let another_file = format!("{}/another.md", &test_name_w_sub);
-    let cat_of_new_url = safe_cmd_stdout(["cat", &another_file], Some(0))?;
-    assert_eq!(cat_of_new_url, "exists");
+    let output = safe_cmd_stdout(["cat", &nrs_map_xorurl], Some(0))?;
 
-    let via_default_also = safe_cmd_stdout(
-        ["cat", &format!("safe://{}/another.md", &test_name)],
-        Some(0),
-    )?;
-    assert_eq!(via_default_also, "exists");
+    assert!(output.contains("safe://"));
+    assert!(output.contains("another.md"));
+    assert!(output.contains(&format!(
+        "Files of FilesContainer (version {})",
+        version.to_string()
+    )));
+
+    nrs_url.set_path("another.md");
+
+    let output = safe_cmd_stdout(["cat", &nrs_url.to_string()], Some(0))?;
+
+    assert_eq!(output, "exists");
+
     Ok(())
 }
 
 #[test]
 fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
     let (container_xorurl, _map) = upload_test_folder(true)?;
+    let mut nrs_url = Url::from_nrsurl(&format!("safe://a.b.{}", &get_random_nrs_string()))?;
 
-    let test_name = get_random_nrs_string();
-    let test_name_w_sub = format!("a.b.{}", &test_name);
-
-    let cat_of_filesmap = safe_cmd_stdout(["cat", &container_xorurl], Some(0))?;
-    assert!(cat_of_filesmap.contains("safe://"));
-
-    let nrs_creation = safe_cmd_stdout(
+    let output = safe_cmd_stdout(
         [
             "nrs",
             "create",
-            &test_name_w_sub,
+            &nrs_url.public_name(),
             "-l",
             &container_xorurl,
             "--json",
@@ -213,30 +208,26 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
         Some(0),
     )?;
 
-    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
+    assert!(output.contains("safe://"));
+    assert!(output.contains("a.b"));
+    assert!(output.contains('+'));
+    assert!(output.contains(&nrs_url.public_name()));
 
-    assert!(nrs_map_xorurl.contains("safe://"));
-    let cat_of_nrs_map_url = safe_cmd_stdout(["cat", &nrs_map_xorurl], Some(0))?;
+    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&output);
+    let url = Url::from_url(&container_xorurl)?;
+    let version = url.content_version().unwrap();
+    let output = safe_cmd_stdout(["cat", &nrs_map_xorurl], Some(0))?;
 
-    // does our resolvable map exist?
-    assert!(cat_of_nrs_map_url.contains("safe://"));
-    assert!(cat_of_nrs_map_url.contains("another.md"));
-    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 0)"));
+    assert!(output.contains("safe://"));
+    assert!(output.contains("another.md"));
+    assert!(output.contains(&format!(
+        "Files of FilesContainer (version {})",
+        version.to_string()
+    )));
 
-    assert!(nrs_creation.contains("safe://"));
-    assert!(nrs_creation.contains("a.b"));
-    assert!(nrs_creation.contains('+'));
-    assert!(nrs_creation.contains(&test_name_w_sub));
-
-    let another_file = format!("{}/another.md", &test_name_w_sub);
-    let cat_of_new_url = safe_cmd_stdout(["cat", &another_file], Some(0))?;
-    assert_eq!(cat_of_new_url, "exists");
-
-    let via_default_from_root = safe_cmd_stdout(
-        ["cat", &format!("safe://{}/another.md", &test_name)],
-        Some(0),
-    )?;
-    assert_eq!(via_default_from_root, "exists");
+    nrs_url.set_path("another.md");
+    let output = safe_cmd_stdout(["cat", &nrs_url.to_string()], Some(0))?;
+    assert_eq!(output, "exists");
     Ok(())
 }
 

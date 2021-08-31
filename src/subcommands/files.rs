@@ -244,7 +244,10 @@ pub async fn files_commander(
                 }
                 table.printstd();
             } else {
-                print_serialized_output(files_container_xorurl, None, processed_files, output_fmt);
+                println!(
+                    "{}",
+                    serialise_output(&(files_container_xorurl, processed_files), output_fmt)
+                );
             }
 
             Ok(())

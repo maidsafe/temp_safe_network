@@ -31,6 +31,18 @@ pub mod util {
         let _ = color_eyre::install();
     }
 
+    pub fn get_directory_file_count(directory_path: impl AsRef<Path>) -> Result<usize> {
+        let paths: Vec<walkdir::DirEntry> = WalkDir::new(directory_path)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|v| v.ok())
+            .into_iter()
+            .collect();
+        // The `directory_path` itself is returned by walkdir. We're only interested in how many
+        // entries are *inside* `directory_path`.
+        Ok(paths.len() - 1)
+    }
+
     pub fn get_directory_len(directory_path: impl AsRef<Path>) -> Result<u64> {
         fs::read_dir(directory_path.as_ref())
             .wrap_err(format!(

@@ -10,6 +10,7 @@
 use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
+use sn_api::Url;
 use sn_cmd_test_utilities::util::{
     can_write_symlinks, create_absolute_symlinks_directory, create_nrs_link, create_symlink,
     digest_file, get_random_nrs_string, safe_cmd, safe_cmd_at, safe_cmd_stdout, safeurl_from,
@@ -441,12 +442,12 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
 fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
-    let tmp_data_path = assert_fs::TempDir::new().unwrap();
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    let tmp_data_dir = assert_fs::TempDir::new().unwrap();
+    tmp_data_dir.copy_from("./testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let mut e = safeurl_from(&files_container_xor)?;
+    let mut e = Url::from_url(&files_container_xor)?;
     e.set_path("subfolder");
     let xor_url_with_path = e.to_string();
 
@@ -507,8 +508,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 /// And the contents of `tmp_data_path` are uploaded using the `files put tmp_data_path/ --recursive` command
 /// And an xor url is created to point to `files_container_xor/tmp_data_path`
 /// And an nrs link is created that points to the above xor url
-/// And an nrs link is created that points to subfolder in the above nrs link
-/// And `src` is set to the nrs link pointing to the subfolder
+/// And `src` is set to `nrs link/subfolder`
 /// And a unique `dest` directory is created
 ///
 /// When the `files get src dest --exists=overwrite --progress=none` command runs
@@ -520,24 +520,25 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
-    let tmp_data_path = assert_fs::TempDir::new().unwrap();
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    let tmp_data_dir = assert_fs::TempDir::new().unwrap();
+    tmp_data_dir.copy_from("./testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let container_folder_name = tmp_data_path.path().file_name().unwrap().to_str().unwrap();
-    let mut xor_url = safeurl_from(&files_container_xor)?;
-    xor_url.set_path(container_folder_name);
+    let container_folder_name = tmp_data_dir.path().file_name().unwrap().to_str().unwrap();
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path(container_folder_name);
 
-    let td = get_random_nrs_string();
-    let td_url = format!("safe://{}", td);
-    let _ = create_nrs_link(&td, &xor_url.to_string())?;
+    let tmp_data_nrs = get_random_nrs_string();
+    let tmp_data_nrs_url = create_nrs_link(&tmp_data_nrs, &url.to_string())?;
+    let url = Url::from_url(&tmp_data_nrs_url)?;
+    let version = url.content_version().unwrap();
 
-    let sf = get_random_nrs_string();
-    let target = format!("{}/subfolder?v=0", td_url);
-    let subfolder_url = create_nrs_link(&sf, &target)?;
-
-    let src = &subfolder_url;
+    let src = format!(
+        "safe://{}/subfolder?v={}",
+        tmp_data_nrs,
+        version.to_string()
+    );
     let dest = assert_fs::TempDir::new().unwrap();
     let dest = dest.path().to_str().unwrap();
 
@@ -546,7 +547,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
         [
             "files",
             "get",
-            src,
+            &src,
             dest,
             "--exists=overwrite",
             "--progress=none",
@@ -555,7 +556,10 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree("testdata/subfolder")?, sum_tree(dest)?);
+    assert_eq!(
+        sum_tree("testdata/subfolder")?,
+        sum_tree(&format!("{}/subfolder", dest))?
+    );
 
     Ok(())
 }
@@ -654,9 +658,9 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
+    let url = Url::from_url(&files_container_xor)?;
     let src = format!(
-        "{}://{}/{}?v=0",
+        "{}://{}/{}",
         url.scheme(),
         url.public_name(),
         "dir%20with%20space/file%20with%20space",
@@ -851,13 +855,11 @@ fn files_get_src_path_is_invalid() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "path/is/invalid",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("/path/is/invalid");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let dest = dest.path().to_str().unwrap();
 
@@ -1010,13 +1012,11 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     child.copy_from("./testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "testdata/",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("testdata/");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let child = dest.child("testdata");
     child.create_dir_all()?;
@@ -1139,13 +1139,11 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
     child.copy_from("./testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "testdata/",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("testdata/");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let dest = format!("{}/testdata", dest.path().to_str().unwrap());
 
@@ -1201,13 +1199,11 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     child.copy_from("./testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "testdata/",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("testdata/");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let child = dest.child("newname");
     child.create_dir_all()?;
@@ -1266,13 +1262,11 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
     child.copy_from("./testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "testdata/",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("testdata/");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let child = dest.child("newname");
     child.write_str("some file contents")?;
@@ -1331,13 +1325,11 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "noextension",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("noextension");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let child = dest.child("noextension");
     child.create_dir_all()?;
@@ -1401,13 +1393,11 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "noextension",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("noextension");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let child = dest.child("noextension");
     child.write_str("noextension is an existing file with some content")?;
@@ -1465,13 +1455,11 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "noextension",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("noextension");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let dest = dest.path().to_str().unwrap();
 
@@ -1531,13 +1519,11 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "noextension",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("noextension");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let child = dest.child("newname");
     child.create_dir_all()?;
@@ -1599,13 +1585,11 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "noextension",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("noextension");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let child = dest.child("newname");
     child.write_str("this file will be overwritten")?;
@@ -1663,13 +1647,11 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
-    let src = format!(
-        "{}://{}/{}?v=0",
-        url.scheme(),
-        url.public_name(),
-        "noextension",
-    );
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    url.set_path("noextension");
+    let src = url.to_string();
+
     let dest = assert_fs::TempDir::new().unwrap();
     let dest = format!("{}/newname", dest.path().to_str().unwrap());
 
@@ -1854,7 +1836,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
 
     // Arrange
     let with_trailing_slash = true;
-    let tmp_data_path = assert_fs::TempDir::new()?.into_persistent();
+    let tmp_data_path = assert_fs::TempDir::new()?;
     create_absolute_symlinks_directory(&tmp_data_path)?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
@@ -1879,7 +1861,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     )?;
 
     let src = &safeurl.to_string();
-    let dest = assert_fs::TempDir::new().unwrap().into_persistent();
+    let dest = assert_fs::TempDir::new().unwrap();
     let dest = format!("{}/newname", dest.path().to_str().unwrap());
 
     // Act

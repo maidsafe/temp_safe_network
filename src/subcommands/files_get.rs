@@ -793,11 +793,10 @@ async fn files_get_private_blob(_safe: &Safe, _url: &str, _range: Range) -> Resu
 /// Get immutable data blobs from the network.
 pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
     match Url::from_url(url)?.data_type() {
-        DataType::PublicBlob => {
+        DataType::Blob => {
             let pub_blob = safe.files_get_public_blob(url, range).await?;
             Ok(pub_blob)
         }
-        DataType::PrivateBlob => files_get_private_blob(safe, url, range).await,
         _ => Err(eyre!("URL target is not immutable data")),
     }
 }

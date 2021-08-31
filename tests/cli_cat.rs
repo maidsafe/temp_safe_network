@@ -8,9 +8,10 @@
 // Software.
 
 use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::fetch::{SafeContentType, SafeDataType};
+use sn_api::fetch::{ContentType, DataType, Url};
 use sn_cmd_test_utilities::util::{
     create_and_get_keys, get_random_nrs_string, parse_files_container_output,
     parse_files_put_or_sync_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout, safeurl_from,
@@ -23,8 +24,6 @@ const TEST_FILE: &str = "./testdata/test.md";
 const TEST_FILE_CONTENT: &str = "hello tests!";
 const ID_RELATIVE_FILE_ERROR: &str = "Cannot get relative path of Immutable Data";
 const TEST_FILE_HEXDUMP_CONTENT: &str = "Length: 12 (0xc) bytes\n0000:   68 65 6c 6c  6f 20 74 65  73 74 73 21                hello tests!\n";
-const ANOTHER_FILE: &str = "./testdata/another.md";
-const ANOTHER_FILE_CONTENT: &str = "exists";
 
 #[test]
 fn calling_safe_cat() -> Result<()> {
@@ -40,14 +39,13 @@ fn calling_safe_cat() -> Result<()> {
     let safeurl = safeurl_from(&map[TEST_FILE].1)?;
     assert_eq!(
         safeurl.content_type(),
-        SafeContentType::MediaType("text/markdown".to_string())
+        ContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), SafeDataType::PublicBlob);
+    assert_eq!(safeurl.data_type(), DataType::Blob);
     Ok(())
 }
 
 #[test]
-//#[ignore = "test has been identified to be hanging indefinitely"]
 fn calling_safe_cat_subfolders() -> Result<()> {
     let content = safe_cmd_stdout(
         ["files", "put", TEST_DATA, "--json", "--recursive"],
@@ -95,102 +93,113 @@ fn calling_safe_cat_hexdump() -> Result<()> {
     let safeurl = safeurl_from(&map[TEST_FILE].1)?;
     assert_eq!(
         safeurl.content_type(),
-        SafeContentType::MediaType("text/markdown".to_string())
+        ContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), SafeDataType::PublicBlob);
+    assert_eq!(safeurl.data_type(), DataType::Blob);
     Ok(())
 }
 
 #[test]
-//#[ignore = "test has been identified to be hanging indefinitely"]
 fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
-    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
+    let tmp_dir = assert_fs::TempDir::new()?;
+    let md_file1 = tmp_dir.child("test.md");
+    let md_file2 = tmp_dir.child("another.md");
+    md_file1.write_str("hello tests!")?;
+    md_file2.write_str("exists")?;
+
+    let output = safe_cmd_stdout(
+        ["files", "put", md_file1.path().to_str().unwrap(), "--json"],
+        Some(0),
+    )?;
+    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
+    let url = Url::from_url(&container_xorurl)?;
+    let version0 = url.content_version().unwrap();
 
     // let's sync with another file so we get a new version, and a different content in the file
     let mut safeurl = safeurl_from(&container_xorurl)?;
     safeurl.set_path("/test.md");
     safeurl.set_content_version(None);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["files", "sync", ANOTHER_FILE, &safeurl.to_string()])
-        .assert()
-        .success();
+    let output = safe_cmd_stdout(
+        [
+            "files",
+            "sync",
+            md_file2.path().to_str().unwrap(),
+            &safeurl.to_string(),
+            "--json",
+        ],
+        Some(0),
+    )?;
+    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
+    let url = Url::from_url(&container_xorurl)?;
+    let version1 = url.content_version().unwrap();
 
-    safeurl.set_content_version(None);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &safeurl.to_string()])
-        .assert()
-        .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
-        .success();
+    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
+    let md_file2_content = std::fs::read_to_string(md_file2.path())?;
+    assert_eq!(output, md_file2_content);
 
-    safeurl.set_content_version(Some(0));
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &safeurl.to_string()])
-        .assert()
-        .stdout(predicate::str::contains(TEST_FILE_CONTENT))
-        .success();
+    safeurl.set_content_version(Some(version0));
+    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
+    let md_file1_content = std::fs::read_to_string(md_file1.path())?;
+    assert_eq!(output, md_file1_content);
 
-    safeurl.set_content_version(Some(1));
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &safeurl.to_string()])
-        .assert()
-        .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
-        .success();
+    safeurl.set_content_version(Some(version1));
+    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
+    assert_eq!(output, md_file2_content);
 
-    safeurl.set_content_version(Some(2));
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &safeurl.to_string()])
-        .assert()
-        .failure();
     Ok(())
 }
 
 #[test]
 fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
-    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
+    let tmp_dir = assert_fs::TempDir::new()?;
+    let md_file1 = tmp_dir.child("test.md");
+    let md_file2 = tmp_dir.child("another.md");
+    md_file1.write_str("hello tests!")?;
+    md_file2.write_str("exists")?;
+
+    let output = safe_cmd_stdout(
+        ["files", "put", md_file1.path().to_str().unwrap(), "--json"],
+        Some(0),
+    )?;
+    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
 
     let nrsurl = get_random_nrs_string();
-    safe_cmd(["nrs", "create", &nrsurl, "-l", &container_xorurl], Some(0))?;
+    let output = safe_cmd_stdout(
+        ["nrs", "create", &nrsurl, "-l", &container_xorurl, "--json"],
+        Some(0),
+    )?;
+    let (nrs_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
+    let url = Url::from_url(&nrs_xorurl)?;
+    let nrs_version = url.content_version().unwrap();
 
     let nrsurl_with_path = format!("{}/test.md", nrsurl);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &nrsurl_with_path])
-        .assert()
-        .stdout(predicate::str::contains(TEST_FILE_CONTENT))
-        .success();
+    safe_cmd(["cat", &nrsurl_with_path], Some(0))?;
 
     // let's sync with another file so we get a new version, and a different content in the file
     let mut safeurl = safeurl_from(&container_xorurl)?;
     safeurl.set_path("/test.md");
     safeurl.set_content_version(None);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["files", "sync", ANOTHER_FILE, &safeurl.to_string()])
-        .assert()
-        .success();
+    safe_cmd(
+        [
+            "files",
+            "sync",
+            md_file2.path().to_str().unwrap(),
+            &safeurl.to_string(),
+        ],
+        Some(0),
+    )?;
 
     // NRS name was not updated (with --updated-nrs) when doing files sync,
     // so our file should not have been updated
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &nrsurl_with_path])
-        .assert()
-        .stdout(predicate::str::contains(TEST_FILE_CONTENT))
-        .success();
+    let output = safe_cmd_stdout(["cat", &nrsurl_with_path], Some(0))?;
+    let md_file1_content = std::fs::read_to_string(md_file1.path())?;
+    assert_eq!(md_file1_content, output);
 
-    // NRS name has only one version which is 0, so using version 0 should also fetch the file
-    let nrsurl_with_path_v0 = format!("{}/test.md?v=0", nrsurl);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &nrsurl_with_path_v0])
-        .assert()
-        .stdout(predicate::str::contains(TEST_FILE_CONTENT))
-        .success();
+    // NRS name has only one version which is the first one, so using this should also fetch the file
+    let nrsurl_with_path_v0 = format!("{}/test.md?v={}", nrsurl, nrs_version.to_string());
+    let output = safe_cmd_stdout(["cat", &nrsurl_with_path_v0], Some(0))?;
+    assert_eq!(md_file1_content, output);
 
-    // there is no version 1 of NRS name
-    let invalid_version_nrsurl = format!("{}/test.md?v=1", nrsurl);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &invalid_version_nrsurl])
-        .assert()
-        .failure();
     Ok(())
 }
 
