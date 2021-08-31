@@ -13,6 +13,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     error::Result, peer::PeerUtils, routing_api::command::Command, section::SectionUtils, Event,
+    SectionAuthUtils,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::Prefix;
@@ -37,7 +38,14 @@ impl Core {
             section.members()
         );
         self.section.merge(section.clone())?;
-        self.network.merge(network.iter(), self.section.chain());
+
+        // Merge the received prefixes SAPs into our NetworkPrefixMap.
+        let chain = self.section.chain();
+        for (prefix, sap) in network.iter() {
+            if sap.verify(chain) {
+                let _ = self.network.insert(*prefix, sap.clone());
+            }
+        }
 
         if self.is_not_elder() {
             let current_adults: BTreeSet<_> = self

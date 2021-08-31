@@ -54,10 +54,10 @@ pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API upd
 #[cfg(any(test, feature = "test-utils"))]
 pub use test_utils::*;
 
-#[cfg(any(test, feature = "test-utils"))]
-pub(crate) use dkg::test_utils as dkg_test_utils;
-#[cfg(any(test, feature = "test-utils"))]
-pub(crate) use section::test_utils as section_test_utils;
+#[cfg(test)]
+pub(crate) use dkg::test_utils::section_signed;
+#[cfg(test)]
+pub(crate) use section::test_utils::gen_section_authority_provider;
 
 // ############################################################################
 // Private
