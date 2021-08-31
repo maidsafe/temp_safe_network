@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     data::{DataExchange, ServiceError, ServiceMsg, StorageLevel},
-    node::InfrastructureMsg,
+    node::SystemMsg,
     DstLocation, MessageId,
 };
 use crate::routing::Prefix;
@@ -98,7 +98,7 @@ pub enum NodeDuty {
     /// Send the same request to each individual node.
     SendToNodes {
         msg_id: MessageId,
-        msg: InfrastructureMsg,
+        msg: SystemMsg,
         targets: BTreeSet<XorName>,
         aggregation: bool,
     },
@@ -127,7 +127,7 @@ pub struct OutgoingMsg {
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum MsgType {
-    Node(InfrastructureMsg),
+    Node(SystemMsg),
     Client(ServiceMsg),
 }
 

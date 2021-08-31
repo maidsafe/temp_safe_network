@@ -9,7 +9,7 @@
 use super::{Command, Event};
 use crate::messaging::{
     data::{ChunkDataExchange, StorageLevel},
-    node::{InfrastructureMsg, Section},
+    node::{Section, SystemMsg},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
 use crate::routing::{
@@ -275,7 +275,7 @@ impl Dispatcher {
                             name: core.node().name(),
                             section_pk,
                         },
-                        InfrastructureMsg::StartConnectivityTest(name),
+                        SystemMsg::StartConnectivityTest(name),
                         section_pk,
                     )?
                 };

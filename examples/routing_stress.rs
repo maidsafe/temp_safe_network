@@ -39,7 +39,7 @@ use yansi::{Color, Style};
 use safe_network::routing::create_test_used_space_and_root_storage;
 
 use safe_network::messaging::{
-    data::Error::FailedToWriteFile, node::InfrastructureMsg, DstLocation, MessageId,
+    data::Error::FailedToWriteFile, node::SystemMsg, DstLocation, MessageId,
 };
 use safe_network::routing::{
     Cache, Config, Event as RoutingEvent, NodeElderChange, Routing, TransportConfig,
@@ -462,7 +462,7 @@ impl Network {
         // section health to appear lower than it actually is.
 
         // just some valid message
-        let node_msg = InfrastructureMsg::NodeMsgError {
+        let node_msg = SystemMsg::NodeMsgError {
             error: FailedToWriteFile,
             correlation_id: MessageId::new(),
         };

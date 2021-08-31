@@ -9,8 +9,8 @@
 use super::super::Core;
 use crate::messaging::{
     node::{
-        InfrastructureMsg, JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason,
-        JoinRequest, JoinResponse, Peer,
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
+        JoinResponse, Peer, SystemMsg,
     },
     WireMsg,
 };
@@ -56,8 +56,7 @@ impl Core {
 
             let redirect_sap = self.matching_section(peer.name())?;
 
-            let node_msg =
-                InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Retry(redirect_sap)));
+            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(redirect_sap)));
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![self.send_direct_message(
                 (*peer.name(), *peer.addr()),
@@ -79,7 +78,7 @@ impl Core {
                 "Rejecting JoinRequest from {} - joins currently not allowed.",
                 peer,
             );
-            let node_msg = InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                 JoinRejectionReason::JoinsDisallowed,
             )));
 
@@ -110,7 +109,7 @@ impl Core {
             }
         } else if peer.age() != MIN_ADULT_AGE {
             // After section split, new node has to join with age of MIN_ADULT_AGE.
-            let node_msg = InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Retry(
+            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
                 self.section.authority_provider().clone(),
             )));
             trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
@@ -142,7 +141,7 @@ impl Core {
         } else {
             // Do reachability check only for the initial join request
             let cmd = if self.comm.is_reachable(peer.addr()).await.is_err() {
-                let node_msg = InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+                let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                     JoinRejectionReason::NodeNotReachable(*peer.addr()),
                 )));
 
@@ -179,13 +178,13 @@ impl Core {
         } else {
             // Do reachability check
             let node_msg = if self.comm.is_reachable(peer.addr()).await.is_err() {
-                InfrastructureMsg::JoinAsRelocatedResponse(Box::new(
+                SystemMsg::JoinAsRelocatedResponse(Box::new(
                     JoinAsRelocatedResponse::NodeNotReachable(*peer.addr()),
                 ))
             } else {
-                InfrastructureMsg::JoinAsRelocatedResponse(Box::new(
-                    JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
-                ))
+                SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
+                    self.section.authority_provider().clone(),
+                )))
             };
 
             trace!("Sending {:?} to {}", node_msg, peer);
@@ -205,7 +204,7 @@ impl Core {
                 self.section.prefix()
             );
 
-            let node_msg = InfrastructureMsg::JoinAsRelocatedResponse(Box::new(
+            let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
                 JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
             ));
             trace!("Sending {:?} to {}", node_msg, peer);
@@ -257,7 +256,7 @@ impl Core {
 
         // Check for signatures and trust of the relocate_payload msg
         let serialised_relocate_details =
-            WireMsg::serialize_msg_payload(&InfrastructureMsg::Relocate(details.clone()))?;
+            WireMsg::serialize_msg_payload(&SystemMsg::Relocate(details.clone()))?;
 
         let payload_section_signed = &relocate_payload.section_signed;
         let is_signautre_valid = payload_section_signed.section_pk.verify(

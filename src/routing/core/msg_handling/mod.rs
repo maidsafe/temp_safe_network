@@ -20,7 +20,7 @@ mod sync;
 use super::Core;
 use crate::messaging::{
     data::{DataCmd, DataQuery, ServiceMsg, StorageLevel},
-    node::{InfrastructureMsg, NodeCmd, NodeQuery, Proposal},
+    node::{NodeCmd, NodeQuery, Proposal, SystemMsg},
     signature_aggregator::Error as AggregatorError,
     DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
     ServiceAuth, SrcLocation, WireMsg,
@@ -64,7 +64,7 @@ impl Core {
         };
 
         match message_type {
-            MessageType::Infrastructure {
+            MessageType::System {
                 msg_id,
                 msg_authority,
                 dst_location,
@@ -190,7 +190,7 @@ impl Core {
         msg_id: MessageId,
         mut msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
-        msg: InfrastructureMsg,
+        msg: SystemMsg,
         payload: Bytes,
     ) -> Result<Vec<Command>> {
         // // Let's now verify the section key in the msg authority is trusted
@@ -231,9 +231,9 @@ impl Core {
             .await
         {
             Ok(false) => match msg {
-                InfrastructureMsg::NodeCmd(_)
-                | InfrastructureMsg::NodeQuery(_)
-                | InfrastructureMsg::NodeQueryResponse { .. } => {
+                SystemMsg::NodeCmd(_)
+                | SystemMsg::NodeQuery(_)
+                | SystemMsg::NodeQueryResponse { .. } => {
                     commands.push(Command::HandleVerifiedNodeDataMessage {
                         msg_id,
                         msg,
@@ -270,13 +270,13 @@ impl Core {
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
         _dst_location: DstLocation,
-        node_msg: InfrastructureMsg,
+        node_msg: SystemMsg,
         known_keys: &[BlsPublicKey],
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
         match node_msg {
-            InfrastructureMsg::AntiEntropyRetry {
+            SystemMsg::AntiEntropyRetry {
                 section_auth,
                 section_signed,
                 proof_chain,
@@ -293,7 +293,7 @@ impl Core {
                 )
                 .await
             }
-            InfrastructureMsg::AntiEntropyRedirect {
+            SystemMsg::AntiEntropyRedirect {
                 section_auth,
                 section_signed,
                 bounced_msg,
@@ -307,7 +307,7 @@ impl Core {
                 )
                 .await
             }
-            InfrastructureMsg::Sync {
+            SystemMsg::Sync {
                 ref section,
                 ref network,
             } => {
@@ -328,7 +328,7 @@ impl Core {
                     Ok(vec![cmd])
                 }
             }
-            InfrastructureMsg::Relocate(ref details) => {
+            SystemMsg::Relocate(ref details) => {
                 trace!("Handling msg: Relocate from {}", sender);
                 if let NodeMsgAuthority::Section(section_signed) = msg_authority {
                     Ok(self
@@ -340,11 +340,11 @@ impl Core {
                     Err(Error::InvalidSrcLocation)
                 }
             }
-            InfrastructureMsg::RelocatePromise(promise) => {
+            SystemMsg::RelocatePromise(promise) => {
                 trace!("Handling msg: RelocatePromise from {}", sender);
                 self.handle_relocate_promise(promise, node_msg).await
             }
-            InfrastructureMsg::StartConnectivityTest(name) => {
+            SystemMsg::StartConnectivityTest(name) => {
                 trace!("Handling msg: StartConnectivityTest from {}", sender);
                 if self.is_not_elder() {
                     return Ok(vec![]);
@@ -352,12 +352,12 @@ impl Core {
 
                 Ok(vec![Command::TestConnectivity(name)])
             }
-            InfrastructureMsg::JoinRequest(join_request) => {
+            SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
                 self.handle_join_request(msg_authority.peer(sender)?, *join_request)
                     .await
             }
-            InfrastructureMsg::JoinAsRelocatedRequest(join_request) => {
+            SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
                 if self.is_not_elder()
                     && join_request.section_key == *self.section.chain().last_key()
@@ -372,7 +372,7 @@ impl Core {
                 )
                 .await
             }
-            InfrastructureMsg::BouncedUntrustedMessage {
+            SystemMsg::BouncedUntrustedMessage {
                 msg: bounced_msg,
                 dst_section_pk,
             } => {
@@ -384,7 +384,7 @@ impl Core {
                     *bounced_msg,
                 )?])
             }
-            InfrastructureMsg::DkgStart {
+            SystemMsg::DkgStart {
                 dkg_key,
                 elder_candidates,
             } => {
@@ -395,7 +395,7 @@ impl Core {
 
                 self.handle_dkg_start(dkg_key, elder_candidates)
             }
-            InfrastructureMsg::DkgMessage { dkg_key, message } => {
+            SystemMsg::DkgMessage { dkg_key, message } => {
                 trace!(
                     "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
                     dkg_key,
@@ -404,7 +404,7 @@ impl Core {
                 );
                 self.handle_dkg_message(dkg_key, message, src_name)
             }
-            InfrastructureMsg::DkgFailureObservation {
+            SystemMsg::DkgFailureObservation {
                 dkg_key,
                 sig,
                 failed_participants,
@@ -412,11 +412,11 @@ impl Core {
                 trace!("Handling msg: Dkg-FailureObservation from {}", sender);
                 self.handle_dkg_failure_observation(dkg_key, &failed_participants, sig)
             }
-            InfrastructureMsg::DkgFailureAgreement(sig_set) => {
+            SystemMsg::DkgFailureAgreement(sig_set) => {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
                 self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
-            InfrastructureMsg::Propose {
+            SystemMsg::Propose {
                 ref content,
                 ref sig_share,
             } => {
@@ -458,11 +458,11 @@ impl Core {
 
                 Ok(commands)
             }
-            InfrastructureMsg::JoinResponse(join_response) => {
+            SystemMsg::JoinResponse(join_response) => {
                 debug!("Ignoring unexpected message: {:?}", join_response);
                 Ok(vec![])
             }
-            InfrastructureMsg::JoinAsRelocatedResponse(join_response) => {
+            SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(RelocateState::InProgress(ref mut joining_as_relocated)) =
                     self.relocate_state.as_mut()
@@ -477,7 +477,7 @@ impl Core {
 
                 Ok(vec![])
             }
-            InfrastructureMsg::NodeMsgError {
+            SystemMsg::NodeMsgError {
                 error,
                 correlation_id,
             } => {
@@ -507,13 +507,13 @@ impl Core {
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
-        node_msg: InfrastructureMsg,
+        node_msg: SystemMsg,
     ) -> Result<Vec<Command>> {
         match node_msg {
             // The following type of messages are all handled by upper sn_node layer.
             // TODO: In the future the sn-node layer won't be receiving Events but just
             // plugging in msg handlers.
-            InfrastructureMsg::NodeCmd(node_cmd) => {
+            SystemMsg::NodeCmd(node_cmd) => {
                 match node_cmd {
                     NodeCmd::Chunks { cmd, auth, .. } => {
                         info!("Processing chunk write with MessageId: {:?}", msg_id);
@@ -564,7 +564,7 @@ impl Core {
 
                 Ok(vec![])
             }
-            InfrastructureMsg::NodeQuery(node_query) => {
+            SystemMsg::NodeQuery(node_query) => {
                 match node_query {
                     // A request from EndUser - via elders - for locally stored chunk
                     NodeQuery::Chunks {
@@ -592,7 +592,7 @@ impl Core {
                     }
                 }
             }
-            InfrastructureMsg::NodeQueryResponse {
+            SystemMsg::NodeQueryResponse {
                 response,
                 correlation_id,
                 user,
@@ -611,7 +611,7 @@ impl Core {
                 )
                 .await
             }
-            InfrastructureMsg::NodeMsgError {
+            SystemMsg::NodeMsgError {
                 error,
                 correlation_id,
             } => {
@@ -644,7 +644,7 @@ impl Core {
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached
-            let msg = InfrastructureMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+            let msg = SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel {
                 section: node_xorname,
                 node_id,
                 level,
@@ -670,7 +670,7 @@ impl Core {
                 &target_holders,
             );
 
-            let msg = InfrastructureMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk));
+            let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk));
             let aggregation = false;
 
             self.send_node_msg_to_targets(msg, target_holders, aggregation)
@@ -683,7 +683,7 @@ impl Core {
     /// Takes a message and forms commands to send to specified targets
     pub(super) fn send_node_msg_to_targets(
         &self,
-        msg: InfrastructureMsg,
+        msg: SystemMsg,
         targets: BTreeSet<XorName>,
         aggregation: bool,
     ) -> Result<Vec<Command>> {

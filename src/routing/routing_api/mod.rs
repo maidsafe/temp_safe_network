@@ -25,7 +25,7 @@ use self::{
 };
 use crate::messaging::{
     data::StorageLevel,
-    node::{InfrastructureMsg, Peer},
+    node::{Peer, SystemMsg},
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
@@ -354,7 +354,7 @@ impl Routing {
     /// Builds a WireMsg signed by this Node
     pub async fn sign_single_src_msg(
         &self,
-        node_msg: InfrastructureMsg,
+        node_msg: SystemMsg,
         dst: DstLocation,
     ) -> Result<WireMsg> {
         let src_section_pk = *self.section_chain().await.last_key();
@@ -369,7 +369,7 @@ impl Routing {
     /// Builds a WireMsg signed for accumulateion at destination
     pub async fn sign_msg_for_dst_accumulation(
         &self,
-        node_msg: InfrastructureMsg,
+        node_msg: SystemMsg,
         dst: DstLocation,
     ) -> Result<WireMsg> {
         let src = self.name().await;

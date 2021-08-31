@@ -9,7 +9,7 @@
 use std::cmp;
 
 use crate::messaging::{
-    node::{InfrastructureMsg, KeyedSig, MembershipState, NodeState, Proposal, SectionAuth},
+    node::{KeyedSig, MembershipState, NodeState, Proposal, SectionAuth, SystemMsg},
     SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -184,7 +184,7 @@ impl Core {
 
             let mut commands = vec![];
             if !sync_recipients.is_empty() {
-                let node_msg = InfrastructureMsg::Sync {
+                let node_msg = SystemMsg::Sync {
                     section: self.section.clone(),
                     network: self
                         .network

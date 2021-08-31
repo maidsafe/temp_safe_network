@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{InfrastructureMsg, NodeCmd},
+    node::{NodeCmd, SystemMsg},
     MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Result};
@@ -33,7 +33,7 @@ pub(crate) async fn push_state(
 
     Ok(NodeDuty::SendToNodes {
         msg_id,
-        msg: InfrastructureMsg::NodeCmd(NodeCmd::ReceiveExistingData { metadata }),
+        msg: SystemMsg::NodeCmd(NodeCmd::ReceiveExistingData { metadata }),
         targets: peers,
         aggregation: false,
     })

@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{InfrastructureMsg, Peer},
+    node::{Peer, SystemMsg},
     NodeMsgAuthority,
 };
 use crate::routing::{
@@ -25,32 +25,32 @@ impl Core {
     pub(crate) fn handle_untrusted_message(
         &self,
         sender: SocketAddr,
-        infra_msg: InfrastructureMsg,
+        system_msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
     ) -> Result<Command> {
         let src_name = msg_authority.name();
 
         let bounce_dst_section_pk = self.section_key_by_name(&src_name);
 
-        let bounce_infra_msg = InfrastructureMsg::BouncedUntrustedMessage {
-            msg: Box::new(infra_msg),
+        let bounce_system_msg = SystemMsg::BouncedUntrustedMessage {
+            msg: Box::new(system_msg),
             dst_section_pk: bounce_dst_section_pk,
         };
 
-        self.send_direct_message((src_name, sender), bounce_infra_msg, bounce_dst_section_pk)
+        self.send_direct_message((src_name, sender), bounce_system_msg, bounce_dst_section_pk)
     }
 
     pub(crate) fn handle_bounced_untrusted_message(
         &self,
         sender: Peer,
         dst_section_key: BlsPublicKey,
-        bounced_msg: InfrastructureMsg,
+        bounced_msg: SystemMsg,
     ) -> Result<Command> {
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();
 
         let new_node_msg = match bounced_msg {
-            InfrastructureMsg::Sync { section, network } => {
+            SystemMsg::Sync { section, network } => {
                 // `Sync` messages are handled specially, because they don't carry a signed chain.
                 // Instead we use the section chain that's part of the included `Section` struct.
                 // Problem is we can't extend that chain as it would invalidate the signature. We
@@ -62,7 +62,7 @@ impl Core {
                         Error::InvalidMessage // TODO: more specific error
                     })?;
 
-                InfrastructureMsg::Sync { section, network }
+                SystemMsg::Sync { section, network }
             }
             bounced_msg => bounced_msg,
         };

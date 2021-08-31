@@ -8,8 +8,7 @@
 
 use crate::messaging::{
     node::{
-        InfrastructureMsg, JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse,
-        Section,
+        JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, Section, SystemMsg,
     },
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
@@ -280,7 +279,7 @@ impl<'a> Join<'a> {
     ) -> Result<()> {
         info!("Sending {:?} to {:?}", join_request, recipients);
 
-        let node_msg = InfrastructureMsg::JoinRequest(Box::new(join_request));
+        let node_msg = SystemMsg::JoinRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted(section_key),
@@ -311,14 +310,14 @@ impl<'a> Join<'a> {
                             continue;
                         }
                         MsgKind::NodeAuthMsg(NodeAuth { .. }) => match wire_msg.into_message() {
-                            Ok(MessageType::Infrastructure {
-                                msg: InfrastructureMsg::JoinResponse(resp),
+                            Ok(MessageType::System {
+                                msg: SystemMsg::JoinResponse(resp),
                                 msg_authority,
                                 ..
                             }) => (*resp, sender, msg_authority.src_location().name()),
                             Ok(
                                 MessageType::Service { msg_id, .. }
-                                | MessageType::Infrastructure { msg_id, .. },
+                                | MessageType::System { msg_id, .. },
                             ) => {
                                 trace!(
                                     "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
@@ -495,19 +494,17 @@ mod tests {
                 recipients.iter().map(|(_name, addr)| *addr).collect();
             assert_eq!(bootstrap_addrs, [bootstrap_addr]);
 
-            let node_msg = assert_matches!(wire_msg.into_message(), Ok(MessageType::Infrastructure { msg, .. }) =>
+            let node_msg = assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
                 msg);
 
-            assert_matches!(node_msg, InfrastructureMsg::JoinRequest(request) => {
+            assert_matches!(node_msg, SystemMsg::JoinRequest(request) => {
                 assert!(request.resource_proof_response.is_none());
             });
 
             // Send JoinResponse::Retry with section auth provider info
             send_response(
                 &recv_tx,
-                InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                    section_auth.clone(),
-                ))),
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(section_auth.clone()))),
                 &bootstrap_node,
                 section_auth.section_key(),
             )?;
@@ -517,7 +514,7 @@ mod tests {
                 .recv()
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
-            let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::Infrastructure { msg, dst_location,.. }) =>
+            let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, dst_location,.. }) =>
                 (msg, dst_location));
 
             assert_eq!(dst_location.section_pk(), Some(pk));
@@ -529,7 +526,7 @@ mod tests {
                     .map(|(name, addr)| (*name, *addr))
                     .collect::<Vec<_>>(),
             );
-            assert_matches!(node_msg, InfrastructureMsg::JoinRequest(request) => {
+            assert_matches!(node_msg, SystemMsg::JoinRequest(request) => {
                 assert_eq!(request.section_key, pk);
             });
 
@@ -539,7 +536,7 @@ mod tests {
             let proof_chain = SecuredLinkedList::new(pk);
             send_response(
                 &recv_tx,
-                InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Approval {
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
                     genesis_key: pk,
                     section_auth: section_auth.clone(),
                     node_state,
@@ -594,8 +591,8 @@ mod tests {
                 vec![bootstrap_node.addr]
             );
 
-            assert_matches!(wire_msg.into_message(), Ok(MessageType::Infrastructure { msg, .. }) =>
-                    assert_matches!(msg, InfrastructureMsg::JoinRequest{..}));
+            assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
+                    assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
             // Send JoinResponse::Redirect
             let new_bootstrap_addrs: BTreeMap<_, _> = (0..ELDER_SIZE)
@@ -604,7 +601,7 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Redirect(
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
                     SectionAuthorityProvider {
                         prefix: Prefix::default(),
                         public_key_set: pk_set.clone(),
@@ -633,11 +630,11 @@ mod tests {
                     .collect::<Vec<_>>()
             );
 
-            let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::Infrastructure { msg, dst_location,.. }) =>
+            let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, dst_location,.. }) =>
                     (msg, dst_location));
 
             assert_eq!(dst_location.section_pk(), Some(pk_set.public_key()));
-            assert_matches!(node_msg, InfrastructureMsg::JoinRequest(req) => {
+            assert_matches!(node_msg, SystemMsg::JoinRequest(req) => {
                 assert_eq!(req.section_key, pk_set.public_key());
             });
 
@@ -676,12 +673,12 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
-            assert_matches!(wire_msg.into_message(), Ok(MessageType::Infrastructure { msg, .. }) =>
-                        assert_matches!(msg, InfrastructureMsg::JoinRequest{..}));
+            assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
+                        assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
             send_response(
                 &recv_tx,
-                InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Redirect(
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
                     SectionAuthorityProvider {
                         prefix: Prefix::default(),
                         public_key_set: pk_set.clone(),
@@ -699,7 +696,7 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Redirect(
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
                     SectionAuthorityProvider {
                         prefix: Prefix::default(),
                         public_key_set: pk_set.clone(),
@@ -716,8 +713,8 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
-            assert_matches!(wire_msg.into_message(), Ok(MessageType::Infrastructure { msg, .. }) =>
-                            assert_matches!(msg, InfrastructureMsg::JoinRequest{..}));
+            assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
+                            assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
             Ok(())
         };
@@ -754,12 +751,12 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
-            assert_matches!(wire_msg.into_message(), Ok(MessageType::Infrastructure { msg, .. }) =>
-                                assert_matches!(msg, InfrastructureMsg::JoinRequest{..}));
+            assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
+                                assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
             send_response(
                 &recv_tx,
-                InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                     JoinRejectionReason::JoinsDisallowed,
                 ))),
                 &bootstrap_node,
@@ -819,13 +816,14 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("NodeMsg was not received"))?;
 
-            let node_msg = assert_matches!(wire_msg.into_message(), Ok(MessageType::Infrastructure{ msg, .. }) => msg);
-            assert_matches!(node_msg, InfrastructureMsg::JoinRequest(_));
+            let node_msg =
+                assert_matches!(wire_msg.into_message(), Ok(MessageType::System{ msg, .. }) => msg);
+            assert_matches!(node_msg, SystemMsg::JoinRequest(_));
 
             // Send `Retry` with bad prefix
             send_response(
                 &recv_tx,
-                InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Retry(
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
                     gen_section_authority_provider(bad_prefix, ELDER_SIZE).0,
                 ))),
                 &bootstrap_node,
@@ -836,7 +834,7 @@ mod tests {
             // Send `Retry` with good prefix
             send_response(
                 &recv_tx,
-                InfrastructureMsg::JoinResponse(Box::new(JoinResponse::Retry(
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
                     gen_section_authority_provider(good_prefix, ELDER_SIZE).0,
                 ))),
                 &bootstrap_node,
@@ -848,8 +846,9 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("NodeMsg was not received"))?;
 
-            let node_msg = assert_matches!(wire_msg.into_message(), Ok(MessageType::Infrastructure{ msg, .. }) => msg);
-            assert_matches!(node_msg, InfrastructureMsg::JoinRequest(_));
+            let node_msg =
+                assert_matches!(wire_msg.into_message(), Ok(MessageType::System{ msg, .. }) => msg);
+            assert_matches!(node_msg, SystemMsg::JoinRequest(_));
 
             Ok(())
         };
@@ -866,7 +865,7 @@ mod tests {
     // test helper
     fn send_response(
         recv_tx: &mpsc::Sender<ConnectionEvent>,
-        node_msg: InfrastructureMsg,
+        node_msg: SystemMsg,
         bootstrap_node: &Node,
         section_pk: BlsPublicKey,
     ) -> Result<()> {

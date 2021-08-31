@@ -12,7 +12,7 @@ use crate::messaging::data::ServiceMsg;
 use crate::messaging::NodeAuth;
 use crate::messaging::{
     data::{ChunkRead, CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite},
-    node::{InfrastructureMsg, NodeQueryResponse},
+    node::{NodeQueryResponse, SystemMsg},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;
@@ -117,7 +117,7 @@ impl Core {
     /// Sign and serialize node message to be sent
     pub(crate) fn prepare_node_msg(
         &self,
-        msg: InfrastructureMsg,
+        msg: SystemMsg,
         dst: DstLocation,
     ) -> Result<Vec<Command>> {
         let msg_id = MessageId::new();
@@ -149,7 +149,7 @@ impl Core {
 
         match self.chunk_storage.read(&query, requester) {
             Ok(response) => {
-                let msg = InfrastructureMsg::NodeQueryResponse {
+                let msg = SystemMsg::NodeQueryResponse {
                     response,
                     correlation_id: msg_id,
                     user,
