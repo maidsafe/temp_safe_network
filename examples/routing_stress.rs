@@ -25,7 +25,7 @@ use std::{
     collections::BTreeMap,
     fs::File,
     io::BufWriter,
-    net::{Ipv4Addr, SocketAddr},
+    net::SocketAddr,
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
@@ -43,9 +43,7 @@ use safe_network::routing::create_test_used_space_and_root_storage;
 use safe_network::messaging::{
     data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MessageId,
 };
-use safe_network::routing::{
-    Cache, Config, Event as RoutingEvent, NodeElderChange, Routing, TransportConfig,
-};
+use safe_network::routing::{Cache, Config, Event as RoutingEvent, NodeElderChange, Routing};
 
 // Minimal delay between two consecutive prints of the network status.
 const MIN_PRINT_DELAY: Duration = Duration::from_millis(500);
@@ -215,19 +213,15 @@ impl Network {
 
     // Create new node and let it join the network.
     async fn create_node(&mut self, event_tx: Sender<Event>) {
-        let bootstrap_addrs = self.get_bootstrap_addrs().await;
+        let bootstrap_nodes = self.get_bootstrap_addrs().await;
 
         let id = self.new_node_id();
         let _ = self.nodes.insert(id, Node::Joining);
         self.stats.join_attempts += 1;
 
         let config = Config {
-            first: bootstrap_addrs.is_empty(),
-            transport_config: TransportConfig {
-                hard_coded_contacts: bootstrap_addrs.into_iter().collect(),
-                local_ip: Some(Ipv4Addr::LOCALHOST.into()),
-                ..Default::default()
-            },
+            first: bootstrap_nodes.is_empty(),
+            bootstrap_nodes,
             ..Default::default()
         };
 

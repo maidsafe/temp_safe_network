@@ -9,18 +9,29 @@
 use crate::client::Error;
 use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr, path::Path, time::Duration};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    path::Path,
+    time::Duration,
+};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
-use tokio::io::{self};
 use tracing::{debug, warn};
+
+const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::LOCALHOST, 0);
 
 /// Defaul amount of time to wait for responses to queries before giving up and returning an error.
 pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// Configuration for sn_client.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct Config {
+    /// The local address to bind to.
+    pub local_addr: SocketAddr,
+
+    /// Initial network contacts.
+    pub bootstrap_nodes: Vec<SocketAddr>,
+
     /// QuicP2p options.
     pub qp2p: QuicP2pConfig,
 
@@ -32,38 +43,42 @@ impl Config {
     /// Returns a new `Config` instance.
     ///
     /// This will try to read QuicP2P configuration from `config_file_path`, or else use the default
-    /// QuicP2P config. In either case, `bootstrap_config` will be used to override the initial
+    /// QuicP2P config. In either case, `bootstrap_nodes` will be used to override the initial
     /// network contacts.
+    ///
+    /// If `local_addr` is not specified, `127.0.0.1:0` will be used (e.g. localhost with a random
+    /// port).
     ///
     /// If `query_timeout` is not specified, [`DEFAULT_QUERY_TIMEOUT`] will be used.
     pub async fn new(
+        local_addr: Option<SocketAddr>,
+        bootstrap_nodes: Option<Vec<SocketAddr>>,
         config_file_path: Option<&Path>,
-        bootstrap_config: Option<HashSet<SocketAddr>>,
         query_timeout: Option<Duration>,
     ) -> Self {
         // If a config file path was provided we try to read it,
         // otherwise we use default qp2p config.
-        let mut qp2p = match &config_file_path {
+        let qp2p = match &config_file_path {
             None => QuicP2pConfig::default(),
-            Some(path) => match read_config_file(path).await {
-                Err(Error::IoError(ref err)) if err.kind() == io::ErrorKind::NotFound => {
-                    QuicP2pConfig {
-                        bootstrap_cache_dir: path.parent().map(|p| p.display().to_string()),
-                        ..Default::default()
-                    }
-                }
-                result => result.unwrap_or_default(),
-            },
+            Some(path) => read_config_file(path).await.unwrap_or_default(),
         };
 
-        if let Some(contacts) = bootstrap_config {
-            debug!("Bootstrapping contacts overriden with: {:?}", contacts);
-            qp2p.hard_coded_contacts = contacts;
-        }
-
         Self {
+            local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
+            bootstrap_nodes: bootstrap_nodes.unwrap_or_default(),
             qp2p,
             query_timeout: query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT),
+        }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            local_addr: SocketAddr::from(DEFAULT_LOCAL_ADDR),
+            bootstrap_nodes: Default::default(),
+            qp2p: Default::default(),
+            query_timeout: Default::default(),
         }
     }
 }
@@ -112,7 +127,7 @@ mod tests {
 
         // In the absence of a config file, the config handler
         // should initialize bootstrap_cache_dir only
-        let config = Config::new(Some(&config_filepath), None, None).await;
+        let config = Config::new(None, None, Some(&config_filepath), None).await;
         // convert to string for assert
         let mut str_path = path
             .to_str()
@@ -124,10 +139,9 @@ mod tests {
         }
 
         let expected_config = Config {
-            qp2p: QuicP2pConfig {
-                bootstrap_cache_dir: Some(str_path),
-                ..Default::default()
-            },
+            local_addr: (Ipv4Addr::LOCALHOST, 0).into(),
+            bootstrap_nodes: vec![],
+            qp2p: QuicP2pConfig::default(),
             query_timeout: DEFAULT_QUERY_TIMEOUT,
         };
         assert_eq!(config, expected_config);
@@ -139,10 +153,10 @@ mod tests {
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = Config::new(Some(&config_filepath), None, None).await;
+        let read_cfg = Config::new(None, None, Some(&config_filepath), None).await;
         assert_eq!(config_on_disk, read_cfg);
 
-        let default_cfg = Config::new(None, None, None).await;
+        let default_cfg = Config::new(None, None, None, None).await;
         assert_eq!(Config::default(), default_cfg);
 
         Ok(())

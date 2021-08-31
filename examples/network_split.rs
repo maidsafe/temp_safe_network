@@ -182,10 +182,12 @@ pub async fn run_split() -> Result<()> {
     sleep(interval_duration).await;
 
     // now we read the data
-    let bootstrap_contacts =
-        read_network_conn_info().context("Could not read network bootstrap".to_string())?;
+    let bootstrap_contacts = read_network_conn_info()
+        .context("Could not read network bootstrap".to_string())?
+        .into_iter()
+        .collect();
 
-    let config = Config::new(None, Some(bootstrap_contacts), Some(QUERY_TIMEOUT)).await;
+    let config = Config::new(None, Some(bootstrap_contacts), None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(None, config).await?;
 
     for (address, hash) in all_data_put {
@@ -219,11 +221,13 @@ pub async fn run_split() -> Result<()> {
 async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
     // Now we PUT data.
     println!("Reading network bootstrap information...");
-    let bootstrap_contacts =
-        read_network_conn_info().context("Could not read network bootstrap".to_string())?;
+    let bootstrap_contacts = read_network_conn_info()
+        .context("Could not read network bootstrap".to_string())?
+        .into_iter()
+        .collect();
 
     println!("Creating a Client to connect to {:?}", bootstrap_contacts);
-    let config = Config::new(None, Some(bootstrap_contacts), Some(QUERY_TIMEOUT)).await;
+    let config = Config::new(None, Some(bootstrap_contacts), None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(None, config).await?;
 
     let raw_data = generate_random_vector::<u8>(1024 * 1024);
