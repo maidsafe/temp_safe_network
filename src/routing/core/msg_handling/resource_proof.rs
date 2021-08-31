@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::node::{InfrastructureMsg, JoinResponse, Peer, ResourceProofResponse};
+use crate::messaging::node::{JoinResponse, Peer, ResourceProofResponse, SystemMsg};
 use crate::routing::{
     core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     ed25519,
@@ -50,7 +50,7 @@ impl Core {
         let nonce: [u8; 32] = rand::random();
         let serialized =
             bincode::serialize(&(peer.name(), &nonce)).map_err(|_| Error::InvalidMessage)?;
-        let response = InfrastructureMsg::JoinResponse(Box::new(JoinResponse::ResourceChallenge {
+        let response = SystemMsg::JoinResponse(Box::new(JoinResponse::ResourceChallenge {
             data_size: RESOURCE_PROOF_DATA_SIZE,
             difficulty: RESOURCE_PROOF_DIFFICULTY,
             nonce,

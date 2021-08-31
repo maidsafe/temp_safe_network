@@ -11,7 +11,7 @@ use crate::messaging::{
     data::{
         ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, Error as ErrorMessage, StorageLevel,
     },
-    node::{InfrastructureMsg, NodeCmd, NodeQuery},
+    node::{NodeCmd, NodeQuery, SystemMsg},
     AuthorityProof, EndUser, MessageId, ServiceAuth,
 };
 
@@ -103,7 +103,7 @@ impl Core {
 
         let target = *chunk.name();
 
-        let msg = InfrastructureMsg::NodeCmd(NodeCmd::Chunks {
+        let msg = SystemMsg::NodeCmd(NodeCmd::Chunks {
             cmd: ChunkWrite::New(chunk),
             auth: auth.into_inner(),
             origin,
@@ -143,7 +143,7 @@ impl Core {
         trace!("Handling delete at elders, forwarding to adults");
         let targets = self.get_chunk_holder_adults(address.name()).await;
 
-        let msg = InfrastructureMsg::NodeCmd(NodeCmd::Chunks {
+        let msg = SystemMsg::NodeCmd(NodeCmd::Chunks {
             cmd: ChunkWrite::DeletePrivate(address),
             auth: auth.into_inner(),
             origin,
@@ -180,7 +180,7 @@ impl Core {
             let _ = fresh_targets.insert(target);
         }
 
-        let msg = InfrastructureMsg::NodeQuery(NodeQuery::Chunks {
+        let msg = SystemMsg::NodeQuery(NodeQuery::Chunks {
             query: ChunkRead::Get(*address),
             auth: auth.into_inner(),
             origin,

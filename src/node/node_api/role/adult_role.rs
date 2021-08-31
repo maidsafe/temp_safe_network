@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{InfrastructureMsg, NodeCmd},
+    node::{NodeCmd, SystemMsg},
     MessageId,
 };
 use crate::node::{
@@ -49,7 +49,7 @@ impl AdultRole {
             .into_iter()
             .map(|(data, targets)| NodeDuty::SendToNodes {
                 msg_id: MessageId::new(),
-                msg: InfrastructureMsg::NodeCmd(NodeCmd::ReplicateChunk(data)),
+                msg: SystemMsg::NodeCmd(NodeCmd::ReplicateChunk(data)),
                 targets,
                 aggregation: false,
             })

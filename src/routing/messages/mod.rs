@@ -10,8 +10,8 @@ mod msg_authority;
 
 pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
-    node::InfrastructureMsg, BlsShareAuth, DstLocation, MessageId, MsgKind, NodeAuth,
-    NodeMsgAuthority, WireMsg,
+    node::SystemMsg, BlsShareAuth, DstLocation, MessageId, MsgKind, NodeAuth, NodeMsgAuthority,
+    WireMsg,
 };
 use crate::routing::{
     error::{Error, Result},
@@ -36,7 +36,7 @@ pub(crate) trait WireMsgUtils {
         key_share: &SectionKeyShare,
         src_name: XorName,
         dst: DstLocation,
-        node_msg: InfrastructureMsg,
+        node_msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error>;
 
@@ -44,7 +44,7 @@ pub(crate) trait WireMsgUtils {
     fn single_src(
         node: &Node,
         dst: DstLocation,
-        node_msg: InfrastructureMsg,
+        node_msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg>;
 }
@@ -77,7 +77,7 @@ impl WireMsgUtils for WireMsg {
         key_share: &SectionKeyShare,
         src_name: XorName,
         dst: DstLocation,
-        node_msg: InfrastructureMsg,
+        node_msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error> {
         let msg_payload =
@@ -97,7 +97,7 @@ impl WireMsgUtils for WireMsg {
     fn single_src(
         node: &Node,
         dst: DstLocation,
-        node_msg: InfrastructureMsg,
+        node_msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg> {
         let msg_payload =

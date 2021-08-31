@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{InfrastructureMsg, KeyedSig, SectionAuth},
+    node::{KeyedSig, SectionAuth, SystemMsg},
     DstLocation, MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
@@ -38,7 +38,7 @@ impl Core {
         src_name: XorName,
     ) -> Result<Vec<Command>> {
         let bounced_msg = match WireMsg::deserialize(bounced_msg)? {
-            MessageType::Infrastructure { msg, .. } => msg,
+            MessageType::System { msg, .. } => msg,
             _ => {
                 warn!("Non Infrastructure MessageType received at Node in AE response. We do not handle any other type yet");
                 return Ok(vec![]);
@@ -102,7 +102,7 @@ impl Core {
         );
 
         let bounced_msg = match WireMsg::deserialize(bounced_msg)? {
-            MessageType::Infrastructure { msg, .. } => msg,
+            MessageType::System { msg, .. } => msg,
             _ => {
                 warn!("Non Infrastructure MessageType received at Node in AE response. We do not handle any other type yet");
                 return Ok(vec![]);
@@ -175,7 +175,7 @@ impl Core {
     pub(crate) async fn check_for_entropy_if_needed(
         &self,
         wire_msg: &WireMsg,
-        msg: &InfrastructureMsg,
+        msg: &SystemMsg,
         src_location: &SrcLocation,
         dst_location: &DstLocation,
         sender: SocketAddr,
@@ -200,10 +200,10 @@ impl Core {
         // TODO: consider changing the join and "join as relocated" flows to
         // make use of AntiEntropy retry/redirect responses.
         match msg {
-            InfrastructureMsg::AntiEntropyRetry { .. }
-            | InfrastructureMsg::AntiEntropyRedirect { .. }
-            | InfrastructureMsg::JoinRequest(_)
-            | InfrastructureMsg::JoinAsRelocatedRequest(_) => Ok(None),
+            SystemMsg::AntiEntropyRetry { .. }
+            | SystemMsg::AntiEntropyRedirect { .. }
+            | SystemMsg::JoinRequest(_)
+            | SystemMsg::JoinAsRelocatedRequest(_) => Ok(None),
             _ => match dst_location.section_pk() {
                 None => Ok(None),
                 Some(dst_section_pk) => {
@@ -255,7 +255,7 @@ impl Core {
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
 
-                InfrastructureMsg::AntiEntropyRetry {
+                SystemMsg::AntiEntropyRetry {
                     section_auth,
                     section_signed,
                     proof_chain,
@@ -275,7 +275,7 @@ impl Core {
                 match self.network.closest(&name) {
                     Some(section_auth) => {
                         // Redirect to the closest section
-                        InfrastructureMsg::AntiEntropyRedirect {
+                        SystemMsg::AntiEntropyRedirect {
                             section_auth: section_auth.value.clone(),
                             section_signed: section_auth.sig,
                             bounced_msg: bounced_msg.clone(),
@@ -395,8 +395,8 @@ mod tests {
                 .context("failed to deserialised anti-entropy message")?
         });
 
-        assert_matches!(msg_type, MessageType::Infrastructure{ msg, .. } => {
-            assert_matches!(msg, InfrastructureMsg::AntiEntropyRedirect { section_auth, .. } => {
+        assert_matches!(msg_type, MessageType::System{ msg, .. } => {
+            assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
                 assert_eq!(section_auth, some_other_sap.value);
             });
         });
@@ -426,8 +426,8 @@ mod tests {
                 .context("failed to deserialised anti-entropy message")?
         });
 
-        assert_matches!(msg_type, MessageType::Infrastructure{ msg, .. } => {
-            assert_matches!(msg, InfrastructureMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+        assert_matches!(msg_type, MessageType::System{ msg, .. } => {
+            assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
                 assert_eq!(section_auth, env.core.section().authority_provider());
                 assert_eq!(proof_chain, env.core.section_chain());
             });
@@ -486,7 +486,7 @@ mod tests {
                 gen_addr(),
             );
 
-            let _msg = InfrastructureMsg::StartConnectivityTest(XorName::random());
+            let _msg = SystemMsg::StartConnectivityTest(XorName::random());
 
             let bounced_bytes = WireMsg::serialize_msg_payload(&_msg)?;
 

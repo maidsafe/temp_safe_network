@@ -8,7 +8,7 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    node::{InfrastructureMsg, NodeCmd},
+    node::{NodeCmd, SystemMsg},
     DstLocation, MessageId, SrcLocation,
 };
 use crate::node::{
@@ -51,7 +51,7 @@ pub(super) fn map_node_msg(
 
             Mapping {
                 op: NodeDuty::Send(OutgoingMsg {
-                    msg: MsgType::Node(InfrastructureMsg::NodeMsgError {
+                    msg: MsgType::Node(SystemMsg::NodeMsgError {
                         error,
                         correlation_id: msg_id,
                     }),

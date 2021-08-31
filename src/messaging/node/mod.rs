@@ -41,7 +41,7 @@ use xor_name::{Prefix, XorName};
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
-pub enum InfrastructureMsg {
+pub enum SystemMsg {
     /// Message sent to a peer when a message with outdated section
     /// information was received, attaching the bounced message so
     /// the peer can resend it with up to date destination information.
@@ -97,7 +97,7 @@ pub enum InfrastructureMsg {
     /// source in order for them to provide new proof that the node would trust.
     BouncedUntrustedMessage {
         /// Untrsuted Node message
-        msg: Box<InfrastructureMsg>,
+        msg: Box<SystemMsg>,
         /// Currently known section pk of the source
         dst_section_pk: BlsPublicKey,
     },

@@ -9,7 +9,7 @@
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::{ServiceError, ServiceMsg},
-    node::InfrastructureMsg,
+    node::SystemMsg,
     AuthorityProof, DstLocation, Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
     ServiceAuth,
 };
@@ -123,15 +123,11 @@ impl WireMsg {
                 })
             }
             MsgKind::NodeAuthMsg(node_signed) => {
-                let msg: InfrastructureMsg =
-                    rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!(
-                            "Node signed message payload as Msgpack: {}",
-                            err
-                        ))
-                    })?;
+                let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                    Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
+                })?;
 
-                Ok(MessageType::Infrastructure {
+                Ok(MessageType::System {
                     msg_id: self.header.msg_envelope.msg_id,
                     msg_authority: NodeMsgAuthority::Node(AuthorityProof::verify(
                         node_signed,
@@ -142,15 +138,14 @@ impl WireMsg {
                 })
             }
             MsgKind::NodeBlsShareAuthMsg(bls_share_signed) => {
-                let msg: InfrastructureMsg =
-                    rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!(
-                            "Node message payload (BLS share signed) as Msgpack: {}",
-                            err
-                        ))
-                    })?;
+                let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                    Error::FailedToParse(format!(
+                        "Node message payload (BLS share signed) as Msgpack: {}",
+                        err
+                    ))
+                })?;
 
-                Ok(MessageType::Infrastructure {
+                Ok(MessageType::System {
                     msg_id: self.header.msg_envelope.msg_id,
                     msg_authority: NodeMsgAuthority::BlsShare(AuthorityProof::verify(
                         bls_share_signed,
@@ -161,15 +156,14 @@ impl WireMsg {
                 })
             }
             MsgKind::SectionAuthMsg(section_signed) => {
-                let msg: InfrastructureMsg =
-                    rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!(
-                            "Node message payload (section signed) as Msgpack: {}",
-                            err
-                        ))
-                    })?;
+                let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                    Error::FailedToParse(format!(
+                        "Node message payload (section signed) as Msgpack: {}",
+                        err
+                    ))
+                })?;
 
-                Ok(MessageType::Infrastructure {
+                Ok(MessageType::System {
                     msg_id: self.header.msg_envelope.msg_id,
                     msg_authority: NodeMsgAuthority::Section(AuthorityProof::verify(
                         section_signed,
@@ -256,7 +250,7 @@ mod tests {
     use crate::{
         messaging::{
             data::{ChunkRead, DataQuery, ServiceMsg, StorageLevel},
-            node::{InfrastructureMsg, NodeCmd},
+            node::{NodeCmd, SystemMsg},
             AuthorityProof, MessageId, NodeAuth, ServiceAuth,
         },
         types::{ChunkAddress, Keypair},
@@ -282,7 +276,7 @@ mod tests {
         let msg_id = MessageId::new();
         let pk = crate::types::PublicKey::Bls(dst_section_pk);
 
-        let node_msg = InfrastructureMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+        let node_msg = SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel {
             node_id: pk,
             section: pk.into(),
             level: StorageLevel::zero(),
@@ -307,7 +301,7 @@ mod tests {
         // test deserialisation of payload
         assert_eq!(
             deserialized.into_message()?,
-            MessageType::Infrastructure {
+            MessageType::System {
                 msg_id: wire_msg.msg_id(),
                 msg_authority: NodeMsgAuthority::Node(node_auth),
                 dst_location,

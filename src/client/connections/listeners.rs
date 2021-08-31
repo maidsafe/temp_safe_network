@@ -16,7 +16,7 @@ use crate::client::connections::messaging::{rebuild_message_for_ae_resend, send_
 use crate::client::Error;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
-    node::InfrastructureMsg,
+    node::SystemMsg,
     MessageId, MessageType, WireMsg,
 };
 
@@ -58,18 +58,18 @@ impl Session {
                 MessageType::Service { msg_id, msg, .. } => {
                     self.handle_client_msg(msg_id, msg, src).await
                 }
-                MessageType::Infrastructure {
+                MessageType::System {
                     msg:
-                        InfrastructureMsg::AntiEntropyRedirect {
+                        SystemMsg::AntiEntropyRedirect {
                             section_auth,
                             bounced_msg,
                             ..
                         },
                     ..
                 }
-                | MessageType::Infrastructure {
+                | MessageType::System {
                     msg:
-                        InfrastructureMsg::AntiEntropyRetry {
+                        SystemMsg::AntiEntropyRetry {
                             section_auth,
                             bounced_msg,
                             ..
