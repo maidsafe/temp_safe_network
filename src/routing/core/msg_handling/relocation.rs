@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{NodeMsg, Peer, Proposal, RelocateDetails, RelocatePromise},
+    node::{InfrastructureMsg, Peer, Proposal, RelocateDetails, RelocatePromise},
     AuthorityProof, SectionAuth,
 };
 use crate::routing::{
@@ -92,7 +92,7 @@ impl Core {
     pub(crate) async fn handle_relocate(
         &mut self,
         relocate_details: RelocateDetails,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         section_auth: AuthorityProof<SectionAuth>,
     ) -> Result<Option<Command>> {
         if relocate_details.pub_id != self.node.name() {
@@ -142,7 +142,7 @@ impl Core {
     pub(crate) async fn handle_relocate_promise(
         &mut self,
         promise: RelocatePromise,
-        msg: NodeMsg,
+        msg: InfrastructureMsg,
     ) -> Result<Vec<Command>> {
         // Check if we need to filter out the `RelocatePromise`.
         if promise.name == self.node.name() {

@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{KeyedSig, NodeMsg, SectionAuth},
+    node::{InfrastructureMsg, KeyedSig, SectionAuth},
     DstLocation, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
@@ -32,7 +32,7 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
-        bounced_msg: Box<NodeMsg>,
+        bounced_msg: Box<InfrastructureMsg>,
         sender: SocketAddr,
         src_name: XorName,
     ) -> Result<Vec<Command>> {
@@ -84,7 +84,7 @@ impl Core {
         &mut self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
-        bounced_msg: Box<NodeMsg>,
+        bounced_msg: Box<InfrastructureMsg>,
         sender: SocketAddr,
     ) -> Result<Vec<Command>> {
         debug!(
@@ -157,7 +157,7 @@ impl Core {
 
     pub(crate) async fn check_for_entropy(
         &self,
-        node_msg: &NodeMsg,
+        node_msg: &InfrastructureMsg,
         src_location: &SrcLocation,
         dst_location: &DstLocation,
         sender: SocketAddr,
@@ -175,10 +175,10 @@ impl Core {
         // TODO: consider changing the join and "join as relocated" flows to
         // make use of AntiEntropy retry/redirect responses.
         match node_msg {
-            NodeMsg::AntiEntropyRetry { .. }
-            | NodeMsg::AntiEntropyRedirect { .. }
-            | NodeMsg::JoinRequest(_)
-            | NodeMsg::JoinAsRelocatedRequest(_) => Ok(None),
+            InfrastructureMsg::AntiEntropyRetry { .. }
+            | InfrastructureMsg::AntiEntropyRedirect { .. }
+            | InfrastructureMsg::JoinRequest(_)
+            | InfrastructureMsg::JoinAsRelocatedRequest(_) => Ok(None),
             _ => match dst_location.section_pk() {
                 None => Ok(None),
                 Some(dst_section_pk) => {
@@ -199,7 +199,7 @@ impl Core {
     // bring the sender's knowledge about us up to date.
     pub(crate) async fn check_dest_section_pk(
         &self,
-        node_msg: &NodeMsg,
+        node_msg: &InfrastructureMsg,
         src_location: &SrcLocation,
         dst_section_pk: &BlsPublicKey,
         dst_name: Option<XorName>,
@@ -221,7 +221,7 @@ impl Core {
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
 
-                NodeMsg::AntiEntropyRetry {
+                InfrastructureMsg::AntiEntropyRetry {
                     section_auth,
                     section_signed,
                     proof_chain,
@@ -241,7 +241,7 @@ impl Core {
                 match self.network.closest(&name) {
                     Some(section_auth) => {
                         // Redirect to the closest section
-                        NodeMsg::AntiEntropyRedirect {
+                        InfrastructureMsg::AntiEntropyRedirect {
                             section_auth: section_auth.value.clone(),
                             section_signed: section_auth.sig,
                             bounced_msg: Box::new(node_msg.clone()),
@@ -361,8 +361,8 @@ mod tests {
                 .context("failed to deserialised anti-entropy message")?
         });
 
-        assert_matches!(msg_type, MessageType::Node{ msg, .. } => {
-            assert_matches!(msg, NodeMsg::AntiEntropyRedirect { section_auth, .. } => {
+        assert_matches!(msg_type, MessageType::Infrastructure{ msg, .. } => {
+            assert_matches!(msg, InfrastructureMsg::AntiEntropyRedirect { section_auth, .. } => {
                 assert_eq!(section_auth, some_other_sap.value);
             });
         });
@@ -392,8 +392,8 @@ mod tests {
                 .context("failed to deserialised anti-entropy message")?
         });
 
-        assert_matches!(msg_type, MessageType::Node{ msg, .. } => {
-            assert_matches!(msg, NodeMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+        assert_matches!(msg_type, MessageType::Infrastructure{ msg, .. } => {
+            assert_matches!(msg, InfrastructureMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
                 assert_eq!(section_auth, env.core.section().authority_provider());
                 assert_eq!(proof_chain, env.core.section_chain());
             });
@@ -446,13 +446,13 @@ mod tests {
             &self,
             src_section_prefix: &Prefix,
             src_section_pk: BlsPublicKey,
-        ) -> Result<(NodeMsg, SrcLocation)> {
+        ) -> Result<(InfrastructureMsg, SrcLocation)> {
             let sender = Node::new(
                 ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );
 
-            let node_msg = NodeMsg::StartConnectivityTest(XorName::random());
+            let node_msg = InfrastructureMsg::StartConnectivityTest(XorName::random());
 
             let src_location = SrcLocation::Node {
                 name: sender.name(),

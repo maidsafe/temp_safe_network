@@ -12,9 +12,9 @@ use super::{Comm, Command, Core, Dispatcher};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     node::{
-        JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, NodeMsg,
-        NodeState, Peer, Proposal, RelocateDetails, RelocatePayload, ResourceProofResponse,
-        Section, SectionAuth,
+        InfrastructureMsg, JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig,
+        MembershipState, NodeState, Peer, Proposal, RelocateDetails, RelocatePayload,
+        ResourceProofResponse, Section, SectionAuth,
     },
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
     SectionAuth as MsgKindSectionAuth, SectionAuthorityProvider, WireMsg,
@@ -87,7 +87,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let wire_msg = WireMsg::single_src(
         &new_node,
         DstLocation::DirectAndUnrouted(section_key),
-        NodeMsg::JoinRequest(Box::new(JoinRequest {
+        InfrastructureMsg::JoinRequest(Box::new(JoinRequest {
             section_key,
             resource_proof_response: None,
         })),
@@ -114,8 +114,8 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     assert_matches!(
         response_wire_msg.into_message(),
-        Ok(MessageType::Node {
-            msg: NodeMsg::JoinResponse(response),
+        Ok(MessageType::Infrastructure {
+            msg: InfrastructureMsg::JoinResponse(response),
             ..
         }) => assert_matches!(*response, JoinResponse::ResourceChallenge { .. })
     );
@@ -154,7 +154,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let wire_msg = WireMsg::single_src(
         &new_node,
         DstLocation::DirectAndUnrouted(section_key),
-        NodeMsg::JoinRequest(Box::new(JoinRequest {
+        InfrastructureMsg::JoinRequest(Box::new(JoinRequest {
             section_key,
             resource_proof_response: Some(ResourceProofResponse {
                 solution,
@@ -236,7 +236,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         age: relocated_node.age(),
     };
 
-    let relocate_node_msg = NodeMsg::Relocate(relocate_details);
+    let relocate_node_msg = InfrastructureMsg::Relocate(relocate_details);
     let payload = WireMsg::serialize_msg_payload(&relocate_node_msg)?;
     let signature = sk_set.secret_key().sign(&payload);
     let section_signed = MsgKindSectionAuth {
@@ -259,7 +259,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let wire_msg = WireMsg::single_src(
         &relocated_node,
         DstLocation::DirectAndUnrouted(section_key),
-        NodeMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
+        InfrastructureMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
             section_key,
             relocate_payload: Some(relocate_payload),
         })),
@@ -328,7 +328,7 @@ async fn aggregate_proposals() -> Result<()> {
         let wire_msg = WireMsg::single_src(
             node,
             DstLocation::DirectAndUnrouted(*section.chain().last_key()),
-            NodeMsg::Propose {
+            InfrastructureMsg::Propose {
                 content: proposal.clone(),
                 sig_share,
             },
@@ -355,7 +355,7 @@ async fn aggregate_proposals() -> Result<()> {
     let wire_msg = WireMsg::single_src(
         &nodes[THRESHOLD],
         DstLocation::DirectAndUnrouted(*section.chain().last_key()),
-        NodeMsg::Propose {
+        InfrastructureMsg::Propose {
             content: proposal.clone(),
             sig_share,
         },
@@ -493,10 +493,11 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         };
 
         let actual_elder_candidates = match wire_msg.into_message() {
-            Ok(MessageType::Node {
-                msg: NodeMsg::DkgStart {
-                    elder_candidates, ..
-                },
+            Ok(MessageType::Infrastructure {
+                msg:
+                    InfrastructureMsg::DkgStart {
+                        elder_candidates, ..
+                    },
                 ..
             }) => elder_candidates,
             _ => continue,
@@ -552,8 +553,8 @@ async fn handle_online_command(
         };
 
         match wire_msg.into_message() {
-            Ok(MessageType::Node {
-                msg: NodeMsg::JoinResponse(response),
+            Ok(MessageType::Infrastructure {
+                msg: InfrastructureMsg::JoinResponse(response),
                 ..
             }) => {
                 if let JoinResponse::Approval {
@@ -566,8 +567,8 @@ async fn handle_online_command(
                     status.node_approval_sent = true;
                 }
             }
-            Ok(MessageType::Node {
-                msg: NodeMsg::Relocate(details),
+            Ok(MessageType::Infrastructure {
+                msg: InfrastructureMsg::Relocate(details),
                 ..
             }) => {
                 if details.pub_id != *peer.name() {
@@ -773,10 +774,11 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         };
 
         let actual_elder_candidates = match wire_msg.into_message() {
-            Ok(MessageType::Node {
-                msg: NodeMsg::DkgStart {
-                    elder_candidates, ..
-                },
+            Ok(MessageType::Infrastructure {
+                msg:
+                    InfrastructureMsg::DkgStart {
+                        elder_candidates, ..
+                    },
                 ..
             }) => elder_candidates,
             _ => continue,
@@ -867,7 +869,7 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     let unknown_chain = SecuredLinkedList::new(pk1);
     // we corrupt the section chain so it's unknown
     section.chain = unknown_chain;
-    let original_node_msg = NodeMsg::Sync {
+    let original_node_msg = InfrastructureMsg::Sync {
         section,
         network: BTreeMap::new(),
     };
@@ -934,9 +936,9 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
             continue;
         };
 
-        if let Ok(MessageType::Node {
+        if let Ok(MessageType::Infrastructure {
             msg:
-                NodeMsg::BouncedUntrustedMessage {
+                InfrastructureMsg::BouncedUntrustedMessage {
                     msg,
                     dst_section_pk,
                 },
@@ -988,7 +990,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         gen_addr(),
     );
 
-    let original_node_msg = NodeMsg::Sync {
+    let original_node_msg = InfrastructureMsg::Sync {
         section: section.clone(),
         network: BTreeMap::new(),
     };
@@ -1010,7 +1012,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
     let bounced_wire_msg = WireMsg::single_src(
         &other_node,
         DstLocation::DirectAndUnrouted(pk1),
-        NodeMsg::BouncedUntrustedMessage {
+        InfrastructureMsg::BouncedUntrustedMessage {
             msg: Box::new(original_node_msg.clone()),
             dst_section_pk: pk0,
         },
@@ -1039,7 +1041,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         };
 
         match wire_msg.into_message() {
-            Ok(MessageType::Node {
+            Ok(MessageType::Infrastructure {
                 msg, dst_location, ..
             }) => {
                 assert_eq!(recipients, [(other_node.name(), other_node.addr)]);
@@ -1117,7 +1119,7 @@ async fn handle_sync() -> Result<()> {
     let wire_msg = WireMsg::single_src(
         &old_node,
         DstLocation::DirectAndUnrouted(pk1),
-        NodeMsg::Sync {
+        InfrastructureMsg::Sync {
             section: new_section.clone(),
             network: BTreeMap::new(),
         },
@@ -1191,7 +1193,7 @@ async fn handle_untrusted_sync() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let sender = create_node(MIN_ADULT_AGE, None);
-    let original_node_msg = NodeMsg::Sync {
+    let original_node_msg = InfrastructureMsg::Sync {
         section: new_section.clone(),
         network: BTreeMap::new(),
     };
@@ -1224,8 +1226,8 @@ async fn handle_untrusted_sync() -> Result<()> {
         };
 
         match wire_msg.into_message() {
-            Ok(MessageType::Node {
-                msg: NodeMsg::BouncedUntrustedMessage { msg, .. },
+            Ok(MessageType::Infrastructure {
+                msg: InfrastructureMsg::BouncedUntrustedMessage { msg, .. },
                 ..
             }) => {
                 assert_eq!(*msg, original_node_msg);
@@ -1281,13 +1283,13 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
     )?;
     let dispatcher = Dispatcher::new(core);
 
-    let original_node_msg = NodeMsg::Sync {
+    let original_node_msg = InfrastructureMsg::Sync {
         section: section_full.clone(),
         network: BTreeMap::new(),
     };
 
     let sender = create_node(MIN_ADULT_AGE, None);
-    let bounced_node_msg = NodeMsg::BouncedUntrustedMessage {
+    let bounced_node_msg = InfrastructureMsg::BouncedUntrustedMessage {
         msg: Box::new(original_node_msg),
         dst_section_pk: pk0,
     };
@@ -1323,8 +1325,8 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
         };
 
         match wire_msg.into_message() {
-            Ok(MessageType::Node {
-                msg: NodeMsg::Sync { section, .. },
+            Ok(MessageType::Infrastructure {
+                msg: InfrastructureMsg::Sync { section, .. },
                 ..
             }) => {
                 assert_eq!(recipients, [(sender.name(), sender.addr)]);
@@ -1432,8 +1434,8 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         }
         match relocated_peer_role {
             RelocatedPeerRole::NonElder => {
-                if let Ok(MessageType::Node {
-                    msg: NodeMsg::Relocate(details),
+                if let Ok(MessageType::Infrastructure {
+                    msg: InfrastructureMsg::Relocate(details),
                     ..
                 }) = wire_msg.into_message()
                 {
@@ -1444,8 +1446,8 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 }
             }
             RelocatedPeerRole::Elder => {
-                if let Ok(MessageType::Node {
-                    msg: NodeMsg::RelocatePromise(promise),
+                if let Ok(MessageType::Infrastructure {
+                    msg: InfrastructureMsg::RelocatePromise(promise),
                     ..
                 }) = wire_msg.into_message()
                 {
@@ -1509,7 +1511,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         },
     };
 
-    let node_msg = NodeMsg::NodeMsgError {
+    let node_msg = InfrastructureMsg::NodeMsgError {
         error: crate::messaging::data::Error::FailedToWriteFile,
         correlation_id: MessageId::new(),
     };
@@ -1529,7 +1531,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         assert_matches!(WireMsg::deserialize(bytes), Ok(msg_type) => msg_type)
     });
 
-    assert_matches!(msg_type, MessageType::Node { msg, dst_location: dst, .. } => {
+    assert_matches!(msg_type, MessageType::Infrastructure { msg, dst_location: dst, .. } => {
         assert_eq!(dst, dst_location);
         assert_eq!(
             msg,
@@ -1623,8 +1625,8 @@ async fn handle_elders_update() -> Result<()> {
         };
 
         let (section, msg_authority) = match wire_msg.into_message() {
-            Ok(MessageType::Node {
-                msg: NodeMsg::Sync { section, .. },
+            Ok(MessageType::Infrastructure {
+                msg: InfrastructureMsg::Sync { section, .. },
                 msg_authority,
                 ..
             }) => (section, msg_authority),
@@ -1762,8 +1764,8 @@ async fn handle_demote_during_split() -> Result<()> {
 
         if matches!(
             wire_msg.into_message(),
-            Ok(MessageType::Node {
-                msg: NodeMsg::Sync { .. },
+            Ok(MessageType::Infrastructure {
+                msg: InfrastructureMsg::Sync { .. },
                 ..
             })
         ) {

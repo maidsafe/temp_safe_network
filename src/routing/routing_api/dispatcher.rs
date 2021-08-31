@@ -9,7 +9,7 @@
 use super::{Command, Event};
 use crate::messaging::{
     data::{ChunkDataExchange, StorageLevel},
-    node::{NodeMsg, Section},
+    node::{InfrastructureMsg, Section},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
 use crate::routing::{
@@ -172,7 +172,7 @@ impl Dispatcher {
                     )
                     .await
             }
-            Command::HandleNodeMessage {
+            Command::HandleInfrastructureMessage {
                 sender,
                 msg_id,
                 auth,
@@ -183,7 +183,7 @@ impl Dispatcher {
                 self.core
                     .read()
                     .await
-                    .handle_node_message(sender, msg_id, auth, dst_location, msg, payload)
+                    .handle_infrastructure_message(sender, msg_id, auth, dst_location, msg, payload)
                     .await
             }
             Command::PrepareNodeMsgToSend { msg, dst } => {
@@ -275,7 +275,7 @@ impl Dispatcher {
                             name: core.node().name(),
                             section_pk,
                         },
-                        NodeMsg::StartConnectivityTest(name),
+                        InfrastructureMsg::StartConnectivityTest(name),
                         section_pk,
                     )?
                 };

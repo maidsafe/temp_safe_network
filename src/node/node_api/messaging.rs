@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::ServiceMsg, node::NodeMsg, DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
+    data::ServiceMsg, node::InfrastructureMsg, DstLocation, MessageId, MsgKind, ServiceAuth,
+    WireMsg,
 };
 use crate::node::{
     network::Network,
@@ -68,7 +69,7 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
 
 pub(crate) async fn send_to_nodes(
     msg_id: MessageId,
-    node_msg: NodeMsg,
+    node_msg: InfrastructureMsg,
     targets: BTreeSet<XorName>,
     aggregation: bool,
     network: &Network,

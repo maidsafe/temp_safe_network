@@ -11,7 +11,7 @@ use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
 use crate::messaging::data::{ServiceError, ServiceMsg};
 use crate::messaging::{
     data::{ChunkRead, CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite},
-    node::{NodeMsg, NodeQueryResponse},
+    node::{InfrastructureMsg, NodeQueryResponse},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::messaging::{NodeAuth, SectionAuthorityProvider};
@@ -120,7 +120,11 @@ impl Core {
     }
 
     /// Sign and serialize node message to be sent
-    pub(crate) fn prepare_node_msg(&self, msg: NodeMsg, dst: DstLocation) -> Result<Vec<Command>> {
+    pub(crate) fn prepare_node_msg(
+        &self,
+        msg: InfrastructureMsg,
+        dst: DstLocation,
+    ) -> Result<Vec<Command>> {
         let msg_id = MessageId::new();
 
         let section_pk = *self.section().chain().last_key();
@@ -150,7 +154,7 @@ impl Core {
 
         match self.chunk_storage.read(&query, requester) {
             Ok(response) => {
-                let msg = NodeMsg::NodeQueryResponse {
+                let msg = InfrastructureMsg::NodeQueryResponse {
                     response,
                     correlation_id: msg_id,
                     user,

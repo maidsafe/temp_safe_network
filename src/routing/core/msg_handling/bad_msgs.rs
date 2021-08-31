@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{NodeMsg, Peer},
+    node::{InfrastructureMsg, Peer},
     NodeMsgAuthority,
 };
 use crate::routing::{
@@ -25,14 +25,14 @@ impl Core {
     pub(crate) fn handle_untrusted_message(
         &self,
         sender: SocketAddr,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         msg_authority: NodeMsgAuthority,
     ) -> Result<Command> {
         let src_name = msg_authority.name();
 
         let bounce_dst_section_pk = self.section_key_by_name(&src_name);
 
-        let bounce_node_msg = NodeMsg::BouncedUntrustedMessage {
+        let bounce_node_msg = InfrastructureMsg::BouncedUntrustedMessage {
             msg: Box::new(node_msg),
             dst_section_pk: bounce_dst_section_pk,
         };
@@ -44,13 +44,13 @@ impl Core {
         &self,
         sender: Peer,
         dst_section_key: BlsPublicKey,
-        bounced_msg: NodeMsg,
+        bounced_msg: InfrastructureMsg,
     ) -> Result<Command> {
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();
 
         let new_node_msg = match bounced_msg {
-            NodeMsg::Sync { section, network } => {
+            InfrastructureMsg::Sync { section, network } => {
                 // `Sync` messages are handled specially, because they don't carry a signed chain.
                 // Instead we use the section chain that's part of the included `Section` struct.
                 // Problem is we can't extend that chain as it would invalidate the signature. We
@@ -62,7 +62,7 @@ impl Core {
                         Error::InvalidMessage // TODO: more specific error
                     })?;
 
-                NodeMsg::Sync { section, network }
+                InfrastructureMsg::Sync { section, network }
             }
             bounced_msg => bounced_msg,
         };

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSigSet, KeyedSig, NodeMsg, Proposal, Section},
+    node::{DkgFailureSigSet, InfrastructureMsg, KeyedSig, Proposal, Section},
     DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
@@ -32,10 +32,10 @@ pub(crate) enum Command {
     },
     // TODO: rename this as/when this is all node for clarity
     /// Handle Node, either directly or notify via event listener
-    HandleNodeMessage {
+    HandleInfrastructureMessage {
         sender: SocketAddr,
         msg_id: MessageId,
-        msg: NodeMsg,
+        msg: InfrastructureMsg,
         auth: NodeMsgAuthority,
         dst_location: DstLocation,
         #[debug(skip)]
@@ -45,7 +45,7 @@ pub(crate) enum Command {
     HandleVerifiedNodeNonDataMessage {
         sender: SocketAddr,
         msg_id: MessageId,
-        msg: NodeMsg,
+        msg: InfrastructureMsg,
         auth: NodeMsgAuthority,
         dst_location: DstLocation,
         known_keys: Vec<BlsPublicKey>,
@@ -53,7 +53,7 @@ pub(crate) enum Command {
     /// Handle Node data messages directly
     HandleVerifiedNodeDataMessage {
         msg_id: MessageId,
-        msg: NodeMsg,
+        msg: InfrastructureMsg,
         auth: NodeMsgAuthority,
         dst_location: DstLocation,
     },
@@ -81,7 +81,10 @@ pub(crate) enum Command {
     /// Parses WireMsg to send to the correct location
     ParseAndSendWireMsg(WireMsg),
     /// Performs serialisation and signing for sending of NodeMst
-    PrepareNodeMsgToSend { msg: NodeMsg, dst: DstLocation },
+    PrepareNodeMsgToSend {
+        msg: InfrastructureMsg,
+        dst: DstLocation,
+    },
     /// Send a message to `delivery_group_size` peers out of the given `recipients`.
     SendMessageDeliveryGroup {
         recipients: Vec<(XorName, SocketAddr)>,

@@ -20,7 +20,7 @@ mod sync;
 use super::Core;
 use crate::messaging::{
     data::{DataCmd, DataQuery, ServiceMsg, StorageLevel},
-    node::{NodeCmd, NodeMsg, NodeQuery, Proposal},
+    node::{InfrastructureMsg, NodeCmd, NodeQuery, Proposal},
     signature_aggregator::Error as AggregatorError,
     DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth, ServiceAuth,
     WireMsg,
@@ -78,12 +78,12 @@ impl Core {
         };
 
         match message_type {
-            MessageType::Node {
+            MessageType::Infrastructure {
                 msg_id,
                 msg_authority,
                 dst_location,
                 msg,
-            } => Ok(vec![Command::HandleNodeMessage {
+            } => Ok(vec![Command::HandleInfrastructureMessage {
                 sender,
                 msg_id,
                 auth: msg_authority,
@@ -106,13 +106,13 @@ impl Core {
     }
 
     // Handler for all node messages
-    pub(crate) async fn handle_node_message(
+    pub(crate) async fn handle_infrastructure_message(
         &self,
         sender: SocketAddr,
         msg_id: MessageId,
         mut msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         payload: Bytes,
     ) -> Result<Vec<Command>> {
         // Let's now verify the section key in the msg authority is trusted
@@ -163,7 +163,9 @@ impl Core {
             .await
         {
             Ok(false) => match node_msg {
-                NodeMsg::NodeCmd(_) | NodeMsg::NodeQuery(_) | NodeMsg::NodeQueryResponse { .. } => {
+                InfrastructureMsg::NodeCmd(_)
+                | InfrastructureMsg::NodeQuery(_)
+                | InfrastructureMsg::NodeQueryResponse { .. } => {
                     commands.push(Command::HandleVerifiedNodeDataMessage {
                         msg_id,
                         msg: node_msg,
@@ -200,13 +202,13 @@ impl Core {
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
         _dst_location: DstLocation,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
         known_keys: &[BlsPublicKey],
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
         match node_msg {
-            NodeMsg::AntiEntropyRetry {
+            InfrastructureMsg::AntiEntropyRetry {
                 section_auth,
                 section_signed,
                 proof_chain,
@@ -223,7 +225,7 @@ impl Core {
                 )
                 .await
             }
-            NodeMsg::AntiEntropyRedirect {
+            InfrastructureMsg::AntiEntropyRedirect {
                 section_auth,
                 section_signed,
                 bounced_msg,
@@ -237,7 +239,7 @@ impl Core {
                 )
                 .await
             }
-            NodeMsg::Sync {
+            InfrastructureMsg::Sync {
                 ref section,
                 ref network,
             } => {
@@ -258,7 +260,7 @@ impl Core {
                     Ok(vec![cmd])
                 }
             }
-            NodeMsg::Relocate(ref details) => {
+            InfrastructureMsg::Relocate(ref details) => {
                 trace!("Handling msg: Relocate from {}", sender);
                 if let NodeMsgAuthority::Section(section_signed) = msg_authority {
                     Ok(self
@@ -270,11 +272,11 @@ impl Core {
                     Err(Error::InvalidSrcLocation)
                 }
             }
-            NodeMsg::RelocatePromise(promise) => {
+            InfrastructureMsg::RelocatePromise(promise) => {
                 trace!("Handling msg: RelocatePromise from {}", sender);
                 self.handle_relocate_promise(promise, node_msg).await
             }
-            NodeMsg::StartConnectivityTest(name) => {
+            InfrastructureMsg::StartConnectivityTest(name) => {
                 trace!("Handling msg: StartConnectivityTest from {}", sender);
                 if self.is_not_elder() {
                     return Ok(vec![]);
@@ -282,12 +284,12 @@ impl Core {
 
                 Ok(vec![Command::TestConnectivity(name)])
             }
-            NodeMsg::JoinRequest(join_request) => {
+            InfrastructureMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
                 self.handle_join_request(msg_authority.peer(sender)?, *join_request)
                     .await
             }
-            NodeMsg::JoinAsRelocatedRequest(join_request) => {
+            InfrastructureMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
                 if self.is_not_elder()
                     && join_request.section_key == *self.section.chain().last_key()
@@ -302,7 +304,7 @@ impl Core {
                 )
                 .await
             }
-            NodeMsg::BouncedUntrustedMessage {
+            InfrastructureMsg::BouncedUntrustedMessage {
                 msg: bounced_msg,
                 dst_section_pk,
             } => {
@@ -314,7 +316,7 @@ impl Core {
                     *bounced_msg,
                 )?])
             }
-            NodeMsg::DkgStart {
+            InfrastructureMsg::DkgStart {
                 dkg_key,
                 elder_candidates,
             } => {
@@ -325,7 +327,7 @@ impl Core {
 
                 self.handle_dkg_start(dkg_key, elder_candidates)
             }
-            NodeMsg::DkgMessage { dkg_key, message } => {
+            InfrastructureMsg::DkgMessage { dkg_key, message } => {
                 trace!(
                     "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
                     dkg_key,
@@ -334,7 +336,7 @@ impl Core {
                 );
                 self.handle_dkg_message(dkg_key, message, src_name)
             }
-            NodeMsg::DkgFailureObservation {
+            InfrastructureMsg::DkgFailureObservation {
                 dkg_key,
                 sig,
                 failed_participants,
@@ -342,11 +344,11 @@ impl Core {
                 trace!("Handling msg: Dkg-FailureObservation from {}", sender);
                 self.handle_dkg_failure_observation(dkg_key, &failed_participants, sig)
             }
-            NodeMsg::DkgFailureAgreement(sig_set) => {
+            InfrastructureMsg::DkgFailureAgreement(sig_set) => {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
                 self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
-            NodeMsg::Propose {
+            InfrastructureMsg::Propose {
                 ref content,
                 ref sig_share,
             } => {
@@ -388,11 +390,11 @@ impl Core {
 
                 Ok(commands)
             }
-            NodeMsg::JoinResponse(join_response) => {
+            InfrastructureMsg::JoinResponse(join_response) => {
                 debug!("Ignoring unexpected message: {:?}", join_response);
                 Ok(vec![])
             }
-            NodeMsg::JoinAsRelocatedResponse(join_response) => {
+            InfrastructureMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(RelocateState::InProgress(ref mut joining_as_relocated)) =
                     self.relocate_state.as_mut()
@@ -407,7 +409,7 @@ impl Core {
 
                 Ok(vec![])
             }
-            NodeMsg::NodeMsgError {
+            InfrastructureMsg::NodeMsgError {
                 error,
                 correlation_id,
             } => {
@@ -437,13 +439,13 @@ impl Core {
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
-        node_msg: NodeMsg,
+        node_msg: InfrastructureMsg,
     ) -> Result<Vec<Command>> {
         match node_msg {
             // The following type of messages are all handled by upper sn_node layer.
             // TODO: In the future the sn-node layer won't be receiving Events but just
             // plugging in msg handlers.
-            NodeMsg::NodeCmd(node_cmd) => {
+            InfrastructureMsg::NodeCmd(node_cmd) => {
                 match node_cmd {
                     NodeCmd::Chunks { cmd, auth, .. } => {
                         info!("Processing chunk write with MessageId: {:?}", msg_id);
@@ -494,7 +496,7 @@ impl Core {
 
                 Ok(vec![])
             }
-            NodeMsg::NodeQuery(node_query) => {
+            InfrastructureMsg::NodeQuery(node_query) => {
                 match node_query {
                     // A request from EndUser - via elders - for locally stored chunk
                     NodeQuery::Chunks {
@@ -522,7 +524,7 @@ impl Core {
                     }
                 }
             }
-            NodeMsg::NodeQueryResponse {
+            InfrastructureMsg::NodeQueryResponse {
                 response,
                 correlation_id,
                 user,
@@ -541,7 +543,7 @@ impl Core {
                 )
                 .await
             }
-            NodeMsg::NodeMsgError {
+            InfrastructureMsg::NodeMsgError {
                 error,
                 correlation_id,
             } => {
@@ -574,7 +576,7 @@ impl Core {
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached
-            let msg = NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+            let msg = InfrastructureMsg::NodeCmd(NodeCmd::RecordStorageLevel {
                 section: node_xorname,
                 node_id,
                 level,
@@ -600,7 +602,7 @@ impl Core {
                 &target_holders,
             );
 
-            let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk));
+            let msg = InfrastructureMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk));
             let aggregation = false;
 
             self.send_node_msg_to_targets(msg, target_holders, aggregation)
@@ -613,7 +615,7 @@ impl Core {
     /// Takes a message and forms commands to send to specified targets
     pub(super) fn send_node_msg_to_targets(
         &self,
-        msg: NodeMsg,
+        msg: InfrastructureMsg,
         targets: BTreeSet<XorName>,
         aggregation: bool,
     ) -> Result<Vec<Command>> {

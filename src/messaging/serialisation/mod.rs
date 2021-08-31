@@ -11,8 +11,8 @@ mod wire_msg_header;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    data::ServiceMsg, node::NodeMsg, AuthorityProof, BlsShareAuth, DstLocation, MessageId,
-    NodeAuth, SectionAuth, ServiceAuth,
+    data::ServiceMsg, node::InfrastructureMsg, AuthorityProof, BlsShareAuth, DstLocation,
+    MessageId, NodeAuth, SectionAuth, ServiceAuth,
 };
 
 /// Type of message.
@@ -32,8 +32,8 @@ pub enum MessageType {
         /// the message
         msg: ServiceMsg,
     },
-    /// Node to node message
-    Node {
+    /// Infrastructure message
+    Infrastructure {
         /// Message ID
         msg_id: MessageId,
         /// Node authority over this message
@@ -41,7 +41,7 @@ pub enum MessageType {
         /// Message destination location
         dst_location: DstLocation,
         /// the message
-        msg: NodeMsg,
+        msg: InfrastructureMsg,
     },
     #[cfg(test)]
     /// A proxy message for testing
