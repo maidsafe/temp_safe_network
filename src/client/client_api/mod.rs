@@ -22,10 +22,8 @@ use tokio::{
     sync::{mpsc::Receiver, RwLock},
     time::Duration,
 };
-use tracing::{debug, info, trace};
+use tracing::info;
 
-// Number of attempts to make when trying to bootstrap to the network
-const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 1;
 const BLOB_CACHE_CAP: usize = 150;
 
 /// Client object
@@ -76,12 +74,14 @@ impl Client {
         let client_pk = keypair.public_key();
 
         // Create the session with the network
-        let mut session = Session::new(client_pk, config.qp2p, err_sender)?;
-
-        // Bootstrap to the network, connecting to the section responsible
-        // for our client public key
-        debug!("Bootstrapping to the network...");
-        attempt_bootstrap(&mut session).await?;
+        let session = Session::new(
+            client_pk,
+            config.local_addr,
+            &config.bootstrap_nodes,
+            config.qp2p,
+            err_sender,
+        )
+        .await?;
 
         let client = Self {
             keypair,
@@ -125,29 +125,6 @@ impl Client {
     #[cfg(test)]
     pub async fn expect_cmd_error(&mut self) -> Option<CmdError> {
         self.incoming_errors.write().await.recv().await
-    }
-}
-
-/// Utility function that bootstraps a client to the network. If there is a failure then it retries.
-/// After a maximum of three attempts if the boostrap process still fails, then an error is returned.
-async fn attempt_bootstrap(session: &mut Session) -> Result<(), Error> {
-    let mut attempts: u8 = 0;
-    loop {
-        match session.bootstrap().await {
-            Ok(()) => return Ok(()),
-            Err(err) => {
-                attempts += 1;
-                if attempts < NUM_OF_BOOTSTRAPPING_ATTEMPTS {
-                    trace!(
-                        "Error connecting to network! {:?}\nRetrying... ({})",
-                        err,
-                        attempts
-                    );
-                } else {
-                    return Err(err);
-                }
-            }
-        }
     }
 }
 

@@ -10,7 +10,6 @@ use super::Prefix;
 use crate::messaging::data::Error as ErrorMessage;
 pub use crate::routing::dkg::proposal::ProposalError;
 use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};
-use qp2p::Error as Qp2pError;
 use secured_linked_list::error::Error as SecuredLinkedListError;
 use std::io;
 use std::net::SocketAddr;
@@ -34,20 +33,22 @@ pub enum Error {
     CannotRoute,
     #[error("Empty recipient list")]
     EmptyRecipientList,
-    #[error("The config is invalid: {err}")]
-    InvalidConfig {
-        #[source]
-        err: Qp2pError,
-    },
+    #[error("Could not connect to any bootstrap contact")]
+    BootstrapFailed,
+    // #[error("The config is invalid: {err}")]
+    // InvalidConfig {
+    //     #[source]
+    //     err: Qp2pError,
+    // },
     #[error("Cannot connect to the endpoint: {err}")]
     CannotConnectEndpoint {
-        #[source]
-        err: Qp2pError,
+        #[from]
+        err: qp2p::EndpointError,
     },
     #[error("Address not reachable: {err}")]
     AddressNotReachable {
-        #[source]
-        err: Qp2pError,
+        #[from]
+        err: qp2p::RpcError,
     },
     #[error("The node is not in a state to handle the action.")]
     InvalidState,
@@ -147,6 +148,25 @@ pub enum Error {
     /// Configuration error.
     #[error("Invalid node authority received for a QueryResponse message")]
     InvalidQueryResponseAuthority,
+}
+
+impl From<qp2p::ClientEndpointError> for Error {
+    fn from(error: qp2p::ClientEndpointError) -> Self {
+        Self::CannotConnectEndpoint {
+            err: match error {
+                qp2p::ClientEndpointError::Config(error) => qp2p::EndpointError::Config(error),
+                qp2p::ClientEndpointError::Socket(error) => qp2p::EndpointError::Socket(error),
+            },
+        }
+    }
+}
+
+impl From<qp2p::SendError> for Error {
+    fn from(error: qp2p::SendError) -> Self {
+        Self::AddressNotReachable {
+            err: qp2p::RpcError::Send(error),
+        }
+    }
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {

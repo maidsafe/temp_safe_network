@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     io::{self},
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::SocketAddr,
     path::PathBuf,
+    time::Duration,
 };
 use structopt::StructOpt;
 use tokio::fs::{self, File};
@@ -218,9 +219,7 @@ impl Config {
         }
 
         if let Some(local_addr) = config.local_addr {
-            self.local_addr = config.local_addr;
-            self.network_config.local_port = Some(local_addr.port());
-            self.network_config.local_ip = Some(local_addr.ip());
+            self.local_addr = Some(local_addr);
         }
 
         if let Some(public_addr) = config.public_addr {
@@ -232,27 +231,29 @@ impl Config {
         self.network_config.forward_port = !config.skip_igd;
 
         if !config.hard_coded_contacts.is_empty() {
-            self.network_config.hard_coded_contacts = config.hard_coded_contacts;
+            self.hard_coded_contacts = config.hard_coded_contacts;
         }
 
         if let Some(max_msg_size) = config.max_msg_size_allowed {
-            self.network_config.max_msg_size_allowed = Some(max_msg_size);
+            self.max_msg_size_allowed = Some(max_msg_size);
         }
 
         if let Some(idle_timeout) = config.idle_timeout_msec {
-            self.network_config.idle_timeout_msec = Some(idle_timeout);
+            self.network_config.idle_timeout = Some(Duration::from_millis(idle_timeout));
         }
 
         if let Some(keep_alive) = config.keep_alive_interval_msec {
-            self.network_config.keep_alive_interval_msec = Some(keep_alive);
+            self.network_config.keep_alive_interval =
+                Some(Duration::from_millis(keep_alive.into()));
         }
 
         if let Some(bootstrap_cache_dir) = config.bootstrap_cache_dir {
-            self.network_config.bootstrap_cache_dir = Some(bootstrap_cache_dir);
+            self.bootstrap_cache_dir = Some(bootstrap_cache_dir);
         }
 
         if let Some(upnp_lease_duration) = config.upnp_lease_duration {
-            self.network_config.upnp_lease_duration = Some(upnp_lease_duration);
+            self.network_config.upnp_lease_duration =
+                Some(Duration::from_millis(upnp_lease_duration.into()));
         }
     }
 
@@ -330,11 +331,6 @@ impl Config {
     /// Attempt to self-update without starting the node process
     pub fn update_only(&self) -> bool {
         self.update_only
-    }
-
-    /// Set the Quic-P2P `ip` configuration to 127.0.0.1.
-    pub fn listen_on_loopback(&mut self) {
-        self.network_config.local_ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
     // Clear data from of a previous node running on the same PC
@@ -453,7 +449,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 504;
+    let expected_size = 456;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }

@@ -1501,14 +1501,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let node = create_node(MIN_ADULT_AGE, None);
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let comm = Comm::new(
-        qp2p::Config {
-            local_ip: Some(Ipv4Addr::LOCALHOST.into()),
-            ..Default::default()
-        },
-        comm_tx,
-    )
-    .await?;
+    let comm = Comm::new((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
 
     let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir)?;
@@ -1830,14 +1823,7 @@ fn create_node(age: u8, prefix: Option<Prefix>) -> Node {
 
 pub(crate) async fn create_comm() -> Result<Comm> {
     let (tx, _rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    Ok(Comm::new(
-        qp2p::Config {
-            local_ip: Some(Ipv4Addr::LOCALHOST.into()),
-            ..Default::default()
-        },
-        tx,
-    )
-    .await?)
+    Ok(Comm::new((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), tx).await?)
 }
 
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
