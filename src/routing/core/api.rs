@@ -12,7 +12,7 @@ use super::{
 };
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    node::{NodeState, Peer, Proposal, Section},
+    system::{NodeState, Peer, Proposal, Section},
     MessageId, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{

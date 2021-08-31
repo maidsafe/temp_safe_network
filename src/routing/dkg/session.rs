@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, SystemMsg},
+    system::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, SystemMsg},
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{

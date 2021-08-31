@@ -1,5 +1,5 @@
 use super::{
-    node::{KeyedSig, SigShare},
+    system::{KeyedSig, SigShare},
     Error, Result,
 };
 use crate::{

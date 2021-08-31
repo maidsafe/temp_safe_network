@@ -11,7 +11,7 @@ mod wire_msg_header;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    data::ServiceMsg, node::SystemMsg, AuthorityProof, BlsShareAuth, DstLocation, MessageId,
+    data::ServiceMsg, system::SystemMsg, AuthorityProof, BlsShareAuth, DstLocation, MessageId,
     NodeAuth, SectionAuth, ServiceAuth,
 };
 

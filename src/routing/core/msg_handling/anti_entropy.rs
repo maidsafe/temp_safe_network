@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{KeyedSig, SectionAuth, SystemMsg},
+    system::{KeyedSig, SectionAuth, SystemMsg},
     DstLocation, MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
@@ -314,7 +314,7 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{node::Section, MessageType};
+    use crate::messaging::{system::Section, MessageType};
     use crate::routing::{
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,

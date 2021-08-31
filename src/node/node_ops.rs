@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     data::{DataExchange, ServiceError, ServiceMsg, StorageLevel},
-    node::SystemMsg,
+    system::SystemMsg,
     DstLocation, MessageId,
 };
 use crate::routing::Prefix;

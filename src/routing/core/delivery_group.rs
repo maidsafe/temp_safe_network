@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{Peer, Section},
+    system::{Peer, Section},
     DstLocation,
 };
 use crate::routing::{
@@ -162,7 +162,7 @@ fn get_peer(name: &XorName, section: &Section, network: &Network) -> Option<Peer
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{node::NodeState, SectionAuthorityProvider};
+    use crate::messaging::{system::NodeState, SectionAuthorityProvider};
     use crate::routing::{
         dkg::test_utils::section_signed,
         ed25519,

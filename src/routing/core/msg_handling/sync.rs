@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{Section, SectionAuth},
+    system::{Section, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::routing::{

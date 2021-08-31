@@ -12,7 +12,7 @@ use crate::types::{Chunk, ChunkAddress, ChunkKind, PublicKey};
 use crate::{
     messaging::{
         data::{ChunkRead, ChunkWrite},
-        node::NodeQueryResponse,
+        system::NodeQueryResponse,
     },
     types::DataAddress,
 };

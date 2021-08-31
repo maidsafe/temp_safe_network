@@ -20,8 +20,8 @@
 
 /// Data messages that clients and nodes can send.
 pub mod data;
-/// Messages that nodes can exchange on the network.
-pub mod node;
+/// Operational Messages that can be exchanged on the network.
+pub mod system;
 /// The wire format and message (de)serialization API.
 pub mod serialisation;
 /// BLS Signature aggregator

@@ -8,7 +8,7 @@
 
 use super::{Mapping, MsgContext};
 use crate::messaging::{
-    node::{NodeCmd, SystemMsg},
+    system::{NodeCmd, SystemMsg},
     DstLocation, MessageId, SrcLocation,
 };
 use crate::node::{

@@ -9,7 +9,7 @@
 //! Relocation related types and utilities.
 
 use crate::messaging::{
-    node::{
+    system::{
         NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, Section, SystemMsg,
     },
     AuthorityProof, SectionAuth,

@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{
+    system::{
         DkgKey, ElderCandidates, JoinResponse, NodeState, Peer, Proposal, RelocateDetails,
         RelocatePromise, Section, SectionAuth, SystemMsg,
     },

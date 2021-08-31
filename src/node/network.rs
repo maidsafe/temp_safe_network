@@ -8,7 +8,7 @@
 
 use crate::dbs::UsedSpace;
 use crate::messaging::data::StorageLevel;
-use crate::messaging::{data::ChunkDataExchange, node::SystemMsg, DstLocation, WireMsg};
+use crate::messaging::{data::ChunkDataExchange, system::SystemMsg, DstLocation, WireMsg};
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
     ChunkStore, Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils,

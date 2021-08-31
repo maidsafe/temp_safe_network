@@ -12,7 +12,7 @@ use crate::messaging::data::ServiceMsg;
 use crate::messaging::NodeAuth;
 use crate::messaging::{
     data::{ChunkRead, CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite},
-    node::{NodeQueryResponse, SystemMsg},
+    system::{NodeQueryResponse, SystemMsg},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::routing::core::capacity::CHUNK_COPY_COUNT;

@@ -11,7 +11,7 @@
 use super::{Comm, Command, Core, Dispatcher};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    node::{
+    system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, NodeState,
         Peer, Proposal, RelocateDetails, RelocatePayload, ResourceProofResponse, Section,
         SectionAuth, SystemMsg,

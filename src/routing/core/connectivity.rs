@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::node::Proposal;
+use crate::messaging::system::Proposal;
 use crate::routing::{
     error::Result,
     peer::PeerUtils,

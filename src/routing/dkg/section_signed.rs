@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{verify_sig, KeyedSig};
-use crate::messaging::node::SectionAuth;
+use crate::messaging::system::SectionAuth;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 

@@ -25,7 +25,7 @@ use self::{
 };
 use crate::messaging::{
     data::StorageLevel,
-    node::{Peer, SystemMsg},
+    system::{Peer, SystemMsg},
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
