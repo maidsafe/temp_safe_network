@@ -121,7 +121,7 @@ pub enum Error {
     ServiceMsg(#[from] crate::messaging::data::Error),
     /// Network service error.
     #[error("Service error:: {0:?}")]
-    ServiceError(crate::messaging::data::ServiceError),
+    ServiceError(Box<crate::messaging::data::ServiceError>),
     /// Network data error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] crate::types::Error),

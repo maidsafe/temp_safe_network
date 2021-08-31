@@ -16,11 +16,11 @@ use crate::client::connections::messaging::{rebuild_message_for_ae_resend, send_
 use crate::client::Error;
 use crate::messaging::data::Error as DataError;
 use crate::messaging::data::ServiceError;
+use crate::messaging::ServiceAuth;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
     MessageId, MessageType, WireMsg,
 };
-use crate::messaging::{DstLocation, ServiceAuth};
 
 impl Session {
     // Listen for incoming messages on a connection
@@ -58,12 +58,9 @@ impl Session {
             trace!("Incoming message from {:?}", &src);
             match message_type {
                 MessageType::Service {
-                    msg_id,
-                    msg,
-                    auth,
-                    dst_location,
+                    msg_id, msg, auth, ..
                 } => {
-                    self.handle_client_msg(msg_id, msg, src, auth.into_inner(), dst_location)
+                    self.handle_client_msg(msg_id, msg, src, auth.into_inner())
                         .await
                 }
                 msg_type => {
@@ -83,7 +80,6 @@ impl Session {
         msg: ServiceMsg,
         src: SocketAddr,
         auth: ServiceAuth,
-        dst_location: DstLocation,
     ) {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = self.pending_queries.clone();
