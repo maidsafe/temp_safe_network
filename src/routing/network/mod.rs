@@ -10,7 +10,7 @@ mod stats;
 
 use self::stats::NetworkStats;
 use crate::messaging::{
-    node::{Peer, SectionAuth},
+    system::{Peer, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::routing::{

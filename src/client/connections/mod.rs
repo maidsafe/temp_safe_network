@@ -16,7 +16,7 @@ use crate::client::Error;
 use crate::messaging::data::OperationId;
 use crate::messaging::{
     data::{CmdError, QueryResponse},
-    node::SigShare,
+    system::SigShare,
     signature_aggregator::{Error as AggregatorError, SignatureAggregator},
     SectionAuthorityProvider,
 };

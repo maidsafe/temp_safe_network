@@ -9,7 +9,7 @@
 use super::{Command, Event};
 use crate::messaging::{
     data::{ChunkDataExchange, StorageLevel},
-    node::{Section, SystemMsg},
+    system::{Section, SystemMsg},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
 use crate::routing::{

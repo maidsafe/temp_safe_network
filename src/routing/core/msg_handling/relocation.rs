@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{Peer, Proposal, RelocateDetails, RelocatePromise, SystemMsg},
+    system::{Peer, Proposal, RelocateDetails, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
 };
 use crate::routing::{

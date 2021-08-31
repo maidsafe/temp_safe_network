@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     data::ServiceMsg,
-    node::{NodeCmd, NodeQuery, NodeQueryResponse},
+    system::{NodeCmd, NodeQuery, NodeQueryResponse},
     AuthorityProof, DstLocation, EndUser, MessageId, ServiceAuth, SrcLocation,
 };
 use bls::PublicKey as BlsPublicKey;

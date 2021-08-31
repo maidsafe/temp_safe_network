@@ -8,7 +8,7 @@
 
 use super::super::Core;
 use crate::messaging::{
-    node::{
+    system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
         JoinResponse, Peer, SystemMsg,
     },

@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{Proposal, SigShare},
+    system::{Proposal, SigShare},
     signature_aggregator::Error as AggregatorError,
 };
 use crate::routing::{dkg::ProposalError, routing_api::command::Command, Error, Result};

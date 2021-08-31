@@ -9,7 +9,7 @@
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::{ServiceError, ServiceMsg},
-    node::SystemMsg,
+    system::SystemMsg,
     AuthorityProof, DstLocation, Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
     ServiceAuth,
 };
@@ -250,7 +250,7 @@ mod tests {
     use crate::{
         messaging::{
             data::{ChunkRead, DataQuery, ServiceMsg, StorageLevel},
-            node::{NodeCmd, SystemMsg},
+            system::{NodeCmd, SystemMsg},
             AuthorityProof, MessageId, NodeAuth, ServiceAuth,
         },
         types::{ChunkAddress, Keypair},

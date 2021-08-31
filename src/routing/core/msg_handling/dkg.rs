@@ -8,7 +8,7 @@
 
 use super::super::Core;
 use crate::messaging::{
-    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, Proposal, SystemMsg},
+    system::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, Proposal, SystemMsg},
     SectionAuthorityProvider,
 };
 use crate::routing::{

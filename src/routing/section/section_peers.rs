@@ -8,7 +8,7 @@
 
 use super::node_state::NodeStateUtils;
 use crate::messaging::{
-    node::{MembershipState, NodeState, Peer, SectionAuth, SectionPeers},
+    system::{MembershipState, NodeState, Peer, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
 use crate::routing::{peer::PeerUtils, SectionAuthorityProviderUtils};

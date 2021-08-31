@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::ServiceMsg, node::SystemMsg, DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
+    data::ServiceMsg, system::SystemMsg, DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::node::{
     network::Network,

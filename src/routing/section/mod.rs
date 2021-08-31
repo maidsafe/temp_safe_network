@@ -17,7 +17,7 @@ pub(crate) use self::section_authority_provider::test_utils;
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 use crate::messaging::{
-    node::{ElderCandidates, KeyedSig, NodeState, Peer, Section, SectionAuth, SectionPeers},
+    system::{ElderCandidates, KeyedSig, NodeState, Peer, Section, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
 use crate::routing::{

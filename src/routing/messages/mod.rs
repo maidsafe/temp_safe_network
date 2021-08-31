@@ -10,7 +10,7 @@ mod msg_authority;
 
 pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
-    node::SystemMsg, BlsShareAuth, DstLocation, MessageId, MsgKind, NodeAuth, NodeMsgAuthority,
+    system::SystemMsg, BlsShareAuth, DstLocation, MessageId, MsgKind, NodeAuth, NodeMsgAuthority,
     WireMsg,
 };
 use crate::routing::{

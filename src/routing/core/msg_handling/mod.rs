@@ -20,7 +20,7 @@ mod sync;
 use super::Core;
 use crate::messaging::{
     data::{DataCmd, DataQuery, ServiceMsg, StorageLevel},
-    node::{NodeCmd, NodeQuery, Proposal, SystemMsg},
+    system::{NodeCmd, NodeQuery, Proposal, SystemMsg},
     signature_aggregator::Error as AggregatorError,
     DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
     ServiceAuth, SrcLocation, WireMsg,

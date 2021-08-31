@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{Peer, SystemMsg},
+    system::{Peer, SystemMsg},
     NodeMsgAuthority,
 };
 use crate::routing::{

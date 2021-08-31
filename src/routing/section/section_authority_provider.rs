@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{ElderCandidates, Peer},
+    system::{ElderCandidates, Peer},
     SectionAuthorityProvider,
 };
 use crate::routing::{peer::PeerUtils, Prefix, XorName};

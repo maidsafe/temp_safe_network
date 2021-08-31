@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{NodeCmd, SystemMsg},
+    system::{NodeCmd, SystemMsg},
     MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Result};

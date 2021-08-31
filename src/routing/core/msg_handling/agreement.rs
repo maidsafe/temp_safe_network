@@ -9,7 +9,7 @@
 use std::cmp;
 
 use crate::messaging::{
-    node::{KeyedSig, MembershipState, NodeState, Proposal, SectionAuth, SystemMsg},
+    system::{KeyedSig, MembershipState, NodeState, Proposal, SectionAuth, SystemMsg},
     SectionAuthorityProvider,
 };
 use crate::routing::{

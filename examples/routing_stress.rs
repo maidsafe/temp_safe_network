@@ -39,7 +39,7 @@ use yansi::{Color, Style};
 use safe_network::routing::create_test_used_space_and_root_storage;
 
 use safe_network::messaging::{
-    data::Error::FailedToWriteFile, node::SystemMsg, DstLocation, MessageId,
+    data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MessageId,
 };
 use safe_network::routing::{
     Cache, Config, Event as RoutingEvent, NodeElderChange, Routing, TransportConfig,

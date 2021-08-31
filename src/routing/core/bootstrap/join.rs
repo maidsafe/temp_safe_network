@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{
+    system::{
         JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, Section, SystemMsg,
     },
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
@@ -440,7 +440,7 @@ async fn send_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{node::NodeState, SectionAuthorityProvider};
+    use crate::messaging::{system::NodeState, SectionAuthorityProvider};
     use crate::routing::{
         dkg::test_utils::*, error::Error as RoutingError, messages::WireMsgUtils,
         section::test_utils::*, section::NodeStateUtils, SectionAuthorityProviderUtils, ELDER_SIZE,

@@ -33,9 +33,9 @@ use std::{collections::BTreeMap, path::PathBuf};
 pub(crate) use chunk_store::ChunkStore;
 
 use self::split_barrier::SplitBarrier;
-use crate::messaging::node::SectionAuth;
+use crate::messaging::system::SectionAuth;
 use crate::messaging::{
-    node::{Proposal, Section},
+    system::{Proposal, Section},
     signature_aggregator::SignatureAggregator,
     MessageId, SectionAuthorityProvider,
 };

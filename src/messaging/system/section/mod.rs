@@ -15,7 +15,7 @@ pub use node_state::MembershipState;
 pub use node_state::NodeState;
 pub use peer::Peer;
 
-use crate::messaging::{node::agreement::SectionAuth, SectionAuthorityProvider};
+use crate::messaging::{system::agreement::SectionAuth, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};

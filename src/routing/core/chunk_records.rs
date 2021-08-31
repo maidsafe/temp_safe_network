@@ -11,7 +11,7 @@ use crate::messaging::{
     data::{
         ChunkDataExchange, ChunkRead, ChunkWrite, CmdError, Error as ErrorMessage, StorageLevel,
     },
-    node::{NodeCmd, NodeQuery, SystemMsg},
+    system::{NodeCmd, NodeQuery, SystemMsg},
     AuthorityProof, EndUser, MessageId, ServiceAuth,
 };
 

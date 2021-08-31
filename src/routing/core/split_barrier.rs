@@ -8,7 +8,7 @@
 
 use std::mem;
 
-use crate::messaging::{node::SectionAuth, SectionAuthorityProvider};
+use crate::messaging::{system::SectionAuth, SectionAuthorityProvider};
 use crate::routing::dkg::KeyedSig;
 use xor_name::Prefix;
 

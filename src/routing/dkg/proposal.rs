@@ -8,7 +8,7 @@
 
 use super::{KeyedSig, SigShare};
 use crate::messaging::{
-    node::Proposal,
+    system::Proposal,
     signature_aggregator::{Error as AggregatorError, SignatureAggregator},
 };
 use crate::routing::error::Result;

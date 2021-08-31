@@ -16,7 +16,7 @@ use crate::client::connections::messaging::{rebuild_message_for_ae_resend, send_
 use crate::client::Error;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
-    node::SystemMsg,
+    system::SystemMsg,
     MessageId, MessageType, WireMsg,
 };
 

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::node::{JoinResponse, Peer, ResourceProofResponse, SystemMsg};
+use crate::messaging::system::{JoinResponse, Peer, ResourceProofResponse, SystemMsg};
 use crate::routing::{
     core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     ed25519,

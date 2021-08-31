@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{
+    system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocateDetails, RelocatePayload, Section,
         SystemMsg,
     },
