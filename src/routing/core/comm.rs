@@ -313,11 +313,13 @@ pub(crate) enum SendStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{DstLocation, MessageId, MsgKind};
+    use crate::messaging::{DstLocation, MessageId, MsgKind, ServiceAuth};
+    use crate::types::Keypair;
     use assert_matches::assert_matches;
     use eyre::Result;
     use futures::future;
     use qp2p::Config;
+    use rand::rngs::OsRng;
     use std::{net::Ipv4Addr, time::Duration};
     use tokio::{net::UdpSocket, sync::mpsc, time};
 
@@ -335,7 +337,7 @@ mod tests {
 
         let status = comm
             .send(
-                &[(peer0._name, peer0.addr), (peer1._name, peer1.addr)],
+                &[(peer0.name, peer0.addr), (peer1.name, peer1.addr)],
                 2,
                 original_message.clone(),
             )
@@ -365,7 +367,7 @@ mod tests {
         let original_message = new_test_message()?;
         let status = comm
             .send(
-                &[(peer0._name, peer0.addr), (peer1._name, peer1.addr)],
+                &[(peer0.name, peer0.addr), (peer1.name, peer1.addr)],
                 1,
                 original_message.clone(),
             )
@@ -429,7 +431,7 @@ mod tests {
         let message = new_test_message()?;
         let _ = comm
             .send(
-                &[(name, invalid_addr), (peer._name, peer.addr)],
+                &[(name, invalid_addr), (peer.name, peer.addr)],
                 1,
                 message.clone(),
             )
@@ -459,7 +461,7 @@ mod tests {
         let message = new_test_message()?;
         let status = comm
             .send(
-                &[(name, invalid_addr), (peer._name, peer.addr)],
+                &[(name, invalid_addr), (peer.name, peer.addr)],
                 2,
                 message.clone(),
             )
@@ -560,17 +562,28 @@ mod tests {
             section_pk: bls::SecretKey::random().public_key(),
         };
 
-        let bytes = WireMsg::serialize_msg_payload(&"test_string".to_string())?;
-        let wire_msg =
-            WireMsg::new_msg(MessageId::new(), bytes, MsgKind::TestMessage, dst_location)?;
+        let mut rng = OsRng;
+        let src_keypair = Keypair::new_ed25519(&mut rng);
+
+        let payload = WireMsg::serialize_msg_payload(&"test_string".to_string())?;
+        let auth = ServiceAuth {
+            public_key: src_keypair.public_key(),
+            signature: src_keypair.sign(&payload),
+        };
+
+        let wire_msg = WireMsg::new_msg(
+            MessageId::new(),
+            payload,
+            MsgKind::ServiceMsg(auth),
+            dst_location,
+        )?;
+
         Ok(wire_msg)
     }
 
     struct Peer {
         addr: SocketAddr,
-        _incoming_connections: qp2p::IncomingConnections,
-        _disconnections: qp2p::DisconnectionEvents,
-        _name: XorName,
+        name: XorName,
         rx: mpsc::Receiver<Bytes>,
     }
 
@@ -578,8 +591,7 @@ mod tests {
         async fn new() -> Result<Self> {
             let transport = QuicP2p::<XorName>::with_config(Some(transport_config()), &[], false)?;
 
-            let (endpoint, incoming_connections, mut incoming_messages, disconnections) =
-                transport.new_endpoint().await?;
+            let (endpoint, _, mut incoming_messages, _) = transport.new_endpoint().await?;
             let addr = endpoint.socket_addr();
 
             let (tx, rx) = mpsc::channel(1);
@@ -593,9 +605,7 @@ mod tests {
             Ok(Self {
                 addr,
                 rx,
-                _incoming_connections: incoming_connections,
-                _disconnections: disconnections,
-                _name: XorName::random(),
+                name: XorName::random(),
             })
         }
     }

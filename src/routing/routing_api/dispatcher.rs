@@ -343,11 +343,6 @@ impl Dispatcher {
 
                 vec![]
             }
-            #[cfg(test)]
-            MsgKind::TestMessage => {
-                self.deliver_messages(recipients, delivery_group_size, wire_msg)
-                    .await?
-            }
         };
 
         Ok(cmds)

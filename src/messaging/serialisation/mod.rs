@@ -43,9 +43,6 @@ pub enum MessageType {
         /// the message
         msg: SystemMsg,
     },
-    #[cfg(test)]
-    /// A proxy message for testing
-    TestMessage(String),
 }
 
 /// Authority of a NodeMsg.
