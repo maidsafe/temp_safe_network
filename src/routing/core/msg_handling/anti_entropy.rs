@@ -275,28 +275,19 @@ impl Core {
                         }
                     }
                     None => {
-                        // Last ditch effort to find a better SAP the ideal section for this data
-                        if let Some(section_auth) =
-                            self.check_for_better_section_sap_for_data(dst_name)
-                        {
-                            SystemMsg::AntiEntropyRedirect {
-                                section_auth: section_auth.value.clone(),
-                                section_signed: section_auth.sig,
-                                bounced_msg,
-                            }
-                            // let ae_commands = self.check_for_entropy().await
-                        } else {
-                            // TODO: instead of just dropping the message, don't we actually need
-                            // to get up to date info from other Elders in our section as it may be
-                            // a section key we are not aware of yet?
-                            // ...and once we acquired new key/s we attempt AE check again?
-                            error!(
-                                    "Anti-Entropy: cannot reply with redirect msg for dest key {:?} to a closest section",
-                                    dst_section_pk
-                                );
+                        // TODO: do we want to reroute some data messages to another seciton here using check_for_better_section_sap_for_data ?
+                        // if not we can remove that function.
 
-                            return Err(Error::NoMatchingSection);
-                        }
+                        // TODO: instead of just dropping the message, don't we actually need
+                        // to get up to date info from other Elders in our section as it may be
+                        // a section key we are not aware of yet?
+                        // ...and once we acquired new key/s we attempt AE check again?
+                        error!(
+                                "Anti-Entropy: cannot reply with redirect msg for dest key {:?} to a closest section",
+                                dst_section_pk
+                            );
+
+                        return Err(Error::NoMatchingSection);
                     }
                 }
             }
@@ -316,6 +307,7 @@ impl Core {
     }
 
     // checks to see if we're actually in the ideal section for this data
+    #[allow(dead_code)]
     pub(crate) fn check_for_better_section_sap_for_data(
         &self,
         data_name: Option<XorName>,
