@@ -75,6 +75,14 @@ impl NetworkPrefixMap {
             .map(|e| e.value().clone())
     }
 
+    /// Returns all known sections SAP.
+    pub(crate) fn all(&self) -> Vec<SectionAuthorityProvider> {
+        self.sections
+            .iter()
+            .map(|e| e.value().value.clone())
+            .collect()
+    }
+
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
     pub(crate) fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
         self.sections
