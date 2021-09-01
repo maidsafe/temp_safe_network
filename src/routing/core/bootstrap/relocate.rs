@@ -253,7 +253,10 @@ impl JoiningAsRelocated {
         let node_msg = SystemMsg::JoinAsRelocatedRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(self.dst_section_key),
+            DstLocation::Section {
+                name: recipients[0].0,
+                section_pk: self.dst_section_key,
+            },
             node_msg,
             self.genesis_key,
         )?;

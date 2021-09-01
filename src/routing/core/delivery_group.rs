@@ -65,7 +65,6 @@ pub(crate) fn delivery_targets(
                 candidates(name, our_name, section, network)
             }
         }
-        DstLocation::DirectAndUnrouted(_) => Err(Error::CannotRoute),
     }
 }
 

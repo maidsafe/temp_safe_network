@@ -282,7 +282,10 @@ impl<'a> Join<'a> {
         let node_msg = SystemMsg::JoinRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(section_key),
+            DstLocation::Section {
+                name: recipients[0].0,
+                section_pk: section_key,
+            },
             node_msg,
             section_key,
         )?;
@@ -433,6 +436,7 @@ mod tests {
         section::test_utils::*, section::NodeStateUtils, SectionAuthorityProviderUtils, ELDER_SIZE,
         MIN_ADULT_AGE, MIN_AGE,
     };
+    use crate::types::PublicKey;
     use assert_matches::assert_matches;
     use eyre::{eyre, Error, Result};
     use futures::{
@@ -858,7 +862,10 @@ mod tests {
     ) -> Result<()> {
         let wire_msg = WireMsg::single_src(
             bootstrap_node,
-            DstLocation::DirectAndUnrouted(section_pk),
+            DstLocation::Section {
+                name: XorName::from(PublicKey::Bls(section_pk)),
+                section_pk,
+            },
             node_msg,
             section_pk,
         )?;
