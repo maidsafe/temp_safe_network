@@ -134,7 +134,7 @@ impl Dispatcher {
             // Data node msg that requires no locking
             Command::HandleVerifiedNodeDataMessage {
                 msg_id,
-                auth,
+                msg_authority,
                 dst_location,
                 msg,
             } => {
@@ -144,7 +144,7 @@ impl Dispatcher {
                     .handle_verified_data_message(
                         // sender,
                         msg_id,
-                        auth,
+                        msg_authority,
                         dst_location,
                         msg,
                     )
@@ -154,8 +154,7 @@ impl Dispatcher {
             Command::HandleVerifiedNodeNonDataMessage {
                 sender,
                 msg_id,
-                auth,
-                dst_location,
+                msg_authority,
                 msg,
                 known_keys,
             } => {
@@ -165,25 +164,33 @@ impl Dispatcher {
                     .handle_verified_non_data_node_message(
                         sender,
                         msg_id,
-                        auth,
-                        dst_location,
+                        msg_authority,
                         msg,
-                        &known_keys,
+                        known_keys,
                     )
                     .await
             }
             Command::HandleInfrastructureMessage {
                 sender,
                 msg_id,
-                auth,
+                msg_authority,
                 dst_location,
                 msg,
                 payload,
+                known_keys,
             } => {
                 self.core
                     .read()
                     .await
-                    .handle_infrastructure_message(sender, msg_id, auth, dst_location, msg, payload)
+                    .handle_infrastructure_message(
+                        sender,
+                        msg_id,
+                        msg_authority,
+                        dst_location,
+                        msg,
+                        payload,
+                        known_keys,
+                    )
                     .await
             }
             Command::PrepareNodeMsgToSend { msg, dst } => {

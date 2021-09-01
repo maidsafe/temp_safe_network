@@ -170,7 +170,7 @@ impl Core {
         &mut self,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
-        known_keys: &[BlsPublicKey],
+        known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
         debug!("Received {:?} from {}", join_request, peer);
         let relocate_payload = if let Some(relocate_payload) = join_request.relocate_payload {

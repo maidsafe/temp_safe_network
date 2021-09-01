@@ -48,6 +48,7 @@ impl Core {
         // Deserialize the payload of the incoming message
         let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
+
         let message_type = match wire_msg.clone().into_message() {
             Ok(message_type) => message_type,
             Err(error) => {
@@ -66,8 +67,6 @@ impl Core {
                 dst_location,
                 msg,
             } => {
-                // First we perform AE checks
-
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
                 let mut known_keys: Vec<BlsPublicKey> =
@@ -87,31 +86,51 @@ impl Core {
                 );
 
                 // Let's check for entropy before we proceed further
-                if let Some(ae_command) = self
-                    .check_for_entropy_if_needed(
-                        &wire_msg,
-                        &msg,
-                        &msg_authority.src_location(),
-                        &dst_location,
-                        sender,
-                    )
-                    .await?
-                {
-                    return Ok(vec![ae_command]);
-                }
+                // Adult nodes don't need to carry out entropy checking,
+                // however the message shall always be handled.
+                if self.is_elder() {
+                    // For the case of receiving a join request not matching our prefix,
+                    // we just let the join request handler to deal with it later on.
+                    // We also skip AE check on Anti-Entropy messages
+                    //
+                    // TODO: consider changing the join and "join as relocated" flows to
+                    // make use of AntiEntropy retry/redirect responses.
+                    match msg {
+                        SystemMsg::AntiEntropyRetry { .. }
+                        | SystemMsg::AntiEntropyRedirect { .. }
+                        | SystemMsg::JoinRequest(_)
+                        | SystemMsg::JoinAsRelocatedRequest(_) => {}
+                        _ => match dst_location.section_pk() {
+                            None => {}
+                            Some(dst_section_pk) => {
+                                if let Some(ae_command) = self
+                                    .check_for_entropy(
+                                        &wire_msg,
+                                        &msg_authority.src_location(),
+                                        &dst_section_pk,
+                                        dst_location.name(),
+                                        sender,
+                                    )
+                                    .await?
+                                {
+                                    // short circuit and send those AE responses
+                                    return Ok(vec![ae_command]);
+                                }
+                            }
+                        },
+                    }
 
-                trace!(
-                    "Entropy check passed. Handling verified node msg {}",
-                    msg_id
-                );
+                    trace!("Entropy check passed. Handling verified msg {}", msg_id);
+                }
 
                 Ok(vec![Command::HandleInfrastructureMessage {
                     sender,
                     msg_id,
-                    auth: msg_authority,
+                    msg_authority,
                     dst_location,
                     msg,
                     payload,
+                    known_keys,
                 }])
             }
             MessageType::Service {
@@ -120,6 +139,11 @@ impl Core {
                 msg,
                 dst_location,
             } => {
+                // Adult nodes don't process service messages directly
+                if self.is_not_elder() {
+                    return Ok(vec![]);
+                }
+
                 // First we perform AE checks
                 let received_section_pk = match dst_location.section_pk() {
                     Some(section_pk) => section_pk,
@@ -139,18 +163,17 @@ impl Core {
                         return Ok(vec![]);
                     }
                 };
-                let src_location = SrcLocation::EndUser(user);
-                let ae_responses = self
+
+                if let Some(command) = self
                     .check_for_entropy(
                         &wire_msg,
-                        &src_location,
+                        &SrcLocation::EndUser(user),
                         &received_section_pk,
                         msg.dst_address(),
                         sender,
                     )
-                    .await?;
-
-                if let Some(command) = ae_responses {
+                    .await?
+                {
                     // short circuit and send those AE responses
                     return Ok(vec![command]);
                 }
@@ -161,7 +184,8 @@ impl Core {
         }
     }
 
-    // Handler for all node messages
+    // Handler for all infrastructure messages
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_infrastructure_message(
         &self,
         sender: SocketAddr,
@@ -170,34 +194,8 @@ impl Core {
         dst_location: DstLocation,
         msg: SystemMsg,
         payload: Bytes,
+        known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
-        // // Let's now verify the section key in the msg authority is trusted
-        // // based on our current knowledge of the network and sections chains.
-        let mut known_keys: Vec<BlsPublicKey> = self.section.chain().keys().copied().collect();
-        known_keys.extend(self.network.section_keys());
-        known_keys.push(*self.section.genesis_key());
-
-        // if !msg_authority.verify_src_section_key(&known_keys) {
-        //     debug!("Untrusted message from {:?}: {:?} ", sender, msg);
-        //     let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
-        //     return Ok(vec![cmd]);
-        // }
-        // trace!(
-        //     "Trusted msg authority in message from {:?}: {:?}",
-        //     sender,
-        //     msg
-        // );
-
-        // // Let's check for entropy before we proceed further
-        // if let Some(ae_command) = self
-        //     .check_for_entropy_if_needed(&msg, &msg_authority.src_location(), &dst_location, sender)
-        //     .await?
-        // {
-        //     return Ok(vec![ae_command]);
-        // }
-
-        let mut commands = vec![];
-
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
             .aggregate_message_and_stop(&mut msg_authority, payload)
@@ -207,32 +205,33 @@ impl Core {
                 SystemMsg::NodeCmd(_)
                 | SystemMsg::NodeQuery(_)
                 | SystemMsg::NodeQueryResponse { .. } => {
-                    commands.push(Command::HandleVerifiedNodeDataMessage {
+                    let cmd = Command::HandleVerifiedNodeDataMessage {
                         msg_id,
                         msg,
-                        auth: msg_authority,
+                        msg_authority,
                         dst_location,
-                    });
+                    };
+
+                    Ok(vec![cmd])
                 }
                 _ => {
-                    commands.push(Command::HandleVerifiedNodeNonDataMessage {
+                    let cmd = Command::HandleVerifiedNodeNonDataMessage {
                         sender,
                         msg_id,
                         msg,
-                        auth: msg_authority,
-                        dst_location,
+                        msg_authority,
                         known_keys,
-                    });
+                    };
+
+                    Ok(vec![cmd])
                 }
             },
             Err(Error::InvalidSignatureShare) => {
                 let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
-                commands.push(cmd);
+                Ok(vec![cmd])
             }
-            Ok(true) | Err(_) => {}
+            Ok(true) | Err(_) => Ok(vec![]),
         }
-
-        Ok(commands)
     }
 
     // Hanlder for node messages which have successfully
@@ -242,9 +241,8 @@ impl Core {
         sender: SocketAddr,
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
-        _dst_location: DstLocation,
         node_msg: SystemMsg,
-        known_keys: &[BlsPublicKey],
+        known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
@@ -473,7 +471,7 @@ impl Core {
         }
     }
 
-    // Hanlder for node messages which have successfully
+    // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
     pub(crate) async fn handle_verified_data_message(
         &self,
