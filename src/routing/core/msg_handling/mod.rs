@@ -129,15 +129,6 @@ impl Core {
                 dst_location,
             } => {
                 // First we perform AE checks
-
-                let data_name = match msg.dst_address() {
-                    Some(name) => name,
-                    None => {
-                        warn!("Dropping client message as there is no valid destination.");
-                        return Ok(vec![]);
-                    }
-                };
-
                 let received_section_pk = match dst_location.section_pk() {
                     Some(section_pk) => section_pk,
                     None => {
@@ -156,23 +147,20 @@ impl Core {
                         return Ok(vec![]);
                     }
                 };
-                if !self.dst_is_for_our_section(&received_section_pk) {
-                    let src_location = SrcLocation::EndUser(user);
-                    let bounced_bytes = wire_msg.serialize()?;
-                    let ae_responses = self
-                        .check_for_entropy(
-                            &bounced_bytes,
-                            &src_location,
-                            &received_section_pk,
-                            Some(data_name),
-                            sender,
-                        )
-                        .await?;
+                let src_location = SrcLocation::EndUser(user);
+                let ae_responses = self
+                    .check_for_entropy(
+                        &wire_msg,
+                        &src_location,
+                        &received_section_pk,
+                        msg.dst_address(),
+                        sender,
+                    )
+                    .await?;
 
-                    if let Some(command) = ae_responses {
-                        // short circuit and send those AE responses
-                        return Ok(vec![command]);
-                    }
+                if let Some(command) = ae_responses {
+                    // short circuit and send those AE responses
+                    return Ok(vec![command]);
                 }
 
                 self.handle_service_message(msg_id, auth, msg, dst_location, user)

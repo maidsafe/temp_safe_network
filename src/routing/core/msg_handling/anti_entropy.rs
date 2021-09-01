@@ -186,13 +186,6 @@ impl Core {
             return Ok(None);
         }
 
-        if let Some(pk) = dst_location.section_pk() {
-            if self.dst_is_for_our_section(&pk) {
-                // we're in the right section, no entropy to be checked
-                return Ok(None);
-            }
-        }
-
         // For the case of receiving a join request not matching our prefix,
         // we just let the join request handler to deal with it later on.
         // We also skip AE check on Anti-Entropy messages
@@ -207,10 +200,8 @@ impl Core {
             _ => match dst_location.section_pk() {
                 None => Ok(None),
                 Some(dst_section_pk) => {
-                    let bounced_bytes = wire_msg.serialize()?;
-
                     self.check_for_entropy(
-                        &bounced_bytes,
+                        wire_msg,
                         src_location,
                         &dst_section_pk,
                         dst_location.name(),
@@ -233,7 +224,7 @@ impl Core {
     // bring the sender's knowledge about us up to date.
     pub(crate) async fn check_for_entropy(
         &self,
-        bounced_msg: &Bytes,
+        original_wire_msg: &WireMsg,
         src_location: &SrcLocation,
         dst_section_pk: &BlsPublicKey,
         dst_name: Option<XorName>,
@@ -244,13 +235,15 @@ impl Core {
             return Ok(None);
         }
 
-        info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
+        let bounced_msg = original_wire_msg.serialize()?;
+
         let ae_msg = match self
             .section
             .chain()
             .get_proof_chain_to_current(dst_section_pk)
         {
             Ok(proof_chain) => {
+                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
                 let section_signed_auth = self.section.section_signed_authority_provider().clone();
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
@@ -259,7 +252,7 @@ impl Core {
                     section_auth,
                     section_signed,
                     proof_chain,
-                    bounced_msg: bounced_msg.clone(),
+                    bounced_msg,
                 }
             }
             Err(_) => {
@@ -278,20 +271,32 @@ impl Core {
                         SystemMsg::AntiEntropyRedirect {
                             section_auth: section_auth.value.clone(),
                             section_signed: section_auth.sig,
-                            bounced_msg: bounced_msg.clone(),
+                            bounced_msg,
                         }
                     }
                     None => {
-                        // TODO: instead of just dropping the message, don't we actually need
-                        // to get up to date info from other Elders in our section as it may be
-                        // a section key we are not aware of yet?
-                        // ...and once we acquired new key/s we attempt AE check again?
-                        error!(
-                                "Anti-Entropy: cannot reply with redirect msg for dest key {:?} to a closest section",
-                                dst_section_pk
-                            );
+                        // Last ditch effort to find a better SAP the ideal section for this data
+                        if let Some(section_auth) =
+                            self.check_for_better_section_sap_for_data(dst_name)
+                        {
+                            SystemMsg::AntiEntropyRedirect {
+                                section_auth: section_auth.value.clone(),
+                                section_signed: section_auth.sig,
+                                bounced_msg,
+                            }
+                            // let ae_commands = self.check_for_entropy().await
+                        } else {
+                            // TODO: instead of just dropping the message, don't we actually need
+                            // to get up to date info from other Elders in our section as it may be
+                            // a section key we are not aware of yet?
+                            // ...and once we acquired new key/s we attempt AE check again?
+                            error!(
+                                    "Anti-Entropy: cannot reply with redirect msg for dest key {:?} to a closest section",
+                                    dst_section_pk
+                                );
 
-                        return Err(Error::NoMatchingSection);
+                            return Err(Error::NoMatchingSection);
+                        }
                     }
                 }
             }
@@ -309,12 +314,42 @@ impl Core {
             wire_msg,
         }))
     }
+
+    // checks to see if we're actually in the ideal section for this data
+    pub(crate) fn check_for_better_section_sap_for_data(
+        &self,
+        data_name: Option<XorName>,
+    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
+        if let Some(data_name) = data_name {
+            let our_section = self.section.section_auth.clone();
+            let better_sap = self
+                .network()
+                .get_matching_or_opposite(&data_name)
+                .unwrap_or_else(|_| self.section.section_auth.clone());
+
+            trace!("Our SAP: {:?}", our_section);
+            trace!("Better SAP for data {:?}: {:?}", data_name, better_sap);
+
+            if better_sap != our_section {
+                // Update the client of the actual destination section
+                trace!(
+                    "We have a better matched section for the data name {:?}",
+                    data_name
+                );
+                Some(better_sap)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{system::Section, MessageType};
+    use crate::messaging::{system::Section, MessageId, MessageType, MsgKind, NodeAuth};
     use crate::routing::{
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
@@ -325,6 +360,7 @@ mod tests {
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
+    use bls::SecretKey;
     use eyre::{eyre, Context, Result};
     use secured_linked_list::SecuredLinkedList;
     use tokio::sync::mpsc;
@@ -480,29 +516,46 @@ mod tests {
             &self,
             src_section_prefix: &Prefix,
             src_section_pk: BlsPublicKey,
-        ) -> Result<(Bytes, SrcLocation)> {
+        ) -> Result<(WireMsg, SrcLocation)> {
             let sender = Node::new(
                 ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );
 
-            let _msg = SystemMsg::StartConnectivityTest(XorName::random());
+            let sender_name = sender.name();
+            let src_node_keypair = sender.keypair;
 
-            let bounced_bytes = WireMsg::serialize_msg_payload(&_msg)?;
+            let payload_msg = SystemMsg::StartConnectivityTest(XorName::random());
+            let payload = WireMsg::serialize_msg_payload(&payload_msg)?;
+
+            let dst_name = XorName::random();
+            let dst_section_pk = SecretKey::random().public_key();
+            let dst_location = DstLocation::Node {
+                name: dst_name,
+                section_pk: dst_section_pk,
+            };
+
+            let msg_id = MessageId::new();
+
+            let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
+
+            let msg_kind = MsgKind::NodeAuthMsg(node_auth.into_inner());
+
+            let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
             let src_location = SrcLocation::Node {
-                name: sender.name(),
+                name: sender_name,
                 section_pk: src_section_pk,
             };
 
-            Ok((bounced_bytes, src_location))
+            Ok((wire_msg, src_location))
         }
     }
 
     // Creates a section chain with three blocks
-    fn create_chain(sap_sk: &bls::SecretKey, last_key: BlsPublicKey) -> Result<SecuredLinkedList> {
+    fn create_chain(sap_sk: &SecretKey, last_key: BlsPublicKey) -> Result<SecuredLinkedList> {
         // create chain with random genesis key
-        let genesis_sk = bls::SecretKey::random();
+        let genesis_sk = SecretKey::random();
         let genesis_pk = genesis_sk.public_key();
         let mut chain = SecuredLinkedList::new(genesis_pk);
 

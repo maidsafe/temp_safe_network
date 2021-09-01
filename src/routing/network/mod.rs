@@ -43,6 +43,19 @@ impl Network {
             .map(|e| e.value().clone())
     }
 
+    /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
+    /// one with the longest prefix. If there are no prefixes matching the given `name`, return
+    /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
+    pub(crate) fn get_matching_or_opposite(
+        &self,
+        name: &XorName,
+    ) -> Result<SectionAuth<SectionAuthorityProvider>> {
+        self.sections
+            .get_matching_or_opposite(name)
+            .ok_or(Error::NoMatchingSection)
+            .map(|(_, section_auth)| section_auth)
+    }
+
     /// Returns iterator over all known sections.
     pub(crate) fn all(&self) -> Box<dyn Iterator<Item = SectionAuthorityProvider> + '_> {
         Box::new(self.sections.iter().map(|e| e.value().value.clone()))
@@ -193,20 +206,6 @@ impl Network {
     pub(crate) fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.sections
             .get_matching(name)
-            .ok_or(Error::NoMatchingSection)
-            .map(|(_, section_auth)| section_auth.value)
-    }
-
-    /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
-    /// one with the longest prefix. If there are no prefixes matching the given `name`, return
-    /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
-    #[allow(dead_code)]
-    pub(crate) fn get_matching_or_opposite(
-        &self,
-        name: &XorName,
-    ) -> Result<SectionAuthorityProvider> {
-        self.sections
-            .get_matching_or_opposite(name)
             .ok_or(Error::NoMatchingSection)
             .map(|(_, section_auth)| section_auth.value)
     }
