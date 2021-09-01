@@ -8,11 +8,9 @@
 
 use crate::messaging::{
     system::{DkgFailureSigSet, KeyedSig, Proposal, Section, SystemMsg},
-    DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
+    DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
-use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
 use custom_debug::Debug;
 use std::{
     net::SocketAddr,
@@ -29,33 +27,6 @@ pub(crate) enum Command {
     HandleMessage {
         sender: SocketAddr,
         wire_msg: WireMsg,
-    },
-    // TODO: rename this as/when this is all node for clarity
-    /// Handle Node, either directly or notify via event listener
-    HandleInfrastructureMessage {
-        sender: SocketAddr,
-        msg_id: MessageId,
-        msg: SystemMsg,
-        auth: NodeMsgAuthority,
-        dst_location: DstLocation,
-        #[debug(skip)]
-        payload: Bytes,
-    },
-    /// Handle verified node message after aggregation either directly or notify via event listener
-    HandleVerifiedNodeNonDataMessage {
-        sender: SocketAddr,
-        msg_id: MessageId,
-        msg: SystemMsg,
-        auth: NodeMsgAuthority,
-        dst_location: DstLocation,
-        known_keys: Vec<BlsPublicKey>,
-    },
-    /// Handle Node data messages directly
-    HandleVerifiedNodeDataMessage {
-        msg_id: MessageId,
-        msg: SystemMsg,
-        auth: NodeMsgAuthority,
-        dst_location: DstLocation,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),

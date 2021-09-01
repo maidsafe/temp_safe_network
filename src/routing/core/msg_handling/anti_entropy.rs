@@ -9,7 +9,7 @@
 use super::Core;
 use crate::messaging::{
     system::{KeyedSig, SectionAuth, SystemMsg},
-    DstLocation, MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
+    MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
     dkg::SectionAuthUtils,
@@ -172,54 +172,6 @@ impl Core {
         }
     }
 
-    pub(crate) async fn check_for_entropy_if_needed(
-        &self,
-        wire_msg: &WireMsg,
-        msg: &SystemMsg,
-        src_location: &SrcLocation,
-        dst_location: &DstLocation,
-        sender: SocketAddr,
-    ) -> Result<Option<Command>> {
-        // Adult nodes don't need to carry out entropy checking,
-        // however the message shall always be handled.
-        if self.is_not_elder() {
-            return Ok(None);
-        }
-
-        // For the case of receiving a join request not matching our prefix,
-        // we just let the join request handler to deal with it later on.
-        // We also skip AE check on Anti-Entropy messages
-        //
-        // TODO: consider changing the join and "join as relocated" flows to
-        // make use of AntiEntropy retry/redirect responses.
-        match msg {
-            SystemMsg::AntiEntropyRetry { .. }
-            | SystemMsg::AntiEntropyRedirect { .. }
-            | SystemMsg::JoinRequest(_)
-            | SystemMsg::JoinAsRelocatedRequest(_) => Ok(None),
-            _ => match dst_location.section_pk() {
-                None => Ok(None),
-                Some(dst_section_pk) => {
-                    self.check_for_entropy(
-                        wire_msg,
-                        src_location,
-                        &dst_section_pk,
-                        dst_location.name(),
-                        sender,
-                    )
-                    .await
-                }
-            },
-        }
-    }
-
-    /// Tells us if the message has reached the correct section
-    /// If not, we'll need to respond with AE
-    pub(crate) fn dst_is_for_our_section(&self, dst_section_pk: &BlsPublicKey) -> bool {
-        // Destination section key matches our current section key
-        dst_section_pk == self.section.chain().last_key()
-    }
-
     // If entropy is found, determine the msg to send in order to
     // bring the sender's knowledge about us up to date.
     pub(crate) async fn check_for_entropy(
@@ -230,7 +182,9 @@ impl Core {
         dst_name: Option<XorName>,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
-        if self.dst_is_for_our_section(dst_section_pk) {
+        // Check if the message has reached the correct section,
+        // if not, we'll need to respond with AE
+        if dst_section_pk == self.section.chain().last_key() {
             // Destination section key matches our current section key
             return Ok(None);
         }
@@ -341,7 +295,9 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{system::Section, MessageId, MessageType, MsgKind, NodeAuth};
+    use crate::messaging::{
+        system::Section, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
+    };
     use crate::routing::{
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,

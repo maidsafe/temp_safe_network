@@ -131,61 +131,6 @@ impl Dispatcher {
 
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
-            // Data node msg that requires no locking
-            Command::HandleVerifiedNodeDataMessage {
-                msg_id,
-                auth,
-                dst_location,
-                msg,
-            } => {
-                self.core
-                    .read()
-                    .await
-                    .handle_verified_data_message(
-                        // sender,
-                        msg_id,
-                        auth,
-                        dst_location,
-                        msg,
-                    )
-                    .await
-            }
-            // Non-data node msg that requires locking
-            Command::HandleVerifiedNodeNonDataMessage {
-                sender,
-                msg_id,
-                auth,
-                dst_location,
-                msg,
-                known_keys,
-            } => {
-                self.core
-                    .write()
-                    .await
-                    .handle_verified_non_data_node_message(
-                        sender,
-                        msg_id,
-                        auth,
-                        dst_location,
-                        msg,
-                        &known_keys,
-                    )
-                    .await
-            }
-            Command::HandleInfrastructureMessage {
-                sender,
-                msg_id,
-                auth,
-                dst_location,
-                msg,
-                payload,
-            } => {
-                self.core
-                    .read()
-                    .await
-                    .handle_infrastructure_message(sender, msg_id, auth, dst_location, msg, payload)
-                    .await
-            }
             Command::PrepareNodeMsgToSend { msg, dst } => {
                 self.core.read().await.prepare_node_msg(msg, dst)
             }
