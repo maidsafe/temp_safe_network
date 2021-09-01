@@ -36,25 +36,27 @@ pub(crate) enum Command {
         sender: SocketAddr,
         msg_id: MessageId,
         msg: SystemMsg,
-        auth: NodeMsgAuthority,
+        msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
         #[debug(skip)]
         payload: Bytes,
+        #[debug(skip)]
+        known_keys: Vec<BlsPublicKey>,
     },
     /// Handle verified node message after aggregation either directly or notify via event listener
     HandleVerifiedNodeNonDataMessage {
         sender: SocketAddr,
         msg_id: MessageId,
         msg: SystemMsg,
-        auth: NodeMsgAuthority,
-        dst_location: DstLocation,
+        msg_authority: NodeMsgAuthority,
+        #[debug(skip)]
         known_keys: Vec<BlsPublicKey>,
     },
     /// Handle Node data messages directly
     HandleVerifiedNodeDataMessage {
         msg_id: MessageId,
         msg: SystemMsg,
-        auth: NodeMsgAuthority,
+        msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
