@@ -200,6 +200,7 @@ impl Network {
     /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
     /// one with the longest prefix. If there are no prefixes matching the given `name`, return
     /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
+    #[allow(dead_code)]
     pub(crate) fn get_matching_or_opposite(
         &self,
         name: &XorName,
