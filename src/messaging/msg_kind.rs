@@ -38,9 +38,6 @@ pub enum MsgKind {
     /// A message from an Elder node with authority of its whole section.
     // FIXME: find an example.
     SectionAuthMsg(SectionAuth),
-    /// A proxy message for testing
-    #[cfg(test)]
-    TestMessage,
 }
 
 impl MsgKind {
@@ -51,8 +48,6 @@ impl MsgKind {
             Self::NodeBlsShareAuthMsg(_) => 1,
             Self::NodeAuthMsg(_) => 0,
             Self::ServiceMsg(_) => -2,
-            #[cfg(test)]
-            Self::TestMessage => 0,
         }
     }
 }

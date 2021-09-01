@@ -173,16 +173,6 @@ impl WireMsg {
                     msg,
                 })
             }
-            #[cfg(test)]
-            MsgKind::TestMessage => {
-                let string = rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!(
-                        "Node message payload (section signed) as Msgpack: {}",
-                        err
-                    ))
-                })?;
-                Ok(MessageType::TestMessage(string))
-            }
         }
     }
 

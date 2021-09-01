@@ -326,24 +326,11 @@ impl<'a> Join<'a> {
                                 );
                                 continue;
                             }
-                            #[cfg(test)]
-                            Ok(MessageType::TestMessage(_)) => {
-                                error!(
-                                    "TestMessage received on bootstrapping from sender: {:?}",
-                                    sender,
-                                );
-                                continue;
-                            }
                             Err(err) => {
                                 debug!("Failed to deserialize message payload: {:?}", err);
                                 continue;
                             }
                         },
-                        #[cfg(test)]
-                        MsgKind::TestMessage => {
-                            debug!("Received MsgKind::TestMessage wrongly on joining");
-                            continue;
-                        }
                     },
                     Err(err) => {
                         debug!("Failed to deserialize message: {:?}", err);

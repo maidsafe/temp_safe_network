@@ -46,8 +46,6 @@ impl Core {
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
         // Deserialize the payload of the incoming message
-
-        // We can now deserialize the payload of the incoming message
         let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
         let message_type = match wire_msg.clone().into_message() {
@@ -160,8 +158,6 @@ impl Core {
                 self.handle_service_message(msg_id, auth, msg, dst_location, user)
                     .await
             }
-            #[cfg(test)]
-            MessageType::TestMessage(_) => Ok(vec![]),
         }
     }
 
