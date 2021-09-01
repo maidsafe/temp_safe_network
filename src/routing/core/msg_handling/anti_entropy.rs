@@ -323,7 +323,7 @@ impl Core {
         if let Some(data_name) = data_name {
             let our_section = self.section.section_auth.clone();
             let better_sap = self
-                .network()
+                .network
                 .get_matching_or_opposite(&data_name)
                 .unwrap_or_else(|_| self.section.section_auth.clone());
 
