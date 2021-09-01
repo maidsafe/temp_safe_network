@@ -26,8 +26,11 @@ async fn upload_bytes(size: usize) -> Result<(), Error> {
     let client = Client::new(config, bootstrap_nodes, None).await?;
     let address = client.write_to_network(data.clone(), Scope::Public).await?;
 
+    // the larger the file, the longer we have to wait before we start querying
+    let delay = usize::max(1, size / 2_000_000);
+
     // let's make sure the public chunk is stored
-    let received_data = run_w_backoff_delayed(|| client.read_blob(address), 10).await?;
+    let received_data = run_w_backoff_delayed(|| client.read_blob(address), 10, delay).await?;
 
     assert_eq!(received_data, data);
 

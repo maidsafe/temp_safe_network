@@ -39,7 +39,7 @@ use xor_name::XorName;
 // Number of attempts when retrying to send a message to a node
 const NUMBER_OF_RETRIES: usize = 3;
 // Number of Elders subset to send queries to
-const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
+const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 1;
 // Number of attempts to make when trying to bootstrap to a section
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
 
@@ -281,7 +281,7 @@ impl Session {
             let task_handle = tokio::spawn(async move {
                 // Retry queries that failed due to connection issues only
                 let mut result = Err(Error::ElderQuery);
-                for attempt in 0..NUMBER_OF_RETRIES + 1 {
+                for attempt in 1..NUMBER_OF_RETRIES + 1 {
                     let msg_bytes_clone = msg_bytes.clone();
 
                     if let Err(err) = endpoint
@@ -290,9 +290,7 @@ impl Session {
                     {
                         error!(
                             "Try #{:?} @ {:?}, failed sending query message: {:?}",
-                            attempt + 1,
-                            socket,
-                            err
+                            attempt, socket, err
                         );
                         result = Err(Error::SendingQuery);
                         if attempt <= NUMBER_OF_RETRIES {
