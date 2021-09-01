@@ -25,12 +25,12 @@ pub use test_client::{create_test_client, create_test_client_with, init_logger};
 pub type ClientResult<T> = Result<T, Error>;
 
 ///
-pub async fn run_w_backoff_delayed<F, Fut, T>(f: F, retries: u8) -> ClientResult<T>
+pub async fn run_w_backoff_delayed<F, Fut, T>(f: F, retries: u8, delay: usize) -> ClientResult<T>
 where
     F: Fn() -> Fut,
     Fut: Future<Output = ClientResult<T>>,
 {
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(delay as u64)).await;
     run_w_backoff_base(f, retries, Error::NoResponse).await
 }
 
