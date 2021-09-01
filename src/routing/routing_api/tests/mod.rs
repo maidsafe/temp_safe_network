@@ -903,19 +903,9 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
 
     let commands = if source == UntrustedMessageSource::Accumulation {
         // here we go only one level deep
-        let commands = dispatcher
+        dispatcher
             .handle_command(Command::HandleMessage { sender, wire_msg })
-            .await?;
-
-        let mut node_msg_handling = vec![];
-
-        for command in commands {
-            // first pass gets us into node msg handling
-            let commands = dispatcher.handle_command(command).await?;
-            node_msg_handling.extend(commands);
-        }
-
-        node_msg_handling
+            .await?
     } else {
         // and here two levels deep
         get_internal_commands(Command::HandleMessage { sender, wire_msg }, &dispatcher).await?
