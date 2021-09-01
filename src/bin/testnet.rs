@@ -29,7 +29,7 @@
 
 use dirs_next::home_dir;
 use eyre::{eyre, Result, WrapErr as _};
-use sn_launch_tool::run_with;
+use sn_launch_tool::Launch;
 use std::{
     io,
     path::PathBuf,
@@ -39,6 +39,7 @@ use structopt::StructOpt;
 use tokio::fs::{create_dir_all, remove_dir_all};
 use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
+use tracing_subscriber::EnvFilter;
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node";
@@ -46,9 +47,9 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 #[cfg(target_os = "windows")]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
+const BASE_TRACING_DIRECTIVES: &str = "testnet=info,sn_launch_tool=debug";
 const NODES_DIR: &str = "local-test-network";
 const INTERVAL: Duration = Duration::from_secs(2);
-const RUST_LOG: &str = "RUST_LOG";
 const DEFAULT_NODE_COUNT: u32 = 33;
 
 #[derive(Debug, StructOpt)]
@@ -62,7 +63,7 @@ struct Cmd {
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
-    tracing_subscriber::fmt::init();
+    init_tracing()?;
 
     let path = std::path::Path::new("nodes");
     remove_dir_all(&path)
@@ -88,7 +89,8 @@ async fn main() -> Result<()> {
         args.push("test-utils");
     }
 
-    println!("Building current sn_node");
+    info!("Building current sn_node");
+    debug!("Building current sn_node with args: {:?}", args);
     let _child = Command::new("cargo")
         .args(args.clone())
         // .env("RUST_LOG", "debug")
@@ -98,7 +100,7 @@ async fn main() -> Result<()> {
         .output()
         .wrap_err_with(|| format!("Failed to run build command with args: {:?}", args))?;
 
-    println!("sn_node built successfully");
+    info!("sn_node built successfully");
 
     run_network().await?;
 
@@ -132,7 +134,6 @@ pub async fn run_network() -> Result<()> {
     let interval_str = INTERVAL.as_secs().to_string();
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool",
-        "-v",
         "--node-path",
         &arg_node_path,
         "--nodes-dir",
@@ -148,7 +149,8 @@ pub async fn run_network() -> Result<()> {
 
     // If RUST_LOG was set we pass it down to the launch tool
     // so it's set for each of the nodes logs as well.
-    let rust_log = std::env::var(RUST_LOG).unwrap_or_else(|_| "safe_network=info".to_string());
+    let rust_log =
+        std::env::var(EnvFilter::DEFAULT_ENV).unwrap_or_else(|_| "safe_network=info".to_string());
     if !rust_log.is_empty() {
         sn_launch_tool_args.push("--rust-log");
         sn_launch_tool_args.push(&rust_log);
@@ -171,12 +173,41 @@ pub async fn run_network() -> Result<()> {
 
     // We can now call the tool with the args
     info!("Launching local Safe network...");
-    run_with(Some(&sn_launch_tool_args)).map_err(|error| eyre!(error))?;
+    Launch::from_iter_safe(&sn_launch_tool_args)?.run()?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
     let interval_duration = INTERVAL * node_count;
 
     sleep(interval_duration).await;
+
+    Ok(())
+}
+
+fn init_tracing() -> Result<()> {
+    let mut filter = EnvFilter::try_new(BASE_TRACING_DIRECTIVES)
+        .wrap_err("BUG: hard-coded tracing directives are invalid")?;
+
+    let extra_directives = std::env::var(EnvFilter::DEFAULT_ENV)
+        .map_or_else(
+            |error| match error {
+                std::env::VarError::NotPresent => Ok(None),
+                std::env::VarError::NotUnicode(_) => Err(eyre!(error)),
+            },
+            |filter| Ok(Some(EnvFilter::try_new(filter)?)),
+        )
+        .wrap_err_with(|| format!("Invalid value for {}", EnvFilter::DEFAULT_ENV))?;
+
+    if let Some(extra_directives) = extra_directives {
+        for directive in extra_directives.to_string().split(',') {
+            filter = filter.add_directive(
+                directive
+                    .parse()
+                    .expect("BUG: invalid directive in parsed EnvFilter"),
+            );
+        }
+    }
+
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     Ok(())
 }
