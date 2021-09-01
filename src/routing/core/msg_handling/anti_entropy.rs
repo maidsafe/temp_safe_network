@@ -198,6 +198,7 @@ impl Core {
         {
             Ok(proof_chain) => {
                 info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
+
                 let section_signed_auth = self.section.section_signed_authority_provider().clone();
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
@@ -218,31 +219,37 @@ impl Core {
 
                 // Let's try to find a section closer to the destination,
                 // otherwise we just drop the message.
-                let name = dst_name.ok_or_else(|| Error::InvalidDstLocation(format!("DirectAndUnrouted destination with section key ({:?}) not found in our section chain", dst_section_pk)))?;
-                match self.network.closest(&name) {
-                    Some(section_auth) => {
-                        // Redirect to the closest section
-                        SystemMsg::AntiEntropyRedirect {
-                            section_auth: section_auth.value.clone(),
-                            section_signed: section_auth.sig,
-                            bounced_msg,
+
+                if let Some(name) = dst_name {
+                    match self.network.closest(&name) {
+                        Some(section_auth) => {
+                            // Redirect to the closest section
+                            SystemMsg::AntiEntropyRedirect {
+                                section_auth: section_auth.value.clone(),
+                                section_signed: section_auth.sig,
+                                bounced_msg,
+                            }
+                        }
+                        None => {
+                            // TODO: do we want to reroute some data messages to another seciton here using check_for_better_section_sap_for_data ?
+                            // if not we can remove that function.
+
+                            // TODO: instead of just dropping the message, don't we actually need
+                            // to get up to date info from other Elders in our section as it may be
+                            // a section key we are not aware of yet?
+                            // ...and once we acquired new key/s we attempt AE check again?
+                            error!(
+                                    "Anti-Entropy: cannot reply with redirect msg for dest key {:?} to a closest section. Resending our SAP",
+                                    dst_section_pk
+                                );
+
+                            return Err(Error::NoMatchingSection);
                         }
                     }
-                    None => {
-                        // TODO: do we want to reroute some data messages to another seciton here using check_for_better_section_sap_for_data ?
-                        // if not we can remove that function.
-
-                        // TODO: instead of just dropping the message, don't we actually need
-                        // to get up to date info from other Elders in our section as it may be
-                        // a section key we are not aware of yet?
-                        // ...and once we acquired new key/s we attempt AE check again?
-                        error!(
-                                "Anti-Entropy: cannot reply with redirect msg for dest key {:?} to a closest section",
-                                dst_section_pk
-                            );
-
-                        return Err(Error::NoMatchingSection);
-                    }
+                } else {
+                    trace!("A destination with section key ({:?}) not found in our section chain. Continuing to process", dst_section_pk);
+                    // TODO, actually AE retry
+                    return Ok(None);
                 }
             }
         };

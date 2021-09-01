@@ -84,7 +84,10 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let wire_msg = WireMsg::single_src(
         &new_node,
-        DstLocation::DirectAndUnrouted(section_key),
+        DstLocation::Section {
+            name: XorName::from(PublicKey::Bls(section_key)),
+            section_pk: section_key,
+        },
         SystemMsg::JoinRequest(Box::new(JoinRequest {
             section_key,
             resource_proof_response: None,
@@ -151,7 +154,10 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let wire_msg = WireMsg::single_src(
         &new_node,
-        DstLocation::DirectAndUnrouted(section_key),
+        DstLocation::Section {
+            name: XorName::from(PublicKey::Bls(section_key)),
+            section_pk: section_key,
+        },
         SystemMsg::JoinRequest(Box::new(JoinRequest {
             section_key,
             resource_proof_response: Some(ResourceProofResponse {
@@ -256,7 +262,10 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let wire_msg = WireMsg::single_src(
         &relocated_node,
-        DstLocation::DirectAndUnrouted(section_key),
+        DstLocation::Section {
+            name: XorName::from(PublicKey::Bls(section_key)),
+            section_pk: section_key,
+        },
         SystemMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
             section_key,
             relocate_payload: Some(relocate_payload),
@@ -321,11 +330,16 @@ async fn aggregate_proposals() -> Result<()> {
         dst_key: None,
     };
 
+    let section_pk = *section.chain().last_key();
     for (index, node) in nodes.iter().enumerate().take(THRESHOLD) {
         let sig_share = proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
+
         let wire_msg = WireMsg::single_src(
             node,
-            DstLocation::DirectAndUnrouted(*section.chain().last_key()),
+            DstLocation::Section {
+                name: XorName::from(PublicKey::Bls(section_pk)),
+                section_pk,
+            },
             SystemMsg::Propose {
                 content: proposal.clone(),
                 sig_share,
@@ -350,9 +364,13 @@ async fn aggregate_proposals() -> Result<()> {
         THRESHOLD,
         &sk_set.secret_key_share(THRESHOLD),
     )?;
+    let section_pk = *section.chain().last_key();
     let wire_msg = WireMsg::single_src(
         &nodes[THRESHOLD],
-        DstLocation::DirectAndUnrouted(*section.chain().last_key()),
+        DstLocation::Section {
+            name: XorName::from(PublicKey::Bls(section_pk)),
+            section_pk,
+        },
         SystemMsg::Propose {
             content: proposal.clone(),
             sig_share,
@@ -999,7 +1017,10 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
     // Create the bounced message, indicating the last key the peer knows is `pk0`
     let bounced_wire_msg = WireMsg::single_src(
         &other_node,
-        DstLocation::DirectAndUnrouted(pk1),
+        DstLocation::Node {
+            name: XorName::from(PublicKey::Bls(pk1)),
+            section_pk: pk1,
+        },
         SystemMsg::BouncedUntrustedMessage {
             msg: Box::new(original_node_msg.clone()),
             dst_section_pk: pk0,
@@ -1106,7 +1127,10 @@ async fn handle_sync() -> Result<()> {
     // Create the `Sync` message containing the new `Section`.
     let wire_msg = WireMsg::single_src(
         &old_node,
-        DstLocation::DirectAndUnrouted(pk1),
+        DstLocation::Node {
+            name: XorName::from(PublicKey::Bls(pk1)),
+            section_pk: pk1,
+        },
         SystemMsg::Sync {
             section: new_section.clone(),
             network: BTreeMap::new(),
@@ -1185,9 +1209,13 @@ async fn handle_untrusted_sync() -> Result<()> {
         section: new_section.clone(),
         network: BTreeMap::new(),
     };
+    let section_pk = *new_section.chain().last_key();
     let wire_msg = WireMsg::single_src(
         &sender,
-        DstLocation::DirectAndUnrouted(*new_section.chain().last_key()),
+        DstLocation::Section {
+            name: XorName::from(PublicKey::Bls(section_pk)),
+            section_pk,
+        },
         original_node_msg.clone(),
         *new_section.chain().last_key(),
     )?;

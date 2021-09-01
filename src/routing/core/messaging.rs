@@ -24,10 +24,10 @@ use crate::routing::{
     section::{SectionKeyShare, SectionUtils},
     SectionAuthorityProviderUtils,
 };
+use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use std::{collections::BTreeMap, net::SocketAddr, slice};
 use xor_name::{Prefix, XorName};
-
 impl Core {
     // Send proposal to all our elders.
     pub(crate) fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
@@ -72,9 +72,13 @@ impl Core {
             content: proposal,
             sig_share,
         };
+        let section_pk = *self.section.chain().last_key();
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(*self.section.chain().last_key()),
+            DstLocation::Section {
+                name: XorName::from(PublicKey::Bls(section_pk)),
+                section_pk,
+            },
             node_msg,
             self.section.authority_provider().section_key(),
         )?;
@@ -247,10 +251,13 @@ impl Core {
             dkg_key,
             elder_candidates,
         };
-
+        let section_pk = *self.section.chain().last_key();
         self.send_message_for_dst_accumulation(
             src_prefix.name(),
-            DstLocation::DirectAndUnrouted(*self.section.chain().last_key()),
+            DstLocation::Section {
+                name: XorName::from(PublicKey::Bls(section_pk)),
+                section_pk,
+            },
             node_msg,
             recipients,
         )
@@ -341,7 +348,10 @@ impl Core {
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(dst_section_pk),
+            DstLocation::Section {
+                name: recipient.0,
+                section_pk: dst_section_pk,
+            },
             node_msg,
             self.section.authority_provider().section_key(),
         )?;
@@ -360,7 +370,10 @@ impl Core {
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(dst_section_pk),
+            DstLocation::Section {
+                name: XorName::from(PublicKey::Bls(dst_section_pk)),
+                section_pk: dst_section_pk,
+            },
             node_msg,
             self.section.authority_provider().section_key(),
         )?;

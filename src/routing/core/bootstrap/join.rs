@@ -23,6 +23,8 @@ use crate::routing::{
     section::SectionUtils,
     SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
+use crate::types::PublicKey;
+
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use rand::seq::IteratorRandom;
@@ -282,7 +284,10 @@ impl<'a> Join<'a> {
         let node_msg = SystemMsg::JoinRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(section_key),
+            DstLocation::Section {
+                name: XorName::from(PublicKey::Bls(section_key)),
+                section_pk: section_key,
+            },
             node_msg,
             section_key,
         )?;
@@ -433,6 +438,7 @@ mod tests {
         section::test_utils::*, section::NodeStateUtils, SectionAuthorityProviderUtils, ELDER_SIZE,
         MIN_ADULT_AGE, MIN_AGE,
     };
+    use crate::types::PublicKey;
     use assert_matches::assert_matches;
     use eyre::{eyre, Error, Result};
     use futures::{
@@ -858,7 +864,10 @@ mod tests {
     ) -> Result<()> {
         let wire_msg = WireMsg::single_src(
             bootstrap_node,
-            DstLocation::DirectAndUnrouted(section_pk),
+            DstLocation::Section {
+                name: XorName::from(PublicKey::Bls(section_pk)),
+                section_pk,
+            },
             node_msg,
             section_pk,
         )?;
