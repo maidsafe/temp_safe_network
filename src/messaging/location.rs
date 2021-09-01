@@ -77,10 +77,6 @@ pub enum DstLocation {
         /// Section's public key.
         section_pk: BlsPublicKey,
     },
-    /// Destination is a specific node to be directly connected to, and so the message is unrouted.
-    ///
-    /// The destination's known section key is provided.
-    DirectAndUnrouted(BlsPublicKey),
 }
 
 impl DstLocation {
@@ -90,7 +86,6 @@ impl DstLocation {
             Self::EndUser(_) => None,
             Self::Node { section_pk, .. } => Some(*section_pk),
             Self::Section { section_pk, .. } => Some(*section_pk),
-            Self::DirectAndUnrouted(section_pk) => Some(*section_pk),
         }
     }
 
@@ -100,7 +95,6 @@ impl DstLocation {
             Self::EndUser(_) => {}
             Self::Node { section_pk, .. } => *section_pk = pk,
             Self::Section { section_pk, .. } => *section_pk = pk,
-            Self::DirectAndUnrouted(section_pk) => *section_pk = pk,
         }
     }
 
@@ -118,7 +112,6 @@ impl DstLocation {
             Self::Section {
                 name: self_name, ..
             } => prefix.matches(self_name),
-            Self::DirectAndUnrouted(_) => true,
         }
     }
 
@@ -128,17 +121,15 @@ impl DstLocation {
             Self::EndUser(user) => Some(user.0),
             Self::Node { name, .. } => Some(*name),
             Self::Section { name, .. } => Some(*name),
-            Self::DirectAndUnrouted(_) => None,
         }
     }
 
-    /// Updates the name of this location if it's not `DirectAndUnrouted`.
+    /// Updates the name of this location.
     pub fn set_name(&mut self, new_name: XorName) {
         match self {
             Self::EndUser(EndUser(name)) => *name = new_name,
             Self::Node { name, .. } => *name = new_name,
             Self::Section { name, .. } => *name = new_name,
-            Self::DirectAndUnrouted(_) => {}
         }
     }
 

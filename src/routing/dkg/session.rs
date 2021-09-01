@@ -20,6 +20,7 @@ use crate::routing::{
     section::SectionKeyShare,
     SectionAuthorityProviderUtils,
 };
+use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use itertools::Itertools;
@@ -114,7 +115,10 @@ impl Session {
             };
             let wire_msg = WireMsg::single_src(
                 node,
-                DstLocation::DirectAndUnrouted(section_pk),
+                DstLocation::Section {
+                    name: XorName::from(PublicKey::Bls(section_pk)),
+                    section_pk,
+                },
                 node_msg,
                 section_pk,
             )?;
@@ -267,7 +271,10 @@ impl Session {
                 };
                 let wire_msg = WireMsg::single_src(
                     node,
-                    DstLocation::DirectAndUnrouted(section_pk),
+                    DstLocation::Section {
+                        name: XorName::from(PublicKey::Bls(section_pk)),
+                        section_pk,
+                    },
                     node_msg,
                     section_pk,
                 )?;

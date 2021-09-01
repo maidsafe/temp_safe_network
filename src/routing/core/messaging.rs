@@ -74,7 +74,10 @@ impl Core {
         };
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(*self.section.chain().last_key()),
+            DstLocation::Section {
+                name: *recipients[0].name(),
+                section_pk: *self.section.chain().last_key(),
+            },
             node_msg,
             self.section.authority_provider().section_key(),
         )?;
@@ -250,7 +253,11 @@ impl Core {
 
         self.send_message_for_dst_accumulation(
             src_prefix.name(),
-            DstLocation::DirectAndUnrouted(*self.section.chain().last_key()),
+            // DstLocation::Section(*self.section.chain().last_key()),
+            DstLocation::Section {
+                name: *recipients[0].name(),
+                section_pk: *self.section.chain().last_key(),
+            },
             node_msg,
             recipients,
         )
@@ -341,7 +348,10 @@ impl Core {
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(dst_section_pk),
+            DstLocation::Section {
+                name: recipient.0,
+                section_pk: dst_section_pk,
+            },
             node_msg,
             self.section.authority_provider().section_key(),
         )?;
@@ -358,9 +368,13 @@ impl Core {
         node_msg: SystemMsg,
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
+        let a_name_from_section = recipients[0].0;
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted(dst_section_pk),
+            DstLocation::Section {
+                name: a_name_from_section,
+                section_pk: dst_section_pk,
+            },
             node_msg,
             self.section.authority_provider().section_key(),
         )?;
