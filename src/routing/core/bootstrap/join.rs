@@ -23,6 +23,8 @@ use crate::routing::{
     section::SectionUtils,
     SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
+use crate::types::PublicKey;
+
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use rand::seq::IteratorRandom;
@@ -283,7 +285,7 @@ impl<'a> Join<'a> {
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
-                name: recipients[0].0,
+                name: XorName::from(PublicKey::Bls(section_key)),
                 section_pk: section_key,
             },
             node_msg,

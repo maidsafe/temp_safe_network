@@ -367,7 +367,6 @@ async fn aggregate_proposals() -> Result<()> {
     let section_pk = *section.chain().last_key();
     let wire_msg = WireMsg::single_src(
         &nodes[THRESHOLD],
-        // DstLocation::Section(*section.chain().last_key()),
         DstLocation::Section {
             name: XorName::from(PublicKey::Bls(section_pk)),
             section_pk,
@@ -1018,7 +1017,6 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
     // Create the bounced message, indicating the last key the peer knows is `pk0`
     let bounced_wire_msg = WireMsg::single_src(
         &other_node,
-        // DstLocation::Node(pk1),
         DstLocation::Node {
             name: XorName::from(PublicKey::Bls(pk1)),
             section_pk: pk1,
@@ -1129,7 +1127,6 @@ async fn handle_sync() -> Result<()> {
     // Create the `Sync` message containing the new `Section`.
     let wire_msg = WireMsg::single_src(
         &old_node,
-        // DstLocation::Node(pk1),
         DstLocation::Node {
             name: XorName::from(PublicKey::Bls(pk1)),
             section_pk: pk1,
