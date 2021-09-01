@@ -10,11 +10,12 @@
 //! for the Safe network.
 
 use dirs_next::home_dir;
-use sn_launch_tool::run_with;
+use sn_launch_tool::Launch;
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
+use structopt::StructOpt;
 use tokio::fs::create_dir_all;
 use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
@@ -141,8 +142,10 @@ pub async fn run_split() -> Result<()> {
 
     // We can now call the tool with the args
     info!("Launching local Safe network...");
-    run_with(Some(&sn_launch_tool_args))
-        .map_err(|err| eyre!("Error starting the testnet, {:?}", err))?;
+    Launch::from_iter_safe(&sn_launch_tool_args)
+        .map_err(|error| eyre!(error))
+        .and_then(|launch| launch.run())
+        .wrap_err("Error starting the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
     let interval_duration = Duration::from_secs(interval_as_int * start_node_count);
@@ -168,8 +171,10 @@ pub async fn run_split() -> Result<()> {
 
     // We can now call the tool with the args
     info!("Adding nodes to the local Safe network...");
-    run_with(Some(&sn_launch_tool_args))
-        .map_err(|err| eyre!("Error adding nodes to the testnet, {:?}", err))?;
+    Launch::from_iter_safe(&sn_launch_tool_args)
+        .map_err(|error| eyre!(error))
+        .and_then(|launch| launch.run())
+        .wrap_err("Error adding nodes to the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
     let interval_duration = Duration::from_secs(interval_as_int * additional_node_count);
