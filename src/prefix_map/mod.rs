@@ -284,13 +284,14 @@ impl NetworkPrefixMap {
     fn prune(&self, mut prefix: Prefix) {
         // TODO: can this be optimized?
         loop {
-            {
+            let is_covered = {
                 let descendants: Vec<_> = self.descendants(&prefix).collect();
                 let descendant_prefixes: Vec<&Prefix> =
                     descendants.iter().map(|item| item.key()).collect();
-                if prefix.is_covered_by(descendant_prefixes) {
-                    let _ = self.sections.remove(&prefix);
-                }
+                prefix.is_covered_by(descendant_prefixes)
+            };
+            if is_covered {
+                let _ = self.sections.remove(&prefix);
             }
 
             if prefix.is_empty() {
