@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#![recursion_limit = "256"]
+
 use bls::PublicKey;
 use eyre::{eyre, Context, Error, Result};
 use futures::{
