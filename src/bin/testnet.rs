@@ -28,8 +28,10 @@
 )]
 
 use dirs_next::home_dir;
+use eyre::{eyre, Result, WrapErr as _};
 use sn_launch_tool::run_with;
 use std::{
+    io,
     path::PathBuf,
     process::{Command, Stdio},
 };
@@ -45,9 +47,9 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "2";
+const INTERVAL: Duration = Duration::from_secs(2);
 const RUST_LOG: &str = "RUST_LOG";
-const NODE_COUNT: &str = "33";
+const DEFAULT_NODE_COUNT: u32 = 33;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "testnet")]
@@ -58,14 +60,21 @@ struct Cmd {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), String> {
+async fn main() -> Result<()> {
+    color_eyre::install()?;
     tracing_subscriber::fmt::init();
 
     let path = std::path::Path::new("nodes");
-    remove_dir_all(&path).await.unwrap_or(()); // Delete nodes directory if it exists;
+    remove_dir_all(&path)
+        .await
+        .or_else(|error| match error.kind() {
+            io::ErrorKind::NotFound => Ok(()),
+            _ => Err(error),
+        })
+        .wrap_err("Failed to remove existing nodes directory")?;
     create_dir_all(&path)
         .await
-        .expect("Cannot create nodes directory");
+        .wrap_err("Cannot create nodes directory")?;
 
     let mut args = vec!["build", "--release"];
 
@@ -87,12 +96,7 @@ async fn main() -> Result<(), String> {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .output()
-        .map_err(|err| {
-            format!(
-                "Failed to run build command with args '{:?}': {}",
-                args, err
-            )
-        })?;
+        .wrap_err_with(|| format!("Failed to run build command with args: {:?}", args))?;
 
     println!("sn_node built successfully");
 
@@ -101,22 +105,8 @@ async fn main() -> Result<(), String> {
     Ok(())
 }
 
-fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
-    match node_path {
-        Some(p) => Ok(p),
-        None => {
-            let mut home_dirs =
-                home_dir().ok_or_else(|| "Failed to obtain user's home path".to_string())?;
-
-            home_dirs.push(".safe");
-            home_dirs.push("node");
-            Ok(home_dirs)
-        }
-    }
-}
-
 /// Uses SNLT to create a local network of nodes
-pub async fn run_network() -> Result<(), String> {
+pub async fn run_network() -> Result<()> {
     let args = Cmd::from_args();
     let adding_nodes = args.add_nodes_to_existing_network;
 
@@ -131,17 +121,15 @@ pub async fn run_network() -> Result<(), String> {
     let node_log_dir = base_log_dir.join(NODES_DIR);
     if !node_log_dir.exists() {
         debug!("Creating '{}' folder", node_log_dir.display());
-        create_dir_all(node_log_dir.clone()).await.map_err(|err| {
-            format!(
-                "Couldn't create target path to store nodes' generated data: {}",
-                err
-            )
-        })?;
+        create_dir_all(node_log_dir.clone())
+            .await
+            .wrap_err("Couldn't create target path to store nodes' generated data")?;
     }
     let arg_node_log_dir = node_log_dir.display().to_string();
     info!("Storing nodes' generated data at {}", arg_node_log_dir);
 
     // Let's create an args array to pass to the network launcher tool
+    let interval_str = INTERVAL.as_secs().to_string();
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool",
         "-v",
@@ -150,7 +138,7 @@ pub async fn run_network() -> Result<(), String> {
         "--nodes-dir",
         &arg_node_log_dir,
         "--interval",
-        INTERVAL,
+        &interval_str,
         "--local",
     ];
 
@@ -166,14 +154,15 @@ pub async fn run_network() -> Result<(), String> {
         sn_launch_tool_args.push(&rust_log);
     }
 
-    let interval_as_int = &INTERVAL
-        .parse::<u64>()
-        .map_err(|_| String::from("Error parsing Interval argument"))?;
-
-    let node_count = std::env::var("NODE_COUNT").unwrap_or_else(|_| NODE_COUNT.to_string());
-    let node_count_as_int = node_count
-        .parse::<u64>()
-        .map_err(|_| String::from("Error parsing Node Count argument"))?;
+    let node_count = std::env::var("NODE_COUNT")
+        .map_or_else(
+            |error| match error {
+                std::env::VarError::NotPresent => Ok(DEFAULT_NODE_COUNT),
+                _ => Err(eyre!(error)),
+            },
+            |node_count| Ok(node_count.parse()?),
+        )
+        .wrap_err("Invalid value for NODE_COUNT")?;
 
     debug!(
         "Running network launch tool with args: {:?}",
@@ -182,12 +171,20 @@ pub async fn run_network() -> Result<(), String> {
 
     // We can now call the tool with the args
     info!("Launching local Safe network...");
-    run_with(Some(&sn_launch_tool_args))?;
+    run_with(Some(&sn_launch_tool_args)).map_err(|error| eyre!(error))?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_secs(interval_as_int * node_count_as_int);
+    let interval_duration = INTERVAL * node_count;
 
     sleep(interval_duration).await;
 
     Ok(())
+}
+
+fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
+    node_path.ok_or(()).or_else(|()| {
+        let mut bin_path = home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
+        bin_path.push(".safe/node");
+        Ok(bin_path)
+    })
 }
