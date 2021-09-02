@@ -34,7 +34,7 @@ impl Client {
     ///
     /// A tag must be supplied.
     /// A xorname must be supplied, this can be random or deterministic as per your apps needs.
-    pub fn store_private_register(
+    pub async fn store_private_register(
         &self,
         name: XorName,
         tag: u64,
@@ -47,7 +47,8 @@ impl Client {
         let priv_register = Register::new_private(pk, name, tag, Some(policy));
         let address = *priv_register.address();
 
-        self.pay_and_write_register_to_network(priv_register)?;
+        self.pay_and_write_register_to_network(priv_register)
+            .await?;
 
         Ok(address)
     }
@@ -59,7 +60,7 @@ impl Client {
     ///
     /// A tag must be supplied.
     /// A xorname must be supplied, this can be random or deterministic as per your apps needs.
-    pub fn store_public_register(
+    pub async fn store_public_register(
         &self,
         name: XorName,
         tag: u64,
@@ -72,7 +73,7 @@ impl Client {
         let pub_register = Register::new_public(pk, name, tag, Some(policy));
         let address = *pub_register.address();
 
-        self.pay_and_write_register_to_network(pub_register)?;
+        self.pay_and_write_register_to_network(pub_register).await?;
 
         Ok(address)
     }
@@ -105,21 +106,31 @@ impl Client {
         let signature = self.keypair.sign(&bytes);
         op.signature = Some(signature);
 
-        let id = format!("{:?}", &hash);
+        // let id = format!("{:?}", &hash);
+        // // Finally we can send the mutation to the network's replicas
+        // self.push_reg_op_to_batch(id, RegisterWrite::Edit(op));
+
         // Finally we can send the mutation to the network's replicas
-        self.push_reg_op_to_batch(id, RegisterWrite::Edit(op));
+        let cmd = DataCmd::Register(RegisterWrite::Edit(op));
+        self.send_cmd(cmd).await?;
 
         Ok(hash)
     }
 
     /// Store a new Register data object
     /// Wraps msg_contents for payment validation and mutation
-    pub(crate) fn pay_and_write_register_to_network(&self, data: Register) -> Result<(), Error> {
+    pub(crate) async fn pay_and_write_register_to_network(
+        &self,
+        data: Register,
+    ) -> Result<(), Error> {
         debug!("Attempting to pay and write a Register to the network");
-        let id = data.address().encode_to_zbase32()?;
-        // Finally we can send the mutation to the network's replicas
-        self.push_reg_op_to_batch(id, RegisterWrite::New(data));
-        Ok(())
+
+        // let id = data.address().encode_to_zbase32()?;
+        // // Finally we can send the mutation to the network's replicas
+        // self.push_reg_op_to_batch(id, RegisterWrite::New(data));
+
+        let cmd = DataCmd::Register(RegisterWrite::New(data));
+        self.send_cmd(cmd).await
     }
 
     ///
@@ -271,7 +282,9 @@ mod tests {
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Key(owner), PublicPermissions::new(true));
 
-        let address = client.store_public_register(name, tag, owner, perms)?;
+        let address = client
+            .store_public_register(name, tag, owner, perms)
+            .await?;
 
         let value_1 = random_url()?;
 
@@ -308,7 +321,9 @@ mod tests {
         // store a Private Register
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let address = client.store_private_register(name, tag, owner, perms)?;
+        let address = client
+            .store_private_register(name, tag, owner, perms)
+            .await?;
 
         let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
 
@@ -321,7 +336,9 @@ mod tests {
         // store a Public Register
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
-        let address = client.store_public_register(name, tag, owner, perms)?;
+        let address = client
+            .store_public_register(name, tag, owner, perms)
+            .await?;
 
         let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
 
@@ -342,7 +359,9 @@ mod tests {
         let owner = client.public_key();
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let address = client.store_private_register(name, tag, owner, perms)?;
+        let address = client
+            .store_private_register(name, tag, owner, perms)
+            .await?;
 
         let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
 
@@ -382,7 +401,9 @@ mod tests {
         let owner = client.public_key();
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Key(owner), PublicPermissions::new(None));
-        let address = client.store_public_register(name, tag, owner, perms)?;
+        let address = client
+            .store_public_register(name, tag, owner, perms)
+            .await?;
 
         let permissions = run_w_backoff_delayed(
             || client.get_register_permissions_for_user(address, owner),
@@ -421,7 +442,9 @@ mod tests {
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Key(owner), PublicPermissions::new(true));
 
-        let address = client.store_public_register(name, tag, owner, perms)?;
+        let address = client
+            .store_public_register(name, tag, owner, perms)
+            .await?;
 
         let value_1 = random_url()?;
 
@@ -485,7 +508,9 @@ mod tests {
         let owner = client.public_key();
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let address = client.store_private_register(name, tag, owner, perms)?;
+        let address = client
+            .store_private_register(name, tag, owner, perms)
+            .await?;
 
         // Assert that the data is stored.
         let current_owner =
@@ -506,7 +531,9 @@ mod tests {
         // store a Private Register
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let address = client.store_private_register(name, tag, owner, perms)?;
+        let address = client
+            .store_private_register(name, tag, owner, perms)
+            .await?;
 
         let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
 
@@ -542,7 +569,9 @@ mod tests {
         // store a Public Register
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
-        let address = client.store_public_register(name, tag, owner, perms)?;
+        let address = client
+            .store_public_register(name, tag, owner, perms)
+            .await?;
 
         let register = run_w_backoff_delayed(|| client.get_register(address), 10).await?;
         assert!(register.is_public());
