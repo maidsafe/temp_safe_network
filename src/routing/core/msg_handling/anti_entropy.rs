@@ -28,6 +28,50 @@ use std::net::SocketAddr;
 use xor_name::XorName;
 
 impl Core {
+    pub(crate) async fn handle_anti_entropy_update_msg(
+        &mut self,
+        section_auth: SectionAuthorityProvider,
+        section_signed: KeyedSig,
+        proof_chain: SecuredLinkedList,
+        sender: SocketAddr,
+    ) -> Result<Vec<Command>> {
+        info!(
+            "Anti-Entropy: section update message received from peer: {}",
+            sender
+        );
+
+        match self.network.update_remote_section_sap(
+            SectionAuth {
+                value: section_auth.clone(),
+                sig: section_signed,
+            },
+            &proof_chain,
+            self.section.chain(),
+        ) {
+            Ok(updated) => {
+                if updated {
+                    info!(
+                        "Anti-Entropy: updated remote section SAP updated for {:?}",
+                        section_auth.prefix
+                    );
+                } else {
+                    debug!(
+                        "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                        section_auth.prefix, section_auth
+                    );
+                }
+
+                Ok(vec![])
+            }
+            Err(err) => {
+                warn!(
+                    "Anti-Entropy: failed to update remote section SAP: {:?}",
+                    err
+                );
+                Err(err)
+            }
+        }
+    }
     pub(crate) async fn handle_anti_entropy_retry_msg(
         &mut self,
         section_auth: SectionAuthorityProvider,

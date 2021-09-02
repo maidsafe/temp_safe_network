@@ -13,7 +13,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     messages::NodeMsgAuthorityUtils, peer::PeerUtils, routing_api::command::Command,
-    section::SectionUtils, Error, Result,
+    section::SectionUtils, Result,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;
@@ -40,39 +40,50 @@ impl Core {
         self.send_direct_message((src_name, sender), bounce_system_msg, bounce_dst_section_pk)
     }
 
+    /// Generate command to update a peer with our current section chain
+    pub(crate) fn send_ae_update_to_sender(
+        &self,
+        sender: Peer,
+        dst_section_key: BlsPublicKey,
+    ) -> Result<Command> {
+        let section_signed_auth = self.section.section_signed_authority_provider().clone();
+        let section_auth = section_signed_auth.value;
+        let section_signed = section_signed_auth.sig;
+
+        let proof_chain = self
+            .section
+            .chain()
+            .get_proof_chain_to_current(&dst_section_key)?;
+
+        let ae_msg = SystemMsg::AntiEntropyUpdate {
+            section_auth,
+            section_signed,
+            proof_chain,
+        };
+
+        Ok(self.send_direct_message((*sender.name(), *sender.addr()), ae_msg, dst_section_key)?)
+    }
+
     pub(crate) fn handle_bounced_untrusted_message(
         &self,
         sender: Peer,
         dst_section_key: BlsPublicKey,
         bounced_msg: SystemMsg,
-    ) -> Result<Command> {
+    ) -> Result<Vec<Command>> {
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();
+        let mut commands = vec![];
 
-        let new_node_msg = match bounced_msg {
-            SystemMsg::Sync { section, network } => {
-                // `Sync` messages are handled specially, because they don't carry a signed chain.
-                // Instead we use the section chain that's part of the included `Section` struct.
-                // Problem is we can't extend that chain as it would invalidate the signature. We
-                // must construct a new message instead.
-                let section = section
-                    .extend_chain(&dst_section_key, self.section.chain())
-                    .map_err(|err| {
-                        error!("extending section chain failed: {:?}", err);
-                        Error::InvalidMessage // TODO: more specific error
-                    })?;
-
-                SystemMsg::Sync { section, network }
-            }
-            bounced_msg => bounced_msg,
-        };
+        // first lets update the sender with our section info, which they currently do not trust
+        commands.push(self.send_ae_update_to_sender(sender, dst_section_key)?);
 
         let cmd = self.send_direct_message(
             (*sender.name(), *sender.addr()),
-            new_node_msg,
+            bounced_msg,
             dst_section_key,
         )?;
+        commands.push(cmd);
 
-        Ok(cmd)
+        Ok(commands)
     }
 }

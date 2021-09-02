@@ -26,7 +26,7 @@ pub(crate) trait NodeMsgAuthorityUtils {
 
     // Verify if the section key of the NodeMsgAuthority can be trusted
     // based on a set of known keys.
-    fn verify_src_section_key(&self, known_keys: &[BlsPublicKey]) -> bool;
+    fn verify_src_section_key_is_known(&self, known_keys: &[BlsPublicKey]) -> bool;
 }
 
 impl NodeMsgAuthorityUtils for NodeMsgAuthority {
@@ -69,7 +69,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
 
     // Verify if the section key of the NodeMsgAuthority can be trusted
     // based on a set of known keys.
-    fn verify_src_section_key(&self, known_keys: &[BlsPublicKey]) -> bool {
+    fn verify_src_section_key_is_known(&self, known_keys: &[BlsPublicKey]) -> bool {
         let section_pk = match &self {
             NodeMsgAuthority::Node(_) => return true,
             NodeMsgAuthority::BlsShare(bls_share_auth) => &bls_share_auth.section_pk,
