@@ -961,7 +961,7 @@ mod tests {
         #[test]
         fn proptest_converge_with_shuffled_ops_from_many_replicas_across_arbitrary_number_of_replicas(
             dataset in generate_dataset(1000),
-            res in generate_replicas(100)
+            res in generate_replicas(7)
         ) {
             let (mut replicas, owner_keypair) = res?;
             let dataset_length = dataset.len() as u64;
@@ -1053,7 +1053,7 @@ mod tests {
         #[test]
         fn proptest_converge_with_shuffled_ops_from_many_while_dropping_some_at_random(
             dataset in generate_dataset_and_probability(1000),
-            res in generate_replicas(100),
+            res in generate_replicas(7),
         ) {
             let (mut replicas, owner_keypair) = res?;
             let dataset_length = dataset.len() as u64;
