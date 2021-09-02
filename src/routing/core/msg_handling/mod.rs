@@ -75,10 +75,17 @@ impl Core {
                 known_keys.extend(self.network.section_keys());
                 known_keys.push(*self.section.genesis_key());
 
-                if !msg_authority.verify_src_section_key(&known_keys) {
+                if !msg_authority.verify_src_section_key_is_known(&known_keys) {
                     debug!("Untrusted message from {:?}: {:?} ", sender, msg);
-                    let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
-                    return Ok(vec![cmd]);
+
+                    if !matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
+                        let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
+                        return Ok(vec![cmd]);
+                    } else {
+                        // otherwise we might loop
+                        warn!("Dropping untrusted AE Update");
+                        return Ok(vec![]);
+                    }
                 }
                 trace!(
                     "Trusted msg authority in message from {:?}: {:?}",
@@ -98,6 +105,7 @@ impl Core {
                     // make use of AntiEntropy retry/redirect responses.
                     match msg {
                         SystemMsg::AntiEntropyRetry { .. }
+                        | SystemMsg::AntiEntropyUpdate { .. }
                         | SystemMsg::AntiEntropyRedirect { .. }
                         | SystemMsg::JoinRequest(_)
                         | SystemMsg::JoinAsRelocatedRequest(_) => {}
@@ -280,6 +288,20 @@ impl Core {
                 )
                 .await
             }
+            SystemMsg::AntiEntropyUpdate {
+                section_auth,
+                section_signed,
+                proof_chain,
+            } => {
+                trace!("Handling msg: AE-Update from {}", sender);
+                self.handle_anti_entropy_update_msg(
+                    section_auth,
+                    section_signed,
+                    proof_chain,
+                    sender,
+                )
+                .await
+            }
             SystemMsg::Sync {
                 ref section,
                 ref network,
@@ -351,11 +373,11 @@ impl Core {
             } => {
                 trace!("Handling msg: BouncedUntrustedMessage from {}", sender);
 
-                Ok(vec![self.handle_bounced_untrusted_message(
+                Ok(self.handle_bounced_untrusted_message(
                     msg_authority.peer(sender)?,
                     dst_section_pk,
                     *bounced_msg,
-                )?])
+                )?)
             }
             SystemMsg::DkgStart {
                 dkg_key,

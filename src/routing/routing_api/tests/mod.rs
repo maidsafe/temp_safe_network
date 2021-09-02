@@ -1645,7 +1645,7 @@ async fn handle_elders_update() -> Result<()> {
         assert_eq!(section.chain().last_key(), &pk1);
 
         // The message is trusted even by peers who don't yet know the new section key.
-        assert!(msg_authority.verify_src_section_key(&[pk0]));
+        assert!(msg_authority.verify_src_section_key_is_known(&[pk0]));
 
         // Merging the section contained in the message with the original section succeeds.
         assert_matches!(section0.clone().merge(section.clone()), Ok(()));
