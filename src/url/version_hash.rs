@@ -11,8 +11,10 @@ use crate::types::register::EntryHash;
 use multibase::Base;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
-use std::fmt::{self, Display};
-use std::str::FromStr;
+use std::{
+    fmt::{self, Display},
+    str::FromStr,
+};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -26,7 +28,9 @@ pub enum VersionHashError {
 }
 
 /// Version Hash corresponding to the entry hash where the content is stored
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, Copy)]
+#[derive(
+    Debug, Eq, Hash, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Clone, Default, Copy,
+)]
 pub struct VersionHash {
     entry_hash: EntryHash,
 }

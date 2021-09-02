@@ -20,8 +20,8 @@ use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tracing::{info, trace, warn};
-use url::Url;
-use url_parts::NativeUrlParts;
+use url::Url as RustUrl;
+use url_parts::UrlParts;
 pub use version_hash::VersionHash;
 use xor_name::{XorName, XOR_NAME_LEN};
 use xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
@@ -32,8 +32,8 @@ pub const NRS_MAP_TYPE_TAG: u64 = 1_500;
 /// Default base encoding used for XOR URLs
 pub const DEFAULT_XORURL_BASE: XorUrlBase = XorUrlBase::Base32z;
 
-const SAFE_URL_PROTOCOL: &str = "safe://";
-const SAFE_URL_SCHEME: &str = "safe";
+const URL_PROTOCOL: &str = "safe://";
+const URL_SCHEME: &str = "safe";
 const XOR_URL_VERSION_1: u64 = 0x1; // TODO: consider using 16 bits
 const XOR_URL_STR_MAX_LENGTH: usize = 44;
 const XOR_NAME_BYTES_OFFSET: usize = 5; // offset where to find the XoR name bytes
@@ -98,7 +98,7 @@ impl XorUrlBase {
 
 /// We encode the content type that a XOR-URL is targetting, this allows the consumer/user to
 /// treat the content in particular ways when the content requires it.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
 pub enum ContentType {
     #[allow(missing_docs)]
     Raw,
@@ -152,7 +152,7 @@ impl ContentType {
 /// We also encode the native SAFE data type where the content is being stored on the SAFE Network,
 /// this allows us to fetch the targetted data using the corresponding API, regardless of the
 /// data that is being held which is identified by the ContentType instead.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
 pub enum DataType {
     #[allow(missing_docs)]
     SafeKey = 0x00,
@@ -169,7 +169,7 @@ impl std::fmt::Display for DataType {
 }
 
 /// We also encode the data scope - i.e. accessibility on the SAFE Network.
-#[derive(Debug, Copy, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
 pub enum Scope {
     #[allow(missing_docs)]
     Public = 0x00,
@@ -177,19 +177,19 @@ pub enum Scope {
     Private = 0x01,
 }
 
-/// An enumeration of possible NativeUrl types.
+/// An enumeration of possible Url types.
 ///
 /// This is the type of safe url itself,
 /// not the content it points to.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum NativeUrlType {
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub enum UrlType {
     #[allow(missing_docs)]
     XorUrl,
     #[allow(missing_docs)]
     NrsUrl,
 }
 
-impl NativeUrlType {
+impl UrlType {
     #[allow(missing_docs)]
     pub fn value(&self) -> Result<u16> {
         match &*self {
@@ -199,9 +199,9 @@ impl NativeUrlType {
     }
 }
 
-/// Represents a NativeUrl
+/// Represents a Url
 ///
-/// A NativeUrl can be in one of two formats:  nrs or xor.
+/// A Url can be in one of two formats:  nrs or xor.
 ///   aka:  nrsurl or xorurl
 ///
 /// Here is a breakdown of how name terminology is used.
@@ -228,8 +228,8 @@ impl NativeUrlType {
 ///   public_name()   --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
 ///   top_name() --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
 ///   sub_names()   --> None
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct NativeUrl {
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Ord, PartialOrd)]
+pub struct Url {
     encoding_version: u64,      // currently only v1 supported
     xor_name: XorName,          // applies to nrsurl and xorurl
     public_name: String,        // "a.b.name" in "a.b.name"
@@ -245,7 +245,7 @@ pub struct NativeUrl {
     query_string: String,                 // query-string, no separator, url-encoded
     fragment: String,                     // fragment, no separator
     content_version: Option<VersionHash>, // convenience for ?v=<version
-    native_url_type: NativeUrlType,       // nrsurl or xorurl
+    url_type: UrlType,                    // nrsurl or xorurl
 }
 
 /// This implementation performs semi-rigorous validation,
@@ -257,16 +257,16 @@ pub struct NativeUrl {
 /// invalid URLs.  GIGO.
 ///
 /// As such, it is recommended to check validity by
-/// calling NativeUrl::validate() after instantiating
+/// calling Url::validate() after instantiating
 /// or modifying.
 ///
 // TBD: In the future, we may want to perform all validity
 // checks in the setters, however, this requires modifying
 // setters to return a Result, which potentially impacts a
 // bunch of code elsewhere.
-impl NativeUrl {
+impl Url {
     #[allow(clippy::too_many_arguments)]
-    /// Instantiates a new NativeUrl
+    /// Instantiates a new Url
     ///
     /// Performs some basic validation checks, however it is
     /// possible to create invalid urls using this method.
@@ -301,7 +301,7 @@ impl NativeUrl {
         let top_name: String;
         let sub_names_str: String;
         let sub_names_vec: Vec<String>;
-        let native_url_type: NativeUrlType;
+        let url_type: UrlType;
         if let Some(nh) = nrs_name {
             // we have an NRS Url
             if nh.is_empty() {
@@ -309,8 +309,8 @@ impl NativeUrl {
                 return Err(Error::InvalidInput(msg));
             }
             // Validate that nrs_name hash matches xor_name
-            let tmpurl = format!("{}{}", SAFE_URL_PROTOCOL, nh);
-            let parts = NativeUrlParts::parse(&tmpurl, false)?;
+            let tmpurl = format!("{}{}", URL_PROTOCOL, nh);
+            let parts = UrlParts::parse(&tmpurl, false)?;
             let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
             if hashed_name != xor_name {
                 let msg = format!(
@@ -323,14 +323,14 @@ impl NativeUrl {
             top_name = parts.top_name;
             sub_names_str = parts.sub_names;
             sub_names_vec = parts.sub_names_vec; // use sub_names from nrs_name, ignoring sub_names arg, in case they do not match.
-            native_url_type = NativeUrlType::NrsUrl;
+            url_type = UrlType::NrsUrl;
         } else {
             // we have an xorurl
             public_name = String::default(); // set later
             top_name = String::default(); // set later
             sub_names_vec = sub_names.unwrap_or_else(Vec::new);
             sub_names_str = sub_names_vec.join(".");
-            native_url_type = NativeUrlType::XorUrl;
+            url_type = UrlType::XorUrl;
 
             for s in &sub_names_vec {
                 if s.is_empty() {
@@ -341,7 +341,7 @@ impl NativeUrl {
         }
 
         // finally, instantiate.
-        let mut safe_url = Self {
+        let mut url = Self {
             encoding_version: XOR_URL_VERSION_1,
             xor_name,
             public_name,
@@ -357,35 +357,31 @@ impl NativeUrl {
             query_string: String::default(), // set below.
             fragment: fragment.unwrap_or("").to_string(),
             content_version: None, // set below.
-            native_url_type,
+            url_type,
         };
 
         // now we can call ::name_to_base(), to generate the top_name.
-        if safe_url.native_url_type == NativeUrlType::XorUrl {
-            safe_url.top_name = safe_url.name_to_base(DEFAULT_XORURL_BASE, false);
-            let sep = if safe_url.sub_names.is_empty() {
-                ""
-            } else {
-                "."
-            };
-            safe_url.public_name = format!("{}{}{}", safe_url.sub_names(), sep, safe_url.top_name);
+        if url.url_type == UrlType::XorUrl {
+            url.top_name = url.name_to_base(DEFAULT_XORURL_BASE, false);
+            let sep = if url.sub_names.is_empty() { "" } else { "." };
+            url.public_name = format!("{}{}{}", url.sub_names(), sep, url.top_name);
         }
 
         // we call this to add leading slash if needed
         // but we do NOT want percent-encoding as caller
         // must already provide it that way.
-        safe_url.set_path_internal(path.unwrap_or(""), false);
+        url.set_path_internal(path.unwrap_or(""), false);
 
         // we set query_string and content_version using setters to
         // ensure they are in sync.
-        safe_url.set_query_string(query_string.unwrap_or(""))?;
+        url.set_query_string(query_string.unwrap_or(""))?;
 
         // If present, content_version will override ?v in query string.
         if let Some(version) = content_version {
-            safe_url.set_content_version(Some(version));
+            url.set_content_version(Some(version));
         }
 
-        Ok(safe_url)
+        Ok(url)
     }
 
     /// A non-member utility function to check if a media-type is currently supported by XOR-URL encoding
@@ -393,7 +389,7 @@ impl NativeUrl {
         MEDIA_TYPE_CODES.get(media_type).is_some()
     }
 
-    /// Parses a safe url into NativeUrl
+    /// Parses a safe url into Url
     ///
     /// # Arguments
     ///
@@ -411,13 +407,13 @@ impl NativeUrl {
         }
     }
 
-    /// Parses an NRS Url into NativeUrl
+    /// Parses an NRS Url into Url
     ///
     /// # Arguments
     ///
     /// * `nrsurl` - an nrsurl.
     pub fn from_nrsurl(nrsurl: &str) -> Result<Self> {
-        let parts = NativeUrlParts::parse(nrsurl, false)?;
+        let parts = UrlParts::parse(nrsurl, false)?;
 
         let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
 
@@ -436,13 +432,13 @@ impl NativeUrl {
         )
     }
 
-    /// Parses a XorUrl into NativeUrl
+    /// Parses a XorUrl into Url
     ///
     /// # Arguments
     ///
     /// * `xorurl` - an xorurl.
     pub fn from_xorurl(xorurl: &str) -> Result<Self> {
-        let parts = NativeUrlParts::parse(xorurl, true)?;
+        let parts = UrlParts::parse(xorurl, true)?;
 
         let (_base, xorurl_bytes): (Base, Vec<u8>) = base_decode(&parts.top_name)
             .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
@@ -551,7 +547,7 @@ impl NativeUrl {
 
     /// The url scheme.  Only 'safe' scheme is presently supported.
     pub fn scheme(&self) -> &str {
-        SAFE_URL_SCHEME
+        URL_SCHEME
     }
 
     /// returns encoding version of xorurl
@@ -640,8 +636,8 @@ impl NativeUrl {
 
     /// sets sub_names portion of URL
     pub fn set_sub_names(&mut self, sub_names: &str) -> Result<()> {
-        let tmpurl = format!("{}{}.{}", SAFE_URL_PROTOCOL, sub_names, self.top_name());
-        let parts = NativeUrlParts::parse(&tmpurl, false)?;
+        let tmpurl = format!("{}{}.{}", URL_PROTOCOL, sub_names, self.top_name());
+        let parts = UrlParts::parse(&tmpurl, false)?;
         self.sub_names = parts.sub_names;
         self.sub_names_vec = parts.sub_names_vec;
         self.public_name = parts.public_name;
@@ -710,7 +706,7 @@ impl NativeUrl {
         // eg: by storing parsed key/val pairs.
         // Parsing of the query string is checked/validated by
         // set_query_string().  Thus, it should never be invalid, else
-        // we have a serious bug in NativeUrl impl.
+        // we have a serious bug in Url impl.
         self.set_query_key(URL_VERSION_QUERY_NAME, v_option)
             .unwrap_or_else(|e| {
                 warn!("{}", e);
@@ -854,20 +850,20 @@ impl NativeUrl {
 
     /// returns true if an NrsUrl, false if an XorUrl
     pub fn is_nrsurl(&self) -> bool {
-        self.native_url_type == NativeUrlType::NrsUrl
+        self.url_type == UrlType::NrsUrl
     }
 
     /// returns true if an XorUrl, false if an NrsUrl
     pub fn is_xorurl(&self) -> bool {
-        self.native_url_type == NativeUrlType::XorUrl
+        self.url_type == UrlType::XorUrl
     }
 
-    /// returns type of this native_url.
+    /// returns type of this url.
     ///
     /// for type of the linked content, see
     ///   ::content_type()
-    pub fn native_url_type(&self) -> &NativeUrlType {
-        &self.native_url_type
+    pub fn url_type(&self) -> &UrlType {
+        &self.url_type
     }
 
     // XOR-URL encoding format (var length from 37 to 45 bytes):
@@ -900,7 +896,7 @@ impl NativeUrl {
 
         let url = format!(
             "{}{}{}{}{}",
-            SAFE_URL_PROTOCOL, self.public_name, self.path, query_string, fragment
+            URL_PROTOCOL, self.public_name, self.path, query_string, fragment
         );
 
         Some(url)
@@ -916,7 +912,7 @@ impl NativeUrl {
         // serialize full xorurl
         format!(
             "{}{}{}{}{}",
-            SAFE_URL_PROTOCOL, name, self.path, query_string, fragment
+            URL_PROTOCOL, name, self.path, query_string, fragment
         )
     }
 
@@ -970,9 +966,9 @@ impl NativeUrl {
         urlencoding::encode(s)
     }
 
-    /// Validates that a NativeUrl instance can be parsed correctly.
+    /// Validates that a Url instance can be parsed correctly.
     ///
-    /// NativeUrl::from_url() performs rigorous validation,
+    /// Url::from_url() performs rigorous validation,
     /// however setters and new() do not enforce all the rules
     ///
     /// This routine enables a caller to easily validate
@@ -998,7 +994,7 @@ impl NativeUrl {
         content_version: Option<VersionHash>,
         base: XorUrlBase,
     ) -> Result<String> {
-        let native_url = NativeUrl::new(
+        let url = Url::new(
             xor_name,
             nrs_name,
             type_tag,
@@ -1012,12 +1008,12 @@ impl NativeUrl {
             content_version,
         )?;
 
-        Ok(native_url.to_base(base))
+        Ok(url.to_base(base))
     }
 
     /// A non-member SafeKey encoder function for convenience
     pub fn encode_safekey(xor_name: XorName, base: XorUrlBase) -> Result<String> {
-        NativeUrl::encode(
+        Url::encode(
             xor_name,
             None,
             0,
@@ -1040,7 +1036,7 @@ impl NativeUrl {
         content_type: ContentType,
         base: XorUrlBase,
     ) -> Result<String> {
-        NativeUrl::encode(
+        Url::encode(
             xor_name,
             None,
             0,
@@ -1064,7 +1060,7 @@ impl NativeUrl {
         content_type: ContentType,
         base: XorUrlBase,
     ) -> Result<String> {
-        NativeUrl::encode(
+        Url::encode(
             xor_name,
             None,
             type_tag,
@@ -1081,9 +1077,9 @@ impl NativeUrl {
     }
 
     // utility to generate a dummy url from a query string.
-    fn query_string_to_url(query_str: &str) -> Result<Url> {
+    fn query_string_to_url(query_str: &str) -> Result<RustUrl> {
         let dummy = format!("file://dummy?{}", query_str);
-        match Url::parse(&dummy) {
+        match RustUrl::parse(&dummy) {
             Ok(u) => Ok(u),
             Err(_e) => {
                 let msg = format!("Invalid query string: {}", query_str);
@@ -1150,12 +1146,12 @@ impl NativeUrl {
             return;
         }
 
-        // impl note: this func tries to behave like url::Url::set_path()
+        // impl note: this func tries to behave like RustUrl::set_path()
         // with respect to percent-encoding each path component.
         //
         // tbd: It might be more correct to simply instantiate a
         // dummy URL and call set_path(), return path();
-        // counter-argument is that Url::set_path() does not
+        // counter-argument is that RustUrl::set_path() does not
         // prefix leading slash and allows urls to be created
         // that merge name and path together.
         let parts: Vec<&str> = path.split('/').collect();
@@ -1213,7 +1209,7 @@ impl NativeUrl {
     }
 }
 
-impl fmt::Display for NativeUrl {
+impl fmt::Display for Url {
     /// serializes the URL to a string.
     ///
     /// an NrsUrl will be serialized in NrsUrl form.
@@ -1253,13 +1249,13 @@ mod tests {
         }
 
     #[test]
-    fn test_native_url_new_validation() -> Result<()> {
+    fn test_url_new_validation() -> Result<()> {
         // Tests some errors when calling Self::new()
 
         let xor_name = XorName(*b"12345678901234567890123456789012");
 
         // test: "Media-type '{}' not supported. You can use 'ContentType::Raw' as the 'content_type' for this type of content",
-        let result = NativeUrl::new(
+        let result = Url::new(
             xor_name,
             None,
             NRS_MAP_TYPE_TAG,
@@ -1275,7 +1271,7 @@ mod tests {
         verify_expected_result!(result, Err(Error::InvalidMediaType(err)) if err.contains("You can use 'ContentType::Raw'"))?;
 
         // test: "nrs_name cannot be empty string."
-        let result = NativeUrl::new(
+        let result = Url::new(
             xor_name,
             Some(""), // passing empty string as nrs name
             NRS_MAP_TYPE_TAG,
@@ -1291,7 +1287,7 @@ mod tests {
         verify_expected_result!(result, Err(Error::InvalidInput(err)) if err.contains("nrs_name cannot be empty string."))?;
 
         // test: "input mis-match. nrs_name `{}` does not hash to xor_name `{}`"
-        let result = NativeUrl::new(
+        let result = Url::new(
             xor_name,
             Some("a.b.c"), // passing nrs name not matching xor_name.
             NRS_MAP_TYPE_TAG,
@@ -1307,7 +1303,7 @@ mod tests {
         verify_expected_result!(result, Err(Error::InvalidInput(err)) if err.contains("does not hash to xor_name"))?;
 
         // test: "Host contains empty subname" (in nrs name)
-        let result = NativeUrl::new(
+        let result = Url::new(
             xor_name,
             Some("a..b.c"), // passing empty sub-name in nrs name
             NRS_MAP_TYPE_TAG,
@@ -1323,7 +1319,7 @@ mod tests {
         verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("name contains empty subname"))?;
 
         // test: "empty subname" (in xorurl sub_names)
-        let result = NativeUrl::new(
+        let result = Url::new(
             xor_name,
             None, // not NRS
             NRS_MAP_TYPE_TAG,
@@ -1342,9 +1338,9 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_base32_encoding() -> Result<()> {
+    fn test_url_base32_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = NativeUrl::encode(
+        let xorurl = Url::encode(
             xor_name,
             None,
             0xa632_3c4d_4a32,
@@ -1365,9 +1361,9 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_base32z_encoding() -> Result<()> {
+    fn test_url_base32z_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = NativeUrl::encode_blob(
+        let xorurl = Url::encode_blob(
             xor_name,
             Scope::Public,
             ContentType::Raw,
@@ -1379,9 +1375,9 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_base64_encoding() -> Result<()> {
+    fn test_url_base64_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = NativeUrl::encode_register(
+        let xorurl = Url::encode_register(
             xor_name,
             4_584_545,
             Scope::Public,
@@ -1390,23 +1386,23 @@ mod tests {
         )?;
         let base64_xorurl = "safe://mAQACAAIxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMkX0YQ";
         assert_eq!(xorurl, base64_xorurl);
-        let native_url = NativeUrl::from_url(base64_xorurl)?;
-        assert_eq!(base64_xorurl, native_url.to_base(XorUrlBase::Base64));
-        assert_eq!("", native_url.path());
-        assert_eq!(XOR_URL_VERSION_1, native_url.encoding_version());
-        assert_eq!(xor_name, native_url.xorname());
-        assert_eq!(4_584_545, native_url.type_tag());
-        assert_eq!(Scope::Public, native_url.scope());
-        assert_eq!(DataType::Register, native_url.data_type());
-        assert_eq!(ContentType::FilesContainer, native_url.content_type());
+        let url = Url::from_url(base64_xorurl)?;
+        assert_eq!(base64_xorurl, url.to_base(XorUrlBase::Base64));
+        assert_eq!("", url.path());
+        assert_eq!(XOR_URL_VERSION_1, url.encoding_version());
+        assert_eq!(xor_name, url.xorname());
+        assert_eq!(4_584_545, url.type_tag());
+        assert_eq!(Scope::Public, url.scope());
+        assert_eq!(DataType::Register, url.data_type());
+        assert_eq!(ContentType::FilesContainer, url.content_type());
         Ok(())
     }
 
     #[test]
-    fn test_native_url_default_base_encoding() -> Result<()> {
+    fn test_url_default_base_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
-        let xorurl = NativeUrl::encode_blob(
+        let xorurl = Url::encode_blob(
             xor_name,
             Scope::Public,
             ContentType::Raw,
@@ -1417,7 +1413,7 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_decoding() -> Result<()> {
+    fn test_url_decoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
         let subdirs = "/dir1/dir2";
@@ -1425,7 +1421,7 @@ mod tests {
         let query_string = "k1=v1&k2=v2";
         let query_string_v = format!("{}&v={}", query_string, content_version);
         let fragment = "myfragment";
-        let xorurl = NativeUrl::encode(
+        let xorurl = Url::encode(
             xor_name,
             None,
             type_tag,
@@ -1439,26 +1435,26 @@ mod tests {
             Some(content_version),
             XorUrlBase::Base32z,
         )?;
-        let native_url = NativeUrl::from_url(&xorurl)?;
+        let url = Url::from_url(&xorurl)?;
 
-        assert_eq!(subdirs, native_url.path());
-        assert_eq!(XOR_URL_VERSION_1, native_url.encoding_version());
-        assert_eq!(xor_name, native_url.xorname());
-        assert_eq!(type_tag, native_url.type_tag());
-        assert_eq!(Scope::Public, native_url.scope());
-        assert_eq!(DataType::Blob, native_url.data_type());
-        assert_eq!(ContentType::Raw, native_url.content_type());
-        assert_eq!(Some(content_version), native_url.content_version());
-        assert_eq!(query_string_v, native_url.query_string());
-        assert_eq!(fragment, native_url.fragment());
+        assert_eq!(subdirs, url.path());
+        assert_eq!(XOR_URL_VERSION_1, url.encoding_version());
+        assert_eq!(xor_name, url.xorname());
+        assert_eq!(type_tag, url.type_tag());
+        assert_eq!(Scope::Public, url.scope());
+        assert_eq!(DataType::Blob, url.data_type());
+        assert_eq!(ContentType::Raw, url.content_type());
+        assert_eq!(Some(content_version), url.content_version());
+        assert_eq!(query_string_v, url.query_string());
+        assert_eq!(fragment, url.fragment());
         Ok(())
     }
 
     #[test]
-    fn test_native_url_decoding_with_path() -> Result<()> {
+    fn test_url_decoding_with_path() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let xorurl = NativeUrl::encode_register(
+        let xorurl = Url::encode_register(
             xor_name,
             type_tag,
             Scope::Public,
@@ -1467,26 +1463,23 @@ mod tests {
         )?;
 
         let xorurl_with_path = format!("{}/subfolder/file", xorurl);
-        let native_url_with_path = NativeUrl::from_url(&xorurl_with_path)?;
-        assert_eq!(
-            xorurl_with_path,
-            native_url_with_path.to_base(XorUrlBase::Base32z)
-        );
-        assert_eq!("/subfolder/file", native_url_with_path.path());
-        assert_eq!(XOR_URL_VERSION_1, native_url_with_path.encoding_version());
-        assert_eq!(xor_name, native_url_with_path.xorname());
-        assert_eq!(type_tag, native_url_with_path.type_tag());
-        assert_eq!(Scope::Public, native_url_with_path.scope());
-        assert_eq!(DataType::Register, native_url_with_path.data_type());
-        assert_eq!(ContentType::Wallet, native_url_with_path.content_type());
+        let url_with_path = Url::from_url(&xorurl_with_path)?;
+        assert_eq!(xorurl_with_path, url_with_path.to_base(XorUrlBase::Base32z));
+        assert_eq!("/subfolder/file", url_with_path.path());
+        assert_eq!(XOR_URL_VERSION_1, url_with_path.encoding_version());
+        assert_eq!(xor_name, url_with_path.xorname());
+        assert_eq!(type_tag, url_with_path.type_tag());
+        assert_eq!(Scope::Public, url_with_path.scope());
+        assert_eq!(DataType::Register, url_with_path.data_type());
+        assert_eq!(ContentType::Wallet, url_with_path.content_type());
         Ok(())
     }
 
     #[test]
-    fn test_native_url_decoding_with_subname() -> Result<()> {
+    fn test_url_decoding_with_subname() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let xorurl_with_subname = NativeUrl::encode(
+        let xorurl_with_subname = Url::encode(
             xor_name,
             None,
             type_tag,
@@ -1502,47 +1495,47 @@ mod tests {
         )?;
 
         assert!(xorurl_with_subname.contains("safe://sub."));
-        let native_url_with_subname = NativeUrl::from_url(&xorurl_with_subname)?;
+        let url_with_subname = Url::from_url(&xorurl_with_subname)?;
         assert_eq!(
             xorurl_with_subname,
-            native_url_with_subname.to_base(XorUrlBase::Base32z)
+            url_with_subname.to_base(XorUrlBase::Base32z)
         );
-        assert_eq!("", native_url_with_subname.path());
-        assert_eq!(1, native_url_with_subname.encoding_version());
-        assert_eq!(xor_name, native_url_with_subname.xorname());
-        assert_eq!(type_tag, native_url_with_subname.type_tag());
-        assert_eq!(&["sub"], native_url_with_subname.sub_names_vec());
+        assert_eq!("", url_with_subname.path());
+        assert_eq!(1, url_with_subname.encoding_version());
+        assert_eq!(xor_name, url_with_subname.xorname());
+        assert_eq!(type_tag, url_with_subname.type_tag());
+        assert_eq!(&["sub"], url_with_subname.sub_names_vec());
         assert_eq!(
             ContentType::NrsMapContainer,
-            native_url_with_subname.content_type()
+            url_with_subname.content_type()
         );
         Ok(())
     }
 
     #[test]
-    fn test_native_url_encoding_decoding_with_media_type() -> Result<()> {
+    fn test_url_encoding_decoding_with_media_type() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = NativeUrl::encode_blob(
+        let xorurl = Url::encode_blob(
             xor_name,
             Scope::Public,
             ContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,
         )?;
 
-        let native_url = NativeUrl::from_url(&xorurl)?;
+        let url = Url::from_url(&xorurl)?;
         assert_eq!(
             ContentType::MediaType("text/html".to_string()),
-            native_url.content_type()
+            url.content_type()
         );
         Ok(())
     }
 
     #[test]
-    fn test_native_url_too_long() -> Result<()> {
+    fn test_url_too_long() -> Result<()> {
         let xorurl =
             "safe://heyyynunctugo4ucp3a8radnctugo4ucp3a8radnctugo4ucp3a8radnctmfp5zq75zq75zq7";
 
-        match NativeUrl::from_xorurl(xorurl) {
+        match Url::from_xorurl(xorurl) {
             Ok(_) => Err(eyre!(
                 "Unexpectedly parsed an invalid (too long) xorurl".to_string(),
             )),
@@ -1555,9 +1548,9 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_too_short() -> Result<()> {
+    fn test_url_too_short() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = NativeUrl::encode_blob(
+        let xorurl = Url::encode_blob(
             xor_name,
             Scope::Public,
             ContentType::MediaType("text/html".to_string()),
@@ -1566,7 +1559,7 @@ mod tests {
 
         // TODO: we need to add checksum to be able to detect even 1 single char change
         let len = xorurl.len() - 2;
-        match NativeUrl::from_xorurl(&xorurl[..len]) {
+        match Url::from_xorurl(&xorurl[..len]) {
             Ok(_) => Err(eyre!(
                 "Unexpectedly parsed an invalid (too short) xorurl".to_string(),
             )),
@@ -1579,8 +1572,8 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_query_key_first() -> Result<()> {
-        let x = NativeUrl::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
+    fn test_url_query_key_first() -> Result<()> {
+        let x = Url::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
         let name = x.query_key_first("name");
         assert_eq!(name, Some("John Doe".to_string()));
 
@@ -1588,8 +1581,8 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_query_key_last() -> Result<()> {
-        let x = NativeUrl::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
+    fn test_url_query_key_last() -> Result<()> {
+        let x = Url::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
         let name = x.query_key_last("name");
         assert_eq!(name, Some("Jane Doe".to_string()));
 
@@ -1597,8 +1590,8 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_query_key() -> Result<()> {
-        let x = NativeUrl::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
+    fn test_url_query_key() -> Result<()> {
+        let x = Url::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
         let name = x.query_key("name");
         assert_eq!(name, vec!["John Doe".to_string(), "Jane Doe".to_string()]);
 
@@ -1606,8 +1599,8 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_set_query_key() -> Result<()> {
-        let mut x = NativeUrl::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
+    fn test_url_set_query_key() -> Result<()> {
+        let mut x = Url::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
 
         // set_query_key should replace the multiple name= with a single instance.
         let peggy_sue = "Peggy Sue".to_string();
@@ -1650,8 +1643,8 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_set_sub_names() -> Result<()> {
-        let mut x = NativeUrl::from_url("safe://sub1.sub2.myname")?;
+    fn test_url_set_sub_names() -> Result<()> {
+        let mut x = Url::from_url("safe://sub1.sub2.myname")?;
         assert_eq!(x.sub_names(), "sub1.sub2");
         assert_eq!(x.sub_names_vec(), ["sub1", "sub2"]);
 
@@ -1664,8 +1657,8 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_set_content_version() -> Result<()> {
-        let mut x = NativeUrl::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
+    fn test_url_set_content_version() -> Result<()> {
+        let mut x = Url::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
 
         let version_hash = VersionHash::default();
         x.set_content_version(Some(version_hash));
@@ -1691,14 +1684,14 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_path() -> Result<()> {
+    fn test_url_path() -> Result<()> {
         // Make sure we can read percent-encoded paths, and set them as well.
-        // Here we verify that url::Url has the same path encoding behavior
+        // Here we verify that RustUrl has the same path encoding behavior
         // as our implementation...for better or worse.
-        let mut x = NativeUrl::from_url("safe://domain/path/to/my%20file.txt")?;
-        let mut u = Url::parse("safe://domain/path/to/my%20file.txt").map_err(|e| {
+        let mut x = Url::from_url("safe://domain/path/to/my%20file.txt")?;
+        let mut u = RustUrl::parse("safe://domain/path/to/my%20file.txt").map_err(|e| {
             Error::InvalidInput(format!(
-                "Unexpectedly failed to parse with third-party Url::parse: {}",
+                "Unexpectedly failed to parse with third-party RustUrl::parse: {}",
                 e
             ))
         })?;
@@ -1731,7 +1724,7 @@ mod tests {
         assert_eq!(x.to_string(), "safe://domain");
         assert_eq!(x.to_string(), u.to_string());
 
-        // TODO: url::Url preserves the missing slash, and allows path to
+        // TODO: RustUrl preserves the missing slash, and allows path to
         // merge with domain...seems kind of broken.  bug?
         x.set_path("/");
         u.set_path("/");
@@ -1744,13 +1737,13 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_to_string() -> Result<()> {
+    fn test_url_to_string() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
         let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
         let xorurl = "safe://my.sub.hyryygyynpm7tjdim96rdtz9kkyc758zqth5b3ynzya69njrjshgu7w84k3tomzy/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
 
-        let nrs = NativeUrl::from_url(nrsurl)?;
-        let xor = NativeUrl::from_url(xorurl)?;
+        let nrs = Url::from_url(nrsurl)?;
+        let xor = Url::from_url(xorurl)?;
 
         assert_eq!(nrs.to_string(), nrsurl);
         assert_eq!(xor.to_string(), xorurl);
@@ -1765,16 +1758,16 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_parts() -> Result<()> {
+    fn test_url_parts() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
         let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
         let xorurl = "safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
 
-        let nrs = NativeUrl::from_url(nrsurl)?;
-        let xor = NativeUrl::from_url(xorurl)?;
+        let nrs = Url::from_url(nrsurl)?;
+        let xor = Url::from_url(xorurl)?;
 
-        assert_eq!(nrs.scheme(), SAFE_URL_SCHEME);
-        assert_eq!(xor.scheme(), SAFE_URL_SCHEME);
+        assert_eq!(nrs.scheme(), URL_SCHEME);
+        assert_eq!(xor.scheme(), URL_SCHEME);
 
         assert_eq!(nrs.public_name(), "my.sub.domain");
         assert_eq!(
@@ -1819,60 +1812,60 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_from_url_validation() -> Result<()> {
+    fn test_url_from_url_validation() -> Result<()> {
         // Tests basic URL syntax errors that are common to
         // both ::from_xorurl() and ::from_nrsurl()
 
-        let result = NativeUrl::from_url("withoutscheme");
+        let result = Url::from_url("withoutscheme");
         verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("relative URL without a base"))?;
 
-        let result = NativeUrl::from_url("http://badscheme");
+        let result = Url::from_url("http://badscheme");
         verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("invalid scheme"))?;
 
-        let result = NativeUrl::from_url("safe:///emptyname");
+        let result = Url::from_url("safe:///emptyname");
         verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("missing name"))?;
 
-        let result = NativeUrl::from_url("safe://space in name");
+        let result = Url::from_url("safe://space in name");
         verify_expected_result!(result, Err(Error::InvalidInput(err)) if err.contains("The URL cannot contain whitespace"))?;
 
-        let result = NativeUrl::from_url("safe://my.sub..name");
+        let result = Url::from_url("safe://my.sub..name");
         verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("name contains empty subname"))?;
 
-        let result = NativeUrl::from_url("safe://name//");
+        let result = Url::from_url("safe://name//");
         verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("path contains empty component"))?;
 
         // note: ?? is actually ok in a standard url.  I suppose no harm in allowing for safe
         // see:  https://stackoverflow.com/questions/2924160/is-it-valid-to-have-more-than-one-question-mark-in-a-url
-        let _ = NativeUrl::from_url("safe://name??foo=bar")?;
+        let _ = Url::from_url("safe://name??foo=bar")?;
 
         // note: ## and #frag1#frag2 are accepted by rust URL parser.
         // tbd: if we want to disallow.
         // see: https://stackoverflow.com/questions/10850781/multiple-hash-signs-in-url
-        let _ = NativeUrl::from_url("safe://name?foo=bar##fragment")?;
+        let _ = Url::from_url("safe://name?foo=bar##fragment")?;
 
         // note: single%percent/in/path is accepted by rust URL parser.
         // tbd: if we want to disallow.
-        let _ = NativeUrl::from_nrsurl("safe://name/single%percent/in/path")?;
+        let _ = Url::from_nrsurl("safe://name/single%percent/in/path")?;
 
         Ok(())
     }
 
     #[test]
-    fn test_native_url_from_xorurl_validation() -> Result<()> {
+    fn test_url_from_xorurl_validation() -> Result<()> {
         // Tests some URL errors that are specific to xorurl
 
         let msg = "Expected error";
         let wrong_err = "Wrong error type".to_string();
 
         // test: "Failed to decode XOR-URL"
-        let result = NativeUrl::from_xorurl("safe://invalidxor").expect_err(msg);
+        let result = Url::from_xorurl("safe://invalidxor").expect_err(msg);
         match result {
             Error::InvalidXorUrl(e) => assert!(e.contains("Failed to decode XOR-URL")),
             _ => bail!(wrong_err),
         }
 
         // test: xorurl with a space in it
-        let result = NativeUrl::from_xorurl(
+        let result = Url::from_xorurl(
             "safe://hnyydy iixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh",
         )
         .expect_err(msg);
@@ -1895,19 +1888,19 @@ mod tests {
     }
 
     #[test]
-    fn test_native_url_validate() -> Result<()> {
+    fn test_url_validate() -> Result<()> {
         let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
         let trailing_slash = "safe://my.domain/";
         let double_q = "safe://my.domain/??foo=bar";
 
-        let nrs = NativeUrl::from_url(nrsurl)?;
-        let xor = NativeUrl::from_url(&nrs.to_xorurl_string())?;
+        let nrs = Url::from_url(nrsurl)?;
+        let xor = Url::from_url(&nrs.to_xorurl_string())?;
 
         assert!(nrs.validate().is_ok());
         assert!(xor.validate().is_ok());
 
-        assert!(NativeUrl::from_url(trailing_slash)?.validate().is_ok());
-        assert!(NativeUrl::from_url(double_q)?.validate().is_ok());
+        assert!(Url::from_url(trailing_slash)?.validate().is_ok());
+        assert!(Url::from_url(double_q)?.validate().is_ok());
 
         Ok(())
     }
