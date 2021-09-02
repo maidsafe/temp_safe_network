@@ -28,7 +28,7 @@ use safe_network::{
         utils::generate_random_vector, utils::test_utils::read_network_conn_info, Client, Config,
     },
     types::ChunkAddress,
-    url::{ContentType, NativeUrl, Scope, DEFAULT_XORURL_BASE},
+    url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -240,7 +240,7 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
     println!("Storing data w/ hash {:?}", output);
 
     let address = client.store_public_blob(&raw_data).await?;
-    let xorurl = NativeUrl::encode_blob(
+    let xorurl = Url::encode_blob(
         *address.name(),
         Scope::Public,
         ContentType::Raw,
