@@ -46,7 +46,7 @@ impl Network {
             local_addr: config
                 .local_addr
                 .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::LOCALHOST, rand::random()))),
-            bootstrap_nodes: config.bootstrap_nodes.clone(),
+            bootstrap_nodes: config.hard_coded_contacts.clone(),
             network_config: config.network_config().clone(),
             keypair: None,
         };

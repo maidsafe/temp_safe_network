@@ -117,10 +117,13 @@ async fn main() -> Result<()> {
         !command_line_args.skip_igd
     );
 
-    if !command_line_args.bootstrap_nodes.is_empty() {
-        assert_eq!(command_line_args.bootstrap_nodes, config.bootstrap_nodes)
+    if !command_line_args.hard_coded_contacts.is_empty() {
+        assert_eq!(
+            command_line_args.hard_coded_contacts,
+            config.hard_coded_contacts
+        )
     } else {
-        assert_eq!(file_config.bootstrap_nodes, config.bootstrap_nodes)
+        assert_eq!(file_config.hard_coded_contacts, config.hard_coded_contacts)
     }
 
     if command_line_args.max_msg_size_allowed.is_some() {

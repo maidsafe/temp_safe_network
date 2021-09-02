@@ -98,7 +98,7 @@ pub struct Config {
         default_value = "[]",
         parse(try_from_str = serde_json::from_str)
     )]
-    pub bootstrap_nodes: BTreeSet<SocketAddr>,
+    pub hard_coded_contacts: BTreeSet<SocketAddr>,
     /// This is the maximum message size we'll allow the peer to send to us. Any bigger message and
     /// we'll error out probably shutting down the connection to the peer. If none supplied we'll
     /// default to the documented constant.
@@ -140,11 +140,6 @@ impl Config {
 
         let mut config = Config::default();
 
-        if cfg!(feature = "test-utils") {
-            println!("skipping igd");
-            config.skip_igd = true;
-        }
-
         let mut command_line_args = Config::from_args();
         command_line_args.validate()?;
 
@@ -152,10 +147,10 @@ impl Config {
             command_line_args.local_addr = Some(socket_addr);
         }
 
-        if command_line_args.bootstrap_nodes.is_empty() {
+        if command_line_args.hard_coded_contacts.is_empty() {
             debug!("Using node connection config file as no hard coded contacts were passed in");
             if let Ok(info) = read_conn_info_from_file().await {
-                command_line_args.bootstrap_nodes = info;
+                command_line_args.hard_coded_contacts = info;
             }
         }
 
@@ -237,8 +232,8 @@ impl Config {
 
         self.network_config.forward_port = !config.skip_igd;
 
-        if !config.bootstrap_nodes.is_empty() {
-            self.bootstrap_nodes = config.bootstrap_nodes;
+        if !config.hard_coded_contacts.is_empty() {
+            self.hard_coded_contacts = config.hard_coded_contacts;
         }
 
         if let Some(max_msg_size) = config.max_msg_size_allowed {
