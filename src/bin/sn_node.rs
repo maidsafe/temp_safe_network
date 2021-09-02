@@ -27,6 +27,7 @@
     unused_results
 )]
 
+use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
@@ -159,6 +160,21 @@ async fn run_node() -> Result<()> {
     let (node, event_stream) = loop {
         match Node::new(&config).await {
             Ok(result) => break result,
+            Err(Error::Routing(routing::Error::CannotConnectEndpoint {
+                err: qp2p::EndpointError::Upnp(error),
+            })) => {
+                return Err(error).suggestion(
+                    "You can disable port forwarding by supplying --skip-igd. Without port\n\
+                    forwarding, your machine must be publicly reachable by the given\n\
+                    --public-addr. If your machine is not publicly reachable, you may have to\n\
+                    adjust your router settings to either:\n\
+                    \n\
+                    - Resolve the error (e.g. by enabling UPnP).\n\
+                    - Manually configure port forwarding, such that your machine is publicly \
+                      reachable, and supplying that address with --public-addr."
+                        .header("Disable port forwarding or change your router settings"),
+                );
+            }
             Err(Error::Routing(routing::Error::TryJoinLater)) => {
                 println!("{}", log);
                 info!("{}", log);
