@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    system::{KeyedSig, SectionAuth, SystemMsg},
+    system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
     MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
@@ -33,18 +33,22 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
+        members: Option<SectionPeers>,
         sender: SocketAddr,
     ) -> Result<Vec<Command>> {
         info!(
             "Anti-Entropy: section update message received from peer: {}",
             sender
         );
+        let snapshot = self.state_snapshot();
 
-        match self.network.update_remote_section_sap(
-            SectionAuth {
-                value: section_auth.clone(),
-                sig: section_signed,
-            },
+        let signed_section_auth = SectionAuth {
+            value: section_auth.clone(),
+            sig: section_signed,
+        };
+
+        match self.network.verify_with_chain_and_update(
+            signed_section_auth.clone(),
             &proof_chain,
             self.section.chain(),
         ) {
@@ -60,17 +64,20 @@ impl Core {
                         section_auth.prefix, section_auth
                     );
                 }
-
-                Ok(vec![])
             }
             Err(err) => {
                 warn!(
                     "Anti-Entropy: failed to update remote section SAP: {:?}",
                     err
                 );
-                Err(err)
+                return Err(err);
             }
         }
+
+        // TODO: when do we want to do all the things that were done on aync? Will all AE?
+
+        self.update_section(&signed_section_auth, snapshot, proof_chain, members)
+            .await
     }
     pub(crate) async fn handle_anti_entropy_retry_msg(
         &mut self,

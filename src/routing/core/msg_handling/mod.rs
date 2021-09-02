@@ -15,7 +15,7 @@ mod proposals;
 mod relocation;
 mod resource_proof;
 mod service_msgs;
-mod sync;
+mod update_section;
 
 use super::Core;
 use crate::messaging::{
@@ -68,6 +68,7 @@ impl Core {
                 dst_location,
                 msg,
             } => {
+                println!("sysstem msg received....");
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
                 let mut known_keys: Vec<BlsPublicKey> =
@@ -82,6 +83,7 @@ impl Core {
                         let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
                         return Ok(vec![cmd]);
                     } else {
+                        println!("Dropping AEEEE");
                         // otherwise we might loop
                         warn!("Dropping untrusted AE Update");
                         return Ok(vec![]);
@@ -129,7 +131,7 @@ impl Core {
                         },
                     }
 
-                    trace!("Entropy check passed. Handling verified msg {}", msg_id);
+                    println!("Entropy check passed. Handling verified msg {}", msg_id);
                 }
 
                 Ok(vec![Command::HandleInfrastructureMessage {
@@ -206,6 +208,8 @@ impl Core {
         payload: Bytes,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
+        println!("handling infra msg");
+
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
             .aggregate_message_and_stop(&mut msg_authority, payload)
@@ -237,6 +241,7 @@ impl Core {
                 }
             },
             Err(Error::InvalidSignatureShare) => {
+                println!("Invalid sigggg");
                 let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
                 Ok(vec![cmd])
             }
@@ -256,6 +261,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
+        println!("handling vvvv non data msg");
         match node_msg {
             SystemMsg::AntiEntropyRetry {
                 section_auth,
@@ -292,36 +298,17 @@ impl Core {
                 section_auth,
                 section_signed,
                 proof_chain,
+                members,
             } => {
-                trace!("Handling msg: AE-Update from {}", sender);
+                println!("Handling msg: AE-Update from {}", sender);
                 self.handle_anti_entropy_update_msg(
                     section_auth,
                     section_signed,
                     proof_chain,
+                    members,
                     sender,
                 )
                 .await
-            }
-            SystemMsg::Sync {
-                ref section,
-                ref network,
-            } => {
-                trace!("Handling msg: Sync from {}", sender);
-                // Ignore `Sync` not for our section.
-                if !section.prefix().matches(&self.node.name()) {
-                    return Ok(vec![]);
-                }
-
-                if section.chain().check_trust(known_keys.iter()) {
-                    self.handle_sync(section, network).await
-                } else {
-                    debug!(
-                        "Untrusted Sync message from {:?} and section: {:?} ",
-                        sender, section
-                    );
-                    let cmd = self.handle_untrusted_message(sender, node_msg, msg_authority)?;
-                    Ok(vec![cmd])
-                }
             }
             SystemMsg::Relocate(ref details) => {
                 trace!("Handling msg: Relocate from {}", sender);

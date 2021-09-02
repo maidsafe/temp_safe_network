@@ -40,8 +40,9 @@ use crate::routing::{
 };
 use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
+use bls_dkg::message::Message;
 use ed25519_dalek::Signer;
-use eyre::{eyre, Context, Result};
+use eyre::{bail, eyre, Context, Result};
 use rand::rngs::OsRng;
 use rand::{distributions::Alphanumeric, Rng};
 use resource_proof::ResourceProof;
@@ -835,23 +836,14 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn handle_untrusted_message_from_peer() -> Result<()> {
-    handle_untrusted_message(UntrustedMessageSource::Peer).await
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn handle_untrusted_accumulated_message() -> Result<()> {
-    handle_untrusted_message(UntrustedMessageSource::Accumulation).await
-}
-
 #[derive(PartialEq)]
 enum UntrustedMessageSource {
     Peer,
     Accumulation,
 }
 
-async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn handle_untrusted_accumulated_message() -> Result<()> {
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
     let chain = SecuredLinkedList::new(pk0);
@@ -877,6 +869,13 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
         used_space,
         root_storage_dir,
     )?;
+
+    // just any non-AE message here as they are handle differently
+    let original_node_msg = SystemMsg::NodeMsgError {
+        error: crate::messaging::data::Error::DataExists,
+        correlation_id: MessageId::new(),
+    };
+
     let dispatcher = Dispatcher::new(core);
 
     // Create a any message signed by a key not known to the node.
@@ -885,31 +884,17 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     let unknown_chain = SecuredLinkedList::new(pk1);
     // we corrupt the section chain so it's unknown
     section.chain = unknown_chain;
-    let original_node_msg = SystemMsg::Sync {
-        section,
-        network: BTreeMap::new(),
-    };
+
     let payload = WireMsg::serialize_msg_payload(&original_node_msg)?;
     let expected_recipients = vec![sender];
-    let msg_kind = match source {
-        UntrustedMessageSource::Peer => {
-            let mut rng = OsRng {};
-            let keypair = ed25519_dalek::Keypair::generate(&mut rng);
-            MsgKind::NodeAuthMsg(NodeAuth {
-                section_pk: pk1,
-                public_key: keypair.public,
-                signature: keypair.sign(&payload),
-            })
-        }
-        UntrustedMessageSource::Accumulation => MsgKind::SectionAuthMsg(MsgKindSectionAuth {
-            section_pk: pk1,
-            src_name: Prefix::default().name(),
-            sig: KeyedSig {
-                public_key: pk1,
-                signature: sk1.sign(&payload),
-            },
-        }),
-    };
+    let msg_kind = MsgKind::SectionAuthMsg(MsgKindSectionAuth {
+        section_pk: pk1,
+        src_name: Prefix::default().name(),
+        sig: KeyedSig {
+            public_key: pk1,
+            signature: sk1.sign(&payload),
+        },
+    });
 
     let dst_location = DstLocation::Section {
         name: node_name,
@@ -917,15 +902,9 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     };
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst_location)?;
 
-    let commands = if source == UntrustedMessageSource::Accumulation {
-        // here we go only one level deep
-        dispatcher
-            .handle_command(Command::HandleMessage { sender, wire_msg })
-            .await?
-    } else {
-        // and here two levels deep
-        get_internal_commands(Command::HandleMessage { sender, wire_msg }, &dispatcher).await?
-    };
+    let commands = dispatcher
+        .handle_command(Command::HandleMessage { sender, wire_msg })
+        .await?;
 
     let mut bounce_sent = false;
 
@@ -971,7 +950,10 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn handle_bounced_untrusted_message() -> Result<()> {
+// A message has been bounced back to us as it was not trusted.
+// 1. Check the message we send an AE-Update response.
+// // nop// 2. Check the original was bounced
+async fn check_we_send_ae_update_when_msg_bounced_as_untrusted() -> Result<()> {
     let (section_auth, mut nodes, sk_set0) =
         gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
 
@@ -996,11 +978,6 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         gen_addr(),
     );
 
-    let original_node_msg = SystemMsg::Sync {
-        section: section.clone(),
-        network: BTreeMap::new(),
-    };
-
     // Create our node.
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
@@ -1012,6 +989,13 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         used_space,
         root_storage_dir,
     )?;
+
+    // just any non-AE message here as they are handle differently
+    let original_node_msg = SystemMsg::NodeMsgError {
+        error: crate::messaging::data::Error::DataExists,
+        correlation_id: MessageId::new(),
+    };
+
     let dispatcher = Dispatcher::new(core);
 
     // Create the bounced message, indicating the last key the peer knows is `pk0`
@@ -1037,7 +1021,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
     )
     .await?;
 
-    let mut message_resent = false;
+    let mut ae_update_sent = false;
 
     for command in commands {
         let (recipients, wire_msg) = match command {
@@ -1050,26 +1034,32 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         };
 
         match wire_msg.into_message() {
+            // check we are firing out an AE-update
             Ok(MessageType::System {
-                msg, dst_location, ..
+                msg: SystemMsg::AntiEntropyUpdate { proof_chain, .. },
+                dst_location,
+                ..
             }) => {
                 assert_eq!(recipients, [(other_node.name(), other_node.addr)]);
-                assert_eq!(msg, original_node_msg);
+                assert_eq!(proof_chain.len(), 2);
+
                 assert_eq!(dst_location.section_pk(), Some(pk0));
 
-                message_resent = true;
+                ae_update_sent = true;
             }
+
             _ => continue,
         }
     }
 
-    assert!(message_resent);
+    assert!(ae_update_sent);
 
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn handle_sync() -> Result<()> {
+// Checking when we get an untrusted AE info to a section, if it's ahead of us we should handle it.
+async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     // Create first `Section` with a chain of length 2
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
@@ -1099,6 +1089,7 @@ async fn handle_sync() -> Result<()> {
         used_space,
         root_storage_dir,
     )?;
+
     let dispatcher = Dispatcher::new(core);
 
     // Create new `Section` as a successor to the previous one.
@@ -1109,6 +1100,7 @@ async fn handle_sync() -> Result<()> {
     chain.insert(&pk1, pk2, pk2_signature)?;
 
     let old_node = nodes.remove(0);
+    let src_section_pk = *chain.last_key();
 
     // Create the new `SectionAuthorityProvider` by replacing the last peer with a new one.
     let new_peer = create_peer(MIN_AGE);
@@ -1121,21 +1113,24 @@ async fn handle_sync() -> Result<()> {
         sk2_set.public_keys(),
     );
     let new_section_elders: BTreeSet<_> = new_section_auth.names();
-    let section_signed_new_section_auth = section_signed(sk2, new_section_auth)?;
+    let section_signed_new_section_auth = section_signed(sk2, new_section_auth.clone())?;
     let new_section = Section::new(pk0, chain, section_signed_new_section_auth)?;
 
     // Create the `Sync` message containing the new `Section`.
+    let proof_chain = new_section.chain().clone();
     let wire_msg = WireMsg::single_src(
         &old_node,
         DstLocation::Node {
             name: XorName::from(PublicKey::Bls(pk1)),
             section_pk: pk1,
         },
-        SystemMsg::Sync {
-            section: new_section.clone(),
-            network: BTreeMap::new(),
+        SystemMsg::AntiEntropyUpdate {
+            section_auth: new_section_auth,
+            members: Some(new_section.members().clone()),
+            section_signed: new_section.section_auth.sig,
+            proof_chain,
         },
-        *new_section.chain().last_key(),
+        src_section_pk,
     )?;
 
     let _ = get_internal_commands(
@@ -1162,7 +1157,8 @@ async fn handle_sync() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn handle_untrusted_sync() -> Result<()> {
+// Checking when we send untrusted AE info to a section, we do not handle it AND do not bounce it
+async fn untrusted_section_msg_is_bounced() -> Result<()> {
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
 
@@ -1170,54 +1166,62 @@ async fn handle_untrusted_sync() -> Result<()> {
     let pk1 = sk1.public_key();
     let sig1 = sk0.sign(&bincode::serialize(&pk1)?);
 
-    let sk2 = bls::SecretKey::random();
-    let pk2 = sk2.public_key();
-    let sig2 = sk1.sign(&bincode::serialize(&pk2)?);
+    // let sk2 = bls::SecretKey::random();
+    // let pk2 = sk2.public_key();
+    // let sig2 = sk1.sign(&bincode::serialize(&pk2)?);
 
+    let nonsense_section_sk = bls::SecretKey::random();
+    let nonsense_section_pk = nonsense_section_sk.public_key();
+
+    // the chain is valid
     let mut chain = SecuredLinkedList::new(pk0);
     chain.insert(&pk0, pk1, sig1)?;
-    chain.insert(&pk1, pk2, sig2)?;
+    // chain.insert(&pk1, pk2, sig2)?;
 
-    let (old_section_auth, _) = create_section_auth();
-    let section_signed_old_section_auth = section_signed(&sk0, old_section_auth.clone())?;
-    let old_section = Section::new(
+    let (our_section_auth, _) = create_section_auth();
+    let section_signed_our_section_auth = section_signed(&sk0, our_section_auth.clone())?;
+    let our_section = Section::new(
         pk0,
         SecuredLinkedList::new(pk0),
-        section_signed_old_section_auth,
+        section_signed_our_section_auth,
     )?;
 
-    let (new_section_auth, _) = create_section_auth();
-    let section_signed_new_section_auth = section_signed(&sk2, new_section_auth.clone())?;
-    let new_section = Section::new(pk0, chain.truncate(2), section_signed_new_section_auth)?;
+    // let (bogus_section_auth, _) = create_section_auth();
+    // let section_signed_bogus_section_auth = section_signed(&sk1, bogus_section_auth.clone())?;
+    // let new_section = Section::new(pk0, chain.truncate(2), section_signed_bogus_section_auth)?;
 
-    let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    println!("we have a bogus section....");
+
+    let bogus_section_pk = pk1;
+
+    let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = create_node(MIN_ADULT_AGE, None);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
-        old_section,
+        our_section,
         None,
         event_tx,
         used_space,
         root_storage_dir,
     )?;
+
+    // any valid msg..
+    let original_node_msg = core.generate_ae_update(bogus_section_pk, false)?;
+
     let dispatcher = Dispatcher::new(core);
 
     let sender = create_node(MIN_ADULT_AGE, None);
-    let original_node_msg = SystemMsg::Sync {
-        section: new_section.clone(),
-        network: BTreeMap::new(),
-    };
-    let section_pk = *new_section.chain().last_key();
     let wire_msg = WireMsg::single_src(
         &sender,
         DstLocation::Section {
-            name: XorName::from(PublicKey::Bls(section_pk)),
-            section_pk,
+            name: XorName::from(PublicKey::Bls(nonsense_section_pk)),
+            section_pk: nonsense_section_pk,
         },
         original_node_msg.clone(),
-        *new_section.chain().last_key(),
+        // we use the nonsense here
+        nonsense_section_pk,
     )?;
 
     let commands = get_internal_commands(
@@ -1227,135 +1231,17 @@ async fn handle_untrusted_sync() -> Result<()> {
         },
         &dispatcher,
     )
-    .await?;
+    .await;
 
-    let mut bounce_sent = false;
-
-    for command in commands {
-        let (recipients, wire_msg) = match command {
-            Command::SendMessage {
-                recipients,
-                wire_msg,
-                ..
-            } => (recipients, wire_msg),
-            _ => continue,
-        };
-
-        match wire_msg.into_message() {
-            Ok(MessageType::System {
-                msg: SystemMsg::BouncedUntrustedMessage { msg, .. },
-                ..
-            }) => {
-                assert_eq!(*msg, original_node_msg);
-                assert_eq!(recipients, [(sender.name(), sender.addr)]);
-                bounce_sent = true;
-            }
-            _ => continue,
+    match commands {
+        Err(error) => {
+            println!(">>>>> the error we see {:?}", error);
+            Ok(())
+        }
+        Ok(_) => {
+            bail!("AE update handling should error due to bad signing")
         }
     }
-
-    assert!(bounce_sent);
-    assert!(timeout(Duration::from_secs(5), event_rx.recv())
-        .await
-        .is_err());
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn handle_bounced_untrusted_sync() -> Result<()> {
-    let sk0 = bls::SecretKey::random();
-    let pk0 = sk0.public_key();
-
-    let sk1 = bls::SecretKey::random();
-    let pk1 = sk1.public_key();
-    let sig1 = sk0.sign(&bincode::serialize(&pk1)?);
-
-    let sk2_set = SecretKeySet::random();
-    let sk2 = sk2_set.secret_key();
-    let pk2 = sk2.public_key();
-    let sig2 = sk1.sign(&bincode::serialize(&pk2)?);
-
-    let mut chain = SecuredLinkedList::new(pk0);
-    chain.insert(&pk0, pk1, sig1)?;
-    chain.insert(&pk1, pk2, sig2)?;
-
-    let (section_auth, mut nodes) = create_section_auth();
-    let section_signed_section_auth = section_signed(sk2, section_auth.clone())?;
-    let section_full = Section::new(pk0, chain, section_signed_section_auth)?;
-
-    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let node = nodes.remove(0);
-    let section_key_share = create_section_key_share(&sk2_set, 0);
-    let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
-    let core = Core::new(
-        create_comm().await?,
-        node.clone(),
-        section_full.clone(),
-        Some(section_key_share),
-        event_tx,
-        used_space,
-        root_storage_dir,
-    )?;
-    let dispatcher = Dispatcher::new(core);
-
-    let original_node_msg = SystemMsg::Sync {
-        section: section_full.clone(),
-        network: BTreeMap::new(),
-    };
-
-    let sender = create_node(MIN_ADULT_AGE, None);
-    let bounced_node_msg = SystemMsg::BouncedUntrustedMessage {
-        msg: Box::new(original_node_msg),
-        dst_section_pk: pk0,
-    };
-    let bounced_wire_msg = WireMsg::single_src(
-        &sender,
-        DstLocation::Node {
-            name: node.name(),
-            section_pk: *section_full.chain().last_key(),
-        },
-        bounced_node_msg,
-        bls::SecretKey::random().public_key(),
-    )?;
-
-    let inner_commands = get_internal_commands(
-        Command::HandleMessage {
-            sender: sender.addr,
-            wire_msg: bounced_wire_msg,
-        },
-        &dispatcher,
-    )
-    .await?;
-
-    let mut message_resent = false;
-
-    for command in inner_commands {
-        let (recipients, wire_msg) = match command {
-            Command::SendMessage {
-                recipients,
-                wire_msg,
-                ..
-            } => (recipients, wire_msg),
-            _ => continue,
-        };
-
-        match wire_msg.into_message() {
-            Ok(MessageType::System {
-                msg: SystemMsg::Sync { section, .. },
-                ..
-            }) => {
-                assert_eq!(recipients, [(sender.name(), sender.addr)]);
-                assert!(section.chain().has_key(&pk0));
-                message_resent = true;
-            }
-            _ => continue,
-        }
-    }
-
-    assert!(message_resent);
-
-    Ok(())
 }
 
 /// helper to get through first command layers used for concurrency, to commands we can analyse in a useful fashion for testing
@@ -1373,7 +1259,6 @@ async fn get_internal_commands(command: Command, dispatcher: &Dispatcher) -> Res
 
     for command in node_msg_handling {
         // second pass gets us into non-data handling
-
         let commands = dispatcher.handle_command(command).await?;
         inner_handling.extend(commands);
     }
@@ -1621,7 +1506,7 @@ async fn handle_elders_update() -> Result<()> {
         .handle_command(Command::HandleAgreement { proposal, sig })
         .await?;
 
-    let mut sync_actual_recipients = HashSet::new();
+    let mut update_actual_recipients = HashSet::new();
 
     for command in commands {
         let (recipients, wire_msg) = match command {
@@ -1633,27 +1518,28 @@ async fn handle_elders_update() -> Result<()> {
             _ => continue,
         };
 
-        let (section, msg_authority) = match wire_msg.into_message() {
+        let (proof_chain, msg_authority) = match wire_msg.into_message() {
             Ok(MessageType::System {
-                msg: SystemMsg::Sync { section, .. },
+                msg: SystemMsg::AntiEntropyUpdate { proof_chain, .. },
                 msg_authority,
                 ..
-            }) => (section, msg_authority),
+            }) => (proof_chain, msg_authority),
             _ => continue,
         };
 
-        assert_eq!(section.chain().last_key(), &pk1);
+        assert_eq!(proof_chain.last_key(), &pk1);
 
         // The message is trusted even by peers who don't yet know the new section key.
         assert!(msg_authority.verify_src_section_key_is_known(&[pk0]));
 
         // Merging the section contained in the message with the original section succeeds.
-        assert_matches!(section0.clone().merge(section.clone()), Ok(()));
+        // TODO: how to do this here?
+        // assert_matches!(section0.clone().merge(proof_chain.clone()), Ok(()));
 
-        sync_actual_recipients.extend(recipients);
+        update_actual_recipients.extend(recipients);
     }
 
-    let sync_expected_recipients: HashSet<_> = other_elder_peers
+    let update_expected_recipients: HashSet<_> = other_elder_peers
         .into_iter()
         .map(|peer| (*peer.name(), *peer.addr()))
         .chain(iter::once((*promoted_peer.name(), *promoted_peer.addr())))
@@ -1661,7 +1547,7 @@ async fn handle_elders_update() -> Result<()> {
         .chain(iter::once((*adult_peer.name(), *adult_peer.addr())))
         .collect();
 
-    assert_eq!(sync_actual_recipients, sync_expected_recipients);
+    assert_eq!(update_actual_recipients, update_expected_recipients);
 
     assert_matches!(
         event_rx.recv().await,
@@ -1759,7 +1645,7 @@ async fn handle_demote_during_split() -> Result<()> {
     let command = create_our_elders_command(sk_set_v1_p1.secret_key(), section_auth)?;
     let commands = dispatcher.handle_command(command).await?;
 
-    let mut sync_recipients = HashSet::new();
+    let mut update_recipients = HashSet::new();
 
     for command in commands {
         let (recipients, wire_msg) = match command {
@@ -1774,15 +1660,15 @@ async fn handle_demote_during_split() -> Result<()> {
         if matches!(
             wire_msg.into_message(),
             Ok(MessageType::System {
-                msg: SystemMsg::Sync { .. },
+                msg: SystemMsg::AntiEntropyUpdate { .. },
                 ..
             })
         ) {
-            sync_recipients.extend(recipients);
+            update_recipients.extend(recipients);
         }
     }
 
-    let expected_sync_recipients = if prefix0.matches(&node_name) {
+    let expected_ae_update_recipients = if prefix0.matches(&node_name) {
         peers_a
             .iter()
             .map(|peer| (*peer.name(), *peer.addr()))
@@ -1795,7 +1681,7 @@ async fn handle_demote_during_split() -> Result<()> {
             .collect()
     };
 
-    assert_eq!(sync_recipients, expected_sync_recipients);
+    assert_eq!(update_recipients, expected_ae_update_recipients);
 
     Ok(())
 }

@@ -177,7 +177,7 @@ impl Core {
             }
 
             if new.is_elder || old.is_elder {
-                commands.extend(self.send_sync(self.section.clone(), self.network.dump())?);
+                commands.extend(self.send_ae_update_to_our_section(self.section.clone())?);
             }
 
             let current: BTreeSet<_> = self.section.authority_provider().names();

@@ -28,6 +28,7 @@ impl Core {
         system_msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
     ) -> Result<Command> {
+        println!("handling untrusted...");
         let src_name = msg_authority.name();
 
         let bounce_dst_section_pk = self.section_key_by_name(&src_name);
@@ -40,28 +41,40 @@ impl Core {
         self.send_direct_message((src_name, sender), bounce_system_msg, bounce_dst_section_pk)
     }
 
-    /// Generate command to update a peer with our current section chain
-    pub(crate) fn send_ae_update_to_sender(
+    /// Generate message to update a peer with our current section chain
+    pub(crate) fn generate_ae_update(
         &self,
-        sender: Peer,
         dst_section_key: BlsPublicKey,
-    ) -> Result<Command> {
+        add_peer_info_to_update: bool,
+    ) -> Result<SystemMsg> {
         let section_signed_auth = self.section.section_signed_authority_provider().clone();
         let section_auth = section_signed_auth.value;
         let section_signed = section_signed_auth.sig;
 
-        let proof_chain = self
+        let proof_chain = match self
             .section
             .chain()
-            .get_proof_chain_to_current(&dst_section_key)?;
+            .get_proof_chain_to_current(&dst_section_key)
+        {
+            Ok(chain) => chain,
+            Err(_) => {
+                // error getting chain from key, so lets send the whole thing
+                self.section.chain().clone()
+            }
+        };
 
-        let ae_msg = SystemMsg::AntiEntropyUpdate {
+        let members = if add_peer_info_to_update {
+            Some(self.section.members().clone())
+        } else {
+            None
+        };
+
+        Ok(SystemMsg::AntiEntropyUpdate {
             section_auth,
             section_signed,
             proof_chain,
-        };
-
-        Ok(self.send_direct_message((*sender.name(), *sender.addr()), ae_msg, dst_section_key)?)
+            members,
+        })
     }
 
     pub(crate) fn handle_bounced_untrusted_message(
@@ -75,7 +88,11 @@ impl Core {
         let mut commands = vec![];
 
         // first lets update the sender with our section info, which they currently do not trust
-        commands.push(self.send_ae_update_to_sender(sender, dst_section_key)?);
+        // we do not send our adult info there
+        let ae_msg = self.generate_ae_update(dst_section_key, false)?;
+        let cmd =
+            self.send_direct_message((*sender.name(), *sender.addr()), ae_msg, dst_section_key)?;
+        commands.push(cmd);
 
         let cmd = self.send_direct_message(
             (*sender.name(), *sender.addr()),

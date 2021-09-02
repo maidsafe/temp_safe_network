@@ -23,10 +23,7 @@ use crate::routing::{Error, Result, SectionAuthUtils, SectionAuthorityProviderUt
 use bls::PublicKey as BlsPublicKey;
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use secured_linked_list::SecuredLinkedList;
-use std::{
-    collections::BTreeMap,
-    iter::{self, Iterator},
-};
+use std::iter::{self, Iterator};
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
@@ -107,17 +104,6 @@ impl NetworkPrefixMap {
         self.sections
             .get(prefix)
             .map(|entry| entry.value().value.clone())
-    }
-
-    /// Dump a collections with a copy of the prefixes and mapped SAPs.
-    pub(crate) fn dump(&self) -> BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>> {
-        self.sections
-            .iter()
-            .map(|e| {
-                let (prefix, sap) = e.pair();
-                (*prefix, sap.clone())
-            })
-            .collect()
     }
 
     /// Update our knowledge of a remote section's SAP only
