@@ -1209,7 +1209,7 @@ impl NativeUrl {
     }
 
     fn xor_name_from_nrs_string(name: &str) -> XorName {
-        XorName::from_content(&[name.as_bytes()])
+        XorName::from_content(name.as_bytes())
     }
 }
 

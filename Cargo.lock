@@ -3302,9 +3302,9 @@ dependencies = [
 
 [[package]]
 name = "xor_name"
-version = "3.0.0"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4687b6d260f34b138ef094a0446c652fdcb3cdbca88b3a318a33eea4c4b712ba"
+checksum = "1ac010ec8541cbd12e6394b5ea6ded89aaf08e4077cb26cd0e376cd8e9dd1861"
 dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
