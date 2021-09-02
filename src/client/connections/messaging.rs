@@ -12,7 +12,6 @@ use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::XorName;
 use crate::types::{Chunk, PrivateChunk, PublicChunk};
 
@@ -20,7 +19,7 @@ use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
 use qp2p::Endpoint;
-use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
+use std::{collections::BTreeMap, net::SocketAddr};
 use tokio::{sync::mpsc::channel, task::JoinHandle, time::sleep};
 use tracing::{debug, error, trace, warn};
 
@@ -39,16 +38,12 @@ impl Session {
 
         let (endpoint, _, incoming_messages, _disconnections, bootstrap_peer) =
             self.qp2p.bootstrap().await?;
+        debug!("Successfully bootstrapped to peer: {:?}", bootstrap_peer);
 
         self.endpoint = Some(endpoint.clone());
         self.bootstrap_peer = Some(bootstrap_peer);
 
         self.spawn_message_listener_thread(incoming_messages).await;
-
-        debug!(
-            "Successfully obtained the initial list of Elders: {:?}",
-            self.network
-        );
 
         Ok(())
     }
@@ -74,9 +69,9 @@ impl Session {
                 sap.public_key_set.public_key(),
             )
         } else {
-            // Send message to our bootstrap peer with a random section PK.
+            // Send message to our bootstrap peer with network's genesis PK.
             self.bootstrap_peer
-                .map(|addr| (vec![addr], bls::SecretKey::random().public_key()))
+                .map(|addr| (vec![addr], self.genesis_pk))
                 .ok_or(Error::NotBootstrapped)?
         };
 
@@ -129,12 +124,12 @@ impl Session {
         let (elders, section_pk) = if let Ok(sap) = self.network.section_by_name(&data_name) {
             (sap.elders, sap.public_key_set.public_key())
         } else {
-            // Send message to our bootstrap peer with a random section PK and addressing adring.
+            // Send message to our bootstrap peer with the network's genesis PK and addressing adring.
             self.bootstrap_peer
                 .map(|addr| {
                     let mut bootstrapped_peer = BTreeMap::new();
                     let _ = bootstrapped_peer.insert(XorName::random(), addr);
-                    (bootstrapped_peer, bls::SecretKey::random().public_key())
+                    (bootstrapped_peer, self.genesis_pk)
                 })
                 .ok_or(Error::NotBootstrapped)?
         };
@@ -390,7 +385,7 @@ pub(crate) async fn send_message(
                 .send_message(msg_bytes_clone, &socket, priority)
                 .await?;
 
-            trace!("Sent cmd with MsgId {:?}to {:?}", msg_id, &socket);
+            trace!("Sent cmd with MsgId {:?} to {:?}", msg_id, &socket);
             Ok(())
         });
         tasks.push(task_handle);
@@ -411,38 +406,4 @@ pub(crate) async fn send_message(
     }
 
     Ok(())
-}
-
-pub(crate) async fn rebuild_message_for_ae_resend(
-    msg_id: MessageId,
-    serialized_cmd: Bytes,
-    auth: ServiceAuth,
-    dst_address: Option<XorName>,
-    network: Arc<NetworkPrefixMap>,
-) -> Option<(WireMsg, Vec<SocketAddr>)> {
-    info!("Rebuilding message for AE resend");
-    if let Some(dst_address) = dst_address {
-        if let Ok(sap) = network.section_by_name(&dst_address) {
-            let elders = sap.elders.values().cloned().collect::<Vec<SocketAddr>>();
-            let section_pk = sap.public_key_set.public_key();
-
-            // Let's rebuild the message with the updated destination details
-            if let Ok(wire_msg) = WireMsg::new_msg(
-                msg_id,
-                serialized_cmd,
-                MsgKind::ServiceMsg(auth),
-                DstLocation::Section {
-                    name: dst_address,
-                    section_pk,
-                },
-            ) {
-                return Some((wire_msg, elders));
-            } else {
-                error!("Error generating WireMsg on resending");
-            }
-        } else {
-            error!("Error fetching latest elders for resending AE message");
-        }
-    }
-    None
 }

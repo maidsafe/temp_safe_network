@@ -38,6 +38,7 @@ use bytes::Bytes;
 use rand::rngs::OsRng;
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
+
 // Message handling
 impl Core {
     pub(crate) async fn handle_message(

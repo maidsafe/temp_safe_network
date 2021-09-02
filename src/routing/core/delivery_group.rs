@@ -524,7 +524,7 @@ mod tests {
             assert!(section.update_member(node_state));
         }
 
-        let network = NetworkPrefixMap::new();
+        let network = NetworkPrefixMap::new(genesis_pk);
 
         let (section_auth1, _, secret_key_set) =
             gen_section_authority_provider(prefix1, ELDER_SIZE);
@@ -545,7 +545,7 @@ mod tests {
         proof_chain.insert(&pk1, pk2, sig2)?;
 
         assert!(network
-            .update_remote_section_sap(section_auth1, &proof_chain, section.chain())
+            .verify_with_chain_and_update(section_auth1, &proof_chain, section.chain())
             .is_ok(),);
 
         let our_name = choose_elder_name(section.authority_provider())?;
@@ -563,7 +563,7 @@ mod tests {
         let chain = SecuredLinkedList::new(genesis_pk);
         let section = Section::new(genesis_pk, chain, section_auth)?;
 
-        let network = NetworkPrefixMap::new();
+        let network = NetworkPrefixMap::new(genesis_pk);
         let our_name = section.prefix().substituted_in(rand::random());
 
         Ok((our_name, section, network))

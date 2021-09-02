@@ -41,9 +41,9 @@ impl Core {
 
         // Merge the received prefixes SAPs into our NetworkPrefixMap.
         let chain = self.section.chain();
-        for (prefix, sap) in network.iter() {
+        for (_, sap) in network.iter() {
             if sap.verify(chain) {
-                let _ = self.network.insert(*prefix, sap.clone());
+                let _ = self.network.insert(sap.clone());
             }
         }
 

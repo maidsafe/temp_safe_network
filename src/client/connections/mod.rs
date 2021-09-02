@@ -52,6 +52,8 @@ pub(super) struct Session {
     bootstrap_peer: Option<SocketAddr>,
     /// BLS Signature aggregator for aggregating network messages
     aggregator: Arc<RwLock<SignatureAggregator>>,
+    /// Network's genesis key
+    genesis_pk: bls::PublicKey,
 }
 
 impl Session {
@@ -62,6 +64,11 @@ impl Session {
     ) -> Result<Self, Error> {
         debug!("QP2p config: {:?}", qp2p_config);
 
+        // *****************************************************
+        // FIXME: receive the network's genesis pk from the user
+        let genesis_pk = bls::SecretKey::random().public_key();
+        // *****************************************************
+
         let qp2p =
             qp2p::QuicP2p::<XorName>::with_config(Some(qp2p_config), Default::default(), true)?;
         Ok(Self {
@@ -70,9 +77,10 @@ impl Session {
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
             endpoint: None,
-            network: Arc::new(NetworkPrefixMap::new()),
+            network: Arc::new(NetworkPrefixMap::new(genesis_pk)),
             bootstrap_peer: None,
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
+            genesis_pk,
         })
     }
 

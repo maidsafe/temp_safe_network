@@ -105,12 +105,13 @@ impl Core {
 
         let capacity = Capacity::new(BTreeMap::new());
         let adult_liveness = Liveness::new();
+        let genesis_pk = *section.genesis_key();
 
         Ok(Self {
             comm,
             node,
             section,
-            network: NetworkPrefixMap::new(),
+            network: NetworkPrefixMap::new(genesis_pk),
             section_keys_provider,
             proposal_aggregator: ProposalAggregator::default(),
             split_barrier: SplitBarrier::new(),
@@ -157,10 +158,7 @@ impl Core {
             info!("Split");
         }
 
-        if self
-            .network
-            .insert(new_section_auth.value.prefix, new_section_auth)
-        {
+        if self.network.insert(new_section_auth) {
             info!("Updated our section's state in network's NetworkPrefixMap");
         }
 
@@ -209,7 +207,7 @@ impl Core {
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
                 info!("Demoted");
-                self.network = NetworkPrefixMap::new();
+                self.network = NetworkPrefixMap::new(*self.section.genesis_key());
                 self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None);
                 NodeElderChange::Demoted
             } else {

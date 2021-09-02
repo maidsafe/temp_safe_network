@@ -12,13 +12,16 @@ use qp2p::IncomingMessages;
 use tracing::{debug, error, info, trace, warn};
 
 use super::Session;
-use crate::client::connections::messaging::{rebuild_message_for_ae_resend, send_message};
-use crate::client::Error;
+use crate::client::{connections::messaging::send_message, Error};
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
-    system::{SectionAuth, SystemMsg},
-    MessageId, MessageType, WireMsg,
+    system::{KeyedSig, SectionAuth, SystemMsg},
+    DstLocation, MessageId, MessageType, MsgKind, SectionAuthorityProvider, WireMsg,
 };
+use crate::routing::XorName;
+use crate::types::PublicKey;
+use bytes::Bytes;
+use secured_linked_list::SecuredLinkedList;
 
 impl Session {
     // Listen for incoming messages on a connection
@@ -56,7 +59,7 @@ impl Session {
             trace!("Incoming message from {:?}", &src);
             match message_type {
                 MessageType::Service { msg_id, msg, .. } => {
-                    self.handle_client_msg(msg_id, msg, src).await
+                    self.handle_client_msg(msg_id, msg, src).await;
                 }
                 MessageType::System {
                     msg:
@@ -64,75 +67,38 @@ impl Session {
                             section_auth,
                             section_signed,
                             bounced_msg,
-                            ..
                         },
                     ..
+                } => {
+                    if let Err(err) = self
+                        .handle_ae_redirect_msg(section_auth, section_signed, bounced_msg, src)
+                        .await
+                    {
+                        warn!("Failed to handle AE-Redirect msg: {}", err);
+                    }
                 }
-                | MessageType::System {
+                MessageType::System {
                     msg:
                         SystemMsg::AntiEntropyRetry {
                             section_auth,
                             section_signed,
                             bounced_msg,
-                            ..
+                            proof_chain,
                         },
                     ..
                 } => {
-                    info!("Received AE-Redirect/retry SAP: {:?}", section_auth);
-                    // Update our network knowledge
-                    let _ = self.network.insert(
-                        section_auth.prefix,
-                        SectionAuth {
-                            value: section_auth.clone(),
-                            sig: section_signed,
-                        },
-                    );
-                    info!("Updated network knowledge");
-
-                    let (msg_id, service_msg, dst_location, auth) =
-                        match WireMsg::deserialize(bounced_msg)? {
-                            MessageType::Service {
-                                msg_id,
-                                msg,
-                                auth,
-                                dst_location,
-                            } => (msg_id, msg, dst_location, auth),
-                            _ => {
-                                warn!("Unexpected non-serviceMsg returned in AE response.");
-                                return Ok(true);
-                            }
-                        };
-
-                    info!("Prev message retrieved: {:?}", service_msg);
-
-                    let message = WireMsg::serialize_msg_payload(&service_msg)?;
-
-                    info!("Prev message serialized to be resent: {:?}", message.len());
-
-                    if let Some((wire_msg, elders)) = rebuild_message_for_ae_resend(
-                        msg_id,
-                        message,
-                        auth.into_inner(),
-                        dst_location.name(),
-                        self.network.clone(),
-                    )
-                    .await
+                    if let Err(err) = self
+                        .handle_ae_retry_msg(section_auth, section_signed, bounced_msg, proof_chain)
+                        .await
                     {
-                        if let Err(e) =
-                            send_message(elders, wire_msg, self.endpoint.clone(), msg_id).await
-                        {
-                            error!("AE: Error on resending ServiceMsg w/id {:?}: {:?}. Restart the flow", msg_id, e)
-                            //     TODO: Remove pending_query channels on query failure.
-                        }
-                    } else {
-                        error!("AE: Error rebuilding message for resending");
+                        warn!("Failed to handle AE-Retry msg: {}", err);
                     }
                 }
-
                 msg_type => {
                     warn!("Unexpected message type received: {:?}", msg_type);
                 }
             }
+
             Ok(true)
         } else {
             Ok(false)
@@ -196,5 +162,152 @@ impl Session {
                 }
             };
         });
+    }
+
+    // Handle Antry-Entropy Redirect messages
+    async fn handle_ae_redirect_msg(
+        &self,
+        section_auth: SectionAuthorityProvider,
+        _section_signed: KeyedSig,
+        bounced_msg: Bytes,
+        sender: SocketAddr,
+    ) -> Result<(), Error> {
+        // TODO: Check if SAP signature is valid
+        /*let signed_section_auth = SectionAuth {
+            value: section_auth.clone(),
+            sig: section_signed,
+        };
+        if !signed_section_auth.self_verify() {
+            warn!(
+                "SAP returned in AE-Redirect response has an invalid signature: {:?}",
+                section_auth
+            );
+            return Ok(());
+        }*/
+
+        let (msg_id, service_msg, auth) = match WireMsg::deserialize(bounced_msg)? {
+            MessageType::Service {
+                msg_id, msg, auth, ..
+            } => (msg_id, msg, auth),
+            other => {
+                warn!(
+                    "Unexpected non-serviceMsg returned in AE-Redirect response: {:?}",
+                    other
+                );
+                return Ok(());
+            }
+        };
+        debug!(
+            "Received AE-Redirect for {:?}, from {}, with SAP: {:?}",
+            msg_id, sender, section_auth
+        );
+
+        debug!(
+            "Bounced message ({:?}) received in AE-Redirect response: {:?}",
+            msg_id, service_msg
+        );
+        let message = WireMsg::serialize_msg_payload(&service_msg)?;
+
+        // TODO: we cannot trust these Elders belong to the network we are intended
+        // to connect to (based on the genesis key we know). We could send the genesis key
+        // as the destination section key and that should cause an AE-Retry response,
+        // which we could use to verify the SAP we receive an trust.
+        let elders = section_auth
+            .elders
+            .values()
+            .cloned()
+            .collect::<Vec<SocketAddr>>();
+        let section_pk = section_auth.public_key_set.public_key();
+
+        // Let's rebuild the message with the updated destination details
+        let wire_msg = WireMsg::new_msg(
+            msg_id,
+            message,
+            MsgKind::ServiceMsg(auth.into_inner()),
+            DstLocation::Section {
+                name: XorName::from(PublicKey::Bls(section_pk)),
+                section_pk,
+            },
+        )?;
+
+        send_message(elders, wire_msg, self.endpoint.clone(), msg_id).await
+    }
+
+    // Handle Antry-Entropy Retry messages
+    async fn handle_ae_retry_msg(
+        &self,
+        section_auth: SectionAuthorityProvider,
+        section_signed: KeyedSig,
+        bounced_msg: Bytes,
+        proof_chain: SecuredLinkedList,
+    ) -> Result<(), Error> {
+        debug!("Received AE-Retry with new SAP: {:?}", section_auth);
+        // Update our network knowledge making sure proof chain
+        // validates the new SAP based on currently known remote section SAP.
+        match self.network.update(
+            SectionAuth {
+                value: section_auth.clone(),
+                sig: section_signed,
+            },
+            &proof_chain,
+        ) {
+            Ok(updated) => {
+                if updated {
+                    debug!(
+                        "Anti-Entropy: updated remote section SAP updated for {:?}",
+                        section_auth.prefix
+                    );
+                } else {
+                    debug!(
+                        "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                        section_auth.prefix, section_auth
+                    );
+                }
+            }
+            Err(err) => {
+                warn!("Anti-Entropy: failed to update remote section SAP, bounced msg dropped: {:?}, {}", bounced_msg, err);
+                return Ok(());
+            }
+        }
+
+        let (msg_id, service_msg, mut dst_location, auth) = match WireMsg::deserialize(bounced_msg)?
+        {
+            MessageType::Service {
+                msg_id,
+                msg,
+                auth,
+                dst_location,
+            } => (msg_id, msg, dst_location, auth),
+            other => {
+                warn!(
+                    "Unexpected non-serviceMsg returned in AE response: {:?}",
+                    other
+                );
+                return Ok(());
+            }
+        };
+
+        debug!(
+            "Bounced message ({:?}) received in AE response: {:?}",
+            msg_id, service_msg
+        );
+        let payload = WireMsg::serialize_msg_payload(&service_msg)?;
+
+        // Let's rebuild the message with the updated destination details
+        let elders = section_auth
+            .elders
+            .values()
+            .cloned()
+            .collect::<Vec<SocketAddr>>();
+        dst_location.set_section_pk(section_auth.public_key_set.public_key());
+
+        let wire_msg = WireMsg::new_msg(
+            msg_id,
+            payload,
+            MsgKind::ServiceMsg(auth.into_inner()),
+            dst_location,
+        )?;
+
+        send_message(elders, wire_msg, self.endpoint.clone(), msg_id).await
     }
 }
