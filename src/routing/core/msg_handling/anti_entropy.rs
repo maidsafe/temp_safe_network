@@ -50,7 +50,7 @@ impl Core {
             src_name, sender
         );
 
-        match self.network.update_remote_section_sap(
+        match self.network.verify_with_chain_and_update(
             SectionAuth {
                 value: section_auth.clone(),
                 sig: section_signed,
@@ -101,56 +101,64 @@ impl Core {
             sender
         );
 
-        let bounced_msg = match WireMsg::deserialize(bounced_msg)? {
-            MessageType::System { msg, .. } => msg,
+        let (bounced_msg, msg_id) = match WireMsg::deserialize(bounced_msg)? {
+            MessageType::System { msg_id, msg, .. } => (msg, msg_id),
             _ => {
                 warn!("Non Infrastructure MessageType received at Node in AE response. We do not handle any other type yet");
                 return Ok(vec![]);
             }
         };
 
-        // We verify SAP signature although we cannot trust it without a proof chain anyways.
+        // Check if SAP signature is valid
         let section_signed = SectionAuth {
             value: section_auth.clone(),
             sig: section_signed,
         };
         if !section_signed.self_verify() {
             warn!(
-                "Anti-Entropy: failed to verify signature of SAP received in a redirect msg, bounced msg dropped: {:?}",
-                bounced_msg
+                "Anti-Entropy: failed to verify signature of SAP received in a redirect msg, bounced msg ({:?}) dropped: {:?}",
+                msg_id,bounced_msg
             );
             return Ok(vec![]);
         }
 
-        // When there are elders exist in both the local and incoming SAPs, send msg to the elder
-        // closest to the dest section key.
-        // The dst_section_pk is set to be local knowledge or genesis_key when no local knowledge.
-        let (local_dst_elders, dst_section_pk) =
+        // Try to find Elders we have in our local records matching the prefix of the
+        // provided SAP, or just use the Elders contained in the provided SAP.
+        // The chosen dst_section_pk will either be the latest we are aware of
+        // if we find a matching prefix in our records, or the genesis_key otherwise.
+        let (dst_elders, dst_section_pk) =
             match self.network.section_by_prefix(&section_auth.prefix) {
                 Ok(trusted_sap) => (trusted_sap.elders, trusted_sap.public_key_set.public_key()),
                 Err(_) => {
                     // In case we don't have the knowledge of that neighbour locally,
-                    // have to trust the incoming SAP when it's self verifable.
+                    // let's take the Elders from the provided SAP and genesis key.
                     (section_signed.value.elders, *self.section.genesis_key())
                 }
             };
 
-        // We send the msg to the Elder closest to the dest section key,
+        // We choose the Elder closest to the dest section key,
         // just to pick one of them in a random but deterministic fashion.
         let name = XorName::from(PublicKey::Bls(dst_section_pk));
-        let chosen_dst_elder = local_dst_elders
+        let chosen_dst_elder = dst_elders
             .iter()
-            .filter(|(local_elder, _)| section_auth.elders.contains_key(local_elder))
+            .filter(|(elder, _)| section_auth.elders.contains_key(elder))
             .sorted_by(|lhs, rhs| name.cmp_distance(lhs.0, rhs.0))
             .next();
 
         if let Some((name, addr)) = chosen_dst_elder {
-            let cmd = self.send_direct_message((*name, *addr), bounced_msg, dst_section_pk)?;
-            Ok(vec![cmd])
+            if addr == &sender {
+                error!(
+                    "Failed to find an alternative Elder to resend msg ({:?}) upon AE-Redirect response.",msg_id
+                );
+                Ok(vec![])
+            } else {
+                let cmd = self.send_direct_message((*name, *addr), bounced_msg, dst_section_pk)?;
+                Ok(vec![cmd])
+            }
         } else {
             warn!(
-                "Anti-Entropy: no trust-worthy elder among incoming SAP {:?} and local elders {:?}",
-                section_auth, local_dst_elders
+                "Anti-Entropy: no trust-worthy elder among incoming SAP {:?} and locally known elders.",
+                section_auth
             );
 
             // For the situation non-elder exists in both incoming and local SAP, send to one of
@@ -164,8 +172,8 @@ impl Core {
                 Ok(vec![cmd])
             } else {
                 error!(
-                    "Anti-Entropy: incoming SAP doesn't contain any elder! {:?}",
-                    section_auth
+                    "Anti-Entropy: incoming SAP in {:?} doesn't contain any elder! {:?}",
+                    msg_id, section_auth
                 );
                 Ok(vec![])
             }
@@ -355,7 +363,7 @@ mod tests {
     async fn ae_everything_up_to_date() -> Result<()> {
         let env = Env::new().await?;
 
-        let (_msg, src_location) = env.create_message(
+        let (msg, src_location) = env.create_message(
             env.core.section().prefix(),
             *env.core.section_chain().last_key(),
         )?;
@@ -364,7 +372,7 @@ mod tests {
 
         let command = env
             .core
-            .check_for_entropy(&_msg, &src_location, &dst_section_pk, None, sender)
+            .check_for_entropy(&msg, &src_location, &dst_section_pk, None, sender)
             .await?;
 
         assert!(command.is_none());
@@ -379,15 +387,15 @@ mod tests {
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();
 
-        let (_msg, src_location) = env.create_message(&env.other_prefix, other_pk)?;
+        let (msg, src_location) = env.create_message(&env.other_sap.value.prefix, other_pk)?;
         let sender = env.core.node().addr;
 
         // since it's not aware of the other prefix, it shall fail with NoMatchingSection
         let dst_section_pk = other_pk;
-        let dst_name = Some(env.other_prefix.name());
+        let dst_name = Some(env.other_sap.value.prefix.name());
         match env
             .core
-            .check_for_entropy(&_msg, &src_location, &dst_section_pk, dst_name, sender)
+            .check_for_entropy(&msg, &src_location, &dst_section_pk, dst_name, sender)
             .await
         {
             Err(Error::NoMatchingSection) => {}
@@ -395,18 +403,16 @@ mod tests {
         }
 
         // now let's insert a SAP to make it aware of the other prefix
-        let (some_other_auth, _, _) = gen_section_authority_provider(env.other_prefix, ELDER_SIZE);
-        let some_other_sap = section_signed(&other_sk, some_other_auth)?;
-        let _ = env
+        assert!(env
             .core
             .network
-            .insert(some_other_sap.value.prefix, some_other_sap.clone());
+            .update(env.other_sap.clone(), &env.proof_chain)?);
 
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
         let command = env
             .core
-            .check_for_entropy(&_msg, &src_location, &dst_section_pk, dst_name, sender)
+            .check_for_entropy(&msg, &src_location, &dst_section_pk, dst_name, sender)
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
@@ -417,7 +423,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                assert_eq!(section_auth, some_other_sap.value);
+                assert_eq!(section_auth, env.other_sap.value);
             });
         });
 
@@ -428,7 +434,7 @@ mod tests {
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
         let env = Env::new().await?;
 
-        let (_msg, src_location) = env.create_message(
+        let (msg, src_location) = env.create_message(
             env.core.section().prefix(),
             *env.core.section_chain().last_key(),
         )?;
@@ -437,7 +443,7 @@ mod tests {
 
         let command = env
             .core
-            .check_for_entropy(&_msg, &src_location, &dst_section_pk, None, sender)
+            .check_for_entropy(&msg, &src_location, &dst_section_pk, None, sender)
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
@@ -458,7 +464,8 @@ mod tests {
 
     struct Env {
         core: Core,
-        other_prefix: Prefix,
+        other_sap: SectionAuth<SectionAuthorityProvider>,
+        proof_chain: SecuredLinkedList,
     }
 
     impl Env {
@@ -466,18 +473,22 @@ mod tests {
             let prefix0 = Prefix::default().pushed(false);
             let prefix1 = Prefix::default().pushed(true);
 
+            // generate a SAP for prefix0
             let (section_auth, mut nodes, secret_key_set) =
                 gen_section_authority_provider(prefix0, ELDER_SIZE);
             let node = nodes.remove(0);
-            let sap_secret_key = secret_key_set.secret_key();
-            let signed_section_auth = section_signed(sap_secret_key, section_auth)?;
+            let sap_sk = secret_key_set.secret_key();
+            let signed_section_auth = section_signed(sap_sk, section_auth)?;
 
-            let chain = create_chain(
-                sap_secret_key,
+            let (chain, genesis_sk) = create_chain(
+                sap_sk,
                 signed_section_auth.value.public_key_set.public_key(),
             )
             .context("failed to create section chain")?;
-            let section = Section::new(*chain.root_key(), chain, signed_section_auth)
+            let genesis_pk = genesis_sk.public_key();
+            assert_eq!(genesis_pk, *chain.root_key());
+
+            let section = Section::new(genesis_pk, chain, signed_section_auth)
                 .context("failed to create section")?;
 
             let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
@@ -490,9 +501,21 @@ mod tests {
             )?;
             let core = tmp_core.relocated(node, section).await?;
 
+            // generate other SAP for prefix1
+            let (other_sap, _, secret_key_set) =
+                gen_section_authority_provider(prefix1, ELDER_SIZE);
+            let other_sap_sk = secret_key_set.secret_key();
+            let other_sap = section_signed(other_sap_sk, other_sap)?;
+            // generate a proof chain for this other SAP
+            let mut proof_chain = SecuredLinkedList::new(genesis_pk);
+            let signature = bincode::serialize(&other_sap_sk.public_key())
+                .map(|bytes| genesis_sk.sign(&bytes))?;
+            proof_chain.insert(&genesis_pk, other_sap_sk.public_key(), signature)?;
+
             Ok(Self {
                 core,
-                other_prefix: prefix1,
+                other_sap,
+                proof_chain,
             })
         }
 
@@ -537,7 +560,10 @@ mod tests {
     }
 
     // Creates a section chain with three blocks
-    fn create_chain(sap_sk: &SecretKey, last_key: BlsPublicKey) -> Result<SecuredLinkedList> {
+    fn create_chain(
+        sap_sk: &SecretKey,
+        last_key: BlsPublicKey,
+    ) -> Result<(SecuredLinkedList, SecretKey)> {
         // create chain with random genesis key
         let genesis_sk = SecretKey::random();
         let genesis_pk = genesis_sk.public_key();
@@ -552,6 +578,6 @@ mod tests {
         let last_sig = sap_sk.sign(&bincode::serialize(&last_key)?);
         chain.insert(&sap_pk, last_key, last_sig)?;
 
-        Ok(chain)
+        Ok((chain, genesis_sk))
     }
 }

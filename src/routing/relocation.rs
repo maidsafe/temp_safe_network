@@ -291,7 +291,7 @@ mod tests {
 
         let sk_set = SecretKeySet::random();
         let sk = sk_set.secret_key();
-        let pk = sk.public_key();
+        let genesis_pk = sk.public_key();
 
         // Create `Section` with `peers` as its members and set the `ELDER_SIZE` oldest peers as
         // the elders.
@@ -307,7 +307,8 @@ mod tests {
         );
         let section_auth = section_signed(sk, section_auth)?;
 
-        let mut section = Section::new(pk, SecuredLinkedList::new(pk), section_auth)?;
+        let mut section =
+            Section::new(genesis_pk, SecuredLinkedList::new(genesis_pk), section_auth)?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);
@@ -316,7 +317,7 @@ mod tests {
             assert!(section.update_member(info));
         }
 
-        let network = NetworkPrefixMap::new();
+        let network = NetworkPrefixMap::new(genesis_pk);
 
         // Simulate a churn event whose signature has the given number of trailing zeros.
         let churn_name = rng.gen();

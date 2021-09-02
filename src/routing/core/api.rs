@@ -65,7 +65,7 @@ impl Core {
         let comm = self.comm.clone();
         new_node.addr = comm.our_connection_info();
 
-        let network = NetworkPrefixMap::new();
+        let network = NetworkPrefixMap::new(*new_section.genesis_key());
         // TODO: to keep our knowledge of the network and avoid unnecessary AE msgs:
         // - clone self.network instead,
         // - remove the SAP of our new section from the cloned network
