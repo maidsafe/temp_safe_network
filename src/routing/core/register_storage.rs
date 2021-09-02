@@ -400,9 +400,9 @@ impl RegisterStorage {
 /// This also encodes the Public | Private scope,
 /// as well as the tag of the Address.
 fn to_reg_key(address: &Address) -> Result<XorName> {
-    Ok(XorName::from_content(&[address
-        .encode_to_zbase32()?
-        .as_bytes()]))
+    Ok(XorName::from_content(
+        address.encode_to_zbase32()?.as_bytes(),
+    ))
 }
 
 impl Display for RegisterStorage {

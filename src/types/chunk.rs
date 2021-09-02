@@ -32,7 +32,7 @@ pub struct PrivateChunk {
 impl PrivateChunk {
     /// Creates a new instance of `PrivateChunk`.
     pub fn new(value: Vec<u8>, owner: PublicKey) -> Self {
-        let address = Address::Private(XorName::from_content(&[&value, &owner.to_bytes()]));
+        let address = Address::Private(XorName::from_content_parts(&[&value, &owner.to_bytes()]));
 
         Self {
             address,
@@ -110,7 +110,7 @@ impl PublicChunk {
     /// Creates a new instance of `Chunk`.
     pub fn new(value: Vec<u8>) -> Self {
         Self {
-            address: Address::Public(XorName::from_content(&[&value])),
+            address: Address::Public(XorName::from_content(&value)),
             value,
         }
     }

@@ -221,7 +221,7 @@ pub(crate) fn check(age: u8, churn_signature: &bls::Signature) -> bool {
 // Compute the destination for the node with `relocating_name` to be relocated to. `churn_name` is
 // the name of the joined/left node that triggered the relocation.
 fn dst(relocating_name: &XorName, churn_name: &XorName) -> XorName {
-    XorName::from_content(&[&relocating_name.0, &churn_name.0])
+    XorName::from_content_parts(&[&relocating_name.0, &churn_name.0])
 }
 
 // Returns the number of trailing zero bits of the byte slice.
