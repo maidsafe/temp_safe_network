@@ -55,7 +55,12 @@ pub(super) trait SectionUtils {
 
     /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or
     /// its chain is not compatible with the chain of `self`.
-    fn merge(&mut self, other: Section) -> Result<()>;
+    fn merge(
+        &mut self,
+        other: &SectionAuth<SectionAuthorityProvider>,
+        proof_chain: SecuredLinkedList,
+        members: Option<SectionPeers>,
+    ) -> Result<()>;
 
     /// Update the `SectionAuthorityProvider` of our section.
     fn update_elders(
@@ -177,25 +182,23 @@ impl SectionUtils for Section {
 
     /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or
     /// its chain is not compatible with the chain of `self`.
-    fn merge(&mut self, other: Section) -> Result<()> {
-        if !other.section_auth.self_verify() {
-            error!("can't merge sections: other section_auth failed self-verification");
-            return Err(Error::InvalidMessage);
-        }
-        if &other.section_auth.sig.public_key != other.chain.last_key() {
-            // TODO: use more specific error variant.
-            error!("can't merge sections: other section_auth signed with incorrect key");
-            return Err(Error::InvalidMessage);
-        }
+    fn merge(
+        &mut self,
+        other: &SectionAuth<SectionAuthorityProvider>,
+        proof_chain: SecuredLinkedList,
+        members: Option<SectionPeers>,
+    ) -> Result<()> {
+        // We've been AE validated here.
+        self.chain.merge(proof_chain)?;
 
-        self.chain.merge(other.chain.clone())?;
-
-        if &other.section_auth.sig.public_key == self.chain.last_key() {
-            self.section_auth = other.section_auth;
+        if &other.sig.public_key == self.chain.last_key() {
+            self.section_auth = other.clone();
         }
 
-        for info in other.members {
-            let _ = self.update_member(info);
+        if let Some(members) = members {
+            for info in members {
+                let _ = self.update_member(info);
+            }
         }
 
         self.members
@@ -223,6 +226,7 @@ impl SectionUtils for Section {
             return false;
         }
 
+        // TODO: dont chain insert here
         if let Err(error) = self.chain.insert(
             &new_key_sig.public_key,
             new_section_auth.sig.public_key,

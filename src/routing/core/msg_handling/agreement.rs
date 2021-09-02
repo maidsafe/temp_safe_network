@@ -9,7 +9,7 @@
 use std::cmp;
 
 use crate::messaging::{
-    system::{KeyedSig, MembershipState, NodeState, Proposal, SectionAuth, SystemMsg},
+    system::{KeyedSig, MembershipState, NodeState, Proposal, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -107,7 +107,7 @@ impl Core {
 
         let result = self.promote_and_demote_elders()?;
         if result.is_empty() {
-            commands.extend(self.send_sync_to_adults()?);
+            commands.extend(self.send_ae_update_to_adults()?);
         }
 
         commands.extend(result);
@@ -142,7 +142,7 @@ impl Core {
 
         let result = self.promote_and_demote_elders()?;
         if result.is_empty() {
-            commands.extend(self.send_sync_to_adults()?);
+            commands.extend(self.send_ae_update_to_adults()?);
         }
 
         commands.extend(result);
@@ -161,10 +161,13 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
+        trace!("handling agreeeemtn on section");
         let equal_or_extension = section_auth.prefix() == *self.section.prefix()
             || section_auth.prefix().is_extension_of(self.section.prefix());
 
         if equal_or_extension {
+            trace!("equal or extension,,,,");
+
             // Our section or sub-section
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let infos = self.section.promote_and_demote_elders(&self.node.name());
@@ -173,9 +176,9 @@ impl Core {
                 return Ok(vec![]);
             }
 
-            // Send a `Sync` message to all the to-be-promoted members so they have the full
+            // Send a `AE Update` message to all the to-be-promoted members so they have the full
             // section and network data.
-            let sync_recipients: Vec<_> = infos
+            let ae_update_recipients: Vec<_> = infos
                 .iter()
                 .flat_map(|info| info.peers())
                 .filter(|peer| !self.section.is_elder(peer.name()))
@@ -183,13 +186,12 @@ impl Core {
                 .collect();
 
             let mut commands = vec![];
-            if !sync_recipients.is_empty() {
-                let node_msg = SystemMsg::Sync {
-                    section: self.section.clone(),
-                    network: self.network.dump(),
-                };
+            if !ae_update_recipients.is_empty() {
+                trace!("sync recipients exist, sending msgs");
+
+                let node_msg = self.generate_ae_update(sig.public_key, true)?;
                 let cmd =
-                    self.send_direct_message_to_nodes(sync_recipients, node_msg, sig.public_key)?;
+                    self.send_direct_message_to_nodes(ae_update_recipients, node_msg, sig.public_key)?;
 
                 commands.push(cmd);
             }
@@ -219,6 +221,7 @@ impl Core {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
+        println!("agrreeeing ourelders");
         let updates =
             self.split_barrier
                 .process(self.section.prefix(), signed_section_auth.clone(), key_sig);

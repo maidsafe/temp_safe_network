@@ -8,21 +8,23 @@
 
 use super::Core;
 use crate::messaging::{
-    system::{Section, SectionAuth},
+    system::{SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    error::Result, peer::PeerUtils, routing_api::command::Command, section::SectionUtils, Event,
-    SectionAuthUtils,
+    core::StateSnapshot, error::Result, peer::PeerUtils, routing_api::command::Command,
+    section::SectionUtils, Event,
 };
-use std::collections::{BTreeMap, BTreeSet};
-use xor_name::Prefix;
+use secured_linked_list::SecuredLinkedList;
+use std::collections::BTreeSet;
 
 impl Core {
-    pub(crate) async fn handle_sync(
+    pub(crate) async fn update_section(
         &mut self,
-        section: &Section,
-        network: &BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
+        section_auth: &SectionAuth<SectionAuthorityProvider>,
+        snapshot: StateSnapshot,
+        proof_chain: SecuredLinkedList,
+        members: Option<SectionPeers>, // network: &BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
     ) -> Result<Vec<Command>> {
         let old_adults: BTreeSet<_> = self
             .section
@@ -31,21 +33,9 @@ impl Core {
             .copied()
             .collect();
 
-        let snapshot = self.state_snapshot();
-        trace!(
-            "Updating knowledge of own section \n    elders: {:?} \n    members: {:?}",
-            section.authority_provider(),
-            section.members()
-        );
-        self.section.merge(section.clone())?;
+        trace!("Updating knowledge of own section members: {:?}", members);
 
-        // Merge the received prefixes SAPs into our NetworkPrefixMap.
-        let chain = self.section.chain();
-        for (_, sap) in network.iter() {
-            if sap.verify(chain) {
-                let _ = self.network.insert(sap.clone());
-            }
-        }
+        self.section.merge(section_auth, proof_chain, members)?;
 
         if self.is_not_elder() {
             let current_adults: BTreeSet<_> = self
