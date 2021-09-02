@@ -20,7 +20,7 @@ use crate::routing::peer::PeerUtils;
 use crate::routing::{error::Result, routing_api::command::Command, section::SectionUtils};
 use crate::types::PublicKey;
 use itertools::Itertools;
-use std::collections::BTreeSet;
+use std::{cmp::Ordering, collections::BTreeSet};
 use xor_name::XorName;
 
 impl Core {
@@ -294,11 +294,38 @@ impl Core {
             .copied()
             .map(|p2p_node| *p2p_node.name());
 
-        adults
+        let mut candidates = adults
             .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
             .filter(|name| !full_adults.contains(name))
             .take(CHUNK_COPY_COUNT)
-            .collect::<BTreeSet<_>>()
+            .collect::<BTreeSet<_>>();
+        trace!(
+            "Chunk holders of {:?} are empty adults: {:?} and full adults: {:?}",
+            target,
+            candidates,
+            full_adults
+        );
+
+        // Full adults that are close to the chunk, shall still be considered as candidates
+        // to allow chunks stored to empty adults can be queried when nodes become full.
+        let close_full_adults = if let Some(closest_empty) = candidates.iter().next() {
+            full_adults
+                .iter()
+                .filter_map(|name| {
+                    if target.cmp_distance(name, closest_empty) == Ordering::Less {
+                        Some(*name)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<BTreeSet<_>>()
+        } else {
+            // In case there is no empty candidates, query all full_adults
+            full_adults
+        };
+
+        candidates.extend(close_full_adults);
+        candidates
     }
 
     /// Handle incoming data msgs.
