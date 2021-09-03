@@ -139,9 +139,21 @@ impl Core {
                 msg,
                 dst_location,
             } => {
-                // Adult nodes don't process service messages directly
+                let user = match self.comm.get_connection_id(&sender).await {
+                    Some(name) => EndUser(name),
+                    None => {
+                        error!(
+                            "Service msg has been dropped since client connection id for {} was not found: {:?}",
+                            sender, msg
+                        );
+                        return Ok(vec![]);
+                    }
+                };
+                let src_location = SrcLocation::EndUser(user);
+
                 if self.is_not_elder() {
-                    return Ok(vec![]);
+                    trace!("Redirecting from adult to section elders");
+                    return Ok(vec![self.ae_redirect(sender, &src_location, &wire_msg)?]);
                 }
 
                 // First we perform AE checks
@@ -153,21 +165,10 @@ impl Core {
                     }
                 };
 
-                let user = match self.comm.get_connection_id(&sender).await {
-                    Some(name) => EndUser(name),
-                    None => {
-                        error!(
-                            "Service msg has been dropped since client connection id for {} was not found: {:?}",
-                            sender, msg
-                        );
-                        return Ok(vec![]);
-                    }
-                };
-
                 if let Some(command) = self
                     .check_for_entropy(
                         &wire_msg,
-                        &SrcLocation::EndUser(user),
+                        &src_location,
                         &received_section_pk,
                         msg.dst_address(),
                         sender,
