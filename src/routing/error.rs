@@ -50,8 +50,6 @@ pub enum Error {
         #[from]
         err: qp2p::RpcError,
     },
-    #[error("No contact was made.")]
-    CouldNotBootstrap,
     #[error("The node is not in a state to handle the action.")]
     InvalidState,
     #[error("Invalid source location")]
