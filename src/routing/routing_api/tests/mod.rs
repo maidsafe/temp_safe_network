@@ -75,9 +75,10 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     )?;
     let dispatcher = Dispatcher::new(core);
 
+    let new_node_comm = create_comm().await?;
     let new_node = Node::new(
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
-        gen_addr(),
+        new_node_comm.our_connection_info(),
     );
     let section_key = *dispatcher.core.read().await.section().chain().last_key();
 
