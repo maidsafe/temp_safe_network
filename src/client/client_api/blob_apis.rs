@@ -527,17 +527,6 @@ mod tests {
         Ok(())
     }
 
-    // Test creating and retrieving a 1kb blob.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn create_and_retrieve_3kb_pub_unencrypted() -> Result<()> {
-        create_and_retrieve(MIN_BLOB_SIZE, Scope::Public).await
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn create_and_retrieve_3kb_private_unencrypted() -> Result<()> {
-        create_and_retrieve(MIN_BLOB_SIZE, Scope::Private).await
-    }
-
     #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_1mb_public() -> Result<()> {
         create_and_retrieve(1024 * 1024, Scope::Public).await
@@ -548,23 +537,31 @@ mod tests {
         create_and_retrieve(1024 * 1024, Scope::Private).await
     }
 
-    // ----------------------------------------------------------------
-    // 10mb
-    // ----------------------------------------------------------------
     #[tokio::test(flavor = "multi_thread")]
     async fn create_and_retrieve_10mb_private() -> Result<()> {
         create_and_retrieve(10 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn create_and_retrieve_10mb_public() -> Result<()> {
-        create_and_retrieve(10 * 1024 * 1024, Scope::Public).await
+    async fn create_and_retrieve_20mb_private() -> Result<()> {
+        create_and_retrieve(20 * 1024 * 1024, Scope::Private).await
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn create_and_retrieve_40mb_private() -> Result<()> {
+        create_and_retrieve(40 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
-    async fn create_and_retrieve_100mb_public() -> Result<()> {
-        create_and_retrieve(100 * 1024 * 1024, Scope::Public).await
+    async fn create_and_retrieve_80mb_private() -> Result<()> {
+        create_and_retrieve(80 * 1024 * 1024, Scope::Private).await
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "too heavy for CI"]
+    async fn create_and_retrieve_160mb_private() -> Result<()> {
+        create_and_retrieve(160 * 1024 * 1024, Scope::Private).await
     }
 
     async fn create_and_retrieve(size: usize, scope: Scope) -> Result<()> {
