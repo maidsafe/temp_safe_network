@@ -467,7 +467,7 @@ mod tests {
         let node_age = MIN_AGE + 2;
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), node_age),
-            crate::gen_addr(),
+            gen_addr(),
         );
         let peer = node.peer();
         let state = Join::new(node, send_tx, &mut recv_rx);
@@ -564,7 +564,7 @@ mod tests {
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            crate::gen_addr(),
+            gen_addr(),
         );
         let state = Join::new(node, send_tx, &mut recv_rx);
 
@@ -589,7 +589,7 @@ mod tests {
 
             // Send JoinResponse::Redirect
             let new_bootstrap_addrs: BTreeMap<_, _> = (0..ELDER_SIZE)
-                .map(|_| (XorName::random(), crate::gen_addr()))
+                .map(|_| (XorName::random(), gen_addr()))
                 .collect();
 
             send_response(
@@ -655,7 +655,7 @@ mod tests {
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            crate::gen_addr(),
+            gen_addr(),
         );
         let state = Join::new(node, send_tx, &mut recv_rx);
 
@@ -684,7 +684,7 @@ mod tests {
             task::yield_now().await;
 
             let addrs = (0..ELDER_SIZE)
-                .map(|_| (XorName::random(), crate::gen_addr()))
+                .map(|_| (XorName::random(), gen_addr()))
                 .collect();
 
             send_response(
@@ -732,7 +732,7 @@ mod tests {
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            crate::gen_addr(),
+            gen_addr(),
         );
 
         let state = Join::new(node, send_tx, &mut recv_rx);
@@ -776,12 +776,12 @@ mod tests {
 
         let bootstrap_node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            crate::gen_addr(),
+            gen_addr(),
         );
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            crate::gen_addr(),
+            gen_addr(),
         );
 
         let (good_prefix, bad_prefix) = {
@@ -799,12 +799,7 @@ mod tests {
 
         let section_key = bls::SecretKey::random().public_key();
         let elders = (0..ELDER_SIZE)
-            .map(|_| {
-                (
-                    good_prefix.substituted_in(rand::random()),
-                    crate::gen_addr(),
-                )
-            })
+            .map(|_| (good_prefix.substituted_in(rand::random()), gen_addr()))
             .collect();
         let join_task = state.join(section_key, elders);
 

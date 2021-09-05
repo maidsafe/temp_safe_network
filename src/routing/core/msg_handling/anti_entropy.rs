@@ -394,9 +394,13 @@ mod tests {
         system::Section, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
     };
     use crate::routing::{
-        create_test_used_space_and_root_storage, dkg::test_utils::section_signed, ed25519,
-        node::Node, routing_api::tests::create_comm,
-        section::test_utils::gen_section_authority_provider, XorName, ELDER_SIZE, MIN_ADULT_AGE,
+        create_test_used_space_and_root_storage,
+        dkg::test_utils::section_signed,
+        ed25519,
+        node::Node,
+        routing_api::tests::create_comm,
+        section::test_utils::{gen_addr, gen_section_authority_provider},
+        XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
     use bls::SecretKey;
@@ -596,7 +600,7 @@ mod tests {
         ) -> Result<(WireMsg, SrcLocation)> {
             let sender = Node::new(
                 ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
-                crate::gen_addr(),
+                gen_addr(),
             );
 
             let sender_name = sender.name();

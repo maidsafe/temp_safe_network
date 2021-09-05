@@ -97,7 +97,6 @@ pub async fn create_connected_nodes(count: usize) -> Result<Vec<(Routing, EventS
     // Create the first node
     let (node, mut event_stream) = create_node(Config {
         first: true,
-        skip_igd: true,
         ..Default::default()
     })
     .await?;
