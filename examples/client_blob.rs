@@ -6,16 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use bytes::Bytes;
-use eyre::{Context, Result};
+use eyre::Result;
 use safe_network::{
     client::{utils::test_utils::read_network_conn_info, Client, Config},
+    types::utils::random_bytes,
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
-use std::{
-    io::{stdout, Write},
-    time::Duration,
-};
+use std::time::Duration;
 use tokio::time::sleep;
 
 #[tokio::main]
@@ -32,13 +29,10 @@ async fn main() -> Result<()> {
     let pk = client.public_key();
     println!("Client Public Key: {}", pk);
 
-    let random_num: u64 = rand::random();
-    let raw_data = format!("Hello Safe World #{}", random_num);
-    println!("Storing data: {}", raw_data);
+    let random_bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES);
+    println!("Storing data.. ({} bytes)", random_bytes.len());
 
-    let address = client
-        .write_to_network(Bytes::from(raw_data), Scope::Public)
-        .await?;
+    let address = client.write_to_network(random_bytes, Scope::Public).await?;
     let xorurl = Url::encode_blob(
         *address.name(),
         Scope::Public,
@@ -52,11 +46,8 @@ async fn main() -> Result<()> {
     sleep(Duration::from_secs(delay)).await;
 
     println!("...fetching Blob from the network now...");
-    let data = client.read_blob(address).await?;
+    let _data = client.read_blob(address).await?;
     println!("Blob read from {:?}:", address);
-    stdout()
-        .write_all(&data)
-        .context("Failed to print out the content of the file")?;
 
     println!();
 

@@ -206,7 +206,7 @@ jobs:
       # - name: Was there a section split?
       #   run: ./scripts/has_split.sh
 
-      - name: Are nodes still running nodes...
+      - name: Are nodes still running...?
         if: failure() && matrix.os != 'windows-latest'
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
