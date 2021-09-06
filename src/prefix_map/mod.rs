@@ -294,13 +294,12 @@ impl NetworkPrefixMap {
             .iter()
             .map(|e| e.value().value.elder_count())
             .sum();
-        let known = our.elder_count() + network_elders_count;
-        let total = known as f64 / network_fraction;
+        let total = network_elders_count as f64 / network_fraction;
 
         // `total_elders_exact` indicates whether `total_elders` is
         // an exact number or an estimate.
         NetworkStats {
-            known_elders: known as u64,
+            known_elders: network_elders_count as u64,
             total_elders: total.ceil() as u64,
             total_elders_exact,
         }
