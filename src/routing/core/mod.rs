@@ -20,18 +20,14 @@ mod msg_handling;
 mod register_storage;
 mod split_barrier;
 
-use crate::dbs::UsedSpace;
+pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL};
+pub(crate) use chunk_store::ChunkStore;
+pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub(crate) use register_storage::RegisterStorage;
 
-pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
-use capacity::Capacity;
-pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
-use std::{collections::BTreeMap, path::PathBuf};
-
-pub(crate) use chunk_store::ChunkStore;
-
 use self::split_barrier::SplitBarrier;
+use crate::dbs::UsedSpace;
 use crate::messaging::{
     signature_aggregator::SignatureAggregator,
     system::{Proposal, Section},
@@ -47,11 +43,15 @@ use crate::routing::{
     section::{SectionKeyShare, SectionKeysProvider, SectionUtils},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
+use capacity::Capacity;
 use itertools::Itertools;
 use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
-use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
+    sync::Arc,
+};
 use tokio::sync::{mpsc, RwLock};
 use xor_name::{Prefix, XorName};
 

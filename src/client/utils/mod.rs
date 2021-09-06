@@ -10,9 +10,10 @@
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 
-use rand::distributions::{Alphanumeric, Distribution, Standard};
+use rand::distributions::Alphanumeric;
 use rand::rngs::OsRng;
 use rand::{self, Rng};
+use rayon::current_num_threads;
 
 /// Generates a `String` from `length` random UTF-8 `char`s.  Note that the NULL character will be
 /// excluded to allow conversion to a `CString` if required, and that the actual `len()` of the
@@ -37,15 +38,35 @@ pub fn generate_readable_string(length: usize) -> String {
 }
 
 /// Generates a random vector using provided `length`.
-pub fn generate_random_vector<T>(length: usize) -> Vec<T>
-where
-    Standard: Distribution<T>,
-{
-    let mut rng = OsRng;
-    ::std::iter::repeat(())
-        .map(|()| rng.gen::<T>())
-        .take(length)
-        .collect()
+pub fn generate_random_vector(length: usize) -> Vec<u8> {
+    use rayon::prelude::*;
+    let threads = current_num_threads();
+
+    if threads > length {
+        let mut rng = OsRng;
+        return ::std::iter::repeat(())
+            .map(|()| rng.gen::<u8>())
+            .take(length)
+            .collect();
+    }
+
+    let per_thread = length / threads;
+    let remainder = length % threads;
+
+    let mut bytes: Vec<u8> = (0..threads)
+        .par_bridge()
+        .map(|_| vec![0u8; per_thread])
+        .map(|mut bytes| {
+            let bytes = bytes.as_mut_slice();
+            rand::thread_rng().fill(bytes);
+            bytes.to_owned()
+        })
+        .flatten()
+        .collect();
+
+    bytes.extend(vec![0u8; remainder]);
+
+    bytes
 }
 
 /// Convert binary data to a diplay-able format
@@ -94,9 +115,9 @@ mod tests {
     // Test `generate_random_vector` and that the results are not repeated.
     #[test]
     fn random_vector() {
-        let vec0 = generate_random_vector::<u8>(SIZE);
-        let vec1 = generate_random_vector::<u8>(SIZE);
-        let vec2 = generate_random_vector::<u8>(SIZE);
+        let vec0 = generate_random_vector(SIZE);
+        let vec1 = generate_random_vector(SIZE);
+        let vec2 = generate_random_vector(SIZE);
 
         assert_ne!(vec0, vec1);
         assert_ne!(vec0, vec2);
