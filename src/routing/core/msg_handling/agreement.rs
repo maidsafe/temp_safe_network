@@ -233,7 +233,7 @@ impl Core {
             info!("Updating {:?}", &section_auth);
             if section_auth.value.prefix.matches(&self.node.name()) {
                 let _ = self.section.update_elders(section_auth.clone(), key_sig);
-                if self.network.insert(section_auth.value.prefix, section_auth) {
+                if self.network.update(section_auth, self.section_chain())? {
                     info!("Updated our section's state in network's NetworkPrefixMap");
                 }
             } else {
@@ -247,17 +247,13 @@ impl Core {
                 }
 
                 info!("Updating neighbouring section's SAP");
-                if let Err(e) = self.network.update_remote_section_sap(
-                    section_auth,
-                    &old_chain,
-                    self.section_chain(),
-                ) {
+                if let Err(e) = self.network.update(section_auth, &old_chain) {
                     error!("Error updating neighbouring section's details on our NetworkPrefixMap: {:?}", e);
                 }
             }
         }
 
-        info!("PREFIXES WE KNOW ABOUT: {:?}", self.network);
+        info!("Prefixes we know about: {:?}", self.network);
 
         self.update_state(snapshot).await
     }
