@@ -190,8 +190,11 @@ impl Core {
                 trace!("sync recipients exist, sending msgs");
 
                 let node_msg = self.generate_ae_update(sig.public_key, true)?;
-                let cmd =
-                    self.send_direct_message_to_nodes(ae_update_recipients, node_msg, sig.public_key)?;
+                let cmd = self.send_direct_message_to_nodes(
+                    ae_update_recipients,
+                    node_msg,
+                    sig.public_key,
+                )?;
 
                 commands.push(cmd);
             }
