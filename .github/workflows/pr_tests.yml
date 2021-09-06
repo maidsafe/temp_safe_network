@@ -1,0 +1,107 @@
+name: Run All Tests
+
+on: pull_request
+
+env:
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  tests:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run all test categories
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dorny/paths-filter@v2
+        id: messaging_changes
+        with:
+          filters: |
+            src:
+              - 'src/messaging/**'
+              - 'src/types/**'
+      - uses: dorny/paths-filter@v2
+        id: node_changes
+        with:
+          filters: |
+            src:
+              - 'src/node/**'
+              - 'src/routing/**'
+              - 'src/messaging/**'
+              - 'src/types/**'
+      - uses: dorny/paths-filter@v2
+        id: client_changes
+        with:
+          filters: |
+            src:
+              - 'src/client/**'
+              - 'src/messaging/**'
+              - 'src/types/**'
+      - uses: dorny/paths-filter@v2
+        id: routing_changes
+        with:
+          filters: |
+            src:
+              - 'src/routing/**'
+              - 'src/messaging/**'
+              - 'src/types/**'
+      - uses: dorny/paths-filter@v2
+        id: url_changes
+        with:
+          filters: |
+            src:
+              - 'src/url/**'
+      - uses: dorny/paths-filter@v2
+        id: data_types_changes
+        with:
+          filters: |
+            src:
+              - 'src/types/**'
+
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build all safe_network targets
+        run: cargo build --all-targets --release
+
+      - name: Run Messaging tests
+        if: steps.messaging_changes.outputs.src == 'true'
+        run: cargo test --release messaging
+
+      - name: Run Node tests
+        if: steps.node_changes.outputs.src == 'true'
+        run: cargo test --release node
+
+      - name: Run Doc tests
+        if: steps.node_changes.outputs.src == 'true'
+        run: cargo test --release client --doc
+
+      - name: Run Routing tests
+        if: steps.routing_changes.outputs.src == 'true'
+        run: cargo test --release routing
+
+      - name: Run URL tests
+        if: steps.url_changes.outputs.src == 'true'
+        run: cargo test --release url
+
+      - name: Run Data Types tests
+        if: steps.data_types_changes.outputs.src == 'true'
+        run: cargo test --release types 
