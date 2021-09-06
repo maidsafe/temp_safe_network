@@ -12,7 +12,6 @@ use crate::messaging::{
     data::{ChunkRead, DataQuery, QueryResponse},
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::routing::XorName;
 use crate::types::{Chunk, PrivateChunk, PublicChunk};
 
 use bytes::Bytes;
@@ -22,6 +21,7 @@ use qp2p::Endpoint;
 use std::{collections::BTreeMap, net::SocketAddr};
 use tokio::{sync::mpsc::channel, task::JoinHandle, time::sleep};
 use tracing::{debug, error, trace, warn};
+use xor_name::XorName;
 
 // Number of attempts when retrying to send a message to a node
 const NUMBER_OF_RETRIES: usize = 3;

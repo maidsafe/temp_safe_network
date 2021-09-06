@@ -18,10 +18,10 @@ use crate::messaging::{
     system::{KeyedSig, SectionAuth, SystemMsg},
     DstLocation, MessageId, MessageType, MsgKind, SectionAuthorityProvider, WireMsg,
 };
-use crate::routing::XorName;
 use crate::types::PublicKey;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
+use xor_name::XorName;
 
 impl Session {
     // Listen for incoming messages on a connection
@@ -168,22 +168,21 @@ impl Session {
     async fn handle_ae_redirect_msg(
         &self,
         section_auth: SectionAuthorityProvider,
-        _section_signed: KeyedSig,
+        section_signed: KeyedSig,
         bounced_msg: Bytes,
         sender: SocketAddr,
     ) -> Result<(), Error> {
-        // TODO: Check if SAP signature is valid
-        /*let signed_section_auth = SectionAuth {
-            value: section_auth.clone(),
-            sig: section_signed,
-        };
-        if !signed_section_auth.self_verify() {
+        // Check if SAP signature is valid
+        if !bincode::serialize(&section_auth)
+            .map(|bytes| section_signed.verify(&bytes))
+            .unwrap_or(false)
+        {
             warn!(
-                "SAP returned in AE-Redirect response has an invalid signature: {:?}",
+                "Signature returned with SAP in AE-Redirect response is invalid: {:?}",
                 section_auth
             );
             return Ok(());
-        }*/
+        }
 
         let (msg_id, service_msg, auth) = match WireMsg::deserialize(bounced_msg)? {
             MessageType::Service {
