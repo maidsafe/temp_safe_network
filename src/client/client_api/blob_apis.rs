@@ -375,7 +375,7 @@ mod tests {
             .map(|i| (i, client.clone()))
             .map(|(i, client)| {
                 tokio::spawn(async move {
-                    let value = generate_random_vector::<u8>(1000);
+                    let value = generate_random_vector(1000);
                     let _ = client.store_public_blob(&value).await?;
                     println!("Iter: {}", i);
                     let res: Result<()> = Ok(());
@@ -404,7 +404,7 @@ mod tests {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         for i in 0..1000_usize {
-            let value = generate_random_vector::<u8>(1000);
+            let value = generate_random_vector(1000);
             let now = Instant::now();
             let _ = client.store_public_blob(&value).await?;
             let elapsed = now.elapsed();
@@ -418,7 +418,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn public_blob_test() -> Result<()> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-        let value = generate_random_vector::<u8>(10);
+        let value = generate_random_vector(10);
         let (_, expected_address) = Client::blob_data_map(value.clone(), None).await?;
 
         // Store blob
@@ -444,7 +444,7 @@ mod tests {
     async fn private_blob_test() -> Result<()> {
         let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
-        let value = generate_random_vector::<u8>(10);
+        let value = generate_random_vector(10);
 
         let owner = client.public_key();
         let (_, expected_address) = Client::blob_data_map(value.clone(), Some(owner)).await?;
@@ -510,7 +510,7 @@ mod tests {
     async fn private_delete_large() -> Result<()> {
         let mut client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
-        let value = generate_random_vector::<u8>(1024 * 1024);
+        let value = generate_random_vector(1024 * 1024);
         let address = client.store_private_blob(&value).await?;
 
         // let's make sure we have all chunks stored on the network

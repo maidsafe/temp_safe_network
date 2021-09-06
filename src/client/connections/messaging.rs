@@ -89,7 +89,6 @@ impl Session {
         query: DataQuery,
         auth: ServiceAuth,
         payload: Bytes,
-        msg_id: MessageId,
     ) -> Result<QueryResult, Error> {
         let endpoint = self.endpoint.clone();
         let pending_queries = self.pending_queries.clone();
@@ -100,10 +99,10 @@ impl Session {
             None
         };
 
-        let data_name = query.dst_name();
+        let dst = query.dst_name();
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&data_name) {
+        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst) {
             (sap.value.elders, sap.value.public_key_set.public_key())
         } else {
             let mut bootstrapped_peer = BTreeMap::new();
@@ -115,22 +114,10 @@ impl Session {
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders = elders
             .into_iter()
-            .sorted_by(|(lhs_name, _), (rhs_name, _)| data_name.cmp_distance(lhs_name, rhs_name))
+            .sorted_by(|(lhs_name, _), (rhs_name, _)| dst.cmp_distance(lhs_name, rhs_name))
             .map(|(_, addr)| addr)
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
             .collect::<Vec<SocketAddr>>();
-
-        let wire_msg = WireMsg::new_msg(
-            msg_id,
-            payload,
-            MsgKind::ServiceMsg(auth),
-            DstLocation::Section {
-                name: data_name,
-                section_pk,
-            },
-        )?;
-        let priority = wire_msg.msg_kind().priority();
-        let msg_bytes = wire_msg.serialize()?;
 
         let elders_len = chosen_elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES && elders_len > 1 {
@@ -169,6 +156,15 @@ impl Session {
         }
 
         let discarded_responses = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
+
+        let dst_location = DstLocation::Section {
+            name: dst,
+            section_pk,
+        };
+        let msg_kind = MsgKind::ServiceMsg(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let priority = wire_msg.msg_kind().priority();
+        let msg_bytes = wire_msg.serialize()?;
 
         // Set up response listeners
         for socket in chosen_elders {

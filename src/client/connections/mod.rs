@@ -26,7 +26,6 @@ mod listeners;
 mod messaging;
 
 type QueryResponseSender = Sender<QueryResponse>;
-
 type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
 
 pub(crate) struct QueryResult {
