@@ -267,6 +267,36 @@ impl Core {
         }))
     }
 
+    // generate an AE redirect command for the given message
+    pub(crate) fn ae_redirect(
+        &self,
+        sender: SocketAddr,
+        src_location: &SrcLocation,
+        original_wire_msg: &WireMsg,
+    ) -> Result<Command> {
+        let section_signed_auth = self.section.section_signed_authority_provider().clone();
+        let section_auth = section_signed_auth.value;
+        let section_signed = section_signed_auth.sig;
+
+        let ae_msg = SystemMsg::AntiEntropyRedirect {
+            section_auth,
+            section_signed,
+            bounced_msg: original_wire_msg.serialize()?,
+        };
+
+        let wire_msg = WireMsg::single_src(
+            &self.node,
+            src_location.to_dst(),
+            ae_msg,
+            self.section.authority_provider().section_key(),
+        )?;
+
+        Ok(Command::SendMessage {
+            recipients: vec![(src_location.name(), sender)],
+            wire_msg,
+        })
+    }
+
     // checks to see if we're actually in the ideal section for this data
     #[allow(dead_code)]
     pub(crate) fn check_for_better_section_sap_for_data(
