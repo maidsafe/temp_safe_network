@@ -10,7 +10,7 @@ use super::Client;
 use crate::client::{connections::QueryResult, errors::Error};
 use crate::messaging::{
     data::{DataQuery, ServiceMsg},
-    MessageId, ServiceAuth, WireMsg,
+    ServiceAuth, WireMsg,
 };
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
@@ -33,9 +33,7 @@ impl Client {
             signature,
         };
 
-        self.session
-            .send_query(query, auth, serialised_query, MessageId::new())
-            .await
+        self.session.send_query(query, auth, serialised_query).await
     }
 
     // Send a Query to the network and await a response.

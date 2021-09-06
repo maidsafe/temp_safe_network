@@ -230,7 +230,7 @@ async fn put_data() -> Result<(ChunkAddress, [u8; 32])> {
     let config = Config::new(None, Some(bootstrap_contacts), None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(None, config).await?;
 
-    let raw_data = generate_random_vector::<u8>(1024 * 1024);
+    let raw_data = generate_random_vector(1024 * 1024);
 
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];

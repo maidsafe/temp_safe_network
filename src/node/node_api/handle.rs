@@ -10,11 +10,12 @@ use super::{
     interaction::push_state,
     messaging::{send, send_error, send_to_nodes},
     role::{AdultRole, ElderRole, Role},
+    Node,
 };
 use crate::node::{
     event_mapping::MsgContext,
     node_ops::{NodeDuties, NodeDuty},
-    Node, Result,
+    Result,
 };
 use crate::{messaging::MessageId, routing::MIN_LEVEL_WHEN_FULL};
 
