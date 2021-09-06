@@ -229,7 +229,7 @@ impl SectionUtils for Section {
             new_key_sig.signature,
         ) {
             error!(
-                "failed to insert key {:?} (signed with {:?}) into the section chain: {}",
+                "failed to insert key {:?} (signed with {:?}) into the section chain: {:?}",
                 new_section_auth.sig.public_key, new_key_sig.public_key, error,
             );
             return false;

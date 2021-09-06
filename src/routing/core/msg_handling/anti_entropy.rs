@@ -229,7 +229,7 @@ impl Core {
                 // otherwise we just drop the message.
 
                 if let Some(name) = dst_name {
-                    match self.network.closest(&name) {
+                    match self.network.closest_or_opposite(&name) {
                         Some(section_auth) => {
                             // Redirect to the closest section
                             SystemMsg::AntiEntropyRedirect {
@@ -315,8 +315,8 @@ impl Core {
             let our_section = self.section.section_auth.clone();
             let better_sap = self
                 .network
-                .get_matching_or_opposite(&data_name)
-                .unwrap_or_else(|_| self.section.section_auth.clone());
+                .closest_or_opposite(&data_name)
+                .unwrap_or_else(|| self.section.section_auth.clone());
 
             trace!("Our SAP: {:?}", our_section);
             trace!("Better SAP for data {:?}: {:?}", data_name, better_sap);

@@ -42,7 +42,7 @@ pub struct Section {
 /// Container for storing information about members of our section.
 #[derive(Clone, Default, Debug, Eq, Serialize, Deserialize)]
 pub struct SectionPeers {
-    /// memebers of the section
+    /// Members of the section
     pub members: BTreeMap<XorName, SectionAuth<NodeState>>,
 }
 

@@ -227,20 +227,38 @@ impl Core {
         }
 
         let snapshot = self.state_snapshot();
+        let mut old_chain = self.section.chain.clone();
 
         for (section_auth, key_sig) in updates {
+            info!("Updating {:?}", &section_auth);
             if section_auth.value.prefix.matches(&self.node.name()) {
-                let _ = self.section.update_elders(section_auth, key_sig);
+                let _ = self.section.update_elders(section_auth.clone(), key_sig);
+                if self.network.insert(section_auth.value.prefix, section_auth) {
+                    info!("Updated our section's state in network's NetworkPrefixMap");
+                }
             } else {
-                // We shouln't be receiving or updating a SAP for
-                // a remote section here, that's done with a AE msg response.
-                debug!(
-                    "Ignoring Proposal::OurElders since prefix doesn't match ours: {:?}",
-                    section_auth
-                );
+                // Update the old chain to become the neighbour's chain.
+                if let Err(e) = old_chain.insert(
+                    &key_sig.public_key,
+                    section_auth.value.section_key(),
+                    key_sig.signature,
+                ) {
+                    error!("Error generating neighbouring section's proof_chain for knowledge update on split: {:?}", e);
+                }
+
+                info!("Updating neighbouring section's SAP");
+                if let Err(e) = self.network.update_remote_section_sap(
+                    section_auth,
+                    &old_chain,
+                    self.section_chain(),
+                ) {
+                    error!("Error updating neighbouring section's details on our NetworkPrefixMap: {:?}", e);
+                }
             }
         }
 
-        self.update_state(signed_section_auth, snapshot).await
+        info!("PREFIXES WE KNOW ABOUT: {:?}", self.network);
+
+        self.update_state(snapshot).await
     }
 }

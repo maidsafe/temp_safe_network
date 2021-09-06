@@ -32,11 +32,10 @@ use std::{collections::BTreeMap, path::PathBuf};
 pub(crate) use chunk_store::ChunkStore;
 
 use self::split_barrier::SplitBarrier;
-use crate::messaging::system::SectionAuth;
 use crate::messaging::{
     signature_aggregator::SignatureAggregator,
     system::{Proposal, Section},
-    MessageId, SectionAuthorityProvider,
+    MessageId,
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
@@ -143,11 +142,7 @@ impl Core {
         }
     }
 
-    pub(crate) async fn update_state(
-        &mut self,
-        new_section_auth: SectionAuth<SectionAuthorityProvider>,
-        old: StateSnapshot,
-    ) -> Result<Vec<Command>> {
+    pub(crate) async fn update_state(&mut self, old: StateSnapshot) -> Result<Vec<Command>> {
         let mut commands = vec![];
         let new = self.state_snapshot();
 
@@ -156,10 +151,6 @@ impl Core {
 
         if new.prefix != old.prefix {
             info!("Split");
-        }
-
-        if self.network.insert(new_section_auth) {
-            info!("Updated our section's state in network's NetworkPrefixMap");
         }
 
         if new.last_key != old.last_key {
