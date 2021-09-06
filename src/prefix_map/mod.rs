@@ -72,11 +72,26 @@ impl NetworkPrefixMap {
 
     /// Returns the known section that is closest to the given name, regardless of whether `name`
     /// belongs in that section or not.
-    pub(crate) fn closest(&self, name: &XorName) -> Option<SectionAuth<SectionAuthorityProvider>> {
+    fn closest(&self, name: &XorName) -> Option<SectionAuth<SectionAuthorityProvider>> {
         self.sections
             .iter()
             .min_by(|lhs, rhs| lhs.key().cmp_distance(rhs.key(), name))
             .map(|e| e.value().clone())
+    }
+
+    /// Returns the known section that is closest to the given name, regardless of whether `name`
+    /// belongs in that section or not. If there are no close matches, return a SAP from an opposite prefix.
+    pub(crate) fn closest_or_opposite(
+        &self,
+        name: &XorName,
+    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
+        self.closest(name).or_else(|| {
+            self.sections
+                .iter()
+                .filter(|e| e.key().matches(&name.with_bit(0, !name.bit(0))))
+                .max_by_key(|e| e.key().bit_count())
+                .map(|entry| entry.value().clone())
+        })
     }
 
     /// Returns all known sections SAP.
@@ -237,6 +252,7 @@ impl NetworkPrefixMap {
     /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
     /// one with the longest prefix. If there are no prefixes matching the given `name`, return
     /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
+    #[allow(unused)]
     pub(crate) fn get_matching_or_opposite(
         &self,
         name: &XorName,

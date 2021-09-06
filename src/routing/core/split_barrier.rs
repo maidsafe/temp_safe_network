@@ -23,8 +23,8 @@ impl SplitBarrier {
         Self(Vec::new())
     }
 
-    // Pass an aggreed-on proposal for `OurElders` through this function. If there is no split, it
-    // returns it unchanged. If there is a split and we've seen the aggreement for only one
+    // Pass an agreed-on proposal for `OurElders` through this function. If there is no split, it
+    // returns it unchanged. If there is a split and we've seen the agreement for only one
     // subsection so far, it caches it and returns nothing. Otherwise it returns both proposals.
     //
     // Note: in case of a fork, it can return more than two proposals. In that case one of the

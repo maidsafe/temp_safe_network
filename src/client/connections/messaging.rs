@@ -59,14 +59,16 @@ impl Session {
         let endpoint = self.endpoint()?.clone();
 
         // Get DataSection elders details.
-        let (elders, section_pk) = if let Ok(sap) = self.network.section_by_name(&dst_address) {
+        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
+        {
             (
-                sap.elders
+                sap.value
+                    .elders
                     .values()
                     .cloned()
                     .take(targets)
                     .collect::<Vec<SocketAddr>>(),
-                sap.public_key_set.public_key(),
+                sap.value.public_key_set.public_key(),
             )
         } else {
             // Send message to our bootstrap peer with network's genesis PK.
@@ -121,8 +123,8 @@ impl Session {
         let data_name = query.dst_name();
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let (elders, section_pk) = if let Ok(sap) = self.network.section_by_name(&data_name) {
-            (sap.elders, sap.public_key_set.public_key())
+        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&data_name) {
+            (sap.value.elders, sap.value.public_key_set.public_key())
         } else {
             // Send message to our bootstrap peer with the network's genesis PK and addressing adring.
             self.bootstrap_peer
