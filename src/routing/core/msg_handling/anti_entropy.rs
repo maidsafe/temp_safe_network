@@ -83,7 +83,7 @@ impl Core {
                 Ok(vec![cmd])
             }
             Err(err) => {
-                warn!("Anti-Entropy: failed to update remote section SAP, bounced msg dropped: {:?}, {}", bounced_msg, err);
+                warn!("Anti-Entropy: failed to update remote section SAP, bounced msg dropped: {:?}, {:?}", bounced_msg, err);
                 Ok(vec![])
             }
         }

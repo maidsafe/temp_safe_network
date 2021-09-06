@@ -122,7 +122,7 @@ impl NetworkPrefixMap {
 
     /// Update our knowledge of a remote section's SAP only
     /// if it's verifiable with the provided proof chain and the
-    /// curently known SAP we are aware of for the Prefix.
+    /// currently known SAP we are aware of for the Prefix.
     pub(crate) fn update(
         &self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
@@ -247,31 +247,6 @@ impl NetworkPrefixMap {
     /// one with the longest prefix.
     pub(crate) fn section_by_prefix(&self, prefix: &Prefix) -> Result<SectionAuthorityProvider> {
         self.section_by_name(&prefix.name())
-    }
-
-    /// Get the entry at the prefix that matches `name`. In case of multiple matches, returns the
-    /// one with the longest prefix. If there are no prefixes matching the given `name`, return
-    /// a prefix matching the opposite to 1st bit of `name`. If the map is empty, return None.
-    #[allow(unused)]
-    pub(crate) fn get_matching_or_opposite(
-        &self,
-        name: &XorName,
-    ) -> Result<SectionAuth<SectionAuthorityProvider>> {
-        if let Some(entry) = self
-            .sections
-            .iter()
-            .filter(|e| e.key().matches(name))
-            .max_by_key(|e| e.key().bit_count())
-        {
-            Ok(entry.value().clone())
-        } else {
-            self.sections
-                .iter()
-                .filter(|e| e.key().matches(&name.with_bit(0, !name.bit(0))))
-                .max_by_key(|e| e.key().bit_count())
-                .ok_or(Error::NoMatchingSection)
-                .map(|entry| entry.value().clone())
-        }
     }
 
     /// Returns network statistics.
@@ -410,13 +385,15 @@ mod tests {
 
         // There are no matching prefixes, so return an opposite prefix.
         assert_eq!(
-            map.get_matching_or_opposite(&p1.substituted_in(rng.gen()))?,
+            map.closest_or_opposite(&p1.substituted_in(rng.gen()))
+                .ok_or(Error::NoMatchingSection)?,
             sap0
         );
 
         let _ = map.insert(sap0.clone());
         assert_eq!(
-            map.get_matching_or_opposite(&p1.substituted_in(rng.gen()))?,
+            map.closest_or_opposite(&p1.substituted_in(rng.gen()))
+                .ok_or(Error::NoMatchingSection)?,
             sap0
         );
 
