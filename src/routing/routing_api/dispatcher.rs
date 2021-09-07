@@ -196,11 +196,15 @@ impl Dispatcher {
             Command::PrepareNodeMsgToSend { msg, dst } => {
                 self.core.read().await.prepare_node_msg(msg, dst)
             }
-            Command::HandleMessage { sender, wire_msg } => {
+            Command::HandleMessage {
+                sender,
+                wire_msg,
+                original_bytes,
+            } => {
                 self.core
                     .read()
                     .await
-                    .handle_message(sender, wire_msg)
+                    .handle_message(sender, wire_msg, original_bytes)
                     .await
             }
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),

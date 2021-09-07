@@ -100,6 +100,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         Command::HandleMessage {
             sender: new_node.addr,
             wire_msg,
+            original_bytes: None,
         },
         &dispatcher,
     )
@@ -175,6 +176,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         Command::HandleMessage {
             sender: new_node.addr,
             wire_msg,
+            original_bytes: None,
         },
         &dispatcher,
     )
@@ -280,6 +282,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         Command::HandleMessage {
             sender: relocated_node.addr,
             wire_msg,
+            original_bytes: None,
         },
         &dispatcher,
     )
@@ -352,6 +355,7 @@ async fn aggregate_proposals() -> Result<()> {
             Command::HandleMessage {
                 sender: node.addr,
                 wire_msg,
+                original_bytes: None,
             },
             &dispatcher,
         )
@@ -383,6 +387,7 @@ async fn aggregate_proposals() -> Result<()> {
         Command::HandleMessage {
             sender: nodes[THRESHOLD].addr,
             wire_msg,
+            original_bytes: None,
         },
         &dispatcher,
     )
@@ -903,7 +908,11 @@ async fn handle_untrusted_accumulated_message() -> Result<()> {
     let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst_location)?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleMessage { sender, wire_msg })
+        .handle_command(Command::HandleMessage {
+            sender,
+            wire_msg,
+            original_bytes: None,
+        })
         .await?;
 
     let mut bounce_sent = false;
@@ -1016,6 +1025,7 @@ async fn check_we_send_ae_update_when_msg_bounced_as_untrusted() -> Result<()> {
         Command::HandleMessage {
             sender: other_node.addr,
             wire_msg: bounced_wire_msg,
+            original_bytes: None,
         },
         &dispatcher,
     )
@@ -1137,6 +1147,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         Command::HandleMessage {
             sender: old_node.addr,
             wire_msg,
+            original_bytes: None,
         },
         &dispatcher,
     )
@@ -1218,6 +1229,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
         Command::HandleMessage {
             sender: sender.addr,
             wire_msg,
+            original_bytes: None,
         },
         &dispatcher,
     )

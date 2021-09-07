@@ -235,7 +235,7 @@ impl Core {
     // bring the sender's knowledge about us up to date.
     pub(crate) async fn check_for_entropy(
         &self,
-        original_wire_msg: &WireMsg,
+        original_bytes: Bytes,
         src_location: &SrcLocation,
         dst_section_pk: &BlsPublicKey,
         dst_name: Option<XorName>,
@@ -248,7 +248,7 @@ impl Core {
             return Ok(None);
         }
 
-        let bounced_msg = original_wire_msg.serialize()?;
+        let bounced_msg = original_bytes;
 
         let ae_msg = match self
             .section
@@ -423,7 +423,13 @@ mod tests {
 
         let command = env
             .core
-            .check_for_entropy(&msg, &src_location, &dst_section_pk, None, sender)
+            .check_for_entropy(
+                msg.serialize()?,
+                &src_location,
+                &dst_section_pk,
+                None,
+                sender,
+            )
             .await?;
 
         assert!(command.is_none());
@@ -446,7 +452,13 @@ mod tests {
         let dst_name = Some(env.other_sap.value.prefix.name());
         match env
             .core
-            .check_for_entropy(&msg, &src_location, &dst_section_pk, dst_name, sender)
+            .check_for_entropy(
+                msg.serialize()?,
+                &src_location,
+                &dst_section_pk,
+                dst_name,
+                sender,
+            )
             .await
         {
             Err(Error::NoMatchingSection) => {}
@@ -463,7 +475,13 @@ mod tests {
         // with the SAP we inserted for other prefix
         let command = env
             .core
-            .check_for_entropy(&msg, &src_location, &dst_section_pk, dst_name, sender)
+            .check_for_entropy(
+                msg.serialize()?,
+                &src_location,
+                &dst_section_pk,
+                dst_name,
+                sender,
+            )
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
@@ -494,7 +512,13 @@ mod tests {
 
         let command = env
             .core
-            .check_for_entropy(&msg, &src_location, &dst_section_pk, None, sender)
+            .check_for_entropy(
+                msg.serialize()?,
+                &src_location,
+                &dst_section_pk,
+                None,
+                sender,
+            )
             .await?;
 
         let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
