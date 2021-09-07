@@ -32,7 +32,7 @@ pub(crate) enum Command {
     },
     // TODO: rename this as/when this is all node for clarity
     /// Handle Node, either directly or notify via event listener
-    HandleInfrastructureMessage {
+    HandleSystemMessage {
         sender: SocketAddr,
         msg_id: MessageId,
         msg: SystemMsg,

@@ -32,7 +32,7 @@ pub enum MessageType {
         /// the message
         msg: ServiceMsg,
     },
-    /// Infrastructure message
+    /// System message
     System {
         /// Message ID
         msg_id: MessageId,

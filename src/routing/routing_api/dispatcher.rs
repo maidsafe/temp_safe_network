@@ -170,7 +170,7 @@ impl Dispatcher {
                     )
                     .await
             }
-            Command::HandleInfrastructureMessage {
+            Command::HandleSystemMessage {
                 sender,
                 msg_id,
                 msg_authority,

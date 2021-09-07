@@ -133,7 +133,7 @@ impl Core {
                     info!("Entropy check passed. Handling verified msg {}", msg_id);
                 }
 
-                Ok(vec![Command::HandleInfrastructureMessage {
+                Ok(vec![Command::HandleSystemMessage {
                     sender,
                     msg_id,
                     msg_authority,
