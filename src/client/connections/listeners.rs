@@ -151,28 +151,24 @@ impl Session {
         let error_sender = session.incoming_err_sender.clone();
 
         let _ = tokio::spawn(async move {
-            debug!("Thread spawned to handle this client message");
             match msg {
                 ServiceMsg::QueryResponse { response, .. } => {
-                    trace!(
-                        "The received query response id is {:?}, msg is {:?}",
-                        response.operation_id(),
-                        response
-                    );
-
                     // Note that this doesn't remove the sender from here since multiple
                     // responses corresponding to the same message ID might arrive.
                     // Once we are satisfied with the response this is channel is discarded in
                     // ConnectionManager::send_query
 
                     if let Ok(op_id) = response.operation_id() {
-                        debug!("Query response (op_id is: {})", op_id);
-
                         if let Some(sender) = &queries.read().await.get(&op_id) {
                             trace!("Sending response for query w/{} via channel.", op_id);
                             let _ = sender.send(response).await;
                         } else {
-                            trace!("No channel found for operation {}", op_id);
+                            // temporarily commenting this out
+                            // if we have already received enough responses for a query,
+                            // we drop the channels and any drop further responses for that query.
+                            // but we should not drop it immediately, but clean it up after a while
+                            // and then not log that "no channel was found" when we already had enough responses..
+                            //trace!("No channel found for operation {}", op_id);
                         }
                     } else {
                         warn!("Ignoring query response without operation id");

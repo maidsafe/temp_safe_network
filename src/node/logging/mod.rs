@@ -17,7 +17,7 @@ use system::Process;
 use tokio::time::MissedTickBehavior;
 use tracing::trace;
 
-const LOG_INTERVAL: Duration = std::time::Duration::from_secs(30);
+const LOG_INTERVAL: Duration = std::time::Duration::from_secs(60);
 
 pub(super) async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) {
     let mut system = System::new_all();
@@ -28,6 +28,7 @@ pub(super) async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) 
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip); // default is `Burst`, probably not what we want
         loop {
             let _ = interval.tick().await;
+            system.refresh_all();
             log(&mut system, &ctx, print_resources_usage).await;
         }
     });
@@ -39,7 +40,7 @@ async fn initial_log(system: &mut System, ctx: &LogCtx) {
     let kernel_version: &str = &fmt(system.kernel_version());
     let os_version: &str = &fmt(system.os_version());
     let host_name: &str = &fmt(system.host_name());
-    trace!(prefix, os_name, kernel_version, os_version, host_name,);
+    trace!(prefix, os_name, kernel_version, os_version, host_name);
 }
 
 fn fmt(string: Option<String>) -> String {
@@ -48,32 +49,10 @@ fn fmt(string: Option<String>) -> String {
 
 #[tracing::instrument(skip(ctx))]
 async fn log(system: &mut System, ctx: &LogCtx, print_resources_usage: bool) {
-    system.refresh_all();
-
     let prefix: &str = &format!("{}", ctx.prefix().await.name());
 
-    let total_memory = system.total_memory();
-    let system_memory = system.used_memory();
-    let total_swap = system.total_swap();
-    let used_swap = system.used_swap();
-
-    trace!(prefix, total_memory, system_memory, total_swap, used_swap,);
-
-    let load_avg = system.load_average();
     let processors = system.processors();
     let processor_count = processors.len();
-
-    let one_min_load_avg = (100_f64 * load_avg.one / processor_count as f64) as u8;
-    let five_min_load_avg = (100_f64 * load_avg.five / processor_count as f64) as u8;
-    let fifteen_min_load_avg = (100_f64 * load_avg.fifteen / processor_count as f64) as u8;
-
-    trace!(
-        prefix,
-        one_min_load_avg,
-        five_min_load_avg,
-        fifteen_min_load_avg,
-        "System load avg",
-    );
 
     let our_pid = &std::process::id();
 
