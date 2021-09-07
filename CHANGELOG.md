@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.2](https://github.com/maidsafe/safe_network/compare/v0.27.1...v0.27.2) (2021-09-07)
+
+
+### Bug Fixes
+
+* Setting Sub Names Ignores Url Labels ([193ae1b](https://github.com/maidsafe/safe_network/commit/193ae1ba8294db3441c46bc219ee011b9df2dc83))
+
 ### [0.27.1](https://github.com/maidsafe/safe_network/compare/v0.27.0...v0.27.1) (2021-09-07)
 
 ## [0.27.0](https://github.com/maidsafe/safe_network/compare/v0.26.2...v0.27.0) (2021-09-07)
