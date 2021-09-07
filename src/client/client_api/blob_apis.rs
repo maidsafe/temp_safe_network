@@ -548,6 +548,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "too heavy for CI"]
     async fn create_and_retrieve_40mb_private() -> Result<()> {
         create_and_retrieve(40 * 1024 * 1024, Scope::Private).await
     }
