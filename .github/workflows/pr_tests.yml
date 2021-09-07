@@ -150,7 +150,7 @@ jobs:
 
       - name: Run Routing tests
         if: steps.routing_changes.outputs.src == 'true'
-        run: cargo test --release routing
+        run: cargo test --release send_after_reconnect
 
       - name: Run Doc tests
         if: steps.node_changes.outputs.src == 'true'
