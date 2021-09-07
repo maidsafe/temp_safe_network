@@ -9,7 +9,6 @@
 use std::{collections::BTreeMap, iter::FromIterator, path::PathBuf, time::Duration};
 
 use super::{
-    blob_storage::Uploader,
     data::{get_data_chunks, Batch},
     Client,
 };
@@ -20,7 +19,6 @@ use crate::{
     url::Scope,
 };
 
-use async_trait::async_trait;
 use bincode::deserialize;
 use bytes::Bytes;
 use futures::future::join_all;
@@ -29,16 +27,6 @@ use self_encryption::{self, ChunkKey, EncryptedChunk, SecretKey as BlobSecretKey
 use tokio::task;
 use tracing::trace;
 use xor_name::XorName;
-
-#[derive(Clone)]
-pub(crate) struct UploaderImpl {}
-
-#[async_trait]
-impl Uploader for UploaderImpl {
-    async fn upload(&self, _bytes: &[u8]) -> Result<()> {
-        Ok(())
-    }
-}
 
 struct HeadChunk {
     chunk: Chunk,

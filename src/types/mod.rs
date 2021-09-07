@@ -34,16 +34,6 @@ pub use token::Token;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-// /// Object storing a data variant.
-// #[allow(clippy::large_enum_variant)]
-// #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-// pub enum Data {
-//     /// Chunk.
-//     Chunk(Chunk),
-//     /// Register.
-//     Register(Register),
-// }
-
 /// Object storing an address of data on the network
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Debug, PartialOrd, Ord)]
 pub enum DataAddress {
@@ -52,30 +42,3 @@ pub enum DataAddress {
     /// Register Address
     Register(RegisterAddress),
 }
-
-// impl Data {
-//     /// Returns true if public.
-//     pub fn is_public(&self) -> bool {
-//         match *self {
-//             Self::Chunk(ref chunk) => chunk.is_public(),
-//             Self::Register(ref register) => register.is_public(),
-//         }
-//     }
-
-//     /// Returns true if private.
-//     pub fn is_private(&self) -> bool {
-//         !self.is_public()
-//     }
-// }
-
-// impl From<Chunk> for Data {
-//     fn from(chunk: Chunk) -> Self {
-//         Self::Chunk(chunk)
-//     }
-// }
-
-// impl From<Register> for Data {
-//     fn from(data: Register) -> Self {
-//         Self::Register(data)
-//     }
-// }

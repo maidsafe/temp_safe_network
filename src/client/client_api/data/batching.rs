@@ -30,8 +30,6 @@ use tokio::{
     task::{self, JoinHandle},
 };
 
-/// The batching is a way to
-
 /// Batching ops into pools is a means to not include all chunks of the
 /// same file into the same quote, since that quote is then sent around the network.
 /// So we avoid that information leak, by mixing chunks from different files.
