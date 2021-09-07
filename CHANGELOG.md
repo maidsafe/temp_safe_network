@@ -2,6 +2,59 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.27.0](https://github.com/maidsafe/safe_network/compare/v0.26.2...v0.27.0) (2021-09-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* Changes to messaging for tracking operation id
+* **anti-entropy:** removing SectionKownledge message type.
+
+### Features
+
+* Add a descriptive error to `sn_node` when UPnP fails ([4ec4994](https://github.com/maidsafe/safe_network/commit/4ec4994db7a9d3eaab19db1eb5668df50a1c5d16))
+* add AE-Update message ([d914a20](https://github.com/maidsafe/safe_network/commit/d914a20ccdb632767088d4e1d49c9b80c0879f2c))
+* add clients to AE flow properly ([9a36116](https://github.com/maidsafe/safe_network/commit/9a36116c8b1244353f145651540934939785bb3f))
+* add dashmap prefix maps ([e6586ce](https://github.com/maidsafe/safe_network/commit/e6586ce4be44696703a0d85931ad216628b63fa5))
+* impl client AE and message resending ([9995dba](https://github.com/maidsafe/safe_network/commit/9995dbac38c19714a1898dba5519051bf052be04))
+* move Chunk read/write functionality into routing ([6f53ca8](https://github.com/maidsafe/safe_network/commit/6f53ca8765d130f16e12e2952a3e51288a266ee6))
+* move prefix_map to types ([5a79481](https://github.com/maidsafe/safe_network/commit/5a794813b0fdd75ee93fa0db7706c7c29ec7d28a))
+* remove Sync messages in favour of AE update ([1db61f3](https://github.com/maidsafe/safe_network/commit/1db61f3c34dad7e29e70484d0f53303302e6d9f1))
+* **anti-entropy:** resend msg when SAP received in AE-Retry was already updated ([0ef4d64](https://github.com/maidsafe/safe_network/commit/0ef4d648dba0176f29342e932118fa9a2b6671e3))
+* **anti-entropy:** return AntiEntropyRedirect when msg destination section key is not part of our section chain. ([c7f07a7](https://github.com/maidsafe/safe_network/commit/c7f07a773a4c7f5d251e2b1e3e3ad059f1341394))
+* **client:** enable client to connect and send messages to multiple sections ([67730c6](https://github.com/maidsafe/safe_network/commit/67730c600a28f13988fc5cce93f6a49f14a1d125))
+* **client:** use the network genesis key to validate SAPs received in AE-Retry messages ([f878a6e](https://github.com/maidsafe/safe_network/commit/f878a6e66ab304787a0f645ae0c2eb98ef23da90))
+* simplify some entropy. check of closest or matching w/ service msgs ([0c2cdc9](https://github.com/maidsafe/safe_network/commit/0c2cdc98174227854d87b2cdeb8d7d081593a003))
+* **priority:** allow setting priority of a msg ([1793b49](https://github.com/maidsafe/safe_network/commit/1793b4962c805929ab4fe5b614815d6a49409afd))
+* **routing:** update knowledge of remote section upon receiving AntiEntropyRetry msg ([9bdd8e7](https://github.com/maidsafe/safe_network/commit/9bdd8e7b051bd51bfe0eaa00a6ea9499e45deea6))
+
+
+### Bug Fixes
+
+* **ci:** build step went out of order ([e2fcf40](https://github.com/maidsafe/safe_network/commit/e2fcf40807e852f505925a73324809c979fca00f))
+* avoid AE looping by removing 'check for better section sap' ([a3980bf](https://github.com/maidsafe/safe_network/commit/a3980bf46d30bbdb9735a2c0f14a53aa4352c1fb))
+* avoid looping AntiEntropyDirect ([50c742b](https://github.com/maidsafe/safe_network/commit/50c742b38039a875cef616c4432475a91c71db31))
+* avoid looping NodeErrorMsg wrapping ([ea1c229](https://github.com/maidsafe/safe_network/commit/ea1c2294cde9fe2c162629651520a0ddbe6ae0ef))
+* closest and various extra clones ([5ba3491](https://github.com/maidsafe/safe_network/commit/5ba349176eb2115b5846b95b53216efb5d5058ee))
+* debug warning ([fb6aa27](https://github.com/maidsafe/safe_network/commit/fb6aa27aa272d3acd2b5cef8c18cfb6a6d6209ed))
+* redundant elder counts in PrefixMap ([8bc10fc](https://github.com/maidsafe/safe_network/commit/8bc10fc4fab7f247233153394eff77b07efb4104))
+* **routing:** insert neighbouring section's SAP on splits ([d8d5a3d](https://github.com/maidsafe/safe_network/commit/d8d5a3d000b53d20d6c5d6148c080439865d3e58))
+* close full adults being chunk holders as well ([6e61640](https://github.com/maidsafe/safe_network/commit/6e616400bda7004b356372ad8715a4f2967fc14e))
+* prefixmap deadlock ([e92d96d](https://github.com/maidsafe/safe_network/commit/e92d96ddc0c1118bb5e4306392cfdfdddca52023))
+* Redirect service messages from adults to elders ([c4aabee](https://github.com/maidsafe/safe_network/commit/c4aabee0d247e628188bca7e75094bd7b04fa868))
+* **client:** minor fixes to client AE ([883959b](https://github.com/maidsafe/safe_network/commit/883959ba0bfc609f4dc8272d0def6330460752a1))
+* **client:** update to use latest prefixmap ([0111134](https://github.com/maidsafe/safe_network/commit/01111341eadd832ee74aa0dc76d52508245ad205))
+* **signature:** fix invalid signature error when client receives AE ([cdf34be](https://github.com/maidsafe/safe_network/commit/cdf34bef84a6f8b76785fa4643a9f8e4c9665b39))
+* make tests compile ([18ca54b](https://github.com/maidsafe/safe_network/commit/18ca54b16790ae0008038e5248a8c0c43a8b45eb))
+* missing core components and utils post-rebase ([86be78e](https://github.com/maidsafe/safe_network/commit/86be78e477735299fb9138c1d8617e0eafc5bfaa))
+* Update `MessageId` -> `OperationId` in client error ([5777c97](https://github.com/maidsafe/safe_network/commit/5777c97dc95945407bbb925ca348f7da913bd0da))
+* use proper dst_section_key when resend in case of AntiEntropyRedirect ([9db261f](https://github.com/maidsafe/safe_network/commit/9db261fbb80041e39ba8b4a192029e0a87a3c893))
+* **anti-entropy:** adding missing SAP validation to check section key matches its signature's key ([2c44a94](https://github.com/maidsafe/safe_network/commit/2c44a949291274216b29f966452f64fd3dd978ef))
+* **anti-entropy:** remove msg early destination name check and relaying msgs so they are handled by AE checks and flow ([8de2ea4](https://github.com/maidsafe/safe_network/commit/8de2ea469a668f9a19aa59a3cc350ac6d42861a7))
+* **dkg:** ignore DKG proposal msgs which are meant to update knowledge of remote sections ([b3b6de9](https://github.com/maidsafe/safe_network/commit/b3b6de9c9e648c08169407368455d6b0ecc4292f))
+* **routing:** improving AE logs, and removing incorrect validation for SectionKnowledge msgs ([b6c40bf](https://github.com/maidsafe/safe_network/commit/b6c40bf0f0689867b2ce5e675ed5bca4a7fe2a66))
+* **routing:** keep the handle to the RegisterStorage when relocating ([3759771](https://github.com/maidsafe/safe_network/commit/3759771823fe56dd7b4343ba0202889b8faf5cfb))
+
 ### [0.26.2](https://github.com/maidsafe/safe_network/compare/v0.26.1...v0.26.2) (2021-08-11)
 
 ### [0.26.1](https://github.com/maidsafe/safe_network/compare/v0.26.0...v0.26.1) (2021-08-11)
