@@ -161,13 +161,10 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        trace!("handling agreeeemtn on section");
         let equal_or_extension = section_auth.prefix() == *self.section.prefix()
             || section_auth.prefix().is_extension_of(self.section.prefix());
 
         if equal_or_extension {
-            trace!("equal or extension,,,,");
-
             // Our section or sub-section
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let infos = self.section.promote_and_demote_elders(&self.node.name());
@@ -187,8 +184,6 @@ impl Core {
 
             let mut commands = vec![];
             if !ae_update_recipients.is_empty() {
-                trace!("sync recipients exist, sending msgs");
-
                 let node_msg = self.generate_ae_update(sig.public_key, true)?;
                 let cmd = self.send_direct_message_to_nodes(
                     ae_update_recipients,

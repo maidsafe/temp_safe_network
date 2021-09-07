@@ -35,8 +35,8 @@ use crate::routing::{
         test_utils::*, ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionPeersUtils,
         SectionUtils,
     },
-    supermajority, Event, SectionAuthorityProviderUtils, ELDER_SIZE, FIRST_SECTION_MIN_AGE,
-    MIN_ADULT_AGE, MIN_AGE,
+    supermajority, Error, Event, Result as RoutingResult, SectionAuthorityProviderUtils,
+    ELDER_SIZE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
@@ -1157,8 +1157,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-// Checking when we send untrusted AE info to a section, we do not handle it AND do not bounce it
-async fn untrusted_section_msg_is_bounced() -> Result<()> {
+// Checking when we send AE info to a section from untrusted section, we do not handle it and error out
+async fn untrusted_ae_message_msg_errors() -> Result<()> {
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
 
@@ -1166,17 +1166,13 @@ async fn untrusted_section_msg_is_bounced() -> Result<()> {
     let pk1 = sk1.public_key();
     let sig1 = sk0.sign(&bincode::serialize(&pk1)?);
 
-    // let sk2 = bls::SecretKey::random();
-    // let pk2 = sk2.public_key();
-    // let sig2 = sk1.sign(&bincode::serialize(&pk2)?);
-
+    // setup some nonsense
     let nonsense_section_sk = bls::SecretKey::random();
     let nonsense_section_pk = nonsense_section_sk.public_key();
 
     // the chain is valid
     let mut chain = SecuredLinkedList::new(pk0);
     chain.insert(&pk0, pk1, sig1)?;
-    // chain.insert(&pk1, pk2, sig2)?;
 
     let (our_section_auth, _) = create_section_auth();
     let section_signed_our_section_auth = section_signed(&sk0, our_section_auth.clone())?;
@@ -1185,12 +1181,6 @@ async fn untrusted_section_msg_is_bounced() -> Result<()> {
         SecuredLinkedList::new(pk0),
         section_signed_our_section_auth,
     )?;
-
-    // let (bogus_section_auth, _) = create_section_auth();
-    // let section_signed_bogus_section_auth = section_signed(&sk1, bogus_section_auth.clone())?;
-    // let new_section = Section::new(pk0, chain.truncate(2), section_signed_bogus_section_auth)?;
-
-    println!("we have a bogus section....");
 
     let bogus_section_pk = pk1;
 
@@ -1207,7 +1197,7 @@ async fn untrusted_section_msg_is_bounced() -> Result<()> {
         root_storage_dir,
     )?;
 
-    // any valid msg..
+    // any valid AE msg..
     let original_node_msg = core.generate_ae_update(bogus_section_pk, false)?;
 
     let dispatcher = Dispatcher::new(core);
@@ -1234,18 +1224,21 @@ async fn untrusted_section_msg_is_bounced() -> Result<()> {
     .await;
 
     match commands {
-        Err(error) => {
-            println!(">>>>> the error we see {:?}", error);
-            Ok(())
-        }
-        Ok(_) => {
+        Err(error) => match error {
+            Error::UntrustedSectionAuthProvider(_) => Ok(()),
+            _ => bail!("AE update handling produced unexpected error with bad AE update"),
+        },
+        _ => {
             bail!("AE update handling should error due to bad signing")
         }
     }
 }
 
 /// helper to get through first command layers used for concurrency, to commands we can analyse in a useful fashion for testing
-async fn get_internal_commands(command: Command, dispatcher: &Dispatcher) -> Result<Vec<Command>> {
+async fn get_internal_commands(
+    command: Command,
+    dispatcher: &Dispatcher,
+) -> RoutingResult<Vec<Command>> {
     let commands = dispatcher.handle_command(command).await?;
 
     let mut node_msg_handling = vec![];
