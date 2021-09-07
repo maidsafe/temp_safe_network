@@ -6,23 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// use super::Session;
-// use crate::{
-//     client::{
-//         connections::messaging::{rebuild_message_for_ae_resend, send_message},
-//         Error,
-//     },
-//     messaging::{
-//         data::{CmdError, ServiceMsg},
-//         system::{SectionAuth, SystemMsg},
-//         MessageId, MessageType, WireMsg,
-//     },
-// };
-
-use qp2p::IncomingMessages;
-use std::net::SocketAddr;
-// use tracing::{debug, error, info, trace, warn};
-
 use super::Session;
 use crate::client::{connections::messaging::send_message, Error};
 use crate::messaging::{
@@ -32,7 +15,9 @@ use crate::messaging::{
 };
 use crate::types::PublicKey;
 use bytes::Bytes;
+use qp2p::IncomingMessages;
 use secured_linked_list::SecuredLinkedList;
+use std::net::SocketAddr;
 use xor_name::XorName;
 
 impl Session {
@@ -45,7 +30,7 @@ impl Session {
         let _ = tokio::spawn(async move {
             loop {
                 session = match Self::get_incoming_message(&mut incoming_messages).await {
-                    Ok((src, msg)) => match Self::take_msg(msg, src, session.clone()).await {
+                    Ok((src, msg)) => match Self::handle_msg(msg, src, session.clone()).await {
                         Ok(session) => session,
                         Err(err) => {
                             error!("Error while processing incoming message: {:?}. Listening for next message...", err);
@@ -78,7 +63,7 @@ impl Session {
         }
     }
 
-    pub(crate) async fn take_msg(
+    pub(crate) async fn handle_msg(
         msg: MessageType,
         src: SocketAddr,
         session: Session,

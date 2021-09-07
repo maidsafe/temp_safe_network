@@ -65,8 +65,8 @@ pub(crate) fn pack(
         // If data map chunk is less that 1MB return it so it can be directly sent to the network
         if chunk.validate_size() {
             let name = *chunk.name();
-            chunks.push(chunk);
             chunks.reverse();
+            chunks.push(chunk);
             // returns the address of the last data map, and all the chunks produced
             let address = if encryption.is_some() {
                 BlobAddress::Private(name)
