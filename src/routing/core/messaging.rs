@@ -313,6 +313,7 @@ impl Core {
             commands.push(Command::HandleMessage {
                 sender: self.node.addr,
                 wire_msg,
+                original_bytes: None,
             });
         }
 

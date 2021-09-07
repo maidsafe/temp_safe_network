@@ -45,6 +45,7 @@ impl Core {
         &self,
         sender: SocketAddr,
         wire_msg: WireMsg,
+        original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
         // Deserialize the payload of the incoming message
         let payload = wire_msg.payload.clone();
@@ -113,9 +114,12 @@ impl Core {
                         _ => match dst_location.section_pk() {
                             None => {}
                             Some(dst_section_pk) => {
+                                let msg_bytes = original_bytes.unwrap_or(wire_msg.serialize()?);
+
                                 if let Some(ae_command) = self
                                     .check_for_entropy(
-                                        &wire_msg,
+                                        // a cheap clone w/ Bytes
+                                        msg_bytes,
                                         &msg_authority.src_location(),
                                         &dst_section_pk,
                                         dst_location.name(),
@@ -175,9 +179,11 @@ impl Core {
                     }
                 };
 
+                let msg_bytes = original_bytes.unwrap_or(wire_msg.serialize()?);
                 if let Some(command) = self
                     .check_for_entropy(
-                        &wire_msg,
+                        // a cheap clone w/ Bytes
+                        msg_bytes,
                         &src_location,
                         &received_section_pk,
                         msg.dst_address(),

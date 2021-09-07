@@ -29,6 +29,8 @@ pub(crate) enum Command {
     HandleMessage {
         sender: SocketAddr,
         wire_msg: WireMsg,
+        // original bytes to avoid reserializing for entropy checks
+        original_bytes: Option<Bytes>,
     },
     // TODO: rename this as/when this is all node for clarity
     /// Handle Node, either directly or notify via event listener

@@ -435,7 +435,9 @@ async fn handle_connection_events(
                     bytes.len(),
                     sender
                 );
-                let wire_msg = match WireMsg::from(bytes) {
+
+                // bytes.clone is cheap
+                let wire_msg = match WireMsg::from(bytes.clone()) {
                     Ok(wire_msg) => wire_msg,
                     Err(error) => {
                         error!("Failed to deserialize message header: {}", error);
@@ -449,7 +451,11 @@ async fn handle_connection_events(
                 };
                 let _span_guard = span.enter();
 
-                let command = Command::HandleMessage { sender, wire_msg };
+                let command = Command::HandleMessage {
+                    sender,
+                    wire_msg,
+                    original_bytes: Some(bytes),
+                };
                 let _ = task::spawn(dispatcher.clone().handle_commands(command));
             }
         }
