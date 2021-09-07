@@ -8,7 +8,7 @@
 // Software.
 
 use anyhow::Result;
-use sn_api::{fetch::SafeData, BootstrapConfig, Url, Safe};
+use sn_api::{fetch::SafeData, BootstrapConfig, Safe, Url};
 use std::{env::temp_dir, fs::File, io::Write, path::PathBuf};
 
 const FILE_TO_UPLOAD: &str = "file_to_upload.rs";
@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
     // We assume there is a local network running which we can
     // bootstrap to using 127.0.0.1:12000 contact address.
     let mut bootstrap_contacts = BootstrapConfig::default();
-    bootstrap_contacts.insert("127.0.0.1:12000".parse()?);
+    bootstrap_contacts.push("127.0.0.1:12000".parse()?);
     // Using our afe instance we connect to the network
     safe.connect(None, None, Some(bootstrap_contacts)).await?;
 

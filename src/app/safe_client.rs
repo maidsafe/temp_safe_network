@@ -17,7 +17,7 @@ use safe_network::types::{
     ChunkAddress, Error as SafeNdError, Keypair,
 };
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
     path::{Path, PathBuf},
     time::Duration,
@@ -29,7 +29,7 @@ const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 #[derive(Default, Clone)]
 pub struct SafeAppClient {
     safe_client: Option<Client>,
-    pub(crate) bootstrap_config: Option<HashSet<SocketAddr>>,
+    pub(crate) bootstrap_config: Option<Vec<SocketAddr>>,
     config_path: Option<PathBuf>,
     timeout: Duration,
 }
@@ -76,8 +76,9 @@ impl SafeAppClient {
             self.bootstrap_config
         );
         let config = Config::new(
-            self.config_path.as_deref(),
+            None,
             self.bootstrap_config.clone(),
+            self.config_path.as_deref(),
             Some(self.timeout),
         )
         .await;

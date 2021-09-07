@@ -19,10 +19,10 @@ pub use self::{
     resp::{AuthGranted, IpcResp},
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr, u32};
+use std::{net::SocketAddr, u32};
 
 /// `QuicP2P` bootstrap info, shared from Authenticator to apps.
-pub type BootstrapConfig = HashSet<SocketAddr>;
+pub type BootstrapConfig = Vec<SocketAddr>;
 
 /// IPC message.
 #[allow(clippy::large_enum_variant)]
