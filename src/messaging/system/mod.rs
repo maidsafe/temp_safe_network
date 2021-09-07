@@ -68,14 +68,14 @@ pub enum SystemMsg {
     /// Message to update a section when they bounced a message as untrusted back at us.
     /// That section must be behind our current knowledge.
     AntiEntropyUpdate {
-        /// Current `SectionAuthorityProvider` of a our section.
+        /// Current `SectionAuthorityProvider` of our section.
         section_auth: SectionAuthorityProvider,
         /// Section signature over the `SectionAuthorityProvider` of our
         /// section the bounced message shall be resent to.
         section_signed: KeyedSig,
-        /// Original sender's section chain truncated from the sender's section key found in the triggering msg (or genesis key for full proof)
+        /// Our section chain truncated from the triggering msg's dst section_key (or genesis key for full proof)
         proof_chain: SecuredLinkedList,
-        /// Optional section members if we're updating our own section
+        /// Optional section members if we're updating our own section adults
         members: Option<SectionPeers>,
     },
     /// Send from a section to the node to be immediately relocated.
