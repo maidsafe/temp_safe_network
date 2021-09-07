@@ -219,7 +219,6 @@ impl Core {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        println!("agrreeeing ourelders");
         let updates =
             self.split_barrier
                 .process(self.section.prefix(), signed_section_auth.clone(), key_sig);

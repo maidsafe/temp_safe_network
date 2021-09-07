@@ -28,7 +28,7 @@ impl Core {
         system_msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
     ) -> Result<Command> {
-        println!("handling untrusted...");
+        info!("handling untrusted...");
         let src_name = msg_authority.name();
 
         let bounce_dst_section_pk = self.section_key_by_name(&src_name);

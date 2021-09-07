@@ -68,7 +68,7 @@ impl Core {
                 dst_location,
                 msg,
             } => {
-                println!("sysstem msg received....");
+                info!("System message received");
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
                 let mut known_keys: Vec<BlsPublicKey> =
@@ -79,15 +79,14 @@ impl Core {
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
                     debug!("Untrusted message from {:?}: {:?} ", sender, msg);
 
-                    if !matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
+                    return if !matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
                         let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
-                        return Ok(vec![cmd]);
+                        Ok(vec![cmd])
                     } else {
-                        println!("Dropping AEEEE");
                         // otherwise we might loop
                         warn!("Dropping untrusted AE Update");
-                        return Ok(vec![]);
-                    }
+                        Ok(vec![])
+                    };
                 }
                 trace!(
                     "Trusted msg authority in message from {:?}: {:?}",
@@ -131,7 +130,7 @@ impl Core {
                         },
                     }
 
-                    println!("Entropy check passed. Handling verified msg {}", msg_id);
+                    info!("Entropy check passed. Handling verified msg {}", msg_id);
                 }
 
                 Ok(vec![Command::HandleInfrastructureMessage {
@@ -208,7 +207,7 @@ impl Core {
         payload: Bytes,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
-        println!("handling infra msg");
+        info!("Handling Infrastructure message");
 
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
@@ -241,7 +240,7 @@ impl Core {
                 }
             },
             Err(Error::InvalidSignatureShare) => {
-                println!("Invalid sigggg");
+                info!("Invalid signature on received Infrastructure message. Handling as untrusted message.");
                 let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
                 Ok(vec![cmd])
             }
@@ -261,7 +260,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
-        println!("handling vvvv non data msg");
+        info!("Handling verified Non-Data message");
         match node_msg {
             SystemMsg::AntiEntropyRetry {
                 section_auth,
@@ -300,7 +299,7 @@ impl Core {
                 proof_chain,
                 members,
             } => {
-                println!("Handling msg: AE-Update from {}", sender);
+                info!("Handling msg: AE-Update from {}", sender);
                 self.handle_anti_entropy_update_msg(
                     section_auth,
                     section_signed,
@@ -513,16 +512,16 @@ impl Core {
                             msg_id
                         );
 
-                        if self.is_elder() {
-                            return self.republish_chunk(chunk).await;
+                        return if self.is_elder() {
+                            self.republish_chunk(chunk).await
                         } else {
                             // We are an adult here, so just store away!
 
                             // TODO: should this be a cmd returned for threading?
                             let level_report =
                                 self.chunk_storage.store_for_replication(chunk).await?;
-                            return Ok(self.record_if_any(level_report).await);
-                        }
+                            Ok(self.record_if_any(level_report).await)
+                        };
                     }
                     NodeCmd::RepublishChunk(chunk) => {
                         info!(

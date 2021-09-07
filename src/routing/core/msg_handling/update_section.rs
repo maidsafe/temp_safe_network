@@ -24,7 +24,7 @@ impl Core {
         section_auth: &SectionAuth<SectionAuthorityProvider>,
         snapshot: StateSnapshot,
         proof_chain: SecuredLinkedList,
-        members: Option<SectionPeers>, // network: &BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
+        members: Option<SectionPeers>,
     ) -> Result<Vec<Command>> {
         let old_adults: BTreeSet<_> = self
             .section
