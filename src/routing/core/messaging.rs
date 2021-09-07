@@ -99,12 +99,6 @@ impl Core {
         if self.section.chain().has_key(&public_key)
             && public_key != *self.section.chain().last_key()
         {
-            // The key is recognized as non-last, indicating the peer is lagging.
-            let _sender_peer = Peer {
-                name: peer.0,
-                addr: peer.1,
-                reachable: true,
-            };
             let dst_section_pk = sig_share.public_key_set.public_key();
             let msg = self.generate_ae_update(dst_section_pk, true)?;
 
