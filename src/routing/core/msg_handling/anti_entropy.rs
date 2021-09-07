@@ -91,7 +91,7 @@ impl Core {
         let bounced_msg = match WireMsg::deserialize(bounced_msg)? {
             MessageType::System { msg, .. } => msg,
             _ => {
-                warn!("Non Infrastructure MessageType received at Node in AE response. We do not handle any other type yet");
+                warn!("Non System MessageType received at Node in AE response. We do not handle any other type yet");
                 return Ok(vec![]);
             }
         };
@@ -155,7 +155,7 @@ impl Core {
         let (bounced_msg, msg_id) = match WireMsg::deserialize(bounced_msg)? {
             MessageType::System { msg_id, msg, .. } => (msg, msg_id),
             _ => {
-                warn!("Non Infrastructure MessageType received at Node in AE response. We do not handle any other type yet");
+                warn!("Non System MessageType received at Node in AE response. We do not handle any other type yet");
                 return Ok(vec![]);
             }
         };
