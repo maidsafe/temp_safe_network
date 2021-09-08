@@ -17,11 +17,11 @@ use std::path::Path;
 
 #[derive(Serialize, Deserialize)]
 pub(crate) enum SecretKey {
-    // Holds the data map to the source data.
+    // Holds the secret key to the source data.
     FirstLevel(BlobSecretKey),
-    // Holds the data map of an _additional_ level of chunks
-    // resulting from chunking up a previous level data map.
-    // This happens when that previous level data map was too big to fit in a chunk itself.
+    // Holds the secret of an _additional_ level of chunks
+    // resulting from chunking up a previous level secret key.
+    // This happens when that previous level secret key was too big to fit in a chunk itself.
     AdditionalLevel(BlobSecretKey),
 }
 
@@ -44,30 +44,30 @@ pub(crate) fn get_data_chunks(
 
 /// Returns the top-most chunk address through which the entire
 /// data tree can be accessed, and all the other encrypted chunks.
-/// If encryption is provided, the additional data map level chunks are encrypted with it.
-/// This is necessary if the data is meant to be private, since a data map is a key to find and decrypt the file.
+/// If encryption is provided, the additional secret key level chunks are encrypted with it.
+/// This is necessary if the data is meant to be private, since a `BlobSecretKey` is used to find and decrypt the original file.
 pub(crate) fn pack(
     secret_key: BlobSecretKey,
     encrypted_chunks: Vec<EncryptedChunk>,
     encryption: Option<&impl Encryption>,
 ) -> Result<(BlobAddress, Vec<Chunk>)> {
-    // Produces a chunk out of the first data map, which is validated for its size.
-    // If the chunk is too big, it is self-encrypted and the resulting (additional level) data map is put into a chunk.
+    // Produces a chunk out of the first secret key, which is validated for its size.
+    // If the chunk is too big, it is self-encrypted and the resulting (additional level) secret key is put into a chunk.
     // The above step is repeated as many times as required until the chunk size is valid.
     // In other words: If the chunk content is too big, it will be
-    // self encrypted into additional chunks, and now we have a new data map
+    // self encrypted into additional chunks, and now we have a new secret key
     // which points to all of those additional chunks.. and so on.
     let mut chunks = vec![];
     let mut chunk_content = pack_secret_key(SecretKey::FirstLevel(secret_key), encryption)?;
 
     let (address, additional_chunks) = loop {
         let chunk = to_chunk(chunk_content, encryption)?;
-        // If data map chunk is less that 1MB return it so it can be directly sent to the network
+        // If secret key chunk is less that 1MB return it so it can be directly sent to the network
         if chunk.validate_size() {
             let name = *chunk.name();
             chunks.reverse();
             chunks.push(chunk);
-            // returns the address of the last data map, and all the chunks produced
+            // returns the address of the last secret key, and all the chunks produced
             let address = if encryption.is_some() {
                 BlobAddress::Private(name)
             } else {
