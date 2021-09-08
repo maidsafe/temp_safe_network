@@ -55,17 +55,13 @@ impl Core {
                     );
                     self.section
                         .merge_chain(&signed_section_auth, proof_chain)?;
-                    self.section.merge_members(members)?;
                 } else {
                     debug!(
                         "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
                         section_auth.prefix, section_auth
                     );
-
-                    self.section.merge_members(members)?;
-
-                    // Ok(vec![])
                 }
+                self.section.merge_members(members)?;
             }
             Err(err) => {
                 warn!(

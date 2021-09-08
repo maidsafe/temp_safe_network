@@ -7,15 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::{
-    system::{SectionAuth, SectionPeers},
-    SectionAuthorityProvider,
-};
-use crate::routing::{
-    core::StateSnapshot, error::Result, peer::PeerUtils, routing_api::command::Command,
-    section::SectionUtils, Event,
-};
-use secured_linked_list::SecuredLinkedList;
+use crate::routing::{error::Result, peer::PeerUtils, section::SectionUtils, Event};
 use std::collections::BTreeSet;
 
 impl Core {
