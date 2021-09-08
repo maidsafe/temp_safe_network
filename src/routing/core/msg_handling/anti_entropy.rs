@@ -53,16 +53,18 @@ impl Core {
                         "Anti-Entropy: updated remote section SAP updated for {:?}",
                         section_auth.prefix
                     );
-
-                    self.update_section(&signed_section_auth, snapshot, proof_chain, members)
-                        .await
+                    self.section
+                        .merge_chain(&signed_section_auth, proof_chain)?;
+                    self.section.merge_members(members)?;
                 } else {
                     debug!(
                         "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
                         section_auth.prefix, section_auth
                     );
 
-                    Ok(vec![])
+                    self.section.merge_members(members)?;
+
+                    // Ok(vec![])
                 }
             }
             Err(err) => {
@@ -70,9 +72,15 @@ impl Core {
                     "Anti-Entropy: failed to update remote section SAP: {:?}",
                     err
                 );
-                Err(err)
+                return Err(err);
             }
         }
+
+        self.fire_node_event_for_any_new_adults().await?;
+
+        // always run this, only changes will trigger events
+        self.update_for_new_node_state_and_fire_events(snapshot)
+            .await
     }
     pub(crate) async fn handle_anti_entropy_retry_msg(
         &mut self,

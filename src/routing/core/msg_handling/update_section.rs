@@ -19,23 +19,13 @@ use secured_linked_list::SecuredLinkedList;
 use std::collections::BTreeSet;
 
 impl Core {
-    pub(crate) async fn update_section(
-        &mut self,
-        section_auth: &SectionAuth<SectionAuthorityProvider>,
-        snapshot: StateSnapshot,
-        proof_chain: SecuredLinkedList,
-        members: Option<SectionPeers>,
-    ) -> Result<Vec<Command>> {
+    pub(crate) async fn fire_node_event_for_any_new_adults(&mut self) -> Result<()> {
         let old_adults: BTreeSet<_> = self
             .section
             .live_adults()
             .map(|p| p.name())
             .copied()
             .collect();
-
-        trace!("Updating knowledge of own section members: {:?}", members);
-
-        self.section.merge(section_auth, proof_chain, members)?;
 
         if self.is_not_elder() {
             let current_adults: BTreeSet<_> = self
@@ -57,6 +47,6 @@ impl Core {
             }
         }
 
-        self.update_state(snapshot).await
+        Ok(())
     }
 }
