@@ -53,13 +53,14 @@ pub(super) trait SectionUtils {
 
     fn genesis_key(&self) -> &bls::PublicKey;
 
-    /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or
-    /// its chain is not compatible with the chain of `self`.
-    fn merge(
+    /// Try to merge this `Section` members with `other`.
+    fn merge_members(&mut self, members: Option<SectionPeers>) -> Result<()>;
+
+    /// Try to merge this `Section` chain with `other`.
+    fn merge_chain(
         &mut self,
         other: &SectionAuth<SectionAuthorityProvider>,
         proof_chain: SecuredLinkedList,
-        members: Option<SectionPeers>,
     ) -> Result<()>;
 
     /// Update the `SectionAuthorityProvider` of our section.
@@ -180,21 +181,8 @@ impl SectionUtils for Section {
         &self.genesis_key
     }
 
-    /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or
-    /// its chain is not compatible with the chain of `self`.
-    fn merge(
-        &mut self,
-        other: &SectionAuth<SectionAuthorityProvider>,
-        proof_chain: SecuredLinkedList,
-        members: Option<SectionPeers>,
-    ) -> Result<()> {
-        // We've been AE validated here.
-        self.chain.merge(proof_chain)?;
-
-        if &other.sig.public_key == self.chain.last_key() {
-            self.section_auth = other.clone();
-        }
-
+    /// Try to merge this `Section` members with `other`. .
+    fn merge_members(&mut self, members: Option<SectionPeers>) -> Result<()> {
         if let Some(members) = members {
             for info in members {
                 let _ = self.update_member(info);
@@ -204,6 +192,21 @@ impl SectionUtils for Section {
         self.members
             .prune_not_matching(&self.section_auth.value.prefix());
 
+        Ok(())
+    }
+    /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or
+    /// its chain is not compatible with the chain of `self`.
+    fn merge_chain(
+        &mut self,
+        other: &SectionAuth<SectionAuthorityProvider>,
+        proof_chain: SecuredLinkedList,
+    ) -> Result<()> {
+        // We've been AE validated here.
+        self.chain.merge(proof_chain)?;
+
+        if &other.sig.public_key == self.chain.last_key() {
+            self.section_auth = other.clone();
+        }
         Ok(())
     }
 

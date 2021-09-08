@@ -142,7 +142,11 @@ impl Core {
         }
     }
 
-    pub(crate) async fn update_state(&mut self, old: StateSnapshot) -> Result<Vec<Command>> {
+    /// Generate commands and fire events based upon any node state changes.
+    pub(crate) async fn update_for_new_node_state_and_fire_events(
+        &mut self,
+        old: StateSnapshot,
+    ) -> Result<Vec<Command>> {
         let mut commands = vec![];
         let new = self.state_snapshot();
 

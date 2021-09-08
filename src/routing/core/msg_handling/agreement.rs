@@ -255,6 +255,7 @@ impl Core {
 
         info!("Prefixes we know about: {:?}", self.network);
 
-        self.update_state(snapshot).await
+        self.update_for_new_node_state_and_fire_events(snapshot)
+            .await
     }
 }
