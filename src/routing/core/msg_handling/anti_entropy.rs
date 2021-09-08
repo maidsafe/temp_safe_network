@@ -58,11 +58,16 @@ impl Core {
                         "Anti-Entropy: updated remote section SAP updated for {:?}",
                         section_auth.prefix
                     );
+
+                    self.update_section(&signed_section_auth, snapshot, proof_chain, members)
+                        .await
                 } else {
                     debug!(
                         "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
                         section_auth.prefix, section_auth
                     );
+
+                    Ok(vec![])
                 }
             }
             Err(err) => {
@@ -73,11 +78,6 @@ impl Core {
                 return Err(err);
             }
         }
-
-        // TODO: when do we want to do all the things that were done on aync? Will all AE?
-
-        self.update_section(&signed_section_auth, snapshot, proof_chain, members)
-            .await
     }
     pub(crate) async fn handle_anti_entropy_retry_msg(
         &mut self,
