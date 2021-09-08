@@ -69,7 +69,7 @@ impl Core {
                 dst_location,
                 msg,
             } => {
-                info!("System message received");
+                trace!("System message received");
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
                 let mut known_keys: Vec<BlsPublicKey> =
@@ -266,7 +266,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
-        info!("Handling verified Non-Data message");
+        trace!("Handling verified Non-Data message");
         match node_msg {
             SystemMsg::AntiEntropyRetry {
                 section_auth,
@@ -305,13 +305,12 @@ impl Core {
                 proof_chain,
                 members,
             } => {
-                info!("Handling msg: AE-Update from {}", sender);
+                trace!("Handling msg: AE-Update from {}", sender);
                 self.handle_anti_entropy_update_msg(
                     section_auth,
                     section_signed,
                     proof_chain,
                     members,
-                    sender,
                 )
                 .await
             }

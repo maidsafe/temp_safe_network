@@ -29,6 +29,7 @@ pub(crate) enum Command {
     HandleMessage {
         sender: SocketAddr,
         wire_msg: WireMsg,
+        #[debug(skip)]
         // original bytes to avoid reserializing for entropy checks
         original_bytes: Option<Bytes>,
     },
