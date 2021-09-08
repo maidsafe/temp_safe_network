@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.28.0](https://github.com/maidsafe/safe_network/compare/v0.27.6...v0.28.0) (2021-09-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* Changes the client blob API.
+
+### Features
+
+* **chunks:** move scope duality to blob level ([3c6c54a](https://github.com/maidsafe/safe_network/commit/3c6c54ad26ae909e7c6b57c13de64100a9f01126))
+* **chunks:** remove batching code ([9edf573](https://github.com/maidsafe/safe_network/commit/9edf5737b1868e0e04a3f99356bebb50b62ad041))
+* **chunks:** remove private chunk owner ([7406631](https://github.com/maidsafe/safe_network/commit/7406631533d3b67373e24a5ee8c90bee824143b1))
+* **upload:** wire payment and batching cfg ([3693ab3](https://github.com/maidsafe/safe_network/commit/3693ab32a69439fb9884000f37b0b40a1da099f3))
+* integrate refactored self-encryption ([4a18fff](https://github.com/maidsafe/safe_network/commit/4a18fff95771e059277923f8ac6db25bd126b7f6))
+
+
+### Bug Fixes
+
+* remove various remaining diffs ([608f81d](https://github.com/maidsafe/safe_network/commit/608f81d3243188e88e11239e1f57af970f68a023))
+
+
+* address PR comments ([d5bf974](https://github.com/maidsafe/safe_network/commit/d5bf9743d241f0f0b884b4a793158c8ce7b396d8))
+
 ### [0.27.6](https://github.com/maidsafe/safe_network/compare/v0.27.5...v0.27.6) (2021-09-08)
 
 ### [0.27.5](https://github.com/maidsafe/safe_network/compare/v0.27.4...v0.27.5) (2021-09-08)
