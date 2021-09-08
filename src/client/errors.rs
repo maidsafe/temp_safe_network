@@ -44,8 +44,8 @@ pub enum Error {
     /// Could not connect to elder.
     #[error("Problem connecting to elder")]
     ElderConnection,
-    /// Client has not gone trhough qp2p bootstrap process yet
-    #[error("Client has failed to bootstrap to a section yet")]
+    /// Client has not gone through qp2p bootstrap process yet
+    #[error("Client has failed to bootstrap to the network yet")]
     NotBootstrapped,
     /// Could not connect to sufficient elder to retrieve reliable responses.
     #[error(
@@ -70,7 +70,7 @@ pub enum Error {
     /// No section prefix found for session
     #[error("We do not have a section prefix.")]
     NoSectionPrefixKnown,
-    /// Unexpected message type receivied while joining.
+    /// Unexpected message type received while joining.
     #[error("Unexpected message type receivied while joining: {0}")]
     UnexpectedMessageOnJoin(String),
     /// Permission set provided is not a PublicPermissionSet.
