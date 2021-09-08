@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use qp2p::Endpoint;
-use std::{borrow::Borrow, collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, trace};
+use tracing::debug;
 
 use crate::client::Error;
 use crate::messaging::{
@@ -39,7 +39,7 @@ pub(crate) struct QueryResult {
 pub(super) struct Session {
     // PublicKey of the client
     client_pk: PublicKey,
-    endpoint: Option<Endpoint<XorName>>,
+    endpoint: Endpoint<XorName>,
     // Channels for sending responses to upper layers
     pending_queries: PendingQueryResponses,
     // Channels for sending errors to upper layer
@@ -78,7 +78,7 @@ impl Session {
             client_pk,
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
-            endpoint: Some(endpoint),
+            endpoint,
             network: Arc::new(NetworkPrefixMap::new(genesis_pk)),
             bootstrap_peer,
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
@@ -90,15 +90,5 @@ impl Session {
             .await;
 
         Ok(session)
-    }
-
-    pub(super) fn endpoint(&self) -> Result<&Endpoint<XorName>, Error> {
-        match self.endpoint.borrow() {
-            Some(endpoint) => Ok(endpoint),
-            None => {
-                trace!("self.endpoint.borrow() was None");
-                Err(Error::NotBootstrapped)
-            }
-        }
     }
 }
