@@ -8,13 +8,11 @@
 // Software.
 
 use super::{utils, Error, XorName};
-use bincode::serialized_size;
 use bytes::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::u64;
 
 /// Maximum allowed size for a serialised Chunk to grow to.
-pub const MAX_CHUNK_SIZE_IN_BYTES: u64 = 1024 * 1024 + 10 * 1024;
+pub const MAX_CHUNK_SIZE_IN_BYTES: usize = 1024 * 1024 + 10 * 1024;
 
 /// Chunk, an immutable chunk of data
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, custom_debug::Debug)]
@@ -57,8 +55,8 @@ impl Chunk {
     }
 
     /// Returns size of this chunk after serialisation.
-    pub fn serialised_size(&self) -> u64 {
-        serialized_size(&self.value).unwrap_or(u64::MAX)
+    pub fn serialised_size(&self) -> usize {
+        self.value.len()
     }
 
     /// Returns `true` if the size is valid.

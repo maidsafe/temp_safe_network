@@ -39,7 +39,7 @@ use xor_name::XorName;
 // Number of attempts when retrying to send a message to a node
 const NUMBER_OF_RETRIES: usize = 3;
 // Number of Elders subset to send queries to
-const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 1;
+const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of attempts to make when trying to bootstrap to a section
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
 
