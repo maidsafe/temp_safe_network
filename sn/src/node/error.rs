@@ -90,7 +90,7 @@ pub enum Error {
     Database(#[from] crate::dbs::Error),
     /// Chunk Disk Store error.
     #[error("Chunk Disk Store error:: {0}")]
-    ChunkDiskStore(#[from] crate::node::routing::ChunkStoreError),
+    ChunkDiskStore(#[from] crate::dbs::ChunkStoreError),
     /// Not enough in the section to perform Chunk operation
     #[error("Not enough Adults available in Section({0:?}) to perform operation")]
     NoAdults(Prefix),

@@ -16,6 +16,7 @@ mod resource_proof;
 mod service_msgs;
 mod update_section;
 
+use crate::dbs::ChunkStoreError;
 use crate::messaging::{
     data::{ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
@@ -29,7 +30,7 @@ use crate::node::{
     error::{Error, Result},
     routing::{
         api::command::Command,
-        core::{ChunkStoreError, Core, DkgSessionInfo},
+        core::{Core, DkgSessionInfo},
         messages::{NodeMsgAuthorityUtils, WireMsgUtils},
         network_knowledge::{NetworkKnowledge, SectionPeers},
         relocation::RelocateState,

@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Error, Result};
+mod errors;
+
+pub(crate) use errors::{Error, Result};
 
 use crate::types::{Chunk, ChunkAddress};
 use crate::UsedSpace;
@@ -21,7 +23,7 @@ const BIT_TREE_DEPTH: usize = 20;
 const CHUNK_DB_DIR: &str = "chunkdb";
 
 /// A disk store for chunks
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct ChunkDiskStore {
     bit_tree_depth: usize,
     chunk_store_path: PathBuf,
@@ -160,6 +162,14 @@ impl ChunkDiskStore {
     pub(crate) fn list_files_with_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
         let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
         list_files_in(prefix_path.as_path())
+    }
+
+    pub(crate) async fn store_batch(&self, chunks: &[Chunk]) -> Result<()> {
+        // temporary, impl proper one
+        for chunk in chunks {
+            let _address = self.write_chunk(chunk).await?;
+        }
+        Ok(())
     }
 }
 

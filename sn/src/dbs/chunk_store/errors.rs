@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::data::Error as ErrorMessage;
-use crate::types::convert_dt_error_to_error_message;
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;
@@ -37,16 +35,4 @@ pub enum Error {
     /// Not enough space to store the Chunk.
     #[error("Not enough space")]
     NotEnoughSpace,
-}
-
-/// Convert chunk errors to messaging error message for sending over the network.
-pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
-    match error {
-        Error::NotEnoughSpace => ErrorMessage::FailedToWriteFile,
-        Error::ChunkNotFound(xorname) => ErrorMessage::ChunkNotFound(xorname),
-        Error::NetworkData(error) => convert_dt_error_to_error_message(error),
-        other => {
-            ErrorMessage::InvalidOperation(format!("Failed to perform operation: {:?}", other))
-        }
-    }
 }

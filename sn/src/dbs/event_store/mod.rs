@@ -6,7 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{deserialise, serialise, Error, Result, ToDbKey};
+mod errors;
+
+pub(crate) use errors::{convert_to_error_message, Error, Result};
+
+use super::{deserialise, serialise, ToDbKey};
+
 use serde::{de::DeserializeOwned, Serialize};
 use sled::{Db, Tree};
 use std::{fmt::Debug, marker::PhantomData};

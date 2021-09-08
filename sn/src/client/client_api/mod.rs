@@ -7,10 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod blob_apis;
+mod blob_storage;
 mod commands;
 mod data;
 mod queries;
 mod register_apis;
+mod stash;
+
+use self::data::{Batch, Batching, BatchingConfig};
 
 use crate::client::{
     connections::{Session, SAFE_CLIENT_DIR},
@@ -22,6 +26,8 @@ use crate::messaging::{ServiceAuth, WireMsg};
 use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::{utils::read_prefix_map_from_disk, Chunk, Keypair, PublicKey, RegisterAddress};
+use crate::UsedSpace;
+
 use itertools::Itertools;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
@@ -51,6 +57,7 @@ pub struct Client {
     #[allow(dead_code)]
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
+    batching: Batching<stash::Stash>,
     pub(crate) query_timeout: Duration,
     chunks_cache: Arc<RwLock<ChunksCache>>,
 }
@@ -162,12 +169,24 @@ impl Client {
         )
         .await?;
 
+        let used_space = UsedSpace::new(config.payment.max_local_space);
+
+        let batching_cfg = BatchingConfig {
+            pool_count: config.payment.op_batching.pool_count,
+            pool_limit: config.payment.op_batching.pool_limit,
+            root_dir: config.payment.db_root,
+            used_space,
+        };
+
+        let batching = Batching::new(batching_cfg, stash::Stash {})?;
+
         let client = Self {
             keypair,
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: config.query_timeout,
             chunks_cache: Arc::new(RwLock::new(ChunksCache::default())),
+            batching,
         };
 
         // TODO: The message being sent below is a temporary solution to fetch network info for
@@ -240,6 +259,12 @@ impl Client {
     ///
     pub fn public_key(&self) -> PublicKey {
         self.keypair().public_key()
+    }
+
+    /// Push a batch of operations on to the pools for
+    /// batching of payments and uploads to network.
+    pub fn push_batch(&self, batch: Batch) {
+        self.batching.push(batch)
     }
 }
 

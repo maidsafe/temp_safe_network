@@ -150,6 +150,12 @@ pub enum Error {
         /// Number of Chunks generated
         chunked: usize,
     },
+    /// Chunk Disk Store error.
+    #[error("Chunk Disk Store error:: {0}")]
+    ChunkDiskStore(#[from] crate::dbs::ChunkStoreError),
+    /// Generic Error (temporary, to be removed)
+    #[error("Generic error")]
+    Generic(String),
 }
 
 impl From<(CmdError, OperationId)> for Error {

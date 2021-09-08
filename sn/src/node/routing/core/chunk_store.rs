@@ -6,8 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
-use crate::types::{log_markers::LogMarker, Chunk, ChunkAddress};
+use crate::dbs::{ChunkDiskStore, ChunkStoreError as Error, ChunkStoreResult as Result};
+use crate::messaging::{
+    data::{Error as ErrorMessage, StorageLevel},
+    system::NodeQueryResponse,
+};
+use crate::types::{
+    convert_dt_error_to_error_message, log_markers::LogMarker, Chunk, ChunkAddress,
+};
+use crate::UsedSpace;
+
 use std::{
     fmt::{self, Display, Formatter},
     io::ErrorKind,
@@ -17,12 +25,7 @@ use std::{
 use tokio::sync::RwLock;
 use tracing::info;
 
-use crate::UsedSpace;
-mod errors;
-pub(crate) use errors::{convert_to_error_message, Error, Result};
-
-mod chunk_disk_store;
-use chunk_disk_store::ChunkDiskStore;
+// pub(crate) use errors::{convert_to_error_message, Error, Result};
 
 /// Operations on data chunks.
 #[derive(Clone)]
@@ -131,5 +134,17 @@ impl ChunkStore {
 impl Display for ChunkStore {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ChunkStore")
+    }
+}
+
+/// Convert chunk errors to messaging error message for sending over the network.
+fn convert_to_error_message(error: Error) -> ErrorMessage {
+    match error {
+        Error::NotEnoughSpace => ErrorMessage::FailedToWriteFile,
+        Error::ChunkNotFound(xorname) => ErrorMessage::ChunkNotFound(xorname),
+        Error::NetworkData(error) => convert_dt_error_to_error_message(error),
+        other => {
+            ErrorMessage::InvalidOperation(format!("Failed to perform operation: {:?}", other))
+        }
     }
 }

@@ -53,7 +53,7 @@ pub(crate) use dkg::test_utils::section_signed;
 pub(crate) use network_knowledge::test_utils::gen_section_authority_provider;
 
 pub(crate) use self::{
-    core::{ChunkStoreError, MIN_LEVEL_WHEN_FULL},
+    core::MIN_LEVEL_WHEN_FULL,
     network_knowledge::{section_keys::SectionKeyShare, SectionAuthorityProvider},
 };
 

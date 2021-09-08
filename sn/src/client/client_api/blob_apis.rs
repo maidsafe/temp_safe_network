@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    data::{encrypt_blob, to_chunk, Blob, Spot},
+    data::{encrypt_blob, to_chunk, Batch, Blob, Spot},
     Client,
 };
 use crate::{
@@ -21,6 +21,7 @@ use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
 use self_encryption::{self, ChunkInfo, DataMap, EncryptedChunk};
+use std::{collections::BTreeMap, iter::FromIterator, path::PathBuf};
 use tokio::task;
 use tracing::trace;
 use xor_name::XorName;
@@ -231,7 +232,7 @@ impl Client {
 
         let tasks = all_chunks.into_iter().map(|chunk| {
             let writer = self.clone();
-            task::spawn(async move { writer.send_cmd(DataCmd::StoreChunk(chunk)).await })
+            tokio::task::spawn(async move { writer.send_cmd(DataCmd::StoreChunk(chunk)).await })
         });
 
         let _ = join_all(tasks)
@@ -250,6 +251,32 @@ impl Client {
         let (address, chunk) = Self::package_spot(spot, scope, self.public_key())?;
         self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
         Ok(address)
+    }
+
+    ///
+    pub fn push_file_to_batch(&self, id: String, path: PathBuf, scope: Scope) {
+        self.push_files_to_batch(BTreeMap::from_iter(vec![(id, (path, scope))]))
+    }
+
+    ///
+    pub fn push_value_to_batch(&self, id: String, value: Bytes, scope: Scope) {
+        self.push_values_to_batch(BTreeMap::from_iter(vec![(id, (value, scope))]))
+    }
+
+    ///
+    pub fn push_files_to_batch(&self, files: BTreeMap<String, (PathBuf, Scope)>) {
+        self.push_batch(Batch {
+            files,
+            ..Default::default()
+        })
+    }
+
+    ///
+    pub fn push_values_to_batch(&self, values: BTreeMap<String, (Bytes, Scope)>) {
+        self.push_batch(Batch {
+            values,
+            ..Default::default()
+        })
     }
 
     // --------------------------------------------
