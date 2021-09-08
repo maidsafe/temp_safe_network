@@ -132,6 +132,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
     /// an IO error, it returns `Error::Io`.
     ///
     /// If a value with the same id already exists, it will be overwritten.
+    #[allow(unused)] // this will soon be used
     pub(crate) async fn store_batch(&self, values: &[V]) -> Result<()> {
         info!("Writing batch");
         use rayon::prelude::*;

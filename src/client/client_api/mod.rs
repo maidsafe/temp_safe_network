@@ -7,19 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod blob_apis;
-mod blob_storage;
 mod commands;
 mod data;
 mod queries;
 mod register_apis;
-mod stash;
 
 pub use self::blob_apis::BlobAddress;
-use self::data::{Batch, Batching, BatchingConfig};
 use crate::client::{connections::Session, errors::Error, Config};
 use crate::messaging::data::CmdError;
 use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
-use crate::UsedSpace;
 
 use lru::LruCache;
 use rand::rngs::OsRng;
@@ -41,7 +37,6 @@ pub struct Client {
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
     blob_cache: Arc<RwLock<LruCache<ChunkAddress, Chunk>>>,
-    batching: Batching<stash::Stash>,
     pub(crate) query_timeout: Duration,
 }
 
@@ -100,25 +95,12 @@ impl Client {
         )
         .await?;
 
-        let used_space = UsedSpace::new(config.payment.max_local_space);
-        used_space.add_dir(&config.payment.db_root);
-
-        let batching_cfg = BatchingConfig {
-            pool_count: config.payment.op_batching.pool_count,
-            pool_limit: config.payment.op_batching.pool_limit,
-            root_dir: config.payment.db_root,
-            used_space,
-        };
-
-        let batching = Batching::new(batching_cfg, stash::Stash {})?;
-
         let client = Self {
             keypair,
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: config.query_timeout,
             blob_cache: Arc::new(RwLock::new(LruCache::new(BLOB_CACHE_CAP))),
-            batching,
         };
 
         Ok(client)
@@ -144,12 +126,6 @@ impl Client {
     ///
     pub fn public_key(&self) -> PublicKey {
         self.keypair().public_key()
-    }
-
-    /// Push a batch of operations on to the pools for
-    /// batching of payments and uploads to network.
-    pub fn push_batch(&self, batch: Batch) {
-        self.batching.push(batch)
     }
 
     #[cfg(test)]
