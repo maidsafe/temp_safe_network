@@ -54,9 +54,7 @@ impl Session {
             )
         } else {
             // Send message to our bootstrap peer with network's genesis PK.
-            self.bootstrap_peer
-                .map(|addr| (vec![addr], self.genesis_pk))
-                .ok_or(Error::NotBootstrapped)?
+            (vec![self.bootstrap_peer], self.genesis_pk)
         };
 
         let msg_id = MessageId::new();
@@ -108,14 +106,10 @@ impl Session {
         let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&data_name) {
             (sap.value.elders, sap.value.public_key_set.public_key())
         } else {
-            // Send message to our bootstrap peer with the network's genesis PK and addressing adring.
-            self.bootstrap_peer
-                .map(|addr| {
-                    let mut bootstrapped_peer = BTreeMap::new();
-                    let _ = bootstrapped_peer.insert(XorName::random(), addr);
-                    (bootstrapped_peer, self.genesis_pk)
-                })
-                .ok_or(Error::NotBootstrapped)?
+            let mut bootstrapped_peer = BTreeMap::new();
+            let _ = bootstrapped_peer.insert(XorName::random(), self.bootstrap_peer);
+            // Send message to our bootstrap peer with the network's genesis PK.
+            (bootstrapped_peer, self.genesis_pk)
         };
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying

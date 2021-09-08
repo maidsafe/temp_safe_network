@@ -47,7 +47,7 @@ pub(super) struct Session {
     /// All elders we know about from AE messages
     network: Arc<NetworkPrefixMap>,
     /// Our initial bootstrap node
-    bootstrap_peer: Option<SocketAddr>,
+    bootstrap_peer: SocketAddr,
     /// BLS Signature aggregator for aggregating network messages
     aggregator: Arc<RwLock<SignatureAggregator>>,
     /// Network's genesis key
@@ -69,7 +69,10 @@ impl Session {
         // *****************************************************
 
         let (endpoint, incoming_messages, _) = Endpoint::new_client(local_addr, qp2p_config)?;
-        let bootstrap_peer = endpoint.connect_to_any(bootstrap_nodes).await;
+        let bootstrap_peer = endpoint
+            .connect_to_any(bootstrap_nodes)
+            .await
+            .ok_or(Error::NotBootstrapped)?;
 
         let session = Self {
             client_pk,
