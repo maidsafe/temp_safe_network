@@ -74,7 +74,7 @@ impl Session {
                         .handle_ae_redirect_msg(section_auth, section_signed, bounced_msg, src)
                         .await
                     {
-                        warn!("Failed to handle AE-Redirect msg: {}", err);
+                        warn!("Failed to handle AE-Redirect msg: {:?}", err);
                     }
                 }
                 MessageType::System {
@@ -91,7 +91,7 @@ impl Session {
                         .handle_ae_retry_msg(section_auth, section_signed, bounced_msg, proof_chain)
                         .await
                     {
-                        warn!("Failed to handle AE-Retry msg: {}", err);
+                        warn!("Failed to handle AE-Retry msg: {:?}", err);
                     }
                 }
                 msg_type => {
@@ -164,7 +164,7 @@ impl Session {
         });
     }
 
-    // Handle Antry-Entropy Redirect messages
+    // Handle Anti-Entropy Redirect messages
     async fn handle_ae_redirect_msg(
         &self,
         section_auth: SectionAuthorityProvider,
@@ -232,7 +232,7 @@ impl Session {
         send_message(elders, wire_msg, self.endpoint.clone(), msg_id).await
     }
 
-    // Handle Antry-Entropy Retry messages
+    // Handle Anti-Entropy Retry messages
     async fn handle_ae_retry_msg(
         &self,
         section_auth: SectionAuthorityProvider,
@@ -264,7 +264,7 @@ impl Session {
                 }
             }
             Err(err) => {
-                warn!("Anti-Entropy: failed to update remote section SAP, bounced msg dropped: {:?}, {}", bounced_msg, err);
+                warn!("Anti-Entropy: failed to update remote section SAP, bounced msg dropped: {:?}, {:?}", bounced_msg, err);
                 return Ok(());
             }
         }

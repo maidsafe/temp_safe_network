@@ -38,7 +38,7 @@ impl Session {
         payload: Bytes,
         targets: usize,
     ) -> Result<(), Error> {
-        let endpoint = self.endpoint()?.clone();
+        let endpoint = self.endpoint.clone();
 
         // Get DataSection elders details.
         let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
@@ -91,7 +91,7 @@ impl Session {
         payload: Bytes,
         msg_id: MessageId,
     ) -> Result<QueryResult, Error> {
-        let endpoint = self.endpoint()?.clone();
+        let endpoint = self.endpoint.clone();
         let pending_queries = self.pending_queries.clone();
 
         let chunk_addr = if let DataQuery::Chunk(ChunkRead::Get(address)) = query {
@@ -225,8 +225,8 @@ impl Session {
         // https://github.com/maidsafe/sn_client/blob/9091a4f1f20565f25d3a8b00571cc80751918928/src/connection_manager.rs#L328
         //
         // For Chunk responses we already validate its hash matches the xorname requested from,
-        // so we don't need more than one valid response to prevent from accepting invaid responses
-        // from byzantine nodes, however for mutable data (non-Chunk esponses) we will
+        // so we don't need more than one valid response to prevent from accepting invalid responses
+        // from byzantine nodes, however for mutable data (non-Chunk responses) we will
         // have to review the approach.
         let mut discarded_responses: usize = 0;
 
@@ -262,7 +262,7 @@ impl Session {
                         trace!("Valid Chunk received for {}", msg_id);
                         break Some(QueryResponse::GetChunk(Ok(chunk)));
                     } else {
-                        // the Chunk content doesn't match its Xorname,
+                        // the Chunk content doesn't match its XorName,
                         // this is suspicious and it could be a byzantine node
                         warn!("We received an invalid Chunk response from one of the nodes");
                         discarded_responses += 1;
@@ -277,7 +277,7 @@ impl Session {
                 | (response @ Some(QueryResponse::GetRegisterOwner((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterUserPermissions((Err(_), _))), None) =>
                 {
-                    debug!("QueryResponse error received (but may be overridden by a non-error reponse from another elder): {:#?}", &response);
+                    debug!("QueryResponse error received (but may be overridden by a non-error response from another elder): {:#?}", &response);
                     error_response = response;
                     discarded_responses += 1;
                 }
@@ -327,7 +327,7 @@ impl Session {
     #[allow(unused)]
     pub(crate) async fn disconnect_from_peers(&self, peers: Vec<SocketAddr>) -> Result<(), Error> {
         for elder in peers {
-            self.endpoint()?.disconnect_from(&elder).await;
+            self.endpoint.disconnect_from(&elder).await;
         }
 
         Ok(())
@@ -337,15 +337,11 @@ impl Session {
 pub(crate) async fn send_message(
     elders: Vec<SocketAddr>,
     wire_msg: WireMsg,
-    endpoint: Option<Endpoint<XorName>>,
+    endpoint: Endpoint<XorName>,
     msg_id: MessageId,
 ) -> Result<(), Error> {
     let priority = wire_msg.msg_kind().priority();
     let msg_bytes = wire_msg.serialize()?;
-    let endpoint = match endpoint {
-        Some(ep) => ep,
-        None => return Err(Error::NotBootstrapped),
-    };
 
     // Send message to all Elders concurrently
     let mut tasks = Vec::default();
