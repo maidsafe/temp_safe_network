@@ -148,11 +148,13 @@ impl Session {
                             trace!("Sending response for query w/{} via channel.", op_id);
                             let _ = sender.send(response).await;
                         } else {
-                            // temporarily commenting this out
-                            // if we have already received enough responses for a query,
-                            // we drop the channels and any drop further responses for that query.
+                            // TODO: The trace is only needed when we have an identified case of not finding a channel, but expecting one.
+                            // When expecting one, we can log "No channel found for operation", (and then probably at warn or error level).
+                            // But when we have received enough responses, we aren't really expecting a channel there, so there is no reason to log anything.
+                            // Right now, if we have already received enough responses for a query,
+                            // we drop the channels and drop any further responses for that query.
                             // but we should not drop it immediately, but clean it up after a while
-                            // and then not log that "no channel was found" when we already had enough responses..
+                            // and then not log that "no channel was found" when we already had enough responses.
                             //trace!("No channel found for operation {}", op_id);
                         }
                     } else {

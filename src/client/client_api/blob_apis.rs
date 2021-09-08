@@ -19,7 +19,6 @@ use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
 use self_encryption::{self, ChunkKey, EncryptedChunk, SecretKey as BlobSecretKey};
-use std::time::Duration;
 use tokio::task;
 use tracing::trace;
 use xor_name::XorName;
@@ -223,22 +222,18 @@ impl Client {
         let tasks = keys.map(|key| {
             let reader = reader.clone();
             task::spawn(async move {
-                for i in 1..11 {
-                    let r_num: u8 = rand::random();
-                    let sleep_ms = i * r_num as u32;
-                    tokio::time::sleep(Duration::from_millis(sleep_ms as u64)).await;
-                    let result = reader.read_from_network(&key.dst_hash, false).await;
-                    if let Ok(chunk) = result {
-                        return Ok::<EncryptedChunk, Error>(EncryptedChunk {
-                            index: key.index,
-                            content: chunk.value().clone(),
-                        });
-                    }
-                }
-                Err(Error::NoResponse)
+                let chunk = reader.read_from_network(&key.dst_hash, true).await?;
+                Ok::<EncryptedChunk, Error>(EncryptedChunk {
+                    index: key.index,
+                    content: chunk.value().clone(),
+                })
             })
         });
 
+        // this swallowing of errors
+        // is basically a compaction into a single
+        // error, that will be raised above this level,
+        // basically saying "didn't get all chunks"..
         join_all(tasks)
             .await
             .into_iter()
@@ -501,6 +496,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "too heavy for CI"]
     async fn create_and_retrieve_20mb_private() -> Result<()> {
         create_and_retrieve(20 * 1024 * 1024, Scope::Private).await
     }
@@ -530,8 +526,6 @@ mod tests {
 
         // the larger the file, the longer we have to wait before we start querying
         let delay = usize::max(1, size / 2_000_000);
-
-        println!("Delay: {} s", delay);
 
         // now that it was written to the network we should be able to retrieve it
         let read_data = run_w_backoff_delayed(|| client.read_blob(address), 1, delay).await?;

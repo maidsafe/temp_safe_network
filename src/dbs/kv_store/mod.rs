@@ -151,7 +151,7 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
 
         if !err_results.is_empty() {
             for e in err_results {
-                println!("{:?}", e);
+                error!("{:?}", e);
             }
 
             return Err(Error::SledBatching);
@@ -175,11 +175,11 @@ impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
 
         match res {
             Ok(_) => {
-                println!("Writing batch succeeded!");
+                info!("Writing batch succeeded!");
                 Ok(())
             }
             Err(e) => {
-                println!("Writing batch failed!");
+                warn!("Writing batch failed!");
                 Err(Error::Sled(e))
             }
         }

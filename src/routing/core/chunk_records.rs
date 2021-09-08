@@ -74,7 +74,7 @@ impl Core {
         auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<Vec<Command>> {
-        trace!("Sending chunk to adults {:?}", chunk);
+        trace!("Sending chunk {:?} to adults", chunk);
 
         let target = *chunk.name();
 
