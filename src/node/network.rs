@@ -20,12 +20,7 @@ use crate::routing::{
 use crate::types::PublicKey;
 use bls::{PublicKey as BlsPublicKey, PublicKeySet};
 use secured_linked_list::SecuredLinkedList;
-use std::{
-    collections::BTreeSet,
-    net::{Ipv4Addr, SocketAddr},
-    path::Path,
-    sync::Arc,
-};
+use std::{collections::BTreeSet, net::SocketAddr, path::Path, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 ///
@@ -41,15 +36,16 @@ impl Network {
         config: &NodeConfig,
         used_space: UsedSpace,
     ) -> Result<(Self, EventStream)> {
-        let routing_config = RoutingConfig {
+        let mut routing_config = RoutingConfig {
             first: config.is_first(),
-            local_addr: config
-                .local_addr
-                .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::LOCALHOST, 0))),
             bootstrap_nodes: config.hard_coded_contacts.clone(),
             network_config: config.network_config().clone(),
-            keypair: None,
+            ..Default::default()
         };
+        if let Some(local_addr) = config.local_addr {
+            routing_config.local_addr = local_addr;
+        }
+
         let (routing, event_stream) =
             RoutingNode::new(routing_config, used_space, root_dir.to_path_buf()).await?;
 
