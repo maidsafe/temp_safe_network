@@ -133,10 +133,7 @@ impl Core {
         Ok(cmd)
     }
 
-    pub(crate) fn send_ae_update_to_our_section(
-        &mut self,
-        section: Section,
-    ) -> Result<Vec<Command>> {
+    pub(crate) fn send_ae_update_to_our_section(&self, section: &Section) -> Result<Vec<Command>> {
         let nodes: Vec<_> = section
             .active_members()
             .filter(|peer| peer.name() != &self.node.name())
