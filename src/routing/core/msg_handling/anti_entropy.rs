@@ -34,12 +34,7 @@ impl Core {
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         members: Option<SectionPeers>,
-        sender: SocketAddr,
     ) -> Result<Vec<Command>> {
-        info!(
-            "Anti-Entropy: section update message received from peer: {}",
-            sender
-        );
         let snapshot = self.state_snapshot();
 
         let signed_section_auth = SectionAuth {
@@ -75,7 +70,7 @@ impl Core {
                     "Anti-Entropy: failed to update remote section SAP: {:?}",
                     err
                 );
-                return Err(err);
+                Err(err)
             }
         }
     }
