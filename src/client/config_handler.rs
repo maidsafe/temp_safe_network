@@ -38,8 +38,6 @@ pub struct Config {
     pub qp2p: QuicP2pConfig,
     /// The amount of time to wait for responses to queries before giving up and returning an error.
     pub query_timeout: Duration,
-    /// Op and payment options.
-    pub payment: PaymentConfig,
 }
 
 impl Config {
@@ -73,10 +71,6 @@ impl Config {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
             root_dir: root_dir.clone(),
             qp2p,
-            payment: PaymentConfig {
-                db_root: root_dir,
-                ..Default::default()
-            },
             query_timeout: query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT),
         }
     }
@@ -88,7 +82,6 @@ impl Default for Config {
             local_addr: SocketAddr::from(DEFAULT_LOCAL_ADDR),
             root_dir: default_dir(),
             qp2p: Default::default(),
-            payment: Default::default(),
             query_timeout: Default::default(),
         }
     }
@@ -109,60 +102,6 @@ async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
         );
         err.into()
     })
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-pub struct PaymentConfig {
-    ///
-    pub db_root: PathBuf,
-    /// Configuration for op batching.
-    pub op_batching: OpBatchConfig,
-    /// The max local space allowed to be used.
-    pub max_local_space: u64,
-}
-
-impl Default for PaymentConfig {
-    fn default() -> Self {
-        Self {
-            db_root: default_dir(),
-            op_batching: Default::default(),
-            max_local_space: u64::MAX,
-        }
-    }
-}
-
-impl Default for OpBatchConfig {
-    fn default() -> Self {
-        Self {
-            pool_count: 3,
-            pool_limit: 3,
-        }
-    }
-}
-
-/// Options for operation batching
-///
-/// These options allow tuning of performance
-/// to your needs wrt network interaction patterns.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-pub struct OpBatchConfig {
-    /// The higher the number of pools,
-    /// the more obscured your activity is.
-    /// A minimum of 3 is recommended.
-    ///
-    /// The cost of increasing it is that
-    /// the actual move of the ops from local to network can be delayed.
-    /// This can affect synchronisation between devices, and extends the time
-    /// that the ops are kept on the local device.
-    pub pool_count: u8,
-    /// The higher the limit, the higher the throughput
-    /// you can achieve.
-    ///
-    /// The cost of increasing it is that
-    /// the actual move of the ops from local to network can be delayed.
-    /// This can affect synchronisation between devices, and extends the time
-    /// that the ops are kept on the local device.
-    pub pool_limit: usize,
 }
 
 /// Root directory for dbs and cached state. If not set, it defaults to
@@ -226,10 +165,6 @@ mod tests {
             local_addr: (Ipv4Addr::LOCALHOST, 0).into(),
             root_dir: root_dir.clone(),
             qp2p: QuicP2pConfig::default(),
-            payment: PaymentConfig {
-                db_root: root_dir.clone(),
-                ..Default::default()
-            },
             query_timeout: DEFAULT_QUERY_TIMEOUT,
         };
         assert_eq!(config, expected_config);

@@ -6,12 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::{collections::BTreeMap, iter::FromIterator, path::PathBuf, time::Duration};
-
-use super::{
-    data::{get_data_chunks, Batch},
-    Client,
-};
+use super::{data::get_data_chunks, Client};
 use crate::messaging::data::{DataCmd, DataQuery, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, Encryption};
 use crate::{
@@ -24,6 +19,7 @@ use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
 use self_encryption::{self, ChunkKey, EncryptedChunk, SecretKey as BlobSecretKey};
+use std::time::Duration;
 use tokio::task;
 use tracing::trace;
 use xor_name::XorName;
@@ -180,32 +176,6 @@ impl Client {
             .collect_vec();
 
         Ok(head_address)
-    }
-
-    ///
-    pub fn push_file_to_batch(&self, id: String, path: PathBuf, scope: Scope) {
-        self.push_files_to_batch(BTreeMap::from_iter(vec![(id, (path, scope))]))
-    }
-
-    ///
-    pub fn push_value_to_batch(&self, id: String, value: Bytes, scope: Scope) {
-        self.push_values_to_batch(BTreeMap::from_iter(vec![(id, (value, scope))]))
-    }
-
-    ///
-    pub fn push_files_to_batch(&self, files: BTreeMap<String, (PathBuf, Scope)>) {
-        self.push_batch(Batch {
-            files,
-            ..Default::default()
-        })
-    }
-
-    ///
-    pub fn push_values_to_batch(&self, values: BTreeMap<String, (Bytes, Scope)>) {
-        self.push_batch(Batch {
-            values,
-            ..Default::default()
-        })
     }
 
     // --------------------------------------------

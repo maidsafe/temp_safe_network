@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::data::Batch;
 use super::Client;
 use crate::client::Error;
 use crate::messaging::data::{DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite};
@@ -18,7 +17,6 @@ use crate::types::{
     PublicKey,
 };
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::FromIterator;
 use tracing::{debug, trace};
 use xor_name::XorName;
 
@@ -106,10 +104,6 @@ impl Client {
         let signature = self.keypair.sign(&bytes);
         op.signature = Some(signature);
 
-        // let id = format!("{:?}", &hash);
-        // // Finally we can send the mutation to the network's replicas
-        // self.push_reg_op_to_batch(id, RegisterWrite::Edit(op));
-
         // Finally we can send the mutation to the network's replicas
         let cmd = DataCmd::Register(RegisterWrite::Edit(op));
         self.send_cmd(cmd).await?;
@@ -125,25 +119,8 @@ impl Client {
     ) -> Result<(), Error> {
         debug!("Attempting to pay and write a Register to the network");
 
-        // let id = data.address().encode_to_zbase32()?;
-        // // Finally we can send the mutation to the network's replicas
-        // self.push_reg_op_to_batch(id, RegisterWrite::New(data));
-
         let cmd = DataCmd::Register(RegisterWrite::New(data));
         self.send_cmd(cmd).await
-    }
-
-    ///
-    pub fn push_reg_op_to_batch(&self, id: String, reg_op: RegisterWrite) {
-        self.push_reg_ops_to_batch(BTreeMap::from_iter(vec![(id, reg_op)]))
-    }
-
-    ///
-    pub fn push_reg_ops_to_batch(&self, reg_ops: BTreeMap<String, RegisterWrite>) {
-        self.push_batch(Batch {
-            reg_ops,
-            ..Default::default()
-        })
     }
 
     //----------------------
