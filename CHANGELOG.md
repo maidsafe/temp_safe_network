@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.4](https://github.com/maidsafe/safe_network/compare/v0.27.3...v0.27.4) (2021-09-08)
+
+
+### Bug Fixes
+
+* AE-Update return earlier so when update isnt wanted do nothing. ([1262442](https://github.com/maidsafe/safe_network/commit/1262442dc4772aa8ee023b41797c6e99e4f52adb))
+* remove original bytes logging and other AE releated cleanup ([1491852](https://github.com/maidsafe/safe_network/commit/14918527aa946a8e0923df32134d5f6c62881b0c))
+
 ### [0.27.3](https://github.com/maidsafe/safe_network/compare/v0.27.2...v0.27.3) (2021-09-08)
 
 ### [0.27.2](https://github.com/maidsafe/safe_network/compare/v0.27.1...v0.27.2) (2021-09-07)
