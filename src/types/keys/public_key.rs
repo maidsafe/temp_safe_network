@@ -25,7 +25,6 @@ use std::{
     fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex},
     hash::{Hash, Hasher},
 };
-// use bls::{self};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Wrapper for different public key types.

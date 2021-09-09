@@ -106,7 +106,7 @@ impl Client {
         Ok(client)
     }
 
-    /// Return the client's FullId.
+    /// Return the client's keypair.
     ///
     /// Useful for retrieving the PublicKey or KeyPair in the event you need to _sign_ something
     ///
@@ -126,11 +126,6 @@ impl Client {
     ///
     pub fn public_key(&self) -> PublicKey {
         self.keypair().public_key()
-    }
-
-    #[cfg(test)]
-    pub async fn expect_cmd_error(&mut self) -> Option<CmdError> {
-        self.incoming_errors.write().await.recv().await
     }
 }
 

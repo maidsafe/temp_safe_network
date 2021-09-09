@@ -39,7 +39,7 @@ impl Section {
     /// Creates a minimal `Section` initially containing only info about our elders
     /// (`section_auth`).
     ///
-    /// Returns error if `section_auth` is not signed with the last key of `chain`.
+    /// Returns error if `section_auth` is not verifiable with the `chain`.
     pub(super) fn new(
         genesis_key: bls::PublicKey,
         chain: SecuredLinkedList,
@@ -50,6 +50,38 @@ impl Section {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key doesn't match last key in proof chain: {:?}",
                 section_auth.value
+            )));
+        }
+
+        if genesis_key != *chain.root_key() {
+            return Err(Error::UntrustedProofChain(format!(
+                "genesis key doesn't match first key in proof chain: {:?}",
+                chain.root_key()
+            )));
+        }
+
+        // Check if SAP signature is valid
+        if !section_auth.self_verify() {
+            return Err(Error::UntrustedSectionAuthProvider(format!(
+                "invalid signature: {:?}",
+                section_auth.value
+            )));
+        }
+
+        // Check if SAP's section key matches SAP signature's key
+        if section_auth.sig.public_key != section_auth.value.public_key_set.public_key() {
+            return Err(Error::UntrustedSectionAuthProvider(format!(
+                "section key doesn't match signature's key: {:?}",
+                section_auth.value
+            )));
+        }
+
+        // Make sure the proof chain can be trusted,
+        // i.e. check each key is signed by its parent/predecesor key.
+        if !chain.self_verify() {
+            return Err(Error::UntrustedProofChain(format!(
+                "invalid chain: {:?}",
+                chain
             )));
         }
 

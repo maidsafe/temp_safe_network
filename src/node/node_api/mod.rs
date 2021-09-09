@@ -137,6 +137,11 @@ impl Node {
         self.network_api.our_prefix().await
     }
 
+    /// Returns the network;s genesis key.
+    pub async fn genesis_key(&self) -> bls::PublicKey {
+        self.network_api.genesis_key().await
+    }
+
     // TODO: remove this, and be processed, calling from routing code directly
     async fn process_routing_event(
         network_events: Arc<Mutex<EventStream>>,

@@ -91,16 +91,19 @@ impl Core {
         let mut age = MIN_ADULT_AGE;
 
         // During the first section, node shall use ranged age to avoid too many nodes got
-        // relocated at the same time. After the first section got split, later on nodes shall
-        // only start with age of MIN_ADULT_AGE
+        // relocated at the same time. After the first section got split, nodes shall only
+        // start with age of MIN_ADULT_AGE
         if self.section.prefix().is_empty() {
             if peer.age() < FIRST_SECTION_MIN_AGE || peer.age() > FIRST_SECTION_MAX_AGE {
-                debug!(
-                    "Ignoring JoinRequest from {} - first-section node having wrong age {:?}",
-                    peer,
-                    peer.age(),
-                );
-                return Ok(vec![]);
+                let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
+                    self.section.authority_provider().clone(),
+                )));
+                trace!("New node in first section should join with age greater than MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
+                return Ok(vec![self.send_direct_message(
+                    (*peer.name(), *peer.addr()),
+                    node_msg,
+                    *self.section.chain().last_key(),
+                )?]);
             } else {
                 age = peer.age();
             }

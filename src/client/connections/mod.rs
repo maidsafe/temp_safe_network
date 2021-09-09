@@ -47,5 +47,5 @@ pub(super) struct Session {
     /// BLS Signature aggregator for aggregating network messages
     aggregator: Arc<RwLock<SignatureAggregator>>,
     /// Network's genesis key
-    genesis_pk: bls::PublicKey,
+    genesis_key: bls::PublicKey,
 }
