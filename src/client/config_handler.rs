@@ -20,7 +20,7 @@ use tokio::{
 };
 use tracing::{debug, warn};
 
-const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::LOCALHOST, 0);
+const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 
 /// Defaul amount of time to wait for responses to queries before giving up and returning an error.
 pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(90);
@@ -162,7 +162,7 @@ mod tests {
         }
 
         let expected_config = Config {
-            local_addr: (Ipv4Addr::LOCALHOST, 0).into(),
+            local_addr: (Ipv4Addr::UNSPECIFIED, 0).into(),
             root_dir: root_dir.clone(),
             qp2p: QuicP2pConfig::default(),
             query_timeout: DEFAULT_QUERY_TIMEOUT,
