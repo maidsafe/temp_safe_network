@@ -229,6 +229,7 @@ impl Session {
             "Bounced message ({:?}) received in AE-Redirect response: {:?}",
             msg_id, service_msg
         );
+
         let message = WireMsg::serialize_msg_payload(&service_msg)?;
 
         // TODO: we cannot trust these Elders belong to the network we are intended

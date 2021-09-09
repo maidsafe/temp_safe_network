@@ -114,7 +114,11 @@ impl Core {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<Vec<Command>> {
-        trace!("preparing to query adults for chunk at {:?}", address);
+        trace!(
+            "preparing to query adults for chunk at {:?} with op_id: {:?}",
+            address,
+            operation_id(&address)
+        );
 
         let targets = self.get_chunk_holder_adults(address.name()).await;
 
@@ -126,9 +130,9 @@ impl Core {
 
         let mut fresh_targets = BTreeSet::new();
         for target in targets {
-            let _ = self
-                .liveness
-                .add_a_pending_request_operation(target, operation_id(&address)?);
+            self.liveness
+                .add_a_pending_request_operation(target, operation_id(&address)?)
+                .await;
             let _ = fresh_targets.insert(target);
         }
 
