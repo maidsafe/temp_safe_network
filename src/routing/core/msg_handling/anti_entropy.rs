@@ -34,6 +34,7 @@ impl Core {
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         members: Option<SectionPeers>,
+        sender: SocketAddr,
     ) -> Result<Vec<Command>> {
         let snapshot = self.state_snapshot();
 
@@ -65,8 +66,8 @@ impl Core {
             }
             Err(err) => {
                 warn!(
-                    "Anti-Entropy: failed to update remote section SAP: {:?}",
-                    err
+                    "Anti-Entropy: Did not update remote section SAP provided by {:?}: {:?}",
+                    sender, err
                 );
                 return Err(err);
             }
@@ -133,7 +134,7 @@ impl Core {
                 Ok(vec![cmd])
             }
             Err(err) => {
-                warn!("Anti-Entropy: failed to update remote section SAP, bounced msg dropped: {:?}, {:?}", bounced_msg, err);
+                warn!("Anti-Entropy: failed to update remote section SAP, bounced msg from {:?} dropped: {:?}, {:?}", sender, bounced_msg, err);
                 Ok(vec![])
             }
         }

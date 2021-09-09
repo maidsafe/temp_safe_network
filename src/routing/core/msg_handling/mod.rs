@@ -311,6 +311,7 @@ impl Core {
                     section_signed,
                     proof_chain,
                     members,
+                    sender,
                 )
                 .await
             }
