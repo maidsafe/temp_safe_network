@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::routing::{error::Result, peer::PeerUtils, section::SectionUtils, Event};
+use crate::routing::{error::Result, peer::PeerUtils, Event};
 use std::collections::BTreeSet;
 
 impl Core {

@@ -21,9 +21,7 @@ use crate::routing::{
     error::Result,
     node::Node,
     routing_api::command::Command,
-    section::{
-        ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionKeysProvider, SectionUtils,
-    },
+    section::{ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionKeysProvider},
     Error, Event,
 };
 use resource_proof::ResourceProof;

@@ -40,7 +40,7 @@ use crate::routing::{
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{SectionKeyShare, SectionKeysProvider, SectionUtils},
+    section::{SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
 use capacity::Capacity;

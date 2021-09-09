@@ -12,7 +12,7 @@ use crate::routing::{
     error::Result,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionPeersUtils, SectionUtils},
+    section::{NodeStateUtils, SectionPeersUtils},
     SectionAuthorityProviderUtils,
 };
 use std::{collections::BTreeSet, iter, net::SocketAddr};

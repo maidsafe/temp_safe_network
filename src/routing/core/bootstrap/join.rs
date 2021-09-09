@@ -20,7 +20,6 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
     peer::PeerUtils,
-    section::SectionUtils,
     SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
 use crate::types::PublicKey;

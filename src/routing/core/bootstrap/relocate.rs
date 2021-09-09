@@ -22,7 +22,6 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    section::SectionUtils,
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;

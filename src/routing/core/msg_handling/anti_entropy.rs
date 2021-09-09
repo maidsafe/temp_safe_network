@@ -16,7 +16,6 @@ use crate::routing::{
     error::{Error, Result},
     messages::WireMsgUtils,
     routing_api::command::Command,
-    section::SectionUtils,
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;

@@ -13,7 +13,6 @@ use crate::routing::{
     ed25519,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::SectionUtils,
     Error, Result,
 };
 use ed25519_dalek::Verifier;
