@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.28.2](https://github.com/maidsafe/safe_network/compare/v0.28.1...v0.28.2) (2021-09-09)
+
+
+### Bug Fixes
+
+* add missing await for liveness tracking. ([17d906b](https://github.com/maidsafe/safe_network/commit/17d906b10f608679b7993afca22033f5f6ce8bf5))
+
 ### [0.28.1](https://github.com/maidsafe/safe_network/compare/v0.28.0...v0.28.1) (2021-09-09)
 
 
