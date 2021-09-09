@@ -72,20 +72,25 @@ pub struct Config {
     /// Delete all data from a previous node running on the same PC
     #[structopt(long)]
     pub clear_data: bool,
-    /// If the node is the first node on the network, the local address to be used should be passed.
-    /// To use a random port number, use 0. If this argument is passed `--local-ip` and `--local-port`
-    /// is not requried, however if they are passed, they should match the value provided here.
+    /// Whether the node is the first on the network.
+    ///
+    /// When set, you must specify either `--local-addr` or `--public-addr` to ensure the correct
+    /// connection info is stored.
     #[structopt(long)]
-    pub first: Option<SocketAddr>,
-    /// Local address to be used for the node. This field is mandatory if manual port forwarding is being used.
-    /// Otherwise, the value is fetched from `--first` (for genesis) and obtained by connecting to the
-    /// bootstrap node otherwise.
+    pub first: bool,
+    /// Local address to be used for the node.
+    ///
+    /// When unspecified, the node will listen on `0.0.0.0` with a random unused port. If you're
+    /// running a local-only network, you should set this to `127.0.0.1:0` to prevent any external
+    /// traffic from reaching the node (but note that the node will also be unable to connect to
+    /// non-local nodes).
     #[structopt(long)]
     pub local_addr: Option<SocketAddr>,
-    /// External address of the node. This field can be used to specify the external socket address when
-    /// manual port forwarding is used. If this field is provided, either `--first` or `--local-addr` must
-    /// be provided
-    #[structopt(long)]
+    /// External address of the node, to use when writing connection info.
+    ///
+    /// If unspecified, it will be queried from a peer; if there are no peers, the `local-addr` will
+    /// be used, if specified.
+    #[structopt(long, parse(try_from_str = parse_public_addr))]
     pub public_addr: Option<SocketAddr>,
     /// This flag can be used to skip port forwarding using IGD. This is used when running a network on LAN
     /// or when a node is connected to the internect directly without a router. Eg. Digital Ocean droplets.
@@ -140,11 +145,7 @@ impl Config {
         let mut config = Config::default();
 
         let mut command_line_args = Config::from_args();
-        command_line_args.validate()?;
-
-        if let Some(socket_addr) = command_line_args.first {
-            command_line_args.local_addr = Some(socket_addr);
-        }
+        command_line_args.validate().map_err(Error::Configuration)?;
 
         if command_line_args.hard_coded_contacts.is_empty() {
             debug!("Using node connection config file as no hard coded contacts were passed in");
@@ -162,20 +163,34 @@ impl Config {
         Ok(config)
     }
 
-    fn validate(&mut self) -> Result<(), Error> {
-        if self.public_addr.is_some() && self.first.is_none() && self.local_addr.is_none() {
-            return Err(Error::Configuration("--public-addr passed without specifing local address using --first or --local-addr".to_string()));
-        }
-
-        if self.public_addr.is_none() && self.local_addr.is_some() {
-            if self.skip_igd {
-                // local_addr duplicated to public_addr so that the specified port is used (and not a random one)
-                self.public_addr = self.local_addr;
-            } else {
-                println!("Warning: Local Address provided is skipped since external address is not provided.");
-                self.local_addr = None;
+    /// Validate configuration that came from the command line.
+    ///
+    /// `StructOpt` doesn't support validation that crosses multiple field values.
+    fn validate(&self) -> Result<(), String> {
+        if let Some(local_addr) = self.local_addr {
+            if local_addr.ip().is_loopback() && self.public_addr.is_some() {
+                return Err(
+                    "Cannot specify --public-addr when --local-addr uses a loopback IP. \
+                    When local-addr uses a loopback IP, the node will never be reachable publicly. \
+                    You can drop public-addr if this is a local-only node, or change local-addr to \
+                    a public or unspecified IP."
+                        .to_string(),
+                );
             }
         }
+
+        let local_ip_unspecified = self
+            .local_addr
+            .map(|addr| addr.ip().is_unspecified())
+            .unwrap_or(true);
+        if local_ip_unspecified && self.first && self.public_addr.is_none() {
+            return Err("Must specify public address for --first node. \
+                The first node cannot query its public address from peers, so one must be \
+                specifed. This can be specified with --public-addr, or by setting a concrete IP \
+                for --local-addr."
+                .to_string());
+        }
+
         Ok(())
     }
 
@@ -211,11 +226,7 @@ impl Config {
         self.update = config.update || self.update;
         self.update_only = config.update_only || self.update_only;
         self.clear_data = config.clear_data || self.clear_data;
-
-        if let Some(socket_addr) = config.first {
-            self.first = Some(socket_addr);
-            self.local_addr = Some(socket_addr);
-        }
+        self.first = config.first || self.first;
 
         if let Some(local_addr) = config.local_addr {
             self.local_addr = Some(local_addr);
@@ -262,7 +273,7 @@ impl Config {
 
     /// Is this the first node in a section?
     pub fn is_first(&self) -> bool {
-        self.first.is_some()
+        self.first
     }
 
     /// Upper limit in bytes for allowed network storage on this node.
@@ -376,6 +387,28 @@ impl Config {
     }
 }
 
+fn parse_public_addr(public_addr: &str) -> Result<SocketAddr, String> {
+    let public_addr: SocketAddr = public_addr.parse().map_err(|err| format!("{}", err))?;
+
+    if public_addr.ip().is_unspecified() {
+        return Err("Cannot use unspecified IP for public address. \
+            You can drop this option to query the public IP from a peer instead."
+            .to_string());
+    }
+    if public_addr.ip().is_loopback() {
+        return Err("Cannot use loopback IP for public address. \
+            You can drop this option for a local-only network."
+            .to_string());
+    }
+    if public_addr.port() == 0 {
+        return Err("Cannot use unspecified port for public address. \
+            You must specify the concrete port on which the node will be reachable."
+            .to_string());
+    }
+
+    Ok(public_addr)
+}
+
 /// Overwrites connection info at file.
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
@@ -442,7 +475,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 472;
+    let expected_size = 440;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }
