@@ -34,7 +34,7 @@ impl Default for Config {
         Self {
             first: false,
             keypair: None,
-            local_addr: SocketAddr::from((Ipv4Addr::LOCALHOST, 0)),
+            local_addr: SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
             bootstrap_nodes: BTreeSet::new(),
             network_config: NetworkConfig::default(),
         }
