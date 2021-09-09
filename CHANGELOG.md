@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.28.1](https://github.com/maidsafe/safe_network/compare/v0.28.0...v0.28.1) (2021-09-09)
+
+
+### Bug Fixes
+
+* Change default local address to `0.0.0.0` ([2c47093](https://github.com/maidsafe/safe_network/commit/2c470939062593fe4a2db709da5c801fb2fc4484))
+
 ## [0.28.0](https://github.com/maidsafe/safe_network/compare/v0.27.6...v0.28.0) (2021-09-08)
 
 
