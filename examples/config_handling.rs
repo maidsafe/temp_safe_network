@@ -90,13 +90,14 @@ async fn main() -> Result<()> {
         file_config.clear_data || command_line_args.clear_data
     );
 
-    if command_line_args.local_addr.is_some() || command_line_args.first.is_some() {
-        assert_eq!(
-            command_line_args.first.or(command_line_args.local_addr),
-            config.local_addr
-        );
+    if command_line_args.local_addr.is_some() {
+        assert_eq!(command_line_args.local_addr, config.local_addr);
     } else {
         assert_eq!(file_config.local_addr, config.local_addr);
+    }
+
+    if command_line_args.first {
+        assert!(config.first);
     }
 
     if command_line_args.public_addr.is_some() {
