@@ -166,15 +166,6 @@ async fn main() -> Result<()> {
         )
     }
 
-    if command_line_args.bootstrap_cache_dir.is_some() {
-        assert_eq!(
-            command_line_args.bootstrap_cache_dir,
-            config.bootstrap_cache_dir
-        )
-    } else {
-        assert_eq!(file_config.bootstrap_cache_dir, config.bootstrap_cache_dir)
-    }
-
     if command_line_args.upnp_lease_duration.is_some() {
         assert_eq!(
             command_line_args

@@ -119,10 +119,6 @@ pub struct Config {
     /// The interval is in milliseconds. A value of 0 disables this feature.
     #[structopt(long)]
     pub keep_alive_interval_msec: Option<u32>,
-    /// Directory in which the bootstrap cache will be stored. If none is supplied, the platform specific
-    /// default cache directory is used.
-    #[structopt(long)]
-    pub bootstrap_cache_dir: Option<String>,
     /// Duration of a UPnP port mapping.
     #[structopt(long)]
     pub upnp_lease_duration: Option<u32>,
@@ -251,10 +247,6 @@ impl Config {
 
         if let Some(keep_alive) = config.keep_alive_interval_msec {
             self.keep_alive_interval_msec = Some(keep_alive);
-        }
-
-        if let Some(bootstrap_cache_dir) = config.bootstrap_cache_dir {
-            self.bootstrap_cache_dir = Some(bootstrap_cache_dir);
         }
 
         if let Some(upnp_lease_duration) = config.upnp_lease_duration {
@@ -450,7 +442,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 496;
+    let expected_size = 472;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }
