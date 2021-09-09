@@ -17,7 +17,7 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionPeersUtils, SectionUtils},
+    section::{NodeStateUtils, SectionPeersUtils},
     Event, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use xor_name::XorName;

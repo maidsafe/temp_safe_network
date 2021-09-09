@@ -29,7 +29,6 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     relocation::RelocateState,
     routing_api::command::Command,
-    section::SectionUtils,
     Error, Event, MessageReceived, Result, SectionAuthorityProviderUtils,
 };
 use crate::types::{Chunk, Keypair, PublicKey};

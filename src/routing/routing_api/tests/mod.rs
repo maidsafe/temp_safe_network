@@ -33,7 +33,6 @@ use crate::routing::{
     relocation::{self, RelocatePayloadUtils},
     section::{
         test_utils::*, ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionPeersUtils,
-        SectionUtils,
     },
     supermajority, Error, Event, Result as RoutingResult, SectionAuthorityProviderUtils,
     ELDER_SIZE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,

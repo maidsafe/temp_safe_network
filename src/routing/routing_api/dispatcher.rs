@@ -20,7 +20,6 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     section::SectionPeersUtils,
-    section::SectionUtils,
     Error, Prefix, XorName,
 };
 // use bls::PublicKey;

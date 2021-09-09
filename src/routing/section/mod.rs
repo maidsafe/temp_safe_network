@@ -30,100 +30,17 @@ pub(crate) use node_state::NodeStateUtils;
 pub(crate) use section_authority_provider::ElderCandidatesUtils;
 use section_authority_provider::SectionAuthorityProviderUtils;
 pub(super) use section_peers::SectionPeersUtils;
-use secured_linked_list::{error::Error as SecuredLinkedListError, SecuredLinkedList};
+use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use std::{collections::BTreeSet, convert::TryInto, iter, marker::Sized, net::SocketAddr};
+use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
-pub(super) trait SectionUtils {
+impl Section {
     /// Creates a minimal `Section` initially containing only info about our elders
     /// (`section_auth`).
     ///
     /// Returns error if `section_auth` is not signed with the last key of `chain`.
-    fn new(
-        genesis_key: bls::PublicKey,
-        chain: SecuredLinkedList,
-        section_auth: SectionAuth<SectionAuthorityProvider>,
-    ) -> Result<Self, Error>
-    where
-        Self: Sized;
-
-    /// Creates `Section` for the first node in the network
-    fn first_node(peer: Peer) -> Result<(Section, SectionKeyShare)>;
-
-    fn genesis_key(&self) -> &bls::PublicKey;
-
-    /// Try to merge this `Section` members with `other`.
-    fn merge_members(&mut self, members: Option<SectionPeers>) -> Result<()>;
-
-    /// Try to merge this `Section` chain with `other`.
-    fn merge_chain(
-        &mut self,
-        other: &SectionAuth<SectionAuthorityProvider>,
-        proof_chain: SecuredLinkedList,
-    ) -> Result<()>;
-
-    /// Update the `SectionAuthorityProvider` of our section.
-    fn update_elders(
-        &mut self,
-        new_section_auth: SectionAuth<SectionAuthorityProvider>,
-        new_key_sig: KeyedSig,
-    ) -> bool;
-
-    /// Update the member. Returns whether it actually changed anything.
-    fn update_member(&mut self, node_state: SectionAuth<NodeState>) -> bool;
-
-    fn chain(&self) -> &SecuredLinkedList;
-
-    // Extend the section chain so it starts at `trusted_key` while keeping the last key intact.
-    fn extend_chain(
-        &self,
-        trusted_key: &bls::PublicKey,
-        full_chain: &SecuredLinkedList,
-    ) -> Result<Section, SecuredLinkedListError>;
-
-    fn authority_provider(&self) -> &SectionAuthorityProvider;
-
-    fn section_signed_authority_provider(&self) -> &SectionAuth<SectionAuthorityProvider>;
-
-    fn is_elder(&self, name: &XorName) -> bool;
-
-    /// Generate a new section info(s) based on the current set of members.
-    /// Returns a set of candidate SectionAuthorityProviders.
-    fn promote_and_demote_elders(&self, our_name: &XorName) -> Vec<ElderCandidates>;
-
-    // Prefix of our section.
-    fn prefix(&self) -> &Prefix;
-
-    fn members(&self) -> &SectionPeers;
-
-    /// Returns members that are either joined or are left but still elders.
-    fn active_members(&self) -> Box<dyn Iterator<Item = &Peer> + '_>;
-
-    /// Returns adults from our section.
-    fn adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_>;
-
-    /// Returns live adults from our section.
-    fn live_adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_>;
-
-    fn find_joined_member_by_addr(&self, addr: &SocketAddr) -> Option<&Peer>;
-
-    // Tries to split our section.
-    // If we have enough mature nodes for both subsections, returns the SectionAuthorityProviders
-    // of the two subsections. Otherwise returns `None`.
-    fn try_split(&self, our_name: &XorName) -> Option<(ElderCandidates, ElderCandidates)>;
-
-    // Returns the candidates for elders out of all the nodes in the section, even out of the
-    // relocating nodes if there would not be enough instead.
-    fn elder_candidates(&self, elder_size: usize) -> Vec<Peer>;
-}
-
-impl SectionUtils for Section {
-    /// Creates a minimal `Section` initially containing only info about our elders
-    /// (`section_auth`).
-    ///
-    /// Returns error if `section_auth` is not signed with the last key of `chain`.
-    fn new(
+    pub(super) fn new(
         genesis_key: bls::PublicKey,
         chain: SecuredLinkedList,
         section_auth: SectionAuth<SectionAuthorityProvider>,
@@ -145,7 +62,7 @@ impl SectionUtils for Section {
     }
 
     /// Creates `Section` for the first node in the network
-    fn first_node(peer: Peer) -> Result<(Section, SectionKeyShare)> {
+    pub(super) fn first_node(peer: Peer) -> Result<(Section, SectionKeyShare)> {
         let secret_key_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
         let public_key_set = secret_key_set.public_keys();
         let secret_key_share = secret_key_set.secret_key_share(0);
@@ -177,12 +94,12 @@ impl SectionUtils for Section {
         Ok((section, section_key_share))
     }
 
-    fn genesis_key(&self) -> &bls::PublicKey {
+    pub(super) fn genesis_key(&self) -> &bls::PublicKey {
         &self.genesis_key
     }
 
     /// Try to merge this `Section` members with `other`. .
-    fn merge_members(&mut self, members: Option<SectionPeers>) -> Result<()> {
+    pub(super) fn merge_members(&mut self, members: Option<SectionPeers>) -> Result<()> {
         if let Some(members) = members {
             for info in members {
                 let _ = self.update_member(info);
@@ -196,7 +113,7 @@ impl SectionUtils for Section {
     }
     /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or
     /// its chain is not compatible with the chain of `self`.
-    fn merge_chain(
+    pub(super) fn merge_chain(
         &mut self,
         other: &SectionAuth<SectionAuthorityProvider>,
         proof_chain: SecuredLinkedList,
@@ -211,7 +128,7 @@ impl SectionUtils for Section {
     }
 
     /// Update the `SectionAuthorityProvider` of our section.
-    fn update_elders(
+    pub(super) fn update_elders(
         &mut self,
         new_section_auth: SectionAuth<SectionAuthorityProvider>,
         new_key_sig: KeyedSig,
@@ -253,7 +170,7 @@ impl SectionUtils for Section {
     }
 
     /// Update the member. Returns whether it actually changed anything.
-    fn update_member(&mut self, node_state: SectionAuth<NodeState>) -> bool {
+    pub(super) fn update_member(&mut self, node_state: SectionAuth<NodeState>) -> bool {
         if !node_state.verify(&self.chain) {
             error!("can't merge member {:?}", node_state.value);
             return false;
@@ -262,49 +179,27 @@ impl SectionUtils for Section {
         self.members.update(node_state)
     }
 
-    fn chain(&self) -> &SecuredLinkedList {
+    pub(super) fn chain(&self) -> &SecuredLinkedList {
         &self.chain
     }
 
-    // Extend the section chain so it starts at `trusted_key` while keeping the last key intact.
-    fn extend_chain(
-        &self,
-        trusted_key: &bls::PublicKey,
-        full_chain: &SecuredLinkedList,
-    ) -> Result<Section, SecuredLinkedListError> {
-        let chain = match self.chain.extend(trusted_key, full_chain) {
-            Ok(chain) => chain,
-            Err(SecuredLinkedListError::InvalidOperation) => {
-                // This means the tip of the chain is not reachable from `trusted_key`.
-                // Use the full chain instead as it is always trusted.
-                self.chain.clone()
-            }
-            Err(error) => return Err(error),
-        };
-
-        Ok(Section {
-            genesis_key: self.genesis_key,
-            section_auth: self.section_auth.clone(),
-            chain,
-            members: self.members.clone(),
-        })
-    }
-
-    fn authority_provider(&self) -> &SectionAuthorityProvider {
+    pub(super) fn authority_provider(&self) -> &SectionAuthorityProvider {
         &self.section_auth.value
     }
 
-    fn section_signed_authority_provider(&self) -> &SectionAuth<SectionAuthorityProvider> {
+    pub(super) fn section_signed_authority_provider(
+        &self,
+    ) -> &SectionAuth<SectionAuthorityProvider> {
         &self.section_auth
     }
 
-    fn is_elder(&self, name: &XorName) -> bool {
+    pub(super) fn is_elder(&self, name: &XorName) -> bool {
         self.authority_provider().contains_elder(name)
     }
 
     /// Generate a new section info(s) based on the current set of members.
     /// Returns a set of candidate SectionAuthorityProviders.
-    fn promote_and_demote_elders(&self, our_name: &XorName) -> Vec<ElderCandidates> {
+    pub(super) fn promote_and_demote_elders(&self, our_name: &XorName) -> Vec<ElderCandidates> {
         if let Some((our_elder_candidates, other_elder_candidates)) = self.try_split(our_name) {
             return vec![our_elder_candidates, other_elder_candidates];
         }
@@ -326,16 +221,16 @@ impl SectionUtils for Section {
     }
 
     // Prefix of our section.
-    fn prefix(&self) -> &Prefix {
+    pub(super) fn prefix(&self) -> &Prefix {
         &self.authority_provider().prefix
     }
 
-    fn members(&self) -> &SectionPeers {
+    pub(super) fn members(&self) -> &SectionPeers {
         &self.members
     }
 
     /// Returns members that are either joined or are left but still elders.
-    fn active_members(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
+    pub(super) fn active_members(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
         Box::new(
             self.members
                 .all()
@@ -347,7 +242,7 @@ impl SectionUtils for Section {
     }
 
     /// Returns adults from our section.
-    fn adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
+    pub(super) fn adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
         Box::new(
             self.members
                 .mature()
@@ -356,7 +251,7 @@ impl SectionUtils for Section {
     }
 
     /// Returns live adults from our section.
-    fn live_adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
+    pub(super) fn live_adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
         Box::new(self.members.joined().filter_map(move |info| {
             if !self.is_elder(info.peer.name()) {
                 Some(&info.peer)
@@ -366,7 +261,7 @@ impl SectionUtils for Section {
         }))
     }
 
-    fn find_joined_member_by_addr(&self, addr: &SocketAddr) -> Option<&Peer> {
+    pub(super) fn find_joined_member_by_addr(&self, addr: &SocketAddr) -> Option<&Peer> {
         self.members
             .joined()
             .find(|info| info.peer.addr() == addr)
@@ -376,7 +271,10 @@ impl SectionUtils for Section {
     // Tries to split our section.
     // If we have enough mature nodes for both subsections, returns the SectionAuthorityProviders
     // of the two subsections. Otherwise returns `None`.
-    fn try_split(&self, our_name: &XorName) -> Option<(ElderCandidates, ElderCandidates)> {
+    pub(super) fn try_split(
+        &self,
+        our_name: &XorName,
+    ) -> Option<(ElderCandidates, ElderCandidates)> {
         let next_bit_index = if let Ok(index) = self.prefix().bit_count().try_into() {
             index
         } else {
@@ -425,7 +323,7 @@ impl SectionUtils for Section {
 
     // Returns the candidates for elders out of all the nodes in the section, even out of the
     // relocating nodes if there would not be enough instead.
-    fn elder_candidates(&self, elder_size: usize) -> Vec<Peer> {
+    pub(super) fn elder_candidates(&self, elder_size: usize) -> Vec<Peer> {
         self.members
             .elder_candidates(elder_size, self.authority_provider())
     }

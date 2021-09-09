@@ -17,7 +17,7 @@ use crate::routing::{
     error::Result,
     peer::PeerUtils,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionPeersUtils, SectionUtils},
+    section::{ElderCandidatesUtils, SectionPeersUtils},
     Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
 

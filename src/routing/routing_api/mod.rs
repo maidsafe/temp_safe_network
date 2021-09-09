@@ -35,7 +35,6 @@ use crate::routing::{
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
-    section::SectionUtils,
     SectionAuthorityProviderUtils, MIN_ADULT_AGE,
 };
 use crate::{dbs::UsedSpace, messaging::data::ChunkDataExchange};

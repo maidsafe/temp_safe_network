@@ -12,7 +12,7 @@ use crate::messaging::{
     system::{NodeCmd, NodeQuery, SystemMsg},
     AuthorityProof, EndUser, MessageId, ServiceAuth,
 };
-use crate::routing::{error::convert_to_error_message, section::SectionUtils, Error};
+use crate::routing::{error::convert_to_error_message, Error};
 use crate::types::{Chunk, ChunkAddress, PublicKey};
 use std::collections::BTreeSet;
 use tracing::info;
