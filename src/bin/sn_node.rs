@@ -210,7 +210,8 @@ async fn run_node() -> Result<()> {
     let our_conn_info = node.our_connection_info().await;
 
     if config.is_first() {
-        set_connection_info(our_conn_info)
+        let genesis_key = node.genesis_key().await;
+        set_connection_info(genesis_key, our_conn_info)
             .await
             .unwrap_or_else(|err| {
                 error!("Unable to write our connection info to disk: {:?}", err);

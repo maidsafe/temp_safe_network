@@ -25,6 +25,8 @@ pub struct Config {
     pub local_addr: SocketAddr,
     /// Initial network contacts.
     pub bootstrap_nodes: BTreeSet<SocketAddr>,
+    /// Network's genesis key if joining an existing network.
+    pub genesis_key: Option<String>,
     /// Configuration for the underlying network transport.
     pub network_config: NetworkConfig,
 }
@@ -36,6 +38,7 @@ impl Default for Config {
             keypair: None,
             local_addr: SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
             bootstrap_nodes: BTreeSet::new(),
+            genesis_key: None,
             network_config: NetworkConfig::default(),
         }
     }

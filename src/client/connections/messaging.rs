@@ -67,7 +67,7 @@ impl Session {
 
         // *****************************************************
         // FIXME: receive the network's genesis pk from the user
-        let genesis_pk = bls::SecretKey::random().public_key();
+        let genesis_key = bls::SecretKey::random().public_key();
         // *****************************************************
 
         let session = Session {
@@ -75,10 +75,10 @@ impl Session {
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
             endpoint,
-            network: Arc::new(NetworkPrefixMap::new(genesis_pk)),
+            network: Arc::new(NetworkPrefixMap::new(genesis_key)),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             bootstrap_peer,
-            genesis_pk,
+            genesis_key,
         };
 
         Self::spawn_message_listener_thread(session.clone(), incoming_messages).await;
@@ -161,7 +161,7 @@ impl Session {
             )
         } else {
             // Send message to our bootstrap peer with network's genesis PK.
-            (vec![self.bootstrap_peer], self.genesis_pk)
+            (vec![self.bootstrap_peer], self.genesis_key)
         };
 
         let msg_id = MessageId::new();
@@ -215,7 +215,7 @@ impl Session {
             let mut bootstrapped_peer = BTreeMap::new();
             let _ = bootstrapped_peer.insert(XorName::random(), self.bootstrap_peer);
             // Send message to our bootstrap peer with the network's genesis PK.
-            (bootstrapped_peer, self.genesis_pk)
+            (bootstrapped_peer, self.genesis_key)
         };
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying

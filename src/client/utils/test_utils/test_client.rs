@@ -44,8 +44,9 @@ pub async fn create_test_client_with(
     init_logger();
     let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
     let timeout = timeout.map(Duration::from_secs);
-    let bootstrap_nodes = read_network_conn_info()?;
-    let config = Config::new(Some(root_dir.path()), None, None, timeout).await;
+    let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
+
+    let config = Config::new(Some(root_dir.path()), None, genesis_key, None, timeout).await;
     let client = Client::new(config, bootstrap_nodes, optional_keypair.clone()).await?;
 
     Ok(client)

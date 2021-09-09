@@ -31,7 +31,7 @@ use crate::messaging::{
 use crate::routing::{
     core::{join_network, ChunkStore, Comm, ConnectionEvent, Core, RegisterStorage},
     ed25519,
-    error::Result,
+    error::{Error, Result},
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
@@ -40,7 +40,7 @@ use crate::routing::{
 use crate::{dbs::UsedSpace, messaging::data::ChunkDataExchange};
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 
-use crate::types::PublicKey as DtPublicKey;
+use crate::types::PublicKey as TypesPublicKey;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::path::PathBuf;
@@ -115,10 +115,25 @@ impl Routing {
                 self_status_change: NodeElderChange::Promoted,
             })
             .await;
-            info!("{} Genesis node started!", node_name);
+            info!(
+                "{} Genesis node started!. Genesis key: {}",
+                node_name,
+                hex::encode(section.genesis_key().to_bytes())
+            );
 
             core
         } else {
+            let genesis_key_str = config.genesis_key.ok_or_else(|| {
+                Error::Configuration("Network's genesis key was not provided.".to_string())
+            })?;
+            let genesis_key = TypesPublicKey::bls_from_hex(&genesis_key_str)?
+                .bls()
+                .ok_or_else(|| {
+                    Error::Configuration(
+                        "Unexpectedly failed to obtain genesis key from configuration.".to_string(),
+                    )
+                })?;
+
             let keypair = config.keypair.unwrap_or_else(|| {
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE)
             });
@@ -138,11 +153,12 @@ impl Routing {
             )
             .await?;
             info!(
-                "{} Joining as a new node (PID: {}) from {} to {}",
+                "{} Joining as a new node (PID: {}) from {} to {}, network's genesis key: {:?}",
                 node_name,
                 std::process::id(),
                 comm.our_connection_info(),
-                bootstrap_addr
+                bootstrap_addr,
+                genesis_key
             );
             let joining_node = Node::new(keypair, comm.our_connection_info());
             let (node, section) = join_network(
@@ -150,6 +166,7 @@ impl Routing {
                 &comm,
                 &mut connection_event_rx,
                 bootstrap_addr,
+                genesis_key,
             )
             .await?;
             let core = Core::new(
@@ -194,7 +211,7 @@ impl Routing {
     /// Returns whether the level changed or not.
     pub(crate) async fn set_storage_level(
         &self,
-        node_id: &DtPublicKey,
+        node_id: &TypesPublicKey,
         level: StorageLevel,
     ) -> bool {
         self.dispatcher.set_storage_level(node_id, level).await
@@ -283,6 +300,11 @@ impl Routing {
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
         self.dispatcher.core.read().await.section_chain().clone()
+    }
+
+    /// Returns the Section Chain's genesis key
+    pub async fn genesis_key(&self) -> bls::PublicKey {
+        self.dispatcher.core.read().await.section().genesis_key
     }
 
     /// Prefix of our section
