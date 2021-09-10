@@ -51,7 +51,7 @@ jobs:
       # Install Rust and required components
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2021-07-05
           override: true
 
       - name: Run cargo-udeps
