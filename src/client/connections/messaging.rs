@@ -17,7 +17,6 @@ use crate::messaging::{
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey;
 
-use async_recursion::async_recursion;
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
@@ -47,6 +46,7 @@ impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     pub(crate) async fn bootstrap(
         client_pk: PublicKey,
+        genesis_key: bls::PublicKey,
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
         bootstrap_nodes: BTreeSet<SocketAddr>,
@@ -64,11 +64,6 @@ impl Session {
             .connect_to_any(&bootstrap_nodes)
             .await
             .ok_or(Error::NotBootstrapped)?;
-
-        // *****************************************************
-        // FIXME: receive the network's genesis pk from the user
-        let genesis_key = bls::SecretKey::random().public_key();
-        // *****************************************************
 
         let session = Session {
             client_pk,
@@ -88,48 +83,42 @@ impl Session {
 
     /// Utility function that bootstraps a client to a section. If there is a failure then it retries.
     /// After a maximum of three attempts if the boostrap process still fails, then an error is returned.
-    #[async_recursion]
     pub(crate) async fn attempt_bootstrap(
         client_pk: PublicKey,
+        genesis_key: bls::PublicKey,
         qp2p_config: qp2p::Config,
         mut bootstrap_nodes: BTreeSet<SocketAddr>,
         local_addr: SocketAddr,
         err_sender: Sender<CmdError>,
-        attempts: u8,
     ) -> Result<Session, Error> {
-        match Session::bootstrap(
-            client_pk,
-            qp2p_config.clone(),
-            err_sender.clone(),
-            bootstrap_nodes.clone(),
-            local_addr,
-        )
-        .await
-        {
-            Ok(session) => Ok(session),
-            Err(err) => {
-                let attempts = attempts + 1;
-                if let Error::BootstrapToPeerFailed(failed_peer) = err {
-                    // Remove the unresponsive peer we boostrapped to and bootstrap again
-                    let _ = bootstrap_nodes.remove(&failed_peer);
-                }
-                if attempts < NUM_OF_BOOTSTRAPPING_ATTEMPTS {
-                    trace!(
-                        "Error connecting to network! {:?}\nRetrying... ({})",
-                        err,
-                        attempts
-                    );
-                    Self::attempt_bootstrap(
-                        client_pk,
-                        qp2p_config,
-                        bootstrap_nodes,
-                        local_addr,
-                        err_sender,
-                        attempts,
-                    )
-                    .await
-                } else {
-                    Err(err)
+        let mut attempts = 0;
+        loop {
+            match Session::bootstrap(
+                client_pk,
+                genesis_key,
+                qp2p_config.clone(),
+                err_sender.clone(),
+                bootstrap_nodes.clone(),
+                local_addr,
+            )
+            .await
+            {
+                Ok(session) => break Ok(session),
+                Err(err) => {
+                    attempts += 1;
+                    if let Error::BootstrapToPeerFailed(failed_peer) = err {
+                        // Remove the unresponsive peer we boostrapped to and bootstrap again
+                        let _ = bootstrap_nodes.remove(&failed_peer);
+                    }
+                    if attempts < NUM_OF_BOOTSTRAPPING_ATTEMPTS {
+                        trace!(
+                            "Error connecting to network! {:?}\nRetrying... ({})",
+                            err,
+                            attempts
+                        );
+                    } else {
+                        break Err(err);
+                    }
                 }
             }
         }

@@ -137,7 +137,7 @@ impl Node {
         self.network_api.our_prefix().await
     }
 
-    /// Returns the network;s genesis key.
+    /// Returns the network's genesis key.
     pub async fn genesis_key(&self) -> bls::PublicKey {
         self.network_api.genesis_key().await
     }
