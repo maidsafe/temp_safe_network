@@ -42,7 +42,6 @@ test-utils = []
 
 [dependencies]
 async-recursion = "0.3.2"
-async-trait = "0.1.42"
 base64 = "~0.10.1"
 bincode = "1.3.1"
 bls = { package = "blsttc", version = "2.0.1" }
@@ -61,7 +60,6 @@ futures = "~0.3.13"
 hex = "~0.3.2"
 hex_fmt = "~0.3.0"
 itertools = "0.10.0"
-if_chain = "1.0.1"
 lazy_static = "1"
 lru = "0.6.5"
 multibase = "~0.8.0"
