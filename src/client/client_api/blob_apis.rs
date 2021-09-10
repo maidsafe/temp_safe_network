@@ -192,6 +192,7 @@ impl Client {
     // reads `len` bytes of the data starting at given `pos` of original file.
     async fn seek(&self, secret_key: BlobSecretKey, pos: usize, len: usize) -> Result<Bytes> {
         let info = self_encryption::seek_info(secret_key.file_size(), pos, len);
+
         let range = &info.index_range;
         let all_keys = secret_key.keys();
 
@@ -219,6 +220,7 @@ impl Client {
         reader: Client,
         keys: impl Iterator<Item = ChunkKey>,
     ) -> Vec<EncryptedChunk> {
+        // <- TODO return Result here
         let tasks = keys.map(|key| {
             let reader = reader.clone();
             task::spawn(async move {
@@ -239,6 +241,7 @@ impl Client {
             .into_iter()
             .flatten() // swallows errors
             .flatten() // swallows errors
+            .map(|a| {println!("<get_chunks>(5): got chunck of len: {:?}", a.content.len()); a})
             .collect_vec()
     }
 
@@ -368,13 +371,13 @@ mod tests {
                 // Read first part
                 let read_data_1 = {
                     let pos = 0;
-                    seek(data.clone(), pos, len).await?
+                    seek_data_chunk(data.clone(), pos, len).await?
                 };
 
                 // Read second part
                 let read_data_2 = {
                     let pos = len;
-                    seek(data.clone(), pos, len).await?
+                    seek_data_chunk(data.clone(), pos, len).await?
                 };
 
                 // Join parts
@@ -390,7 +393,7 @@ mod tests {
         Ok(())
     }
 
-    async fn seek(data: Bytes, pos: usize, len: usize) -> Result<Bytes> {
+    async fn seek_data_chunk(data: Bytes, pos: usize, len: usize) -> Result<Bytes> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let address = client.write_to_network(data.clone(), Scope::Public).await?;
