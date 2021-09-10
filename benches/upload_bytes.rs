@@ -20,9 +20,9 @@ use tokio::runtime::Runtime;
 
 /// This bench requires a network already set up
 async fn upload_bytes(size: usize) -> Result<(), Error> {
-    let bootstrap_nodes = read_network_conn_info().unwrap();
+    let (genesis_key, bootstrap_nodes) = read_network_conn_info().unwrap();
     let data = random_bytes(size);
-    let config = Config::new(None, None, None, None).await;
+    let config = Config::new(None, None, genesis_key, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
     let address = client.write_to_network(data.clone(), Scope::Public).await?;
 
