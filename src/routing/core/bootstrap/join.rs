@@ -217,7 +217,7 @@ impl<'a> Join<'a> {
                 }
                 JoinResponse::Redirect(section_auth) => {
                     if section_auth.section_key() == section_key {
-                        debug!("Ignoring JoinResponse::Retry with same section authority provider key as we previously sent: {:?}", section_auth);
+                        debug!("Ignoring JoinResponse::Redirect with same section authority provider key as we previously sent: {:?}", section_auth);
                         continue;
                     }
 
@@ -251,6 +251,7 @@ impl<'a> Join<'a> {
                         };
 
                         recipients = new_recipients;
+
                         self.send_join_requests(join_request, &recipients, section_key)
                             .await?;
                     } else {
@@ -572,10 +573,9 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+        let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
-        let pk_set = sk_set.public_keys();
+        let genesis_key = sk_set.secret_key().public_key();
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -583,7 +583,7 @@ mod tests {
         );
         let state = Join::new(node, send_tx, &mut recv_rx);
 
-        let bootstrap_task = state.run(bootstrap_node.addr, sk_set.secret_key().public_key());
+        let bootstrap_task = state.run(bootstrap_node.addr, genesis_key);
         let test_task = async move {
             // Receive JoinRequest
             let (wire_msg, recipients) = send_rx
@@ -607,17 +607,21 @@ mod tests {
                 .map(|_| (XorName::random(), gen_addr()))
                 .collect();
 
+            let (new_section_auth, _, new_sk_set) =
+                gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+            let new_pk_set = new_sk_set.public_keys();
+
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
                     SectionAuthorityProvider {
                         prefix: Prefix::default(),
-                        public_key_set: pk_set.clone(),
+                        public_key_set: new_pk_set.clone(),
                         elders: new_bootstrap_addrs.clone(),
                     },
                 ))),
                 &bootstrap_node,
-                section_auth.section_key(),
+                new_section_auth.section_key(),
             )?;
             task::yield_now().await;
 
@@ -641,9 +645,9 @@ mod tests {
             let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, dst_location,.. }) =>
                     (msg, dst_location));
 
-            assert_eq!(dst_location.section_pk(), Some(pk_set.public_key()));
+            assert_eq!(dst_location.section_pk(), Some(new_pk_set.public_key()));
             assert_matches!(node_msg, SystemMsg::JoinRequest(req) => {
-                assert_eq!(req.section_key, pk_set.public_key());
+                assert_eq!(req.section_key, new_pk_set.public_key());
             });
 
             Ok(())
@@ -663,10 +667,8 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+        let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
-        let pk_set = sk_set.public_keys();
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -684,17 +686,21 @@ mod tests {
             assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
                         assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
+            let (new_section_auth, _, new_sk_set) =
+                gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+            let new_pk_set = new_sk_set.public_keys();
+
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
                     SectionAuthorityProvider {
                         prefix: Prefix::default(),
-                        public_key_set: pk_set.clone(),
+                        public_key_set: new_pk_set.clone(),
                         elders: BTreeMap::new(),
                     },
                 ))),
                 &bootstrap_node,
-                section_auth.section_key(),
+                new_section_auth.section_key(),
             )?;
             task::yield_now().await;
 
@@ -707,12 +713,12 @@ mod tests {
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
                     SectionAuthorityProvider {
                         prefix: Prefix::default(),
-                        public_key_set: pk_set.clone(),
+                        public_key_set: new_pk_set.clone(),
                         elders: addrs,
                     },
                 ))),
                 &bootstrap_node,
-                section_auth.section_key(),
+                new_section_auth.section_key(),
             )?;
             task::yield_now().await;
 
