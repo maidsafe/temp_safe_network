@@ -8,6 +8,7 @@
 // Software.
 
 use anyhow::Result;
+use bytes::Buf;
 use sn_api::{fetch::SafeData, BootstrapConfig, Safe, Url};
 use std::{env::temp_dir, fs::File, io::Write, path::PathBuf};
 
@@ -27,9 +28,9 @@ async fn main() -> Result<()> {
     // We assume there is a local network running which we can
     // bootstrap to using 127.0.0.1:12000 contact address.
     let mut bootstrap_contacts = BootstrapConfig::default();
-    bootstrap_contacts.push("127.0.0.1:12000".parse()?);
+    bootstrap_contacts.insert("127.0.0.1:12000".parse()?);
     // Using our afe instance we connect to the network
-    safe.connect(None, None, Some(bootstrap_contacts)).await?;
+    safe.connect(None, None, bootstrap_contacts).await?;
 
     // We can now upload the file to the network, using the following information
     let location = file_path.display().to_string();
@@ -62,7 +63,10 @@ async fn main() -> Result<()> {
     // been fetched from the provided Safe-URL.
     let fetched = safe.fetch(&url.to_string(), None).await;
     if let Ok(SafeData::PublicBlob { data, .. }) = fetched {
-        println!("Content retrieved:\n{}", String::from_utf8(data)?);
+        println!(
+            "Content retrieved:\n{}",
+            String::from_utf8(data.chunk().to_vec())?
+        );
     } else {
         println!("Failed to retrieve Blob, obtained: {:?}", fetched);
     }

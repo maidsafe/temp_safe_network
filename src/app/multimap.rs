@@ -9,8 +9,9 @@
 
 use super::register::EntryHash;
 use crate::{Error, Result, Safe};
+use bytes::Bytes;
 use log::debug;
-use safe_network::url::{ContentType, Url, Scope, XorUrl};
+use safe_network::url::{ContentType, Scope, Url, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -97,10 +98,9 @@ impl Safe {
                 entry, err
             ))
         })?;
-        let entry_xorname = self
-            .safe_client
-            .store_public_blob(&serialised_entry, false)
-            .await?;
+
+        let data = Bytes::copy_from_slice(&serialised_entry);
+        let entry_xorname = self.safe_client.store_public_blob(data, false).await?;
         let entry_xorurl = Url::encode_blob(
             entry_xorname,
             Scope::Public,
@@ -119,10 +119,7 @@ impl Safe {
     // Crate's helper to return the value of a Multimap on
     // the network without resolving the Url,
     // optionally filtering by hash and/or key.
-    pub(crate) async fn fetch_multimap_values(
-        &self,
-        safeurl: &Url,
-    ) -> Result<MultimapKeyValues> {
+    pub(crate) async fn fetch_multimap_values(&self, safeurl: &Url) -> Result<MultimapKeyValues> {
         let entries = match self.fetch_register_entries(safeurl).await {
             Ok(data) => {
                 debug!("Multimap retrieved...");

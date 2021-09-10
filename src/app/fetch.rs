@@ -16,6 +16,7 @@ use super::{
 };
 pub use super::{ContentType, DataType, Scope, Url, VersionHash, XorUrlBase};
 use crate::{Error, Result};
+use bytes::Bytes;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, path::Path};
@@ -44,7 +45,7 @@ pub enum SafeData {
     PublicBlob {
         xorurl: String,
         xorname: XorName,
-        data: Vec<u8>,
+        data: Bytes,
         media_type: Option<String>,
         metadata: Option<FileItem>,
         resolved_from: String,
@@ -498,7 +499,7 @@ impl Safe {
                 .get_public_blob(the_xor.xorname(), range)
                 .await?
         } else {
-            vec![]
+            Bytes::new()
         };
 
         let safe_data = SafeData::PublicBlob {
@@ -685,9 +686,9 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_public_blob() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let data = b"Something super immutable";
+        let data = Bytes::from("Something super immutable");
         let xorurl = safe
-            .files_store_public_blob(data, Some("text/plain"), false)
+            .files_store_public_blob(data.clone(), Some("text/plain"), false)
             .await?;
 
         let safe_url = Url::from_url(&xorurl)?;
@@ -697,7 +698,7 @@ mod tests {
                 == SafeData::PublicBlob {
                     xorurl: xorurl.clone(),
                     xorname: safe_url.xorname(),
-                    data: data.to_vec(),
+                    data: data.clone(),
                     resolved_from: xorurl.clone(),
                     media_type: Some("text/plain".to_string()),
                     metadata: None,
@@ -711,7 +712,7 @@ mod tests {
                 == SafeData::PublicBlob {
                     xorurl: xorurl.clone(),
                     xorname: safe_url.xorname(),
-                    data: vec![],
+                    data: Bytes::new(),
                     resolved_from: xorurl,
                     media_type: Some("text/plain".to_string()),
                     metadata: None,
@@ -723,10 +724,10 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_range_public_blob() -> Result<()> {
         let safe = new_safe_instance().await?;
-        let saved_data = b"Something super immutable";
+        let saved_data = Bytes::from("Something super immutable");
         let size = saved_data.len();
         let xorurl = safe
-            .files_store_public_blob(saved_data, Some("text/plain"), false)
+            .files_store_public_blob(saved_data.clone(), Some("text/plain"), false)
             .await?;
 
         // Fetch first half and match
@@ -734,7 +735,7 @@ mod tests {
         let content = retry_loop!(safe.fetch(&xorurl, fetch_first_half));
 
         if let SafeData::PublicBlob { data, .. } = &content {
-            assert_eq!(data.clone(), saved_data[0..size / 2].to_vec());
+            assert_eq!(data.clone(), saved_data.slice(0..size / 2).to_vec());
         } else {
             bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
@@ -860,8 +861,10 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_public_blob_with_path() -> Result<()> {
         let safe = new_safe_instance().await?;
-        let data = b"Something super immutable";
-        let xorurl = safe.files_store_public_blob(data, None, false).await?;
+        let data = Bytes::from("Something super immutable");
+        let xorurl = safe
+            .files_store_public_blob(data.clone(), None, false)
+            .await?;
 
         let mut safe_url = Url::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
@@ -879,7 +882,7 @@ mod tests {
 
         // test the same but a file with some media type
         let xorurl = safe
-            .files_store_public_blob(data, Some("text/plain"), false)
+            .files_store_public_blob(data.clone(), Some("text/plain"), false)
             .await?;
 
         let mut safe_url = Url::from_url(&xorurl)?;

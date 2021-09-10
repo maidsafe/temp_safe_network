@@ -19,6 +19,7 @@ use crate::{
     },
     Error, Result, Url, XorUrl,
 };
+use bytes::{Buf, Bytes};
 use log::{debug, info, warn};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -295,7 +296,7 @@ impl Safe {
         let serialised_nrs_map = self.fetch_public_blob(&nrs_map_xorurl, None).await?;
 
         debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
-        let nrs_map = serde_json::from_str(&String::from_utf8_lossy(serialised_nrs_map.as_slice()))
+        let nrs_map = serde_json::from_str(&String::from_utf8_lossy(serialised_nrs_map.chunk()))
             .map_err(|err| {
                 Error::ContentError(format!(
                     "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
@@ -319,7 +320,7 @@ impl Safe {
         })?;
 
         let nrs_map_xorurl = self
-            .files_store_public_blob(serialised_nrs_map.as_bytes(), None, false)
+            .files_store_public_blob(Bytes::from(serialised_nrs_map), None, false)
             .await?;
 
         Ok(nrs_map_xorurl)

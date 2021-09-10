@@ -64,14 +64,14 @@ impl Safe {
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
         let result = match safeurl.content_version() {
             Some(v) => {
-                // take entry with version hash
+                debug!("Take entry with version hash");
                 let hash = v.entry_hash();
                 self.fetch_register_entry(safeurl, hash)
                     .await
                     .map(|entry| vec![(hash, entry)].into_iter().collect())
             }
             None => {
-                // then take latest entry
+                debug!("No version so take latest entry");
                 let address = safeurl.register_address()?;
                 self.safe_client.read_register(address).await
             }

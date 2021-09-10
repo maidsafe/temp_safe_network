@@ -11,7 +11,7 @@ use crate::Safe;
 use anyhow::{bail, Context, Result};
 use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
 use safe_network::types::Keypair;
-use std::{env::var, fs, net::SocketAddr, sync::Once};
+use std::{collections::BTreeSet, env::var, fs, net::SocketAddr, sync::Once};
 use tracing_subscriber::{fmt, EnvFilter};
 
 // Environment variable which can be set with the auth credentials
@@ -57,7 +57,7 @@ pub async fn new_safe_instance() -> Result<Safe> {
     };
 
     let bootstrap_contacts = get_bootstrap_contacts()?;
-    safe.connect(Some(credentials), None, Some(bootstrap_contacts))
+    safe.connect(Some(credentials), None, bootstrap_contacts)
         .await?;
     Ok(safe)
 }
@@ -67,7 +67,7 @@ pub fn random_nrs_name() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(15).collect()
 }
 
-fn read_default_peers_from_file() -> Result<Vec<SocketAddr>> {
+fn read_default_peers_from_file() -> Result<BTreeSet<SocketAddr>> {
     let default_peer_file = match dirs_next::home_dir() {
         None => bail!(
             "Failed to obtain local home directory where to read {} from",
@@ -86,7 +86,7 @@ fn read_default_peers_from_file() -> Result<Vec<SocketAddr>> {
         )
     })?;
 
-    let sockaddrs: Vec<SocketAddr> = serde_json::from_str(&raw_json).with_context(|| {
+    let sockaddrs: BTreeSet<SocketAddr> = serde_json::from_str(&raw_json).with_context(|| {
         format!(
             "Failed to parse bootstraping contacts list from file: {:?}",
             &default_peer_file
@@ -96,7 +96,7 @@ fn read_default_peers_from_file() -> Result<Vec<SocketAddr>> {
     Ok(sockaddrs)
 }
 
-fn get_bootstrap_contacts() -> Result<Vec<SocketAddr>> {
+fn get_bootstrap_contacts() -> Result<BTreeSet<SocketAddr>> {
     let contacts = match var(TEST_BOOTSTRAPPING_PEERS) {
         Ok(val) => serde_json::from_str(&val).with_context(|| {
             format!(

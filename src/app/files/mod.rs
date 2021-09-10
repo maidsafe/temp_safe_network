@@ -16,6 +16,7 @@ use crate::{
     app::consts::*, app::nrs::VersionHash, fetch::Range, ContentType, DataType, Error, Result,
     Safe, Scope, Url, XorUrl,
 };
+use bytes::{Buf, Bytes};
 use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
@@ -182,7 +183,7 @@ impl Safe {
         // TODO: use RDF format and deserialise it
         // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
         let serialised_files_map = self.fetch_public_blob(&files_map_xorurl, None).await?;
-        let files_map = serde_json::from_slice(serialised_files_map.as_slice()).map_err(|err| {
+        let files_map = serde_json::from_slice(serialised_files_map.chunk()).map_err(|err| {
             Error::ContentError(format!(
                 "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
                 err
@@ -380,7 +381,7 @@ impl Safe {
     /// ```
     pub async fn files_container_add_from_raw(
         &mut self,
-        data: &[u8],
+        data: Bytes,
         url: &str,
         force: bool,
         update_nrs: bool,
@@ -549,7 +550,7 @@ impl Safe {
     /// ```
     pub async fn files_store_public_blob(
         &self,
-        data: &[u8],
+        data: Bytes,
         media_type: Option<&str>,
         dry_run: bool,
     ) -> Result<XorUrl> {
@@ -591,14 +592,14 @@ impl Safe {
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_get_public_blob(&mut self, url: &str, range: Range) -> Result<Vec<u8>> {
+    pub async fn files_get_public_blob(&mut self, url: &str, range: Range) -> Result<Bytes> {
         // TODO: do we want ownership from other PKs yet?
         let (safe_url, _) = self.parse_and_resolve_url(url).await?;
         self.fetch_public_blob(&safe_url, range).await
     }
 
     /// Fetch an Blob from a Url without performing any type of URL resolution
-    pub(crate) async fn fetch_public_blob(&self, safe_url: &Url, range: Range) -> Result<Vec<u8>> {
+    pub(crate) async fn fetch_public_blob(&self, safe_url: &Url, range: Range) -> Result<Bytes> {
         self.safe_client
             .get_public_blob(safe_url.xorname(), range)
             .await
@@ -616,7 +617,7 @@ impl Safe {
             ))
         })?;
         let files_map_xorurl = self
-            .files_store_public_blob(serialised_files_map.as_bytes(), None, false)
+            .files_store_public_blob(Bytes::from(serialised_files_map), None, false)
             .await?;
 
         Ok(files_map_xorurl)
@@ -1080,17 +1081,18 @@ async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Resu
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
     })?;
+    let data = Bytes::from(data);
 
     let mime_type = mime_guess::from_path(&path);
     match safe
-        .files_store_public_blob(&data, mime_type.first_raw(), dry_run)
+        .files_store_public_blob(data.to_owned(), mime_type.first_raw(), dry_run)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(err) => {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
-                safe.files_store_public_blob(&data, None, dry_run).await
+                safe.files_store_public_blob(data, None, dry_run).await
             } else {
                 Err(err)
             }
@@ -1252,7 +1254,7 @@ mod tests {
             thread_rng().sample_iter(&Alphanumeric).take(20).collect();
 
         let file_xorurl = safe
-            .files_store_public_blob(random_blob_content.as_bytes(), None, false)
+            .files_store_public_blob(Bytes::from(random_blob_content.to_owned()), None, false)
             .await?;
 
         let retrieved = retry_loop!(safe.files_get_public_blob(&file_xorurl, None));
@@ -2610,8 +2612,8 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
-        let data = b"0123456789";
-        let file_xorurl = retry_loop!(safe.files_store_public_blob(data, None, false));
+        let data = Bytes::from("0123456789");
+        let file_xorurl = retry_loop!(safe.files_store_public_blob(data.clone(), None, false));
         let new_filename = "/new_filename_test.md";
 
         let (version1, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
@@ -2649,8 +2651,9 @@ mod tests {
         assert_eq!(new_files_map[new_filename][PREDICATE_LINK], file_xorurl);
 
         // let's add another file but with the same name
-        let data = b"9876543210";
-        let other_file_xorurl = retry_loop!(safe.files_store_public_blob(data, None, false));
+        let data = Bytes::from("9876543210");
+        let other_file_xorurl =
+            retry_loop!(safe.files_store_public_blob(data.clone(), None, false));
         let (version2, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
             &other_file_xorurl,
             &format!("{}{}", xorurl, new_filename),
@@ -2692,12 +2695,12 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
-        let data = b"0123456789";
+        let data = Bytes::from("0123456789");
         let new_filename = "/new_filename_test.md";
 
         let (version1, new_processed_files, new_files_map) = retry_loop!(safe
             .files_container_add_from_raw(
-                data,
+                data.clone(),
                 &format!("{}{}", xorurl, new_filename),
                 false,
                 false,
@@ -2716,10 +2719,10 @@ mod tests {
         );
 
         // let's add another file but with the same name
-        let data = b"9876543210";
+        let data = Bytes::from("9876543210");
         let (version2, new_processed_files, new_files_map) = retry_loop!(safe
             .files_container_add_from_raw(
-                data,
+                data.clone(),
                 &format!("{}{}", xorurl, new_filename),
                 true, // force to overwrite it with new link
                 false,

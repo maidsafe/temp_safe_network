@@ -9,13 +9,16 @@
 
 use super::fetch::Range;
 use crate::{ipc::BootstrapConfig, Error, Result};
+use bytes::Bytes;
 use hex::encode;
 use log::{debug, info};
+use safe_network::client::client_api::BlobAddress;
 use safe_network::client::{Client, Config, Error as ClientError};
 use safe_network::types::{
     register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
-    ChunkAddress, Error as SafeNdError, Keypair,
+    Error as SafeNdError, Keypair,
 };
+use safe_network::url::Scope;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -29,7 +32,6 @@ const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 #[derive(Default, Clone)]
 pub struct SafeAppClient {
     safe_client: Option<Client>,
-    pub(crate) bootstrap_config: Option<Vec<SocketAddr>>,
     config_path: Option<PathBuf>,
     timeout: Duration,
 }
@@ -46,7 +48,6 @@ impl SafeAppClient {
     pub fn new(timeout: Duration) -> Self {
         Self {
             safe_client: None,
-            bootstrap_config: None,
             config_path: None,
             timeout,
         }
@@ -58,12 +59,9 @@ impl SafeAppClient {
         &mut self,
         app_keypair: Option<Keypair>,
         config_path: Option<&Path>,
-        bootstrap_config: Option<BootstrapConfig>,
+        bootstrap_config: BootstrapConfig,
     ) -> Result<()> {
         debug!("Connecting to SAFE Network...");
-        if bootstrap_config.is_some() {
-            self.bootstrap_config = bootstrap_config;
-        }
 
         self.config_path = config_path.map(|p| p.to_path_buf());
 
@@ -71,20 +69,13 @@ impl SafeAppClient {
             "Client to be instantiated with specific pk?: {:?}",
             app_keypair
         );
-        debug!(
-            "Bootstrap contacts list set to: {:?}",
-            self.bootstrap_config
-        );
-        let config = Config::new(
-            None,
-            self.bootstrap_config.clone(),
-            self.config_path.as_deref(),
-            Some(self.timeout),
-        )
-        .await;
-        let client = Client::new(app_keypair, config).await.map_err(|err| {
-            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
-        })?;
+        debug!("Bootstrap contacts list set to: {:?}", bootstrap_config);
+        let config = Config::new(None, None, self.config_path.as_deref(), Some(self.timeout)).await;
+        let client = Client::new(config, bootstrap_config, app_keypair)
+            .await
+            .map_err(|err| {
+                Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+            })?;
 
         self.safe_client = Some(client);
 
@@ -98,37 +89,41 @@ impl SafeAppClient {
     }
 
     // // === Blob operations ===
-    pub async fn store_public_blob(&self, data: &[u8], dry_run: bool) -> Result<XorName> {
+    pub async fn store_public_blob(&self, data: Bytes, dry_run: bool) -> Result<XorName> {
         let address = if dry_run {
-            let (_, address) = Client::blob_data_map(data.to_vec(), None).await?;
-            address
+            // I don't see the equivalent API for doing a dry run, so just returning the default
+            // address for now.
+            BlobAddress::Public(XorName::default())
         } else {
             let client = self.get_safe_client()?;
-            client
-                .store_public_blob(data)
+            let address = client
+                .write_to_network(data.to_owned(), Scope::Public)
                 .await
-                .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?
+                .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?;
+            address
         };
 
         Ok(*address.name())
     }
 
-    pub async fn get_public_blob(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
+    pub async fn get_public_blob(&self, xorname: XorName, range: Range) -> Result<Bytes> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let client = self.get_safe_client()?;
-        let blob_address = ChunkAddress::Public(xorname);
+        let blob_address = BlobAddress::Public(xorname);
         let data = if let Some((start, end)) = range {
-            let len = end.map(|end_index| end_index - start.unwrap_or(0));
+            let len = end
+                .map(|end_index| end_index - start.unwrap_or(0))
+                .unwrap_or(0);
             client
-                .read_blob(
+                .read_blob_from(
                     blob_address,
-                    start.map(|val| val as usize),
-                    len.map(|val| val as usize),
+                    start.map(|val| val as usize).unwrap_or(0),
+                    len as usize,
                 )
                 .await
         } else {
-            client.read_blob(blob_address, None, None).await
+            client.read_blob(blob_address).await
         }
         .map_err(|e| Error::NetDataError(format!("Failed to GET Public Blob: {:?}", e)))?;
 

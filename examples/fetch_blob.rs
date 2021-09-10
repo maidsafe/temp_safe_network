@@ -8,6 +8,7 @@
 // Software.
 
 use anyhow::{anyhow, Result};
+use bytes::Buf;
 use sn_api::{fetch::SafeData, BootstrapConfig, Safe};
 use std::{env::args, net::SocketAddr};
 
@@ -44,7 +45,7 @@ async fn main() -> Result<()> {
     let bootstrap_contacts: BootstrapConfig = vec![network_addr].into_iter().collect();
 
     // Using our safe instance we connect to the network
-    safe.connect(None, None, Some(bootstrap_contacts)).await?;
+    safe.connect(None, None, bootstrap_contacts).await?;
 
     println!("Connected to Safe!");
 
@@ -54,7 +55,7 @@ async fn main() -> Result<()> {
     // been fetched from the provided Safe-URL.
     match safe.fetch(&url, None).await {
         Ok(SafeData::PublicBlob { data, .. }) => {
-            let data = String::from_utf8(data)?;
+            let data = String::from_utf8(data.chunk().to_vec())?;
             println!("Blob content retrieved:\n{}", data);
         }
         Ok(other) => println!("Failed to retrieve Blob, instead obtained: {:?}", other),

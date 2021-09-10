@@ -74,7 +74,7 @@ impl Safe {
         &mut self,
         app_keypair: Option<Keypair>,
         config_path: Option<&Path>,
-        bootstrap_config: Option<BootstrapConfig>,
+        bootstrap_config: BootstrapConfig,
     ) -> Result<()> {
         self.safe_client
             .connect(app_keypair, config_path, bootstrap_config)

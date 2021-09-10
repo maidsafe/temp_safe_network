@@ -9,6 +9,7 @@
 
 use super::{metadata::get_metadata, ProcessedFiles};
 use crate::{app::consts::*, Error, Result, Safe, XorUrl};
+use bytes::Bytes;
 use log::info;
 use std::{collections::BTreeMap, fs, path::Path};
 use walkdir::{DirEntry, WalkDir};
@@ -24,17 +25,18 @@ pub(crate) async fn upload_file_to_net(
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
     })?;
+    let data = Bytes::from(data);
 
     let mime_type = mime_guess::from_path(&path);
     match safe
-        .files_store_public_blob(&data, mime_type.first_raw(), dry_run)
+        .files_store_public_blob(data.to_owned(), mime_type.first_raw(), dry_run)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(err) => {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
-                safe.files_store_public_blob(&data, None, dry_run).await
+                safe.files_store_public_blob(data, None, dry_run).await
             } else {
                 Err(err)
             }
