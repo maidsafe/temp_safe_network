@@ -83,15 +83,18 @@ impl Client {
 
         // Bootstrap to the network, connecting to a section based
         // on a public key of our choice.
-        debug!("Bootstrapping to the network...");
+        debug!(
+            "Bootstrapping to the network, genesis key: {} ...",
+            hex::encode(config.genesis_key.to_bytes())
+        );
         // Create a session with the network
         let session = Session::attempt_bootstrap(
             client_pk,
+            config.genesis_key,
             config.qp2p,
             bootstrap_nodes.clone(),
             config.local_addr,
             err_sender,
-            0,
         )
         .await?;
 
