@@ -180,10 +180,10 @@ pub async fn run_split() -> Result<()> {
     sleep(interval_duration).await;
 
     // now we read the data
-    let bootstrap_nodes =
+    let (genesis_key, bootstrap_nodes) =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
-    let config = Config::new(None, None, None, Some(QUERY_TIMEOUT)).await;
+    let config = Config::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     for (address, hash) in all_data_put {
@@ -217,11 +217,11 @@ pub async fn run_split() -> Result<()> {
 async fn upload_data() -> Result<(BlobAddress, [u8; 32])> {
     // Now we upload the data.
     println!("Reading network bootstrap information...");
-    let bootstrap_nodes =
+    let (genesis_key, bootstrap_nodes) =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_nodes);
-    let config = Config::new(None, None, None, Some(QUERY_TIMEOUT)).await;
+    let config = Config::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     let raw_data = random_bytes(1024 * 1024);
