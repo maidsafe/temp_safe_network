@@ -124,15 +124,19 @@ impl Client {
         allow_cache: bool,
     ) -> Result<Chunk> {
         trace!("Fetching chunk: {:?}", name);
+        println!("<read_from_network>(1): -> {}", *name);
 
         let address = ChunkAddress(*name);
 
         if allow_cache {
             if let Some(chunk) = self.blob_cache.write().await.get(&address) {
                 trace!("Chunk retrieved from cache: {:?}", address);
+                println!("<read_from_network>(1): cache read.");
                 return Ok(chunk.clone());
             }
         }
+
+        println!("<read_from_network>(1): cache miss.");
 
         let res = self.send_query(DataQuery::GetChunk(address)).await?;
 
@@ -191,9 +195,13 @@ impl Client {
     // Gets a subset of chunks from the network, decrypts and
     // reads `len` bytes of the data starting at given `pos` of original file.
     async fn seek(&self, secret_key: BlobSecretKey, pos: usize, len: usize) -> Result<Bytes> {
+
         let info = self_encryption::seek_info(secret_key.file_size(), pos, len);
+
         let range = &info.index_range;
         let all_keys = secret_key.keys();
+
+        println!("<seek>(1): secret_key.file_size={} pos={}, len={}, range.start={}, range.end={}", secret_key.file_size(), pos, len, range.start, range.end + 1);
 
         let encrypted_chunks = Self::get_chunks(
             self.clone(),
@@ -202,6 +210,8 @@ impl Client {
                 .map(|i| all_keys[i].clone()),
         )
         .await;
+
+        println!("<seek>(2): range.len={}, encrypted_chunks.len={}", range.len(), encrypted_chunks.len());
 
         if range.len() > encrypted_chunks.len() {
             return Err(Error::Generic(format!(
@@ -218,11 +228,13 @@ impl Client {
     async fn get_chunks(
         reader: Client,
         keys: impl Iterator<Item = ChunkKey>,
-    ) -> Vec<EncryptedChunk> {
+    ) -> Vec<EncryptedChunk> { // <- TODO return Result here
         let tasks = keys.map(|key| {
             let reader = reader.clone();
             task::spawn(async move {
+                println!("<get_chunks>(1): trying to read from network..");
                 let chunk = reader.read_from_network(&key.dst_hash, true).await?;
+                println!("<get_chunks>(2): {} bytes read from network!", chunk.value().len());
                 Ok::<EncryptedChunk, Error>(EncryptedChunk {
                     index: key.index,
                     content: chunk.value().clone(),
@@ -237,8 +249,21 @@ impl Client {
         join_all(tasks)
             .await
             .into_iter()
-            .flatten() // swallows errors
-            .flatten() // swallows errors
+            .map(|e| {
+                if let Err(err) = e {
+                    println!("<get_chunks>(3): Error {:?}", err);
+                    Result::Err(err)
+                } else {e}
+            })
+            .flatten() // swallows errors <--- TODO spit out errors instead of swallowing them
+            .map(|e| {
+                if let Err(err) = e {
+                    println!("<get_chunks>(4): Error2 {:?}", err);
+                    Result::Err(err)
+                } else {e}
+            })
+            .flatten() // swallows errors <--- TODO spit out errors instead of swallowing them
+            .map(|a| {println!("<get_chunks>(5): got chunck of len: {:?}", a.content.len()); a})
             .collect_vec()
     }
 
@@ -361,20 +386,25 @@ mod tests {
         for i in 1..5 {
             let size = i * MIN_BLOB_SIZE;
 
+            println!("<seek_in_data>(1): <- round={}", i);
             for divisor in 2..5 {
                 let len = size / divisor;
                 let data = random_bytes(size);
 
+                println!("<seek_in_data>(2): ----- divisor={}, len={}, size={} -----", divisor, len, size);
+
                 // Read first part
                 let read_data_1 = {
                     let pos = 0;
-                    seek(data.clone(), pos, len).await?
+                    println!("<seek_in_data>(3): pos={}", pos);
+                    seek_data_chunk(data.clone(), pos, len).await?
                 };
 
                 // Read second part
                 let read_data_2 = {
                     let pos = len;
-                    seek(data.clone(), pos, len).await?
+                    println!("<seek_in_data>(4): pos={}", pos);
+                    seek_data_chunk(data.clone(), pos, len).await?
                 };
 
                 // Join parts
@@ -390,7 +420,7 @@ mod tests {
         Ok(())
     }
 
-    async fn seek(data: Bytes, pos: usize, len: usize) -> Result<Bytes> {
+    async fn seek_data_chunk(data: Bytes, pos: usize, len: usize) -> Result<Bytes> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
 
         let address = client.write_to_network(data.clone(), Scope::Public).await?;
