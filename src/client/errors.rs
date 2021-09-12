@@ -23,6 +23,12 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// All chunks could not be retrieved
+    #[error("One or more of the chunks could not be retrieved, and so the data cannot be reconstructed.")]
+    AChunkFailed(#[from] Box<Error>),
+    /// Chunk retrieval task threw an error
+    #[error("There was an error in the tasks receiving a chunk of data.")]
+    AChunkTaskFailed,
     /// Signature Aggregation Error
     #[error("Error on aggregating signatures from network")]
     Aggregation(String),

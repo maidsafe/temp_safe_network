@@ -183,7 +183,8 @@ impl Client {
 
     // Gets and decrypts chunks from the network using nothing else but the secret key, then returns the raw data.
     async fn read_all(&self, secret_key: BlobSecretKey) -> Result<Bytes> {
-        let encrypted_chunks = Self::get_chunks(self.clone(), secret_key.keys().into_iter()).await;
+        let encrypted_chunks =
+            Self::get_encrypted_chunks(self.clone(), secret_key.keys().into_iter()).await?;
         self_encryption::decrypt_full_set(&secret_key, &encrypted_chunks)
             .map_err(Error::SelfEncryption)
     }
@@ -196,13 +197,13 @@ impl Client {
         let range = &info.index_range;
         let all_keys = secret_key.keys();
 
-        let encrypted_chunks = Self::get_chunks(
+        let encrypted_chunks = Self::get_encrypted_chunks(
             self.clone(),
             (range.start..range.end + 1)
                 .clone()
                 .map(|i| all_keys[i].clone()),
         )
-        .await;
+        .await?;
 
         if range.len() > encrypted_chunks.len() {
             return Err(Error::Generic(format!(
@@ -216,11 +217,10 @@ impl Client {
             .map_err(Error::SelfEncryption)
     }
 
-    async fn get_chunks(
+    async fn get_encrypted_chunks(
         reader: Client,
         keys: impl Iterator<Item = ChunkKey>,
-    ) -> Vec<EncryptedChunk> {
-        // <- TODO return Result here
+    ) -> Result<Vec<EncryptedChunk>> {
         let tasks = keys.map(|key| {
             let reader = reader.clone();
             task::spawn(async move {
@@ -232,17 +232,19 @@ impl Client {
             })
         });
 
-        // this swallowing of errors
-        // is basically a compaction into a single
-        // error, that will be raised above this level,
-        // basically saying "didn't get all chunks"..
-        join_all(tasks)
-            .await
-            .into_iter()
-            .flatten() // swallows errors
-            .flatten() // swallows errors
-            .map(|a| {println!("<get_chunks>(5): got chunck of len: {:?}", a.content.len()); a})
-            .collect_vec()
+        let all_chunk_results = join_all(tasks).await;
+
+        let mut all_chunks = vec![];
+
+        // now lets find any errors and propagate them
+        for task_res in all_chunk_results {
+            let chunk_res = task_res.map_err(|_| Error::AChunkTaskFailed)?;
+            let chunk = chunk_res.map_err(|e| Error::AChunkFailed(Box::new(e)))?;
+
+            all_chunks.push(chunk)
+        }
+
+        Ok(all_chunks)
     }
 
     /// Extracts a blob secretkey from a head chunk.
