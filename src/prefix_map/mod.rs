@@ -166,8 +166,16 @@ impl NetworkPrefixMap {
                 // We are then aware of the prefix, let's just verify the new SAP can
                 // be trusted based on the SAP we aware of and the proof chain provided.
                 if !proof_chain.has_key(&entry.value().value.public_key_set.public_key()) {
+                    // This case may happen when both the sender and receiver is about to using
+                    // a new SAP. The AE-Update was sent before sender switching to use new SAP,
+                    // hence it only contains proof_chain covering the old SAP.
+                    // When the update arrives after the receiver got switched to use new SAP,
+                    // this error will be complained.
+                    // As an outdated node will got updated via AE triggered by other messages,
+                    // there is no need to bounce back here (assuming the sender is outdated) to
+                    // avoid potential looping.
                     return Err(Error::UntrustedProofChain(format!(
-                        "none of the keys match the SAP's key we currently know: {:?}",
+                        "provided proof_chain doesn't cover the SAP's key we currently know: {:?}",
                         signed_section_auth.value
                     )));
                 }
