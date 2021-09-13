@@ -158,7 +158,10 @@ jobs:
 
       - run: ./target/release/testnet
         env:
-          NODE_COUNT: 15 # TODO: change it back to 43 (this should be a split section)
+          NODE_COUNT: 45 
+
+      - name: Was there a section split?
+        run: ./scripts/has_split.sh
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests...
