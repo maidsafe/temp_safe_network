@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::BackPressure;
 use crate::messaging::WireMsg;
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
@@ -19,6 +20,7 @@ use xor_name::XorName;
 #[derive(Clone)]
 pub(crate) struct Comm {
     endpoint: Endpoint<XorName>,
+    back_pressure: BackPressure,
 }
 
 impl Drop for Comm {
@@ -51,7 +53,12 @@ impl Comm {
             event_tx.clone(),
         ));
 
-        Ok(Self { endpoint })
+        let back_pressure = BackPressure::new();
+
+        Ok(Self {
+            endpoint,
+            back_pressure,
+        })
     }
 
     pub(crate) async fn bootstrap(
@@ -76,7 +83,13 @@ impl Comm {
             event_tx.clone(),
         ));
 
-        Ok((Self { endpoint }, bootstrap_addr))
+        Ok((
+            Self {
+                endpoint,
+                back_pressure: BackPressure::new(),
+            },
+            bootstrap_addr,
+        ))
     }
 
     pub(crate) fn our_connection_info(&self) -> SocketAddr {
@@ -101,12 +114,13 @@ impl Comm {
     ) -> Result<(), Error> {
         for (name, addr) in recipients {
             wire_msg.set_dst_xorname(*name);
-            let bytes = wire_msg.serialize()?;
 
+            let bytes = wire_msg.serialize()?;
             let priority = wire_msg.msg_kind().priority();
+            let retries = self.back_pressure.get(addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
             self.endpoint
-                .try_send_message(bytes, addr, priority)
+                .try_send_message_with(bytes, addr, priority, Some(retries))
                 .await
                 .map_err(|err| {
                     error!(
@@ -199,9 +213,11 @@ impl Comm {
                 delivery_group_size,
             );
 
+            let retries = self.back_pressure.get(&recipient.1).await; // TODO: more laid back retries with lower priority, more aggressive with higher
+
             let result = self
                 .endpoint
-                .send_message(msg_bytes, &recipient.1, priority)
+                .send_message_with(msg_bytes, &recipient.1, priority, Some(retries))
                 .await
                 .map_err(|err| match err {
                     qp2p::SendError::ConnectionLost(qp2p::ConnectionError::Closed(
