@@ -10,7 +10,7 @@
 mod test_client;
 
 use crate::client::Error;
-use crate::types::Keypair;
+use crate::types::{Keypair, PublicKey};
 use dirs_next::home_dir;
 use exponential_backoff::Backoff;
 use eyre::{eyre, Context, Result};
@@ -75,7 +75,7 @@ pub fn gen_ed_keypair() -> Keypair {
 }
 
 /// Read local network bootstrapping/connection information
-pub fn read_network_conn_info() -> Result<BTreeSet<SocketAddr>> {
+pub fn read_network_conn_info() -> Result<(bls::PublicKey, BTreeSet<SocketAddr>)> {
     let user_dir = home_dir().ok_or_else(|| eyre!("Could not fetch home directory"))?;
     let conn_info_path = user_dir.join(Path::new(GENESIS_CONN_INFO_FILEPATH));
 
@@ -86,14 +86,19 @@ pub fn read_network_conn_info() -> Result<BTreeSet<SocketAddr>> {
         )
     })?;
     let reader = BufReader::new(file);
-    let contacts: BTreeSet<SocketAddr> = serde_json::from_reader(reader).with_context(|| {
-        format!(
-            "Failed to parse content of node connection information file at '{}'",
-            conn_info_path.display(),
-        )
-    })?;
+    let (genesis_key_hex, bootstrap_nodes): (String, BTreeSet<SocketAddr>) =
+        serde_json::from_reader(reader).with_context(|| {
+            format!(
+                "Failed to parse content of node connection information file at '{}'",
+                conn_info_path.display(),
+            )
+        })?;
 
-    Ok(contacts)
+    let genesis_key = PublicKey::bls_from_hex(&genesis_key_hex)?
+        .bls()
+        .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
+
+    Ok((genesis_key, bootstrap_nodes))
 }
 
 #[cfg(test)]

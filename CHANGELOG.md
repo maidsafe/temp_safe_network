@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.29.1](https://github.com/maidsafe/safe_network/compare/v0.29.0...v0.29.1) (2021-09-13)
+
+## [0.29.0](https://github.com/maidsafe/safe_network/compare/v0.28.4...v0.29.0) (2021-09-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* nodes and clients need the genesis key to be able to join and connect respectivelly.
+
+### Features
+
+* **client:** use genesis key from Config for client bootstrapping, and remove async_recursion ([a82c4cb](https://github.com/maidsafe/safe_network/commit/a82c4cb23cb04f1f1548b184ace2a56dc93e32de))
+* start using the genesis key from clients and joining nodes ([e34a2b6](https://github.com/maidsafe/safe_network/commit/e34a2b69b8077ef50f4a077b15aeeef4a8f2d6ac))
+
 ### [0.28.4](https://github.com/maidsafe/safe_network/compare/v0.28.3...v0.28.4) (2021-09-10)
 
 ### [0.28.3](https://github.com/maidsafe/safe_network/compare/v0.28.2...v0.28.3) (2021-09-09)

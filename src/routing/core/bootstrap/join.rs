@@ -43,6 +43,7 @@ pub(crate) async fn join_network(
     comm: &Comm,
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
     bootstrap_addr: SocketAddr,
+    genesis_key: BlsPublicKey,
 ) -> Result<(Node, Section)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
@@ -50,10 +51,13 @@ pub(crate) async fn join_network(
 
     let state = Join::new(node, send_tx, incoming_conns);
 
-    future::join(state.run(bootstrap_addr), send_messages(send_rx, comm))
-        .instrument(span)
-        .await
-        .0
+    future::join(
+        state.run(bootstrap_addr, genesis_key),
+        send_messages(send_rx, comm),
+    )
+    .instrument(span)
+    .await
+    .0
 }
 
 struct Join<'a> {
@@ -83,21 +87,29 @@ impl<'a> Join<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn run(self, bootstrap_addr: SocketAddr) -> Result<(Node, Section)> {
+    async fn run(
+        self,
+        bootstrap_addr: SocketAddr,
+        genesis_key: BlsPublicKey,
+    ) -> Result<(Node, Section)> {
         // Use our XorName as we do not know their name or section key yet.
-        let section_key = bls::SecretKey::random().public_key();
         let dst_xorname = self.node.name();
-
         let recipients = vec![(dst_xorname, bootstrap_addr)];
 
-        self.join(section_key, recipients).await
+        self.join(genesis_key, recipients).await
     }
 
     async fn join(
         mut self,
-        mut section_key: BlsPublicKey,
+        network_genesis_key: BlsPublicKey,
         mut recipients: Vec<(XorName, SocketAddr)>,
     ) -> Result<(Node, Section)> {
+        // We first use genesis key as the target section key, we'll be getting
+        // a response with the latest section key for us to retry with.
+        // Once we are approved to join, we will make sure the SAP we receive can
+        // be validated with the received proof chain and the 'network_genesis_key'.
+        let mut section_key = network_genesis_key;
+
         // We send a first join request to obtain the resource challenge, which
         // we will then use to generate the challenge proof and send the
         // `JoinRequest` again with it.
@@ -135,17 +147,20 @@ impl<'a> Join<'a> {
                     section_chain,
                     ..
                 } => {
+                    if genesis_key != network_genesis_key {
+                        debug!(
+                            "Ignoring JoinResponse::Approval with wrong network genesis key: {}, expected: {}",
+                            hex::encode(genesis_key.to_bytes()), hex::encode(network_genesis_key.to_bytes())
+                        );
+                        continue;
+                    }
+
                     return Ok((
                         self.node,
                         Section::new(genesis_key, section_chain, section_auth)?,
                     ));
                 }
                 JoinResponse::Retry(section_auth) => {
-                    if section_auth.section_key() == section_key {
-                        debug!("Ignoring JoinResponse::Retry with invalid section authority provider key");
-                        continue;
-                    }
-
                     let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
                         .elders
                         .iter()
@@ -202,6 +217,7 @@ impl<'a> Join<'a> {
                 }
                 JoinResponse::Redirect(section_auth) => {
                     if section_auth.section_key() == section_key {
+                        debug!("Ignoring JoinResponse::Redirect with same section authority provider key as we previously sent: {:?}", section_auth);
                         continue;
                     }
 
@@ -235,6 +251,7 @@ impl<'a> Join<'a> {
                         };
 
                         recipients = new_recipients;
+
                         self.send_join_requests(join_request, &recipients, section_key)
                             .await?;
                     } else {
@@ -472,7 +489,7 @@ mod tests {
         let state = Join::new(node, send_tx, &mut recv_rx);
 
         // Create the bootstrap task, but don't run it yet.
-        let bootstrap = async move { state.run(bootstrap_addr).await.map_err(Error::from) };
+        let bootstrap = async move { state.run(bootstrap_addr, pk).await.map_err(Error::from) };
 
         // Create the task that executes the body of the test, but don't run it either.
         let others = async {
@@ -556,10 +573,9 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+        let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
-        let pk_set = sk_set.public_keys();
+        let genesis_key = sk_set.secret_key().public_key();
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -567,7 +583,7 @@ mod tests {
         );
         let state = Join::new(node, send_tx, &mut recv_rx);
 
-        let bootstrap_task = state.run(bootstrap_node.addr);
+        let bootstrap_task = state.run(bootstrap_node.addr, genesis_key);
         let test_task = async move {
             // Receive JoinRequest
             let (wire_msg, recipients) = send_rx
@@ -591,17 +607,21 @@ mod tests {
                 .map(|_| (XorName::random(), gen_addr()))
                 .collect();
 
+            let (new_section_auth, _, new_sk_set) =
+                gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+            let new_pk_set = new_sk_set.public_keys();
+
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
                     SectionAuthorityProvider {
                         prefix: Prefix::default(),
-                        public_key_set: pk_set.clone(),
+                        public_key_set: new_pk_set.clone(),
                         elders: new_bootstrap_addrs.clone(),
                     },
                 ))),
                 &bootstrap_node,
-                section_auth.section_key(),
+                new_section_auth.section_key(),
             )?;
             task::yield_now().await;
 
@@ -625,9 +645,9 @@ mod tests {
             let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, dst_location,.. }) =>
                     (msg, dst_location));
 
-            assert_eq!(dst_location.section_pk(), Some(pk_set.public_key()));
+            assert_eq!(dst_location.section_pk(), Some(new_pk_set.public_key()));
             assert_matches!(node_msg, SystemMsg::JoinRequest(req) => {
-                assert_eq!(req.section_key, pk_set.public_key());
+                assert_eq!(req.section_key, new_pk_set.public_key());
             });
 
             Ok(())
@@ -647,10 +667,8 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+        let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
-        let pk_set = sk_set.public_keys();
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -658,7 +676,7 @@ mod tests {
         );
         let state = Join::new(node, send_tx, &mut recv_rx);
 
-        let bootstrap_task = state.run(bootstrap_node.addr);
+        let bootstrap_task = state.run(bootstrap_node.addr, sk_set.secret_key().public_key());
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()
@@ -668,17 +686,21 @@ mod tests {
             assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
                         assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
+            let (new_section_auth, _, new_sk_set) =
+                gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+            let new_pk_set = new_sk_set.public_keys();
+
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
                     SectionAuthorityProvider {
                         prefix: Prefix::default(),
-                        public_key_set: pk_set.clone(),
+                        public_key_set: new_pk_set.clone(),
                         elders: BTreeMap::new(),
                     },
                 ))),
                 &bootstrap_node,
-                section_auth.section_key(),
+                new_section_auth.section_key(),
             )?;
             task::yield_now().await;
 
@@ -691,12 +713,12 @@ mod tests {
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
                     SectionAuthorityProvider {
                         prefix: Prefix::default(),
-                        public_key_set: pk_set.clone(),
+                        public_key_set: new_pk_set.clone(),
                         elders: addrs,
                     },
                 ))),
                 &bootstrap_node,
-                section_auth.section_key(),
+                new_section_auth.section_key(),
             )?;
             task::yield_now().await;
 
@@ -725,7 +747,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (section_auth, mut nodes, _) =
+        let (section_auth, mut nodes, sk_set) =
             gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
 
@@ -736,7 +758,7 @@ mod tests {
 
         let state = Join::new(node, send_tx, &mut recv_rx);
 
-        let bootstrap_task = state.run(bootstrap_node.addr);
+        let bootstrap_task = state.run(bootstrap_node.addr, sk_set.secret_key().public_key());
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()

@@ -20,10 +20,14 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     println!("Reading network bootstrap information...");
-    let bootstrap_nodes = read_network_conn_info()?;
+    let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_nodes);
-    let config = Config::new(None, None, None, None).await;
+    println!(
+        "Network's genesis key: {}",
+        hex::encode(genesis_key.to_bytes())
+    );
+    let config = Config::new(None, None, genesis_key, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     let pk = client.public_key();
@@ -41,13 +45,13 @@ async fn main() -> Result<()> {
     )?;
     println!("Blob stored at xorurl: {}", xorurl);
 
-    let delay = 10;
+    let delay = 5;
     println!("Fetching Blob from the network in {} secs...", delay);
     sleep(Duration::from_secs(delay)).await;
 
     println!("...fetching Blob from the network now...");
-    let _data = client.read_blob(address).await?;
-    println!("Blob read from {:?}:", address);
+    let _ = client.read_blob(address).await?;
+    println!("Blob read from {:?}", address);
 
     println!();
 

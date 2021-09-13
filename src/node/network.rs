@@ -39,6 +39,7 @@ impl Network {
         let mut routing_config = RoutingConfig {
             first: config.is_first(),
             bootstrap_nodes: config.hard_coded_contacts.clone(),
+            genesis_key: config.genesis_key.clone(),
             network_config: config.network_config().clone(),
             ..Default::default()
         };
@@ -135,6 +136,10 @@ impl Network {
 
     pub(crate) async fn our_prefix(&self) -> Prefix {
         self.routing.our_prefix().await
+    }
+
+    pub(crate) async fn genesis_key(&self) -> BlsPublicKey {
+        self.routing.genesis_key().await
     }
 
     pub(crate) async fn section_chain(&self) -> SecuredLinkedList {

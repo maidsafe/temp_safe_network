@@ -83,15 +83,18 @@ impl Client {
 
         // Bootstrap to the network, connecting to a section based
         // on a public key of our choice.
-        debug!("Bootstrapping to the network...");
+        debug!(
+            "Bootstrapping to the network, genesis key: {} ...",
+            hex::encode(config.genesis_key.to_bytes())
+        );
         // Create a session with the network
         let session = Session::attempt_bootstrap(
             client_pk,
+            config.genesis_key,
             config.qp2p,
             bootstrap_nodes.clone(),
             config.local_addr,
             err_sender,
-            0,
         )
         .await?;
 
@@ -106,7 +109,7 @@ impl Client {
         Ok(client)
     }
 
-    /// Return the client's FullId.
+    /// Return the client's keypair.
     ///
     /// Useful for retrieving the PublicKey or KeyPair in the event you need to _sign_ something
     ///
@@ -126,11 +129,6 @@ impl Client {
     ///
     pub fn public_key(&self) -> PublicKey {
         self.keypair().public_key()
-    }
-
-    #[cfg(test)]
-    pub async fn expect_cmd_error(&mut self) -> Option<CmdError> {
-        self.incoming_errors.write().await.recv().await
     }
 }
 

@@ -21,7 +21,7 @@ use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
-use tracing::{debug, Level};
+use tracing::{debug, warn, Level};
 
 const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
@@ -99,6 +99,9 @@ pub struct Config {
         parse(try_from_str = serde_json::from_str)
     )]
     pub hard_coded_contacts: BTreeSet<SocketAddr>,
+    /// Genesis key of the network in hex format.
+    #[structopt(long)]
+    pub genesis_key: Option<String>,
     /// This is the maximum message size we'll allow the peer to send to us. Any bigger message and
     /// we'll error out probably shutting down the connection to the peer. If none supplied we'll
     /// default to the documented constant.
@@ -149,7 +152,7 @@ impl Config {
 
         if command_line_args.hard_coded_contacts.is_empty() {
             debug!("Using node connection config file as no hard coded contacts were passed in");
-            if let Ok(info) = read_conn_info_from_file().await {
+            if let Ok((_, info)) = read_conn_info_from_file().await {
                 command_line_args.hard_coded_contacts = info;
             }
         }
@@ -164,10 +167,8 @@ impl Config {
     }
 
     fn validate(&mut self) -> Result<(), Error> {
-        if let Some(_external_addr) = self.public_addr {
-            if self.first.is_none() && self.local_addr.is_none() {
-                return Err(Error::Configuration("--public-addr passed without specifing local address using --first or --local-addr".to_string()));
-            }
+        if self.public_addr.is_some() && self.first.is_none() && self.local_addr.is_none() {
+            return Err(Error::Configuration("--public-addr passed without specifing local address using --first or --local-addr".to_string()));
         }
 
         if self.public_addr.is_none() && self.local_addr.is_some() {
@@ -234,6 +235,10 @@ impl Config {
 
         if !config.hard_coded_contacts.is_empty() {
             self.hard_coded_contacts = config.hard_coded_contacts;
+        }
+
+        if config.genesis_key.is_some() {
+            self.genesis_key = config.genesis_key;
         }
 
         if let Some(max_msg_size) = config.max_msg_size_allowed {
@@ -382,26 +387,22 @@ impl Config {
 /// Overwrites connection info at file.
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub async fn set_connection_info(contact: SocketAddr) -> Result<()> {
-    write_file(CONNECTION_INFO_FILE, &vec![contact]).await
+pub async fn set_connection_info(genesis_key: bls::PublicKey, contact: SocketAddr) -> Result<()> {
+    let genesis_key_hex = hex::encode(genesis_key.to_bytes());
+    write_file(CONNECTION_INFO_FILE, &(genesis_key_hex, vec![contact])).await
 }
 
 /// Writes connection info to file for use by clients (and joining nodes when local network).
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
 pub async fn add_connection_info(contact: SocketAddr) -> Result<()> {
-    let bootstrap_nodes = if let Ok(mut bootstrap_nodes) = read_conn_info_from_file().await {
-        let _ = bootstrap_nodes.insert(contact);
-        bootstrap_nodes
-    } else {
-        vec![contact].into_iter().collect()
-    };
-
-    write_file(CONNECTION_INFO_FILE, &bootstrap_nodes).await
+    let (genesis_key_hex, mut bootstrap_nodes) = read_conn_info_from_file().await?;
+    let _ = bootstrap_nodes.insert(contact);
+    write_file(CONNECTION_INFO_FILE, &(genesis_key_hex, bootstrap_nodes)).await
 }
 
 /// Reads the default node config file.
-async fn read_conn_info_from_file() -> Result<BTreeSet<SocketAddr>> {
+async fn read_conn_info_from_file() -> Result<(String, BTreeSet<SocketAddr>)> {
     let path = project_dirs()?.join(CONNECTION_INFO_FILE);
 
     match fs::read(&path).await {
@@ -449,7 +450,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 432;
+    let expected_size = 456;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }

@@ -205,9 +205,8 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_from_relocated_node() -> Result<()> {
-    let (section_auth, mut nodes) = create_section_auth();
+    let (section_auth, mut nodes, sk_set) = create_section_auth();
 
-    let sk_set = SecretKeySet::random();
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
 
@@ -308,8 +307,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn aggregate_proposals() -> Result<()> {
-    let (section_auth, nodes) = create_section_auth();
-    let sk_set = SecretKeySet::random();
+    let (section_auth, nodes, sk_set) = create_section_auth();
     let pk_set = sk_set.public_keys();
     let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
@@ -407,8 +405,7 @@ async fn handle_agreement_on_online() -> Result<()> {
 
     let prefix = Prefix::default();
 
-    let (section_auth, mut nodes, _) = gen_section_authority_provider(prefix, ELDER_SIZE);
-    let sk_set = SecretKeySet::random();
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, ELDER_SIZE);
     let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
     let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
@@ -620,8 +617,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         NetworkPhase::Startup => Prefix::default(),
         NetworkPhase::Regular => "0".parse().unwrap(),
     };
-    let (section_auth, mut nodes, _) = gen_section_authority_provider(prefix, ELDER_SIZE);
-    let sk_set = SecretKeySet::random();
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, ELDER_SIZE);
     let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
     // Make a left peer.
@@ -635,7 +631,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     let _ = section.update_member(node_state);
 
     // Make a Node
-    let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let state = Core::new(
@@ -690,8 +686,7 @@ async fn handle_agreement_on_online_of_rejoined_node_with_low_age_after_startup(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
-    let (section_auth, mut nodes) = create_section_auth();
-    let sk_set = SecretKeySet::random();
+    let (section_auth, mut nodes, sk_set) = create_section_auth();
 
     let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
@@ -736,8 +731,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
-    let (section_auth, mut nodes) = create_section_auth();
-    let sk_set = SecretKeySet::random();
+    let (section_auth, mut nodes, sk_set) = create_section_auth();
 
     let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
@@ -846,17 +840,18 @@ enum UntrustedMessageSource {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_untrusted_accumulated_message() -> Result<()> {
-    let sk0 = bls::SecretKey::random();
+    let (section_auth, _, sk_set) = create_section_auth();
+
+    let sk0 = sk_set.secret_key();
     let pk0 = sk0.public_key();
     let chain = SecuredLinkedList::new(pk0);
 
-    let (section_auth, _) = create_section_auth();
     let sender = *section_auth
         .addresses()
         .get(0)
         .ok_or_else(|| eyre!("section_auth is empty"))?;
 
-    let section_signed_section_auth = section_signed(&sk0, section_auth.clone())?;
+    let section_signed_section_auth = section_signed(sk0, section_auth.clone())?;
     let mut section = Section::new(pk0, chain, section_signed_section_auth)?;
 
     let node = create_node(MIN_ADULT_AGE, None);
@@ -959,21 +954,22 @@ async fn handle_untrusted_accumulated_message() -> Result<()> {
 // 1. Check the message we send an AE-Update response.
 // // nop// 2. Check the original was bounced
 async fn check_we_send_ae_update_when_msg_bounced_as_untrusted() -> Result<()> {
-    let (section_auth, mut nodes, sk_set0) =
+    let sk_set0 = SecretKeySet::random();
+    let pk0 = sk_set0.public_keys().public_key();
+
+    let (section_auth, mut nodes, sk_set1) =
         gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
 
     // Create section chain with two keys.
-    let pk0 = sk_set0.public_keys().public_key();
-    let sk1_set = SecretKeySet::random();
-    let pk1 = sk1_set.secret_key().public_key();
+    let pk1 = sk_set1.secret_key().public_key();
     let pk1_signature = sk_set0.key.sign(&bincode::serialize(&pk1)?);
 
     let mut chain = SecuredLinkedList::new(pk0);
     let _ = chain.insert(&pk0, pk1, pk1_signature);
 
-    let section_signed_section_auth = section_signed(sk1_set.secret_key(), section_auth)?;
+    let section_signed_section_auth = section_signed(sk_set1.secret_key(), section_auth)?;
     let section = Section::new(pk0, chain.clone(), section_signed_section_auth)?;
-    let section_key_share = create_section_key_share(&sk1_set, 0);
+    let section_key_share = create_section_key_share(&sk_set1, 0);
 
     let node = nodes.remove(0);
 
@@ -1069,21 +1065,21 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     // Create first `Section` with a chain of length 2
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
-    let sk1_set = SecretKeySet::random();
-    let pk1 = sk1_set.secret_key().public_key();
+
+    let (old_section_auth, mut nodes, sk_set1) = create_section_auth();
+    let pk1 = sk_set1.secret_key().public_key();
     let pk1_signature = sk0.sign(bincode::serialize(&pk1)?);
 
     let mut chain = SecuredLinkedList::new(pk0);
     assert_eq!(chain.insert(&pk0, pk1, pk1_signature), Ok(()));
 
-    let (old_section_auth, mut nodes) = create_section_auth();
     let section_signed_old_section_auth =
-        section_signed(sk1_set.secret_key(), old_section_auth.clone())?;
+        section_signed(sk_set1.secret_key(), old_section_auth.clone())?;
     let old_section = Section::new(pk0, chain.clone(), section_signed_old_section_auth)?;
 
     // Create our node
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let section_key_share = create_section_key_share(&sk1_set, 0);
+    let section_key_share = create_section_key_share(&sk_set1, 0);
     let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
@@ -1102,7 +1098,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let sk2_set = SecretKeySet::random();
     let sk2 = sk2_set.secret_key();
     let pk2 = sk2.public_key();
-    let pk2_signature = sk1_set.secret_key().sign(bincode::serialize(&pk2)?);
+    let pk2_signature = sk_set1.secret_key().sign(bincode::serialize(&pk2)?);
     chain.insert(&pk1, pk2, pk2_signature)?;
 
     let old_node = nodes.remove(0);
@@ -1166,46 +1162,38 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 // Checking when we send AE info to a section from untrusted section, we do not handle it and error out
 async fn untrusted_ae_message_msg_errors() -> Result<()> {
-    let sk0 = bls::SecretKey::random();
+    let (our_section_auth, _, sk_set0) = create_section_auth();
+    let sk0 = sk_set0.secret_key();
     let pk0 = sk0.public_key();
 
-    let sk1 = bls::SecretKey::random();
-    let pk1 = sk1.public_key();
-    let sig1 = sk0.sign(&bincode::serialize(&pk1)?);
-
-    // setup some nonsense
-    let nonsense_section_sk = bls::SecretKey::random();
-    let nonsense_section_pk = nonsense_section_sk.public_key();
-
-    // the chain is valid
-    let mut chain = SecuredLinkedList::new(pk0);
-    chain.insert(&pk0, pk1, sig1)?;
-
-    let (our_section_auth, _) = create_section_auth();
-    let section_signed_our_section_auth = section_signed(&sk0, our_section_auth.clone())?;
+    let section_signed_our_section_auth = section_signed(sk0, our_section_auth.clone())?;
     let our_section = Section::new(
         pk0,
         SecuredLinkedList::new(pk0),
-        section_signed_our_section_auth,
+        section_signed_our_section_auth.clone(),
     )?;
 
-    let bogus_section_pk = pk1;
+    // a valid AE msg but with a non-verifiable SAP...
+    let bogus_section_pk = bls::SecretKey::random().public_key();
+    let node_msg = SystemMsg::AntiEntropyUpdate {
+        section_auth: section_signed_our_section_auth.value,
+        section_signed: section_signed_our_section_auth.sig,
+        proof_chain: SecuredLinkedList::new(bogus_section_pk),
+        members: None,
+    };
 
-    let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = create_node(MIN_ADULT_AGE, None);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
-        our_section,
+        our_section.clone(),
         None,
         event_tx,
         used_space,
         root_storage_dir,
     )?;
-
-    // any valid AE msg..
-    let original_node_msg = core.generate_ae_update(bogus_section_pk, false)?;
 
     let dispatcher = Dispatcher::new(core);
 
@@ -1213,12 +1201,12 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     let wire_msg = WireMsg::single_src(
         &sender,
         DstLocation::Section {
-            name: XorName::from(PublicKey::Bls(nonsense_section_pk)),
-            section_pk: nonsense_section_pk,
+            name: XorName::from(PublicKey::Bls(bogus_section_pk)),
+            section_pk: bogus_section_pk,
         },
-        original_node_msg.clone(),
+        node_msg.clone(),
         // we use the nonsense here
-        nonsense_section_pk,
+        bogus_section_pk,
     )?;
 
     let commands = get_internal_commands(
@@ -1232,13 +1220,12 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     .await;
 
     match commands {
-        Err(error) => match error {
-            Error::UntrustedSectionAuthProvider(_) => Ok(()),
-            _ => bail!("AE update handling produced unexpected error with bad AE update"),
-        },
-        _ => {
-            bail!("AE update handling should error due to bad signing")
-        }
+        Err(Error::UntrustedProofChain(_)) => Ok(()),
+        Err(other_err) => bail!(
+            "AE update handling produced unexpected error with bad AE update: {}",
+            other_err
+        ),
+        Ok(_) => bail!("AE update handling should error due to bad signing."),
     }
 }
 
@@ -1281,10 +1268,8 @@ enum RelocatedPeerRole {
 }
 
 async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
-    let sk_set = SecretKeySet::random();
-
     let prefix: Prefix = "0".parse().unwrap();
-    let (section_auth, mut nodes, _) = gen_section_authority_provider(prefix, ELDER_SIZE);
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, ELDER_SIZE);
     let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
     let non_elder_peer = create_peer(MIN_AGE);
@@ -1714,9 +1699,10 @@ pub(crate) async fn create_comm() -> Result<Comm> {
 }
 
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
-fn create_section_auth() -> (SectionAuthorityProvider, Vec<Node>) {
-    let (section_auth, elders, _) = gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
-    (section_auth, elders)
+fn create_section_auth() -> (SectionAuthorityProvider, Vec<Node>, SecretKeySet) {
+    let (section_auth, elders, secret_key_set) =
+        gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+    (section_auth, elders, secret_key_set)
 }
 
 fn create_section_key_share(sk_set: &bls::SecretKeySet, index: usize) -> SectionKeyShare {
