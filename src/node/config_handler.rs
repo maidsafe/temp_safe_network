@@ -29,7 +29,7 @@ const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
 
 /// Node configuration
-#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, StructOpt)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, StructOpt)]
 #[structopt(rename_all = "kebab-case", bin_name = "sn_node")]
 #[structopt(global_settings = &[structopt::clap::AppSettings::ColoredHelp])]
 pub struct Config {
@@ -450,7 +450,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 456;
+    let expected_size = 496;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }
