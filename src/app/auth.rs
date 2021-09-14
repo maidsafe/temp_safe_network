@@ -13,7 +13,7 @@ use super::{
     Safe,
 };
 use crate::{
-    ipc::{BootstrapConfig, IpcMsg, IpcResp},
+    ipc::{IpcMsg, IpcResp, NodeConfig},
     Error, Result,
 };
 use log::{debug, info};
@@ -74,7 +74,7 @@ impl Safe {
         &mut self,
         app_keypair: Option<Keypair>,
         config_path: Option<&Path>,
-        bootstrap_config: BootstrapConfig,
+        bootstrap_config: NodeConfig,
     ) -> Result<()> {
         self.safe_client
             .connect(app_keypair, config_path, bootstrap_config)

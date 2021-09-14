@@ -8,7 +8,7 @@
 // Software.
 
 use super::fetch::Range;
-use crate::{ipc::BootstrapConfig, Error, Result};
+use crate::{ipc::NodeConfig, Error, Result};
 use bytes::Bytes;
 use hex::encode;
 use log::{debug, info};
@@ -21,7 +21,6 @@ use safe_network::types::{
 use safe_network::url::Scope;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -59,7 +58,7 @@ impl SafeAppClient {
         &mut self,
         app_keypair: Option<Keypair>,
         config_path: Option<&Path>,
-        bootstrap_config: BootstrapConfig,
+        node_config: NodeConfig,
     ) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 
@@ -69,9 +68,17 @@ impl SafeAppClient {
             "Client to be instantiated with specific pk?: {:?}",
             app_keypair
         );
-        debug!("Bootstrap contacts list set to: {:?}", bootstrap_config);
-        let config = Config::new(None, None, self.config_path.as_deref(), Some(self.timeout)).await;
-        let client = Client::new(config, bootstrap_config, app_keypair)
+        debug!("Bootstrap contacts list set to: {:?}", node_config);
+
+        let config = Config::new(
+            None,
+            None,
+            node_config.0,
+            self.config_path.as_deref(),
+            Some(self.timeout),
+        )
+        .await;
+        let client = Client::new(config, node_config.1, app_keypair)
             .await
             .map_err(|err| {
                 Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))

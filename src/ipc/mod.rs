@@ -21,8 +21,12 @@ pub use self::{
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, net::SocketAddr, u32};
 
-/// `QuicP2P` bootstrap info, shared from Authenticator to apps.
-pub type BootstrapConfig = BTreeSet<SocketAddr>;
+/// The Node configuration for the network we are participating in.
+///
+/// The `PublicKey` is the Genesis Key that is either supplied or created upon the launching the
+/// first node of the network. The `BTreeSet` is a list of `SocketAddr`, which is an IP address and
+/// port number. This is a list of the nodes participating in the network.
+pub type NodeConfig = (bls::PublicKey, BTreeSet<SocketAddr>);
 
 /// IPC message.
 #[allow(clippy::large_enum_variant)]

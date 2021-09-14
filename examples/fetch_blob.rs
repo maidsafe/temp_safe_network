@@ -7,10 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use anyhow::{anyhow, Result};
 use bytes::Buf;
-use sn_api::{fetch::SafeData, BootstrapConfig, Safe};
-use std::{env::args, net::SocketAddr};
+use color_eyre::{eyre::eyre, Result};
+use sn_api::{fetch::SafeData, PublicKey, Safe};
+use std::{collections::BTreeSet, env::args, net::SocketAddr};
 
 // To be executed passing Safe network contact address and Blob Safe URL, e.g.:
 // $ cargo run --release --example fetch_blob 127.0.0.1:12000 safe://hy8oyeyqhd1e8keggcjyb9zjyje1m7ihod1pyru6h5y6jkmmihdnym4ngdf
@@ -25,16 +25,16 @@ async fn main() -> Result<()> {
     // Read the network contact socket address from first arg passed
     let network_contact = args_received
         .next()
-        .ok_or_else(|| anyhow!("No Safe network contact socket address provided"))?;
+        .ok_or_else(|| eyre!("No Safe network contact socket address provided"))?;
     let network_addr: SocketAddr = network_contact
         .parse()
-        .map_err(|err| anyhow!("Invalid Safe network contact socket address: {}", err))?;
+        .map_err(|err| eyre!("Invalid Safe network contact socket address: {}", err))?;
     println!("Safe network to be contacted at {}", network_addr);
 
     // Read URL from second argument passed
     let url = args_received
         .next()
-        .ok_or_else(|| anyhow!("No Safe URL provided as argument"))?;
+        .ok_or_else(|| eyre!("No Safe URL provided as argument"))?;
     println!("Fetching Blob from Safe with URL: {}", url);
 
     // The Safe instance is what will give us access to the API.
@@ -42,10 +42,15 @@ async fn main() -> Result<()> {
 
     // We assume there is a local network running which we can
     // bootstrap to using the provided contact address.
-    let bootstrap_contacts: BootstrapConfig = vec![network_addr].into_iter().collect();
+    let genesis_key = PublicKey::bls_from_hex("8640e62cc44e75cf4fadc8ee91b74b4cf0fd2c0984fb0e3ab40f026806857d8c41f01d3725223c55b1ef87d669f5e2cc")?
+        .bls()
+        .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
+    let mut nodes: BTreeSet<SocketAddr> = BTreeSet::new();
+    nodes.insert(network_addr);
+    let node_config = (genesis_key, nodes);
 
     // Using our safe instance we connect to the network
-    safe.connect(None, None, bootstrap_contacts).await?;
+    safe.connect(None, None, node_config).await?;
 
     println!("Connected to Safe!");
 

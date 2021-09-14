@@ -7,10 +7,12 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use anyhow::Result;
 use bytes::Buf;
-use sn_api::{fetch::SafeData, BootstrapConfig, Safe, Url};
-use std::{env::temp_dir, fs::File, io::Write, path::PathBuf};
+use color_eyre::{eyre::eyre, Result};
+use sn_api::{fetch::SafeData, PublicKey, Safe, Url};
+use std::{
+    collections::BTreeSet, env::temp_dir, fs::File, io::Write, net::SocketAddr, path::PathBuf,
+};
 
 const FILE_TO_UPLOAD: &str = "file_to_upload.rs";
 
@@ -27,10 +29,16 @@ async fn main() -> Result<()> {
 
     // We assume there is a local network running which we can
     // bootstrap to using 127.0.0.1:12000 contact address.
-    let mut bootstrap_contacts = BootstrapConfig::default();
-    bootstrap_contacts.insert("127.0.0.1:12000".parse()?);
+    // We would also need to be supplied the BLS public key, or the 'genesis key' from the running
+    // network. Here we just provide an example.
+    let genesis_key = PublicKey::bls_from_hex("8640e62cc44e75cf4fadc8ee91b74b4cf0fd2c0984fb0e3ab40f026806857d8c41f01d3725223c55b1ef87d669f5e2cc")?
+        .bls()
+        .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
+    let mut nodes: BTreeSet<SocketAddr> = BTreeSet::new();
+    nodes.insert("127.0.0.1:12000".parse()?);
+    let node_config = (genesis_key, nodes);
     // Using our afe instance we connect to the network
-    safe.connect(None, None, bootstrap_contacts).await?;
+    safe.connect(None, None, node_config).await?;
 
     // We can now upload the file to the network, using the following information
     let location = file_path.display().to_string();
