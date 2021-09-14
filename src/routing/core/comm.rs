@@ -317,6 +317,21 @@ impl Comm {
         }
     }
 
+    /// Regulates comms with the specified peer
+    /// according to the cpu load avg provided by it.
+    pub(crate) async fn regulate(
+        &self,
+        peer: SocketAddr,
+        load_report: crate::messaging::system::LoadAvg,
+    ) {
+        self.back_pressure.set(peer, load_report).await
+    }
+
+    /// Returns cpu load avg if under strain.
+    pub(crate) async fn check_strain(&self) -> Option<crate::messaging::system::LoadAvg> {
+        self.back_pressure.load_report().await
+    }
+
     pub(crate) fn print_stats(&self) {
         let incoming = self.msg_count.incoming();
         let outgoing = self.msg_count.outgoing();
