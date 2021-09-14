@@ -15,9 +15,8 @@ mod register_apis;
 pub use self::blob_apis::BlobAddress;
 use crate::client::{connections::Session, errors::Error, Config};
 use crate::messaging::data::CmdError;
-use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey};
+use crate::types::{Keypair, PublicKey};
 
-use lru::LruCache;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
@@ -28,15 +27,12 @@ use tokio::{
 };
 use tracing::{debug, info};
 
-const BLOB_CACHE_CAP: usize = 150;
-
 /// Client object
 #[derive(Clone, Debug)]
 pub struct Client {
     keypair: Keypair,
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
-    blob_cache: Arc<RwLock<LruCache<ChunkAddress, Chunk>>>,
     pub(crate) query_timeout: Duration,
 }
 
@@ -103,7 +99,6 @@ impl Client {
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: config.query_timeout,
-            blob_cache: Arc::new(RwLock::new(LruCache::new(BLOB_CACHE_CAP))),
         };
 
         Ok(client)
