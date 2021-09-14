@@ -30,7 +30,7 @@ pub struct RelocateDetails {
     pub age: u8,
 }
 
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 /// Details of a node relocation and new signed name
 pub struct RelocatePayload {
     /// Message whose content is Variant::Relocate
