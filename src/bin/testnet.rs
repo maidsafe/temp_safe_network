@@ -130,6 +130,17 @@ pub async fn run_network() -> Result<()> {
     let arg_node_log_dir = node_log_dir.display().to_string();
     info!("Storing nodes' generated data at {}", arg_node_log_dir);
 
+    let node_count = std::env::var("NODE_COUNT")
+        .map_or_else(
+            |error| match error {
+                std::env::VarError::NotPresent => Ok(DEFAULT_NODE_COUNT),
+                _ => Err(eyre!(error)),
+            },
+            |node_count| Ok(node_count.parse()?),
+        )
+        .wrap_err("Invalid value for NODE_COUNT")?;
+    let node_count_str = node_count.to_string();
+
     // Let's create an args array to pass to the network launcher tool
     let interval_str = INTERVAL.as_secs().to_string();
     let mut sn_launch_tool_args = vec![
@@ -138,6 +149,8 @@ pub async fn run_network() -> Result<()> {
         &arg_node_path,
         "--nodes-dir",
         &arg_node_log_dir,
+        "--num-nodes",
+        &node_count_str,
         "--interval",
         &interval_str,
         "--local",
@@ -155,16 +168,6 @@ pub async fn run_network() -> Result<()> {
         sn_launch_tool_args.push("--rust-log");
         sn_launch_tool_args.push(&rust_log);
     }
-
-    let node_count = std::env::var("NODE_COUNT")
-        .map_or_else(
-            |error| match error {
-                std::env::VarError::NotPresent => Ok(DEFAULT_NODE_COUNT),
-                _ => Err(eyre!(error)),
-            },
-            |node_count| Ok(node_count.parse()?),
-        )
-        .wrap_err("Invalid value for NODE_COUNT")?;
 
     debug!(
         "Running network launch tool with args: {:?}",
