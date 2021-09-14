@@ -80,7 +80,7 @@ impl Client {
     where
         Self: Sized,
     {
-        let chunk = self.read_from_network(address.name(), false).await?;
+        let chunk = self.read_from_network(address.name()).await?;
         let secret_key = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
         self.read_all(secret_key).await
     }
@@ -113,26 +113,15 @@ impl Client {
             &position,
         );
 
-        let chunk = self.read_from_network(address.name(), false).await?;
+        let chunk = self.read_from_network(address.name()).await?;
         let secret_key = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
         self.seek(secret_key, position, length).await
     }
 
-    pub(crate) async fn read_from_network(
-        &self,
-        name: &XorName,
-        allow_cache: bool,
-    ) -> Result<Chunk> {
+    pub(crate) async fn read_from_network(&self, name: &XorName) -> Result<Chunk> {
         trace!("Fetching chunk: {:?}", name);
 
         let address = ChunkAddress(*name);
-
-        if allow_cache {
-            if let Some(chunk) = self.blob_cache.write().await.get(&address) {
-                trace!("Chunk retrieved from cache: {:?}", address);
-                return Ok(chunk.clone());
-            }
-        }
 
         let res = self.send_query(DataQuery::GetChunk(address)).await?;
 
@@ -144,16 +133,7 @@ impl Client {
             _ => return Err(Error::ReceivedUnexpectedEvent),
         }?;
 
-        if allow_cache {
-            let _ = self.blob_cache.write().await.put(address, chunk.clone());
-        }
-
         Ok(chunk)
-    }
-
-    /// Clear the client's blob cache
-    pub async fn clear_blob_cache(&mut self) {
-        self.blob_cache.write().await.clear()
     }
 
     /// Directly writes raw data to the network
@@ -183,7 +163,7 @@ impl Client {
 
     // Gets and decrypts chunks from the network using nothing else but the secret key, then returns the raw data.
     async fn read_all(&self, secret_key: BlobSecretKey) -> Result<Bytes> {
-        let encrypted_chunks = Self::get_chunks(self.clone(), secret_key.keys().into_iter()).await;
+        let encrypted_chunks = Self::try_get_chunks(self.clone(), secret_key.keys()).await?;
         self_encryption::decrypt_full_set(&secret_key, &encrypted_chunks)
             .map_err(Error::SelfEncryption)
     }
@@ -195,51 +175,59 @@ impl Client {
         let range = &info.index_range;
         let all_keys = secret_key.keys();
 
-        let encrypted_chunks = Self::get_chunks(
+        let encrypted_chunks = Self::try_get_chunks(
             self.clone(),
             (range.start..range.end + 1)
                 .clone()
-                .map(|i| all_keys[i].clone()),
+                .map(|i| all_keys[i].clone())
+                .collect_vec(),
         )
-        .await;
-
-        if range.len() > encrypted_chunks.len() {
-            return Err(Error::Generic(format!(
-                "Missing chunks! Required {}, but we have {}.",
-                range.len(),
-                encrypted_chunks.len()
-            )));
-        }
+        .await?;
 
         self_encryption::decrypt_range(&secret_key, &encrypted_chunks, info.relative_pos, len)
             .map_err(Error::SelfEncryption)
     }
 
-    async fn get_chunks(
-        reader: Client,
-        keys: impl Iterator<Item = ChunkKey>,
-    ) -> Vec<EncryptedChunk> {
-        let tasks = keys.map(|key| {
+    async fn try_get_chunks(reader: Client, keys: Vec<ChunkKey>) -> Result<Vec<EncryptedChunk>> {
+        let expected_count = keys.len();
+
+        let tasks = keys.into_iter().map(|key| {
             let reader = reader.clone();
             task::spawn(async move {
-                let chunk = reader.read_from_network(&key.dst_hash, true).await?;
-                Ok::<EncryptedChunk, Error>(EncryptedChunk {
-                    index: key.index,
-                    content: chunk.value().clone(),
-                })
+                match reader.read_from_network(&key.dst_hash).await {
+                    Ok(chunk) => Some(EncryptedChunk {
+                        index: key.index,
+                        content: chunk.value().clone(),
+                    }),
+                    Err(e) => {
+                        warn!(
+                            "Reading chunk {} from network, resulted in error {}.",
+                            &key.dst_hash, e
+                        );
+                        None
+                    }
+                }
             })
         });
 
-        // this swallowing of errors
+        // This swallowing of errors
         // is basically a compaction into a single
-        // error, that will be raised above this level,
-        // basically saying "didn't get all chunks"..
-        join_all(tasks)
+        // error saying "didn't get all chunks".
+        let encrypted_chunks = join_all(tasks)
             .await
             .into_iter()
-            .flatten() // swallows errors
-            .flatten() // swallows errors
-            .collect_vec()
+            .flatten()
+            .flatten()
+            .collect_vec();
+
+        if expected_count > encrypted_chunks.len() {
+            Err(Error::NotEnoughChunks(
+                expected_count,
+                encrypted_chunks.len(),
+            ))
+        } else {
+            Ok(encrypted_chunks)
+        }
     }
 
     /// Extracts a blob secretkey from a head chunk.
@@ -307,7 +295,104 @@ mod tests {
         Ok(())
     }
 
-    // Test storing and getting public Blob.
+    // Test storing and reading min size blob.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn store_and_read_3kb() -> Result<()> {
+        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
+
+        let blob = random_bytes(MIN_BLOB_SIZE);
+
+        // Store private blob
+        let private_address = client
+            .write_to_network(blob.clone(), Scope::Private)
+            .await?;
+
+        // the larger the file, the longer we have to wait before we start querying
+        let delay = usize::max(1, blob.len() / 2_000_000);
+
+        // Assert that the blob is stored.
+        let read_data =
+            run_w_backoff_delayed(|| client.read_blob(private_address), 10, delay).await?;
+
+        compare(blob.clone(), read_data)?;
+
+        // Test storing private blob with the same value.
+        // Should not conflict and return same address
+        let address = client
+            .write_to_network(blob.clone(), Scope::Private)
+            .await?;
+        assert_eq!(address, private_address);
+
+        // Test storing public blob with the same value. Should not conflict.
+        let public_address = client.write_to_network(blob.clone(), Scope::Public).await?;
+
+        // Assert that the public blob is stored.
+        let read_data =
+            run_w_backoff_delayed(|| client.read_blob(public_address), 10, delay).await?;
+
+        compare(blob, read_data)?;
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn seek_in_data() -> Result<()> {
+        for i in 1..5 {
+            let size = i * MIN_BLOB_SIZE;
+
+            for divisor in 2..5 {
+                let len = size / divisor;
+                let data = random_bytes(size);
+
+                // Read first part
+                let read_data_1 = {
+                    let pos = 0;
+                    seek(data.clone(), pos, len).await?
+                };
+
+                // Read second part
+                let read_data_2 = {
+                    let pos = len;
+                    seek(data.clone(), pos, len).await?
+                };
+
+                // Join parts
+                let read_data: Bytes = [read_data_1, read_data_2]
+                    .iter()
+                    .flat_map(|bytes| bytes.clone())
+                    .collect();
+
+                compare(data.slice(0..(2 * len)), read_data)?
+            }
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn store_and_read_1mb() -> Result<()> {
+        store_and_read(1024 * 1024, Scope::Public).await?;
+        store_and_read(1024 * 1024, Scope::Private).await
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn store_and_read_10mb() -> Result<()> {
+        store_and_read(10 * 1024 * 1024, Scope::Private).await
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "too heavy for CI"]
+    async fn store_and_read_20mb() -> Result<()> {
+        store_and_read(20 * 1024 * 1024, Scope::Private).await
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "too heavy for CI"]
+    async fn store_and_read_40mb() -> Result<()> {
+        store_and_read(40 * 1024 * 1024, Scope::Private).await
+    }
+
+    // Essentially a load test, seeing how much parallel batting the nodes can take.
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn parallel_timings() -> Result<()> {
@@ -356,43 +441,24 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn seek_in_data() -> Result<()> {
-        for i in 1..5 {
-            let size = i * MIN_BLOB_SIZE;
+    async fn store_and_read(size: usize, scope: Scope) -> Result<()> {
+        let blob = random_bytes(size);
+        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
+        let address = client.write_to_network(blob.clone(), scope).await?;
 
-            for divisor in 2..5 {
-                let len = size / divisor;
-                let data = random_bytes(size);
+        // the larger the file, the longer we have to wait before we start querying
+        let delay = usize::max(1, size / 2_000_000);
 
-                // Read first part
-                let read_data_1 = {
-                    let pos = 0;
-                    seek(data.clone(), pos, len).await?
-                };
-
-                // Read second part
-                let read_data_2 = {
-                    let pos = len;
-                    seek(data.clone(), pos, len).await?
-                };
-
-                // Join parts
-                let read_data: Bytes = [read_data_1, read_data_2]
-                    .iter()
-                    .flat_map(|bytes| bytes.clone())
-                    .collect();
-
-                compare(data.slice(0..(2 * len)), read_data)?
-            }
-        }
+        // now that it was written to the network we should be able to retrieve it
+        let read_data = run_w_backoff_delayed(|| client.read_blob(address), 1, delay).await?;
+        // then the content should be what we stored
+        compare(blob, read_data)?;
 
         Ok(())
     }
 
     async fn seek(data: Bytes, pos: usize, len: usize) -> Result<Bytes> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-
         let address = client.write_to_network(data.clone(), Scope::Public).await?;
 
         // the larger the file, the longer we have to wait before we start querying
@@ -414,124 +480,6 @@ mod tests {
                 return Err(eyre::eyre!(format!("Not equal! Counter: {}", counter)));
             }
         }
-        Ok(())
-    }
-
-    // Test storing and getting public Blob.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn public_blob_test() -> Result<()> {
-        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-        // Generate blob
-        let blob = random_bytes(MIN_BLOB_SIZE);
-        // Store blob
-        let public_address = client.write_to_network(blob.clone(), Scope::Public).await?;
-
-        // the larger the file, the longer we have to wait before we start querying
-        let delay = usize::max(1, blob.len() / 2_000_000);
-
-        // Assert that the blob was written
-        let read_data =
-            run_w_backoff_delayed(|| client.read_blob(public_address), 10, delay).await?;
-        compare(blob.clone(), read_data)?;
-
-        // Test storing public chunk with the same value.
-        // Should not conflict and return same address
-        let address = client.write_to_network(blob, Scope::Public).await?;
-        assert_eq!(address, public_address);
-
-        Ok(())
-    }
-
-    // Test storing, and getting private chunk.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn private_blob_test() -> Result<()> {
-        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-
-        let blob = random_bytes(MIN_BLOB_SIZE);
-
-        // Store Blob
-        let private_address = client
-            .write_to_network(blob.clone(), Scope::Private)
-            .await?;
-
-        // the larger the file, the longer we have to wait before we start querying
-        let delay = usize::max(1, blob.len() / 2_000_000);
-
-        // Assert that the blob is stored.
-        let read_data =
-            run_w_backoff_delayed(|| client.read_blob(private_address), 10, delay).await?;
-        compare(blob.clone(), read_data)?;
-
-        // Test storing private chunk with the same value.
-        // Should not conflict and return same address
-        let address = client
-            .write_to_network(blob.clone(), Scope::Private)
-            .await?;
-        assert_eq!(address, private_address);
-
-        // Test storing public chunk with the same value. Should not conflict.
-        let public_address = client.write_to_network(blob.clone(), Scope::Public).await?;
-
-        // Assert that the public Blob is stored.
-        let read_data =
-            run_w_backoff_delayed(|| client.read_blob(public_address), 10, delay).await?;
-        compare(blob, read_data)?;
-
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn create_and_retrieve_1mb_public() -> Result<()> {
-        create_and_retrieve(1024 * 1024, Scope::Public).await
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn create_and_retrieve_1mb_private() -> Result<()> {
-        create_and_retrieve(1024 * 1024, Scope::Private).await
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn create_and_retrieve_10mb_private() -> Result<()> {
-        create_and_retrieve(10 * 1024 * 1024, Scope::Private).await
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "too heavy for CI"]
-    async fn create_and_retrieve_20mb_private() -> Result<()> {
-        create_and_retrieve(20 * 1024 * 1024, Scope::Private).await
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "too heavy for CI"]
-    async fn create_and_retrieve_40mb_private() -> Result<()> {
-        create_and_retrieve(40 * 1024 * 1024, Scope::Private).await
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "too heavy for CI"]
-    async fn create_and_retrieve_80mb_private() -> Result<()> {
-        create_and_retrieve(80 * 1024 * 1024, Scope::Private).await
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "too heavy for CI"]
-    async fn create_and_retrieve_160mb_private() -> Result<()> {
-        create_and_retrieve(160 * 1024 * 1024, Scope::Private).await
-    }
-
-    async fn create_and_retrieve(size: usize, scope: Scope) -> Result<()> {
-        let blob = random_bytes(size);
-        let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
-        let address = client.write_to_network(blob.clone(), scope).await?;
-
-        // the larger the file, the longer we have to wait before we start querying
-        let delay = usize::max(1, size / 2_000_000);
-
-        // now that it was written to the network we should be able to retrieve it
-        let read_data = run_w_backoff_delayed(|| client.read_blob(address), 1, delay).await?;
-        // then the content should be what we stored
-        compare(blob, read_data)?;
-
         Ok(())
     }
 }

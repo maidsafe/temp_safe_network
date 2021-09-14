@@ -164,7 +164,7 @@ jobs:
       - name: Initial client tests...
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: timeout 5m cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
+        run: timeout 5m cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob --test-threads=1 && sleep 5
 
       # register api
       - name: Client reg tests against local network
@@ -174,8 +174,7 @@ jobs:
       # blob api
       - name: Client blob tests against local network
         shell: bash
-        # TODO: Reenable create_and_retrieve
-        run: timeout 5m cargo test --release --features=always-joinable,test-utils -- client_api::blob --skip create_and_retrieve && sleep 5
+        run: timeout 5m cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 && sleep 5
       
       - name: Run example app for Blob API against local network
         shell: bash

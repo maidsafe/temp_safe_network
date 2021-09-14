@@ -142,6 +142,9 @@ pub enum Error {
     /// Could not bootstrap to an unresponsive peer
     #[error("Could not bootstrap to an unresponsive peer {0}")]
     BootstrapToPeerFailed(SocketAddr),
+    /// Could not retrieve all chunks required to decrypt the data. (Expected, Actual)
+    #[error("Not enough chunks! Required {}, but we have {}.)", _0, _1)]
+    NotEnoughChunks(usize, usize),
 }
 
 impl From<(CmdError, OperationId)> for Error {
