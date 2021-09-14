@@ -28,7 +28,7 @@ pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(90);
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 
 /// Configuration for sn_client.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
     /// The local address to bind to.
     pub local_addr: SocketAddr,
@@ -120,6 +120,7 @@ fn project_dirs() -> Result<PathBuf> {
 mod tests {
     use super::*;
     use crate::client::utils::test_utils::init_logger;
+    use bincode::serialize;
     use eyre::Result;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use std::fs::File;
@@ -169,7 +170,7 @@ mod tests {
             qp2p: QuicP2pConfig::default(),
             query_timeout: DEFAULT_QUERY_TIMEOUT,
         };
-        assert_eq!(config, expected_config);
+        assert_eq!(serialize(&config)?, serialize(&expected_config)?);
 
         create_dir_all(&root_dir).await?;
         let mut file = File::create(&config_filepath)?;
@@ -180,7 +181,7 @@ mod tests {
         file.sync_all()?;
 
         let read_cfg = Config::new(None, None, genesis_key, None, None).await;
-        assert_eq!(config_on_disk, read_cfg);
+        assert_eq!(serialize(&config_on_disk)?, serialize(&read_cfg)?);
 
         Ok(())
     }

@@ -17,6 +17,22 @@ use bytes::Bytes;
 use tracing::debug;
 
 impl Client {
+    // Send a Query to the network and await a response.
+    // This function is a helper private to this module.
+    pub(crate) async fn send_query(&self, query: DataQuery) -> Result<QueryResult, Error> {
+        let client_pk = self.public_key();
+        let msg = ServiceMsg::Query(query.clone());
+        let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
+        let signature = self.keypair.sign(&serialised_query);
+
+        tokio::time::timeout(
+            self.query_timeout,
+            self.send_signed_query(query, client_pk, serialised_query, signature),
+        )
+        .await
+        .map_err(|_| Error::NoResponse)?
+    }
+
     /// Send a Query to the network and await a response
     /// This is to be part of a public API, for the user to
     /// provide the serialised and already signed query.
@@ -34,21 +50,5 @@ impl Client {
         };
 
         self.session.send_query(query, auth, serialised_query).await
-    }
-
-    // Send a Query to the network and await a response.
-    // This function is a helper private to this module.
-    pub(crate) async fn send_query(&self, query: DataQuery) -> Result<QueryResult, Error> {
-        let client_pk = self.public_key();
-        let msg = ServiceMsg::Query(query.clone());
-        let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
-        let signature = self.keypair.sign(&serialised_query);
-
-        tokio::time::timeout(
-            self.query_timeout,
-            self.send_signed_query(query, client_pk, serialised_query, signature),
-        )
-        .await
-        .map_err(|_| Error::NoResponse)?
     }
 }

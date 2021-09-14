@@ -30,13 +30,10 @@ use tokio::{
     sync::mpsc::{channel, Sender},
     sync::RwLock,
     task::JoinHandle,
-    time::sleep,
 };
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
-// Number of attempts when retrying to send a message to a node
-const NUMBER_OF_RETRIES: usize = 3;
 // Number of Elders subset to send queries to
 const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of attempts to make when trying to bootstrap to a section
@@ -81,8 +78,9 @@ impl Session {
         Ok(session)
     }
 
-    /// Utility function that bootstraps a client to a section. If there is a failure then it retries.
-    /// After a maximum of three attempts if the boostrap process still fails, then an error is returned.
+    /// Tries to bootstrap a client to a section. If there is a failure then it retries.
+    /// After a maximum of three attempts if the boostrap process still fails, the unresponsive
+    /// node is removed from the list and an error is returned.
     pub(crate) async fn attempt_bootstrap(
         client_pk: PublicKey,
         genesis_key: bls::PublicKey,
@@ -268,40 +266,15 @@ impl Session {
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
             let task_handle = tokio::spawn(async move {
-                // Retry queries that failed due to connection issues only
-                let mut result = Err(Error::ElderQuery);
-                for attempt in 1..NUMBER_OF_RETRIES + 1 {
-                    let msg_bytes_clone = msg_bytes.clone();
-
-                    if let Err(err) = endpoint
-                        .send_message(msg_bytes_clone, &socket, priority)
-                        .await
-                    {
-                        error!(
-                            "Try #{:?} @ {:?}, failed sending query message: {:?}",
-                            attempt, socket, err
-                        );
-                        result = Err(Error::SendingQuery);
-                        if attempt <= NUMBER_OF_RETRIES {
-                            let millis = 2_u64.pow(attempt as u32 - 1) * 100;
-                            sleep(std::time::Duration::from_millis(millis)).await
-                        }
-                    } else {
-                        trace!("ServiceMsg with id: {:?}, sent to {}", &msg_id, &socket);
-                        result = Ok(());
-                        break;
-                    }
-                }
-
+                let result = endpoint.send_message(msg_bytes, &socket, priority).await;
                 match &result {
                     Err(err) => {
                         error!("Error sending Query to elder: {:?} ", err);
                         let mut a = counter_clone.lock().await;
                         *a += 1;
                     }
-                    Ok(()) => (),
+                    Ok(()) => trace!("ServiceMsg with id: {:?}, sent to {}", &msg_id, &socket),
                 }
-
                 result
             });
 
