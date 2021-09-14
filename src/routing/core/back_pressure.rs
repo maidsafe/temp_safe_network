@@ -6,25 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::messaging::system::LoadAvg;
+
 use qp2p::config::RetryConfig;
-use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
 use sysinfo::{RefreshKind, System, SystemExt};
 use tokio::{sync::RwLock, time::Instant};
 
 const MIN_REPORT_INTERVAL: Duration = Duration::from_secs(10);
-
-/// Average cpu load to be sent over the wire.
-/// The values represent percentages, e.g. 12.234.., 21.721.., etc.
-#[derive(Clone, Copy, Serialize, Deserialize)]
-pub(crate) struct LoadAvg {
-    /// Average cpu load within one minute.
-    pub(crate) one: f64,
-    /// Average cpu load within five minutes.
-    pub(crate) five: f64,
-    /// Average cpu load within fifteen minutes.
-    pub(crate) fifteen: f64,
-}
 
 #[derive(Clone)]
 pub(crate) struct BackPressure {
@@ -56,20 +45,23 @@ impl BackPressure {
             .unwrap_or_default()
     }
 
-    /// If we get a response back from a node, we remove them.
-    pub(crate) async fn remove(&self, addr: &SocketAddr) {
-        let _ = self.reports.write().await.remove(addr);
-    }
+    // #TODO: Cleanup reports in some way.
+    // /// If we get a non-backpressure response back from a node, we remove them.
+    // pub(crate) async fn remove(&self, addr: &SocketAddr) {
+    //     let _ = self.reports.write().await.remove(addr);
+    // }
 
     /// Sets reported load for a node, when it errored back saying it was strained.
-    pub(crate) async fn set(&self, addr: &SocketAddr, load: LoadAvg) {
+    pub(crate) async fn set(&self, addr: SocketAddr, load: LoadAvg) {
         // evaluate the passed in load
         let (short_term, mid_term, long_term) = evaluate(&load);
 
         let default_cfg = RetryConfig::default();
 
         let (initial_retry_interval, retry_delay_multiplier, retrying_max_elapsed_time) =
-            if long_term.triggered() {
+            if long_term.critical {
+                (Duration::from_millis(8000), 5.0, Duration::from_secs(360))
+            } else if long_term.triggered() {
                 (Duration::from_millis(4000), 4.0, Duration::from_secs(180))
             } else if mid_term.triggered() {
                 (Duration::from_millis(2000), 3.0, Duration::from_secs(90))
@@ -91,7 +83,7 @@ impl BackPressure {
             retrying_max_elapsed_time,
         };
 
-        let _ = self.reports.write().await.insert(*addr, cfg);
+        let _ = self.reports.write().await.insert(addr, cfg);
     }
 
     /// Sent to nodes calling us, if we are strained
@@ -112,7 +104,7 @@ impl BackPressure {
 
         let (short_term, mid_term, long_term) = evaluate(&load);
 
-        if long_term.triggered() || mid_term.triggered() || short_term.triggered() {
+        if short_term.triggered() || mid_term.triggered() || long_term.triggered() {
             Some(load)
         } else {
             None

@@ -34,7 +34,7 @@ pub use signed::{KeyedSig, SigShare};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
 pub enum SystemMsg {
@@ -78,6 +78,10 @@ pub enum SystemMsg {
         /// Optional section members if we're updating our own section adults
         members: Option<SectionPeers>,
     },
+    /// Sent when a msg-consuming node is surpassing certain thresholds for
+    /// cpu load. It tells msg-producing nodes to back off a bit, proportional
+    /// to the node's cpu load, as given by the included `LoadAvg`.
+    BackPressure(LoadAvg),
     /// Send from a section to the node to be immediately relocated.
     Relocate(RelocateDetails),
     /// Send:
@@ -157,4 +161,16 @@ pub enum SystemMsg {
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
+}
+
+/// Average cpu load to be sent over the wire.
+/// The values represent percentages, e.g. 12.234.., 21.721.., etc.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LoadAvg {
+    /// Average cpu load within one minute.
+    pub one: f64,
+    /// Average cpu load within five minutes.
+    pub five: f64,
+    /// Average cpu load within fifteen minutes.
+    pub fifteen: f64,
 }

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{BlsShareAuth, NodeAuth, SectionAuth, ServiceAuth};
+use super::{BlsShareAuth, NodeAuth, SectionAuth, ServiceAuth, SrcLocation};
 use serde::{Deserialize, Serialize};
 
 /// Source authority of a message.
@@ -48,6 +48,25 @@ impl MsgKind {
             Self::NodeBlsShareAuthMsg(_) => 1,
             Self::NodeAuthMsg(_) => 0,
             Self::ServiceMsg(_) => -2,
+        }
+    }
+
+    /// The src location of the msg.
+    pub fn src(&self) -> SrcLocation {
+        match self {
+            Self::SectionAuthMsg(auth) => SrcLocation::Section {
+                name: auth.src_name,
+                section_pk: auth.sig.public_key,
+            },
+            Self::NodeBlsShareAuthMsg(auth) => SrcLocation::Node {
+                name: auth.src_name,
+                section_pk: auth.sig_share.public_key_set.public_key(),
+            },
+            Self::NodeAuthMsg(auth) => SrcLocation::Node {
+                name: crate::types::PublicKey::Ed25519(auth.public_key).into(),
+                section_pk: auth.section_pk,
+            },
+            Self::ServiceMsg(auth) => SrcLocation::EndUser(super::EndUser(auth.public_key.into())),
         }
     }
 }
