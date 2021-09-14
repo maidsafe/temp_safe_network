@@ -200,9 +200,9 @@ impl Core {
         }
     }
 
-    // Handler for all infrastructure messages
+    // Handler for all system messages
     #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn handle_infrastructure_message(
+    pub(crate) async fn handle_system_message(
         &self,
         sender: SocketAddr,
         msg_id: MessageId,
@@ -212,7 +212,7 @@ impl Core {
         payload: Bytes,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
-        info!("Handling Infrastructure message");
+        info!("Handling system message");
 
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
@@ -245,7 +245,9 @@ impl Core {
                 }
             },
             Err(Error::InvalidSignatureShare) => {
-                info!("Invalid signature on received Infrastructure message. Handling as untrusted message.");
+                info!(
+                    "Invalid signature on received system message. Handling as untrusted message."
+                );
                 let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
                 Ok(vec![cmd])
             }
