@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.29.4](https://github.com/maidsafe/safe_network/compare/v0.29.3...v0.29.4) (2021-09-14)
+
+
+### Bug Fixes
+
+* make DEFAULT_NODE_COUNT of testnet effective ([06f33ef](https://github.com/maidsafe/safe_network/commit/06f33ef7b63e5c4a4287049dac83266e0cef07f9))
+
 ### [0.29.3](https://github.com/maidsafe/safe_network/compare/v0.29.2...v0.29.3) (2021-09-14)
 
 ### [0.29.2](https://github.com/maidsafe/safe_network/compare/v0.29.1...v0.29.2) (2021-09-13)
