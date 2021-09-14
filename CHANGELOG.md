@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.30.0](https://github.com/maidsafe/safe_network/compare/v0.29.4...v0.30.0) (2021-09-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **blob_api:** New major version of qp2p with changed config.
+
+* **blob_api:** remove blob cache ([5b37ab0](https://github.com/maidsafe/safe_network/commit/5b37ab04c76847f7e6badaadd96e10b9d917ba34))
+
 ### [0.29.4](https://github.com/maidsafe/safe_network/compare/v0.29.3...v0.29.4) (2021-09-14)
 
 
