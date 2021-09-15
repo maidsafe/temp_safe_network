@@ -2246,6 +2246,7 @@ dependencies = [
  "itertools 0.10.1",
  "lazy_static",
  "multibase",
+ "num_cpus",
  "proptest",
  "qp2p",
  "rand 0.7.3",
