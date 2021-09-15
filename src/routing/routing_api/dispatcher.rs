@@ -181,7 +181,7 @@ impl Dispatcher {
                 self.core
                     .read()
                     .await
-                    .handle_infrastructure_message(
+                    .handle_system_message(
                         sender,
                         msg_id,
                         msg_authority,

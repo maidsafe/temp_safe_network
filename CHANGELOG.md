@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.2](https://github.com/maidsafe/safe_network/compare/v0.31.1...v0.31.2) (2021-09-15)
+
+### [0.31.1](https://github.com/maidsafe/safe_network/compare/v0.31.0...v0.31.1) (2021-09-14)
+
+## [0.31.0](https://github.com/maidsafe/safe_network/compare/v0.30.0...v0.31.0) (2021-09-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* At the API level, the `node::Config::first` field has
+changed from `Option<SocketAddr>` to `boolean`. This also affects the
+`sn_node` CLI, where `--first` is no longer allowed a value.
+Additionally, the semantics and validation of `--local-addr` and
+`--public-addr` have changed, however this should only affect
+nonsensical combinations.
+* The `bootstrap_cache_dir` field of `node::Config` has
+been removed.
+
+* remove unused `node::Config::bootstrap_cache_dir` field ([bdd4e98](https://github.com/maidsafe/safe_network/commit/bdd4e982429994e6b2e149168a67eac2e62b44f5))
+* simplify node address config and improve validation ([a4f9e6b](https://github.com/maidsafe/safe_network/commit/a4f9e6bb1620f6bafafc547e97b5bbf8cf980869))
+
+## [0.30.0](https://github.com/maidsafe/safe_network/compare/v0.29.4...v0.30.0) (2021-09-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **blob_api:** New major version of qp2p with changed config.
+
+* **blob_api:** remove blob cache ([5b37ab0](https://github.com/maidsafe/safe_network/commit/5b37ab04c76847f7e6badaadd96e10b9d917ba34))
+
 ### [0.29.4](https://github.com/maidsafe/safe_network/compare/v0.29.3...v0.29.4) (2021-09-14)
 
 

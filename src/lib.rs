@@ -11,7 +11,7 @@
 // For quick_error
 #![recursion_limit = "256"]
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
+    html_logo_url = "https://github.com/maidsafe/QA/raw/master/Images/maidsafe_logo.png",
     html_favicon_url = "https://maidsafe.net/img/favicon.ico",
     test(attr(deny(warnings)))
 )]
