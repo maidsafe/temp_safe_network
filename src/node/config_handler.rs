@@ -154,12 +154,20 @@ impl Config {
             }
         }
 
+        if command_line_args.genesis_key.is_none() {
+            debug!("Using node connection config file as no genesis key was passed in");
+            if let Ok((genesis_key, _)) = read_conn_info_from_file().await {
+                command_line_args.genesis_key = Some(genesis_key);
+            }
+        }
+
         config.merge(command_line_args);
 
         config.clear_data_from_disk().await.unwrap_or_else(|_| {
             tracing::error!("Error deleting data file from disk");
         });
 
+        info!("Node config to be used: {:?}", config);
         Ok(config)
     }
 
