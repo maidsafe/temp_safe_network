@@ -65,10 +65,13 @@ impl Config {
             .unwrap_or_else(default_dir);
         // If a config file path was provided we try to read it,
         // otherwise we use default qp2p config.
-        let qp2p = match &config_file_path {
+        let mut qp2p = match &config_file_path {
             None => QuicP2pConfig::default(),
             Some(path) => read_config_file(path).await.unwrap_or_default(),
         };
+
+        qp2p.idle_timeout = Some(Duration::from_secs(5));
+        qp2p.keep_alive_interval = Some(Duration::from_secs(1));
 
         Self {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
