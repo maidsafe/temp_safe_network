@@ -152,6 +152,16 @@ impl Core {
                 msg,
                 dst_location,
             } => {
+                let dst_name = match msg.dst_address() {
+                    Some(name) => name,
+                    None => {
+                        error!(
+                            "Service msg has been dropped since {:?} is not a valid msg to send from a client {}.",
+                            msg, sender
+                        );
+                        return Ok(vec![]);
+                    }
+                };
                 let user = match self.comm.get_connection_id(&sender).await {
                     Some(name) => EndUser(name),
                     None => {
@@ -162,6 +172,7 @@ impl Core {
                         return Ok(vec![]);
                     }
                 };
+
                 let src_location = SrcLocation::EndUser(user);
 
                 if self.is_not_elder() {
@@ -185,7 +196,7 @@ impl Core {
                         msg_bytes,
                         &src_location,
                         &received_section_pk,
-                        msg.dst_address(),
+                        dst_name,
                         sender,
                     )
                     .await?

@@ -115,12 +115,12 @@ impl DstLocation {
         }
     }
 
-    /// Returns the name of this location, or `None` if it is `Direct`.
-    pub fn name(&self) -> Option<XorName> {
+    /// Returns the name of this location
+    pub fn name(&self) -> XorName {
         match self {
-            Self::EndUser(user) => Some(user.0),
-            Self::Node { name, .. } => Some(*name),
-            Self::Section { name, .. } => Some(*name),
+            Self::EndUser(user) => user.0,
+            Self::Node { name, .. } => *name,
+            Self::Section { name, .. } => *name,
         }
     }
 
