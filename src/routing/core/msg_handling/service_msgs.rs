@@ -193,7 +193,7 @@ impl Core {
 
         let query_response = QueryResponse::GetChunk(response);
 
-        match query_response.operation_id() {
+        let pending_removed = match query_response.operation_id() {
             Ok(op_id) => {
                 let node_id = XorName::from(sending_nodes_pk);
                 self.liveness
@@ -201,9 +201,10 @@ impl Core {
                     .await
             }
             Err(error) => {
-                warn!("Node problems noted when retrieving data: {:?}", error)
+                warn!("Node problems noted when retrieving data: {:?}", error);
+                false
             }
-        }
+        };
 
         // Check for unresponsive adults here.
         for (name, count) in self.liveness.find_unresponsive_nodes().await {
@@ -212,6 +213,11 @@ impl Core {
                 name, count
             );
             commands.push(Command::ProposeOffline(name));
+        }
+
+        if !pending_removed {
+            trace!("Ignoring un-expected response");
+            return Ok(commands);
         }
 
         // Send response if one is warrented
