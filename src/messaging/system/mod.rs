@@ -83,7 +83,7 @@ pub enum SystemMsg {
     /// Sent when a msg-consuming node is surpassing certain thresholds for
     /// cpu load. It tells msg-producing nodes to back off a bit, proportional
     /// to the node's cpu load, as given by the included `LoadAvg`.
-    BackPressure(LoadAvg),
+    BackPressure(LoadReport),
     /// Send from a section to the node to be immediately relocated.
     Relocate(RelocateDetails),
     /// Send:
@@ -165,14 +165,28 @@ pub enum SystemMsg {
     },
 }
 
-/// Average cpu load to be sent over the wire.
-/// The values represent percentages, e.g. 12.234.., 21.721.., etc.
+/// Load report to be sent over the wire.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct LoadAvg {
-    /// Average cpu load within one minute.
-    pub one: f64,
-    /// Average cpu load within five minutes.
-    pub five: f64,
-    /// Average cpu load within fifteen minutes.
-    pub fifteen: f64,
+pub struct LoadReport {
+    /// CPU load short term (~1 min).
+    pub short_term: CpuLoad,
+    /// CPU load mid term (~5 min).
+    pub mid_term: CpuLoad,
+    /// CPU load long term (~15 min).
+    pub long_term: CpuLoad,
+}
+
+/// An evaluationg of measured cpu load during a period.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CpuLoad {
+    /// This is considered to be well below sustainable levels.
+    pub low: bool,
+    /// This is considered to be OK.
+    pub moderate: bool,
+    /// This is not a sustainable level.
+    pub high: bool,
+    /// This is not a sustainable level.
+    pub very_high: bool,
+    /// This is not a sustainable level.
+    pub critical: bool,
 }
