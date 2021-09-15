@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.3](https://github.com/maidsafe/safe_network/compare/v0.31.2...v0.31.3) (2021-09-15)
+
+
+### Features
+
+* read genesis config from file if non provided ([67fc6ca](https://github.com/maidsafe/safe_network/commit/67fc6cac23b3b759ffccb097d776398df2da6588))
+
 ### [0.31.2](https://github.com/maidsafe/safe_network/compare/v0.31.1...v0.31.2) (2021-09-15)
 
 ### [0.31.1](https://github.com/maidsafe/safe_network/compare/v0.31.0...v0.31.1) (2021-09-14)
