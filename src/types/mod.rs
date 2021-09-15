@@ -14,11 +14,13 @@ pub mod register;
 /// Encoding utils
 pub mod utils;
 
+mod cache;
 mod chunk;
 mod errors;
 mod keys;
 mod token;
 
+pub use cache::Cache;
 pub use chunk::{Address as ChunkAddress, Chunk, MAX_CHUNK_SIZE_IN_BYTES};
 pub use errors::{convert_dt_error_to_error_message, Error, Result};
 pub use keys::{
