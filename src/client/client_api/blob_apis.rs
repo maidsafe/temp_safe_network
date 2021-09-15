@@ -347,13 +347,13 @@ mod tests {
                 // Read first part
                 let read_data_1 = {
                     let pos = 0;
-                    seek(data.clone(), pos, len).await?
+                    seek_for_test(data.clone(), pos, len).await?
                 };
 
                 // Read second part
                 let read_data_2 = {
                     let pos = len;
-                    seek(data.clone(), pos, len).await?
+                    seek_for_test(data.clone(), pos, len).await?
                 };
 
                 // Join parts
@@ -457,7 +457,7 @@ mod tests {
         Ok(())
     }
 
-    async fn seek(data: Bytes, pos: usize, len: usize) -> Result<Bytes> {
+    async fn seek_for_test(data: Bytes, pos: usize, len: usize) -> Result<Bytes> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
         let address = client.write_to_network(data.clone(), Scope::Public).await?;
 
