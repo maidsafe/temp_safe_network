@@ -16,6 +16,7 @@ use super::{
     OutputFmt,
 };
 use ansi_term::Colour;
+use bytes::Bytes;
 use color_eyre::{eyre::bail, eyre::eyre, Result};
 use log::debug;
 use prettytable::{format::FormatBuilder, Table};
@@ -334,7 +335,7 @@ pub async fn files_commander(
                 if location.is_empty() {
                     let file_content = get_from_stdin(Some("...awaiting file's content to add from STDIN"))?;
                     // Update the FilesContainer on the Network
-                    safe.files_container_add_from_raw(&file_content, &target_url, force, update_nrs, dry_run).await?
+                    safe.files_container_add_from_raw(Bytes::from(file_content), &target_url, force, update_nrs, dry_run).await?
                 } else {
                     // Update the FilesContainer on the Network
                     safe.files_container_add(&location, &target_url, force, update_nrs, follow_links, dry_run).await?

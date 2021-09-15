@@ -11,6 +11,7 @@ use super::{
     helpers::{div_or, pluralize, prompt_user},
     OutputFmt,
 };
+use bytes::Buf;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, TickTimeLimit};
@@ -795,7 +796,7 @@ pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<
     match Url::from_url(url)?.data_type() {
         DataType::Blob => {
             let pub_blob = safe.files_get_public_blob(url, range).await?;
-            Ok(pub_blob)
+            Ok(pub_blob.chunk().to_vec())
         }
         _ => Err(eyre!("URL target is not immutable data")),
     }
