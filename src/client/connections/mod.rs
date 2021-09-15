@@ -14,7 +14,7 @@ use crate::messaging::{
     signature_aggregator::SignatureAggregator,
 };
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::PublicKey;
+use crate::types::{Cache, PublicKey};
 
 use qp2p::Endpoint;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
@@ -42,6 +42,8 @@ pub(super) struct Session {
     incoming_err_sender: Arc<Sender<CmdError>>,
     /// All elders we know about from AE messages
     network: Arc<NetworkPrefixMap>,
+    /// Message resending cache
+    ae_cache: Arc<Cache<XorName, Vec<SocketAddr>>>,
     /// Our initial bootstrap node
     bootstrap_peer: SocketAddr,
     /// BLS Signature aggregator for aggregating network messages

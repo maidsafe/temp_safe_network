@@ -15,12 +15,13 @@ use crate::messaging::{
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::PublicKey;
+use crate::types::{Cache, PublicKey};
 
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
+use std::time::Duration;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     net::SocketAddr,
@@ -68,6 +69,7 @@ impl Session {
             incoming_err_sender: Arc::new(err_sender),
             endpoint,
             network: Arc::new(NetworkPrefixMap::new(genesis_key)),
+            ae_cache: Arc::new(Cache::with_expiry_duration(Duration::from_secs(5))),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             bootstrap_peer,
             genesis_key,
@@ -174,7 +176,16 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        send_message(elders, wire_msg, self.endpoint.clone(), msg_id).await
+        return match send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await {
+            Ok(()) => {
+                if let Some(old_elders) = self.ae_cache.set(dst_address, elders.clone(), None).await
+                {
+                    warn!("We have already sent this cmd to Elders {:?} Updating cache with latest elders {:?}", old_elders, &elders);
+                }
+                Ok(())
+            }
+            Err(e) => Err(e),
+        };
     }
 
     /// Send a `ServiceMsg` to the network awaiting for the response.
@@ -261,7 +272,7 @@ impl Session {
         let msg_bytes = wire_msg.serialize()?;
 
         // Set up response listeners
-        for socket in chosen_elders {
+        for socket in chosen_elders.clone() {
             let endpoint = endpoint.clone();
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
@@ -301,6 +312,10 @@ impl Session {
                 error!("Error spawning task to send query: {:?} ", err);
                 discarded_responses += 1;
             }
+        }
+
+        if let Some(old_elders) = self.ae_cache.set(dst, chosen_elders.clone(), None).await {
+            warn!("We have already sent this query to Elders {:?} Updating cache with latest elders {:?}", old_elders, &chosen_elders);
         }
 
         let response = loop {

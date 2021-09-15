@@ -170,7 +170,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::routing::cache::Cache;
+    use crate::types::cache::Cache;
     use std::time::Duration;
 
     const KEY: i8 = 0;
