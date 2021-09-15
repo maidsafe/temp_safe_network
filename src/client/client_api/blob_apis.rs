@@ -450,7 +450,7 @@ mod tests {
         let delay = usize::max(1, size / 2_000_000);
 
         // now that it was written to the network we should be able to retrieve it
-        let read_data = run_w_backoff_delayed(|| client.read_blob(address), 1, delay).await?;
+        let read_data = run_w_backoff_delayed(|| client.read_blob(address), 10, delay).await?;
         // then the content should be what we stored
         compare(blob, read_data)?;
 
