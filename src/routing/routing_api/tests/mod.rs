@@ -356,7 +356,17 @@ async fn aggregate_proposals() -> Result<()> {
         )
         .await?;
 
-        assert!(commands.is_empty());
+        if !commands.is_empty() {
+            // only possible/expected msg if not empty, is a backpressure msg
+            assert_eq!(1, commands.len());
+            assert_matches!(
+                commands[0],
+                Command::PrepareNodeMsgToSend {
+                    msg: SystemMsg::BackPressure(_),
+                    ..
+                }
+            )
+        }
     }
 
     let sig_share = proposal.prove(
@@ -389,8 +399,20 @@ async fn aggregate_proposals() -> Result<()> {
     .await?
     .into_iter();
 
+    let mut next_cmd = commands.next();
+
+    if matches!(
+        next_cmd,
+        Some(Command::PrepareNodeMsgToSend {
+            msg: SystemMsg::BackPressure(_),
+            ..
+        })
+    ) {
+        next_cmd = commands.next();
+    }
+
     assert_matches!(
-        commands.next(),
+        next_cmd,
         Some(Command::HandleAgreement { proposal: agreement, .. }) => {
             assert_eq!(agreement, proposal);
         }
