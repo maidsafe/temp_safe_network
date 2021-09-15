@@ -24,8 +24,13 @@
 // Public API
 // ############################################################################
 pub use self::error::ProposalError;
+pub(crate) use self::{
+    core::ChunkStore,
+    core::RegisterStorage,
+    core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
+    section::section_keys::SectionKeyShare,
+};
 pub use self::{
-    cache::Cache,
     dkg::SectionAuthUtils,
     error::{Error, Result},
     peer::PeerUtils,
@@ -39,12 +44,6 @@ pub use self::{
         node_state::{FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE},
         section_authority_provider::SectionAuthorityProviderUtils,
     },
-};
-pub(crate) use self::{
-    core::ChunkStore,
-    core::RegisterStorage,
-    core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
-    section::section_keys::SectionKeyShare,
 };
 pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
@@ -61,7 +60,6 @@ pub(crate) use section::test_utils::gen_section_authority_provider;
 // Private
 // ############################################################################
 
-mod cache;
 mod core;
 mod dkg;
 mod ed25519;
