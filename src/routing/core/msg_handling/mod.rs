@@ -338,6 +338,7 @@ impl Core {
             }
             SystemMsg::BackPressure(load_report) => {
                 trace!("Handling msg: BackPressure from {}", sender);
+                // #TODO: Factor in med/long term backpressure into general node liveness calculations
                 self.comm.regulate(sender, load_report).await;
                 Ok(vec![])
             }

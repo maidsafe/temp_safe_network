@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::BackPressure;
+use crate::messaging::system::LoadReport;
 use crate::messaging::WireMsg;
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
@@ -280,17 +281,15 @@ impl Comm {
     }
 
     /// Regulates comms with the specified peer
-    /// according to the cpu load avg provided by it.
-    pub(crate) async fn regulate(
-        &self,
-        peer: SocketAddr,
-        load_report: crate::messaging::system::LoadAvg,
-    ) {
+    /// according to the cpu load report provided by it.
+    pub(crate) async fn regulate(&self, peer: SocketAddr, load_report: LoadReport) {
         self.back_pressure.set(peer, load_report).await
     }
 
-    /// Returns cpu load avg if under strain.
-    pub(crate) async fn check_strain(&self) -> Option<crate::messaging::system::LoadAvg> {
+    /// Returns cpu load report if
+    /// A. ..being strained, or
+    /// B. ..changed from being strained to OK levels.
+    pub(crate) async fn check_strain(&self) -> Option<LoadReport> {
         self.back_pressure.load_report().await
     }
 }
