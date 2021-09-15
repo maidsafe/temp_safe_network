@@ -35,7 +35,7 @@ use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
 // Number of Elders subset to send queries to
-const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
+pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of attempts to make when trying to bootstrap to a section
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
 

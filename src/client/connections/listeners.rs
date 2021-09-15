@@ -7,12 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Session;
-use crate::client::{connections::messaging::send_message, Error};
+use crate::client::{
+    connections::messaging::{send_message, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
+    Error,
+};
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
     system::{KeyedSig, SectionAuth, SystemMsg},
     DstLocation, MessageId, MessageType, MsgKind, SectionAuthorityProvider, WireMsg,
 };
+use crate::routing::ELDER_SIZE;
 use crate::types::PublicKey;
 use bytes::Bytes;
 use qp2p::IncomingMessages;
@@ -208,10 +212,17 @@ impl Session {
             return Ok(session);
         }
 
+        let mut num_of_elders_for_query = ELDER_SIZE;
+
         let (msg_id, service_msg, auth) = match WireMsg::deserialize(bounced_msg)? {
             MessageType::Service {
                 msg_id, msg, auth, ..
-            } => (msg_id, msg, auth),
+            } => {
+                if let ServiceMsg::Query(_) = msg {
+                    num_of_elders_for_query = NUM_OF_ELDERS_SUBSET_FOR_QUERIES;
+                }
+                (msg_id, msg, auth)
+            }
             other => {
                 warn!(
                     "Unexpected non-serviceMsg returned in AE-Redirect response: {:?}",
@@ -240,6 +251,7 @@ impl Session {
             .elders
             .values()
             .cloned()
+            .take(num_of_elders_for_query)
             .collect::<Vec<SocketAddr>>();
         let section_pk = section_auth.public_key_set.public_key();
 
