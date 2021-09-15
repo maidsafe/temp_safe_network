@@ -22,7 +22,7 @@ use crate::routing::{
     node::Node,
     routing_api::command::Command,
     section::{ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionKeysProvider},
-    Error, Event,
+    Event,
 };
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
@@ -191,7 +191,7 @@ impl Core {
             wire_msg.src_section_pk(),
         );
 
-        let target_name = dst_location.name().ok_or(Error::CannotRoute)?;
+        let target_name = dst_location.name();
 
         // To avoid loop: if destination is to Node, targets are multiple, self is an elder,
         //     self section prefix matches the destination name, then don't carry out a relay.
