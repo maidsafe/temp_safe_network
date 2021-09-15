@@ -7,10 +7,12 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::operations::config::{read_current_network_conn_info, Config, NetworkInfo};
-use color_eyre::{eyre::bail, Result};
+use crate::operations::config::{read_current_node_config, Config, NetworkInfo};
+use color_eyre::{eyre::bail, eyre::eyre, Result};
 use log::debug;
-use std::{collections::HashSet, iter::FromIterator, net::SocketAddr};
+use sn_api::PublicKey;
+use std::collections::BTreeSet;
+use std::net::SocketAddr;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -64,10 +66,10 @@ pub async fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> 
         }
         Some(NetworksSubCommands::Check {}) => {
             println!("Checking current setup network connection information...");
-            let (conn_info_file_path, current_conn_info) = read_current_network_conn_info()?;
+            let (node_config_path, current_node_config) = read_current_node_config()?;
             let mut matched_network = None;
             for (network_name, network_info) in config.networks_iter() {
-                if network_info.matches(&current_conn_info).await {
+                if network_info.matches(&current_node_config).await {
                     matched_network = Some(network_name);
                     break;
                 }
@@ -77,7 +79,7 @@ pub async fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> 
             match matched_network {
                 Some(name) => {
                     println!("'{}' network matched!", name);
-                    println!("Current set network connection information at '{}' matches '{}' network as per current config", conn_info_file_path.display(), name);
+                    println!("Current set network connection information at '{}' matches '{}' network as per current config", node_config_path.display(), name);
                 },
                 None => println!("Current network setup in your system doesn't match any of your networks in the CLI config. Use 'networks switch' command to switch to any of them")
             }
@@ -100,9 +102,18 @@ pub async fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> 
             if addresses.is_empty() {
                 bail!("Please provide the bootstrapping address/es");
             }
-            let addresses = HashSet::from_iter(addresses);
+            let mut set = BTreeSet::new();
+            for address in addresses {
+                set.insert(address);
+            }
+
+            // The command will need to be expanded to provide the genesis key.
+            let genesis_key = PublicKey::bls_from_hex("8640e62cc44e75cf4fadc8ee91b74b4cf0fd2c0984fb0e3ab40f026806857d8c41f01d3725223c55b1ef87d669f5e2cc")?
+                .bls()
+                .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
+            let node_config = (genesis_key, set);
             let net_info =
-                config.add_network(&network_name, Some(NetworkInfo::Addresses(addresses)))?;
+                config.add_network(&network_name, Some(NetworkInfo::Addresses(node_config)))?;
             println!(
                 "Network '{}' was added to the list. Contacts: '{}'",
                 network_name, net_info

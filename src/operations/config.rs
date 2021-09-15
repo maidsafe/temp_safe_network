@@ -11,8 +11,9 @@ use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use log::debug;
 use prettytable::Table;
 use serde::{Deserialize, Serialize};
+use sn_api::{NodeConfig, PublicKey};
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     fmt,
     fs::{self, create_dir_all, remove_file},
     net::SocketAddr,
@@ -25,7 +26,7 @@ const CONFIG_NETWORKS_DIRNAME: &str = "networks";
 #[derive(Deserialize, Debug, Serialize, Clone)]
 pub enum NetworkInfo {
     /// A list of IPv4 addresses wich are the contact peers of the network
-    Addresses(HashSet<SocketAddr>),
+    Addresses(NodeConfig),
     /// A URL where the network connection information can be fetched/read from
     ConnInfoUrl(String),
 }
@@ -40,11 +41,12 @@ impl fmt::Display for NetworkInfo {
 }
 
 impl NetworkInfo {
-    pub async fn matches(&self, conn_info: &HashSet<SocketAddr>) -> bool {
+    pub async fn matches(&self, node_config: &NodeConfig) -> bool {
         match self {
-            Self::Addresses(addresses) => addresses == conn_info,
-            Self::ConnInfoUrl(config_location) => match retrieve_conn_info(config_location).await {
-                Ok(info) => info == *conn_info,
+            Self::Addresses(node_config) => node_config == node_config,
+            Self::ConnInfoUrl(config_location) => match retrieve_node_config(config_location).await
+            {
+                Ok(info) => info == *node_config,
                 Err(_) => false,
             },
         }
@@ -104,7 +106,7 @@ impl Config {
         Ok(config)
     }
 
-    pub async fn get_network_info(&self, name: &str) -> Result<HashSet<SocketAddr>> {
+    pub async fn get_network_info(&self, name: &str) -> Result<NodeConfig> {
         match self.settings.networks.get(name) {
             Some(NetworkInfo::ConnInfoUrl(config_location)) => {
                 println!(
@@ -112,7 +114,8 @@ impl Config {
                     name, config_location
                 );
 
-                retrieve_conn_info(config_location).await
+                let node_config = retrieve_node_config(config_location).await?;
+                Ok(node_config)
             },
             Some(NetworkInfo::Addresses(addresses)) => Ok(addresses.clone()),
             None => bail!("No network with name '{}' was found in the config. Please use the networks 'add'/'set' subcommand to add it", name)
@@ -132,8 +135,8 @@ impl Config {
             info
         } else {
             // Cache current network connection info
-            let (_, conn_info) = read_current_network_conn_info()?;
-            let cache_path = cache_conn_info(name, &conn_info)?;
+            let (_, conn_info) = read_current_node_config()?;
+            let cache_path = cache_node_config(name, &conn_info)?;
             println!(
                 "Caching current network connection information into '{}'",
                 cache_path.display()
@@ -190,7 +193,7 @@ impl Config {
     }
 
     pub async fn switch_to_network(&self, name: &str) -> Result<()> {
-        let (base_path, file_path) = get_current_network_conn_info_path()?;
+        let (base_path, file_path) = get_current_network_info_path()?;
 
         if !base_path.exists() {
             println!(
@@ -202,7 +205,7 @@ impl Config {
         }
 
         let contacts = self.get_network_info(name).await?;
-        let conn_info = serialise_contacts(&contacts)?;
+        let conn_info = serialise_node_config(&contacts)?;
         fs::write(&file_path, conn_info).wrap_err_with(|| {
             format!(
                 "Unable to write network connection info in '{}'",
@@ -215,15 +218,15 @@ impl Config {
         let mut table = Table::new();
         table.add_row(row![bFg->"Networks"]);
         table.add_row(row![bFg->"Current", bFg->"Network name", bFg->"Connection info"]);
-        let current_conn_info = match read_current_network_conn_info() {
+        let current_node_config = match read_current_node_config() {
             Ok((_, current_conn_info)) => Some(current_conn_info),
             Err(_) => None, // we simply ignore the error, none of the networks is currently active/set in the system
         };
 
         for (network_name, net_info) in self.networks_iter() {
             let mut current = "";
-            if let Some(conn_info) = &current_conn_info {
-                if net_info.matches(conn_info).await {
+            if let Some(node_config) = &current_node_config {
+                if net_info.matches(&node_config).await {
                     current = "*";
                 }
             }
@@ -256,8 +259,8 @@ impl Config {
     }
 }
 
-pub fn read_current_network_conn_info() -> Result<(PathBuf, HashSet<SocketAddr>)> {
-    let (_, file_path) = get_current_network_conn_info_path()?;
+pub fn read_current_node_config() -> Result<(PathBuf, NodeConfig)> {
+    let (_, file_path) = get_current_network_info_path()?;
     let current_conn_info = fs::read(&file_path).wrap_err_with(||
         format!(
             "There doesn't seem to be a any network setup in your system. Unable to read current network connection information from '{}'",
@@ -265,14 +268,14 @@ pub fn read_current_network_conn_info() -> Result<(PathBuf, HashSet<SocketAddr>)
         )
     )?;
 
-    let contacts = deserialise_contacts(&current_conn_info).wrap_err_with(|| {
+    let node_config = deserialise_node_config(&current_conn_info).wrap_err_with(|| {
         format!(
             "Unable to read current network connection information from '{}'",
             file_path.display()
         )
     })?;
 
-    Ok((file_path, contacts))
+    Ok((file_path, node_config))
 }
 
 fn config_file_path() -> Result<PathBuf> {
@@ -290,7 +293,7 @@ fn config_file_path() -> Result<PathBuf> {
     Ok(file_path)
 }
 
-fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Result<PathBuf> {
+fn cache_node_config(network_name: &str, contacts: &NodeConfig) -> Result<PathBuf> {
     let mut file_path = get_cli_config_path()?;
     file_path.push(CONFIG_NETWORKS_DIRNAME);
     if !file_path.exists() {
@@ -303,7 +306,7 @@ fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Result
     }
 
     file_path.push(format!("{}_node_connection_info.config", network_name));
-    let conn_info = serialise_contacts(contacts)?;
+    let conn_info = serialise_node_config(contacts)?;
     fs::write(&file_path, conn_info).wrap_err_with(|| {
         format!(
             "Unable to cache connection information in '{}'",
@@ -314,7 +317,7 @@ fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Result
     Ok(file_path)
 }
 
-async fn retrieve_conn_info(location: &str) -> Result<HashSet<SocketAddr>> {
+async fn retrieve_node_config(location: &str) -> Result<NodeConfig> {
     let is_remote_location = location.starts_with("http");
     let contacts_bytes = if is_remote_location {
         #[cfg(feature = "self-update")]
@@ -339,19 +342,25 @@ async fn retrieve_conn_info(location: &str) -> Result<HashSet<SocketAddr>> {
         })?
     };
 
-    deserialise_contacts(&contacts_bytes)
+    deserialise_node_config(&contacts_bytes)
 }
 
-fn deserialise_contacts(bytes: &[u8]) -> Result<HashSet<SocketAddr>> {
-    serde_json::from_slice(bytes)
-        .wrap_err_with(|| "Format of the contacts addresses is not valid and couldn't be parsed")
+fn deserialise_node_config(bytes: &[u8]) -> Result<NodeConfig> {
+    let deserialized: (String, BTreeSet<SocketAddr>) = serde_json::from_slice(bytes)
+        .wrap_err_with(|| "Format of the contacts addresses is not valid and couldn't be parsed")?;
+    let genesis_key = PublicKey::bls_from_hex(&deserialized.0)?
+        .bls()
+        .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
+    Ok((genesis_key, deserialized.1))
 }
 
-pub fn serialise_contacts(contacts: &HashSet<SocketAddr>) -> Result<String> {
-    serde_json::to_string(contacts).wrap_err_with(|| "Failed to serialise network connection info")
+pub fn serialise_node_config(node_config: &NodeConfig) -> Result<String> {
+    let genesis_key_hex = hex::encode(node_config.0.to_bytes());
+    serde_json::to_string(&(genesis_key_hex, node_config.1.clone()))
+        .wrap_err_with(|| "Failed to serialise network connection info")
 }
 
-fn get_current_network_conn_info_path() -> Result<(PathBuf, PathBuf)> {
+fn get_current_network_info_path() -> Result<(PathBuf, PathBuf)> {
     let mut node_data_path =
         dirs_next::home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
 

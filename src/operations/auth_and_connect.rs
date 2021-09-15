@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::config::read_current_network_conn_info;
+use super::config::read_current_node_config;
 use crate::{APP_ID, APP_NAME, APP_VENDOR};
 use color_eyre::{eyre::eyre, eyre::WrapErr, Result};
 use log::{debug, info, warn};
@@ -61,19 +61,19 @@ pub async fn connect(safe: &mut Safe) -> Result<Option<Keypair>> {
         info!("No credentials found for CLI, connecting with read-only access...");
     }
 
-    let (_, bootstrap_contacts) = read_current_network_conn_info()?;
+    let (_, bootstrap_contacts) = read_current_node_config()?;
     let client_cfg = client_config_path();
     match safe
         .connect(
             app_keypair.clone(),
             client_cfg.as_deref(),
-            Some(bootstrap_contacts.clone()),
+            bootstrap_contacts.clone(),
         )
         .await
     {
         Err(_) if found_app_keypair => {
             warn!("Credentials found for CLI are invalid, connecting with read-only access...");
-            safe.connect(None, None, Some(bootstrap_contacts))
+            safe.connect(None, None, bootstrap_contacts)
                 .await
                 .wrap_err("Failed to connect with read-only access")?;
 

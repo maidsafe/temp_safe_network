@@ -12,9 +12,8 @@ use super::helpers::download_and_install_github_release_asset;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use log::debug;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use sn_launch_tool::{join_with, run_with};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     fs::create_dir_all,
     io::{self, Write},
     net::SocketAddr,
@@ -23,6 +22,7 @@ use std::{
     thread,
     time::Duration,
 };
+use structopt::StructOpt;
 
 #[cfg(not(target_os = "windows"))]
 const SN_NODE_EXECUTABLE: &str = "sn_node";
@@ -139,7 +139,6 @@ pub fn node_run(
     // Let's create an args array to pass to the network launcher tool
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool",
-        "-v",
         "--node-path",
         &arg_node_path,
         "--nodes-dir",
@@ -151,14 +150,6 @@ pub fn node_run(
     ];
 
     let interval_as_int = &interval.parse::<u64>().unwrap();
-
-    let mut verbosity_arg = String::from("-");
-    if verbosity > 0 {
-        let v = "y".repeat(verbosity as usize);
-        println!("V: {}", v);
-        verbosity_arg.push_str(&v);
-        sn_launch_tool_args.push(&verbosity_arg);
-    }
 
     if let Some(ref launch_ip) = ip {
         sn_launch_tool_args.push("--ip");
@@ -174,7 +165,10 @@ pub fn node_run(
 
     // We can now call the tool with the args
     println!("Launching local Safe network...");
-    run_with(Some(&sn_launch_tool_args)).map_err(|err| eyre!(err))?;
+    sn_launch_tool::Launch::from_iter_safe(&sn_launch_tool_args)
+        .map_err(|e| eyre!(e))
+        .and_then(|launch| launch.run())
+        .wrap_err("Error launching node")?;
 
     let interval_duration = Duration::from_secs(interval_as_int * 15);
     thread::sleep(interval_duration);
@@ -225,7 +219,7 @@ pub fn node_join(
     node_path: Option<PathBuf>,
     node_data_dir: &str,
     verbosity: u8,
-    contacts: &HashSet<SocketAddr>,
+    contacts: &BTreeSet<SocketAddr>,
     local_addr: Option<SocketAddr>,
     public_addr: Option<SocketAddr>,
     clear_data: bool,
@@ -296,7 +290,10 @@ pub fn node_join(
 
     // We can now call the tool with the args
     println!("Starting a node to join a Safe network...");
-    join_with(Some(&sn_launch_tool_args)).map_err(|err| eyre!(err))?;
+    sn_launch_tool::Join::from_iter_safe(&sn_launch_tool_args)
+        .map_err(|e| eyre!(e))
+        .and_then(|launch| launch.run())
+        .wrap_err("Error launching node")?;
     Ok(())
 }
 

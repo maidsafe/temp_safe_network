@@ -8,12 +8,13 @@
 // Software.
 
 use crate::operations::{
-    config::{read_current_network_conn_info, Config},
+    config::{read_current_node_config, Config},
     node::*,
 };
 use color_eyre::{eyre::eyre, Result};
 use log::debug;
-use std::{collections::HashSet, iter::FromIterator, net::SocketAddr, path::PathBuf};
+use sn_api::PublicKey;
+use std::{collections::BTreeSet, iter::FromIterator, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
 
 const NODES_DATA_FOLDER: &str = "baby-fleming-nodes";
@@ -131,11 +132,18 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
                     println!("{}", msg);
                     config.get_network_info(&name).await?
                 } else {
-                    let (_, contacts) = read_current_network_conn_info()?;
+                    let (_, contacts) = read_current_node_config()?;
                     contacts
                 }
             } else {
-                HashSet::from_iter(hard_coded_contacts)
+                let genesis_key = PublicKey::bls_from_hex("8640e62cc44e75cf4fadc8ee91b74b4cf0fd2c0984fb0e3ab40f026806857d8c41f01d3725223c55b1ef87d669f5e2cc")?
+                    .bls()
+                    .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
+                let mut set: BTreeSet<SocketAddr> = BTreeSet::new();
+                for contact in hard_coded_contacts {
+                    set.insert(contact);
+                }
+                (genesis_key, set)
             };
 
             let msg = format!("Joining network with contacts {:?} ...", network_contacts);
@@ -146,7 +154,7 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
                 node_path,
                 LOCAL_NODE_DIR,
                 verbosity,
-                &network_contacts,
+                &network_contacts.1,
                 local_addr,
                 public_addr,
                 clear_data,
