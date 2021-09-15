@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.4](https://github.com/maidsafe/safe_network/compare/v0.31.3...v0.31.4) (2021-09-15)
+
+
+### Bug Fixes
+
+* query subset on AERedirect ([3dab8ab](https://github.com/maidsafe/safe_network/commit/3dab8ab63bbf1c77481e139678e0149ff0234a22))
+
 ### [0.31.3](https://github.com/maidsafe/safe_network/compare/v0.31.2...v0.31.3) (2021-09-15)
 
 
