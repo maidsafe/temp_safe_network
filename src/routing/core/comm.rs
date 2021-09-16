@@ -137,7 +137,7 @@ impl Comm {
                 })?;
 
             // count outgoing msgs..
-            self.msg_count.increase_outgoing(*addr).await;
+            self.msg_count.increase_outgoing(*addr);
         }
 
         Ok(())
@@ -250,7 +250,7 @@ impl Comm {
                 Ok(()) => {
                     successes += 1;
                     // count outgoing msgs..
-                    self.msg_count.increase_outgoing(addr).await;
+                    self.msg_count.increase_outgoing(addr);
                 }
                 Err(Error::ConnectionClosed) => {
                     // The connection was closed by us which means
@@ -287,9 +287,9 @@ impl Comm {
         }
     }
 
-    pub(crate) async fn print_stats(&self) {
-        let incoming = self.msg_count.incoming().await;
-        let outgoing = self.msg_count.outgoing().await;
+    pub(crate) fn print_stats(&self) {
+        let incoming = self.msg_count.incoming();
+        let outgoing = self.msg_count.outgoing();
         info!("*** Incoming msgs: {:?} ***", incoming);
         info!("*** Outgoing msgs: {:?} ***", outgoing);
     }
@@ -320,7 +320,7 @@ async fn handle_incoming_messages(
     while let Some((src, msg)) = incoming_msgs.next().await {
         let _ = event_tx.send(ConnectionEvent::Received((src, msg))).await;
         // count incoming msgs..
-        msg_count.increase_incoming(src).await;
+        msg_count.increase_incoming(src);
     }
 }
 

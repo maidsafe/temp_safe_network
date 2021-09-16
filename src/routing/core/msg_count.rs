@@ -8,9 +8,8 @@
 
 use dashmap::DashMap;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
 
-type MsgRegistry = DashMap<SocketAddr, Arc<RwLock<usize>>>;
+type MsgRegistry = DashMap<SocketAddr, usize>;
 
 #[derive(Clone)]
 pub(super) struct MsgCount {
@@ -18,7 +17,6 @@ pub(super) struct MsgCount {
     outgoing: Arc<MsgRegistry>,
 }
 
-///
 #[derive(Debug)]
 pub(super) struct MsgNumbers {
     pub(super) total: usize,
@@ -36,27 +34,23 @@ impl MsgCount {
     }
 
     /// Numbers for incoming msgs
-    pub(super) async fn incoming(&self) -> MsgNumbers {
-        Self::get(&self.incoming).await
+    pub(super) fn incoming(&self) -> MsgNumbers {
+        Self::get(&self.incoming)
     }
 
     /// Numbers for outgoing msgs
-    pub(super) async fn outgoing(&self) -> MsgNumbers {
-        Self::get(&self.outgoing).await
+    pub(super) fn outgoing(&self) -> MsgNumbers {
+        Self::get(&self.outgoing)
     }
 
-    async fn get(registry: &MsgRegistry) -> MsgNumbers {
+    fn get(registry: &MsgRegistry) -> MsgNumbers {
         let mut total = 0_usize;
         let mut max = 0_usize;
         let mut max_node = None;
         let mut min = usize::MAX;
         let mut min_node = None;
 
-        for (node, value) in registry
-            .iter()
-            .map(|pair| (*pair.key(), pair.value().clone()))
-        {
-            let msg_count = *value.read().await;
+        for (node, msg_count) in registry.iter().map(|pair| (*pair.key(), *pair.value())) {
             if msg_count > max {
                 max = msg_count;
                 max_node = Some(node);
@@ -78,24 +72,11 @@ impl MsgCount {
         }
     }
 
-    pub(super) async fn increase_incoming(&self, sender: SocketAddr) {
-        Self::increase(&self.incoming, sender).await
+    pub(super) fn increase_incoming(&self, sender: SocketAddr) {
+        *self.incoming.entry(sender).or_insert(0) += 1;
     }
 
-    pub(super) async fn increase_outgoing(&self, recipient: SocketAddr) {
-        Self::increase(&self.outgoing, recipient).await
-    }
-
-    async fn increase(registry: &MsgRegistry, node: SocketAddr) {
-        match registry.get(&node) {
-            Some(pair) => {
-                let count = pair.value();
-                *count.write().await += 1;
-            }
-            None => {
-                // not perfect racey wise, but acceptable for now
-                let _ = registry.insert(node, Arc::new(RwLock::new(1)));
-            }
-        }
+    pub(super) fn increase_outgoing(&self, recipient: SocketAddr) {
+        *self.incoming.entry(recipient).or_insert(0) += 1;
     }
 }
