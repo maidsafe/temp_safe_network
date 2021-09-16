@@ -178,7 +178,7 @@ impl Core {
                     )))?);
                 }
 
-                self.print_network_stats().await;
+                self.print_network_stats();
             }
 
             if new.is_elder || old.is_elder {
@@ -268,11 +268,11 @@ impl Core {
         }
     }
 
-    pub(crate) async fn print_network_stats(&self) {
+    pub(crate) fn print_network_stats(&self) {
         self.network
             .network_stats(self.section.authority_provider())
             .print();
-        self.comm.print_stats().await;
+        self.comm.print_stats();
     }
 }
 
