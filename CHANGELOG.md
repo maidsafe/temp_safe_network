@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.8](https://github.com/maidsafe/safe_network/compare/v0.31.7...v0.31.8) (2021-09-16)
+
+
+### Bug Fixes
+
+* adults only respond to requesting elder now ([d610116](https://github.com/maidsafe/safe_network/commit/d61011642ccbc1fdcb41cdd0ff6606c4c2ffc187))
+
 ### [0.31.7](https://github.com/maidsafe/safe_network/compare/v0.31.6...v0.31.7) (2021-09-16)
 
 
