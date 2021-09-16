@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.11](https://github.com/maidsafe/safe_network/compare/v0.31.10...v0.31.11) (2021-09-16)
+
+
+### Features
+
+* **msg_count:** print stats on in/out going ([05a1c6e](https://github.com/maidsafe/safe_network/commit/05a1c6ec3b749de89b4064a9bdb006ef62eec6f3))
+
+### [0.31.10](https://github.com/maidsafe/safe_network/compare/v0.31.9...v0.31.10) (2021-09-16)
+
+
+### Features
+
+* add specific client connection idle_timeout settings ([7318455](https://github.com/maidsafe/safe_network/commit/73184554268443345b9a0ab9354ffb781487f741))
+
+### [0.31.9](https://github.com/maidsafe/safe_network/compare/v0.31.8...v0.31.9) (2021-09-16)
+
+### [0.31.8](https://github.com/maidsafe/safe_network/compare/v0.31.7...v0.31.8) (2021-09-16)
+
+
+### Bug Fixes
+
+* adults only respond to requesting elder now ([d610116](https://github.com/maidsafe/safe_network/commit/d61011642ccbc1fdcb41cdd0ff6606c4c2ffc187))
+
+### [0.31.7](https://github.com/maidsafe/safe_network/compare/v0.31.6...v0.31.7) (2021-09-16)
+
+
+### Features
+
+* **client:** introduce caching of AE resends at client ([fe69703](https://github.com/maidsafe/safe_network/commit/fe697033cf0116dc8353b73bf2dd781fd6fde450))
+
 ### [0.31.6](https://github.com/maidsafe/safe_network/compare/v0.31.5...v0.31.6) (2021-09-15)
 
 

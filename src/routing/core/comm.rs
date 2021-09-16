@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::msg_count::MsgCount;
 use crate::messaging::WireMsg;
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
@@ -19,6 +20,7 @@ use xor_name::XorName;
 #[derive(Clone)]
 pub(crate) struct Comm {
     endpoint: Endpoint<XorName>,
+    msg_count: MsgCount,
 }
 
 impl Drop for Comm {
@@ -41,9 +43,12 @@ impl Comm {
         let (endpoint, _incoming_connections, incoming_messages, disconnections, _) =
             Endpoint::new(local_addr, Default::default(), config).await?;
 
+        let msg_count = MsgCount::new();
+
         let _ = task::spawn(handle_incoming_messages(
             incoming_messages,
             event_tx.clone(),
+            msg_count.clone(),
         ));
 
         let _ = task::spawn(handle_disconnection_events(
@@ -51,7 +56,10 @@ impl Comm {
             event_tx.clone(),
         ));
 
-        Ok(Self { endpoint })
+        Ok(Self {
+            endpoint,
+            msg_count,
+        })
     }
 
     pub(crate) async fn bootstrap(
@@ -66,9 +74,12 @@ impl Comm {
             Endpoint::new(local_addr, bootstrap_nodes, config).await?;
         let bootstrap_addr = bootstrap_addr.ok_or(Error::BootstrapFailed)?;
 
+        let msg_count = MsgCount::new();
+
         let _ = task::spawn(handle_incoming_messages(
             incoming_messages,
             event_tx.clone(),
+            msg_count.clone(),
         ));
 
         let _ = task::spawn(handle_disconnection_events(
@@ -76,7 +87,13 @@ impl Comm {
             event_tx.clone(),
         ));
 
-        Ok((Self { endpoint }, bootstrap_addr))
+        Ok((
+            Self {
+                endpoint,
+                msg_count,
+            },
+            bootstrap_addr,
+        ))
     }
 
     pub(crate) fn our_connection_info(&self) -> SocketAddr {
@@ -118,6 +135,9 @@ impl Comm {
                     );
                     Error::FailedSend(*addr, *name)
                 })?;
+
+            // count outgoing msgs..
+            self.msg_count.increase_outgoing(*addr).await;
         }
 
         Ok(())
@@ -227,7 +247,11 @@ impl Comm {
 
         while let Some((result, addr)) = tasks.next().await {
             match result {
-                Ok(()) => successes += 1,
+                Ok(()) => {
+                    successes += 1;
+                    // count outgoing msgs..
+                    self.msg_count.increase_outgoing(addr).await;
+                }
                 Err(Error::ConnectionClosed) => {
                     // The connection was closed by us which means
                     // we are terminating so let's cut this short.
@@ -262,6 +286,13 @@ impl Comm {
             Ok(SendStatus::MinDeliveryGroupSizeFailed(failed_recipients))
         }
     }
+
+    pub(crate) async fn print_stats(&self) {
+        let incoming = self.msg_count.incoming().await;
+        let outgoing = self.msg_count.outgoing().await;
+        info!("*** Incoming msgs: {:?} ***", incoming);
+        info!("*** Outgoing msgs: {:?} ***", outgoing);
+    }
 }
 
 #[derive(Debug)]
@@ -284,9 +315,12 @@ async fn handle_disconnection_events(
 async fn handle_incoming_messages(
     mut incoming_msgs: qp2p::IncomingMessages,
     event_tx: mpsc::Sender<ConnectionEvent>,
+    msg_count: MsgCount,
 ) {
     while let Some((src, msg)) = incoming_msgs.next().await {
         let _ = event_tx.send(ConnectionEvent::Received((src, msg))).await;
+        // count incoming msgs..
+        msg_count.increase_incoming(src).await;
     }
 }
 

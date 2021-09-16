@@ -16,6 +16,7 @@ mod connectivity;
 mod delivery_group;
 mod liveness_tracking;
 mod messaging;
+mod msg_count;
 mod msg_handling;
 mod register_storage;
 mod split_barrier;
@@ -177,7 +178,7 @@ impl Core {
                     )))?);
                 }
 
-                self.print_network_stats();
+                self.print_network_stats().await;
             }
 
             if new.is_elder || old.is_elder {
@@ -267,10 +268,11 @@ impl Core {
         }
     }
 
-    pub(crate) fn print_network_stats(&self) {
+    pub(crate) async fn print_network_stats(&self) {
         self.network
             .network_stats(self.section.authority_provider())
-            .print()
+            .print();
+        self.comm.print_stats().await;
     }
 }
 

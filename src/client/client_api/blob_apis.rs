@@ -347,13 +347,13 @@ mod tests {
                 // Read first part
                 let read_data_1 = {
                     let pos = 0;
-                    seek(data.clone(), pos, len).await?
+                    seek_for_test(data.clone(), pos, len).await?
                 };
 
                 // Read second part
                 let read_data_2 = {
                     let pos = len;
-                    seek(data.clone(), pos, len).await?
+                    seek_for_test(data.clone(), pos, len).await?
                 };
 
                 // Join parts
@@ -450,14 +450,14 @@ mod tests {
         let delay = usize::max(1, size / 2_000_000);
 
         // now that it was written to the network we should be able to retrieve it
-        let read_data = run_w_backoff_delayed(|| client.read_blob(address), 1, delay).await?;
+        let read_data = run_w_backoff_delayed(|| client.read_blob(address), 10, delay).await?;
         // then the content should be what we stored
         compare(blob, read_data)?;
 
         Ok(())
     }
 
-    async fn seek(data: Bytes, pos: usize, len: usize) -> Result<Bytes> {
+    async fn seek_for_test(data: Bytes, pos: usize, len: usize) -> Result<Bytes> {
         let client = create_test_client(Some(BLOB_TEST_QUERY_TIMEOUT)).await?;
         let address = client.write_to_network(data.clone(), Scope::Public).await?;
 
