@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.11](https://github.com/maidsafe/safe_network/compare/v0.31.10...v0.31.11) (2021-09-16)
+
+
+### Features
+
+* **msg_count:** print stats on in/out going ([05a1c6e](https://github.com/maidsafe/safe_network/commit/05a1c6ec3b749de89b4064a9bdb006ef62eec6f3))
+
 ### [0.31.10](https://github.com/maidsafe/safe_network/compare/v0.31.9...v0.31.10) (2021-09-16)
 
 
