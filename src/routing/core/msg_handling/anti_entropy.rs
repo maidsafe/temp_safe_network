@@ -433,7 +433,7 @@ mod tests {
                 msg.serialize()?,
                 &src_location,
                 &dst_section_pk,
-                XorName::random(),
+                PublicKey::Bls(dst_section_pk).into(),
                 sender,
             )
             .await?;
@@ -522,7 +522,7 @@ mod tests {
                 msg.serialize()?,
                 &src_location,
                 &dst_section_pk,
-                XorName::random(),
+                PublicKey::Bls(dst_section_pk).into(),
                 sender,
             )
             .await?;
