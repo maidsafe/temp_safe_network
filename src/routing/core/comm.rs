@@ -70,9 +70,9 @@ impl Comm {
     ) -> Result<(Self, SocketAddr)> {
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
-        let (endpoint, _, incoming_messages, disconnections, bootstrap_addr) =
+        let (endpoint, _, incoming_messages, disconnections, bootstrap_peer) =
             Endpoint::new(local_addr, bootstrap_nodes, config).await?;
-        let bootstrap_addr = bootstrap_addr.ok_or(Error::BootstrapFailed)?;
+        let bootstrap_peer = bootstrap_peer.ok_or(Error::BootstrapFailed)?;
 
         let msg_count = MsgCount::new();
 
@@ -92,7 +92,7 @@ impl Comm {
                 endpoint,
                 msg_count,
             },
-            bootstrap_addr,
+            bootstrap_peer.remote_address(),
         ))
     }
 
@@ -102,12 +102,18 @@ impl Comm {
 
     /// Get the connection ID (XorName) of an existing connection with the provided socket address
     pub(crate) async fn get_connection_id(&self, addr: &SocketAddr) -> Option<XorName> {
-        self.endpoint.get_connection_id(addr).await
+        self.endpoint
+            .get_connection_by_addr(addr)
+            .await
+            .map(|connection| connection.id())
     }
 
     /// Get the SocketAddr of a connection using the connection ID (XorName)
     pub(crate) async fn get_socket_addr_by_id(&self, xorname: &XorName) -> Option<SocketAddr> {
-        self.endpoint.get_socket_addr_by_id(xorname).await
+        self.endpoint
+            .get_connection_by_id(xorname)
+            .await
+            .map(|connection| connection.remote_address())
     }
 
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
