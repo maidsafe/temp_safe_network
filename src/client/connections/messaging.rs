@@ -71,7 +71,7 @@ impl Session {
             network: Arc::new(NetworkPrefixMap::new(genesis_key)),
             ae_cache: Arc::new(Cache::with_expiry_duration(Duration::from_secs(5))),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
-            bootstrap_peer,
+            bootstrap_peer: bootstrap_peer.remote_address(),
             genesis_key,
         };
 
