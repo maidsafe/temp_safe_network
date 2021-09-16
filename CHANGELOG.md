@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.10](https://github.com/maidsafe/safe_network/compare/v0.31.9...v0.31.10) (2021-09-16)
+
+
+### Features
+
+* add specific client connection idle_timeout settings ([7318455](https://github.com/maidsafe/safe_network/commit/73184554268443345b9a0ab9354ffb781487f741))
+
 ### [0.31.9](https://github.com/maidsafe/safe_network/compare/v0.31.8...v0.31.9) (2021-09-16)
 
 ### [0.31.8](https://github.com/maidsafe/safe_network/compare/v0.31.7...v0.31.8) (2021-09-16)
