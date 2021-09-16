@@ -140,6 +140,7 @@ impl Core {
         msg_id: MessageId,
         address: ChunkAddress,
         user: EndUser,
+        requesting_elder: XorName,
     ) -> Result<Vec<Command>> {
         trace!("Handling chunk read at adult");
         let mut commands = vec![];
@@ -154,8 +155,8 @@ impl Core {
 
                 // Setup node authority on this response and send this back to our elders
                 let section_pk = *self.section().chain().last_key();
-                let dst = DstLocation::Section {
-                    name: *address.name(),
+                let dst = DstLocation::Node {
+                    name: requesting_elder,
                     section_pk,
                 };
 

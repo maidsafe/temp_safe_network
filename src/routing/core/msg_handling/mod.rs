@@ -564,8 +564,10 @@ impl Core {
                     // A request from EndUser - via elders - for locally stored chunk
                     NodeQuery::GetChunk { origin, address } => {
                         // There is no point in verifying a sig from a sender A or B here.
-                        // Send back response to our Elders
-                        self.handle_get_chunk_at_adult(msg_id, address, origin)
+                        // Send back response to the sending elder
+
+                        let sender_xorname = msg_authority.get_auth_xorname();
+                        self.handle_get_chunk_at_adult(msg_id, address, origin, sender_xorname)
                             .await
                     }
                     _ => {
