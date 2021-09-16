@@ -158,7 +158,7 @@ jobs:
 
       - run: ./target/release/testnet
         env:
-          NODE_COUNT: 15 # TODO: change it back to 43 (this should be a split section)
+          NODE_COUNT: 45 # TODO: change it back to 43 (this should be a split section)
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests...
@@ -199,12 +199,12 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: rm -rf ~/.safe/node
 
-      # - name: Run example of split and chunk check
-      #   shell: bash
-      #   run: timeout 10m cargo run --release  --features=always-joinable,test-utils --example network_split
+      - name: Run example of split and chunk check
+        shell: bash
+        run: timeout 10m cargo run --release  --features=always-joinable,test-utils --example network_split
 
-      # - name: Was there a section split?
-      #   run: ./scripts/has_split.sh
+      - name: Was there a section split?
+        run: ./scripts/has_split.sh
 
       - name: Are nodes still running...?
         if: failure() && matrix.os != 'windows-latest'
