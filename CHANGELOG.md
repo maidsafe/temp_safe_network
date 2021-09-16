@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.12](https://github.com/maidsafe/safe_network/compare/v0.31.11...v0.31.12) (2021-09-16)
+
+
+### Bug Fixes
+
+* not forward un-registed operation response ([995ecac](https://github.com/maidsafe/safe_network/commit/995ecac55eb02abc418ec8400a777cffe7552acf))
+
 ### [0.31.11](https://github.com/maidsafe/safe_network/compare/v0.31.10...v0.31.11) (2021-09-16)
 
 
