@@ -9,6 +9,10 @@
 mod wire_msg;
 mod wire_msg_header;
 
+use xor_name::XorName;
+
+use crate::types::PublicKey;
+
 pub use self::wire_msg::WireMsg;
 use super::{
     data::ServiceMsg, system::SystemMsg, AuthorityProof, BlsShareAuth, DstLocation, MessageId,
@@ -55,4 +59,26 @@ pub enum NodeMsgAuthority {
     BlsShare(AuthorityProof<BlsShareAuth>),
     /// Authority of a whole section.
     Section(AuthorityProof<SectionAuth>),
+}
+
+impl NodeMsgAuthority {
+    /// Returns the XorName of the authority used for the auth signing
+    pub(crate) fn get_auth_xorname(&self) -> XorName {
+        match self.clone() {
+            NodeMsgAuthority::BlsShare(auth_proof) => {
+                let auth = auth_proof.into_inner();
+                auth.src_name
+            }
+            NodeMsgAuthority::Node(auth_proof) => {
+                let auth = auth_proof.into_inner();
+                let pk = auth.public_key;
+
+                XorName::from(PublicKey::from(pk))
+            }
+            NodeMsgAuthority::Section(auth_proof) => {
+                let auth = auth_proof.into_inner();
+                auth.src_name
+            }
+        }
+    }
 }
