@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.14](https://github.com/maidsafe/safe_network/compare/v0.31.13...v0.31.14) (2021-09-16)
+
+
+### Bug Fixes
+
+* **example:** remove deprecated arg ([01f3fa4](https://github.com/maidsafe/safe_network/commit/01f3fa40fa9a14783006ac594b417b15262417a9))
+
 ### [0.31.13](https://github.com/maidsafe/safe_network/compare/v0.31.12...v0.31.13) (2021-09-16)
 
 ### [0.31.12](https://github.com/maidsafe/safe_network/compare/v0.31.11...v0.31.12) (2021-09-16)
