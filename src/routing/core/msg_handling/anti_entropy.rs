@@ -247,6 +247,7 @@ impl Core {
         if !self.section.prefix().matches(&dst_name) {
             match self.network.closest_or_opposite(&dst_name) {
                 Some(section_auth) => {
+                    info!("Found a better matching section {:?}", section_auth);
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropyRedirect {
@@ -266,6 +267,7 @@ impl Core {
                     }));
                 }
                 None => {
+                    error!("Our PrefixMap is empty");
                     // TODO: do we want to reroute some data messages to another seciton here using check_for_better_section_sap_for_data ?
                     // if not we can remove that function.
 
@@ -274,7 +276,7 @@ impl Core {
                     // a section key we are not aware of yet?
                     // ...and once we acquired new key/s we attempt AE check again?
                     error!(
-                            "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section. Resending our SAP",
+                            "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section.",
                             dst_name, dst_section_pk
                         );
 
@@ -284,6 +286,7 @@ impl Core {
         }
 
         if dst_section_pk == self.section.chain().last_key() {
+            trace!("Provided Section PK matching our latest. All AE checks passed!");
             // Destination section key matches our current section key
             return Ok(None);
         }
@@ -412,19 +415,20 @@ mod tests {
     use assert_matches::assert_matches;
     use bls::SecretKey;
     use eyre::{eyre, Context, Result};
+    use rand::Rng;
     use secured_linked_list::SecuredLinkedList;
     use tokio::sync::mpsc;
     use xor_name::Prefix;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_everything_up_to_date() -> Result<()> {
+        let mut rng = rand::thread_rng();
         let env = Env::new().await?;
-
-        let (msg, src_location) = env.create_message(
-            env.core.section().prefix(),
-            *env.core.section_chain().last_key(),
-        )?;
+        let our_prefix = env.core.section().prefix();
+        let (msg, src_location) =
+            env.create_message(our_prefix, *env.core.section_chain().last_key())?;
         let sender = env.core.node().addr;
+        let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_pk = *env.core.section_chain().last_key();
 
         let command = env
@@ -433,7 +437,7 @@ mod tests {
                 msg.serialize()?,
                 &src_location,
                 &dst_section_pk,
-                XorName::random(),
+                dst_name,
                 sender,
             )
             .await?;
@@ -507,13 +511,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
+        let mut rng = rand::thread_rng();
         let env = Env::new().await?;
+        let our_prefix = env.core.section().prefix();
 
-        let (msg, src_location) = env.create_message(
-            env.core.section().prefix(),
-            *env.core.section_chain().last_key(),
-        )?;
+        let (msg, src_location) =
+            env.create_message(our_prefix, *env.core.section_chain().last_key())?;
         let sender = env.core.node().addr;
+        let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_pk = *env.core.section_chain().root_key();
 
         let command = env
@@ -522,7 +527,7 @@ mod tests {
                 msg.serialize()?,
                 &src_location,
                 &dst_section_pk,
-                XorName::random(),
+                dst_name,
                 sender,
             )
             .await?;
