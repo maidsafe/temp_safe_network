@@ -113,7 +113,7 @@ impl Core {
         commands.extend(result);
         commands.push(self.send_node_approval(new_info)?);
 
-        self.print_network_stats();
+        self.print_network_stats().await;
 
         Ok(commands)
     }
