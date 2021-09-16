@@ -60,8 +60,8 @@ where
 }
 
 fn get_backoff_policy(retries: u8) -> Backoff {
-    let min = Duration::from_secs(10);
-    let max = Duration::from_secs(60);
+    let min = Duration::from_secs(2);
+    let max = Duration::from_secs(30);
     Backoff::new(retries as u32, min, max)
 }
 
@@ -109,7 +109,7 @@ macro_rules! retry_loop {
         loop {
             match $async_func.await {
                 Ok(val) => break val,
-                Err(_) => tokio::time::sleep(std::time::Duration::from_secs(10)).await,
+                Err(_) => tokio::time::sleep(std::time::Duration::from_secs(2)).await,
             }
         }
     };
@@ -122,7 +122,7 @@ macro_rules! retry_err_loop {
     ($async_func:expr) => {
         loop {
             match $async_func.await {
-                Ok(_) => tokio::time::sleep(std::time::Duration::from_secs(10)).await,
+                Ok(_) => tokio::time::sleep(std::time::Duration::from_secs(2)).await,
                 Err(err) => break err,
             }
         }
@@ -138,7 +138,7 @@ macro_rules! retry_loop_for_pattern {
             let result = $async_func.await;
             match &result {
                 $pattern $(if $cond)? => break result,
-                Ok(_) | Err(_) => tokio::time::sleep(std::time::Duration::from_secs(10)).await,
+                Ok(_) | Err(_) => tokio::time::sleep(std::time::Duration::from_secs(2)).await,
             }
         }
     };
