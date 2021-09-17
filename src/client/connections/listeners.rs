@@ -15,8 +15,6 @@ use crate::messaging::{
     system::{KeyedSig, SectionAuth, SystemMsg},
     DstLocation, MessageId, MessageType, MsgKind, SectionAuthorityProvider, WireMsg,
 };
-use crate::routing::ELDER_SIZE;
-use crate::types::PublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::IncomingMessages;
@@ -33,7 +31,7 @@ impl Session {
         debug!("Listening for incoming messages");
         let _ = tokio::spawn(async move {
             loop {
-                session = match Self::get_incoming_message(&mut incoming_messages).await {
+                session = match Self::listen_for_incoming_message(&mut incoming_messages).await {
                     Ok((src, msg)) => match Self::handle_msg(msg, src, session.clone()).await {
                         Ok(session) => session,
                         Err(err) => {
@@ -55,7 +53,7 @@ impl Session {
         });
     }
 
-    pub(crate) async fn get_incoming_message(
+    pub(crate) async fn listen_for_incoming_message(
         incoming_messages: &mut IncomingMessages,
     ) -> Result<(SocketAddr, MessageType), Error> {
         if let Some((src, message)) = incoming_messages.next().await {
@@ -212,17 +210,10 @@ impl Session {
             return Ok(session);
         }
 
-        let mut num_of_elders_for_query = ELDER_SIZE;
-
         let (msg_id, service_msg, auth) = match WireMsg::deserialize(bounced_msg)? {
             MessageType::Service {
                 msg_id, msg, auth, ..
-            } => {
-                if let ServiceMsg::Query(_) = msg {
-                    num_of_elders_for_query = NUM_OF_ELDERS_SUBSET_FOR_QUERIES;
-                }
-                (msg_id, msg, auth)
-            }
+            } => (msg_id, msg, auth),
             other => {
                 warn!(
                     "Unexpected non-serviceMsg returned in AE-Redirect response: {:?}",
@@ -231,10 +222,19 @@ impl Session {
                 return Ok(session);
             }
         };
+
         debug!(
             "Received AE-Redirect for {:?}, from {}, with SAP: {:?}",
             msg_id, sender, section_auth
         );
+
+        let (session, elders, dst_address_of_bounced_msg) =
+            Self::check_ae_cache(session, &service_msg, &section_auth, true).await;
+
+        if elders.is_empty() {
+            debug!("We have already resent this message on an AE-Redirect response. Dropping this instance");
+            return Ok(session);
+        }
 
         debug!(
             "Bounced message ({:?}) received in AE-Redirect response: {:?}",
@@ -247,12 +247,6 @@ impl Session {
         // to connect to (based on the genesis key we know). We could send the genesis key
         // as the destination section key and that should cause an AE-Retry response,
         // which we could use to verify the SAP we receive an trust.
-        let elders = section_auth
-            .elders
-            .values()
-            .cloned()
-            .take(num_of_elders_for_query)
-            .collect::<Vec<SocketAddr>>();
         let section_pk = section_auth.public_key_set.public_key();
 
         // Let's rebuild the message with the updated destination details
@@ -261,12 +255,21 @@ impl Session {
             message,
             MsgKind::ServiceMsg(auth.into_inner()),
             DstLocation::Section {
-                name: XorName::from(PublicKey::Bls(section_pk)),
+                name: dst_address_of_bounced_msg,
                 section_pk,
             },
         )?;
 
-        send_message(elders, wire_msg, session.endpoint.clone(), msg_id).await?;
+        debug!("Resending original message via AE-Redirect. Expecting an AE-Retry next");
+        send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
+
+        if let Some(old_elders) = session
+            .ae_redirect_cache
+            .set(dst_address_of_bounced_msg, elders.clone(), None)
+            .await
+        {
+            warn!("We have already sent this AE-Redirect message to Elders {:?} Updating cache with latest elders {:?}", old_elders, &elders);
+        }
 
         Ok(session)
     }
@@ -279,10 +282,6 @@ impl Session {
         bounced_msg: Bytes,
         proof_chain: SecuredLinkedList,
     ) -> Result<Session, Error> {
-        // Remove expired items from ae_cache before checking.
-        // It might be late to not retry now.
-        session.ae_cache.remove_expired().await;
-
         // Deserialize the bounced message for resending
         let (msg_id, service_msg, mut dst_location, auth): (_, ServiceMsg, _, _) =
             match WireMsg::deserialize(bounced_msg)? {
@@ -301,39 +300,18 @@ impl Session {
                 }
             };
 
-        let (targets, dst_address_of_bounced_msg) = match &service_msg {
-            ServiceMsg::Cmd(cmd) => {
-                match &cmd {
-                    DataCmd::StoreChunk(_) => (3, cmd.dst_name()), // stored at Adults, so only 1 correctly functioning Elder need to relay
-                    DataCmd::Register(_) => (7, cmd.dst_name()), // only stored at Elders, all need a copy
-                }
-            }
-            ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),
-            _ => {
-                warn!(
-                    "Bounced message ({:?}) received in AE response: {:?} is of invalid type",
-                    msg_id, service_msg
-                );
-                return Ok(session);
-            }
-        };
-
-        if let Some(old_elders) = session.ae_cache.get(&dst_address_of_bounced_msg).await {
-            let received_elders = section_auth
-                .elders
-                .values()
-                .cloned()
-                .collect::<Vec<SocketAddr>>();
-            if old_elders == received_elders {
-                debug!("We have already resent this message on a AE-Retry. Dropping this instance");
-                return Ok(session);
-            }
-        }
-
         debug!(
             "Received AE-Retry for msg_id: {:?} with new SAP: {:?}",
             msg_id, section_auth
         );
+
+        let (session, elders, dst_address_of_bounced_msg) =
+            Self::check_ae_cache(session, &service_msg, &section_auth, false).await;
+
+        if elders.is_empty() {
+            debug!("We have already responded to this message on an AE-Retry response. Dropping this instance");
+            return Ok(session);
+        }
         // Update our network knowledge making sure proof chain
         // validates the new SAP based on currently known remote section SAP.
         match session.network.update(
@@ -372,16 +350,6 @@ impl Session {
         let payload = WireMsg::serialize_msg_payload(&service_msg)?;
 
         // Let's rebuild the message with the updated destination details
-        let elders = section_auth
-            .elders
-            .into_iter()
-            .sorted_by(|(lhs_name, _), (rhs_name, _)| {
-                dst_address_of_bounced_msg.cmp_distance(lhs_name, rhs_name)
-            })
-            .map(|(_, addr)| addr)
-            .take(targets)
-            .collect::<Vec<SocketAddr>>();
-
         dst_location.set_section_pk(section_auth.public_key_set.public_key());
 
         let wire_msg = WireMsg::new_msg(
@@ -391,15 +359,76 @@ impl Session {
             dst_location,
         )?;
 
+        debug!("Resending original message via AE-Retry");
         send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
         if let Some(old_elders) = session
-            .ae_cache
+            .ae_retry_cache
             .set(dst_address_of_bounced_msg, elders.clone(), None)
             .await
         {
-            warn!("We have already sent this message to Elders {:?} Updating cache with latest elders {:?}", old_elders, &elders);
+            warn!("We have already responded to this AE-Retry message to Elders {:?} Updating cache with latest elders {:?}", old_elders, &elders);
         }
 
         Ok(session)
+    }
+
+    async fn check_ae_cache(
+        session: Session,
+        service_msg: &ServiceMsg,
+        received_auth: &SectionAuthorityProvider,
+        is_redirect: bool, // True for Redirect. False for Retry
+    ) -> (Session, Vec<SocketAddr>, XorName) {
+        let cache = if is_redirect {
+            session.ae_redirect_cache.clone()
+        } else {
+            session.ae_retry_cache.clone()
+        };
+
+        // Remove expired items from ae_cache before checking.
+        // It might be late to not retry now.
+        cache.remove_expired().await;
+
+        let (targets, dst_address_of_bounced_msg) = match service_msg {
+            ServiceMsg::Cmd(cmd) => {
+                match &cmd {
+                    DataCmd::StoreChunk(_) => (3, cmd.dst_name()), // stored at Adults, so only 1 correctly functioning Elder need to relay
+                    DataCmd::Register(_) => (7, cmd.dst_name()), // only stored at Elders, all need a copy
+                }
+            }
+            ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),
+            _ => {
+                warn!(
+                    "Bounced message received in AE response: {:?} is of invalid type",
+                    service_msg
+                );
+                // Early return with random name as we will discard the message at the caller func
+                return (session, vec![], XorName::random());
+            }
+        };
+
+        let new_elders = received_auth
+            .elders
+            .iter()
+            .sorted_by(|(lhs_name, _), (rhs_name, _)| {
+                dst_address_of_bounced_msg.cmp_distance(lhs_name, rhs_name)
+            })
+            .map(|(_, addr)| addr)
+            .take(targets)
+            .cloned()
+            .collect::<Vec<SocketAddr>>();
+
+        let target_elders = if let Some(old_elders) = cache.get(&dst_address_of_bounced_msg).await {
+            debug!("Cache hit! We have sent this AE message before");
+            if old_elders == new_elders {
+                // Return empty vec as we check for it at the caller func
+                vec![]
+            } else {
+                new_elders
+            }
+        } else {
+            new_elders
+        };
+
+        (session, target_elders, dst_address_of_bounced_msg)
     }
 }
