@@ -82,7 +82,7 @@ pub enum SystemMsg {
     AntiEntropyProbe(XorName),
     /// Sent when a msg-consuming node is surpassing certain thresholds for
     /// cpu load. It tells msg-producing nodes to back off a bit, proportional
-    /// to the node's cpu load, as given by the included `LoadAvg`.
+    /// to the node's cpu load, as given by the included `LoadReport`.
     BackPressure(LoadReport),
     /// Send from a section to the node to be immediately relocated.
     Relocate(RelocateDetails),
@@ -176,7 +176,7 @@ pub struct LoadReport {
     pub long_term: CpuLoad,
 }
 
-/// An evaluationg of measured cpu load during a period.
+/// An evaluation of measured cpu load during a period.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CpuLoad {
     /// This is considered to be well below sustainable levels.

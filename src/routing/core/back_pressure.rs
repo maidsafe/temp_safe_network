@@ -67,13 +67,14 @@ impl BackPressure {
             } else if load.mid_term.very_high {
                 (Duration::from_millis(1500), 2.5, Duration::from_secs(60))
             } else if load.is_ok() {
-                // (this is currently not a reachable case as reporting is only done when load is bad.)
+                // (NB: currently unreachable as reporting is only done when load is bad)
                 (Duration::from_millis(1000), 2.0, Duration::from_secs(45))
             } else if load.is_good() {
-                // (this is currently not a reachable case as reporting is only done when load is bad.)
+                // (NB: currently unreachable as reporting is only done when load is bad)
                 // remove regulation, i.e. effectively change back to defaults
                 return self.remove(addr).await;
             } else {
+                // (NB: currently unreachable as reporting is only done when load is bad)
                 // somewhere between ok and good, so slightly higher values than default, but lower than when ok.
                 (Duration::from_millis(750), 1.7, Duration::from_secs(40))
             };
@@ -106,9 +107,9 @@ impl BackPressure {
             let current_load = { evaluate(self.system.read().await.load_average()) };
             *self.our_last_report.write().await = (now, current_load);
 
-            // reduce the checks for this somewhat
+            // placed in this block, we reduce the frequency of this check
             let last_eviction = { *self.last_eviction.read().await };
-            // then only try evict when there's any likelihood of being any expired
+            // only try evict when there's any likelihood of there being any expired..
             if now - last_eviction > REPORT_TTL {
                 self.evict_expired(now).await;
             }

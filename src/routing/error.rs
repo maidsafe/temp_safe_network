@@ -29,8 +29,8 @@ pub enum Error {
     UntrustedSectionAuthProvider(String),
     #[error("Proof chain cannot be trusted: {0}")]
     UntrustedProofChain(String),
-    #[error("Cannot route.")]
-    CannotRoute,
+    #[error("Cannot route. Delivery group size: {}, candidates: {}.", _0, _1)]
+    CannotRoute(usize, usize),
     #[error("Empty recipient list")]
     EmptyRecipientList,
     #[error("Could not connect to any bootstrap contact")]
