@@ -271,6 +271,7 @@ mod tests {
 
     const BLOB_TEST_QUERY_TIMEOUT: u64 = 60;
     const MIN_BLOB_SIZE: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
+    const DELAY_DIVIDER: usize = 500_000;
 
     #[test]
     fn deterministic_chunking() -> Result<()> {
@@ -308,7 +309,7 @@ mod tests {
             .await?;
 
         // the larger the file, the longer we have to wait before we start querying
-        let delay = usize::max(1, blob.len() / 2_000_000);
+        let delay = usize::max(1, blob.len() / DELAY_DIVIDER);
 
         // Assert that the blob is stored.
         let read_data =
@@ -447,7 +448,7 @@ mod tests {
         let address = client.write_to_network(blob.clone(), scope).await?;
 
         // the larger the file, the longer we have to wait before we start querying
-        let delay = usize::max(1, size / 2_000_000);
+        let delay = usize::max(1, size / DELAY_DIVIDER);
 
         // now that it was written to the network we should be able to retrieve it
         let read_data = run_w_backoff_delayed(|| client.read_blob(address), 10, delay).await?;
@@ -462,7 +463,7 @@ mod tests {
         let address = client.write_to_network(data.clone(), Scope::Public).await?;
 
         // the larger the file, the longer we have to wait before we start querying
-        let delay = usize::max(1, len / 2_000_000);
+        let delay = usize::max(1, len / DELAY_DIVIDER);
 
         let read_data =
             run_w_backoff_delayed(|| client.read_blob_from(address, pos, len), 10, delay).await?;
