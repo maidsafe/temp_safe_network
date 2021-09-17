@@ -39,6 +39,8 @@ use xor_name::XorName;
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of attempts to make when trying to bootstrap to a section
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
+// AE cache expiration time
+const CACHE_EXPIRATION_TIME: Duration = Duration::from_secs(5);
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
@@ -69,7 +71,8 @@ impl Session {
             incoming_err_sender: Arc::new(err_sender),
             endpoint,
             network: Arc::new(NetworkPrefixMap::new(genesis_key)),
-            ae_cache: Arc::new(Cache::with_expiry_duration(Duration::from_secs(5))),
+            ae_redirect_cache: Arc::new(Cache::with_expiry_duration(CACHE_EXPIRATION_TIME)),
+            ae_retry_cache: Arc::new(Cache::with_expiry_duration(CACHE_EXPIRATION_TIME)),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             bootstrap_peer,
             genesis_key,
@@ -178,7 +181,10 @@ impl Session {
 
         return match send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await {
             Ok(()) => {
-                if let Some(old_elders) = self.ae_cache.set(dst_address, elders.clone(), None).await
+                if let Some(old_elders) = self
+                    .ae_retry_cache
+                    .set(dst_address, elders.clone(), None)
+                    .await
                 {
                     warn!("We have already sent this cmd to Elders {:?} Updating cache with latest elders {:?}", old_elders, &elders);
                 }
@@ -314,7 +320,11 @@ impl Session {
             }
         }
 
-        if let Some(old_elders) = self.ae_cache.set(dst, chosen_elders.clone(), None).await {
+        if let Some(old_elders) = self
+            .ae_retry_cache
+            .set(dst, chosen_elders.clone(), None)
+            .await
+        {
             warn!("We have already sent this query to Elders {:?} Updating cache with latest elders {:?}", old_elders, &chosen_elders);
         }
 
