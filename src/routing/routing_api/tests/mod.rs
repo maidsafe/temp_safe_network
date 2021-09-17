@@ -359,13 +359,7 @@ async fn aggregate_proposals() -> Result<()> {
         if !commands.is_empty() {
             // only possible/expected msg if not empty, is a backpressure msg
             assert_eq!(1, commands.len());
-            assert_matches!(
-                commands[0],
-                Command::PrepareNodeMsgToSend {
-                    msg: SystemMsg::BackPressure(_),
-                    ..
-                }
-            )
+            assert_matches!(commands[0], Command::SendMessageDeliveryGroup { .. })
         }
     }
 
@@ -401,13 +395,7 @@ async fn aggregate_proposals() -> Result<()> {
 
     let mut next_cmd = commands.next();
 
-    if matches!(
-        next_cmd,
-        Some(Command::PrepareNodeMsgToSend {
-            msg: SystemMsg::BackPressure(_),
-            ..
-        })
-    ) {
+    if matches!(next_cmd, Some(Command::SendMessageDeliveryGroup { .. })) {
         next_cmd = commands.next();
     }
 

@@ -323,9 +323,7 @@ impl Comm {
         self.back_pressure.set(peer, load_report).await
     }
 
-    /// Returns cpu load report if
-    /// A. ..being strained, or
-    /// B. ..changed from being strained to OK levels.
+    /// Returns cpu load report if being strained.
     pub(crate) async fn check_strain(&self) -> Option<LoadReport> {
         self.back_pressure.load_report().await
     }
