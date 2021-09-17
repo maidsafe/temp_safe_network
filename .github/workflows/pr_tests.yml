@@ -158,7 +158,30 @@ jobs:
 
       - run: ./target/release/testnet
         env:
-          NODE_COUNT: 45 # TODO: change it back to 43 (this should be a split section)
+          NODE_COUNT: 43
+
+      - name: Was there a section split?
+        run: ./scripts/has_split.sh
+        id: split-check-1
+
+      - name: Kill Section if no split (unix)
+        if: matrix.os != 'windows-latest' && steps.split-check-1.outcome == 'failure' 
+        run: killall sn_node
+      
+      - name: Kill section if no split (win)
+        if: matrix.os == 'windows-latest' && steps.split-check-1.outcome == 'failure'
+        shell: cmd 
+        run: taskkill /IM sn_node.exe /F
+
+      - name: Restart Section if no split
+        if: steps.split-check-1.outcome == 'failure' 
+        run: ./target/release/testnet
+        env:
+          NODE_COUNT: 43
+
+      - name: Was there a section split?
+        run: ./scripts/has_split.sh
+        id: split-check-2
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests...
@@ -182,29 +205,33 @@ jobs:
 
       - name: Kill the current network (not needed for next test)
         if: matrix.os != 'windows-latest'
-        run: killall sn_node
+        run: |
+          killall sn_node
+          rm -rf ~/.safe/node
         shell: bash
 
       - name: Kill the current network (not needed for next test)
         if: matrix.os == 'windows-latest'
-        run: taskkill /IM sn_node.exe /F
+        run: |
+          taskkill /IM sn_node.exe /F
+          rd /s /q %USERPROFILE%\.safe\node
         shell: cmd
 
-      - name: Remove node dir and logs for next test
-        if: matrix.os == 'windows-latest'
-        run: rd /s /q %USERPROFILE%\.safe\node
-        shell: cmd
+      # - name: Remove node dir and logs for next test
+      #   if: matrix.os == 'windows-latest'
+      #   run: rd /s /q %USERPROFILE%\.safe\node
+      #   shell: cmd
 
-      - name: Remove node dir and logs for next test
-        if: matrix.os != 'windows-latest'
-        run: rm -rf ~/.safe/node
+      # - name: Remove node dir and logs for next test
+      #   if: matrix.os != 'windows-latest'
+      #   run: rm -rf ~/.safe/node
 
-      - name: Run example of split and chunk check
-        shell: bash
-        run: timeout 10m cargo run --release  --features=always-joinable,test-utils --example network_split
+      # - name: Run example of split and chunk check
+      #   shell: bash
+      #   run: timeout 10m cargo run --release  --features=always-joinable,test-utils --example network_split
 
-      - name: Was there a section split?
-        run: ./scripts/has_split.sh
+      # - name: Was there a section split?
+      #   run: ./scripts/has_split.sh
 
       - name: Are nodes still running...?
         if: failure() && matrix.os != 'windows-latest'
