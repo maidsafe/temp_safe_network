@@ -11,7 +11,6 @@
 use super::helpers::download_and_install_github_release_asset;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use sn_launch_tool::{join_with, run_with};
 use std::{
     collections::{BTreeSet, HashMap},
     fs::create_dir_all,

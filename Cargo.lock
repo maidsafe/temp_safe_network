@@ -3166,15 +3166,15 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
+checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
 
 [[package]]
 name = "sn_api"
-version = "0.35.0"
+version = "0.35.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60d252052a61df6b1a58ae2a15d4f630adc447487f7c8b277e292e1eeef130f9"
+checksum = "0a18060c42e4b0c8d8436ef989fd67b35bbb4b4792e46b1baf9d487aa301fc1e"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3214,7 +3214,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.33.8"
+version = "0.34.0"
 dependencies = [
  "ansi_term 0.12.1",
  "assert_cmd",
@@ -3256,6 +3256,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "url",
  "walkdir",
  "xor_name 2.0.0",
  "xor_name 3.1.0",

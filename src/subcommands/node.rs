@@ -7,10 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::operations::{
-    config::{read_current_node_config, Config},
-    node::*,
-};
+use crate::operations::{config::Config, node::*};
 use color_eyre::{eyre::eyre, Result};
 use sn_api::PublicKey;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
@@ -104,7 +101,7 @@ pub enum NodeSubCommands {
     },
 }
 
-pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
+pub async fn node_commander(cmd: Option<NodeSubCommands>, config: &mut Config) -> Result<()> {
     match cmd {
         Some(NodeSubCommands::BinVersion { node_path }) => node_version(node_path),
         Some(NodeSubCommands::Install { node_path, version }) => {
@@ -126,13 +123,12 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
         }) => {
             let network_contacts = if hard_coded_contacts.is_empty() {
                 if let Some(name) = network_name {
-                    let config = Config::read()?;
                     let msg = format!("Joining the '{}' network...", name);
                     debug!("{}", msg);
                     println!("{}", msg);
                     config.get_network_info(&name).await?
                 } else {
-                    let (_, contacts) = read_current_node_config()?;
+                    let (_, contacts) = config.read_current_node_config()?;
                     contacts
                 }
             } else {

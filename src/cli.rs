@@ -8,6 +8,7 @@
 // Software.
 
 use crate::{
+    operations::config::Config,
     operations::safe_net::connect,
     shell,
     subcommands::{
@@ -89,8 +90,8 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
     debug!("Processing command: {:?}", args);
 
     let result = match args.cmd {
-        Some(SubCommands::Config { cmd }) => config_commander(cmd).await,
-        Some(SubCommands::Networks { cmd }) => networks_commander(cmd).await,
+        Some(SubCommands::Config { cmd }) => config_commander(cmd, &mut get_config()?).await,
+        Some(SubCommands::Networks { cmd }) => networks_commander(cmd, &mut get_config()?).await,
         Some(SubCommands::Update { no_confirm }) => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
@@ -111,14 +112,14 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
             recursive,
             follow_links,
         }) => xorurl_commander(cmd, location, recursive, follow_links, output_fmt, safe).await,
-        Some(SubCommands::Node { cmd }) => node_commander(cmd).await,
+        Some(SubCommands::Node { cmd }) => node_commander(cmd, &mut get_config()?).await,
         Some(other) => {
             // We treat these commands separatelly since we use the credentials if they are
             // available to connect to the network with them (unless dry-run was set),
             // otherwise the connection created  will be with read-only access and some
             // of these commands will fail if they require write access.
             if !args.dry {
-                connect(safe).await?;
+                connect(safe, get_config()?).await?;
             }
 
             match other {
@@ -135,4 +136,18 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
 
     safe.xorurl_base = prev_base;
     result
+}
+
+fn get_config() -> Result<Config> {
+    let mut config_path =
+        dirs_next::home_dir().ok_or_else(|| eyre!("Couldn't find user's home directory"))?;
+    config_path.push(".safe");
+    config_path.push("cli");
+    config_path.push("config.json");
+    let mut node_config_path =
+        dirs_next::home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
+    node_config_path.push(".safe");
+    node_config_path.push("node");
+    node_config_path.push("node_connection_info.config");
+    Config::new(config_path, node_config_path)
 }

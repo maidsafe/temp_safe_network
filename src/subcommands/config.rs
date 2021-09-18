@@ -57,14 +57,16 @@ pub enum SettingRemoveCmd {
     // },
 }
 
-pub async fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<()> {
-    let mut config = Config::read()?;
+pub async fn config_commander(cmd: Option<ConfigSubCommands>, config: &mut Config) -> Result<()> {
     match cmd {
         Some(ConfigSubCommands::Add(SettingAddCmd::Network {
             network_name,
             config_location,
         })) => {
-            config.add_network(&network_name, config_location.map(NetworkInfo::ConnInfoUrl))?;
+            config.add_network(
+                &network_name,
+                config_location.map(NetworkInfo::ConnInfoLocation),
+            )?;
         }
         // Some(ConfigSubCommands::Add(SettingAddCmd::Contact { name, safeid })) => {}
         Some(ConfigSubCommands::Remove(SettingRemoveCmd::Network { network_name })) => {

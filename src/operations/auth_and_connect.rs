@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::config::read_current_node_config;
+use super::config::Config;
 use crate::{APP_ID, APP_NAME, APP_VENDOR};
 use color_eyre::{eyre::eyre, eyre::WrapErr, Result};
 use sn_api::{Keypair, Safe};
@@ -47,7 +47,7 @@ pub async fn authorise_cli(endpoint: Option<String>, is_self_authing: bool) -> R
 // otherwise it creates a read only connection.
 // Returns the app's keypair if connection was succesfully made with credentials,
 // otherwise it returns 'None' if conneciton is read only.
-pub async fn connect(safe: &mut Safe) -> Result<Option<Keypair>> {
+pub async fn connect(safe: &mut Safe, config: Config) -> Result<Option<Keypair>> {
     debug!("Connecting...");
 
     let app_keypair = if let Ok((_, keypair)) = read_credentials() {
@@ -61,7 +61,7 @@ pub async fn connect(safe: &mut Safe) -> Result<Option<Keypair>> {
         info!("No credentials found for CLI, connecting with read-only access...");
     }
 
-    let (_, bootstrap_contacts) = read_current_node_config()?;
+    let (_, bootstrap_contacts) = config.read_current_node_config()?;
     let client_cfg = client_config_path();
     match safe
         .connect(
