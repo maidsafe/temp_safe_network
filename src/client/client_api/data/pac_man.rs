@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::client::{client_api::blob_apis::BlobAddress, Error, Result};
+use super::BlobAddress;
+use crate::client::{Error, Result};
 use crate::types::{Chunk, Encryption};
 use bincode::serialize;
 use bytes::Bytes;
@@ -26,7 +27,7 @@ pub(crate) enum SecretKey {
 }
 
 #[allow(unused)]
-pub(crate) fn get_file_chunks(
+pub(crate) fn encrypt_from_path(
     path: &Path,
     encryption: Option<&impl Encryption>,
 ) -> Result<(BlobAddress, Vec<Chunk>)> {
@@ -34,7 +35,7 @@ pub(crate) fn get_file_chunks(
     pack(secret_key, encrypted_chunks, encryption)
 }
 
-pub(crate) fn get_data_chunks(
+pub(crate) fn encrypt_blob(
     data: Bytes,
     encryption: Option<&impl Encryption>,
 ) -> Result<(BlobAddress, Vec<Chunk>)> {
@@ -98,6 +99,23 @@ pub(crate) fn pack(
     Ok((address, all_chunks))
 }
 
+pub(crate) fn to_chunk(
+    chunk_content: Bytes,
+    encryption: Option<&impl Encryption>,
+) -> Result<Chunk> {
+    let chunk: Chunk = if let Some(encryption) = encryption {
+        // If this is a SecretKey: strictly, we do not need to encrypt this if it's not going to be the
+        // last level, since it will then instead be self-encrypted.
+        // But we can just as well do it, for now.. (which also lets us avoid some edge case handling).
+        let encrypted_content = encryption.encrypt(chunk_content)?;
+        Chunk::new(encrypted_content)
+    } else {
+        Chunk::new(chunk_content)
+    };
+
+    Ok(chunk)
+}
+
 fn pack_secret_key(secret_key: SecretKey, encryption: Option<&impl Encryption>) -> Result<Bytes> {
     let raw_bytes = Bytes::from(serialize(&secret_key)?);
     if let Some(encryption) = encryption {
@@ -117,18 +135,4 @@ fn encrypt_file(file: &Path) -> Result<(BlobSecretKey, Vec<EncryptedChunk>)> {
 
 fn encrypt_data(bytes: Bytes) -> Result<(BlobSecretKey, Vec<EncryptedChunk>)> {
     self_encryption::encrypt(bytes).map_err(Error::SelfEncryption)
-}
-
-fn to_chunk(chunk_content: Bytes, encryption: Option<&impl Encryption>) -> Result<Chunk> {
-    let chunk: Chunk = if let Some(encryption) = encryption {
-        // strictly, we do not need to encrypt this if it's not going to be the
-        // last level, since it will then instead be self-encrypted.
-        // But we can just as well do it, for now.. (which also lets us avoid some edge case handling).
-        let encrypted_content = encryption.encrypt(chunk_content)?;
-        Chunk::new(encrypted_content)
-    } else {
-        Chunk::new(chunk_content)
-    };
-
-    Ok(chunk)
 }
