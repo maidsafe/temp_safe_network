@@ -12,7 +12,7 @@ mod data;
 mod queries;
 mod register_apis;
 
-pub use self::blob_apis::BlobAddress;
+pub use self::data::{Blob, BlobAddress, Spot};
 use crate::client::{connections::Session, errors::Error, Config};
 use crate::messaging::data::CmdError;
 use crate::types::{Keypair, PublicKey};
@@ -175,8 +175,8 @@ mod tests {
     async fn long_lived_connection_survives() -> Result<()> {
         let client = create_test_client(None).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
-        let data = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES);
-        let _ = client.write_to_network(data, Scope::Public).await?;
+        let spot = Spot::new(random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES / 2))?;
+        let _ = client.write_spot_to_network(spot, Scope::Public).await?;
         Ok(())
     }
 

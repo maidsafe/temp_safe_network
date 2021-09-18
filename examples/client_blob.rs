@@ -8,7 +8,7 @@
 
 use eyre::Result;
 use safe_network::{
-    client::{utils::test_utils::read_network_conn_info, Client, Config},
+    client::{client_api::Blob, utils::test_utils::read_network_conn_info, Client, Config},
     types::utils::random_bytes,
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
@@ -33,10 +33,10 @@ async fn main() -> Result<()> {
     let pk = client.public_key();
     println!("Client Public Key: {}", pk);
 
-    let random_bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES);
-    println!("Storing data.. ({} bytes)", random_bytes.len());
+    let blob = Blob::new(random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES))?;
+    println!("Storing data.. ({} bytes)", blob.bytes().len());
 
-    let address = client.write_to_network(random_bytes, Scope::Public).await?;
+    let address = client.write_blob_to_network(blob, Scope::Public).await?;
     let xorurl = Url::encode_blob(
         *address.name(),
         Scope::Public,

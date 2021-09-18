@@ -24,7 +24,11 @@ use tiny_keccak::{Hasher, Sha3};
 
 use eyre::{eyre, Context, Result};
 use safe_network::{
-    client::{client_api::BlobAddress, utils::test_utils::read_network_conn_info, Client, Config},
+    client::{
+        client_api::{Blob, BlobAddress},
+        utils::test_utils::read_network_conn_info,
+        Client, Config,
+    },
     types::utils::random_bytes,
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
@@ -223,16 +227,16 @@ async fn upload_data() -> Result<(BlobAddress, [u8; 32])> {
     let config = Config::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
-    let raw_data = random_bytes(1024 * 1024);
+    let blob = Blob::new(random_bytes(1024 * 1024))?;
 
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];
-    hasher.update(&raw_data);
+    hasher.update(&blob.bytes());
     hasher.finalize(&mut output);
 
     println!("Storing data w/ hash {:?}", output);
 
-    let address = client.write_to_network(raw_data, Scope::Public).await?;
+    let address = client.write_blob_to_network(blob, Scope::Public).await?;
     let xorurl = Url::encode_blob(
         *address.name(),
         address.scope(),
