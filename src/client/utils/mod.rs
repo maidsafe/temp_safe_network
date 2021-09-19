@@ -10,10 +10,28 @@
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 
-use crate::types::{Encryption, PublicKey, Result};
+use crate::types::{Encryption, PublicKey, Result as TypesResult};
 use crate::url::Scope;
+use backoff::ExponentialBackoff;
 use bytes::Bytes;
+use futures::Future;
 use rand::{self, distributions::Alphanumeric, rngs::OsRng, Rng};
+use std::time::Duration;
+
+pub(crate) fn retry<R, E, Fn, Fut>(op: Fn) -> impl Future<Output = Result<R, E>>
+where
+    Fn: FnMut() -> Fut,
+    Fut: Future<Output = Result<R, backoff::Error<E>>>,
+{
+    let backoff = ExponentialBackoff {
+        initial_interval: Duration::from_millis(500),
+        max_interval: Duration::from_secs(10),
+        max_elapsed_time: Some(Duration::from_secs(30)),
+        ..Default::default()
+    };
+
+    backoff::future::retry(backoff, op)
+}
 
 struct DummyEncryption {
     public_key: PublicKey,
@@ -29,10 +47,10 @@ impl Encryption for DummyEncryption {
     fn public_key(&self) -> &PublicKey {
         &self.public_key
     }
-    fn encrypt(&self, data: Bytes) -> Result<Bytes> {
+    fn encrypt(&self, data: Bytes) -> TypesResult<Bytes> {
         Ok(data)
     }
-    fn decrypt(&self, encrypted_data: Bytes) -> Result<Bytes> {
+    fn decrypt(&self, encrypted_data: Bytes) -> TypesResult<Bytes> {
         Ok(encrypted_data)
     }
 }
@@ -67,7 +85,7 @@ pub fn generate_readable_string(length: usize) -> String {
         .collect()
 }
 
-/// Convert binary data to a diplay-able format
+/// Convert binary data to a displayable format
 #[inline]
 pub fn bin_data_format(data: &[u8]) -> String {
     let len = data.len();

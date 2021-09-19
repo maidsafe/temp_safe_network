@@ -8,6 +8,7 @@
 
 use super::data::{to_chunk, Blob, BlobAddress, Spot, SpotAddress};
 use super::{data::encrypt_blob, Client};
+use crate::client::utils::retry;
 use crate::messaging::data::{DataCmd, DataQuery, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, Encryption};
 use crate::{
@@ -89,9 +90,12 @@ impl Client {
     pub(crate) async fn read_from_network(&self, name: &XorName) -> Result<Chunk> {
         trace!("Fetching chunk: {:?}", name);
 
-        let address = ChunkAddress(*name);
-
-        let res = self.send_query(DataQuery::GetChunk(address)).await?;
+        let res = retry(|| async {
+            Ok(self
+                .send_query(DataQuery::GetChunk(ChunkAddress(*name)))
+                .await?)
+        })
+        .await?;
 
         let operation_id = res.operation_id;
         let chunk: Chunk = match res.response {
@@ -318,8 +322,12 @@ mod tests {
         let delay = usize::max(1, blob.bytes().len() / DELAY_DIVIDER);
 
         // Assert that the blob is stored.
-        let read_data =
-            run_w_backoff_delayed(|| client.read_blob(private_address), 10, delay).await?;
+        let read_data = run_w_backoff_delayed(
+            || async { Ok(client.read_blob(private_address).await?) },
+            10,
+            delay,
+        )
+        .await?;
 
         compare(blob.bytes(), read_data)?;
 
@@ -336,8 +344,12 @@ mod tests {
             .await?;
 
         // Assert that the public blob is stored.
-        let read_data =
-            run_w_backoff_delayed(|| client.read_blob(public_address), 10, delay).await?;
+        let read_data = run_w_backoff_delayed(
+            || async { Ok(client.read_blob(public_address).await?) },
+            10,
+            delay,
+        )
+        .await?;
 
         compare(blob.bytes(), read_data)?;
 
@@ -465,7 +477,9 @@ mod tests {
         let delay = usize::max(1, size / DELAY_DIVIDER);
 
         // now that it was written to the network we should be able to retrieve it
-        let read_data = run_w_backoff_delayed(|| client.read_blob(address), 10, delay).await?;
+        let read_data =
+            run_w_backoff_delayed(|| async { Ok(client.read_blob(address).await?) }, 10, delay)
+                .await?;
         // then the content should be what we stored
         compare(blob.bytes(), read_data)?;
 
@@ -481,7 +495,10 @@ mod tests {
         let delay = usize::max(1, size / DELAY_DIVIDER);
 
         // now that it was written to the network we should be able to retrieve it
-        let read_data = run_w_backoff_delayed(|| client.read_spot(address), 10, delay).await?;
+        let read_data =
+            run_w_backoff_delayed(|| async { Ok(client.read_spot(address).await?) }, 10, delay)
+                .await?;
+
         // then the content should be what we stored
         compare(spot.bytes(), read_data)?;
 
@@ -497,8 +514,12 @@ mod tests {
         // the larger the file, the longer we have to wait before we start querying
         let delay = usize::max(1, len / DELAY_DIVIDER);
 
-        let read_data =
-            run_w_backoff_delayed(|| client.read_blob_from(address, pos, len), 10, delay).await?;
+        let read_data = run_w_backoff_delayed(
+            || async { Ok(client.read_blob_from(address, pos, len).await?) },
+            10,
+            delay,
+        )
+        .await?;
 
         compare(blob.bytes().slice(pos..(pos + len)), read_data.clone())?;
 

@@ -9,14 +9,13 @@
 #[cfg(test)]
 mod test_client;
 
+use super::retry;
 use crate::client::Error;
 use crate::types::{Keypair, PublicKey};
 use dirs_next::home_dir;
-use exponential_backoff::Backoff;
 use eyre::{eyre, Context, Result};
 use std::{
     collections::BTreeSet, fs::File, future::Future, io::BufReader, net::SocketAddr, path::Path,
-    time::Duration,
 };
 #[cfg(test)]
 pub use test_client::{create_test_client, create_test_client_with, init_logger};
@@ -25,47 +24,19 @@ pub use test_client::{create_test_client, create_test_client_with, init_logger};
 pub type ClientResult<T> = Result<T, Error>;
 
 ///
-pub async fn run_w_backoff_delayed<F, Fut, T>(f: F, retries: u8, delay: usize) -> ClientResult<T>
+#[allow(clippy::needless_question_mark)]
+pub async fn run_w_backoff_delayed<R, F, Fut>(f: F, _retries: u8, delay: usize) -> Result<R, Error>
 where
     F: Fn() -> Fut,
-    Fut: Future<Output = ClientResult<T>>,
+    Fut: Future<Output = Result<R, backoff::Error<Error>>>,
 {
     tokio::time::sleep(tokio::time::Duration::from_secs(delay as u64)).await;
-    run_w_backoff_base(f, retries, Error::NoResponse).await
-}
-
-///
-pub async fn run_w_backoff<F, Fut, T>(f: F, retries: u8) -> ClientResult<T>
-where
-    F: Fn() -> Fut,
-    Fut: Future<Output = ClientResult<T>>,
-{
-    run_w_backoff_base(f, retries, Error::NoResponse).await
-}
-
-async fn run_w_backoff_base<F, Fut, T, E>(f: F, retries: u8, on_fail: E) -> Result<T, E>
-where
-    F: Fn() -> Fut,
-    Fut: Future<Output = Result<T, E>>,
-{
-    let backoff = get_backoff_policy(retries);
-    for duration in &backoff {
-        match f().await {
-            Ok(val) => return Ok(val),
-            Err(_) => {
-                tokio::time::sleep(duration).await;
-                debug!("**** retrying *** ");
-            }
-        }
+    let res = retry(|| async { Ok(f().await?) }).await;
+    if res.is_err() {
+        Err(Error::NoResponse)
+    } else {
+        res
     }
-
-    Err(on_fail)
-}
-
-fn get_backoff_policy(retries: u8) -> Backoff {
-    let min = Duration::from_millis(500);
-    let max = Duration::from_secs(30);
-    Backoff::new(retries as u32, min, max)
 }
 
 // Relative path from $HOME where to read the genesis node connection information from
