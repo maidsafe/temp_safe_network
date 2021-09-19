@@ -33,7 +33,8 @@ async fn upload_bytes(size: usize) -> Result<(), Error> {
     let delay = usize::max(1, size / 2_000_000);
 
     // let's make sure the public chunk is stored
-    let received_data = run_w_backoff_delayed(|| client.read_blob(address), 10, delay).await?;
+    let received_data =
+        run_w_backoff_delayed(|| async { Ok(client.read_blob(address).await?) }, 10, delay).await?;
 
     assert_eq!(received_data, blob.bytes());
 

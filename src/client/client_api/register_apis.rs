@@ -270,7 +270,11 @@ mod tests {
 
             // write to the register
             let _value1_hash = run_w_backoff_delayed(
-                || client.write_to_register(address, value_1.clone(), BTreeSet::new()),
+                || async {
+                    Ok(client
+                        .write_to_register(address, value_1.clone(), BTreeSet::new())
+                        .await?)
+                },
                 10,
                 1,
             )
@@ -303,7 +307,9 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff_delayed(|| client.get_register(address), 10, 1).await?;
+        let register =
+            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
+                .await?;
 
         assert!(register.is_private());
         assert_eq!(*register.name(), name);
@@ -318,7 +324,9 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff_delayed(|| client.get_register(address), 10, 1).await?;
+        let register =
+            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
+                .await?;
 
         assert!(register.is_public());
         assert_eq!(*register.name(), name);
@@ -341,12 +349,18 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff_delayed(|| client.get_register(address), 10, 1).await?;
+        let register =
+            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
+                .await?;
 
         assert_eq!(register.size(None)?, 0);
 
         let permissions = run_w_backoff_delayed(
-            || client.get_register_permissions_for_user(address, owner),
+            || async {
+                Ok(client
+                    .get_register_permissions_for_user(address, owner)
+                    .await?)
+            },
             10,
             1,
         )
@@ -385,7 +399,11 @@ mod tests {
             .await?;
 
         let permissions = run_w_backoff_delayed(
-            || client.get_register_permissions_for_user(address, owner),
+            || async {
+                Ok(client
+                    .get_register_permissions_for_user(address, owner)
+                    .await?)
+            },
             10,
             1,
         )
@@ -430,7 +448,11 @@ mod tests {
 
         // write to the register
         let value1_hash = run_w_backoff_delayed(
-            || client.write_to_register(address, value_1.clone(), BTreeSet::new()),
+            || async {
+                Ok(client
+                    .write_to_register(address, value_1.clone(), BTreeSet::new())
+                    .await?)
+            },
             10,
             1,
         )
@@ -447,7 +469,11 @@ mod tests {
 
         // write to the register
         let value2_hash = run_w_backoff_delayed(
-            || client.write_to_register(address, value_2.clone(), BTreeSet::new()),
+            || async {
+                Ok(client
+                    .write_to_register(address, value_2.clone(), BTreeSet::new())
+                    .await?)
+            },
             10,
             1,
         )
@@ -461,14 +487,20 @@ mod tests {
         assert_eq!(2, hashes.len());
 
         // get_register_entry
-        let retrieved_value_1 =
-            run_w_backoff_delayed(|| client.get_register_entry(address, value1_hash), 10, 1)
-                .await?;
+        let retrieved_value_1 = run_w_backoff_delayed(
+            || async { Ok(client.get_register_entry(address, value1_hash).await?) },
+            10,
+            1,
+        )
+        .await?;
         assert_eq!(retrieved_value_1, value_1);
 
-        let retrieved_value_2 =
-            run_w_backoff_delayed(|| client.get_register_entry(address, value2_hash), 10, 1)
-                .await?;
+        let retrieved_value_2 = run_w_backoff_delayed(
+            || async { Ok(client.get_register_entry(address, value2_hash).await?) },
+            10,
+            1,
+        )
+        .await?;
         assert_eq!(retrieved_value_2, value_2);
 
         // Requesting a hash which desn't exist throws an error
@@ -497,8 +529,12 @@ mod tests {
             .await?;
 
         // Assert that the data is stored.
-        let current_owner =
-            run_w_backoff_delayed(|| client.get_register_owner(address), 10, 1).await?;
+        let current_owner = run_w_backoff_delayed(
+            || async { Ok(client.get_register_owner(address).await?) },
+            10,
+            1,
+        )
+        .await?;
 
         assert_eq!(owner, current_owner);
 
@@ -519,7 +555,9 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff_delayed(|| client.get_register(address), 10, 1).await?;
+        let register =
+            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
+                .await?;
 
         assert!(register.is_private());
 
@@ -557,7 +595,9 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let register = run_w_backoff_delayed(|| client.get_register(address), 10, 1).await?;
+        let register =
+            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
+                .await?;
         assert!(register.is_public());
 
         match client.delete_register(address).await {
