@@ -92,9 +92,9 @@ impl UrlParts {
             Error::InvalidXorUrl(msg)
         })?;
 
-        // Validate the url scheme is 'safe'
+        // Validate the url scheme is 'safe' if it is not empty
         let scheme = parsing_url.scheme().to_string();
-        if scheme != URL_SCHEME {
+        if scheme != "" && scheme != URL_SCHEME {
             let msg = format!("invalid scheme: '{}'. expected: '{}'", scheme, URL_SCHEME);
             return Err(Error::InvalidXorUrl(msg));
         }
