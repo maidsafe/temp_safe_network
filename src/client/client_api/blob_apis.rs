@@ -117,7 +117,7 @@ impl Client {
         let encryption = encryption(scope, self.public_key());
         let chunk = to_chunk(spot.bytes(), encryption.as_ref())?;
         if chunk.value().len() >= self_encryption::MIN_ENCRYPTABLE_BYTES {
-            return Err(Error::Generic("You might need to pad the spot contents, as the encryption of it made it slightly too big".to_string()));
+            return Err(Error::Generic("You might need to pad the spot contents and then store it as a `Blob`, as the encryption has made it slightly too big".to_string()));
         }
         let name = *chunk.name();
         let address = if encryption.is_some() {
