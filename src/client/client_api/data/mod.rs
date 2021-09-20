@@ -8,7 +8,7 @@
 
 mod pac_man;
 
-pub(crate) use pac_man::{encrypt_blob, to_chunk, SecretKey};
+pub(crate) use pac_man::{encrypt_blob, to_chunk, DataMapLevel};
 
 use crate::{
     client::{Error, Result},
@@ -31,7 +31,7 @@ pub struct Spot {
 /// Data of size larger than or equal to [`MIN_ENCRYPTABLE_BYTES`] bytes.
 ///
 /// A `Blob` is spread across multiple chunks in the network.
-/// This is done using self-encryption, which produces at least 4 chunks (3 for the contents, 1 for the `BlobSecretKey`).
+/// This is done using self-encryption, which produces at least 4 chunks (3 for the contents, 1 for the `DataMap`).
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
 pub struct Blob {
