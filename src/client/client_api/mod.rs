@@ -12,7 +12,7 @@ mod data;
 mod queries;
 mod register_apis;
 
-pub use self::data::{Blob, BlobAddress, Spot};
+pub use self::data::{Blob, BlobAddress, Spot, SpotAddress};
 use crate::client::{connections::Session, errors::Error, Config};
 use crate::messaging::data::CmdError;
 use crate::types::{Keypair, PublicKey};
