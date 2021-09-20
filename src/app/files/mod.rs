@@ -13,8 +13,8 @@ mod metadata;
 mod realpath;
 
 use crate::{
-    app::consts::*, app::nrs::VersionHash, fetch::Range, ContentType, DataType, Error, Result,
-    Safe, Scope, Url, XorUrl,
+    app::consts::*, app::nrs::VersionHash, app::SELF_ENCRYPTION_MIN_SIZE, fetch::Range,
+    ContentType, DataType, Error, Result, Safe, Scope, Url, XorUrl,
 };
 use bytes::{Buf, Bytes};
 use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
@@ -33,10 +33,9 @@ pub use files_map::{FileItem, FilesMap, GetAttr};
 // List of files uploaded with details if they were added, updated or deleted from FilesContainer
 pub type ProcessedFiles = BTreeMap<String, (String, String)>;
 
+const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
 // Type tag to use for the FilesContainer stored on Register
 const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
-
-const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
 
 impl Safe {
     /// # Create a FilesContainer.
@@ -168,6 +167,11 @@ impl Safe {
             })?;
 
         // take the 1st entry (TODO Multiple entries)
+        debug!(
+            "Retrieved {} entries for register at {}",
+            entries.len(),
+            safe_url.to_string()
+        );
         if entries.len() > 1 {
             return Err(Error::NotImplementedError("Multiple file container entries not managed, this happends when 2 clients write concurrently to a file container".to_string()));
         }
@@ -532,6 +536,49 @@ impl Safe {
         Ok(new_version)
     }
 
+    /// # Put a Public Spot
+    /// Put data spots onto the network.
+    ///
+    /// Spots are small pieces of data that are less than 3072 bytes.
+    ///
+    /// ## Example
+    /// ```no_run
+    /// # use sn_api::Safe;
+    /// # let mut safe = Safe::default();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    /// #   safe.connect(None, None, None).await.unwrap();
+    ///     let data = b"Something super good";
+    ///     let xorurl = safe.files_store_public_spot(data, Some("text/plain"), false).await.unwrap();
+    ///     let received_data = safe.files_get_public_spot(&xorurl, None).await.unwrap();
+    ///     assert_eq!(received_data, data);
+    /// # });
+    /// ```
+    pub async fn files_store_public_spot(
+        &self,
+        data: Bytes,
+        media_type: Option<&str>,
+        dry_run: bool,
+    ) -> Result<XorUrl> {
+        let content_type = media_type.map_or_else(
+            || Ok(ContentType::Raw),
+            |media_type_str| {
+                if Url::is_media_type_supported(media_type_str) {
+                    Ok(ContentType::MediaType(media_type_str.to_string()))
+                } else {
+                    Err(Error::InvalidMediaType(format!(
+                        "Media-type '{}' not supported. You can pass 'None' as the 'media_type' for this content to be treated as raw",
+                        media_type_str
+                    )))
+                }
+            },
+        )?;
+
+        let xorname = self.safe_client.store_public_spot(data, dry_run).await?;
+        let xorurl = Url::encode_blob(xorname, Scope::Public, content_type, self.xorurl_base)?;
+        Ok(xorurl)
+    }
+
     /// # Put a Public Blob
     /// Put data blobs onto the network.
     ///
@@ -616,10 +663,24 @@ impl Safe {
                 err
             ))
         })?;
-        let files_map_xorurl = self
-            .files_store_public_blob(Bytes::from(serialised_files_map), None, false)
-            .await?;
-
+        let files_map_xorurl;
+        if serialised_files_map.len() < SELF_ENCRYPTION_MIN_SIZE {
+            debug!(
+                "Serialized files map is {} bytes so it will be stored as a spot",
+                serialised_files_map.len()
+            );
+            files_map_xorurl = self
+                .files_store_public_spot(Bytes::from(serialised_files_map), None, false)
+                .await?;
+        } else {
+            debug!(
+                "Serialized files map is {} bytes so it will be stored as a blob",
+                serialised_files_map.len()
+            );
+            files_map_xorurl = self
+                .files_store_public_blob(Bytes::from(serialised_files_map), None, false)
+                .await?;
+        }
         Ok(files_map_xorurl)
     }
 }

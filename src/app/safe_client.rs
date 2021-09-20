@@ -8,11 +8,11 @@
 // Software.
 
 use super::fetch::Range;
-use crate::{ipc::NodeConfig, Error, Result};
+use crate::{app::SELF_ENCRYPTION_MIN_SIZE, ipc::NodeConfig, Error, Result};
 use bytes::Bytes;
 use hex::encode;
 use log::{debug, info};
-use safe_network::client::client_api::BlobAddress;
+use safe_network::client::client_api::{Blob, BlobAddress, Spot, SpotAddress};
 use safe_network::client::{Client, Config, Error as ClientError};
 use safe_network::types::{
     register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
@@ -95,22 +95,54 @@ impl SafeAppClient {
         Ok(client.keypair())
     }
 
-    // // === Blob operations ===
-    pub async fn store_public_blob(&self, data: Bytes, dry_run: bool) -> Result<XorName> {
+    pub async fn store_public_spot(&self, data: Bytes, dry_run: bool) -> Result<XorName> {
         let address = if dry_run {
-            // I don't see the equivalent API for doing a dry run, so just returning the default
-            // address for now.
-            BlobAddress::Public(XorName::default())
+            SpotAddress::Public(XorName::default())
         } else {
             let client = self.get_safe_client()?;
-            let address = client
-                .write_to_network(data.to_owned(), Scope::Public)
-                .await
-                .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?;
-            address
+            client
+                .write_spot_to_network(Spot::new(data.clone())?, Scope::Public)
+                .await?
+        };
+        Ok(*address.name())
+    }
+
+    // // === Blob operations ===
+    pub async fn store_public_blob(&self, data: Bytes, dry_run: bool) -> Result<XorName> {
+        let xorname = if dry_run {
+            // I don't see the equivalent API for doing a dry run, so just returning the default
+            // address for now.
+            XorName::default()
+        } else {
+            let client = self.get_safe_client()?;
+            if data.len() < SELF_ENCRYPTION_MIN_SIZE {
+                debug!(
+                    "Data to write is {} bytes so a spot will be written",
+                    data.len()
+                );
+                let address = client
+                    .write_spot_to_network(Spot::new(data.to_owned())?, Scope::Public)
+                    .await
+                    .map_err(|e| {
+                        Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e))
+                    })?;
+                *address.name()
+            } else {
+                debug!(
+                    "Data to write is {} bytes so a blob will be written",
+                    data.len()
+                );
+                let address = client
+                    .write_blob_to_network(Blob::new(data.to_owned())?, Scope::Public)
+                    .await
+                    .map_err(|e| {
+                        Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e))
+                    })?;
+                *address.name()
+            }
         };
 
-        Ok(*address.name())
+        Ok(xorname)
     }
 
     pub async fn get_public_blob(&self, xorname: XorName, range: Range) -> Result<Bytes> {

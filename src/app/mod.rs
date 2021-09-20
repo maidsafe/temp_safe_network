@@ -35,6 +35,8 @@ pub use helpers::parse_tokens_amount;
 pub use safe_network::url::*;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
+const SELF_ENCRYPTION_MIN_SIZE: usize = 3072;
+
 #[derive(Clone)]
 pub struct Safe {
     safe_client: SafeAppClient,
