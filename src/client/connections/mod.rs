@@ -14,21 +14,24 @@ use crate::messaging::{
     signature_aggregator::SignatureAggregator,
 };
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::{Cache, PublicKey};
-
+use crate::types::PublicKey;
+use bls::PublicKey as BlsPublicKey;
+use bytes::Bytes;
 use qp2p::Endpoint;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{mpsc::Sender, RwLock};
 use xor_name::XorName;
-
 type QueryResponseSender = Sender<QueryResponse>;
 type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
+use uluru::LRUCache;
 
 pub(crate) struct QueryResult {
     pub(super) response: QueryResponse,
     // TODO: unify this
     pub(super) operation_id: OperationId,
 }
+
+pub(crate) type AeCache = LRUCache<(XorName, BlsPublicKey, Bytes), 100>;
 
 #[derive(Clone, Debug)]
 pub(super) struct Session {
@@ -42,10 +45,8 @@ pub(super) struct Session {
     incoming_err_sender: Arc<Sender<CmdError>>,
     /// All elders we know about from AE messages
     network: Arc<NetworkPrefixMap>,
-    /// AE-Retry message resending cache
-    ae_retry_cache: Arc<Cache<XorName, Vec<SocketAddr>>>,
-    /// AE-Redirect message resending cache
-    ae_redirect_cache: Arc<Cache<XorName, Vec<SocketAddr>>>,
+    /// AE message resending cache
+    ae_cache: Arc<RwLock<AeCache>>,
     /// Our initial bootstrap node
     bootstrap_peer: SocketAddr,
     /// BLS Signature aggregator for aggregating network messages

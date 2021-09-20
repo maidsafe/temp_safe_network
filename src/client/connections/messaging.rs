@@ -8,6 +8,7 @@
 
 use super::{QueryResult, Session};
 
+use super::AeCache;
 use crate::client::Error;
 use crate::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
@@ -15,13 +16,12 @@ use crate::messaging::{
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::{Cache, PublicKey};
+use crate::types::PublicKey;
 
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
-use std::time::Duration;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     net::SocketAddr,
@@ -39,8 +39,6 @@ use xor_name::XorName;
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of attempts to make when trying to bootstrap to a section
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
-// AE cache expiration time
-const CACHE_EXPIRATION_TIME: Duration = Duration::from_secs(5);
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
@@ -71,8 +69,7 @@ impl Session {
             incoming_err_sender: Arc::new(err_sender),
             endpoint,
             network: Arc::new(NetworkPrefixMap::new(genesis_key)),
-            ae_redirect_cache: Arc::new(Cache::with_expiry_duration(CACHE_EXPIRATION_TIME)),
-            ae_retry_cache: Arc::new(Cache::with_expiry_duration(CACHE_EXPIRATION_TIME)),
+            ae_cache: Arc::new(RwLock::new(AeCache::default())),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             bootstrap_peer: bootstrap_peer.remote_address(),
             genesis_key,
@@ -179,19 +176,7 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        return match send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await {
-            Ok(()) => {
-                if let Some(old_elders) = self
-                    .ae_retry_cache
-                    .set(dst_address, elders.clone(), None)
-                    .await
-                {
-                    warn!("We have already sent this cmd to Elders {:?} Updating cache with latest elders {:?}", old_elders, &elders);
-                }
-                Ok(())
-            }
-            Err(e) => Err(e),
-        };
+        send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await
     }
 
     /// Send a `ServiceMsg` to the network awaiting for the response.
@@ -259,11 +244,17 @@ impl Session {
             let _ = tokio::spawn(async move {
                 // Insert the response sender
                 trace!("Inserting channel for {:?}", op_id);
-                let _ = pending_queries_for_thread
+                let _old = pending_queries_for_thread
                     .write()
                     .await
-                    .insert(op_id, sender);
+                    .insert(op_id.clone(), sender);
+
+                drop(_old);
+
+                trace!("Inserted channel for {:?}", op_id);
             });
+        } else {
+            warn!("No op_id found for query");
         }
 
         let discarded_responses = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
@@ -283,6 +274,7 @@ impl Session {
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
             let task_handle = tokio::spawn(async move {
+                trace!("queueing query send task to: {:?}", &socket);
                 let result = endpoint.send_message(msg_bytes, &socket, priority).await;
                 match &result {
                     Err(err) => {
@@ -318,14 +310,6 @@ impl Session {
                 error!("Error spawning task to send query: {:?} ", err);
                 discarded_responses += 1;
             }
-        }
-
-        if let Some(old_elders) = self
-            .ae_retry_cache
-            .set(dst, chosen_elders.clone(), None)
-            .await
-        {
-            warn!("We have already sent this query to Elders {:?} Updating cache with latest elders {:?}", old_elders, &chosen_elders);
         }
 
         let response = loop {
@@ -383,7 +367,8 @@ impl Session {
                 let _ = tokio::spawn(async move {
                     // Remove the response sender
                     trace!("Removing channel for {:?}", query_op_id);
-                    let _ = pending_queries.clone().write().await.remove(&query_op_id);
+                    let _old_channel = pending_queries.clone().write().await.remove(&query_op_id);
+                    drop(_old_channel);
                 });
             }
         }
@@ -424,7 +409,7 @@ pub(crate) async fn send_message(
     let mut tasks = Vec::default();
 
     // clone elders as we want to update them in this process
-    for socket in elders {
+    for socket in elders.clone() {
         let msg_bytes_clone = msg_bytes.clone();
         let endpoint = endpoint.clone();
         let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {

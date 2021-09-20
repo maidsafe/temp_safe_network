@@ -72,6 +72,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrayvec"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be4dc07131ffa69b8072d35f5007352af944213cde02545e2103680baed38fcd"
+
+[[package]]
 name = "assert_matches"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2273,6 +2279,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "uhttp_uri",
+ "uluru",
  "url",
  "urlencoding",
  "xor_name",
@@ -2946,6 +2953,15 @@ name = "uhttp_uri"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9b600e6da808f63a440874d633b22fa04abc9c3b08212ee7292512aec62805b"
+
+[[package]]
+name = "uluru"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "794a32261a1f5eb6a4462c81b59cec87b5c27d5deea7dd1ac8fc781c41d226db"
+dependencies = [
+ "arrayvec",
+]
 
 [[package]]
 name = "unicode-bidi"
