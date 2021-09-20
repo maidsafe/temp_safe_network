@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.17](https://github.com/maidsafe/safe_network/compare/v0.31.16...v0.31.17) (2021-09-20)
+
+
+### Bug Fixes
+
+* carry out checks when adding dir into used_space ([6c3385a](https://github.com/maidsafe/safe_network/commit/6c3385af528b7a609d154737f7ce9b55a0511abc))
+
 ### [0.31.16](https://github.com/maidsafe/safe_network/compare/v0.31.15...v0.31.16) (2021-09-17)
 
 ### [0.31.15](https://github.com/maidsafe/safe_network/compare/v0.31.14...v0.31.15) (2021-09-17)
