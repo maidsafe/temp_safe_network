@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.19](https://github.com/maidsafe/safe_network/compare/v0.31.18...v0.31.19) (2021-09-20)
+
+
+### Bug Fixes
+
+* make spot and its address public ([cd6a4d8](https://github.com/maidsafe/safe_network/commit/cd6a4d8ce62b26e7de0793c65c49fad5ca6c4d3d))
+
 ### [0.31.18](https://github.com/maidsafe/safe_network/compare/v0.31.17...v0.31.18) (2021-09-20)
 
 
