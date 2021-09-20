@@ -243,11 +243,22 @@ impl Session {
 
         let message = WireMsg::serialize_msg_payload(&service_msg)?;
 
-        // TODO: we cannot trust these Elders belong to the network we are intended
-        // to connect to (based on the genesis key we know). We could send the genesis key
-        // as the destination section key and that should cause an AE-Retry response,
-        // which we could use to verify the SAP we receive an trust.
-        let section_pk = section_auth.public_key_set.public_key();
+        // We cannot trust these Elders belong to the network we are intended to connect to (based on the genesis key we know).
+        // Here we purposefully try and use old info to expand our network knowledge.
+        // So we use a closest_or opposite key.
+        // From then on we'll be able to message this section without as many AE messaged
+        // We only fall back to the provided key if our search fails.
+        let section_pk = match session
+            .network
+            .closest_or_opposite(&dst_address_of_bounced_msg)
+        {
+            Some(sap) => sap.value.public_key_set.public_key(),
+            None => {
+                // We could send the genesis key... is that better than the returned AE info?
+                error!("Client network graph is not returning any section info for msg dst: {:?}. Falling back to provided AE message section_key (although we cannot trust it and will not get AE-retry messages until our info is out of date...) ", &dst_address_of_bounced_msg);
+                section_auth.public_key_set.public_key()
+            }
+        };
 
         // Let's rebuild the message with the updated destination details
         let wire_msg = WireMsg::new_msg(
