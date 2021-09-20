@@ -111,9 +111,10 @@ impl Client {
         encrypt_blob(blob.bytes(), owner.as_ref())
     }
 
-    /// Encrypts a small piece of t(d)ata (spot) and returns the resulting address and the chunk.
+    /// Packages a small piece of t(d)ata (spot) and returns the resulting address and the chunk.
+    /// The chunk content will be in plain text if it has public scope, or encrypted if it is instead private.
     /// Does not store anything to the network.
-    pub fn encrypt_spot(&self, spot: Spot, scope: Scope) -> Result<(SpotAddress, Chunk)> {
+    pub fn package_spot(&self, spot: Spot, scope: Scope) -> Result<(SpotAddress, Chunk)> {
         let encryption = encryption(scope, self.public_key());
         let chunk = to_chunk(spot.bytes(), encryption.as_ref())?;
         if chunk.value().len() >= self_encryption::MIN_ENCRYPTABLE_BYTES {
@@ -131,7 +132,7 @@ impl Client {
     /// Directly writes a [`Spot`] to the network in the
     /// form of a single chunk, without any batching.
     pub async fn write_spot_to_network(&self, spot: Spot, scope: Scope) -> Result<SpotAddress> {
-        let (address, chunk) = self.encrypt_spot(spot, scope)?;
+        let (address, chunk) = self.package_spot(spot, scope)?;
         self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
         Ok(address)
     }
