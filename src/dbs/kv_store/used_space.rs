@@ -10,6 +10,7 @@ use super::Error;
 use async_recursion::async_recursion;
 use dashmap::DashSet;
 use futures::future::join_all;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
@@ -31,7 +32,38 @@ impl UsedSpace {
         }
     }
 
+    // The dir shall not be added when its ancestor exists.
+    // Remove existing decendant dirs when the dir is ancestor to them.
     pub(crate) fn add_dir(&self, dir: &Path) {
+        let dir_str = if let Some(str) = dir.to_str() {
+            str
+        } else {
+            error!("Path {:?} cannot be coverted to str.", dir);
+            return;
+        };
+
+        let ancestor_strs: HashSet<_> = dir.ancestors().filter_map(|anc| anc.to_str()).collect();
+
+        if self.dirs.iter().any(|dir| {
+            let cur_dir_str = if let Some(str) = dir.to_str() {
+                str
+            } else {
+                return false;
+            };
+            ancestor_strs.contains(cur_dir_str)
+        }) {
+            // Ancestor exists
+            trace!("Path {:?} is a descendant of an existing entry, it will not be added for storage calcuation checks.", dir);
+            return;
+        }
+
+        // Remove descendants
+        self.dirs.retain(|cur_dir| {
+            let cur_ancestor_strs: HashSet<_> =
+                cur_dir.ancestors().filter_map(|anc| anc.to_str()).collect();
+            !cur_ancestor_strs.contains(dir_str)
+        });
+
         let _ = self.dirs.insert(dir.to_path_buf());
     }
 
@@ -74,4 +106,30 @@ async fn get_size(path: PathBuf) -> tokio::io::Result<u64> {
         }
     }
     Ok(size)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn used_space_add_dir() {
+        let used_space = UsedSpace::new(u64::MAX);
+        let path_desc_1 = Path::new("/x/y/a");
+        let path_desc_2 = Path::new("/x/y/b");
+        let path_anc = Path::new("/x");
+
+        used_space.add_dir(path_desc_1);
+        used_space.add_dir(path_desc_2);
+
+        assert_eq!(2, used_space.dirs.len());
+
+        used_space.add_dir(path_anc);
+        assert_eq!(1, used_space.dirs.len());
+        assert!(used_space.dirs.contains(path_anc));
+
+        used_space.add_dir(path_desc_1);
+        assert_eq!(1, used_space.dirs.len());
+        assert!(used_space.dirs.contains(path_anc));
+    }
 }
