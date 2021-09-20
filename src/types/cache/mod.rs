@@ -19,7 +19,7 @@ use tokio::sync::RwLock;
 #[derive(Debug)]
 pub struct Cache<T, V>
 where
-    T: Hash + Eq + Copy,
+    T: Hash + Eq,
 {
     items: RwLock<BTreeMap<T, Item<V>>>,
     item_duration: Option<Duration>,
@@ -29,7 +29,7 @@ where
 #[allow(clippy::len_without_is_empty)]
 impl<T, V> Cache<T, V>
 where
-    T: Ord + Hash + Copy,
+    T: Ord + Hash,
 {
     /// Creating capacity based `Cache`.
     pub fn with_capacity(capacity: usize) -> Self {
@@ -117,18 +117,15 @@ where
 
     /// Remove expired items from the cache storage.
     pub async fn remove_expired(&self) {
-        let expired_keys: Vec<_>;
-        {
-            let read_items = self.items.read().await;
-            expired_keys = read_items
-                .iter()
-                .filter(|(_, item)| item.expired())
-                .map(|(key, _)| *key)
-                .collect();
-        }
+        let read_items = self.items.read().await;
+        let expired_keys: Vec<_> = read_items
+            .iter()
+            .filter(|(_, item)| item.expired())
+            .map(|(key, _)| key)
+            .collect();
 
         for key in expired_keys {
-            let _ = self.items.write().await.remove(&key);
+            let _ = self.items.write().await.remove(key);
         }
     }
 
@@ -137,17 +134,17 @@ where
         let len = self.len().await;
         if len > self.capacity {
             let excess = len - self.capacity;
-            let excess_keys: Vec<_>;
-            {
-                let read_items = self.items.read().await;
+            let read_items = self.items.read().await;
+            let excess_keys: Vec<_> = {
                 let mut items = read_items.iter().collect_vec();
 
                 // reversed sort
                 items.sort_by(|(_, item_a), (_, item_b)| item_b.elapsed().cmp(&item_a.elapsed()));
 
                 // take the excess
-                excess_keys = items.iter().take(excess).map(|(key, _)| **key).collect();
-            }
+                items.iter().take(excess).map(|(key, _)| *key).collect()
+            };
+
             for key in excess_keys {
                 let _ = self.items.write().await.remove(&key);
             }

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{QueryResult, Session};
+use super::{AeCache, QueryResult, Session};
 
 use crate::client::Error;
 use crate::messaging::{
@@ -71,8 +71,7 @@ impl Session {
             incoming_err_sender: Arc::new(err_sender),
             endpoint,
             network: Arc::new(NetworkPrefixMap::new(genesis_key)),
-            ae_redirect_cache: Arc::new(Cache::with_expiry_duration(CACHE_EXPIRATION_TIME)),
-            ae_retry_cache: Arc::new(Cache::with_expiry_duration(CACHE_EXPIRATION_TIME)),
+            ae_cache: Arc::new(Cache::with_expiry_duration(CACHE_EXPIRATION_TIME)),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             bootstrap_peer,
             genesis_key,
@@ -179,19 +178,13 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        return match send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await {
-            Ok(()) => {
-                if let Some(old_elders) = self
-                    .ae_retry_cache
-                    .set(dst_address, elders.clone(), None)
-                    .await
-                {
-                    warn!("We have already sent this cmd to Elders {:?} Updating cache with latest elders {:?}", old_elders, &elders);
-                }
-                Ok(())
-            }
-            Err(e) => Err(e),
-        };
+        send_message(
+            elders.clone(),
+            wire_msg,
+            self.endpoint.clone(),
+            msg_id,
+        )
+        .await
     }
 
     /// Send a `ServiceMsg` to the network awaiting for the response.
@@ -222,6 +215,8 @@ impl Session {
             (bootstrapped_peer, self.genesis_key)
         };
 
+        debug!(">>>>>> about to send query elders found for section: {:?}", elders);
+
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders = elders
             .into_iter()
@@ -229,6 +224,7 @@ impl Session {
             .map(|(_, addr)| addr)
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
             .collect::<Vec<SocketAddr>>();
+
 
         let elders_len = chosen_elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES && elders_len > 1 {
@@ -283,6 +279,8 @@ impl Session {
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
             let task_handle = tokio::spawn(async move {
+
+                debug!("queuging query send task to: {:?}", &socket);
                 let result = endpoint.send_message(msg_bytes, &socket, priority).await;
                 match &result {
                     Err(err) => {
@@ -320,13 +318,13 @@ impl Session {
             }
         }
 
-        if let Some(old_elders) = self
-            .ae_retry_cache
-            .set(dst, chosen_elders.clone(), None)
-            .await
-        {
-            warn!("We have already sent this query to Elders {:?} Updating cache with latest elders {:?}", old_elders, &chosen_elders);
-        }
+        // if let Some(old_elders) = self
+        //     .ae_cache
+        //     .set(msg_bytes, chosen_elders.clone(), None)
+        //     .await
+        // {
+        //     warn!("*** in query ***** We have already sent this query to Elders {:?} Updating cache with latest elders {:?}", old_elders, &chosen_elders);
+        // }
 
         let response = loop {
             let mut error_response = None;
@@ -424,7 +422,7 @@ pub(crate) async fn send_message(
     let mut tasks = Vec::default();
 
     // clone elders as we want to update them in this process
-    for socket in elders {
+    for socket in elders.clone() {
         let msg_bytes_clone = msg_bytes.clone();
         let endpoint = endpoint.clone();
         let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
@@ -438,6 +436,7 @@ pub(crate) async fn send_message(
         });
         tasks.push(task_handle);
     }
+
 
     // Let's await for all messages to be sent
     let results = join_all(tasks).await;

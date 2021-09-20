@@ -261,6 +261,8 @@ impl Core {
                         ae_msg,
                         self.section.authority_provider().section_key(),
                     )?;
+
+                    debug!(">>>>>>>>> SENDING AE-Redirect");
                     return Ok(Some(Command::SendMessage {
                         recipients: vec![(src_location.name(), sender)],
                         wire_msg,
@@ -276,7 +278,7 @@ impl Core {
                     // a section key we are not aware of yet?
                     // ...and once we acquired new key/s we attempt AE check again?
                     error!(
-                            "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section.",
+                            ">>>>>>>> Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section.",
                             dst_name, dst_section_pk
                         );
 
@@ -303,6 +305,7 @@ impl Core {
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
                 let bounced_msg = original_bytes;
+                debug!(">>>>>>>>> SENDING AE-Retry");
 
                 SystemMsg::AntiEntropyRetry {
                     section_auth,
@@ -313,7 +316,7 @@ impl Core {
             }
             Err(_) => {
                 trace!(
-                    "Anti-Entropy: cannot find dst_section_pk {:?} sent by {} in our chain",
+                    ">>>>> Anti-Entropy: cannot find dst_section_pk {:?} sent by {} in our chain",
                     dst_section_pk,
                     sender
                 );
