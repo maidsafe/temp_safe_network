@@ -153,7 +153,7 @@ impl Routing {
             )
             .await?;
             info!(
-                "{} Joining as a new node (PID: {}) from {} to {}, network's genesis key: {:?}",
+                "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
                 node_name,
                 std::process::id(),
                 comm.our_connection_info(),

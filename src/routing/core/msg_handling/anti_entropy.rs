@@ -261,6 +261,7 @@ impl Core {
                         ae_msg,
                         self.section.authority_provider().section_key(),
                     )?;
+
                     return Ok(Some(Command::SendMessage {
                         recipients: vec![(src_location.name(), sender)],
                         wire_msg,
