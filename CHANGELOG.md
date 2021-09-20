@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.18](https://github.com/maidsafe/safe_network/compare/v0.31.17...v0.31.18) (2021-09-20)
+
+
+### Features
+
+* **data:** distinguish between spot and blob ([d3ac4d7](https://github.com/maidsafe/safe_network/commit/d3ac4d761b620d4dd46a65c3cf00dd26a5021aa5))
+
 ### [0.31.17](https://github.com/maidsafe/safe_network/compare/v0.31.16...v0.31.17) (2021-09-20)
 
 
