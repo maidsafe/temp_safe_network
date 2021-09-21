@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.20](https://github.com/maidsafe/safe_network/compare/v0.31.19...v0.31.20) (2021-09-21)
+
+
+### Bug Fixes
+
+* ignore proposal from other section to avoid looping on untrusted msg ([565140a](https://github.com/maidsafe/safe_network/commit/565140a9d0ecd713429c0410581105eb74dc7381))
+
 ### [0.31.19](https://github.com/maidsafe/safe_network/compare/v0.31.18...v0.31.19) (2021-09-20)
 
 
