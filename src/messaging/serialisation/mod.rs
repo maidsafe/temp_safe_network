@@ -49,6 +49,15 @@ pub enum MessageType {
     },
 }
 
+impl MessageType {
+    /// Returns the Message ID
+    pub fn msg_id(&self) -> MessageId {
+        match self {
+            Self::Service { msg_id, .. } | Self::System { msg_id, .. } => *msg_id,
+        }
+    }
+}
+
 /// Authority of a NodeMsg.
 /// Src of message and authority to send it. Authority is validated by the signature.
 #[derive(PartialEq, Debug, Clone)]

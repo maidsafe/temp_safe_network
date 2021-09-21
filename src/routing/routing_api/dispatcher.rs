@@ -200,6 +200,16 @@ impl Dispatcher {
                 wire_msg,
                 original_bytes,
             } => {
+                let message_type = wire_msg
+                    .clone()
+                    .into_message()
+                    .expect("DESERIALISE MSG TO HANDLE");
+                info!(
+                    "==========HANDLING ({:?}): {:?}",
+                    message_type.msg_id(),
+                    message_type
+                );
+
                 self.core
                     .read()
                     .await
@@ -208,6 +218,10 @@ impl Dispatcher {
             }
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
             Command::HandleAgreement { proposal, sig } => {
+                info!(
+                    "==========HANDLING COMMAND::HandleAgreement: {:?}",
+                    proposal
+                );
                 self.core
                     .write()
                     .await
@@ -221,21 +235,43 @@ impl Dispatcher {
             Command::HandleDkgOutcome {
                 section_auth,
                 outcome,
-            } => self
-                .core
-                .write()
-                .await
-                .handle_dkg_outcome(section_auth, outcome),
-            Command::HandleDkgFailure(signeds) => self
-                .core
-                .write()
-                .await
-                .handle_dkg_failure(signeds)
-                .map(|command| vec![command]),
+            } => {
+                info!(
+                    "==========HANDLING COMMAND::HandleDkgOutcome == {:?}: {:?}",
+                    outcome, section_auth
+                );
+
+                self.core
+                    .write()
+                    .await
+                    .handle_dkg_outcome(section_auth, outcome)
+            }
+            Command::HandleDkgFailure(signeds) => {
+                info!(
+                    "==========HANDLING COMMAND::HandleDkgFailure: {:?}",
+                    signeds
+                );
+
+                self.core
+                    .write()
+                    .await
+                    .handle_dkg_failure(signeds)
+                    .map(|command| vec![command])
+            }
             Command::SendMessage {
                 recipients,
                 wire_msg,
             } => {
+                let message_type = wire_msg
+                    .clone()
+                    .into_message()
+                    .expect("DESERIALISE MSG TO SEND");
+                info!(
+                    "==========SENDING ({:?}): {:?} =====> TO: {:?}",
+                    message_type.msg_id(),
+                    message_type,
+                    recipients
+                );
                 self.send_message(&recipients, recipients.len(), wire_msg)
                     .await
             }
@@ -244,6 +280,16 @@ impl Dispatcher {
                 delivery_group_size,
                 wire_msg,
             } => {
+                let message_type = wire_msg
+                    .clone()
+                    .into_message()
+                    .expect("DESERIALISE MSG TO SEND DELIVERY GROUP");
+                info!(
+                    "==========SENDING TO GROUP ({:?}): {:?} =====> TO: {:?}",
+                    message_type.msg_id(),
+                    message_type,
+                    recipients
+                );
                 self.send_message(&recipients, delivery_group_size, wire_msg)
                     .await
             }
