@@ -126,31 +126,31 @@ jobs:
 
       - name: Run Data Types tests
         if: steps.data_types_changes.outputs.src == 'true'
-        run: cargo test --release types 
+        run: cargo test --release --features=always-joinable,test-utils -- types
 
       - name: Run DBs tests
         if: steps.dbs_changes.outputs.src == 'true'
-        run: cargo test --release dbs
+        run: cargo test --release --features=always-joinable,test-utils -- dbs
 
       - name: Run PrefixMap tests
         if: steps.prefix_map_changes.outputs.src == 'true'
-        run: cargo test --release prefix_map
+        run: cargo test --release --features=always-joinable,test-utils -- prefix_map
 
       - name: Run URL tests
         if: steps.url_changes.outputs.src == 'true'
-        run: cargo test --release url
+        run: cargo test --release --features=always-joinable,test-utils -- url
 
       - name: Run Messaging tests
         if: steps.messaging_changes.outputs.src == 'true'
-        run: cargo test --release messaging
+        run: cargo test --release --features=always-joinable,test-utils -- messaging
 
       - name: Run Node tests
         if: steps.node_changes.outputs.src == 'true'
-        run: cargo test --release node
+        run: cargo test --release --features=always-joinable,test-utils -- node
 
       - name: Run Routing tests
         if: steps.routing_changes.outputs.src == 'true'
-        run: cargo test --release routing
+        run: cargo test --release --features=always-joinable,test-utils -- routing
 
       - name: Run Doc tests
         if: steps.node_changes.outputs.src == 'true'
