@@ -61,3 +61,6 @@ installer/docker/sn_node
 installer/docker/sn_node.*.config
 installer/docker/.env
 nodes
+
+# Generated in CI for cache (in)validation
+/Cargo.cache-key
