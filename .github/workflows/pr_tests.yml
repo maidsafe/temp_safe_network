@@ -22,17 +22,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: dorny/paths-filter@v2
-        id: messaging_changes
+        id: changes
         with:
           filters: |
-            src:
+            messaging:
               - 'src/messaging/**'
               - 'src/types/**'
-      - uses: dorny/paths-filter@v2
-        id: node_changes
-        with:
-          filters: |
-            src:
+            node:
               - 'src/node/**'
               - 'src/routing/**'
               - 'src/messaging/**'
@@ -40,49 +36,25 @@ jobs:
               - 'src/dbs/**'
               - 'src/prefix_map/**'
               - 'src/url/**'
-      - uses: dorny/paths-filter@v2
-        id: client_changes
-        with:
-          filters: |
-            src:
+            client:
               - 'src/client/**'
               - 'src/messaging/**'
               - 'src/types/**'
               - 'src/dbs/**'
               - 'src/prefix_map/**'
               - 'src/url/**'
-      - uses: dorny/paths-filter@v2
-        id: routing_changes
-        with:
-          filters: |
-            src:
+            routing:
               - 'src/routing/**'
               - 'src/messaging/**'
               - 'src/types/**'
               - 'src/prefix_map/**'
-      - uses: dorny/paths-filter@v2
-        id: url_changes
-        with:
-          filters: |
-            src:
+            url:
               - 'src/url/**'
-      - uses: dorny/paths-filter@v2
-        id: data_types_changes
-        with:
-          filters: |
-            src:
+            data_types:
               - 'src/types/**'
-      - uses: dorny/paths-filter@v2
-        id: dbs_changes
-        with:
-          filters: |
-            src:
+            dbs:
               - 'src/dbs/**'
-      - uses: dorny/paths-filter@v2
-        id: prefix_map_changes
-        with:
-          filters: |
-            src:
+            prefix_map:
               - 'src/prefix_map/**'
 
       - name: Mac setup timeout
@@ -125,35 +97,35 @@ jobs:
         run: cargo build --all-targets --release --features=always-joinable,test-utils
 
       - name: Run Data Types tests
-        if: steps.data_types_changes.outputs.src == 'true'
+        if: steps.changes.outputs.data_types == 'true'
         run: cargo test --release --features=always-joinable,test-utils -- types
 
       - name: Run DBs tests
-        if: steps.dbs_changes.outputs.src == 'true'
+        if: steps.changes.outputs.dbs == 'true'
         run: cargo test --release --features=always-joinable,test-utils -- dbs
 
       - name: Run PrefixMap tests
-        if: steps.prefix_map_changes.outputs.src == 'true'
+        if: steps.changes.outputs.prefix_map == 'true'
         run: cargo test --release --features=always-joinable,test-utils -- prefix_map
 
       - name: Run URL tests
-        if: steps.url_changes.outputs.src == 'true'
+        if: steps.changes.outputs.url == 'true'
         run: cargo test --release --features=always-joinable,test-utils -- url
 
       - name: Run Messaging tests
-        if: steps.messaging_changes.outputs.src == 'true'
+        if: steps.changes.outputs.messaging == 'true'
         run: cargo test --release --features=always-joinable,test-utils -- messaging
 
       - name: Run Node tests
-        if: steps.node_changes.outputs.src == 'true'
+        if: steps.changes.outputs.node == 'true'
         run: cargo test --release --features=always-joinable,test-utils -- node
 
       - name: Run Routing tests
-        if: steps.routing_changes.outputs.src == 'true'
+        if: steps.changes.outputs.routing == 'true'
         run: cargo test --release --features=always-joinable,test-utils -- routing
 
       - name: Run Doc tests
-        if: steps.node_changes.outputs.src == 'true'
+        if: steps.changes.outputs.node == 'true'
         run: cargo test --release client --doc
 
       - run: ./target/release/testnet
