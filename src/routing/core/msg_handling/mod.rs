@@ -436,6 +436,15 @@ impl Core {
                         }
                     }
                     _ => {
+                        // Proposal from other section shall be ignored.
+                        if !self.section.prefix().matches(&src_name) {
+                            trace!(
+                                "Ignore proposal from other section, src_name {:?}",
+                                src_name
+                            );
+                            return Ok(vec![]);
+                        }
+
                         if !self
                             .section
                             .chain()
