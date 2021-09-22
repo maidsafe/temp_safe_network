@@ -11,7 +11,7 @@ use super::{data::encrypt_blob, Client};
 use crate::messaging::data::{DataCmd, DataQuery, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, Encryption};
 use crate::{
-    client::{client_api::data::SecretKey, utils::encryption, Error, Result},
+    client::{client_api::data::DataMapLevel, utils::encryption, Error, Result},
     url::Scope,
 };
 
@@ -19,7 +19,7 @@ use bincode::deserialize;
 use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
-use self_encryption::{self, ChunkKey, EncryptedChunk, SecretKey as BlobSecretKey};
+use self_encryption::{self, ChunkInfo, DataMap, EncryptedChunk};
 use tokio::task;
 use tracing::trace;
 use xor_name::XorName;
@@ -43,8 +43,8 @@ impl Client {
         Self: Sized,
     {
         let chunk = self.read_from_network(address.name()).await?;
-        let secret_key = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
-        self.read_all(secret_key).await
+        let data_map = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
+        self.read_all(data_map).await
     }
 
     /// Reads a spot from the network. The contents are contained within a single chunk.
@@ -82,8 +82,8 @@ impl Client {
         );
 
         let chunk = self.read_from_network(address.name()).await?;
-        let secret_key = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
-        self.seek(secret_key, position, length).await
+        let data_map = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
+        self.seek(data_map, position, length).await
     }
 
     pub(crate) async fn read_from_network(&self, name: &XorName) -> Result<Chunk> {
@@ -160,34 +160,34 @@ impl Client {
     // ---------- Private helpers -----------------
     // --------------------------------------------
 
-    // Gets and decrypts chunks from the network using nothing else but the secret key, then returns the raw data.
-    async fn read_all(&self, secret_key: BlobSecretKey) -> Result<Bytes> {
-        let encrypted_chunks = Self::try_get_chunks(self.clone(), secret_key.keys()).await?;
-        self_encryption::decrypt_full_set(&secret_key, &encrypted_chunks)
+    // Gets and decrypts chunks from the network using nothing else but the data map, then returns the raw data.
+    async fn read_all(&self, data_map: DataMap) -> Result<Bytes> {
+        let encrypted_chunks = Self::try_get_chunks(self.clone(), data_map.infos()).await?;
+        self_encryption::decrypt_full_set(&data_map, &encrypted_chunks)
             .map_err(Error::SelfEncryption)
     }
 
     // Gets a subset of chunks from the network, decrypts and
     // reads `len` bytes of the data starting at given `pos` of original file.
-    async fn seek(&self, secret_key: BlobSecretKey, pos: usize, len: usize) -> Result<Bytes> {
-        let info = self_encryption::seek_info(secret_key.file_size(), pos, len);
+    async fn seek(&self, data_map: DataMap, pos: usize, len: usize) -> Result<Bytes> {
+        let info = self_encryption::seek_info(data_map.file_size(), pos, len);
         let range = &info.index_range;
-        let all_keys = secret_key.keys();
+        let all_infos = data_map.infos();
 
         let encrypted_chunks = Self::try_get_chunks(
             self.clone(),
             (range.start..range.end + 1)
                 .clone()
-                .map(|i| all_keys[i].clone())
+                .map(|i| all_infos[i].clone())
                 .collect_vec(),
         )
         .await?;
 
-        self_encryption::decrypt_range(&secret_key, &encrypted_chunks, info.relative_pos, len)
+        self_encryption::decrypt_range(&data_map, &encrypted_chunks, info.relative_pos, len)
             .map_err(Error::SelfEncryption)
     }
 
-    async fn try_get_chunks(reader: Client, keys: Vec<ChunkKey>) -> Result<Vec<EncryptedChunk>> {
+    async fn try_get_chunks(reader: Client, keys: Vec<ChunkInfo>) -> Result<Vec<EncryptedChunk>> {
         let expected_count = keys.len();
 
         let tasks = keys.into_iter().map(|key| {
@@ -229,20 +229,20 @@ impl Client {
         }
     }
 
-    /// Extracts a blob secretkey from a head chunk.
-    /// If the secretkey is not the first level mapping directly to the user's contents,
-    /// the process repeats itself until it obtains the first level secretkey.
-    async fn unpack_head_chunk(&self, chunk: HeadChunk) -> Result<BlobSecretKey> {
+    /// Extracts a blob DataMapLevel from a head chunk.
+    /// If the DataMapLevel is not the first level mapping directly to the user's contents,
+    /// the process repeats itself until it obtains the first level DataMapLevel.
+    async fn unpack_head_chunk(&self, chunk: HeadChunk) -> Result<DataMap> {
         let HeadChunk { mut chunk, address } = chunk;
         loop {
             let bytes = self.get_bytes(chunk, address.scope())?;
 
             match deserialize(&bytes)? {
-                SecretKey::FirstLevel(secret_key) => {
-                    return Ok(secret_key);
+                DataMapLevel::First(data_map) => {
+                    return Ok(data_map);
                 }
-                SecretKey::AdditionalLevel(secret_key) => {
-                    let serialized_chunk = self.read_all(secret_key).await?;
+                DataMapLevel::Additional(data_map) => {
+                    let serialized_chunk = self.read_all(data_map).await?;
                     chunk = deserialize(&serialized_chunk)?;
                 }
             }
