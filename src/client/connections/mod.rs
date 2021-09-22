@@ -15,12 +15,12 @@ use crate::messaging::{
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::{Cache, PublicKey};
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use qp2p::Endpoint;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{mpsc::Sender, RwLock};
 use xor_name::XorName;
-use bls::PublicKey as BlsPublicKey;
 type QueryResponseSender = Sender<QueryResponse>;
 type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
 
@@ -30,7 +30,7 @@ pub(crate) struct QueryResult {
     pub(super) operation_id: OperationId,
 }
 
-pub type AeCache = Arc<Cache<(XorName, BlsPublicKey, Bytes), Vec<SocketAddr>>>;
+pub(crate) type AeCache = Arc<Cache<(XorName, BlsPublicKey, Bytes), Vec<SocketAddr>>>;
 
 #[derive(Clone, Debug)]
 pub(super) struct Session {

@@ -146,7 +146,7 @@ where
             };
 
             for key in excess_keys {
-                let _ = self.items.write().await.remove(&key);
+                let _ = self.items.write().await.remove(key);
             }
         }
     }

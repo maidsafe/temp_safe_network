@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{AeCache, QueryResult, Session};
+use super::{QueryResult, Session};
 
 use crate::client::Error;
 use crate::messaging::{
@@ -178,13 +178,7 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        send_message(
-            elders.clone(),
-            wire_msg,
-            self.endpoint.clone(),
-            msg_id,
-        )
-        .await
+        send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await
     }
 
     /// Send a `ServiceMsg` to the network awaiting for the response.
@@ -215,7 +209,10 @@ impl Session {
             (bootstrapped_peer, self.genesis_key)
         };
 
-        debug!(">>>>>> about to send query elders found for section: {:?}", elders);
+        debug!(
+            ">>>>>> about to send query elders found for section: {:?}",
+            elders
+        );
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders = elders
@@ -224,7 +221,6 @@ impl Session {
             .map(|(_, addr)| addr)
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
             .collect::<Vec<SocketAddr>>();
-
 
         let elders_len = chosen_elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES && elders_len > 1 {
@@ -279,7 +275,6 @@ impl Session {
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
             let task_handle = tokio::spawn(async move {
-
                 debug!("queuging query send task to: {:?}", &socket);
                 let result = endpoint.send_message(msg_bytes, &socket, priority).await;
                 match &result {
@@ -436,7 +431,6 @@ pub(crate) async fn send_message(
         });
         tasks.push(task_handle);
     }
-
 
     // Let's await for all messages to be sent
     let results = join_all(tasks).await;
