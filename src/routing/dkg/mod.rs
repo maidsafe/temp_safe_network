@@ -15,7 +15,7 @@ pub(crate) mod test_utils;
 mod voter;
 
 pub(crate) use self::{
-    dkg_msgs_utils::{DkgFailureSigSetUtils, DkgKeyUtils},
+    dkg_msgs_utils::{DkgFailureSigSetUtils, DkgSessionIdUtils},
     proposal::{ProposalAggregator, ProposalError, ProposalUtils},
     voter::DkgVoter,
 };

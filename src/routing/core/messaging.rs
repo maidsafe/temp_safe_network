@@ -9,13 +9,13 @@
 use super::Core;
 use crate::messaging::{
     system::{
-        DkgKey, ElderCandidates, JoinResponse, NodeState, Peer, Proposal, RelocateDetails,
+        DkgSessionId, ElderCandidates, JoinResponse, NodeState, Peer, Proposal, RelocateDetails,
         RelocatePromise, Section, SectionAuth, SystemMsg,
     },
     DstLocation, WireMsg,
 };
 use crate::routing::{
-    dkg::{DkgKeyUtils, ProposalUtils, SigShare},
+    dkg::{DkgSessionIdUtils, ProposalUtils, SigShare},
     error::Result,
     messages::WireMsgUtils,
     peer::PeerUtils,
@@ -214,17 +214,17 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let src_prefix = elder_candidates.prefix;
         let generation = self.section.chain().main_branch_len() as u64;
-        let dkg_key = DkgKey::new(&elder_candidates, generation);
+        let session_id = DkgSessionId::new(&elder_candidates, generation);
 
         trace!(
             "Send DkgStart for {:?} with {:?} to {:?}",
             elder_candidates,
-            dkg_key,
+            session_id,
             recipients
         );
 
         let node_msg = SystemMsg::DkgStart {
-            dkg_key,
+            session_id,
             elder_candidates,
         };
         let section_pk = *self.section.chain().last_key();

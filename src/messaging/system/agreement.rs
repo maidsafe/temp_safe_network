@@ -20,7 +20,7 @@ type Digest256 = [u8; 32];
 
 /// Unique identifier of a DKG session.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, custom_debug::Debug)]
-pub struct DkgKey {
+pub struct DkgSessionId {
     /// A hash of the peers and prefix of the specific session.
     #[debug(with = "Self::fmt_hash")]
     pub hash: Digest256,
@@ -28,7 +28,7 @@ pub struct DkgKey {
     pub generation: u64,
 }
 
-impl DkgKey {
+impl DkgSessionId {
     fn fmt_hash(hash: &Digest256, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:0.10}", HexFmt(hash))
     }
