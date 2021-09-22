@@ -68,7 +68,7 @@ rayon = "1.5.1"
 resource_proof = "0.8.0"
 rmp-serde = "~0.15.4"
 secured_linked_list = "~0.3.0"
-self_encryption = { git = "https://github.com/oetyng/self_encryption", branch = "rename-secretkey-to-datamap" }
+self_encryption = "0.27.0"
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "0.11.5"
 serde_json = "1.0.53"
