@@ -249,8 +249,6 @@ impl Session {
                     .await
                     .insert(op_id.clone(), sender);
 
-                drop(_old);
-
                 trace!("Inserted channel for {:?}", op_id);
             });
         } else {
@@ -368,7 +366,6 @@ impl Session {
                     // Remove the response sender
                     trace!("Removing channel for {:?}", query_op_id);
                     let _old_channel = pending_queries.clone().write().await.remove(&query_op_id);
-                    drop(_old_channel);
                 });
             }
         }
