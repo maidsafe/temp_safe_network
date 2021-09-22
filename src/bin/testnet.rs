@@ -49,7 +49,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const BASE_TRACING_DIRECTIVES: &str = "testnet=info,sn_launch_tool=debug";
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: Duration = Duration::from_secs(2);
+const INTERVAL: Duration = Duration::from_secs(0);
 const DEFAULT_NODE_COUNT: u32 = 33;
 
 #[derive(Debug, StructOpt)]
