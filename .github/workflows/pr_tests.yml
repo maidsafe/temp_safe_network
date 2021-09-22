@@ -11,52 +11,132 @@ env:
   SAFE_AUTH_PASSWORD: "y"
 
 jobs:
-  tests:
+  changes:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run all test categories
-    runs-on: ${{ matrix.os }}
+    name: Identify affected modules
+    runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ toJSON(steps.changes.outputs) }}
+    steps:
+    - uses: actions/checkout@v2
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          messaging:
+            - 'src/messaging/**'
+            - 'src/types/**'
+          node:
+            - 'src/node/**'
+            - 'src/routing/**'
+            - 'src/messaging/**'
+            - 'src/types/**'
+            - 'src/dbs/**'
+            - 'src/prefix_map/**'
+            - 'src/url/**'
+          client:
+            - 'src/client/**'
+            - 'src/messaging/**'
+            - 'src/types/**'
+            - 'src/dbs/**'
+            - 'src/prefix_map/**'
+            - 'src/url/**'
+          routing:
+            - 'src/routing/**'
+            - 'src/messaging/**'
+            - 'src/types/**'
+            - 'src/prefix_map/**'
+          url:
+            - 'src/url/**'
+          data_types:
+            - 'src/types/**'
+          dbs:
+            - 'src/dbs/**'
+          prefix_map:
+            - 'src/prefix_map/**'
+
+  # Use a separate build job so that cache is saved even if tests fail (as long as build succeeds)
+  build:
+    name: Build
+    needs: changes
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    outputs:
+      # GHA doesn't allow dependencies on a specific job in a matrix, and we can't interpolate into
+      # keys, so we have to specify them all...
+      ubuntu-latest_lib_tests: ${{ steps.build.outputs['ubuntu-latest_lib_tests'] }}
+      ubuntu-latest_testnet_bin: ${{ steps.build.outputs['ubuntu-latest_testnet_bin'] }}
+      ubuntu-latest_client_blob_bin: ${{ steps.build.outputs['ubuntu-latest_client_blob_bin'] }}
+      windows-latest_lib_tests: ${{ steps.build.outputs['windows-latest_lib_tests'] }}
+      windows-latest_testnet_bin: ${{ steps.build.outputs['windows-latest_testnet_bin'] }}
+      windows-latest_client_blob_bin: ${{ steps.build.outputs['windows-latest_client_blob_bin'] }}
+      macos-latest_lib_tests: ${{ steps.build.outputs['macos-latest_lib_tests'] }}
+      macos-latest_testnet_bin: ${{ steps.build.outputs['macos-latest_testnet_bin'] }}
+      macos-latest_client_blob_bin: ${{ steps.build.outputs['macos-latest_client_blob_bin'] }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            messaging:
-              - 'src/messaging/**'
-              - 'src/types/**'
-            node:
-              - 'src/node/**'
-              - 'src/routing/**'
-              - 'src/messaging/**'
-              - 'src/types/**'
-              - 'src/dbs/**'
-              - 'src/prefix_map/**'
-              - 'src/url/**'
-            client:
-              - 'src/client/**'
-              - 'src/messaging/**'
-              - 'src/types/**'
-              - 'src/dbs/**'
-              - 'src/prefix_map/**'
-              - 'src/url/**'
-            routing:
-              - 'src/routing/**'
-              - 'src/messaging/**'
-              - 'src/types/**'
-              - 'src/prefix_map/**'
-            url:
-              - 'src/url/**'
-            data_types:
-              - 'src/types/**'
-            dbs:
-              - 'src/dbs/**'
-            prefix_map:
-              - 'src/prefix_map/**'
+    - name: Install Rust
+      id: toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
 
+    - uses: actions/checkout@v2
+
+    # Remove safe_network version from Cargo.lock to maintain cache across versions
+    - name: Prepare cache key
+      id: cache_key
+      run: |
+        cat Cargo.lock \
+          | sed -e '/^name = "safe_network"/ {' -e 'n;d' -e '}' \
+          > Cargo.cache-key
+      shell: bash
+
+    - name: Cargo cache registry, index and build
+      uses: actions/cache@v2.1.4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('Cargo.cache-key') }}
+
+    - name: Build all safe_network targets
+      id: build
+      run: |
+        output="$(cargo build --all-targets --message-format=json --release --features=always-joinable,test-utils)"
+        lib_tests="$(echo "$output" | jq -r 'select(.target.name == "safe_network" and .executable != null).executable')"
+        testnet_bin="$(echo "$output" | jq -r 'select(.target.name == "testnet" and .executable != null and (.profile.test | not)).executable')"
+        client_blob_bin="$(echo "$output" | jq -r 'select(.target.name == "client_blob").executable')"
+
+        echo "::set-output name=${{ matrix.os }}_lib_tests::$lib_tests"
+        echo "::set-output name=${{ matrix.os }}_testnet_bin::$testnet_bin"
+        echo "::set-output name=${{ matrix.os }}_client_blob_bin::$client_blob_bin"
+      shell: bash
+
+    - name: Upload binaries
+      uses: actions/upload-artifact@v2
+      with:
+        name: target
+        path: |
+          ${{ steps.build.outputs[format('{0}_lib_tests', matrix.os)] }}
+          ${{ steps.build.outputs[format('{0}_testnet_bin', matrix.os)] }}
+          ${{ steps.build.outputs[format('{0}_client_blob_bin', matrix.os)] }}
+
+  tests:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run all test categories
+    needs: [changes, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
       - name: Mac setup timeout
         if: matrix.os == 'macos-latest'
         run: |
@@ -75,69 +155,41 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install ripgrep
 
-      # Install Rust
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Download binaries
+        uses: actions/download-artifact@v2
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      # Remove safe_network version from Cargo.lock to maintain cache across versions
-      - name: Prepare cache key
-        id: cache_key
-        run: |
-          cat Cargo.lock \
-            | sed -e '/^name = "safe_network"/ {' -e 'n;d' -e '}' \
-            > Cargo.cache-key
-        shell: bash
-
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('/Cargo.cache-key') }}
-
-      - name: Build all safe_network targets
-        run: cargo build --all-targets --release --features=always-joinable,test-utils
+          name: target
 
       - name: Run Data Types tests
-        if: steps.changes.outputs.data_types == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- types
+        if: fromJSON(needs.changes.outputs.changes).data_types == 'true'
+        run: ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} types
 
       - name: Run DBs tests
-        if: steps.changes.outputs.dbs == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- dbs
+        if: fromJSON(needs.changes.outputs.changes).dbs == 'true'
+        run: ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} dbs
 
       - name: Run PrefixMap tests
-        if: steps.changes.outputs.prefix_map == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- prefix_map
+        if: fromJSON(needs.changes.outputs.changes).prefix_map == 'true'
+        run: ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} prefix_map
 
       - name: Run URL tests
-        if: steps.changes.outputs.url == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- url
+        if: fromJSON(needs.changes.outputs.changes).url == 'true'
+        run: ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} url
 
       - name: Run Messaging tests
-        if: steps.changes.outputs.messaging == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- messaging
+        if: fromJSON(needs.changes.outputs.changes).messaging == 'true'
+        run: ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} messaging
 
       - name: Run Node tests
-        if: steps.changes.outputs.node == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- node
+        if: fromJSON(needs.changes.outputs.changes).node == 'true'
+        run: ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} node
 
       - name: Run Routing tests
-        if: steps.changes.outputs.routing == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- routing
+        if: fromJSON(needs.changes.outputs.changes).routing == 'true'
+        run: ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} routing
 
-      - name: Run Doc tests
-        if: steps.changes.outputs.node == 'true'
-        run: cargo test --release client --doc
-
-      - run: ./target/release/testnet
+      - name: Launch testnet
+        run: ${{ needs.build.outputs[format('{0}_testnet_bin', matrix.os)] }}
         env:
           NODE_COUNT: 43
 
@@ -154,9 +206,9 @@ jobs:
         shell: cmd 
         run: taskkill /IM sn_node.exe /F
 
-      - name: Restart Section if no split
+      - name: Restart testnet if no split
         if: steps.split-check-1.outcome == 'failure' 
-        run: ./target/release/testnet
+        run: ${{ needs.build.outputs[format('{0}_testnet_bin', matrix.os)] }}
         env:
           NODE_COUNT: 43
 
@@ -168,21 +220,21 @@ jobs:
       - name: Initial client tests...
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: timeout 5m cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob && sleep 5
+        run: timeout 5m ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} client_api --skip client_api::reg --skip client_api::blob && sleep 5
 
       # register api
       - name: Client reg tests against local network
         shell: bash
-        run: timeout 10m cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 && sleep 5
+        run: timeout 10m ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} client_api::reg --test-threads=1 && sleep 5
       
       # blob api
       - name: Client blob tests against local network
         shell: bash
-        run: timeout 10m cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 && sleep 5
+        run: timeout 10m ${{ needs.build.outputs[format('{0}_lib_tests', matrix.os)] }} client_api::blob --test-threads=1 && sleep 5
       
       - name: Run example app for Blob API against local network
         shell: bash
-        run: timeout 5m cargo run --release  --features=always-joinable,test-utils --example client_blob
+        run: timeout 5m ${{ needs.build.outputs[format('{0}_client_blob_bin', matrix.os)] }}
 
       - name: Kill the current network (not needed for next test)
         if: matrix.os != 'windows-latest'
