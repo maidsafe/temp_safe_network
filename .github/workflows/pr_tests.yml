@@ -198,12 +198,14 @@ jobs:
       - name: Client reg tests against local network
         shell: bash
         run: timeout 10m cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
-      
+        env:
+          RUST_LOG: safe_network=trace,qp2p=trace
       # blob api
       - name: Client blob tests against local network
         shell: bash
         run: timeout 10m cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
-      
+        env:
+            RUST_LOG: safe_network=trace,qp2p=trace
       - name: Run example app for Blob API against local network
         shell: bash
         run: timeout 5m cargo run --release  --features=always-joinable,test-utils --example client_blob
