@@ -75,7 +75,7 @@ serde_bytes = "0.11.5"
 serde_json = "1.0.53"
 signature = "1.1.10"
 sled = "0.34.6"
-sn_launch_tool = "0.7.0"
+sn_launch_tool = {path="../sn_launch_tool"}
 structopt = "~0.3.17"
 sysinfo = "0.19.0"
 tempfile = "3.2.0"
