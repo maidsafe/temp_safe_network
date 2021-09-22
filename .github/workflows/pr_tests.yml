@@ -167,12 +167,16 @@ jobs:
 
       - name: Kill Section if no split (unix)
         if: matrix.os != 'windows-latest' && steps.split-check-1.outcome == 'failure' 
-        run: killall sn_node
+        run: |
+          killall sn_node
+          rm -rf ~/.safe/node
       
       - name: Kill section if no split (win)
         if: matrix.os == 'windows-latest' && steps.split-check-1.outcome == 'failure'
         shell: cmd 
-        run: taskkill /IM sn_node.exe /F
+        run: |
+          taskkill /IM sn_node.exe /F
+          rd /s /q %USERPROFILE%\.safe\node
 
       - name: Restart Section if no split
         if: steps.split-check-1.outcome == 'failure' 
