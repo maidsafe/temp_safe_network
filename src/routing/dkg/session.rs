@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, SystemMsg},
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, ElderCandidates, SystemMsg},
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
@@ -58,7 +58,7 @@ impl Session {
     pub(crate) fn process_message(
         &mut self,
         node: &Node,
-        dkg_key: &DkgKey,
+        session_id: &DkgSessionId,
         message: DkgMessage,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
@@ -73,12 +73,12 @@ impl Session {
 
         let mut commands = vec![];
         for response in responses.into_iter() {
-            commands.extend(self.broadcast(node, dkg_key, response, section_pk)?);
+            commands.extend(self.broadcast(node, session_id, response, section_pk)?);
         }
         if add_reset_timer {
             commands.push(self.reset_timer());
         }
-        commands.extend(self.check(node, dkg_key, section_pk)?);
+        commands.extend(self.check(node, session_id, section_pk)?);
         Ok(commands)
     }
 
@@ -95,7 +95,7 @@ impl Session {
     pub(crate) fn broadcast(
         &mut self,
         node: &Node,
-        dkg_key: &DkgKey,
+        session_id: &DkgSessionId,
         message: DkgMessage,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
@@ -106,11 +106,11 @@ impl Session {
             trace!(
                 "DKG broadcasting {:?} - {:?} to {:?}",
                 message,
-                dkg_key,
+                session_id,
                 recipients
             );
             let node_msg = SystemMsg::DkgMessage {
-                dkg_key: *dkg_key,
+                session_id: *session_id,
                 message: message.clone(),
             };
             let wire_msg = WireMsg::single_src(
@@ -129,14 +129,14 @@ impl Session {
             });
         }
 
-        commands.extend(self.process_message(node, dkg_key, message, section_pk)?);
+        commands.extend(self.process_message(node, session_id, message, section_pk)?);
         Ok(commands)
     }
 
     pub(crate) fn handle_timeout(
         &mut self,
         node: &Node,
-        dkg_key: &DkgKey,
+        session_id: &DkgSessionId,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         if self.complete {
@@ -149,15 +149,15 @@ impl Session {
             Ok(messages) => {
                 let mut commands = vec![];
                 for message in messages.into_iter() {
-                    commands.extend(self.broadcast(node, dkg_key, message, section_pk)?);
+                    commands.extend(self.broadcast(node, session_id, message, section_pk)?);
                 }
                 commands.push(self.reset_timer());
-                commands.extend(self.check(node, dkg_key, section_pk)?);
+                commands.extend(self.check(node, session_id, section_pk)?);
                 Ok(commands)
             }
             Err(error) => {
                 trace!("DKG failed for {:?}: {}", self.elder_candidates, error);
-                self.report_failure(node, dkg_key, BTreeSet::new(), section_pk)
+                self.report_failure(node, session_id, BTreeSet::new(), section_pk)
             }
         }
     }
@@ -166,7 +166,7 @@ impl Session {
     fn check(
         &mut self,
         node: &Node,
-        dkg_key: &DkgKey,
+        session_id: &DkgSessionId,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         if self.complete {
@@ -204,7 +204,7 @@ impl Session {
                 })
                 .collect();
 
-            return self.report_failure(node, dkg_key, failed_participants, section_pk);
+            return self.report_failure(node, session_id, failed_participants, section_pk);
         }
 
         // Corrupted DKG outcome. This can happen when a DKG session is restarted using the same set
@@ -220,7 +220,7 @@ impl Session {
                 "DKG failed due to corrupted outcome for {:?}",
                 self.elder_candidates
             );
-            return self.report_failure(node, dkg_key, BTreeSet::new(), section_pk);
+            return self.report_failure(node, session_id, BTreeSet::new(), section_pk);
         }
 
         trace!(
@@ -250,11 +250,11 @@ impl Session {
     fn report_failure(
         &mut self,
         node: &Node,
-        dkg_key: &DkgKey,
+        session_id: &DkgSessionId,
         failed_participants: BTreeSet<XorName>,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
-        let sig = DkgFailureSig::new(&node.keypair, &failed_participants, dkg_key);
+        let sig = DkgFailureSig::new(&node.keypair, &failed_participants, session_id);
 
         if !self.failures.insert(sig, &failed_participants) {
             return Ok(vec![]);
@@ -265,7 +265,7 @@ impl Session {
             .into_iter()
             .chain(iter::once({
                 let node_msg = SystemMsg::DkgFailureObservation {
-                    dkg_key: *dkg_key,
+                    session_id: *session_id,
                     sig,
                     failed_participants,
                 };
@@ -291,7 +291,7 @@ impl Session {
 
     pub(crate) fn process_failure(
         &mut self,
-        dkg_key: &DkgKey,
+        session_id: &DkgSessionId,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
     ) -> Option<Command> {
@@ -303,7 +303,7 @@ impl Session {
             return None;
         }
 
-        if !signed.verify(dkg_key, failed_participants) {
+        if !signed.verify(session_id, failed_participants) {
             return None;
         }
 
@@ -333,28 +333,28 @@ impl Session {
     }
 }
 
-pub(crate) struct Backlog(VecDeque<(DkgKey, DkgMessage)>);
+pub(crate) struct Backlog(VecDeque<(DkgSessionId, DkgMessage)>);
 
 impl Backlog {
     pub(crate) fn new() -> Self {
         Self(VecDeque::with_capacity(BACKLOG_CAPACITY))
     }
 
-    pub(crate) fn push(&mut self, dkg_key: DkgKey, message: DkgMessage) {
+    pub(crate) fn push(&mut self, session_id: DkgSessionId, message: DkgMessage) {
         if self.0.len() == self.0.capacity() {
             let _ = self.0.pop_front();
         }
 
-        self.0.push_back((dkg_key, message))
+        self.0.push_back((session_id, message))
     }
 
-    pub(crate) fn take(&mut self, dkg_key: &DkgKey) -> Vec<DkgMessage> {
+    pub(crate) fn take(&mut self, session_id: &DkgSessionId) -> Vec<DkgMessage> {
         let mut output = Vec::new();
         let max = self.0.len();
 
         for _ in 0..max {
             if let Some((message_dkg_key, message)) = self.0.pop_front() {
-                if &message_dkg_key == dkg_key {
+                if &message_dkg_key == session_id {
                     output.push(message)
                 } else {
                     self.0.push_back((message_dkg_key, message))
@@ -365,9 +365,9 @@ impl Backlog {
         output
     }
 
-    pub(crate) fn prune(&mut self, dkg_key: &DkgKey) {
+    pub(crate) fn prune(&mut self, session_id: &DkgSessionId) {
         self.0
-            .retain(|(old_dkg_key, _)| old_dkg_key.generation >= dkg_key.generation)
+            .retain(|(old_dkg_key, _)| old_dkg_key.generation >= session_id.generation)
     }
 }
 
@@ -376,9 +376,10 @@ mod tests {
     use super::*;
     use crate::messaging::MessageType;
     use crate::routing::{
-        dkg::voter::DkgVoter, dkg::DkgKeyUtils, ed25519, node::test_utils::arbitrary_unique_nodes,
-        node::Node, section::section_authority_provider::ElderCandidatesUtils,
-        section::test_utils::gen_addr, ELDER_SIZE, MIN_ADULT_AGE,
+        dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
+        node::test_utils::arbitrary_unique_nodes, node::Node,
+        section::section_authority_provider::ElderCandidatesUtils, section::test_utils::gen_addr,
+        ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};
@@ -399,9 +400,9 @@ mod tests {
             gen_addr(),
         );
         let elder_candidates = ElderCandidates::new(iter::once(node.peer()), Prefix::default());
-        let dkg_key = DkgKey::new(&elder_candidates, 0);
+        let session_id = DkgSessionId::new(&elder_candidates, 0);
 
-        let commands = voter.start(&node, dkg_key, elder_candidates, section_pk)?;
+        let commands = voter.start(&node, session_id, elder_candidates, section_pk)?;
         assert_matches!(&commands[..], &[Command::HandleDkgOutcome { .. }]);
 
         Ok(())
@@ -425,7 +426,7 @@ mod tests {
 
         let elder_candidates =
             ElderCandidates::new(nodes.iter().map(Node::peer), Prefix::default());
-        let dkg_key = DkgKey::new(&elder_candidates, 0);
+        let session_id = DkgSessionId::new(&elder_candidates, 0);
 
         let mut actors: HashMap<_, _> = nodes
             .into_iter()
@@ -433,13 +434,15 @@ mod tests {
             .collect();
 
         for actor in actors.values_mut() {
-            let commands =
-                actor
-                    .voter
-                    .start(&actor.node, dkg_key, elder_candidates.clone(), section_pk)?;
+            let commands = actor.voter.start(
+                &actor.node,
+                session_id,
+                elder_candidates.clone(),
+                section_pk,
+            )?;
 
             for command in commands {
-                messages.extend(actor.handle(command, &dkg_key)?)
+                messages.extend(actor.handle(command, &session_id)?)
             }
         }
 
@@ -464,10 +467,10 @@ mod tests {
             let commands =
                 actor
                     .voter
-                    .process_message(&actor.node, &dkg_key, message, section_pk)?;
+                    .process_message(&actor.node, &session_id, message, section_pk)?;
 
             for command in commands {
-                messages.extend(actor.handle(command, &dkg_key)?)
+                messages.extend(actor.handle(command, &session_id)?)
             }
         }
     }
@@ -490,7 +493,7 @@ mod tests {
         fn handle(
             &mut self,
             command: Command,
-            expected_dkg_key: &DkgKey,
+            expected_dkg_key: &DkgSessionId,
         ) -> Result<Vec<(SocketAddr, DkgMessage)>> {
             match command {
                 Command::SendMessage {
@@ -498,10 +501,14 @@ mod tests {
                     wire_msg,
                 } => match wire_msg.into_message()? {
                     MessageType::System {
-                        msg: SystemMsg::DkgMessage { dkg_key, message },
+                        msg:
+                            SystemMsg::DkgMessage {
+                                session_id,
+                                message,
+                            },
                         ..
                     } => {
-                        assert_eq!(dkg_key, *expected_dkg_key);
+                        assert_eq!(session_id, *expected_dkg_key);
                         Ok(recipients
                             .into_iter()
                             .map(|addr| (addr.1, message.clone()))
