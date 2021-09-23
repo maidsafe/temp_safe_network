@@ -432,7 +432,11 @@ pub(crate) async fn send_message(
     });
 
     if failures > 0 {
-        error!("Sending the message to {} Elders failed", failures);
+        error!(
+            "Sending the message to {}/{} of the elders failed",
+            failures,
+            elders.len()
+        );
     }
 
     Ok(())

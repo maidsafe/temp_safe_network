@@ -546,6 +546,8 @@ mod tests {
         client.query_timeout = Duration::from_secs(5); // override with a short timeout
         let mut res = client.get_register(address).await;
         while res.is_ok() {
+            // attempt to delete register again (perhaps a message was dropped)
+            client.delete_register(address).await?;
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             res = client.get_register(address).await;
         }
