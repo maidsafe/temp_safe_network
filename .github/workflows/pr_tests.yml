@@ -159,6 +159,7 @@ jobs:
       - run: ./target/release/testnet
         env:
           NODE_COUNT: 43
+          RUST_LOG: safe_network=trace
 
       - name: Was there a section split?
         run: ./scripts/has_split.sh
@@ -183,6 +184,7 @@ jobs:
         run: ./target/release/testnet
         env:
           NODE_COUNT: 43
+          RUST_LOG: safe_network=trace
 
       - name: Was there a section split?
         run: ./scripts/has_split.sh
