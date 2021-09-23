@@ -19,7 +19,7 @@ use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey;
 
 use bytes::Bytes;
-use futures::{future::join_all, stream::FuturesUnordered};
+use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
 use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
 use std::{
@@ -273,7 +273,13 @@ impl Session {
             let counter_clone = discarded_responses.clone();
             let task_handle = tokio::spawn(async move {
                 trace!("queueing query send task to: {:?}", &socket);
-                let result = endpoint.send_message(msg_bytes, &socket, priority).await;
+                let result = endpoint
+                    .connect_to(&socket)
+                    .err_into()
+                    .and_then(|connection| async move {
+                        connection.send_with(msg_bytes, priority, None).await
+                    })
+                    .await;
                 match &result {
                     Err(err) => {
                         error!("Error sending Query to elder: {:?} ", err);
@@ -412,7 +418,11 @@ pub(crate) async fn send_message(
         let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
             trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
             endpoint
-                .send_message(msg_bytes_clone, &socket, priority)
+                .connect_to(&socket)
+                .err_into()
+                .and_then(|connection| async move {
+                    connection.send_with(msg_bytes_clone, priority, None).await
+                })
                 .await?;
 
             trace!("Sent cmd with MsgId {:?} to {:?}", msg_id, &socket);
