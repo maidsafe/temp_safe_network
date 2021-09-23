@@ -91,6 +91,11 @@ jobs:
           brew install coreutils
           alias timeout=gtimeout
 
+      # faster compiler linking
+      - name: Mac add zld
+        if: matrix.os == 'macos-latest'
+        run: brew install michaeleisel/zld/zld
+
       - name: Mac install ripgrep
         if: matrix.os == 'macos-latest'
         run: brew install ripgrep
