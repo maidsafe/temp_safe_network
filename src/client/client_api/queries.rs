@@ -19,6 +19,7 @@ use tracing::debug;
 
 impl Client {
     // Send a Query to the network and await a response.
+    // Queries are automatically retried using exponential backoff if the timeout is hit
     // This function is a helper private to this module.
     pub(crate) async fn send_query(&self, query: DataQuery) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();

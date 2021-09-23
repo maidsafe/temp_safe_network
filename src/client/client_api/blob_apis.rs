@@ -265,7 +265,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use crate::client::client_api::blob_apis::Blob;
-    use crate::client::utils::test_utils::{create_test_client, run_w_backoff_delayed};
+    use crate::client::utils::test_utils::create_test_client;
     use crate::types::{utils::random_bytes, Keypair};
     use crate::url::Scope;
     use bytes::Bytes;
@@ -316,15 +316,14 @@ mod tests {
             .await?;
 
         // the larger the file, the longer we have to wait before we start querying
-        let delay = usize::max(1, blob.bytes().len() / DELAY_DIVIDER);
+        let delay = tokio::time::Duration::from_secs(usize::max(
+            1,
+            blob.bytes().len() / DELAY_DIVIDER,
+        ) as u64);
+        tokio::time::sleep(delay).await;
 
         // Assert that the blob is stored.
-        let read_data = run_w_backoff_delayed(
-            || async { Ok(client.read_blob(private_address).await?) },
-            10,
-            delay,
-        )
-        .await?;
+        let read_data = client.read_blob(private_address).await?;
 
         compare(blob.bytes(), read_data)?;
 
@@ -341,12 +340,7 @@ mod tests {
             .await?;
 
         // Assert that the public blob is stored.
-        let read_data = run_w_backoff_delayed(
-            || async { Ok(client.read_blob(public_address).await?) },
-            10,
-            delay,
-        )
-        .await?;
+        let read_data = client.read_blob(public_address).await?;
 
         compare(blob.bytes(), read_data)?;
 
@@ -471,12 +465,11 @@ mod tests {
         let address = client.write_blob_to_network(blob.clone(), scope).await?;
 
         // the larger the file, the longer we have to wait before we start querying
-        let delay = usize::max(1, size / DELAY_DIVIDER);
+        let delay = tokio::time::Duration::from_secs(usize::max(1, size / DELAY_DIVIDER) as u64);
+        tokio::time::sleep(delay).await;
 
         // now that it was written to the network we should be able to retrieve it
-        let read_data =
-            run_w_backoff_delayed(|| async { Ok(client.read_blob(address).await?) }, 10, delay)
-                .await?;
+        let read_data = client.read_blob(address).await?;
         // then the content should be what we stored
         compare(blob.bytes(), read_data)?;
 
@@ -489,12 +482,11 @@ mod tests {
         let address = client.write_spot_to_network(spot.clone(), scope).await?;
 
         // the larger the size, the longer we have to wait before we start querying
-        let delay = usize::max(1, size / DELAY_DIVIDER);
+        let delay = tokio::time::Duration::from_secs(usize::max(1, size / DELAY_DIVIDER) as u64);
+        tokio::time::sleep(delay).await;
 
         // now that it was written to the network we should be able to retrieve it
-        let read_data =
-            run_w_backoff_delayed(|| async { Ok(client.read_spot(address).await?) }, 10, delay)
-                .await?;
+        let read_data = client.read_spot(address).await?;
 
         // then the content should be what we stored
         compare(spot.bytes(), read_data)?;
@@ -509,14 +501,10 @@ mod tests {
             .await?;
 
         // the larger the file, the longer we have to wait before we start querying
-        let delay = usize::max(1, len / DELAY_DIVIDER);
+        let delay = tokio::time::Duration::from_secs(usize::max(1, len / DELAY_DIVIDER) as u64);
+        tokio::time::sleep(delay).await;
 
-        let read_data = run_w_backoff_delayed(
-            || async { Ok(client.read_blob_from(address, pos, len).await?) },
-            10,
-            delay,
-        )
-        .await?;
+        let read_data = client.read_blob_from(address, pos, len).await?;
 
         compare(blob.bytes().slice(pos..(pos + len)), read_data.clone())?;
 
