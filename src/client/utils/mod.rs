@@ -25,8 +25,8 @@ where
 {
     let backoff = ExponentialBackoff {
         initial_interval: Duration::from_millis(500),
-        max_interval: Duration::from_secs(20),
-        max_elapsed_time: Some(Duration::from_secs(60)),
+        max_interval: Duration::from_secs(15),
+        max_elapsed_time: Some(Duration::from_secs(180)),
         ..Default::default()
     };
 
