@@ -19,7 +19,7 @@ use crate::routing::{
     SectionAuthorityProviderUtils,
 };
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use std::{collections::BTreeSet, slice};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Core {
@@ -69,48 +69,47 @@ impl Core {
     }
 
     pub(crate) fn handle_dkg_failure_agreement(
-        &self,
+        &mut self,
         sender: &XorName,
         failure_set: &DkgFailureSigSet,
     ) -> Result<Vec<Command>> {
-        let sender = &self
-            .section
-            .members()
-            .get(sender)
-            .ok_or(Error::InvalidSrcLocation)?
-            .peer;
+        if self.section.members().get(sender).is_none() {
+            return Err(Error::InvalidSrcLocation);
+        }
 
         let generation = self.section.chain().main_branch_len() as u64;
-        let elder_candidates = self
+
+        let elder_candidates = if let Some(elder_candidates) = self
             .section
-            .promote_and_demote_elders(&self.node.name())
+            .promote_and_demote_elders(&self.node.name(), &BTreeSet::new())
             .into_iter()
-            .find(|elder_candidates| failure_set.verify(elder_candidates, generation));
-        let elder_candidates = if let Some(elder_candidates) = elder_candidates {
+            .find(|elder_candidates| failure_set.verify(elder_candidates, generation))
+        {
             elder_candidates
         } else {
             trace!("Ignore DKG failure agreement with invalid signeds or outdated participants",);
             return Ok(vec![]);
         };
 
-        if failure_set.failed_participants.is_empty() {
-            // The DKG failure is a corrupted one due to lagging.
-            trace!(
-                "Received DKG failure agreement - restarting: {:?}",
-                elder_candidates
-            );
+        let mut commands = vec![];
 
-            self.send_dkg_start(elder_candidates, slice::from_ref(sender))
-        } else {
+        if !failure_set.failed_participants.is_empty() {
             // The DKG failure is regarding failed_participants, i.e. potential unresponsive node.
             trace!(
-                "Received DKG failure agreement of failed_participants {:?} , DKG generation({}) {:?}",
+                "Received DKG failure agreement, propose offline for failed participants: {:?} , DKG generation({}), candidates: {:?}",
                 failure_set.failed_participants,
-                generation,
-                elder_candidates
+                generation, elder_candidates
             );
-            self.cast_offline_proposals(&failure_set.failed_participants)
+            commands.extend(self.cast_offline_proposals(&failure_set.failed_participants)?);
         }
+
+        trace!(
+            "Received DKG failure agreement, we will restart with candidates: {:?} except failed participants: {:?}",
+            elder_candidates, failure_set.failed_participants
+        );
+
+        commands.extend(self.promote_and_demote_elders_except(&failure_set.failed_participants)?);
+        Ok(commands)
     }
 
     pub(crate) fn handle_dkg_outcome(

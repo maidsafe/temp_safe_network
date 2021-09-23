@@ -23,7 +23,10 @@ impl Core {
     ) -> Result<Vec<Command>> {
         match self.proposal_aggregator.add(proposal, sig_share) {
             Ok((proposal, sig)) => Ok(vec![Command::HandleAgreement { proposal, sig }]),
-            Err(ProposalError::Aggregation(AggregatorError::NotEnoughShares)) => Ok(vec![]),
+            Err(ProposalError::Aggregation(AggregatorError::NotEnoughShares)) => {
+                trace!("Proposal inserted in aggregator, not enough sig shares yet",);
+                Ok(vec![])
+            }
             Err(error) => {
                 error!("Failed to add proposal: {:?}", error);
                 Err(Error::InvalidSignatureShare)

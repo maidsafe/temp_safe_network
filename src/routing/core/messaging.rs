@@ -21,7 +21,7 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::SectionKeyShare,
+    section::{ElderCandidatesUtils, SectionKeyShare},
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
@@ -207,14 +207,13 @@ impl Core {
         }
     }
 
-    pub(crate) fn send_dkg_start(
-        &self,
-        elder_candidates: ElderCandidates,
-        recipients: &[Peer],
-    ) -> Result<Vec<Command>> {
+    pub(crate) fn send_dkg_start(&self, elder_candidates: ElderCandidates) -> Result<Vec<Command>> {
         let src_prefix = elder_candidates.prefix;
         let generation = self.section.chain().main_branch_len() as u64;
         let session_id = DkgSessionId::new(&elder_candidates, generation);
+
+        // Send DKG start to all candidates
+        let recipients: Vec<_> = elder_candidates.peers().collect();
 
         trace!(
             "Send DkgStart for {:?} with {:?} to {:?}",
@@ -235,7 +234,7 @@ impl Core {
                 section_pk,
             },
             node_msg,
-            recipients,
+            &recipients,
         )
     }
 

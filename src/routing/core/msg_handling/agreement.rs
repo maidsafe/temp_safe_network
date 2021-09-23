@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::cmp;
+use std::{cmp, collections::BTreeSet};
 
 use crate::messaging::{
     system::{KeyedSig, MembershipState, NodeState, Proposal, SectionAuth},
@@ -167,7 +167,9 @@ impl Core {
         if equal_or_extension {
             // Our section or sub-section
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
-            let infos = self.section.promote_and_demote_elders(&self.node.name());
+            let infos = self
+                .section
+                .promote_and_demote_elders(&self.node.name(), &BTreeSet::new());
             if !infos.contains(&signed_section_auth.value.elder_candidates()) {
                 // SectionInfo out of date, ignore.
                 return Ok(vec![]);

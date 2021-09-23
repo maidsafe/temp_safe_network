@@ -439,6 +439,10 @@ impl Core {
                             // know it yet. We only require the src_name of the
                             // proposal to be one of the DKG participants.
                             if !section_auth.contains_elder(&src_name) {
+                                trace!(
+                                    "Ignoring proposal from src not being a DKG participant: {:?}",
+                                    content
+                                );
                                 return Ok(vec![]);
                             }
                         }
@@ -469,8 +473,7 @@ impl Core {
 
                 commands.extend(self.check_lagging((src_name, sender), sig_share)?);
 
-                let result = self.handle_proposal(content.clone(), sig_share.clone())?;
-                commands.extend(result);
+                commands.extend(self.handle_proposal(content.clone(), sig_share.clone())?);
 
                 Ok(commands)
             }
