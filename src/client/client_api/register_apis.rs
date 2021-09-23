@@ -307,9 +307,10 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register =
-            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
-                .await?;
+        let delay = tokio::time::Duration::from_secs(1);
+        tokio::time::sleep(delay).await;
+
+        let register = client.get_register(address).await?;
 
         assert!(register.is_private());
         assert_eq!(*register.name(), name);
@@ -324,9 +325,8 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let register =
-            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
-                .await?;
+        tokio::time::sleep(delay).await;
+        let register = client.get_register(address).await?;
 
         assert!(register.is_public());
         assert_eq!(*register.name(), name);
@@ -349,22 +349,17 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register =
-            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
-                .await?;
+        let delay = tokio::time::Duration::from_secs(1);
+        tokio::time::sleep(delay).await;
+
+        let register = client.get_register(address).await?;
 
         assert_eq!(register.size(None)?, 0);
 
-        let permissions = run_w_backoff_delayed(
-            || async {
-                Ok(client
-                    .get_register_permissions_for_user(address, owner)
-                    .await?)
-            },
-            10,
-            1,
-        )
-        .await?;
+        tokio::time::sleep(delay).await;
+        let permissions = client
+            .get_register_permissions_for_user(address, owner)
+            .await?;
 
         match permissions {
             Permissions::Private(user_perms) => {
@@ -398,16 +393,12 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let permissions = run_w_backoff_delayed(
-            || async {
-                Ok(client
-                    .get_register_permissions_for_user(address, owner)
-                    .await?)
-            },
-            10,
-            1,
-        )
-        .await?;
+        let delay = tokio::time::Duration::from_secs(1);
+        tokio::time::sleep(delay).await;
+
+        let permissions = client
+            .get_register_permissions_for_user(address, owner)
+            .await?;
 
         match permissions {
             Permissions::Public(user_perms) => {
@@ -486,21 +477,14 @@ mod tests {
 
         assert_eq!(2, hashes.len());
 
+        let delay = tokio::time::Duration::from_secs(1);
+        tokio::time::sleep(delay).await;
         // get_register_entry
-        let retrieved_value_1 = run_w_backoff_delayed(
-            || async { Ok(client.get_register_entry(address, value1_hash).await?) },
-            10,
-            1,
-        )
-        .await?;
+        let retrieved_value_1 = client.get_register_entry(address, value1_hash).await?;
         assert_eq!(retrieved_value_1, value_1);
 
-        let retrieved_value_2 = run_w_backoff_delayed(
-            || async { Ok(client.get_register_entry(address, value2_hash).await?) },
-            10,
-            1,
-        )
-        .await?;
+        tokio::time::sleep(delay).await;
+        let retrieved_value_2 = client.get_register_entry(address, value2_hash).await?;
         assert_eq!(retrieved_value_2, value_2);
 
         // Requesting a hash which desn't exist throws an error
@@ -529,12 +513,7 @@ mod tests {
             .await?;
 
         // Assert that the data is stored.
-        let current_owner = run_w_backoff_delayed(
-            || async { Ok(client.get_register_owner(address).await?) },
-            10,
-            1,
-        )
-        .await?;
+        let current_owner = client.get_register_owner(address).await?;
 
         assert_eq!(owner, current_owner);
 
@@ -555,9 +534,10 @@ mod tests {
             .store_private_register(name, tag, owner, perms)
             .await?;
 
-        let register =
-            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
-                .await?;
+        let delay = tokio::time::Duration::from_secs(1);
+        tokio::time::sleep(delay).await;
+
+        let register = client.get_register(address).await?;
 
         assert!(register.is_private());
 
@@ -595,9 +575,10 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let register =
-            run_w_backoff_delayed(|| async { Ok(client.get_register(address).await?) }, 10, 1)
-                .await?;
+        let delay = tokio::time::Duration::from_secs(1);
+        tokio::time::sleep(delay).await;
+
+        let register = client.get_register(address).await?;
         assert!(register.is_public());
 
         match client.delete_register(address).await {
