@@ -13,7 +13,11 @@ use crate::messaging::{
 };
 use crate::routing::{peer::PeerUtils, SectionAuthorityProviderUtils};
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::btree_map::Entry, mem};
+use std::{
+    cmp::Ordering,
+    collections::{btree_map::Entry, BTreeSet},
+    mem,
+};
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about members of our section.
@@ -38,6 +42,7 @@ pub(crate) trait SectionPeersUtils {
         &self,
         elder_size: usize,
         current_elders: &SectionAuthorityProvider,
+        excluded_names: &BTreeSet<XorName>,
     ) -> Vec<Peer>;
 
     /// Returns the candidates for elders out of all nodes matching the prefix.
@@ -102,14 +107,17 @@ impl SectionPeersUtils for SectionPeers {
         &self,
         elder_size: usize,
         current_elders: &SectionAuthorityProvider,
+        excluded_names: &BTreeSet<XorName>,
     ) -> Vec<Peer> {
         elder_candidates(
             elder_size,
             current_elders,
             self.members
-                .values()
-                .filter(|info| is_active(&info.value, current_elders))
-                .filter(|info| info.value.peer.is_reachable()),
+                .iter()
+                .filter(|(name, _)| !excluded_names.contains(name))
+                .filter(|(_, info)| is_active(&info.value, current_elders))
+                .filter(|(_, info)| info.value.peer.is_reachable())
+                .map(|(_, info)| info),
         )
     }
 

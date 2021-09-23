@@ -229,14 +229,24 @@ impl Section {
         self.authority_provider().contains_elder(name)
     }
 
-    /// Generate a new section info(s) based on the current set of members.
+    /// Generate a new section info(s) based on the current set of members,
+    /// excluding any member matching a name in the provided `excluded_names` set.
     /// Returns a set of candidate SectionAuthorityProviders.
-    pub(super) fn promote_and_demote_elders(&self, our_name: &XorName) -> Vec<ElderCandidates> {
+    pub(super) fn promote_and_demote_elders(
+        &self,
+        our_name: &XorName,
+        excluded_names: &BTreeSet<XorName>,
+    ) -> Vec<ElderCandidates> {
         if let Some((our_elder_candidates, other_elder_candidates)) = self.try_split(our_name) {
             return vec![our_elder_candidates, other_elder_candidates];
         }
 
-        let expected_peers = self.elder_candidates(ELDER_SIZE);
+        // Candidates for elders out of all the nodes in the section, even out of the
+        // relocating nodes if there would not be enough instead.
+        let expected_peers =
+            self.members
+                .elder_candidates(ELDER_SIZE, self.authority_provider(), excluded_names);
+
         let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).cloned().collect();
         let current_names: BTreeSet<_> = self.authority_provider().names();
 
@@ -351,13 +361,6 @@ impl Section {
         let other_elder_candidates = ElderCandidates::new(other_elders, other_prefix);
 
         Some((our_elder_candidates, other_elder_candidates))
-    }
-
-    // Returns the candidates for elders out of all the nodes in the section, even out of the
-    // relocating nodes if there would not be enough instead.
-    pub(super) fn elder_candidates(&self, elder_size: usize) -> Vec<Peer> {
-        self.members
-            .elder_candidates(elder_size, self.authority_provider())
     }
 }
 

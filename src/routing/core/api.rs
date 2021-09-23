@@ -21,14 +21,12 @@ use crate::routing::{
     error::Result,
     node::Node,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionKeysProvider},
+    section::{NodeStateUtils, SectionKeyShare, SectionKeysProvider},
     Event,
 };
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::sync::{mpsc, RwLock};
 use xor_name::XorName;
 
@@ -237,10 +235,30 @@ impl Core {
     pub(crate) fn promote_and_demote_elders(&mut self) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
-        for elder_candidates in self.section.promote_and_demote_elders(&self.node.name()) {
-            // Send DKG start to all candidates
-            let recipients: Vec<_> = elder_candidates.peers().collect();
-            commands.extend(self.send_dkg_start(elder_candidates, &recipients)?);
+        for elder_candidates in self
+            .section
+            .promote_and_demote_elders(&self.node.name(), &BTreeSet::new())
+        {
+            commands.extend(self.send_dkg_start(elder_candidates)?);
+        }
+
+        Ok(commands)
+    }
+
+    // Generate a new section info based on the current set of members, but
+    // excluding the ones in the provided list. And if the outcome list of candidates
+    // differs from the current elders, trigger a DKG.
+    pub(crate) fn promote_and_demote_elders_except(
+        &mut self,
+        excluded_names: &BTreeSet<XorName>,
+    ) -> Result<Vec<Command>> {
+        let mut commands = vec![];
+
+        for elder_candidates in self
+            .section
+            .promote_and_demote_elders(&self.node.name(), excluded_names)
+        {
+            commands.extend(self.send_dkg_start(elder_candidates)?);
         }
 
         Ok(commands)

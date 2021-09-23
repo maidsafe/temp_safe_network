@@ -157,7 +157,9 @@ impl Session {
             }
             Err(error) => {
                 trace!("DKG failed for {:?}: {}", self.elder_candidates, error);
-                self.report_failure(node, session_id, BTreeSet::new(), section_pk)
+                let failed_participants = self.key_gen.possible_blockers();
+
+                self.report_failure(node, session_id, failed_participants, section_pk)
             }
         }
     }
@@ -170,10 +172,12 @@ impl Session {
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         if self.complete {
+            trace!("DKG check: complete");
             return Ok(vec![]);
         }
 
         if !self.key_gen.is_finalized() {
+            trace!("DKG check: finalised");
             return Ok(vec![]);
         }
 
