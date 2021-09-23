@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
+use crate::client::utils::retry;
 use crate::client::{connections::QueryResult, errors::Error};
 use crate::messaging::{
     data::{DataQuery, ServiceMsg},
@@ -25,10 +26,19 @@ impl Client {
         let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
         let signature = self.keypair.sign(&serialised_query);
 
-        tokio::time::timeout(
-            self.query_timeout,
-            self.send_signed_query(query, client_pk, serialised_query, signature),
-        )
+        retry(|| async {
+            tokio::time::timeout(
+                self.query_timeout,
+                self.send_signed_query(
+                    query.clone(),
+                    client_pk,
+                    serialised_query.clone(),
+                    signature.clone(),
+                ),
+            )
+            .await
+            .map_err(backoff::Error::Transient)
+        })
         .await
         .map_err(|_| Error::NoResponse)?
     }
