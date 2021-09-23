@@ -8,7 +8,6 @@
 
 use super::data::{to_chunk, Blob, BlobAddress, Spot, SpotAddress};
 use super::{data::encrypt_blob, Client};
-use crate::client::utils::retry;
 use crate::messaging::data::{DataCmd, DataQuery, QueryResponse};
 use crate::types::{Chunk, ChunkAddress, Encryption};
 use crate::{
@@ -90,12 +89,9 @@ impl Client {
     pub(crate) async fn read_from_network(&self, name: &XorName) -> Result<Chunk> {
         trace!("Fetching chunk: {:?}", name);
 
-        let res = retry(|| async {
-            Ok(self
-                .send_query(DataQuery::GetChunk(ChunkAddress(*name)))
-                .await?)
-        })
-        .await?;
+        let res = self
+            .send_query(DataQuery::GetChunk(ChunkAddress(*name)))
+            .await?;
 
         let operation_id = res.operation_id;
         let chunk: Chunk = match res.response {
