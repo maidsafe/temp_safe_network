@@ -83,7 +83,7 @@ jobs:
           fetch-depth: '0'
       - uses: maidsafe/pr_size_checker@v3
         with:
-          max_lines_changed: 200
+          max_lines_changed: 1000
 
   # Test publish using --dry-run.
   test-publish:
