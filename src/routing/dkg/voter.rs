@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates},
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, ElderCandidates},
     SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -41,7 +41,7 @@ use xor_name::XorName;
 /// successfully. Some kind of disambiguation strategy needs to be employed in that case, but that
 /// is currently not a responsibility of this module.
 pub(crate) struct DkgVoter {
-    sessions: HashMap<DkgKey, Session>,
+    sessions: HashMap<DkgSessionId, Session>,
 
     // Due to the asyncronous nature of the network we might sometimes receive a DKG message before
     // we created the corresponding session. To avoid losing those messages, we store them in this
@@ -63,7 +63,7 @@ impl DkgVoter {
     pub(crate) fn start(
         &mut self,
         node: &Node,
-        dkg_key: DkgKey,
+        dkg_key: DkgSessionId,
         elder_candidates: ElderCandidates,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
@@ -163,7 +163,7 @@ impl DkgVoter {
     pub(crate) fn process_message(
         &mut self,
         node: &Node,
-        dkg_key: &DkgKey,
+        dkg_key: &DkgSessionId,
         message: DkgMessage,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
@@ -177,7 +177,7 @@ impl DkgVoter {
 
     pub(crate) fn process_failure(
         &mut self,
-        dkg_key: &DkgKey,
+        dkg_key: &DkgSessionId,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
     ) -> Option<Command> {

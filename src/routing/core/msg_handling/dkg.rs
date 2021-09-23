@@ -8,7 +8,7 @@
 
 use super::super::Core;
 use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, Proposal, SystemMsg},
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, ElderCandidates, Proposal, SystemMsg},
     SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -25,13 +25,13 @@ use xor_name::XorName;
 impl Core {
     pub(crate) fn handle_dkg_start(
         &mut self,
-        dkg_key: DkgKey,
+        session_id: DkgSessionId,
         elder_candidates: ElderCandidates,
     ) -> Result<Vec<Command>> {
         trace!("Received DkgStart for {:?}", elder_candidates);
         self.dkg_voter.start(
             &self.node,
-            dkg_key,
+            session_id,
             elder_candidates,
             *self.section_chain().last_key(),
         )
@@ -39,7 +39,7 @@ impl Core {
 
     pub(crate) fn handle_dkg_message(
         &mut self,
-        dkg_key: DkgKey,
+        session_id: DkgSessionId,
         message: DkgMessage,
         sender: XorName,
     ) -> Result<Vec<Command>> {
@@ -47,7 +47,7 @@ impl Core {
 
         self.dkg_voter.process_message(
             &self.node,
-            &dkg_key,
+            &session_id,
             message,
             *self.section_chain().last_key(),
         )
@@ -55,13 +55,13 @@ impl Core {
 
     pub(crate) fn handle_dkg_failure_observation(
         &mut self,
-        dkg_key: DkgKey,
+        session_id: DkgSessionId,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
     ) -> Result<Vec<Command>> {
         match self
             .dkg_voter
-            .process_failure(&dkg_key, failed_participants, signed)
+            .process_failure(&session_id, failed_participants, signed)
         {
             None => Ok(vec![]),
             Some(cmd) => Ok(vec![cmd]),

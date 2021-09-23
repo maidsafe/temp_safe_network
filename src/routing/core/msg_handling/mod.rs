@@ -384,7 +384,7 @@ impl Core {
                 )?)
             }
             SystemMsg::DkgStart {
-                dkg_key,
+                session_id,
                 elder_candidates,
             } => {
                 trace!("Handling msg: Dkg-Start from {}", sender);
@@ -392,24 +392,27 @@ impl Core {
                     return Ok(vec![]);
                 }
 
-                self.handle_dkg_start(dkg_key, elder_candidates)
+                self.handle_dkg_start(session_id, elder_candidates)
             }
-            SystemMsg::DkgMessage { dkg_key, message } => {
+            SystemMsg::DkgMessage {
+                session_id,
+                message,
+            } => {
                 trace!(
                     "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
-                    dkg_key,
+                    session_id,
                     message,
                     sender
                 );
-                self.handle_dkg_message(dkg_key, message, src_name)
+                self.handle_dkg_message(session_id, message, src_name)
             }
             SystemMsg::DkgFailureObservation {
-                dkg_key,
+                session_id,
                 sig,
                 failed_participants,
             } => {
                 trace!("Handling msg: Dkg-FailureObservation from {}", sender);
-                self.handle_dkg_failure_observation(dkg_key, &failed_participants, sig)
+                self.handle_dkg_failure_observation(session_id, &failed_participants, sig)
             }
             SystemMsg::DkgFailureAgreement(sig_set) => {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);

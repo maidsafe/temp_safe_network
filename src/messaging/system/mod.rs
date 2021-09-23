@@ -15,7 +15,7 @@ mod section;
 mod signed;
 
 use crate::messaging::{EndUser, MessageId, SectionAuthorityProvider};
-pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionAuth};
+pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
@@ -103,21 +103,21 @@ pub enum SystemMsg {
     /// Sent to the new elder candidates to start the DKG process.
     DkgStart {
         /// The identifier of the DKG session to start.
-        dkg_key: DkgKey,
+        session_id: DkgSessionId,
         /// The DKG particpants.
         elder_candidates: ElderCandidates,
     },
     /// Message exchanged for DKG process.
     DkgMessage {
         /// The identifier of the DKG session this message is for.
-        dkg_key: DkgKey,
+        session_id: DkgSessionId,
         /// The DKG message.
         message: DkgMessage,
     },
     /// Broadcast to the other DKG participants when a DKG failure is observed.
     DkgFailureObservation {
         /// The DKG key
-        dkg_key: DkgKey,
+        session_id: DkgSessionId,
         /// Signature over the failure
         sig: DkgFailureSig,
         /// Nodes that failed to participate
