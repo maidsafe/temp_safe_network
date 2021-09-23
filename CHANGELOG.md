@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.24](https://github.com/maidsafe/safe_network/compare/v0.31.23...v0.31.24) (2021-09-23)
+
+
+### Features
+
+* when resending after AE-Redirect, purposfully use older knowledge ([ae187bf](https://github.com/maidsafe/safe_network/commit/ae187bf7c2d086d312525384057bf7f1d59e32cf))
+* **client:** cache AE-Redirects also ([3748fc5](https://github.com/maidsafe/safe_network/commit/3748fc558b622e0df2ee3490445808b6c02090b7))
+
+
+### Bug Fixes
+
+* client hangs: use LRU cache for AE-Cache in client ([2621817](https://github.com/maidsafe/safe_network/commit/2621817ba184248b2b750c59d2e33bfaaf48e092))
+
 ### [0.31.23](https://github.com/maidsafe/safe_network/compare/v0.31.22...v0.31.23) (2021-09-23)
 
 ### [0.31.22](https://github.com/maidsafe/safe_network/compare/v0.31.21...v0.31.22) (2021-09-22)
