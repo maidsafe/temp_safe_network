@@ -10,7 +10,10 @@ use super::msg_count::MsgCount;
 use crate::messaging::WireMsg;
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
-use futures::stream::{FuturesUnordered, StreamExt};
+use futures::{
+    future::TryFutureExt,
+    stream::{FuturesUnordered, StreamExt},
+};
 use qp2p::Endpoint;
 use std::net::SocketAddr;
 use tokio::{sync::mpsc, task};
@@ -227,7 +230,11 @@ impl Comm {
 
             let result = self
                 .endpoint
-                .send_message(msg_bytes, &recipient.1, priority)
+                .connect_to(&recipient.1)
+                .err_into()
+                .and_then(|connection| async move {
+                    connection.send_with(msg_bytes, priority, None).await
+                })
                 .await
                 .map_err(|err| match err {
                     qp2p::SendError::ConnectionLost(qp2p::ConnectionError::Closed(
