@@ -11,7 +11,7 @@ use crate::messaging::WireMsg;
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
 use futures::{
-    future::TryFutureExt,
+    future::{FutureExt, TryFutureExt},
     stream::{FuturesUnordered, StreamExt},
 };
 use qp2p::Endpoint;
@@ -132,7 +132,14 @@ impl Comm {
             let priority = wire_msg.msg_kind().priority();
 
             self.endpoint
-                .try_send_message(bytes, addr, priority)
+                .get_connection_by_addr(addr)
+                .map(|res| res.ok_or(None))
+                .and_then(|connection| async move {
+                    connection
+                        .send_with(bytes, priority, None)
+                        .await
+                        .map_err(Some)
+                })
                 .await
                 .map_err(|err| {
                     error!(
@@ -326,14 +333,19 @@ async fn handle_disconnection_events(
 }
 
 async fn handle_incoming_messages(
-    mut incoming_msgs: qp2p::IncomingMessages,
+    mut incoming_msgs: qp2p::IncomingMessages<XorName>,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
 ) {
-    while let Some((src, msg)) = incoming_msgs.next().await {
-        let _ = event_tx.send(ConnectionEvent::Received((src, msg))).await;
+    while let Some((connection, msg)) = incoming_msgs.next().await {
+        let _ = event_tx
+            .send(ConnectionEvent::Received((
+                connection.remote_address(),
+                msg,
+            )))
+            .await;
         // count incoming msgs..
-        msg_count.increase_incoming(src);
+        msg_count.increase_incoming(connection.remote_address());
     }
 }
 
@@ -535,10 +547,12 @@ mod tests {
 
         // Receive one message and disconnect from the peer
         {
-            if let Some((src, msg)) = time::timeout(TIMEOUT, incoming_msgs.next()).await? {
+            if let Some((connection, msg)) = time::timeout(TIMEOUT, incoming_msgs.next()).await? {
                 assert_eq!(WireMsg::from(msg)?, msg0);
                 msg0_received = true;
-                recv_endpoint.disconnect_from(&src).await;
+                recv_endpoint
+                    .disconnect_from(&connection.remote_address())
+                    .await;
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
             assert!(msg0_received);
