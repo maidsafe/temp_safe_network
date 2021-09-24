@@ -33,7 +33,7 @@ use tokio::{
 };
 use tracing::Instrument;
 
-const PROBE_TIME: Duration = Duration::from_secs(10);
+const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 
 // `Command` Dispatcher.
 pub(super) struct Dispatcher {
@@ -100,7 +100,7 @@ impl Dispatcher {
         info!("Starting to probe network");
         let _ = tokio::spawn(async move {
             let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(PROBE_TIME);
+            let mut interval = tokio::time::interval(PROBE_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
