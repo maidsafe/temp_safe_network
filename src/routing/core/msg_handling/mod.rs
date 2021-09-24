@@ -108,7 +108,7 @@ impl Core {
                         SystemMsg::AntiEntropyRetry { .. }
                         | SystemMsg::AntiEntropyUpdate { .. }
                         | SystemMsg::AntiEntropyRedirect { .. }
-                        | SystemMsg::ProbeMessage(_)
+                        | SystemMsg::AntiEntropyProbe(_)
                         | SystemMsg::JoinRequest(_)
                         | SystemMsg::JoinAsRelocatedRequest(_) => {}
                         _ => match dst_location.section_pk() {
@@ -328,7 +328,7 @@ impl Core {
                 )
                 .await
             }
-            SystemMsg::ProbeMessage(_dst) => {
+            SystemMsg::AntiEntropyProbe(_dst) => {
                 info!("Received Probe message from {:?}: {:?}", sender, msg_id);
                 Ok(vec![])
             }

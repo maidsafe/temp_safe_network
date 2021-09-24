@@ -78,8 +78,8 @@ pub enum SystemMsg {
         /// Optional section members if we're updating our own section adults
         members: Option<SectionPeers>,
     },
-    /// Probes the network by sending q message to a random dst triggering an AE flow.
-    ProbeMessage(XorName),
+    /// Probes the network by sending a message to a random dst triggering an AE flow.
+    AntiEntropyProbe(XorName),
     /// Send from a section to the node to be immediately relocated.
     Relocate(RelocateDetails),
     /// Send:

@@ -155,7 +155,7 @@ impl Core {
 
         let matching_section = self.network.section_by_name(&dst)?;
 
-        let message = SystemMsg::ProbeMessage(dst);
+        let message = SystemMsg::AntiEntropyProbe(dst);
         let section_key = matching_section.section_key();
         let recipients = matching_section.elders.into_iter().collect::<Vec<_>>();
 
