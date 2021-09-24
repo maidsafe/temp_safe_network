@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{capacity::CHUNK_COPY_COUNT, Command, Core, Prefix, Result};
+use crate::routing::log_markers::LogMarker;
 use crate::routing::{error::convert_to_error_message, Error};
 use crate::types::{Chunk, PublicKey};
 use crate::{
@@ -77,7 +78,7 @@ impl Core {
         auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<Vec<Command>> {
-        trace!("Sending chunk {:?} to adults", chunk);
+        trace!("{:?}: {:?}", LogMarker::ChunkStoreReceivedAtElder, chunk);
 
         let target = *chunk.name();
 
@@ -119,7 +120,8 @@ impl Core {
         origin: EndUser,
     ) -> Result<Vec<Command>> {
         trace!(
-            "preparing to query adults for chunk at {:?} with op_id: {:?}",
+            "{:?} preparing to query adults for chunk at {:?} with op_id: {:?}",
+            LogMarker::ChunkQueryReceviedAtElder,
             address,
             operation_id(&address)
         );

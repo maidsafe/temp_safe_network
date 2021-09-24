@@ -8,8 +8,8 @@
 
 use crate::dbs::{convert_to_error_message, Error, KvStore, Result, Subdir, UsedSpace};
 use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
+use crate::routing::log_markers::LogMarker;
 use crate::types::{Chunk, ChunkAddress};
-
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -64,20 +64,24 @@ impl ChunkStore {
 
     // Read chunk from local store and return NodeQueryResponse
     pub(crate) fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
+        trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
         NodeQueryResponse::GetChunk(self.get_chunk(address).map_err(convert_to_error_message))
     }
 
-    pub(super) async fn store(&self, chunk: &Chunk) -> Result<Option<StorageLevel>> {
-        if self.db.has(chunk.address())? {
+    pub(super) async fn store(&self, data: &Chunk) -> Result<Option<StorageLevel>> {
+        trace!("{:?}", LogMarker::StoringChunk);
+        if self.db.has(data.address())? {
             info!(
                 "{}: Chunk already exists, not storing: {:?}",
                 self,
-                chunk.address()
+                data.address()
             );
             // Nothing more to do here
             return Ok(None);
         }
-        self.db.store(chunk).await?;
+        self.db.store(data).await?;
+
+        trace!("{:?}", LogMarker::StoredNewChunk);
 
         let last_recorded_level = { *self.last_recorded_level.read().await };
         if let Ok(next_level) = last_recorded_level.next() {

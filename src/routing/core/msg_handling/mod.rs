@@ -26,6 +26,7 @@ use crate::messaging::{
     ServiceAuth, SrcLocation, WireMsg,
 };
 use crate::routing::{
+    log_markers::LogMarker,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     relocation::RelocateState,
     routing_api::command::Command,
@@ -79,7 +80,6 @@ impl Core {
                 dst_location,
                 msg,
             } => {
-                trace!("System message received");
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
                 let mut known_keys: Vec<BlsPublicKey> =
@@ -245,7 +245,7 @@ impl Core {
         payload: Bytes,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
-        info!("Handling system message");
+        trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
@@ -653,7 +653,7 @@ impl Core {
                 correlation_id,
                 user,
             } => {
-                debug!("QueryResponse received from a node");
+                debug!("{:?}", LogMarker::ChunkQueryResponseReceviedFromAdult);
                 let sending_nodes_pk = match msg_authority {
                     NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().public_key),
                     _ => return Err(Error::InvalidQueryResponseAuthority),
