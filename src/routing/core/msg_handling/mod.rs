@@ -108,6 +108,7 @@ impl Core {
                         SystemMsg::AntiEntropyRetry { .. }
                         | SystemMsg::AntiEntropyUpdate { .. }
                         | SystemMsg::AntiEntropyRedirect { .. }
+                        | SystemMsg::ProbeMessage(_)
                         | SystemMsg::JoinRequest(_)
                         | SystemMsg::JoinAsRelocatedRequest(_) => {}
                         _ => match dst_location.section_pk() {
@@ -266,7 +267,7 @@ impl Core {
         }
     }
 
-    // Hanlder for node messages which have successfully
+    // Handler for node messages which have successfully
     // passed all signature checks and msg verifications
     pub(crate) async fn handle_verified_non_data_node_message(
         &mut self,
@@ -326,6 +327,10 @@ impl Core {
                     sender,
                 )
                 .await
+            }
+            SystemMsg::ProbeMessage(_dst) => {
+                info!("Received Probe message from {:?}: {:?}", sender, msg_id);
+                Ok(vec![])
             }
             SystemMsg::Relocate(ref details) => {
                 trace!("Handling msg: Relocate from {}", sender);

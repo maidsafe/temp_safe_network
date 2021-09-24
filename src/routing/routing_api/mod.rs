@@ -192,6 +192,8 @@ impl Routing {
             connection_event_rx,
         ));
 
+        dispatcher.clone().start_network_probing().await;
+
         let routing = Self { dispatcher };
 
         Ok((routing, event_stream))
@@ -466,7 +468,7 @@ async fn handle_connection_events(
                 let wire_msg = match WireMsg::from(bytes.clone()) {
                     Ok(wire_msg) => wire_msg,
                     Err(error) => {
-                        error!("Failed to deserialize message header: {}", error);
+                        error!("Failed to deserialize message header: {:?}", error);
                         continue;
                     }
                 };
