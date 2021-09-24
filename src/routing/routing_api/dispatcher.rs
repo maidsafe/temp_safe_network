@@ -22,16 +22,18 @@ use crate::routing::{
     section::SectionPeersUtils,
     Error, Prefix, XorName,
 };
-// use bls::PublicKey;
 use crate::types::PublicKey;
 use itertools::Itertools;
 use std::collections::BTreeSet;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tokio::time::MissedTickBehavior;
 use tokio::{
     sync::{watch, RwLock},
     time,
 };
 use tracing::Instrument;
+
+const PROBE_TIME: Duration = Duration::from_secs(10);
 
 // `Command` Dispatcher.
 pub(super) struct Dispatcher {
@@ -94,9 +96,33 @@ impl Dispatcher {
         Ok(())
     }
 
+    pub(super) async fn start_network_probing(self: Arc<Self>) {
+        info!("Starting to probe network");
+        let _ = tokio::spawn(async move {
+            let dispatcher = self.clone();
+            let mut interval = tokio::time::interval(PROBE_TIME);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            loop {
+                let _ = interval.tick().await;
+
+                // Send a probe message if we are an elder
+                let core = dispatcher.core.read().await;
+                if core.is_elder() && !core.section().prefix().is_empty() {
+                    if let Ok(command) = core.generate_probe_message().await {
+                        info!("Sending ProbeMessage");
+                        if let Err(e) = dispatcher.handle_command(command).await {
+                            error!("Error sending a Probe message to the network: {:?}", e);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     // Note: this indirecton is needed. Trying to call `spawn(self.handle_commands(...))` directly
     // inside `handle_commands` causes compile error about type check cycle.
-    fn spawn_handle_commands(self: Arc<Self>, command: Command) {
+    pub(super) fn spawn_handle_commands(self: Arc<Self>, command: Command) {
         let _ = tokio::spawn(self.handle_commands(command));
     }
 

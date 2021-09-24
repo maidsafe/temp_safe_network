@@ -29,6 +29,7 @@ pub(crate) use register_storage::RegisterStorage;
 
 use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
+use crate::messaging::system::SystemMsg;
 use crate::messaging::{
     signature_aggregator::SignatureAggregator,
     system::{Proposal, Section},
@@ -141,6 +142,29 @@ impl Core {
             prefix: *self.section.prefix(),
             elders: self.section().authority_provider().names(),
         }
+    }
+
+    pub(crate) async fn generate_probe_message(&self) -> Result<Command> {
+        // Generate a random address not belonging to our Prefix
+        let mut dst = XorName::random();
+
+        // We don't probe ourselves
+        while self.section.prefix().matches(&dst) {
+            dst = XorName::random();
+        }
+
+        let matching_section = self.network.section_by_name(&dst)?;
+
+        let message = SystemMsg::ProbeMessage(dst);
+        let section_key = matching_section.section_key();
+        let recipients = matching_section.elders.into_iter().collect::<Vec<_>>();
+
+        info!(
+            "ProbeMessage target {:?} w/key {:?}",
+            matching_section.prefix, section_key
+        );
+
+        self.send_direct_message_to_nodes(recipients, message, section_key)
     }
 
     /// Generate commands and fire events based upon any node state changes.
