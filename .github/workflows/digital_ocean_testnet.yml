@@ -31,40 +31,41 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.inputs.start-network == 'y'
     steps:
-      - uses: actions/checkout@v2
+      # - uses: actions/checkout@v2
 
       # Install Rust and required components
-      - uses: actions-rs/toolchain@v1
-        id: toolchain
-        with:
-          target: x86_64-unknown-linux-musl
-          profile: minimal
-          toolchain: stable
-          override: true
+      # - uses: actions-rs/toolchain@v1
+      #   id: toolchain
+      #   with:
+      #     target: x86_64-unknown-linux-musl
+      #     profile: minimal
+      #     toolchain: stable
+      #     override: true
 
       # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+      # - name: Cargo cache registry, index and build
+      #   uses: actions/cache@v2.1.4
+      #   with:
+      #     path: |
+      #       ~/.cargo/registry
+      #       ~/.cargo/git
+      #       target
+      #     key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install musl-tools
-        run: sudo apt update -y && sudo apt install -y musl-tools
-      - name: Build node
-        run: cargo build --release --target x86_64-unknown-linux-musl --features="always-joinable"
+      # - name: Install musl-tools
+      #   run: sudo apt update -y && sudo apt install -y musl-tools
+      # - name: Build node
+      #   run: cargo build --release --target x86_64-unknown-linux-musl --features="always-joinable"
 
       - name: Launch testnet
-        uses: maidsafe/sn_testnet_action@master
+        uses: lionel1704/sn_testnet_action@commit-sha
         with:
           do-token: ${{ secrets.DO_TOKEN }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
           node-path: $GITHUB_WORKSPACE/target/x86_64-unknown-linux-musl/release/sn_node
+          build-node: true
           node-count: ${{ github.event.inputs.node-count }}
   
   run-client-tests:
@@ -131,7 +132,7 @@ jobs:
     if: always() && github.event.inputs.stop-network == 'y'
     steps:
       - name: Kill testnet
-        uses: maidsafe/sn_testnet_action@master
+        uses: lionel1704/sn_testnet_action@commit-sha
         with:
           do-token: ${{ secrets.DO_TOKEN }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
