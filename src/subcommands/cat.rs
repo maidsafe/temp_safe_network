@@ -12,12 +12,12 @@ use super::{
     OutputFmt,
 };
 use color_eyre::{eyre::WrapErr, Result};
-use log::{debug, trace};
 use prettytable::Table;
 use sn_api::{fetch::SafeData, Safe};
 use std::io::{self, Write};
 use structopt::StructOpt;
 use tokio::time::{sleep, Duration};
+use tracing::{debug, trace};
 
 const MAX_RETRY_ATTEMPTS: usize = 5;
 

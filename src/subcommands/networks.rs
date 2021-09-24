@@ -9,11 +9,11 @@
 
 use crate::operations::config::{read_current_node_config, Config, NetworkInfo};
 use color_eyre::{eyre::bail, eyre::eyre, Result};
-use log::debug;
 use sn_api::PublicKey;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use structopt::StructOpt;
+use tracing::debug;
 
 #[derive(StructOpt, Debug)]
 pub enum NetworksSubCommands {

@@ -8,7 +8,6 @@
 // Software.
 
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
-use log::debug;
 use prettytable::Table;
 use serde::{Deserialize, Serialize};
 use sn_api::{NodeConfig, PublicKey};
@@ -19,6 +18,7 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
 };
+use tracing::debug;
 
 const CONFIG_FILENAME: &str = "config.json";
 const CONFIG_NETWORKS_DIRNAME: &str = "networks";

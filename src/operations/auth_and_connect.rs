@@ -10,13 +10,13 @@
 use super::config::read_current_node_config;
 use crate::{APP_ID, APP_NAME, APP_VENDOR};
 use color_eyre::{eyre::eyre, eyre::WrapErr, Result};
-use log::{debug, info, warn};
 use sn_api::{Keypair, Safe};
 use std::{
     fs::{create_dir_all, File},
     io::{Read, Write},
     path::PathBuf,
 };
+use tracing::{debug, info, warn};
 
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 

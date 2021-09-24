@@ -15,7 +15,6 @@ use bytes::Buf;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, TickTimeLimit};
-use log::{debug, info, trace, warn};
 use sn_api::{
     fetch::Range,
     fetch::SafeData,
@@ -28,6 +27,7 @@ use std::{
     path::Path,
     time::Duration,
 };
+use tracing::{debug, info, trace, warn};
 
 /// # Retrieval/write status for current file and overall transfer.
 #[derive(Debug, Clone)]

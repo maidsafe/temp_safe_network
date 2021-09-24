@@ -9,8 +9,8 @@
 
 use crate::operations::config::{Config, NetworkInfo};
 use color_eyre::Result;
-use log::debug;
 use structopt::StructOpt;
+use tracing::debug;
 
 #[derive(StructOpt, Debug)]
 pub enum ConfigSubCommands {

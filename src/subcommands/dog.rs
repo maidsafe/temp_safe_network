@@ -12,12 +12,12 @@ use super::{
     OutputFmt,
 };
 use color_eyre::Result;
-use log::debug;
 use sn_api::{
     fetch::{ContentType, SafeData},
     Safe, Url,
 };
 use structopt::StructOpt;
+use tracing::debug;
 
 #[derive(StructOpt, Debug)]
 pub struct DogCommands {

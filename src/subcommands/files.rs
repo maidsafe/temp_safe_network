@@ -18,7 +18,6 @@ use super::{
 use ansi_term::Colour;
 use bytes::Bytes;
 use color_eyre::{eyre::bail, eyre::eyre, Result};
-use log::debug;
 use prettytable::{format::FormatBuilder, Table};
 use serde::Serialize;
 use sn_api::{
@@ -32,6 +31,7 @@ use std::{
     path::{Component, Path},
 };
 use structopt::StructOpt;
+use tracing::debug;
 
 type FileDetails = BTreeMap<String, String>;
 

@@ -12,7 +12,7 @@ use super::helpers::download_from_s3_and_install_bin;
 use crate::APP_ID;
 use color_eyre::{eyre::eyre, eyre::bail, eyre::WithErr, Result};
 use envy::from_env;
-use log::info;
+use tracing::info;
 use prettytable::Table;
 use serde::Deserialize;
 use sn_api::{

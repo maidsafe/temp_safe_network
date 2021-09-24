@@ -7,9 +7,9 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-#[cfg(feature = "self-update")]
-use log::debug;
 use std::error::Error;
+#[cfg(feature = "self-update")]
+use tracing::debug;
 
 #[cfg(feature = "self-update")]
 const REPO_NAME: &str = "sn_cli";

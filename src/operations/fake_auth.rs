@@ -8,7 +8,7 @@
 // Software.
 
 use crate::APP_ID;
-use log::debug;
+use tracing::debug;
 use sn_api::Safe;
 use color_eyre::Result;
 

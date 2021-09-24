@@ -10,7 +10,6 @@
 #[cfg(feature = "self-update")]
 use super::helpers::download_and_install_github_release_asset;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
-use log::debug;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
     collections::{BTreeSet, HashMap},
@@ -23,6 +22,7 @@ use std::{
     time::Duration,
 };
 use structopt::StructOpt;
+use tracing::debug;
 
 #[cfg(not(target_os = "windows"))]
 const SN_NODE_EXECUTABLE: &str = "sn_node";

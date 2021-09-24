@@ -12,13 +12,12 @@ mod operations;
 mod shell;
 mod subcommands;
 
-use chrono::Local;
 use cli::run;
-use color_eyre::{Report, Result};
+use color_eyre::{eyre::eyre, Help, Report, Result};
 use human_panic::{handle_dump, Metadata};
-use log::debug;
-use std::io::Write;
 use std::panic::set_hook;
+use tracing::{self, debug};
+use tracing_subscriber::filter::EnvFilter;
 
 #[macro_use]
 extern crate prettytable;
@@ -33,21 +32,24 @@ const APP_VENDOR: &str = "MaidSafe.net Ltd";
 #[tokio::main]
 async fn main() -> Result<(), Report> {
     color_eyre::install()?;
-    let mut builder = env_logger::Builder::from_default_env();
-    builder
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "[{}] {} {} [{}:{}] {}",
-                record.module_path().unwrap_or(""),
-                record.level(),
-                Local::now().format("%Y-%m-%dT%H:%M:%S.%f"),
-                record.file().unwrap_or_default(),
-                record.line().unwrap_or_default(),
-                record.args()
+    if let Ok(filter) = std::env::var("RUST_LOG") {
+        let filter = EnvFilter::try_new(filter).map_err(|e| {
+            eyre!(
+                "Failed to parse the logging filter specified with RUST_LOG: {}",
+                e
             )
-        })
-        .init();
+            .suggestion(
+                "Please try another filter.\
+                  Example: RUST_LOG=safe=debug,sn_api=debug,safe_network=debug",
+            )
+        })?;
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_thread_names(true)
+            .with_ansi(false);
+        tracing_subscriber::fmt::init();
+    };
+
     debug!("Starting Safe CLI...");
 
     // We register our own panic hook to customise the error message displayed,

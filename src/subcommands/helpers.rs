@@ -10,7 +10,6 @@
 use super::OutputFmt;
 use ansi_term::Style;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
-use log::debug;
 use num_traits::Float;
 use prettytable::{format::FormatBuilder, Table};
 use serde::ser::Serialize;
@@ -19,6 +18,7 @@ use std::{
     collections::BTreeMap,
     io::{stdin, stdout, Read, Write},
 };
+use tracing::debug;
 use xor_name::{XorName, XOR_NAME_LEN};
 
 const UNKNOWN_PUBLIC_NAME: &str = "<unknown>";

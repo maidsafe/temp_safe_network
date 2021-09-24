@@ -18,11 +18,11 @@ use crate::{
     },
 };
 use color_eyre::{eyre::eyre, Result};
-use log::debug;
 use sn_api::{Safe, XorUrlBase};
 use std::env;
 use std::time::Duration;
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
+use tracing::debug;
 
 const DEFAULT_TIMEOUT_SECS: u64 = 60 * 10; //10 mins
 

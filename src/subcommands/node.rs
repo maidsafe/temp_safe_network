@@ -12,10 +12,10 @@ use crate::operations::{
     node::*,
 };
 use color_eyre::{eyre::eyre, Result};
-use log::debug;
 use sn_api::PublicKey;
 use std::{collections::BTreeSet, iter::FromIterator, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
+use tracing::debug;
 
 const NODES_DATA_FOLDER: &str = "baby-fleming-nodes";
 
