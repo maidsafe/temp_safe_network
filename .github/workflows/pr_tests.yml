@@ -214,9 +214,17 @@ jobs:
         run: timeout 15m cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
         env:
             RUST_LOG: safe_network=trace,qp2p=trace
+
       - name: Run example app for Blob API against local network
         shell: bash
         run: timeout 5m cargo run --release  --features=always-joinable,test-utils --example client_blob
+
+      - name: Run network asserts one by one
+        shell: bash
+        # FIXME: windows has an issue w/ locking of log files
+        if: matrix.os != 'windows-latest'
+        # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
+        run: timeout 5m cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 && sleep 5
 
       - name: Kill the current network (not needed for next test)
         if: matrix.os != 'windows-latest'
