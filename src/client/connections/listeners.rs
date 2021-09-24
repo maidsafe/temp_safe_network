@@ -21,12 +21,13 @@ use itertools::Itertools;
 use qp2p::IncomingMessages;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
+use xor_name::XorName;
 
 impl Session {
     // Listen for incoming messages on a connection
     pub(crate) async fn spawn_message_listener_thread(
         mut session: Session,
-        mut incoming_messages: IncomingMessages,
+        mut incoming_messages: IncomingMessages<XorName>,
     ) {
         debug!("Listening for incoming messages");
         let _ = tokio::spawn(async move {
@@ -54,14 +55,14 @@ impl Session {
     }
 
     pub(crate) async fn listen_for_incoming_message(
-        incoming_messages: &mut IncomingMessages,
+        incoming_messages: &mut IncomingMessages<XorName>,
     ) -> Result<(SocketAddr, MessageType), Error> {
-        if let Some((src, message)) = incoming_messages.next().await {
-            trace!("Incoming message from {:?}", &src);
+        if let Some((connection, message)) = incoming_messages.next().await {
+            trace!("Incoming message from {:?}", connection.remote_address());
             let msg_type = WireMsg::deserialize(message)?;
             trace!("Incoming message deserialized fine");
 
-            Ok((src, msg_type))
+            Ok((connection.remote_address(), msg_type))
         } else {
             Err(Error::Generic("Nothing..".to_string())) // TODO: FIX error type
         }
