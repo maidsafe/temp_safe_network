@@ -18,7 +18,10 @@ use futures::Future;
 use rand::{self, distributions::Alphanumeric, rngs::OsRng, Rng};
 use std::time::Duration;
 
-pub(crate) fn retry<R, E, Fn, Fut>(op: Fn) -> impl Future<Output = Result<R, E>>
+pub(crate) fn retry<R, E, Fn, Fut>(
+    op: Fn,
+    max_elapsed_time: Duration,
+) -> impl Future<Output = Result<R, E>>
 where
     Fn: FnMut() -> Fut,
     Fut: Future<Output = Result<R, backoff::Error<E>>>,
@@ -26,7 +29,7 @@ where
     let backoff = ExponentialBackoff {
         initial_interval: Duration::from_millis(500),
         max_interval: Duration::from_secs(15),
-        max_elapsed_time: Some(Duration::from_secs(180)),
+        max_elapsed_time: Some(max_elapsed_time),
         ..Default::default()
     };
 

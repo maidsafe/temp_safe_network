@@ -27,19 +27,22 @@ impl Client {
         let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
         let signature = self.keypair.sign(&serialised_query);
 
-        retry(|| async {
-            tokio::time::timeout(
-                self.query_timeout,
-                self.send_signed_query(
-                    query.clone(),
-                    client_pk,
-                    serialised_query.clone(),
-                    signature.clone(),
-                ),
-            )
-            .await
-            .map_err(backoff::Error::Transient)
-        })
+        retry(
+            || async {
+                tokio::time::timeout(
+                    self.query_timeout,
+                    self.send_signed_query(
+                        query.clone(),
+                        client_pk,
+                        serialised_query.clone(),
+                        signature.clone(),
+                    ),
+                )
+                .await
+                .map_err(backoff::Error::Transient)
+            },
+            self.query_timeout.mul_f32(3.0),
+        )
         .await
         .map_err(|_| Error::NoResponse)?
     }

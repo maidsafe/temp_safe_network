@@ -31,7 +31,11 @@ where
     Fut: Future<Output = Result<R, backoff::Error<Error>>>,
 {
     tokio::time::sleep(tokio::time::Duration::from_secs(delay as u64)).await;
-    let res = retry(|| async { Ok(f().await?) }).await;
+    let res = retry(
+        || async { Ok(f().await?) },
+        tokio::time::Duration::from_secs(180),
+    )
+    .await;
     if res.is_err() {
         Err(Error::NoResponse)
     } else {
