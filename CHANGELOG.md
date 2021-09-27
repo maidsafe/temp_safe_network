@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.31](https://github.com/maidsafe/safe_network/compare/v0.31.30...v0.31.31) (2021-09-27)
+
+
+### Bug Fixes
+
+* **routing:** exclude non-responsive Adults from candidate list when splitting ([cd8ca69](https://github.com/maidsafe/safe_network/commit/cd8ca698ec551d8d7044ad25aa5410b2e68d44a8))
+* **routing:** restart DKG session with new set of candidates upon a failed one ([296313d](https://github.com/maidsafe/safe_network/commit/296313de2bcf8ae44551a71da0c163bc31ed53f2))
+
 ### [0.31.30](https://github.com/maidsafe/safe_network/compare/v0.31.29...v0.31.30) (2021-09-27)
 
 
