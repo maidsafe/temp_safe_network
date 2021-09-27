@@ -63,11 +63,19 @@ static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
-    let node = create_node(FIRST_SECTION_MIN_AGE, None);
+    let (section_auth, mut nodes, sk_set) = create_section_auth();
+
+    let pk_set = sk_set.public_keys();
+    let section_key = pk_set.public_key();
+
+    let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
-    let core = Core::first_node(
+    let core = Core::new(
         create_comm().await?,
         node,
+        section,
+        Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
@@ -79,7 +87,6 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
         new_node_comm.our_connection_info(),
     );
-    let section_key = *dispatcher.core.read().await.section().chain().last_key();
 
     let wire_msg = WireMsg::single_src(
         &new_node,
@@ -105,8 +112,14 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     .await?
     .into_iter();
 
+    let mut next_cmd = commands.next();
+
+    if matches!(next_cmd, Some(Command::SendMessageDeliveryGroup { .. })) {
+        next_cmd = commands.next();
+    }
+
     let response_wire_msg = assert_matches!(
-        commands.next(),
+        next_cmd,
         Some(Command::SendMessage {
             wire_msg,
             ..
@@ -126,11 +139,19 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_with_resource_proof_response() -> Result<()> {
-    let node = create_node(FIRST_SECTION_MIN_AGE, None);
+    let (section_auth, mut nodes, sk_set) = create_section_auth();
+
+    let pk_set = sk_set.public_keys();
+    let section_key = pk_set.public_key();
+
+    let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
-    let core = Core::first_node(
+    let core = Core::new(
         create_comm().await?,
         node,
+        section,
+        Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
@@ -141,7 +162,6 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
         gen_addr(),
     );
-    let section_key = *dispatcher.core.read().await.section().chain().last_key();
 
     let nonce: [u8; 32] = rand::random();
     let serialized = bincode::serialize(&(new_node.name(), nonce))?;
