@@ -20,7 +20,7 @@ on:
         required: false
         default: 'n'
   pull_request_review:
-    types: [sumbitted, edited]
+    types: [submitted, edited]
 
 env:
   CARGO_INCREMENTAL: '0'
