@@ -51,6 +51,7 @@ pub(crate) trait SectionPeersUtils {
         prefix: &Prefix,
         elder_size: usize,
         current_elders: &SectionAuthorityProvider,
+        excluded_names: &BTreeSet<XorName>,
     ) -> Vec<Peer>;
 
     /// Returns whether the given peer is a joined member of our section.
@@ -114,9 +115,9 @@ impl SectionPeersUtils for SectionPeers {
             current_elders,
             self.members
                 .iter()
-                .filter(|(name, _)| !excluded_names.contains(name))
                 .filter(|(_, info)| is_active(&info.value, current_elders))
                 .filter(|(_, info)| info.value.peer.is_reachable())
+                .filter(|(name, _)| !excluded_names.contains(name))
                 .map(|(_, info)| info),
         )
     }
@@ -127,15 +128,18 @@ impl SectionPeersUtils for SectionPeers {
         prefix: &Prefix,
         elder_size: usize,
         current_elders: &SectionAuthorityProvider,
+        excluded_names: &BTreeSet<XorName>,
     ) -> Vec<Peer> {
         elder_candidates(
             elder_size,
             current_elders,
-            self.members.values().filter(|info| {
-                info.value.state == MembershipState::Joined
-                    && prefix.matches(info.value.peer.name())
-                    && info.value.peer.is_reachable()
-            }),
+            self.members
+                .iter()
+                .filter(|(_, info)| info.value.state == MembershipState::Joined)
+                .filter(|(name, _)| prefix.matches(name))
+                .filter(|(_, info)| info.value.peer.is_reachable())
+                .filter(|(name, _)| !excluded_names.contains(name))
+                .map(|(_, info)| info),
         )
     }
 
