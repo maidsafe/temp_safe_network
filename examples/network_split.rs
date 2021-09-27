@@ -36,7 +36,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "2";
+const INTERVAL: &str = "100";
 const RUST_LOG: &str = "RUST_LOG";
 const ADDITIONAL_NODES_TO_SPLIT: u64 = 30;
 const QUERY_TIMEOUT: Duration = Duration::from_secs(90);
@@ -115,8 +115,6 @@ pub async fn run_split() -> Result<()> {
         &arg_node_path,
         "--nodes-dir",
         &arg_node_log_dir,
-        "--interval",
-        INTERVAL,
         "--local",
     ];
 
@@ -145,7 +143,7 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error starting the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_secs(interval_as_int * start_node_count);
+    let interval_duration = Duration::from_millis(interval_as_int * start_node_count);
     sleep(interval_duration).await;
     println!("Done sleeping....");
 
