@@ -237,7 +237,9 @@ impl Section {
         our_name: &XorName,
         excluded_names: &BTreeSet<XorName>,
     ) -> Vec<ElderCandidates> {
-        if let Some((our_elder_candidates, other_elder_candidates)) = self.try_split(our_name) {
+        if let Some((our_elder_candidates, other_elder_candidates)) =
+            self.try_split(our_name, excluded_names)
+        {
             return vec![our_elder_candidates, other_elder_candidates];
         }
 
@@ -316,6 +318,7 @@ impl Section {
     pub(super) fn try_split(
         &self,
         our_name: &XorName,
+        excluded_names: &BTreeSet<XorName>,
     ) -> Option<(ElderCandidates, ElderCandidates)> {
         let next_bit_index = if let Ok(index) = self.prefix().bit_count().try_into() {
             index
@@ -329,6 +332,7 @@ impl Section {
         let (our_new_size, sibling_new_size) = self
             .members
             .mature()
+            .filter(|peer| !excluded_names.contains(peer.name()))
             .map(|peer| peer.name().bit(next_bit_index) == next_bit)
             .fold((0, 0), |(ours, siblings), is_our_prefix| {
                 if is_our_prefix {
@@ -350,11 +354,13 @@ impl Section {
             &our_prefix,
             ELDER_SIZE,
             self.authority_provider(),
+            excluded_names,
         );
         let other_elders = self.members.elder_candidates_matching_prefix(
             &other_prefix,
             ELDER_SIZE,
             self.authority_provider(),
+            excluded_names,
         );
 
         let our_elder_candidates = ElderCandidates::new(our_elders, our_prefix);
