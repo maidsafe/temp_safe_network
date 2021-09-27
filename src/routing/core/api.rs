@@ -233,16 +233,7 @@ impl Core {
     // Generate a new section info based on the current set of members and if it differs from the
     // current elders, trigger a DKG.
     pub(crate) fn promote_and_demote_elders(&mut self) -> Result<Vec<Command>> {
-        let mut commands = vec![];
-
-        for elder_candidates in self
-            .section
-            .promote_and_demote_elders(&self.node.name(), &BTreeSet::new())
-        {
-            commands.extend(self.send_dkg_start(elder_candidates)?);
-        }
-
-        Ok(commands)
+        self.promote_and_demote_elders_except(&BTreeSet::new())
     }
 
     // Generate a new section info based on the current set of members, but
