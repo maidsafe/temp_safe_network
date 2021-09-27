@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.30](https://github.com/maidsafe/safe_network/compare/v0.31.29...v0.31.30) (2021-09-27)
+
+
+### Features
+
+* **routing:** introduce probing messages ([f097ce9](https://github.com/maidsafe/safe_network/commit/f097ce96f46044b18e1889b8447e861cfe3cf5a5))
+
 ### [0.31.29](https://github.com/maidsafe/safe_network/compare/v0.31.28...v0.31.29) (2021-09-27)
 
 ### [0.31.28](https://github.com/maidsafe/safe_network/compare/v0.31.27...v0.31.28) (2021-09-24)
