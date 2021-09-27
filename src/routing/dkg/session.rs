@@ -177,7 +177,7 @@ impl Session {
         }
 
         if !self.key_gen.is_finalized() {
-            trace!("DKG check: finalised");
+            trace!("DKG check: not finalised");
             return Ok(vec![]);
         }
 
