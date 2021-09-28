@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.34.2](https://github.com/maidsafe/sn_api/compare/v0.34.1...v0.34.2) (2021-09-28)
+
+
+### Features
+
+* file container create returing version in xorurl ([75d67a3](https://github.com/maidsafe/sn_api/commit/75d67a38bb1f6643eee2e1e234d2e145800601fa))
+* nrs_map_container_create returns xorurl containing version ([9193720](https://github.com/maidsafe/sn_api/commit/919372004ede01333a4cee6d5a8ec69a318be516))
+* upgrade safe network to 0.28.x ([5666955](https://github.com/maidsafe/sn_api/commit/5666955d8c8fba171d2bcb710b0ed101089736d6))
+* upgrade safe network to 0.31.x ([cd5ed44](https://github.com/maidsafe/sn_api/commit/cd5ed446c03d2c16267ce812eb1e2b9f24c0db72))
+* use new api for storing files ([c869294](https://github.com/maidsafe/sn_api/commit/c8692940f4a46866632018eda761ee4da2a20328))
+
 ### [0.34.1](https://github.com/maidsafe/sn_api/compare/v0.34.0...v0.34.1) (2021-08-13)
 
 
