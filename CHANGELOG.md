@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.35.0](https://github.com/maidsafe/sn_api/compare/v0.34.2...v0.35.0) (2021-09-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* the actual breaking changes were in the previous PR and commits. This change simply
+just modifies the README so we can get a new release through.
+
+The 0.34.2 release will be yanked from crates.io.
+
+* use readme change to force new release ([7c0ae4c](https://github.com/maidsafe/sn_api/commit/7c0ae4c0e05037bca98c41d8ddf166ab8f003032))
+
 ### [0.34.2](https://github.com/maidsafe/sn_api/compare/v0.34.1...v0.34.2) (2021-09-28)
 
 
