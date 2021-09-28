@@ -253,13 +253,8 @@ impl Session {
             )?;
 
             debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
-            send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
 
-            let _old_entry = session.ae_cache.write().await.insert((
-                dst_location.name(),
-                section_pk,
-                bounced_msg,
-            ));
+            send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
         }
 
         Ok(session)
@@ -334,12 +329,6 @@ impl Session {
             debug!("Resending original message via AE-Retry");
 
             send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
-
-            let _old_entry = session.ae_cache.write().await.insert((
-                dst_location.name(),
-                target_section_pk,
-                bounced_msg,
-            ));
         }
 
         Ok(session)
@@ -426,6 +415,12 @@ impl Session {
             debug!("Cache hit! We have sent this message before, removing target elders");
 
             target_elders = vec![];
+        } else {
+            let _old_entry_that_does_not_exist = the_cache_guard.insert((
+                dst_address_of_bounced_msg,
+                received_auth.public_key_set.public_key(),
+                bounced_msg.clone(),
+            ));
         }
 
         debug!(
