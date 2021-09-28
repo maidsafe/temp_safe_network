@@ -87,7 +87,7 @@ fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
         [
             "nrs",
             "create",
-            &nrs_url.public_name(),
+            nrs_url.public_name(),
             "-l",
             &container_url.to_string(),
             "--json",
@@ -157,7 +157,7 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() -> Result<()> {
         [
             "nrs",
             "create",
-            &nrs_url.public_name(),
+            nrs_url.public_name(),
             "-l",
             &container_xorurl.to_string(),
             "--json",
@@ -200,7 +200,7 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
         [
             "nrs",
             "create",
-            &nrs_url.public_name(),
+            nrs_url.public_name(),
             "-l",
             &container_xorurl,
             "--json",

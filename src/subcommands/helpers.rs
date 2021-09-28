@@ -19,7 +19,7 @@ use std::{
     io::{stdin, stdout, Read, Write},
 };
 use tracing::debug;
-use xor_name::{XorName, XOR_NAME_LEN};
+use xor_name::XorName;
 
 const UNKNOWN_PUBLIC_NAME: &str = "<unknown>";
 
@@ -31,19 +31,6 @@ pub fn notice_dry_run() {
 // Converts the XOR name bytes into a hex encoded string
 pub fn xorname_to_hex(xorname: &XorName) -> String {
     xorname.0.iter().map(|b| format!("{:02x}", b)).collect()
-}
-
-// Converts a hex encoded string to XOR name bytes
-pub fn hex_to_xorname(hex_str: &str) -> Result<XorName> {
-    if hex_str.len() != XOR_NAME_LEN {
-        bail!("Invalid hex encoded XorName string".to_string())
-    } else {
-        let mut xorname = XorName::default();
-        xorname
-            .0
-            .copy_from_slice(hex_str[0..XOR_NAME_LEN].as_bytes());
-        Ok(xorname)
-    }
 }
 
 // Read the argument string from the STDIN if is not an arg provided

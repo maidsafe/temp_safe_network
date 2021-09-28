@@ -19,12 +19,7 @@ use sn_cmd_test_utilities::util::{
     test_symlinks_are_valid, upload_path, upload_test_symlinks_folder,
     upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
-use std::{
-    fs::{self, OpenOptions},
-    io::{prelude::*, Seek, SeekFrom},
-    process::Command,
-    str::FromStr,
-};
+use std::{process::Command, str::FromStr};
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
 const TEST_FILE: &str = "./testdata/test.md";
@@ -62,7 +57,7 @@ fn calling_safe_files_put() -> Result<()> {
 #[test]
 fn calling_safe_files_put_dry_run() -> Result<()> {
     let random_content: String = (0..10).map(|_| rand::random::<char>()).collect();
-    fs::write(TEST_FILE_RANDOM_CONTENT, random_content).map_err(|e| eyre!(e.to_string()))?;
+    std::fs::write(TEST_FILE_RANDOM_CONTENT, random_content).map_err(|e| eyre!(e.to_string()))?;
 
     let content = safe_cmd_stdout(
         [
@@ -160,7 +155,7 @@ fn calling_safe_files_put_emptyfolder() -> Result<()> {
     .success();
 
     // cleanup
-    fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
+    std::fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
     Ok(())
 }
 
@@ -273,7 +268,7 @@ fn calling_safe_files_sync_dry_run() -> Result<()> {
     target.set_content_version(None);
 
     let random_content: String = (0..10).map(|_| rand::random::<char>()).collect();
-    fs::write(TEST_FILE_RANDOM_CONTENT, random_content).map_err(|e| eyre!(e.to_string()))?;
+    std::fs::write(TEST_FILE_RANDOM_CONTENT, random_content).map_err(|e| eyre!(e.to_string()))?;
     let sync_content = safe_cmd_stdout(
         [
             "files",
@@ -350,7 +345,7 @@ fn calling_safe_files_removed_sync() -> Result<()> {
     )?;
 
     // cleanup
-    fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
+    std::fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
 
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, files_container_v1);
@@ -377,7 +372,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -
     sub2_file.write_str("modify content for sub2 file")?;
     let subexists_file = tmp_data_dir.child("subexists.md");
     let subexists_file_content = std::fs::read_to_string(subexists_file.path())?;
-    fs::remove_file(subexists_file.path()).map_err(|e| eyre!(e.to_string()))?;
+    std::fs::remove_file(subexists_file.path()).map_err(|e| eyre!(e.to_string()))?;
 
     let mut url = Url::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -486,7 +481,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         [
             "files",
             "sync",
-            &empty_dir.path().to_str().unwrap(),
+            empty_dir.path().to_str().unwrap(),
             &nrsurl,
             "--recursive",
             "--delete",
@@ -549,7 +544,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
         [
             "files",
             "sync",
-            &empty_dir.path().to_str().unwrap(),
+            empty_dir.path().to_str().unwrap(),
             &nrsurl,
             "--recursive",
             "--delete",

@@ -784,12 +784,6 @@ fn create_dir_all(dir_path: &Path) -> Result<()> {
         .with_context(|| format!("Couldn't create path: \"{}\"", dir_path.display(),))
 }
 
-/// # Get Private Blob
-/// Get private immutable data blobs from the network.
-async fn files_get_private_blob(_safe: &Safe, _url: &str, _range: Range) -> Result<Vec<u8>> {
-    unimplemented!();
-}
-
 /// # Get Public or Private Blob
 /// Get immutable data blobs from the network.
 pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {

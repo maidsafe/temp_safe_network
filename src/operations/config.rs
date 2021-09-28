@@ -43,7 +43,7 @@ impl fmt::Display for NetworkInfo {
 impl NetworkInfo {
     pub async fn matches(&self, node_config: &NodeConfig) -> bool {
         match self {
-            Self::Addresses(node_config) => node_config == node_config,
+            Self::Addresses(nc) => node_config == nc,
             Self::ConnInfoUrl(config_location) => match retrieve_node_config(config_location).await
             {
                 Ok(info) => info == *node_config,
@@ -226,7 +226,7 @@ impl Config {
         for (network_name, net_info) in self.networks_iter() {
             let mut current = "";
             if let Some(node_config) = &current_node_config {
-                if net_info.matches(&node_config).await {
+                if net_info.matches(node_config).await {
                     current = "*";
                 }
             }

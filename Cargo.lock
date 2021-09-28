@@ -84,6 +84,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
+name = "arrayvec"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be4dc07131ffa69b8072d35f5007352af944213cde02545e2103680baed38fcd"
+
+[[package]]
 name = "assert_cmd"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -351,7 +357,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afa748e348ad3be8263be728124b24a24f268266f6f5d58af9d75f6a40b5c587"
 dependencies = [
  "arrayref",
- "arrayvec",
+ "arrayvec 0.5.2",
  "constant_time_eq",
 ]
 
@@ -569,15 +575,6 @@ dependencies = [
  "textwrap",
  "unicode-width",
  "vec_map",
-]
-
-[[package]]
-name = "cloudabi"
-version = "0.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
-dependencies = [
- "bitflags",
 ]
 
 [[package]]
@@ -1042,15 +1039,6 @@ name = "event-listener"
 version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
-
-[[package]]
-name = "exponential-backoff"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ae1fe2c498e7a53a8c86b96d9dbd789c14a6a6f6886b2e4383963094b6b9895"
-dependencies = [
- "rand 0.5.6",
-]
 
 [[package]]
 name = "eyre"
@@ -1739,9 +1727,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.102"
+version = "0.2.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2a5ac8f984bfcf3a823267e5fde638acc3325f6496633a5da6bb6eb2171e103"
+checksum = "dd8f7255a17a627354f321ef0055d63b898c6fb27eff628af4d1b66b7331edf6"
 
 [[package]]
 name = "linked-hash-map"
@@ -2351,9 +2339,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.19.0"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "124962f4b566a6be0d37840116fd07bd8b8ce78fdb623e51ec48382716194162"
+checksum = "1dc237722b53dbb2e80992848000559c37ff64a2dc760d716dabfbb43cac98e7"
 dependencies = [
  "backoff",
  "bincode",
@@ -2450,19 +2438,6 @@ dependencies = [
  "libc",
  "rand_core 0.3.1",
  "rdrand",
- "winapi",
-]
-
-[[package]]
-name = "rand"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c618c47cd3ebd209790115ab837de41425723956ad3ce2e6a7f09890947cacb9"
-dependencies = [
- "cloudabi",
- "fuchsia-cprng",
- "libc",
- "rand_core 0.3.1",
  "winapi",
 ]
 
@@ -2853,9 +2828,12 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe_network"
-version = "0.31.18"
+version = "0.31.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "444ba19e6a887fda7dbc12fbd5599dc9e60060dfa97926b6d7ed919b928a3d05"
 dependencies = [
  "async-recursion",
+ "backoff",
  "base64 0.10.1",
  "bincode",
  "bls_dkg",
@@ -2868,7 +2846,6 @@ dependencies = [
  "dirs-next 2.0.0",
  "ed25519",
  "ed25519-dalek",
- "exponential-backoff",
  "eyre",
  "futures",
  "hex 0.3.2",
@@ -2889,7 +2866,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
- "sn_launch_tool",
+ "sn_launch_tool 0.8.0",
  "structopt",
  "sysinfo",
  "tempfile",
@@ -2900,6 +2877,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "uhttp_uri",
+ "uluru",
  "url",
  "urlencoding",
  "xor_name 3.1.0",
@@ -2945,9 +2923,9 @@ dependencies = [
 
 [[package]]
 name = "self_encryption"
-version = "0.26.3"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c2344b79a4bc5b300f42be2b0309629c750b989f639403f5d8e2edf5a7bb65d"
+checksum = "9c0a5382c7ea687ad56d44c338012637cc2312eb459a1a413e3d46ea71b847a9"
 dependencies = [
  "aes",
  "bincode",
@@ -3194,7 +3172,9 @@ checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "sn_api"
-version = "0.34.1"
+version = "0.35.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60d252052a61df6b1a58ae2a15d4f630adc447487f7c8b277e292e1eeef130f9"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3270,7 +3250,7 @@ dependencies = [
  "shrust",
  "sn_api",
  "sn_cmd_test_utilities",
- "sn_launch_tool",
+ "sn_launch_tool 0.7.0",
  "structopt",
  "tokio",
  "tracing",
@@ -3303,6 +3283,21 @@ name = "sn_launch_tool"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b756e3149e2e7243f64770fe7303f5521a4873afaabd868482f0adae7ebc8a29"
+dependencies = [
+ "color-eyre",
+ "dirs-next 1.0.2",
+ "eyre",
+ "serde_json",
+ "structopt",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "sn_launch_tool"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71ba1c42982966e3371a8479a501e4707704bfaf6156f58eb56ac825ca3db1f2"
 dependencies = [
  "color-eyre",
  "dirs-next 1.0.2",
@@ -3569,9 +3564,9 @@ dependencies = [
 
 [[package]]
 name = "tinyvec"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5241dd6f21443a3606b432718b166d3cedc962fd4b8bea54a8bc7f514ebda986"
+checksum = "f83b2a3d4d9091d0abd7eba4dc2710b1718583bd4d8992e2190720ea38f391f7"
 dependencies = [
  "tinyvec_macros",
 ]
@@ -3775,6 +3770,15 @@ name = "uhttp_uri"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9b600e6da808f63a440874d633b22fa04abc9c3b08212ee7292512aec62805b"
+
+[[package]]
+name = "uluru"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "794a32261a1f5eb6a4462c81b59cec87b5c27d5deea7dd1ac8fc781c41d226db"
+dependencies = [
+ "arrayvec 0.7.1",
+]
 
 [[package]]
 name = "unicase"

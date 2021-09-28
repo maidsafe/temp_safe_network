@@ -13,7 +13,7 @@ use crate::operations::{
 };
 use color_eyre::{eyre::eyre, Result};
 use sn_api::PublicKey;
-use std::{collections::BTreeSet, iter::FromIterator, net::SocketAddr, path::PathBuf};
+use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
 use tracing::debug;
 
