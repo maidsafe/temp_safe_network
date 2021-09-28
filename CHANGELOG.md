@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.34.0](https://github.com/maidsafe/sn_cli/compare/v0.33.8...v0.34.0) (2021-09-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* there have been commands that have been removed and we also can't upload things
+like files with 0 bytes in them any more.
+
+### Features
+
+* updates for new sn_api and safe_network 0.28.x ([4bbf857](https://github.com/maidsafe/sn_cli/commit/4bbf857454126a7c0b733a477a8086354fd613d2))
+* updates for new sn_api and safe_network 0.31.x ([ec6dd1b](https://github.com/maidsafe/sn_cli/commit/ec6dd1bb76b91cbee6d4945bf873ea6b88fc5418))
+* upgrade to 0.34.1 of sn_api ([41c6d1d](https://github.com/maidsafe/sn_cli/commit/41c6d1d1655485ba9cc915104cdde2919aa7e9a5))
+
+
+* upgrade sn_api to 0.35.x ([76c0290](https://github.com/maidsafe/sn_cli/commit/76c0290d42c9598b7634ae4d1532cd87273b80eb))
+
 ### [0.33.8](https://github.com/maidsafe/sn_cli/compare/v0.33.7...v0.33.8) (2021-08-23)
 
 ### [0.33.7](https://github.com/maidsafe/sn_cli/compare/v0.33.6...v0.33.7) (2021-08-09)
