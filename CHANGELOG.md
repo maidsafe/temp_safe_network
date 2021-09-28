@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.1](https://github.com/maidsafe/sn_api/compare/v0.35.0...v0.35.1) (2021-09-28)
+
+
+### Bug Fixes
+
+* **tests:** adapt tests utils to new format of network contacts info file ([fef862d](https://github.com/maidsafe/sn_api/commit/fef862d9605286733aeede08a63abaa13f0aba81))
+
 ## [0.35.0](https://github.com/maidsafe/sn_api/compare/v0.34.2...v0.35.0) (2021-09-28)
 
 
