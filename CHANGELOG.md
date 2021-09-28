@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.35.0](https://github.com/maidsafe/sn_cli/compare/v0.34.0...v0.35.0) (2021-09-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* the `network set` command now has different arguments.
+
+The `network set` command creates a new network in the configuration, that has a name and a set of
+nodes. Now that we require a genesis key to connect to a network, a genesis key argument was created
+for the command.
+
+Test coverage has been added for this change and also to various other parts of the `Config` struct.
+They've been added as unit style tests rather than to the integration suite, because these commands
+are fairly simple and don't require a full integration test. The coverage is mostly on the `Config`
+struct rather than the commands, because the `add` and `set` commands basically just call
+`Config::add_network` and it would be quite wasteful and a bit of a maintenance issue to cover both.
+One test was created for the `set` command just to make sure it correctly maps its arguments onto
+the `add_network`.
+
+Some refactoring took place to make testing a bit easier. The `Config::read` function was changed to
+a constructor that accepted both the CLI config file path and the default node config path. This
+gives us the ability to pass temporary file paths that are created with `assertfs`, meaning we're not
+working with user profile directories when the tests are run on a someone's development machine. Any
+command handlers that used the `Config::read` function were updated to accept a reference to a
+`Config` as a parameter. The `Config` can be created in the CLI config, and that's where we can pass
+in the real profile directory parameters.
+
+The `NetworkInfo` enum entries were renamed from Addresses -> NodeConfig and ConnInfoURL ->
+ConnInfoLocation. Since the addition of the genesis key, the network info was no longer just a set
+of addresses, and in terms of the connection info, that could be either a URL or a file path, so it
+made more sense to name that a bit more generally.
+
+### Features
+
+* updates for new sn_api and safe_network 0.31.x ([944596d](https://github.com/maidsafe/sn_cli/commit/944596dfcb97272ce220bb9a026233c42c6c0505))
+* use genesis key in network set command ([3b9f60c](https://github.com/maidsafe/sn_cli/commit/3b9f60cd1202a6713098378006e7e485c5ae90bd))
+
 ## [0.34.0](https://github.com/maidsafe/sn_cli/compare/v0.33.8...v0.34.0) (2021-09-28)
 
 
