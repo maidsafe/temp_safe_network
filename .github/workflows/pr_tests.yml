@@ -92,7 +92,8 @@ jobs:
 
       - name: ubuntu install ripgrep
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
+        run: |
+          sudo apt-get -y install ripgrep zsh
 
       - name: windows install ripgrep
         if: matrix.os == 'windows-latest'
@@ -119,37 +120,37 @@ jobs:
       - name: Build all safe_network targets
         run: cargo build --all-targets --release --features=always-joinable,test-utils
 
-      - name: Run Data Types tests
-        if: steps.data_types_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- types
+      # - name: Run Data Types tests
+      #   if: steps.data_types_changes.outputs.src == 'true'
+      #   run: cargo test --release --features=always-joinable,test-utils -- types
 
-      - name: Run DBs tests
-        if: steps.dbs_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- dbs
+      # - name: Run DBs tests
+      #   if: steps.dbs_changes.outputs.src == 'true'
+      #   run: cargo test --release --features=always-joinable,test-utils -- dbs
 
-      - name: Run PrefixMap tests
-        if: steps.prefix_map_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- prefix_map
+      # - name: Run PrefixMap tests
+      #   if: steps.prefix_map_changes.outputs.src == 'true'
+      #   run: cargo test --release --features=always-joinable,test-utils -- prefix_map
 
-      - name: Run URL tests
-        if: steps.url_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- url
+      # - name: Run URL tests
+      #   if: steps.url_changes.outputs.src == 'true'
+      #   run: cargo test --release --features=always-joinable,test-utils -- url
 
-      - name: Run Messaging tests
-        if: steps.messaging_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- messaging
+      # - name: Run Messaging tests
+      #   if: steps.messaging_changes.outputs.src == 'true'
+      #   run: cargo test --release --features=always-joinable,test-utils -- messaging
 
-      - name: Run Node tests
-        if: steps.node_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- node
+      # - name: Run Node tests
+      #   if: steps.node_changes.outputs.src == 'true'
+      #   run: cargo test --release --features=always-joinable,test-utils -- node
 
-      - name: Run Routing tests
-        if: steps.routing_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- routing
+      # - name: Run Routing tests
+      #   if: steps.routing_changes.outputs.src == 'true'
+      #   run: cargo test --release --features=always-joinable,test-utils -- routing
 
-      - name: Run Doc tests
-        if: steps.node_changes.outputs.src == 'true'
-        run: cargo test --release client --doc
+      # - name: Run Doc tests
+      #   if: steps.node_changes.outputs.src == 'true'
+      #   run: cargo test --release client --doc
 
       - run: ./target/release/testnet
         env:
@@ -195,29 +196,55 @@ jobs:
         if: matrix.os != 'windows-latest'
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
         run: cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 && sleep 5
-        timeout-minutes: 5
+        timeout-minutes: 10
         continue-on-error: true
         env:
-          NETWORK_ASSERT_DELAY: 80
+          NETWORK_ASSERT_DELAY: 100
       
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests...
+        shell: zsh {0}
+        if: matrix.os != 'windows-latest'
+        # always joinable not actually needed here, but should speed up compilation as we've just built with it
+        run: repeat 3 cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob && sleep 5
+        timeout-minutes: 5
+
+      - name: Initial client tests...
         shell: bash
+        if: matrix.os == 'windows-latest'
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
         run: cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob && sleep 5
         timeout-minutes: 5
 
       # register api
-      - name: Client reg tests against local network
-        shell: bash
-        run: cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+      - name: Unix client reg tests against local network
+        shell: zsh {0}
+        if: matrix.os != 'windows-latest'
+        run: repeat 3 cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
         timeout-minutes: 15
+        env:
+          RUST_LOG: safe_network=trace,qp2p=trace
+   
+      # register api
+      - name: Win client reg tests against local network
+        shell: bash
+        if: matrix.os == 'windows-latest'
+        run: cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+        timeout-minutes: 5
 
       # blob api
-      - name: Client blob tests against local network
+      - name: Unix client blob tests against local network
+        shell: zsh {0}
+        if: matrix.os != 'windows-latest'
+        run: repeat 3 cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
+        timeout-minutes: 20
+     
+      # blob api
+      - name: Windows client blob tests against local network
         shell: bash
+        if: matrix.os == 'windows-latest'
         run: cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
-        timeout-minutes: 15
+        timeout-minutes: 5
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 5
