@@ -15,7 +15,7 @@
 
 ## Description
 
-This crate provides all that's needed by any Rust application which intends to connect and read/write data on [The Safe Network](https://safenetwork.tech).
+This crate provides all that's needed by any Rust application intending to connect and read/write data on [The Safe Network](https://safenetwork.tech).
 
 A Rust Safe application can make use of the `sn_api` crate to be able to not only read/write data on the Safe Network but also to send/receive authorisation requests to the Safe Authenticator (see https://hub.safedev.org/discover for additional info of the Authenticator). You can find more information about the Authenticator in MaidSafe reference implementation [sn_authd](https://github.com/maidsafe/sn_authd/blob/master/README.md).
 
