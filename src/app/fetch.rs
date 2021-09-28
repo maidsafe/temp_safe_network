@@ -124,7 +124,7 @@ impl Safe {
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false, false).await.unwrap();
+    ///     let (xorurl, _, _) = safe.files_container_create(Some("./testdata/"), None, true, false, false).await.unwrap();
     ///
     ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
     ///     let data_string = match safe_data {
@@ -167,7 +167,7 @@ impl Safe {
     /// # rt.block_on(async {
     /// #   let mut safe = Safe::default();
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (container_xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false, false).await.unwrap();
+    ///     let (container_xorurl, _, _) = safe.files_container_create(Some("./testdata/"), None, true, false, false).await.unwrap();
     ///
     ///     let inspected_content = safe.inspect( &format!( "{}/test.md", &container_xorurl.replace("?v=0", "") ) ).await.unwrap();
     ///     match &inspected_content[0] {
@@ -555,7 +555,7 @@ mod tests {
     async fn test_fetch_files_container() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, false, false)
+            .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
 
         let safe_url = Url::from_url(&xorurl)?;
@@ -597,7 +597,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
 
         let (xorurl, _, the_files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, false, false)
+            .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
@@ -648,7 +648,7 @@ mod tests {
 
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, _the_files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, false, false)
+            .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
@@ -762,7 +762,7 @@ mod tests {
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
         let (xorurl, _, _files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, false, false)
+            .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
@@ -775,11 +775,11 @@ mod tests {
 
         let nrs_url = format!("safe://{}/test.md", site_name);
 
-        let mut file = File::open("../testdata/test.md")
-            .context("Failed to open local file: ../testdata/test.md".to_string())?;
+        let mut file = File::open("./testdata/test.md")
+            .context("Failed to open local file: ./testdata/test.md".to_string())?;
         let mut file_data = Vec::new();
         file.read_to_end(&mut file_data)
-            .context("Failed to read local file: ../testdata/test.md".to_string())?;
+            .context("Failed to read local file: ./testdata/test.md".to_string())?;
         let file_size = file_data.len();
 
         // Fetch full file and match

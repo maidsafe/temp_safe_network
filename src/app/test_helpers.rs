@@ -10,8 +10,8 @@
 use crate::{ipc::NodeConfig, Safe};
 use anyhow::{bail, Context, Result};
 use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
-use safe_network::types::Keypair;
-use std::{env::var, fs, sync::Once};
+use safe_network::types::{Keypair, PublicKey};
+use std::{collections::BTreeSet, env::var, fs, net::SocketAddr, sync::Once};
 use tracing_subscriber::{fmt, EnvFilter};
 
 // Environment variable which can be set with the auth credentials
@@ -67,7 +67,7 @@ pub fn random_nrs_name() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(15).collect()
 }
 
-fn read_default_peers_from_file() -> Result<NodeConfig> {
+fn read_default_peers_from_file() -> Result<(String, BTreeSet<SocketAddr>)> {
     let default_peer_file = match dirs_next::home_dir() {
         None => bail!(
             "Failed to obtain local home directory where to read {} from",
@@ -86,18 +86,19 @@ fn read_default_peers_from_file() -> Result<NodeConfig> {
         )
     })?;
 
-    let sockaddrs: NodeConfig = serde_json::from_str(&raw_json).with_context(|| {
-        format!(
-            "Failed to parse bootstraping contacts list from file: {:?}",
-            &default_peer_file
-        )
-    })?;
+    let info: (String, BTreeSet<SocketAddr>) =
+        serde_json::from_str(&raw_json).with_context(|| {
+            format!(
+                "Failed to parse bootstraping contacts list from file: {:?}",
+                &default_peer_file
+            )
+        })?;
 
-    Ok(sockaddrs)
+    Ok(info)
 }
 
 fn get_bootstrap_contacts() -> Result<NodeConfig> {
-    let contacts = match var(TEST_BOOTSTRAPPING_PEERS) {
+    let (genesis_key_hex, bootstrap_contacts) = match var(TEST_BOOTSTRAPPING_PEERS) {
         Ok(val) => serde_json::from_str(&val).with_context(|| {
             format!(
                 "Failed to parse bootstraping contacts list from {} env var",
@@ -110,7 +111,13 @@ fn get_bootstrap_contacts() -> Result<NodeConfig> {
         }
     };
 
-    Ok(contacts)
+    let genesis_key = PublicKey::bls_from_hex(&genesis_key_hex)?
+        .bls()
+        .ok_or_else(|| {
+            anyhow::anyhow!("Unexpectedly failed to obtain network's (BLS) genesis key.")
+        })?;
+
+    Ok((genesis_key, bootstrap_contacts))
 }
 
 #[macro_export]
