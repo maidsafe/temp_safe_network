@@ -98,7 +98,7 @@ default-features = false
 features = ["archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate", "rustls"]
 
 [dependencies.tokio]
-version = "1.8.0"
+version = "1.12.0"
 features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 
 [dev-dependencies]

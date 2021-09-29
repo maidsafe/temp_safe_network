@@ -33,6 +33,7 @@ where
     tokio::time::sleep(tokio::time::Duration::from_secs(delay as u64)).await;
     let res = retry(
         || async { Ok(f().await?) },
+        tokio::time::Duration::from_secs(5),
         tokio::time::Duration::from_secs(180),
     )
     .await;

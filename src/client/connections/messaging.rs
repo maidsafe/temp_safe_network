@@ -227,7 +227,7 @@ impl Session {
         let msg_id = MessageId::new();
 
         debug!(
-            "Sending query message {:?}, msg_id: {}, from {}, to the {} Elders closest to data name: {:?}",
+            "Sending query message {:?}, msg_id: {:?}, from {}, to the {} Elders closest to data name: {:?}",
             query,
             msg_id,
             endpoint.public_addr(),
@@ -437,6 +437,7 @@ pub(crate) async fn send_message(
     let mut failures = 0;
     results.iter().for_each(|res| {
         if res.is_err() {
+            error!("Client error contacting node was: {:?}", res);
             failures += 1;
         }
     });
