@@ -305,7 +305,7 @@ mod tests {
     // Test storing and reading min size blob.
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_3kb() -> Result<()> {
-        let client = create_test_client(None).await?;
+        let client = create_test_client().await?;
 
         let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
 
@@ -413,7 +413,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn parallel_timings() -> Result<()> {
-        let client = create_test_client(None).await?;
+        let client = create_test_client().await?;
 
         let handles = (0..1000_usize)
             .map(|i| (i, client.clone()))
@@ -445,7 +445,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn one_by_one_timings() -> Result<()> {
-        let client = create_test_client(None).await?;
+        let client = create_test_client().await?;
 
         for i in 0..1000_usize {
             let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
@@ -460,7 +460,7 @@ mod tests {
 
     async fn store_and_read_blob(size: usize, scope: Scope) -> Result<()> {
         let blob = Blob::new(random_bytes(size))?;
-        let client = create_test_client(None).await?;
+        let client = create_test_client().await?;
         let address = client.write_blob_to_network(blob.clone(), scope).await?;
 
         // the larger the file, the longer we have to wait before we start querying
@@ -477,7 +477,7 @@ mod tests {
 
     async fn store_and_read_spot(size: usize, scope: Scope) -> Result<()> {
         let spot = Spot::new(random_bytes(size))?;
-        let client = create_test_client(None).await?;
+        let client = create_test_client().await?;
         let address = client.write_spot_to_network(spot.clone(), scope).await?;
 
         // the larger the size, the longer we have to wait before we start querying
@@ -494,7 +494,7 @@ mod tests {
     }
 
     async fn seek_for_test(blob: Blob, pos: usize, len: usize) -> Result<Bytes> {
-        let client = create_test_client(None).await?;
+        let client = create_test_client().await?;
         let address = client
             .write_blob_to_network(blob.clone(), Scope::Public)
             .await?;

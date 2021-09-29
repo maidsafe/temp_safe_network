@@ -141,7 +141,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn client_creation() -> Result<()> {
-        let _client = create_test_client(None).await?;
+        let _client = create_test_client().await?;
 
         Ok(())
     }
@@ -173,7 +173,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn long_lived_connection_survives() -> Result<()> {
-        let client = create_test_client(None).await?;
+        let client = create_test_client().await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
         let spot = Spot::new(random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES / 2))?;
         let _ = client.write_spot_to_network(spot, Scope::Public).await?;
@@ -187,6 +187,6 @@ mod tests {
     #[test]
     fn client_is_send() {
         fn require_send<T: Send>(_t: T) {}
-        require_send(create_test_client(None));
+        require_send(create_test_client());
     }
 }
