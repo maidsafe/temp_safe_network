@@ -30,9 +30,9 @@ pub fn init_logger() {
     });
 }
 
-/// Create a test client without providing any specific keypair or bootstrap_config
-pub async fn create_test_client(timeout: Option<u64>) -> Result<Client> {
-    create_test_client_with(None, timeout).await
+/// Create a test client without providing any specific keypair, bootstrap_config, or timeout.
+pub async fn create_test_client() -> Result<Client> {
+    create_test_client_with(None, None).await
 }
 
 /// Create a test client optionally providing keypair and/or bootstrap_config
