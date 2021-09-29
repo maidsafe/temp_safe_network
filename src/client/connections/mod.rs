@@ -25,6 +25,7 @@ type QueryResponseSender = Sender<QueryResponse>;
 type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
 use uluru::LRUCache;
 
+#[derive(Debug)]
 pub(crate) struct QueryResult {
     pub(super) response: QueryResponse,
     // TODO: unify this

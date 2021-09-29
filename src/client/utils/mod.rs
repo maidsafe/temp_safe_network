@@ -20,6 +20,7 @@ use std::time::Duration;
 
 pub(crate) fn retry<R, E, Fn, Fut>(
     op: Fn,
+    initial_interval: Duration,
     max_elapsed_time: Duration,
 ) -> impl Future<Output = Result<R, E>>
 where
@@ -27,8 +28,8 @@ where
     Fut: Future<Output = Result<R, backoff::Error<E>>>,
 {
     let backoff = ExponentialBackoff {
-        initial_interval: Duration::from_millis(500),
-        max_interval: Duration::from_secs(15),
+        initial_interval,
+        max_interval: max_elapsed_time,
         max_elapsed_time: Some(max_elapsed_time),
         ..Default::default()
     };
