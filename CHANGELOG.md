@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.32](https://github.com/maidsafe/safe_network/compare/v0.31.31...v0.31.32) (2021-09-29)
+
+
+### Features
+
+* **actions:** add Github Actions workflow to deploy a testnet to ([e6e01e1](https://github.com/maidsafe/safe_network/commit/e6e01e1714fae1beb5584326f264eb9a1f66422b))
+* **actions:** trigger the digital ocean testnets on PR review too ([c958749](https://github.com/maidsafe/safe_network/commit/c958749aa93ef1ec0d2bb9e3f4281232f872ad85))
+* **actions:** use commit from current branch to build and deploy nodes ([ae0e88c](https://github.com/maidsafe/safe_network/commit/ae0e88c6d0f60e5df62179a221db42d3c5395548))
+
 ### [0.31.31](https://github.com/maidsafe/safe_network/compare/v0.31.30...v0.31.31) (2021-09-27)
 
 
