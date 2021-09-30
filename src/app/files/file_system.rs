@@ -29,14 +29,14 @@ pub(crate) async fn upload_file_to_net(
 
     let mime_type = mime_guess::from_path(&path);
     match safe
-        .files_store_public_blob(data.to_owned(), mime_type.first_raw(), dry_run)
+        .store_public_data(data.to_owned(), mime_type.first_raw(), dry_run)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(err) => {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
-                safe.files_store_public_blob(data, None, dry_run).await
+                safe.store_public_data(data, None, dry_run).await
             } else {
                 Err(err)
             }

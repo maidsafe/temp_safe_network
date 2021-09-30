@@ -18,6 +18,7 @@ pub use super::{ContentType, DataType, Scope, Url, VersionHash, XorUrlBase};
 use crate::{Error, Result};
 use bytes::Bytes;
 use log::{debug, info};
+use safe_network::client::{BlobAddress, SpotAddress};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, path::Path};
 
@@ -422,8 +423,8 @@ impl Safe {
                         };
                         Ok((safe_data, None))
                     }
-                    DataType::Blob => {
-                        self.retrieve_blob(&the_xor, retrieve_data, None, &metadata, range)
+                    DataType::Blob | DataType::Spot => {
+                        self.retrieve_data(&the_xor, retrieve_data, None, &metadata, range)
                             .await
                     }
                     DataType::Register => {
@@ -457,8 +458,8 @@ impl Safe {
                 }
 
                 match the_xor.data_type() {
-                    DataType::Blob => {
-                        self.retrieve_blob(
+                    DataType::Blob | DataType::Spot => {
+                        self.retrieve_data(
                             &the_xor,
                             retrieve_data,
                             Some(media_type_str),
@@ -479,7 +480,7 @@ impl Safe {
         }
     }
 
-    async fn retrieve_blob(
+    async fn retrieve_data(
         &self,
         the_xor: &Url,
         retrieve_data: bool,
@@ -495,9 +496,25 @@ impl Safe {
         };
 
         let data = if retrieve_data {
-            self.safe_client
-                .get_public_blob(the_xor.xorname(), range)
-                .await?
+            match the_xor.data_type() {
+                DataType::Blob => {
+                    self.safe_client
+                        .get_blob(BlobAddress::Public(the_xor.xorname()), range)
+                        .await?
+                }
+                DataType::Spot => {
+                    self.safe_client
+                        .get_spot(SpotAddress::Public(the_xor.xorname()))
+                        .await?
+                }
+                other => {
+                    return Err(Error::ContentError(format!(
+                        "Error retrieving content: at this point only Blob or Spot types \
+                                can be retrieved. The {} type is not supported.",
+                        other
+                    )));
+                }
+            }
         } else {
             Bytes::new()
         };
@@ -688,7 +705,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
         let xorurl = safe
-            .files_store_public_blob(data.clone(), Some("text/plain"), false)
+            .store_public_data(data.clone(), Some("text/plain"), false)
             .await?;
 
         let safe_url = Url::from_url(&xorurl)?;
@@ -727,7 +744,7 @@ mod tests {
         let saved_data = Bytes::from("Something super immutable");
         let size = saved_data.len();
         let xorurl = safe
-            .files_store_public_blob(saved_data.clone(), Some("text/plain"), false)
+            .store_public_data(saved_data.clone(), Some("text/plain"), false)
             .await?;
 
         // Fetch first half and match
@@ -862,9 +879,7 @@ mod tests {
     async fn test_fetch_public_blob_with_path() -> Result<()> {
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe
-            .files_store_public_blob(data.clone(), None, false)
-            .await?;
+        let xorurl = safe.store_public_data(data.clone(), None, false).await?;
 
         let mut safe_url = Url::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
@@ -882,7 +897,7 @@ mod tests {
 
         // test the same but a file with some media type
         let xorurl = safe
-            .files_store_public_blob(data.clone(), Some("text/plain"), false)
+            .store_public_data(data.clone(), Some("text/plain"), false)
             .await?;
 
         let mut safe_url = Url::from_url(&xorurl)?;

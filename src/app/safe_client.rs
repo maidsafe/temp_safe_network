@@ -95,20 +95,10 @@ impl SafeAppClient {
         Ok(client.keypair())
     }
 
-    pub async fn store_public_spot(&self, data: Bytes, dry_run: bool) -> Result<XorName> {
-        let address = if dry_run {
-            SpotAddress::Public(XorName::default())
-        } else {
-            let client = self.get_safe_client()?;
-            client
-                .write_spot_to_network(Spot::new(data.clone())?, Scope::Public)
-                .await?
-        };
-        Ok(*address.name())
-    }
-
-    // // === Blob operations ===
-    pub async fn store_public_blob(&self, data: Bytes, dry_run: bool) -> Result<XorName> {
+    //
+    // Blob operations
+    //
+    pub async fn store_data(&self, data: Bytes, dry_run: bool) -> Result<XorName> {
         let xorname = if dry_run {
             // I don't see the equivalent API for doing a dry run, so just returning the default
             // address for now.
@@ -145,32 +135,44 @@ impl SafeAppClient {
         Ok(xorname)
     }
 
-    pub async fn get_public_blob(&self, xorname: XorName, range: Range) -> Result<Bytes> {
-        debug!("Fetching immutable data: {:?}", &xorname);
-
+    pub async fn get_blob(&self, address: BlobAddress, range: Range) -> Result<Bytes> {
+        debug!("Attempting to fetch Blob data from {:?}", address.name());
         let client = self.get_safe_client()?;
-        let blob_address = BlobAddress::Public(xorname);
         let data = if let Some((start, end)) = range {
             let len = end
                 .map(|end_index| end_index - start.unwrap_or(0))
                 .unwrap_or(0);
             client
                 .read_blob_from(
-                    blob_address,
+                    address,
                     start.map(|val| val as usize).unwrap_or(0),
                     len as usize,
                 )
                 .await
         } else {
-            client.read_blob(blob_address).await
+            client.read_blob(address).await
         }
-        .map_err(|e| Error::NetDataError(format!("Failed to GET Public Blob: {:?}", e)))?;
-
+        .map_err(|e| Error::NetDataError(format!("Failed to GET Blob: {:?}", e)))?;
         debug!(
-            "Public Blob data successfully retrieved from: {:?}",
-            &xorname
+            "{} bytes of Blob data successfully retrieved from: {:?}",
+            data.len(),
+            address.name()
         );
+        Ok(data)
+    }
 
+    pub async fn get_spot(&self, address: SpotAddress) -> Result<Bytes> {
+        debug!("Attempting to fetch Spot data from {:?}", address.name());
+        let client = self.get_safe_client()?;
+        let data = client
+            .read_spot(address)
+            .await
+            .map_err(|e| Error::NetDataError(format!("Failed to GET Spot: {:?}", e)))?;
+        debug!(
+            "{} bytes of Spot data successfully retrieved from: {:?}",
+            data.len(),
+            address.name()
+        );
         Ok(data)
     }
 

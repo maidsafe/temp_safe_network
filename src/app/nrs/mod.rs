@@ -293,7 +293,7 @@ impl Safe {
         let nrs_map_xorurl = Url::from_url(&url)?;
 
         // Using the NrsMap XOR-URL we can now fetch the NrsMap and deserialise it
-        let serialised_nrs_map = self.fetch_public_blob(&nrs_map_xorurl, None).await?;
+        let serialised_nrs_map = self.fetch_public_data(&nrs_map_xorurl, None).await?;
 
         debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
         let nrs_map = serde_json::from_str(&String::from_utf8_lossy(serialised_nrs_map.chunk()))
@@ -320,7 +320,7 @@ impl Safe {
         })?;
 
         let nrs_map_xorurl = self
-            .files_store_public_blob(Bytes::from(serialised_nrs_map), None, false)
+            .store_public_data(Bytes::from(serialised_nrs_map), None, false)
             .await?;
 
         Ok(nrs_map_xorurl)

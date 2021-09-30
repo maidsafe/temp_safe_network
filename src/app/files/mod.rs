@@ -21,6 +21,7 @@ use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
+use safe_network::client::client_api::{BlobAddress, SpotAddress};
 use std::collections::{BTreeMap, HashSet};
 use std::iter::FromIterator;
 use std::{fs, path::Path};
@@ -186,7 +187,7 @@ impl Safe {
         debug!("Files map retrieved.... v{:?}", &version);
         // TODO: use RDF format and deserialise it
         // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
-        let serialised_files_map = self.fetch_public_blob(&files_map_xorurl, None).await?;
+        let serialised_files_map = self.fetch_public_data(&files_map_xorurl, None).await?;
         let files_map = serde_json::from_slice(serialised_files_map.chunk()).map_err(|err| {
             Error::ContentError(format!(
                 "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
@@ -395,7 +396,7 @@ impl Safe {
             validate_files_add_params(self, "", url, update_nrs).await?;
 
         let dest_path = safe_url.path();
-        let new_file_xorurl = self.files_store_public_blob(data, None, false).await?;
+        let new_file_xorurl = self.store_public_data(data, None, false).await?;
 
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) =
@@ -536,51 +537,11 @@ impl Safe {
         Ok(new_version)
     }
 
-    /// # Put a Public Spot
-    /// Put data spots onto the network.
+    /// # Store a public file
     ///
-    /// Spots are small pieces of data that are less than 3072 bytes.
-    ///
-    /// ## Example
-    /// ```no_run
-    /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
-    /// # let rt = tokio::runtime::Runtime::new().unwrap();
-    /// # rt.block_on(async {
-    /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_store_public_spot(data, Some("text/plain"), false).await.unwrap();
-    ///     let received_data = safe.files_get_public_spot(&xorurl, None).await.unwrap();
-    ///     assert_eq!(received_data, data);
-    /// # });
-    /// ```
-    pub async fn files_store_public_spot(
-        &self,
-        data: Bytes,
-        media_type: Option<&str>,
-        dry_run: bool,
-    ) -> Result<XorUrl> {
-        let content_type = media_type.map_or_else(
-            || Ok(ContentType::Raw),
-            |media_type_str| {
-                if Url::is_media_type_supported(media_type_str) {
-                    Ok(ContentType::MediaType(media_type_str.to_string()))
-                } else {
-                    Err(Error::InvalidMediaType(format!(
-                        "Media-type '{}' not supported. You can pass 'None' as the 'media_type' for this content to be treated as raw",
-                        media_type_str
-                    )))
-                }
-            },
-        )?;
-
-        let xorname = self.safe_client.store_public_spot(data, dry_run).await?;
-        let xorurl = Url::encode_blob(xorname, Scope::Public, content_type, self.xorurl_base)?;
-        Ok(xorurl)
-    }
-
-    /// # Put a Public Blob
-    /// Put data blobs onto the network.
+    /// Put data blobs onto the network. The data will either be saved as a blob or a spot,
+    /// depending on the size of the data. If it's less than 3072 bytes, it'll be stored as a spot,
+    /// otherwise, it'll be stored as a blob.
     ///
     /// ## Example
     /// ```no_run
@@ -590,12 +551,12 @@ impl Safe {
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_store_public_blob(data, Some("text/plain"), false).await.unwrap();
+    ///     let xorurl = safe.store_public_data(data, Some("text/plain"), false).await.unwrap();
     ///     let received_data = safe.files_get_public_blob(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_store_public_blob(
+    pub async fn store_public_data(
         &self,
         data: Bytes,
         media_type: Option<&str>,
@@ -616,11 +577,21 @@ impl Safe {
         )?;
 
         // TODO: do we want ownership from other PKs yet?
-        let xorname = self.safe_client.store_public_blob(data, dry_run).await?;
-
-        let xorurl = Url::encode_blob(xorname, Scope::Public, content_type, self.xorurl_base)?;
-
-        Ok(xorurl)
+        let xorname = self.safe_client.store_data(data.clone(), dry_run).await?;
+        if data.len() < SELF_ENCRYPTION_MIN_SIZE {
+            debug!(
+                "Data is {} bytes so the XorUrl will be encoded with a Spot data type",
+                data.len()
+            );
+            Url::encode_spot(SpotAddress::Public(xorname), content_type, self.xorurl_base)
+        } else {
+            debug!(
+                "Data is {} bytes so the XorUrl will be encoded with a Blob data type",
+                data.len()
+            );
+            Url::encode_blob(BlobAddress::Public(xorname), content_type, self.xorurl_base)
+        }
+        .map_err(|e| Error::ContentError(format!("Could not encode content to an XorUrl: {}", e)))
     }
 
     /// # Get a Public Blob
@@ -639,17 +610,30 @@ impl Safe {
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_get_public_blob(&mut self, url: &str, range: Range) -> Result<Bytes> {
+    pub async fn files_get_public_data(&mut self, url: &str, range: Range) -> Result<Bytes> {
         // TODO: do we want ownership from other PKs yet?
         let (safe_url, _) = self.parse_and_resolve_url(url).await?;
-        self.fetch_public_blob(&safe_url, range).await
+        self.fetch_public_data(&safe_url, range).await
     }
 
     /// Fetch an Blob from a Url without performing any type of URL resolution
-    pub(crate) async fn fetch_public_blob(&self, safe_url: &Url, range: Range) -> Result<Bytes> {
-        self.safe_client
-            .get_public_blob(safe_url.xorname(), range)
-            .await
+    pub(crate) async fn fetch_public_data(&self, safe_url: &Url, range: Range) -> Result<Bytes> {
+        let data = match safe_url.data_type() {
+            DataType::Blob => {
+                self.safe_client
+                    .get_blob(BlobAddress::Public(safe_url.xorname()), range)
+                    .await?
+            }
+            DataType::Spot => {
+                self.safe_client
+                    .get_spot(SpotAddress::Public(safe_url.xorname()))
+                    .await?
+            }
+            other => {
+                return Err(Error::ContentError(format!("{}", other)));
+            }
+        };
+        Ok(data)
     }
 
     // Private helper to serialise a FilesMap and store it in a Public Blob
@@ -663,24 +647,9 @@ impl Safe {
                 err
             ))
         })?;
-        let files_map_xorurl;
-        if serialised_files_map.len() < SELF_ENCRYPTION_MIN_SIZE {
-            debug!(
-                "Serialized files map is {} bytes so it will be stored as a spot",
-                serialised_files_map.len()
-            );
-            files_map_xorurl = self
-                .files_store_public_spot(Bytes::from(serialised_files_map), None, false)
-                .await?;
-        } else {
-            debug!(
-                "Serialized files map is {} bytes so it will be stored as a blob",
-                serialised_files_map.len()
-            );
-            files_map_xorurl = self
-                .files_store_public_blob(Bytes::from(serialised_files_map), None, false)
-                .await?;
-        }
+        let files_map_xorurl = self
+            .store_public_data(Bytes::from(serialised_files_map), None, false)
+            .await?;
         Ok(files_map_xorurl)
     }
 }
@@ -723,7 +692,9 @@ async fn validate_files_add_params(
     // Let's act according to if it's a local file path or a safe:// location
     if source_file.starts_with("safe://") {
         let source_safe_url = Safe::parse_url(source_file)?;
-        if source_safe_url.data_type() != DataType::Blob {
+        if source_safe_url.data_type() != DataType::Blob
+            && source_safe_url.data_type() != DataType::Spot
+        {
             return Err(Error::InvalidInput(format!(
                 "The source URL should target a file ('{}'), but the URL provided targets a '{}'",
                 DataType::Blob,
@@ -1146,14 +1117,14 @@ async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Resu
 
     let mime_type = mime_guess::from_path(&path);
     match safe
-        .files_store_public_blob(data.to_owned(), mime_type.first_raw(), dry_run)
+        .store_public_data(data.to_owned(), mime_type.first_raw(), dry_run)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(err) => {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
-                safe.files_store_public_blob(data, None, dry_run).await
+                safe.store_public_data(data, None, dry_run).await
             } else {
                 Err(err)
             }
@@ -1315,10 +1286,10 @@ mod tests {
             thread_rng().sample_iter(&Alphanumeric).take(20).collect();
 
         let file_xorurl = safe
-            .files_store_public_blob(Bytes::from(random_blob_content.to_owned()), None, false)
+            .store_public_data(Bytes::from(random_blob_content.to_owned()), None, false)
             .await?;
 
-        let retrieved = retry_loop!(safe.files_get_public_blob(&file_xorurl, None));
+        let retrieved = retry_loop!(safe.files_get_public_data(&file_xorurl, None));
         assert_eq!(retrieved, random_blob_content.as_bytes());
 
         Ok(())
@@ -2674,7 +2645,7 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         let data = Bytes::from("0123456789");
-        let file_xorurl = retry_loop!(safe.files_store_public_blob(data.clone(), None, false));
+        let file_xorurl = retry_loop!(safe.store_public_data(data.clone(), None, false));
         let new_filename = "/new_filename_test.md";
 
         let (version1, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
@@ -2713,8 +2684,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
-        let other_file_xorurl =
-            retry_loop!(safe.files_store_public_blob(data.clone(), None, false));
+        let other_file_xorurl = retry_loop!(safe.store_public_data(data.clone(), None, false));
         let (version2, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
             &other_file_xorurl,
             &format!("{}{}", xorurl, new_filename),

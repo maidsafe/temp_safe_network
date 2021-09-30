@@ -11,6 +11,7 @@ use super::register::EntryHash;
 use crate::{Error, Result, Safe};
 use bytes::Bytes;
 use log::debug;
+use safe_network::client::BlobAddress;
 use safe_network::url::{ContentType, Scope, Url, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -100,10 +101,9 @@ impl Safe {
         })?;
 
         let data = Bytes::copy_from_slice(&serialised_entry);
-        let entry_xorname = self.safe_client.store_public_blob(data, false).await?;
+        let entry_xorname = self.safe_client.store_data(data, false).await?;
         let entry_xorurl = Url::encode_blob(
-            entry_xorname,
-            Scope::Public,
+            BlobAddress::Public(entry_xorname),
             ContentType::Raw,
             self.xorurl_base,
         )?;
@@ -138,7 +138,7 @@ impl Safe {
         // We parse each entry in the Register as a 'MultimapKeyValue'
         let mut multimap_key_vals = MultimapKeyValues::new();
         for (hash, entry_ptr) in entries.iter() {
-            let entry = self.fetch_public_blob(entry_ptr, None).await?;
+            let entry = self.fetch_public_data(entry_ptr, None).await?;
             let key_val = Self::decode_multimap_entry(&entry)?;
             multimap_key_vals.insert((*hash, key_val));
         }
@@ -168,7 +168,7 @@ impl Safe {
             Err(other) => Err(other),
         }?;
 
-        let entry = self.fetch_public_blob(&entry_ptr, None).await?;
+        let entry = self.fetch_public_data(&entry_ptr, None).await?;
         let key_val = Self::decode_multimap_entry(&entry)?;
         Ok(key_val)
     }
