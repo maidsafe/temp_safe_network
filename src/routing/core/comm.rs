@@ -324,8 +324,8 @@ impl Comm {
     }
 
     /// Returns cpu load report if being strained.
-    pub(crate) async fn check_strain(&self) -> Option<LoadReport> {
-        self.back_pressure.load_report().await
+    pub(crate) async fn check_strain(&self, caller: SocketAddr) -> Option<LoadReport> {
+        self.back_pressure.load_report(caller).await
     }
 
     pub(crate) fn print_stats(&self) {
