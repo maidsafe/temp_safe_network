@@ -411,8 +411,11 @@ pub(crate) async fn send_message(
     // Send message to all Elders concurrently
     let mut tasks = Vec::default();
 
+    let successes = Arc::new(RwLock::new(0));
+
     // clone elders as we want to update them in this process
     for socket in elders.clone() {
+        let successes_clone = successes.clone();
         let msg_bytes_clone = msg_bytes.clone();
         let endpoint = endpoint.clone();
         let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
@@ -425,6 +428,8 @@ pub(crate) async fn send_message(
                 })
                 .await?;
 
+            *successes_clone.write().await += 1;
+
             trace!("Sent cmd with MsgId {:?} to {:?}", msg_id, &socket);
             Ok(())
         });
@@ -432,15 +437,10 @@ pub(crate) async fn send_message(
     }
 
     // Let's await for all messages to be sent
-    let results = join_all(tasks).await;
+    let _ = join_all(tasks).await;
 
-    let mut failures = 0;
-    results.iter().for_each(|res| {
-        if res.is_err() {
-            error!("Client error contacting node was: {:?}", res);
-            failures += 1;
-        }
-    });
+    // anything not concretely registered as success here is a failure
+    let failures = elders.len() - *successes.read().await;
 
     if failures > 0 {
         error!(
