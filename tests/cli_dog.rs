@@ -17,6 +17,7 @@ use sn_cmd_test_utilities::util::{
 const TEST_FILE: &str = "./testdata/test.md";
 
 #[test]
+#[ignore = "nrs"]
 fn calling_safe_dog_files_container_nrsurl() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
@@ -38,6 +39,7 @@ fn calling_safe_dog_files_container_nrsurl() -> Result<()> {
 }
 
 #[test]
+#[ignore = "nrs"]
 fn calling_safe_dog_files_container_nrsurl_jsoncompact() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--output=jsoncompact"], Some(0))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
@@ -59,6 +61,7 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() -> Result<()> {
 }
 
 #[test]
+#[ignore = "nrs"]
 fn calling_safe_dog_files_container_nrsurl_yaml() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
@@ -79,6 +82,7 @@ fn calling_safe_dog_files_container_nrsurl_yaml() -> Result<()> {
 }
 
 #[test]
+#[ignore = "nrs"]
 fn calling_safe_dog_safekey_nrsurl() -> Result<()> {
     let (safekey_xorurl, _sk) = create_and_get_keys()?;
 
@@ -98,7 +102,7 @@ fn calling_safe_dog_safekey_nrsurl() -> Result<()> {
 }
 
 #[test]
-#[ignore = "fails consistently with 'relative URL without a base'"]
+#[ignore = "nrs"]
 fn calling_safe_dog_nrs_url_with_subnames() -> Result<()> {
     let (safekey_xorurl, _sk) = create_and_get_keys()?;
 

@@ -788,8 +788,8 @@ fn create_dir_all(dir_path: &Path) -> Result<()> {
 /// Get immutable data blobs from the network.
 pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
     match Url::from_url(url)?.data_type() {
-        DataType::Blob => {
-            let pub_blob = safe.files_get_public_blob(url, range).await?;
+        DataType::Blob | DataType::Spot => {
+            let pub_blob = safe.files_get_public_data(url, range).await?;
             Ok(pub_blob.chunk().to_vec())
         }
         _ => Err(eyre!("URL target is not immutable data")),

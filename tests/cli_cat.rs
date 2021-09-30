@@ -25,18 +25,51 @@ const TEST_FILE_CONTENT: &str = "hello tests!";
 const ID_RELATIVE_FILE_ERROR: &str = "Cannot get relative path of Immutable Data";
 const TEST_FILE_HEXDUMP_CONTENT: &str = "Length: 12 (0xc) bytes\n0000:   68 65 6c 6c  6f 20 74 65  73 74 73 21                hello tests!\n";
 
+/// A 'spot' file is one that's less than 3072 bytes in size.
+/// These small files are rejected by self encryption and need another way to be stored.
 #[test]
-fn calling_safe_cat() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
+fn calling_safe_cat_using_spot_file() -> Result<()> {
+    let content = safe_cmd_stdout(["files", "put", "./testdata/test.md", "--json"], Some(0))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &map[TEST_FILE].1])
+    cmd.args(&vec!["cat", &map["./testdata/test.md"].1])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
-    let safeurl = safeurl_from(&map[TEST_FILE].1)?;
+    let safeurl = safeurl_from(&map["./testdata/test.md"].1)?;
+    assert_eq!(
+        safeurl.content_type(),
+        ContentType::MediaType("text/markdown".to_string())
+    );
+    assert_eq!(safeurl.data_type(), DataType::Spot);
+    Ok(())
+}
+
+/// A 'blob' file is one that's larger than 3072 bytes in size.
+/// These use self encryption and are stored in a different way from 'spot' files.
+#[test]
+fn calling_safe_cat_using_blob_file() -> Result<()> {
+    let output = safe_cmd_stdout(
+        [
+            "files",
+            "put",
+            "./testdata/large_markdown_file.md",
+            "--json",
+        ],
+        Some(0),
+    )?;
+
+    let content = std::fs::read_to_string("./testdata/large_markdown_file.md")?;
+    let (_container_xorurl, map) = parse_files_put_or_sync_output(&output);
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
+    cmd.args(&vec!["cat", &map["./testdata/large_markdown_file.md"].1])
+        .assert()
+        .stdout(predicate::str::contains(content))
+        .success();
+
+    let safeurl = safeurl_from(&map["./testdata/large_markdown_file.md"].1)?;
     assert_eq!(
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
@@ -95,7 +128,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), DataType::Blob);
+    assert_eq!(safeurl.data_type(), DataType::Spot);
     Ok(())
 }
 
@@ -150,6 +183,7 @@ fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
 }
 
 #[test]
+#[ignore = "nrs"]
 fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     let tmp_dir = assert_fs::TempDir::new()?;
     let md_file1 = tmp_dir.child("test.md");

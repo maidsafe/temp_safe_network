@@ -435,7 +435,7 @@ mod constructor {
                 }
             }
         }"#;
-        let tmp_dir = assert_fs::TempDir::new()?.into_persistent();
+        let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         cli_config_file.write_str(serialized_config)?;
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");

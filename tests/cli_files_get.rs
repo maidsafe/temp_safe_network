@@ -369,6 +369,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 /// Then it should download `src` to `dest`
 /// And the directory tree of `dest` should match the test data directory in the repository
 #[test]
+#[ignore = "nrs"]
 fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
@@ -439,6 +440,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
 /// And the contents of `dest/sub2.ms` should match the contents of sub2.md in the repository
 /// testdata
 #[test]
+#[ignore = "nrs"]
 fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
@@ -517,6 +519,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 /// And the nrs link pointing to the subfolder should have been downloaded to `dest`
 /// And the contents of `dest/subfolder` should be the same as `testdata/subfolder`
 #[test]
+#[ignore = "nrs"]
 fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;

@@ -8,9 +8,9 @@ exit=0
 export SN_CLI_QUERY_TIMEOUT=15
 export RUST_BACKTRACE=full
 
-target/release/safe keys create --test-coins --for-cli || ((exit++))
-cargo test --release --test cli_cat -- --nocapture || ((exit++))
-cargo test --release --test cli_dog || ((exit++))
+cargo run --release -- keys create --test-coins --for-cli || ((exit++))
+cargo test --release --test cli_cat -- --test-threads=1 || ((exit++))
+cargo test --release --test cli_dog -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_files -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_files_get -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_keys || ((exit++))
