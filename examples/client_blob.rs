@@ -37,12 +37,7 @@ async fn main() -> Result<()> {
     println!("Storing data.. ({} bytes)", blob.bytes().len());
 
     let address = client.write_blob_to_network(blob, Scope::Public).await?;
-    let xorurl = Url::encode_blob(
-        *address.name(),
-        Scope::Public,
-        ContentType::Raw,
-        DEFAULT_XORURL_BASE,
-    )?;
+    let xorurl = Url::encode_blob(address, ContentType::Raw, DEFAULT_XORURL_BASE)?;
     println!("Blob stored at xorurl: {}", xorurl);
 
     let delay = 5;

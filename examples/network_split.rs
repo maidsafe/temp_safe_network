@@ -237,12 +237,7 @@ async fn upload_data() -> Result<(BlobAddress, [u8; 32])> {
     println!("Storing data w/ hash {:?}", output);
 
     let address = client.write_blob_to_network(blob, Scope::Public).await?;
-    let xorurl = Url::encode_blob(
-        *address.name(),
-        address.scope(),
-        ContentType::Raw,
-        DEFAULT_XORURL_BASE,
-    )?;
+    let xorurl = Url::encode_blob(address, ContentType::Raw, DEFAULT_XORURL_BASE)?;
     println!("Blob stored at xorurl: {}", xorurl);
 
     let delay = 2;
