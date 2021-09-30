@@ -49,7 +49,7 @@ impl Core {
         let mut cmds = vec![];
 
         // Apply backpressure if needed.
-        if let Some(load_report) = self.comm.check_strain().await {
+        if let Some(load_report) = self.comm.check_strain(sender).await {
             let msg_src = wire_msg.msg_kind().src();
             cmds.push(Command::PrepareNodeMsgToSend {
                 msg: SystemMsg::BackPressure(load_report),

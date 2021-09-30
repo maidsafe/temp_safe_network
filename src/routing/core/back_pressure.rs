@@ -8,6 +8,7 @@
 
 use crate::messaging::system::{CpuLoad, LoadReport};
 
+use futures::future::join;
 use itertools::Itertools;
 use qp2p::config::RetryConfig;
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
@@ -17,11 +18,14 @@ use tokio::{sync::RwLock, time::Instant};
 const MIN_REPORT_INTERVAL: Duration = Duration::from_secs(10);
 const REPORT_TTL: Duration = Duration::from_secs(300); // 5 minutes
 
+type OutgoingReports = BTreeMap<SocketAddr, (Instant, LoadReport)>;
+type IncomingReports = BTreeMap<SocketAddr, (Instant, RetryConfig)>;
+
 #[derive(Clone)]
 pub(crate) struct BackPressure {
     system: Arc<RwLock<System>>,
-    our_last_report: Arc<RwLock<(Instant, LoadReport)>>,
-    reports: Arc<RwLock<BTreeMap<SocketAddr, (Instant, RetryConfig)>>>,
+    our_reports: Arc<RwLock<OutgoingReports>>,
+    reports: Arc<RwLock<IncomingReports>>,
     last_eviction: Arc<RwLock<Instant>>,
 }
 
@@ -29,12 +33,11 @@ impl BackPressure {
     pub(crate) fn new() -> Self {
         let mut system = System::new_with_specifics(RefreshKind::new());
         system.refresh_cpu();
-        let load = evaluate(system.load_average());
 
         Self {
             system: Arc::new(RwLock::new(system)),
-            our_last_report: Arc::new(RwLock::new((Instant::now(), load))),
-            reports: Arc::new(RwLock::new(BTreeMap::new())),
+            our_reports: Arc::new(RwLock::new(OutgoingReports::new())),
+            reports: Arc::new(RwLock::new(IncomingReports::new())),
             last_eviction: Arc::new(RwLock::new(Instant::now())),
         }
     }
@@ -96,27 +99,19 @@ impl BackPressure {
     }
 
     /// Sent to nodes calling us, if we are strained
-    pub(crate) async fn load_report(&self) -> Option<LoadReport> {
+    pub(crate) async fn load_report(&self, caller: SocketAddr) -> Option<LoadReport> {
         let now = Instant::now();
-        let (then, our_last_report) = { *self.our_last_report.read().await };
-        // do not refresh too often
-        let load = if now - then > MIN_REPORT_INTERVAL {
-            {
-                self.system.write().await.refresh_cpu();
+        let sent = { self.our_reports.read().await.get(&caller).copied() };
+        let load = match sent {
+            Some((then, _)) => {
+                // do not refresh too often
+                if now > then && now - then > MIN_REPORT_INTERVAL {
+                    self.get_load(caller, now).await
+                } else {
+                    return None; // send None if too short time has elapsed
+                }
             }
-            let current_load = { evaluate(self.system.read().await.load_average()) };
-            *self.our_last_report.write().await = (now, current_load);
-
-            // placed in this block, we reduce the frequency of this check
-            let last_eviction = { *self.last_eviction.read().await };
-            // only try evict when there's any likelihood of there being any expired..
-            if now - last_eviction > REPORT_TTL {
-                self.evict_expired(now).await;
-            }
-
-            current_load
-        } else {
-            our_last_report // use previous report if too short time has elapsed
+            None => self.get_load(caller, now).await,
         };
 
         if load.is_bad() {
@@ -126,14 +121,41 @@ impl BackPressure {
         }
     }
 
+    async fn get_load(&self, caller: SocketAddr, now: Instant) -> LoadReport {
+        {
+            self.system.write().await.refresh_cpu();
+        }
+        let current_load = { evaluate(self.system.read().await.load_average()) };
+        let _ = self
+            .our_reports
+            .write()
+            .await
+            .insert(caller, (now, current_load));
+
+        // placed in this block, we reduce the frequency of this check
+        let last_eviction = { *self.last_eviction.read().await };
+        // only try evict when there's any likelihood of there being any expired..
+        if now > last_eviction && now - last_eviction > REPORT_TTL {
+            self.evict_expired(now).await;
+        }
+
+        current_load
+    }
+
     async fn evict_expired(&self, now: Instant) {
+        let _ = join(self.evict_in_expired(now), self.evict_out_expired(now)).await;
+        *self.last_eviction.write().await = now;
+    }
+
+    async fn evict_in_expired(&self, now: Instant) {
         let expired = {
             self.reports
                 .read()
                 .await
                 .iter()
                 .filter_map(|(key, (last_seen, _))| {
-                    if now - *last_seen > REPORT_TTL {
+                    let last_seen = *last_seen;
+                    if now > last_seen && now - last_seen > REPORT_TTL {
                         Some(*key)
                     } else {
                         None
@@ -145,8 +167,28 @@ impl BackPressure {
         for addr in expired {
             self.remove(addr).await
         }
+    }
 
-        *self.last_eviction.write().await = now;
+    async fn evict_out_expired(&self, now: Instant) {
+        let expired = {
+            self.our_reports
+                .read()
+                .await
+                .iter()
+                .filter_map(|(key, (last_seen, _))| {
+                    let last_seen = *last_seen;
+                    if now > last_seen && now - last_seen > REPORT_TTL {
+                        Some(*key)
+                    } else {
+                        None
+                    }
+                })
+                .collect_vec()
+        };
+
+        for addr in expired {
+            let _ = self.our_reports.write().await.remove(&addr);
+        }
     }
 }
 
