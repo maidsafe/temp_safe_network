@@ -390,6 +390,49 @@ impl Session {
         }
     }
 
+    pub(crate) async fn fire_and_forget_payload(
+        &self,
+        dst_address: XorName,
+        auth: ServiceAuth,
+        payload: Bytes,
+    ) -> Result<(), Error> {
+        let endpoint = self.endpoint.clone();
+        // Get DataSection elders details.
+        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
+        {
+            (
+                sap.value
+                    .elders
+                    .values()
+                    .cloned()
+                    .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
+                    .collect::<Vec<SocketAddr>>(),
+                sap.value.public_key_set.public_key(),
+            )
+        } else {
+            // Send message to our bootstrap peer with network's genesis PK.
+            (vec![self.bootstrap_peer], self.genesis_key)
+        };
+
+        let msg_id = MessageId::new();
+
+        debug!(
+            "Firing payload w/id {:?}, from {}, to {} Elders whose result will be dropped",
+            msg_id,
+            endpoint.public_addr(),
+            elders.len()
+        );
+
+        let dst_location = DstLocation::Section {
+            name: dst_address,
+            section_pk,
+        };
+        let msg_kind = MsgKind::ServiceMsg(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+
+        send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await
+    }
+
     #[allow(unused)]
     pub(crate) async fn disconnect_from_peers(&self, peers: Vec<SocketAddr>) -> Result<(), Error> {
         for elder in peers {
