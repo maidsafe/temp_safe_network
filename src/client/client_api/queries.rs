@@ -30,7 +30,8 @@ impl Client {
         // we divide the total query timeout by this to get a more reasonable starting timeout
         // this also represents the max retries possible _if no backoff were present_, while still staying within the max_timeout
         // in practice it's _probably_ one less than this value
-        let max_retry_count = 11.0;
+        // standard query timeout is 90s. So this would initially retry after 3s
+        let max_retry_count = 30.0;
 
         let starting_query_timeout = self.query_timeout.div_f32(max_retry_count);
         trace!(
