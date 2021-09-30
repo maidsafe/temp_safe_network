@@ -7,6 +7,7 @@ env:
   # RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
+  RUST_LOG: "safe_network=trace"
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
 
@@ -153,7 +154,6 @@ jobs:
       - run: ./target/release/testnet
         env:
           NODE_COUNT: 43
-          RUST_LOG: safe_network=trace
 
       - name: Extra wait on CI for split organisation
         run: sleep 60
@@ -181,7 +181,6 @@ jobs:
         run: ./target/release/testnet
         env:
           NODE_COUNT: 43
-          RUST_LOG: safe_network=trace
 
       - name: Was there a section split?
         run: ./scripts/has_split.sh
@@ -198,7 +197,7 @@ jobs:
         run: timeout 5m cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 && sleep 5
         continue-on-error: true
         env:
-          NETWORK_ASSERT_DELAY: 60
+          NETWORK_ASSERT_DELAY: 80
       
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests...
@@ -210,17 +209,14 @@ jobs:
       # register api
       - name: Client reg tests against local network
         shell: bash
-        run: cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
         timeout-minutes: 15
-        env:
-          RUST_LOG: safe_network=trace,qp2p=trace
+
       # blob api
       - name: Client blob tests against local network
         shell: bash
         run: cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
         timeout-minutes: 15
-        env:
-            RUST_LOG: safe_network=trace,qp2p=trace
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 5
@@ -259,10 +255,13 @@ jobs:
       # - name: Was there a section split?
       #   run: ./scripts/has_split.sh
 
+      
+
       - name: Are nodes still running...?
         if: failure() && matrix.os != 'windows-latest'
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
 
       - name: Upload Node Logs
           # Upload artifacts.
