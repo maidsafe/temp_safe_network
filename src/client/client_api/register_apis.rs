@@ -234,7 +234,7 @@ mod tests {
     use crate::{
         client::{
             utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff_delayed},
-            Error,
+            BlobAddress, Error,
         },
         url::Url,
     };
@@ -606,8 +606,7 @@ mod tests {
         use crate::url::*;
         let xor_name = XorName::random();
         let url = match Url::encode_blob(
-            xor_name,
-            Scope::Public,
+            BlobAddress::Public(xor_name),
             ContentType::Raw,
             XorUrlBase::Base32z,
         ) {
