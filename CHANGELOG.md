@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.38](https://github.com/maidsafe/safe_network/compare/v0.31.37...v0.31.38) (2021-10-01)
+
+
+### Features
+
+* wrap SplitBarrier in arc/rwlock for better concurrency ([d80bedb](https://github.com/maidsafe/safe_network/commit/d80bedb748721b4fd444c59061b0e966ec40ff0b))
+
 ### [0.31.37](https://github.com/maidsafe/safe_network/compare/v0.31.36...v0.31.37) (2021-10-01)
 
 
