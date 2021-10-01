@@ -7,12 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::system::{KeyedSig, SigShare};
+use dashmap::DashMap;
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
+    sync::Arc,
     time::{Duration, Instant},
 };
 use thiserror::Error;
 use tiny_keccak::{Hasher, Sha3};
+use tokio::sync::RwLock;
 
 /// Default duration since their last modification after which all unaggregated entries expire.
 const DEFAULT_EXPIRATION: Duration = Duration::from_secs(120);
@@ -31,9 +34,9 @@ type Digest256 = [u8; 32];
 /// separately. This avoids mixing signature shares created from different curves which would
 /// otherwise lead to invalid signature to be produced even though all the shares are valid.
 ///
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SignatureAggregator {
-    map: HashMap<Digest256, State>,
+    map: Arc<DashMap<Digest256, State>>,
     expiration: Duration,
 }
 
@@ -59,8 +62,8 @@ impl SignatureAggregator {
     /// shares still need to be added for that particular payload. This error could be safely
     /// ignored (it might still be useful perhaps for debugging). The other error variants, however,
     /// indicate failures and should be treated a such. See [Error] for more info.
-    pub(crate) fn add(&mut self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
-        self.remove_expired();
+    pub(crate) async fn add(&self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
+        self.remove_expired().await;
 
         if !sig_share.verify(payload) {
             return Err(Error::InvalidShare);
@@ -76,20 +79,26 @@ impl SignatureAggregator {
         hasher.update(&public_key.to_bytes());
         hasher.finalize(&mut hash);
 
-        self.map
-            .entry(hash)
-            .or_insert_with(State::new)
-            .add(sig_share)
-            .map(|signature| KeyedSig {
-                public_key,
-                signature,
-            })
+        let mut entry = self.map.entry(hash).or_insert_with(State::new);
+
+        entry.add(sig_share).await.map(|signature| KeyedSig {
+            public_key,
+            signature,
+        })
     }
 
-    fn remove_expired(&mut self) {
+    async fn remove_expired(&self) {
         let expiration = self.expiration;
-        self.map
-            .retain(|_, state| state.modified.elapsed() < expiration)
+        let mut to_remove = vec![];
+
+        for ref_multi in self.map.iter() {
+            let (digest, state) = ref_multi.pair();
+            if state.modified.read().await.elapsed() >= expiration {
+                to_remove.push(*digest);
+            }
+        }
+
+        self.map.retain(|digest, _| !to_remove.contains(digest))
     }
 }
 
@@ -116,36 +125,44 @@ pub enum Error {
     Combine(#[from] bls::error::Error),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct State {
-    shares: HashMap<usize, bls::SignatureShare>,
-    modified: Instant,
+    shares: Arc<DashMap<usize, bls::SignatureShare>>,
+    modified: Arc<RwLock<Instant>>,
 }
 
 impl State {
     fn new() -> Self {
         Self {
             shares: Default::default(),
-            modified: Instant::now(),
+            modified: Arc::new(RwLock::new(Instant::now())),
         }
     }
 
-    fn add(&mut self, sig_share: SigShare) -> Result<bls::Signature, Error> {
+    async fn add(&mut self, sig_share: SigShare) -> Result<bls::Signature, Error> {
         if self
             .shares
             .insert(sig_share.index, sig_share.signature_share)
             .is_none()
         {
-            self.modified = Instant::now();
+            *self.modified.write().await = Instant::now();
         } else {
             // Duplicate share
             return Err(Error::NotEnoughShares);
         }
 
         if self.shares.len() > sig_share.public_key_set.threshold() {
+            // lets massage the dashmap data into something combine sigs can work with
+            let mut shares_map = BTreeMap::default();
+            for ref_multi in self.shares.iter() {
+                let (index, share) = ref_multi.pair();
+
+                let _old_share = shares_map.insert(*index, share.clone());
+            }
+
             let signature = sig_share
                 .public_key_set
-                .combine_signatures(self.shares.iter().map(|(&index, share)| (index, share)))
+                .combine_signatures(&shares_map)
                 .map_err(Error::Combine)?;
             self.shares.clear();
 
@@ -162,20 +179,19 @@ mod tests {
     use rand::thread_rng;
     use std::thread::sleep;
 
-    #[test]
-    fn smoke() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn smoke() -> Result<(), Error> {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let mut aggregator = SignatureAggregator::default();
+        let aggregator = SignatureAggregator::default();
         let payload = b"hello";
 
         // Not enough shares yet
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            println!("{:?}", sig_share);
-            let result = aggregator.add(payload, sig_share);
+            let result = aggregator.add(payload, sig_share).await;
 
             match result {
                 Err(Error::NotEnoughShares) => (),
@@ -185,38 +201,38 @@ mod tests {
 
         // Enough shares now
         let sig_share = create_sig_share(&sk_set, threshold, payload);
-        let sig = aggregator.add(payload, sig_share).unwrap();
+        let sig = aggregator.add(payload, sig_share).await?;
 
         assert!(sig.verify(payload));
 
         // Extra shares start another round
         let sig_share = create_sig_share(&sk_set, threshold + 1, payload);
-        let result = aggregator.add(payload, sig_share);
+        let result = aggregator.add(payload, sig_share).await;
 
         match result {
-            Err(Error::NotEnoughShares) => (),
+            Err(Error::NotEnoughShares) => Ok(()),
             _ => panic!("unexpected result: {:?}", result),
         }
     }
 
-    #[test]
-    fn invalid_share() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn invalid_share() -> Result<(), Error> {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let mut aggregator = SignatureAggregator::new();
+        let aggregator = SignatureAggregator::new();
         let payload = b"good";
 
         // First insert less than threshold + 1 valid shares.
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            let _ = aggregator.add(payload, sig_share);
+            let _ = aggregator.add(payload, sig_share).await;
         }
 
         // Then try to insert invalid share.
         let invalid_sig_share = create_sig_share(&sk_set, threshold, b"bad");
-        let result = aggregator.add(payload, invalid_sig_share);
+        let result = aggregator.add(payload, invalid_sig_share).await;
 
         match result {
             Err(Error::InvalidShare) => (),
@@ -226,29 +242,31 @@ mod tests {
         // The invalid share doesn't spoil the aggregation - we can still aggregate once enough
         // valid shares are inserted.
         let sig_share = create_sig_share(&sk_set, threshold + 1, payload);
-        let sig = aggregator.add(payload, sig_share).unwrap();
-        assert!(sig.verify(payload))
+        let sig = aggregator.add(payload, sig_share).await?;
+        assert!(sig.verify(payload));
+
+        Ok(())
     }
 
-    #[test]
-    fn expiration() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn expiration() {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let mut aggregator = SignatureAggregator::with_expiration(Duration::from_millis(500));
+        let aggregator = SignatureAggregator::with_expiration(Duration::from_millis(500));
         let payload = b"hello";
 
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            let _ = aggregator.add(payload, sig_share);
+            let _ = aggregator.add(payload, sig_share).await;
         }
 
         sleep(Duration::from_secs(1));
 
         // Adding another share does nothing now, because the previous shares expired.
         let sig_share = create_sig_share(&sk_set, threshold, payload);
-        let result = aggregator.add(payload, sig_share);
+        let result = aggregator.add(payload, sig_share).await;
 
         match result {
             Err(Error::NotEnoughShares) => (),
@@ -256,13 +274,13 @@ mod tests {
         }
     }
 
-    #[test]
-    fn repeated_voting() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn repeated_voting() {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let mut aggregator = SignatureAggregator::new();
+        let aggregator = SignatureAggregator::new();
 
         let payload = b"hello";
 
@@ -270,11 +288,11 @@ mod tests {
 
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            assert!(aggregator.add(payload, sig_share).is_err());
+            assert!(aggregator.add(payload, sig_share).await.is_err());
         }
 
         let sig_share = create_sig_share(&sk_set, threshold, payload);
-        assert!(aggregator.add(payload, sig_share).is_ok());
+        assert!(aggregator.add(payload, sig_share).await.is_ok());
 
         // round 2
 
@@ -282,11 +300,11 @@ mod tests {
 
         for index in offset..(threshold + offset) {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            assert!(aggregator.add(payload, sig_share).is_err());
+            assert!(aggregator.add(payload, sig_share).await.is_err());
         }
 
         let sig_share = create_sig_share(&sk_set, threshold + offset + 1, payload);
-        assert!(aggregator.add(payload, sig_share).is_ok());
+        assert!(aggregator.add(payload, sig_share).await.is_ok());
     }
 
     fn create_sig_share(sk_set: &bls::SecretKeySet, index: usize, payload: &[u8]) -> SigShare {
