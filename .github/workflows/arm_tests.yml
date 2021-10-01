@@ -1,4 +1,4 @@
-name: Run All Tests
+name: Run All Tests on Arm
 
 on:
   schedule:
