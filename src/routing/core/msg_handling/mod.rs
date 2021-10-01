@@ -46,6 +46,17 @@ impl Core {
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
+        let mut cmds = vec![];
+
+        // Apply backpressure if needed.
+        if let Some(load_report) = self.comm.check_strain(sender).await {
+            let msg_src = wire_msg.msg_kind().src();
+            cmds.push(Command::PrepareNodeMsgToSend {
+                msg: SystemMsg::BackPressure(load_report),
+                dst: msg_src.to_dst(),
+            })
+        }
+
         // Deserialize the payload of the incoming message
         let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
@@ -57,7 +68,7 @@ impl Core {
                     "Failed to deserialize message payload ({:?}): {:?}",
                     msg_id, error
                 );
-                return Ok(vec![]);
+                return Ok(cmds);
             }
         };
 
@@ -79,14 +90,14 @@ impl Core {
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
                     debug!("Untrusted message from {:?}: {:?} ", sender, msg);
 
-                    return if !matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
+                    if !matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
                         let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
-                        Ok(vec![cmd])
+                        cmds.push(cmd);
                     } else {
                         // otherwise we might loop
                         warn!("Dropping untrusted AE Update");
-                        Ok(vec![])
-                    };
+                    }
+                    return Ok(cmds);
                 }
                 trace!(
                     "Trusted msg authority in message from {:?}: {:?}",
@@ -128,7 +139,8 @@ impl Core {
                                     .await?
                                 {
                                     // short circuit and send those AE responses
-                                    return Ok(vec![ae_command]);
+                                    cmds.push(ae_command);
+                                    return Ok(cmds);
                                 }
                             }
                         },
@@ -137,7 +149,7 @@ impl Core {
                     info!("Entropy check passed. Handling verified msg {}", msg_id);
                 }
 
-                Ok(vec![Command::HandleSystemMessage {
+                cmds.push(Command::HandleSystemMessage {
                     sender,
                     msg_id,
                     msg_authority,
@@ -145,7 +157,9 @@ impl Core {
                     msg,
                     payload,
                     known_keys,
-                }])
+                });
+
+                Ok(cmds)
             }
             MessageType::Service {
                 msg_id,
@@ -170,7 +184,7 @@ impl Core {
                             "Service msg has been dropped since client connection id for {} was not found: {:?}",
                             sender, msg
                         );
-                        return Ok(vec![]);
+                        return Ok(cmds);
                     }
                 };
 
@@ -178,7 +192,8 @@ impl Core {
 
                 if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
-                    return Ok(vec![self.ae_redirect(sender, &src_location, &wire_msg)?]);
+                    cmds.push(self.ae_redirect(sender, &src_location, &wire_msg)?);
+                    return Ok(cmds);
                 }
 
                 // First we perform AE checks
@@ -186,12 +201,12 @@ impl Core {
                     Some(section_pk) => section_pk,
                     None => {
                         warn!("Dropping service message as there is no valid dst section_pk.");
-                        return Ok(vec![]);
+                        return Ok(cmds);
                     }
                 };
 
                 let msg_bytes = original_bytes.unwrap_or(wire_msg.serialize()?);
-                if let Some(command) = self
+                if let Some(cmd) = self
                     .check_for_entropy(
                         // a cheap clone w/ Bytes
                         msg_bytes,
@@ -203,11 +218,16 @@ impl Core {
                     .await?
                 {
                     // short circuit and send those AE responses
-                    return Ok(vec![command]);
+                    cmds.push(cmd);
+                    return Ok(cmds);
                 }
 
-                self.handle_service_message(msg_id, auth, msg, dst_location, user)
-                    .await
+                cmds.extend(
+                    self.handle_service_message(msg_id, auth, msg, dst_location, user)
+                        .await?,
+                );
+
+                Ok(cmds)
             }
         }
     }
@@ -330,6 +350,12 @@ impl Core {
             }
             SystemMsg::AntiEntropyProbe(_dst) => {
                 info!("Received Probe message from {:?}: {:?}", sender, msg_id);
+                Ok(vec![])
+            }
+            SystemMsg::BackPressure(load_report) => {
+                trace!("Handling msg: BackPressure from {}", sender);
+                // #TODO: Factor in med/long term backpressure into general node liveness calculations
+                self.comm.regulate(sender, load_report).await;
                 Ok(vec![])
             }
             SystemMsg::Relocate(ref details) => {

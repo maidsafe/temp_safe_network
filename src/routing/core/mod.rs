@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod api;
+mod back_pressure;
 mod bootstrap;
 mod capacity;
 mod chunk_records;
@@ -21,6 +22,7 @@ mod msg_handling;
 mod register_storage;
 mod split_barrier;
 
+pub(crate) use back_pressure::BackPressure;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL};
 pub(crate) use chunk_store::ChunkStore;

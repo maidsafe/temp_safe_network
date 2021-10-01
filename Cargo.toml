@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "safe_network"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.31.36"
+version = "0.31.37"
 
 #[profile.release]
 #incremental = true
@@ -62,6 +62,7 @@ uluru="~3.0.0"
 itertools = "0.10.0"
 lazy_static = "1"
 multibase = "~0.8.0"
+num_cpus = "1.13.0"
 qp2p = "0.22.0"
 rand = "~0.7.3"
 rayon = "1.5.1"

@@ -34,7 +34,7 @@ pub use signed::{KeyedSig, SigShare};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
 pub enum SystemMsg {
@@ -80,6 +80,10 @@ pub enum SystemMsg {
     },
     /// Probes the network by sending a message to a random dst triggering an AE flow.
     AntiEntropyProbe(XorName),
+    /// Sent when a msg-consuming node is surpassing certain thresholds for
+    /// cpu load. It tells msg-producing nodes to back off a bit, proportional
+    /// to the node's cpu load, as given by the included `LoadReport`.
+    BackPressure(LoadReport),
     /// Send from a section to the node to be immediately relocated.
     Relocate(RelocateDetails),
     /// Send:
@@ -159,4 +163,30 @@ pub enum SystemMsg {
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
+}
+
+/// Load report to be sent over the wire.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LoadReport {
+    /// CPU load short term (~1 min).
+    pub short_term: CpuLoad,
+    /// CPU load mid term (~5 min).
+    pub mid_term: CpuLoad,
+    /// CPU load long term (~15 min).
+    pub long_term: CpuLoad,
+}
+
+/// An evaluation of measured cpu load during a period.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CpuLoad {
+    /// This is considered to be well below sustainable levels.
+    pub low: bool,
+    /// This is considered to be OK.
+    pub moderate: bool,
+    /// This is not a sustainable level.
+    pub high: bool,
+    /// This is not a sustainable level.
+    pub very_high: bool,
+    /// This is not a sustainable level.
+    pub critical: bool,
 }

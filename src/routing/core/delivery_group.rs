@@ -145,7 +145,7 @@ fn candidates(
     if dg_size > 0 && candidates.len() >= dg_size {
         Ok((candidates, dg_size))
     } else {
-        Err(Error::CannotRoute)
+        Err(Error::CannotRoute(dg_size, candidates.len()))
     }
 }
 

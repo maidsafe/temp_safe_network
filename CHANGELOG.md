@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.37](https://github.com/maidsafe/safe_network/compare/v0.31.36...v0.31.37) (2021-10-01)
+
+
+### Features
+
+* **backpressure:** add cpu load based adaption ([097eb75](https://github.com/maidsafe/safe_network/commit/097eb757b5e0ae8779dc7ab95627efa84b9789bd))
+* **backpressure:** expire load reports ([d0c9d22](https://github.com/maidsafe/safe_network/commit/d0c9d22bf0eee99045d041fcb98de8eafca4d7be))
+* **backpressure:** send and receive backpressure ([1f9be80](https://github.com/maidsafe/safe_network/commit/1f9be80b2653f0811befc13e8e51f542e3ed6d91))
+* **error:** add info to cannot route error ([da628a1](https://github.com/maidsafe/safe_network/commit/da628a1d81398d7486871a857e9475b472bfc8f6))
+
+
+### Bug Fixes
+
+* **backpressure:** only send once per interval ([b57006b](https://github.com/maidsafe/safe_network/commit/b57006b85f03d2973cbf89dc99be9b67489019d1))
+* **test:** take new cmd into account ([faacb9d](https://github.com/maidsafe/safe_network/commit/faacb9dbf6e01a94a1e8c869c1cc76bc349d0975))
+* **tests:** setup network where expected recipient ([69b395f](https://github.com/maidsafe/safe_network/commit/69b395fc22b293e461dd588e76d630b5282ecf56))
+
 ### [0.31.36](https://github.com/maidsafe/safe_network/compare/v0.31.35...v0.31.36) (2021-10-01)
 
 
