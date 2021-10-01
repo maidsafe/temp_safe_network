@@ -262,6 +262,7 @@ impl Core {
                 | SystemMsg::DkgFailureAgreement(_)
                 | SystemMsg::DkgMessage { .. }
                 | SystemMsg::DkgFailureObservation { .. }
+                | SystemMsg::Propose { .. }
                 | SystemMsg::NodeQuery(_)
                 | SystemMsg::NodeQueryResponse { .. } => {
                     let cmd = Command::HandleNonBlockingMessage {
@@ -391,60 +392,6 @@ impl Core {
 
                 Ok(vec![Command::TestConnectivity(name)])
             }
-            SystemMsg::Propose {
-                ref content,
-                ref sig_share,
-            } => {
-                trace!("Handling msg: Propose from {}", sender);
-                // Any other proposal than SectionInfo needs to be signed by a known key.
-                match content {
-                    Proposal::SectionInfo(ref section_auth) => {
-                        if section_auth.prefix == *self.section.prefix()
-                            || section_auth.prefix.is_extension_of(self.section.prefix())
-                        {
-                            // This `SectionInfo` is proposed by the DKG participants and
-                            // it's signed by the new key created by the DKG so we don't
-                            // know it yet. We only require the src_name of the
-                            // proposal to be one of the DKG participants.
-                            if !section_auth.contains_elder(&src_name) {
-                                trace!(
-                                    "Ignoring proposal from src not being a DKG participant: {:?}",
-                                    content
-                                );
-                                return Ok(vec![]);
-                            }
-                        }
-                    }
-                    _ => {
-                        // Proposal from other section shall be ignored.
-                        if !self.section.prefix().matches(&src_name) {
-                            trace!(
-                                "Ignore proposal from other section, src_name {:?}",
-                                src_name
-                            );
-                            return Ok(vec![]);
-                        }
-
-                        if !self
-                            .section
-                            .chain()
-                            .has_key(&sig_share.public_key_set.public_key())
-                        {
-                            let cmd =
-                                self.handle_untrusted_message(sender, node_msg, msg_authority)?;
-                            return Ok(vec![cmd]);
-                        }
-                    }
-                }
-
-                let mut commands = vec![];
-
-                commands.extend(self.check_lagging((src_name, sender), sig_share)?);
-
-                commands.extend(self.handle_proposal(content.clone(), sig_share.clone())?);
-
-                Ok(commands)
-            }
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(RelocateState::InProgress(ref mut joining_as_relocated)) =
@@ -539,6 +486,63 @@ impl Core {
                     dst_section_pk,
                     *bounced_msg,
                 )?)
+            }
+            SystemMsg::Propose {
+                ref content,
+                ref sig_share,
+            } => {
+                trace!("Handling msg: Propose from {}", sender);
+                // Any other proposal than SectionInfo needs to be signed by a known key.
+                match content {
+                    Proposal::SectionInfo(ref section_auth) => {
+                        if section_auth.prefix == *self.section.prefix()
+                            || section_auth.prefix.is_extension_of(self.section.prefix())
+                        {
+                            // This `SectionInfo` is proposed by the DKG participants and
+                            // it's signed by the new key created by the DKG so we don't
+                            // know it yet. We only require the src_name of the
+                            // proposal to be one of the DKG participants.
+                            if !section_auth.contains_elder(&src_name) {
+                                trace!(
+                                    "Ignoring proposal from src not being a DKG participant: {:?}",
+                                    content
+                                );
+                                return Ok(vec![]);
+                            }
+                        }
+                    }
+                    _ => {
+                        // Proposal from other section shall be ignored.
+                        if !self.section.prefix().matches(&src_name) {
+                            trace!(
+                                "Ignore proposal from other section, src_name {:?}",
+                                src_name
+                            );
+                            return Ok(vec![]);
+                        }
+
+                        if !self
+                            .section
+                            .chain()
+                            .has_key(&sig_share.public_key_set.public_key())
+                        {
+                            let cmd =
+                                self.handle_untrusted_message(sender, node_msg, msg_authority)?;
+                            return Ok(vec![cmd]);
+                        }
+                    }
+                }
+
+                let mut commands = vec![];
+
+                commands.extend(self.check_lagging((src_name, sender), sig_share)?);
+
+                commands.extend(
+                    self.handle_proposal(content.clone(), sig_share.clone())
+                        .await?,
+                );
+
+                Ok(commands)
             }
             SystemMsg::DkgStart {
                 session_id,
