@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.31.39](https://github.com/maidsafe/safe_network/compare/v0.31.38...v0.31.39) (2021-10-01)
+
+
+### Features
+
+* make DKG voter concurrent and cloneable ([468625b](https://github.com/maidsafe/safe_network/commit/468625b35e7986e6ec9045a09f3b47a4964c43f6))
+
 ### [0.31.38](https://github.com/maidsafe/safe_network/compare/v0.31.37...v0.31.38) (2021-10-01)
 
 
