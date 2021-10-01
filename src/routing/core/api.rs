@@ -74,7 +74,7 @@ impl Core {
             network,
             section_keys_provider,
             proposal_aggregator: ProposalAggregator::default(),
-            split_barrier: SplitBarrier::new(),
+            split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: Arc::new(RwLock::new(SignatureAggregator::default())),
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
