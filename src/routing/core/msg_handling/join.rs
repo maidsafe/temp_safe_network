@@ -24,7 +24,7 @@ use bls::PublicKey as BlsPublicKey;
 // Message handling
 impl Core {
     pub(crate) async fn handle_join_request(
-        &mut self,
+        &self,
         peer: Peer,
         join_request: JoinRequest,
     ) -> Result<Vec<Command>> {
@@ -167,7 +167,7 @@ impl Core {
     }
 
     pub(crate) async fn handle_join_as_relocated_request(
-        &mut self,
+        &self,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
         known_keys: Vec<BlsPublicKey>,

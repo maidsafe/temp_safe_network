@@ -73,7 +73,7 @@ impl Core {
     }
 
     pub(crate) async fn handle_dkg_failure_agreement(
-        &mut self,
+        &self,
         sender: &XorName,
         failure_set: &DkgFailureSigSet,
     ) -> Result<Vec<Command>> {
@@ -123,7 +123,7 @@ impl Core {
     }
 
     pub(crate) async fn handle_dkg_outcome(
-        &mut self,
+        &self,
         section_auth: SectionAuthorityProvider,
         key_share: SectionKeyShare,
     ) -> Result<Vec<Command>> {
