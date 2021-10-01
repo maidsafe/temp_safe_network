@@ -89,7 +89,7 @@ pub(crate) struct Core {
 
 impl Core {
     // Creates `Core` for a regular node.
-    pub(crate) fn new(
+    pub(crate) async fn new(
         comm: Comm,
         mut node: Node,
         section: Section,
@@ -98,7 +98,8 @@ impl Core {
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
     ) -> Result<Self> {
-        let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share);
+        let section_keys_provider =
+            SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share).await;
 
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
@@ -178,7 +179,8 @@ impl Core {
         let new = self.state_snapshot();
 
         self.section_keys_provider
-            .finalise_dkg(self.section.chain().last_key());
+            .finalise_dkg(self.section.chain().last_key())
+            .await;
 
         if new.prefix != old.prefix {
             info!("Split");
@@ -193,15 +195,18 @@ impl Core {
                     self.section.authority_provider().peers().format(", ")
                 );
 
-                if self.section_keys_provider.has_key_share() {
-                    commands.extend(self.promote_and_demote_elders()?);
+                if self.section_keys_provider.has_key_share().await {
+                    commands.extend(self.promote_and_demote_elders().await?);
 
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
-                    commands.extend(self.propose(Proposal::JoinsAllowed((
-                        MessageId::new(),
-                        self.joins_allowed,
-                    )))?);
+                    commands.extend(
+                        self.propose(Proposal::JoinsAllowed((
+                            MessageId::new(),
+                            self.joins_allowed,
+                        )))
+                        .await?,
+                    );
                 }
 
                 self.print_network_stats();
@@ -230,7 +235,7 @@ impl Core {
             } else if old.is_elder && !new.is_elder {
                 info!("Demoted");
                 self.network = NetworkPrefixMap::new(*self.section.genesis_key());
-                self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None);
+                self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None).await;
                 NodeElderChange::Demoted
             } else {
                 NodeElderChange::None

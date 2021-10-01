@@ -98,7 +98,7 @@ impl Routing {
             )
             .await?;
             let node = Node::new(keypair, comm.our_connection_info());
-            let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir)?;
+            let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir).await?;
 
             let section = core.section();
 
@@ -177,7 +177,8 @@ impl Routing {
                 event_tx,
                 used_space,
                 root_storage_dir.to_path_buf(),
-            )?;
+            )
+            .await?;
             info!("{} Joined the network!", core.node().name());
 
             core
@@ -275,6 +276,7 @@ impl Routing {
             .read()
             .await
             .sign_with_section_key_share(data, public_key)
+            .await
     }
 
     /// Verifies `signature` on `data` with the ed25519 public key of this node.
@@ -408,11 +410,13 @@ impl Routing {
         let src_section_pk = *self.section_chain().await.last_key();
 
         WireMsg::for_dst_accumulation(
-            self.dispatcher
+            &self
+                .dispatcher
                 .core
                 .read()
                 .await
                 .key_share()
+                .await
                 .map_err(|err| err)?,
             src,
             dst,
@@ -433,13 +437,13 @@ impl Routing {
     /// Returns the current BLS public key set if this node has one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.dispatcher.core.read().await.public_key_set()
+        self.dispatcher.core.read().await.public_key_set().await
     }
 
     /// Returns our index in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn our_index(&self) -> Result<usize> {
-        self.dispatcher.core.read().await.our_index()
+        self.dispatcher.core.read().await.our_index().await
     }
 }
 

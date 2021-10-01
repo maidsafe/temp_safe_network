@@ -587,7 +587,7 @@ mod tests {
                 mpsc::channel(1).0,
                 used_space,
                 root_storage_dir,
-            )?;
+            ).await?;
             let core = tmp_core.relocated(node, section).await?;
 
             // generate other SAP for prefix1

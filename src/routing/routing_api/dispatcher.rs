@@ -236,15 +236,17 @@ impl Dispatcher {
             Command::HandleConnectionLost(addr) => {
                 self.core.read().await.handle_connection_lost(addr)
             }
-            Command::HandlePeerLost(addr) => self.core.read().await.handle_peer_lost(&addr),
+            Command::HandlePeerLost(addr) => self.core.read().await.handle_peer_lost(&addr).await,
             Command::HandleDkgOutcome {
                 section_auth,
                 outcome,
-            } => self
-                .core
-                .write()
-                .await
-                .handle_dkg_outcome(section_auth, outcome),
+            } => {
+                self.core
+                    .write()
+                    .await
+                    .handle_dkg_outcome(section_auth, outcome)
+                    .await
+            }
             Command::HandleDkgFailure(signeds) => self
                 .core
                 .write()
@@ -277,7 +279,11 @@ impl Dispatcher {
                 Ok(vec![])
             }
             Command::SetJoinsAllowed(joins_allowed) => {
-                self.core.read().await.set_joins_allowed(joins_allowed)
+                self.core
+                    .read()
+                    .await
+                    .set_joins_allowed(joins_allowed)
+                    .await
             }
             Command::ProposeOnline {
                 mut peer,
@@ -292,7 +298,7 @@ impl Dispatcher {
                     .make_online_proposal(peer, previous_name, dst_key)
                     .await
             }
-            Command::ProposeOffline(name) => self.core.read().await.propose_offline(name),
+            Command::ProposeOffline(name) => self.core.read().await.propose_offline(name).await,
             Command::StartConnectivityTest(name) => {
                 let msg = {
                     let core = self.core.read().await;

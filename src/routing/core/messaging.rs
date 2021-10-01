@@ -30,22 +30,26 @@ use std::{net::SocketAddr, slice};
 use xor_name::XorName;
 impl Core {
     // Send proposal to all our elders.
-    pub(crate) fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
+    pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
         let elders: Vec<_> = self.section.authority_provider().peers().collect();
-        self.send_proposal(&elders, proposal)
+        self.send_proposal(&elders, proposal).await
     }
 
     // Send `proposal` to `recipients`.
-    pub(crate) fn send_proposal(
+    pub(crate) async fn send_proposal(
         &self,
         recipients: &[Peer],
         proposal: Proposal,
     ) -> Result<Vec<Command>> {
-        let key_share = self.section_keys_provider.key_share().map_err(|err| {
-            trace!("Can't propose {:?}: {}", proposal, err);
-            err
-        })?;
-        self.send_proposal_with(recipients, proposal, key_share)
+        let key_share = self
+            .section_keys_provider
+            .key_share()
+            .await
+            .map_err(|err| {
+                trace!("Can't propose {:?}: {}", proposal, err);
+                err
+            })?;
+        self.send_proposal_with(recipients, proposal, &key_share)
     }
 
     pub(crate) fn send_proposal_with(
@@ -165,7 +169,7 @@ impl Core {
         Ok(vec![cmd])
     }
 
-    pub(crate) fn send_relocate(
+    pub(crate) async fn send_relocate(
         &self,
         recipient: &Peer,
         details: RelocateDetails,
@@ -178,9 +182,10 @@ impl Core {
         let node_msg = SystemMsg::Relocate(details);
 
         self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
+            .await
     }
 
-    pub(crate) fn send_relocate_promise(
+    pub(crate) async fn send_relocate_promise(
         &self,
         recipient: &Peer,
         promise: RelocatePromise,
@@ -196,6 +201,7 @@ impl Core {
         let node_msg = SystemMsg::RelocatePromise(promise);
 
         self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
+            .await
     }
 
     pub(crate) fn return_relocate_promise(&self) -> Option<Command> {
@@ -207,7 +213,10 @@ impl Core {
         }
     }
 
-    pub(crate) fn send_dkg_start(&self, elder_candidates: ElderCandidates) -> Result<Vec<Command>> {
+    pub(crate) async fn send_dkg_start(
+        &self,
+        elder_candidates: ElderCandidates,
+    ) -> Result<Vec<Command>> {
         let src_prefix = elder_candidates.prefix;
         let generation = self.section.chain().main_branch_len() as u64;
         let session_id = DkgSessionId::new(&elder_candidates, generation);
@@ -236,27 +245,32 @@ impl Core {
             node_msg,
             &recipients,
         )
+        .await
     }
 
-    pub(crate) fn send_message_for_dst_accumulation(
+    pub(crate) async fn send_message_for_dst_accumulation(
         &self,
         src: XorName,
         dst: DstLocation,
         node_msg: SystemMsg,
         recipients: &[Peer],
     ) -> Result<Vec<Command>> {
-        let key_share = self.section_keys_provider.key_share().map_err(|err| {
-            trace!(
-                "Can't create message {:?} for accumulation at dst {:?}: {}",
-                node_msg,
-                dst,
+        let key_share = self
+            .section_keys_provider
+            .key_share()
+            .await
+            .map_err(|err| {
+                trace!(
+                    "Can't create message {:?} for accumulation at dst {:?}: {}",
+                    node_msg,
+                    dst,
+                    err
+                );
                 err
-            );
-            err
-        })?;
+            })?;
 
         let wire_msg = WireMsg::for_dst_accumulation(
-            key_share,
+            &key_share,
             src,
             dst,
             node_msg,
