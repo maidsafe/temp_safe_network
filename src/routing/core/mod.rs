@@ -70,7 +70,7 @@ pub(crate) struct Core {
     section_keys_provider: SectionKeysProvider,
     message_aggregator: Arc<RwLock<SignatureAggregator>>,
     proposal_aggregator: ProposalAggregator,
-    split_barrier: SplitBarrier,
+    split_barrier: Arc<RwLock<SplitBarrier>>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
     relocate_state: Option<RelocateState>,
@@ -115,7 +115,7 @@ impl Core {
             network: NetworkPrefixMap::new(genesis_pk),
             section_keys_provider,
             proposal_aggregator: ProposalAggregator::default(),
-            split_barrier: SplitBarrier::new(),
+            split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: Arc::new(RwLock::new(SignatureAggregator::default())),
             dkg_voter: DkgVoter::default(),
             relocate_state: None,

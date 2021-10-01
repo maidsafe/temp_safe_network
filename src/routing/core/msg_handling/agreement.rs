@@ -221,9 +221,11 @@ impl Core {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let updates =
-            self.split_barrier
-                .process(self.section.prefix(), signed_section_auth.clone(), key_sig);
+        let updates = self.split_barrier.write().await.process(
+            self.section.prefix(),
+            signed_section_auth.clone(),
+            key_sig,
+        );
         if updates.is_empty() {
             return Ok(vec![]);
         }
