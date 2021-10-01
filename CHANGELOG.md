@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.32.0](https://github.com/maidsafe/safe_network/compare/v0.31.39...v0.32.0) (2021-10-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* This is to facilitate the new way that files are stored on the network, which was
+updated to support changes in self encryption.
+
+Self encryption doesn't allow encryption of files less than 3072 bytes in size, so a new type of
+data was created to support storage of smaller files. This data type is known as a 'spot'.
+
+We need to distinguish between blobs and spots when retrieving files, and the solution is for the
+DataType on XorUrls to be marked as the Spot type when they are saved (which will be done in the
+API).
+
+The `encode_blob` and `encode_spot` functions are both introduced for convenience. These accept a
+BlobAddress and a SpotAddress, respectively. Added a couple of extra tests for checking that
+`encode_spot` was setting fields correctly.
+
+### Features
+
+* add spot entry to datatype enum ([b13125b](https://github.com/maidsafe/safe_network/commit/b13125b33c5224e3dc7a2fa120259221d55a6bba))
+
 ### [0.31.39](https://github.com/maidsafe/safe_network/compare/v0.31.38...v0.31.39) (2021-10-01)
 
 
