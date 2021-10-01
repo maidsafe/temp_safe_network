@@ -161,26 +161,21 @@ impl Dispatcher {
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
             // Data node msg that requires no locking
-            Command::HandleVerifiedNodeDataMessage {
+            Command::HandleNonBlockingMessage {
                 msg_id,
                 msg_authority,
                 dst_location,
                 msg,
+                sender,
             } => {
                 self.core
                     .read()
                     .await
-                    .handle_verified_data_message(
-                        // sender,
-                        msg_id,
-                        msg_authority,
-                        dst_location,
-                        msg,
-                    )
+                    .handle_non_blocking_message(msg_id, msg_authority, dst_location, msg, sender)
                     .await
             }
             // Non-data node msg that requires locking
-            Command::HandleVerifiedNodeNonDataMessage {
+            Command::HandleBlockingMessage {
                 sender,
                 msg_id,
                 msg_authority,
@@ -190,13 +185,7 @@ impl Dispatcher {
                 self.core
                     .write()
                     .await
-                    .handle_verified_non_data_node_message(
-                        sender,
-                        msg_id,
-                        msg_authority,
-                        msg,
-                        known_keys,
-                    )
+                    .handle_blocking_message(sender, msg_id, msg_authority, msg, known_keys)
                     .await
             }
             Command::HandleSystemMessage {

@@ -253,19 +253,23 @@ impl Core {
         {
             Ok(false) => match msg {
                 SystemMsg::NodeCmd(_)
+                | SystemMsg::DkgStart { .. }
+                | SystemMsg::DkgMessage { .. }
+                | SystemMsg::DkgFailureObservation { .. }
                 | SystemMsg::NodeQuery(_)
                 | SystemMsg::NodeQueryResponse { .. } => {
-                    let cmd = Command::HandleVerifiedNodeDataMessage {
+                    let cmd = Command::HandleNonBlockingMessage {
                         msg_id,
                         msg,
                         msg_authority,
                         dst_location,
+                        sender,
                     };
 
                     Ok(vec![cmd])
                 }
                 _ => {
-                    let cmd = Command::HandleVerifiedNodeNonDataMessage {
+                    let cmd = Command::HandleBlockingMessage {
                         sender,
                         msg_id,
                         msg,
@@ -289,7 +293,7 @@ impl Core {
 
     // Handler for node messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_verified_non_data_node_message(
+    pub(crate) async fn handle_blocking_message(
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,
@@ -299,7 +303,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
-        trace!("Handling verified Non-Data message");
+        trace!("Handling verified non-thread-safe system message");
         match node_msg {
             SystemMsg::AntiEntropyRetry {
                 section_auth,
@@ -414,37 +418,6 @@ impl Core {
                     *bounced_msg,
                 )?)
             }
-            SystemMsg::DkgStart {
-                session_id,
-                elder_candidates,
-            } => {
-                trace!("Handling msg: Dkg-Start from {}", sender);
-                if !elder_candidates.elders.contains_key(&self.node.name()) {
-                    return Ok(vec![]);
-                }
-
-                self.handle_dkg_start(session_id, elder_candidates)
-            }
-            SystemMsg::DkgMessage {
-                session_id,
-                message,
-            } => {
-                trace!(
-                    "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
-                    session_id,
-                    message,
-                    sender
-                );
-                self.handle_dkg_message(session_id, message, src_name)
-            }
-            SystemMsg::DkgFailureObservation {
-                session_id,
-                sig,
-                failed_participants,
-            } => {
-                trace!("Handling msg: Dkg-FailureObservation from {}", sender);
-                self.handle_dkg_failure_observation(session_id, &failed_participants, sig)
-            }
             SystemMsg::DkgFailureAgreement(sig_set) => {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
                 self.handle_dkg_failure_agreement(&src_name, &sig_set)
@@ -537,7 +510,7 @@ impl Core {
             }
             _ => {
                 warn!(
-                    "!!! Unexpected NodeMsg handled at verified NON DATA nodemsg handling: {:?}",
+                    "!!! Unexpected SystemMsg handled at verified non thread safe nodemsg handling: {:?}",
                     node_msg
                 );
                 Ok(vec![])
@@ -547,14 +520,48 @@ impl Core {
 
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_verified_data_message(
+    pub(crate) async fn handle_non_blocking_message(
         &self,
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
         node_msg: SystemMsg,
+        sender: SocketAddr,
     ) -> Result<Vec<Command>> {
+        let src_name = msg_authority.name();
+
         match node_msg {
+            SystemMsg::DkgStart {
+                session_id,
+                elder_candidates,
+            } => {
+                trace!("Handling msg: Dkg-Start from {}", sender);
+                if !elder_candidates.elders.contains_key(&self.node.name()) {
+                    return Ok(vec![]);
+                }
+
+                self.handle_dkg_start(session_id, elder_candidates).await
+            }
+            SystemMsg::DkgMessage {
+                session_id,
+                message,
+            } => {
+                trace!(
+                    "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
+                    session_id,
+                    message,
+                    sender
+                );
+                self.handle_dkg_message(session_id, message, src_name).await
+            }
+            SystemMsg::DkgFailureObservation {
+                session_id,
+                sig,
+                failed_participants,
+            } => {
+                trace!("Handling msg: Dkg-FailureObservation from {}", sender);
+                self.handle_dkg_failure_observation(session_id, &failed_participants, sig)
+            }
             // The following type of messages are all handled by upper sn_node layer.
             // TODO: In the future the sn-node layer won't be receiving Events but just
             // plugging in msg handlers.
