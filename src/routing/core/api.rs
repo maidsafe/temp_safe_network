@@ -128,11 +128,7 @@ impl Core {
 
     /// Returns the current BLS public key set
     pub(crate) async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        Ok(self
-            .section_keys_provider
-            .key_share()
-            .await?
-            .public_key_set)
+        Ok(self.section_keys_provider.key_share().await?.public_key_set)
     }
 
     /// Returns the info about the section matching the name.
@@ -244,7 +240,7 @@ impl Core {
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
     pub(crate) async fn promote_and_demote_elders_except(
-        &mut self,
+        &self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];

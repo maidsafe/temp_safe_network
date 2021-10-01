@@ -167,11 +167,19 @@ impl Dispatcher {
                 dst_location,
                 msg,
                 sender,
+                known_keys,
             } => {
                 self.core
                     .read()
                     .await
-                    .handle_non_blocking_message(msg_id, msg_authority, dst_location, msg, sender)
+                    .handle_non_blocking_message(
+                        msg_id,
+                        msg_authority,
+                        dst_location,
+                        msg,
+                        sender,
+                        known_keys,
+                    )
                     .await
             }
             // Non-data node msg that requires locking
@@ -180,12 +188,11 @@ impl Dispatcher {
                 msg_id,
                 msg_authority,
                 msg,
-                known_keys,
             } => {
                 self.core
                     .write()
                     .await
-                    .handle_blocking_message(sender, msg_id, msg_authority, msg, known_keys)
+                    .handle_blocking_message(sender, msg_id, msg_authority, msg)
                     .await
             }
             Command::HandleSystemMessage {
