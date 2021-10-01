@@ -72,7 +72,7 @@ impl Core {
         }
     }
 
-    pub(crate) fn handle_dkg_failure_agreement(
+    pub(crate) async fn handle_dkg_failure_agreement(
         &mut self,
         sender: &XorName,
         failure_set: &DkgFailureSigSet,
@@ -104,7 +104,10 @@ impl Core {
                 failure_set.failed_participants,
                 generation, elder_candidates
             );
-            commands.extend(self.cast_offline_proposals(&failure_set.failed_participants)?);
+            commands.extend(
+                self.cast_offline_proposals(&failure_set.failed_participants)
+                    .await?,
+            );
         }
 
         trace!(
@@ -112,11 +115,14 @@ impl Core {
             elder_candidates, failure_set.failed_participants
         );
 
-        commands.extend(self.promote_and_demote_elders_except(&failure_set.failed_participants)?);
+        commands.extend(
+            self.promote_and_demote_elders_except(&failure_set.failed_participants)
+                .await?,
+        );
         Ok(commands)
     }
 
-    pub(crate) fn handle_dkg_outcome(
+    pub(crate) async fn handle_dkg_outcome(
         &mut self,
         section_auth: SectionAuthorityProvider,
         key_share: SectionKeyShare,
@@ -130,7 +136,7 @@ impl Core {
         self.section_keys_provider.insert_dkg_outcome(key_share);
 
         if self.section.chain().has_key(&public_key) {
-            self.section_keys_provider.finalise_dkg(&public_key)
+            self.section_keys_provider.finalise_dkg(&public_key).await
         }
 
         result

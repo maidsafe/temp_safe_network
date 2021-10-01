@@ -24,7 +24,7 @@ use xor_name::XorName;
 
 // Relocation
 impl Core {
-    pub(crate) fn relocate_peers(
+    pub(crate) async fn relocate_peers(
         &self,
         churn_name: &XorName,
         churn_signature: &bls::Signature,
@@ -60,14 +60,17 @@ impl Core {
                 churn_name
             );
 
-            commands.extend(self.propose(Proposal::Offline(info.relocate(*action.dst())))?);
+            commands.extend(
+                self.propose(Proposal::Offline(info.relocate(*action.dst())))
+                    .await?,
+            );
 
             match action {
                 RelocateAction::Instant(details) => {
-                    commands.extend(self.send_relocate(&peer, details)?)
+                    commands.extend(self.send_relocate(&peer, details).await?)
                 }
                 RelocateAction::Delayed(promise) => {
-                    commands.extend(self.send_relocate_promise(&peer, promise)?)
+                    commands.extend(self.send_relocate_promise(&peer, promise).await?)
                 }
             }
         }
@@ -75,7 +78,11 @@ impl Core {
         Ok(commands)
     }
 
-    pub(crate) fn relocate_rejoining_peer(&self, peer: &Peer, age: u8) -> Result<Vec<Command>> {
+    pub(crate) async fn relocate_rejoining_peer(
+        &self,
+        peer: &Peer,
+        age: u8,
+    ) -> Result<Vec<Command>> {
         let details =
             RelocateDetails::with_age(&self.section, &self.network, peer, *peer.name(), age);
 
@@ -86,7 +93,7 @@ impl Core {
             details.age
         );
 
-        self.send_relocate(peer, details)
+        self.send_relocate(peer, details).await
     }
 
     pub(crate) async fn handle_relocate(
@@ -202,7 +209,7 @@ impl Core {
         if let Some(info) = self.section.members().get(&promise.name) {
             let details =
                 RelocateDetails::new(&self.section, &self.network, &info.peer, promise.dst);
-            commands.extend(self.send_relocate(&info.peer, details)?);
+            commands.extend(self.send_relocate(&info.peer, details).await?);
         } else {
             error!(
                 "ignore returned RelocatePromise from {} - unknown node",

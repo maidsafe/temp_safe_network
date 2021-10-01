@@ -421,7 +421,7 @@ impl Core {
             }
             SystemMsg::DkgFailureAgreement(sig_set) => {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
-                self.handle_dkg_failure_agreement(&src_name, &sig_set)
+                self.handle_dkg_failure_agreement(&src_name, &sig_set).await
             }
             SystemMsg::Propose {
                 ref content,
@@ -532,6 +532,49 @@ impl Core {
         let src_name = msg_authority.name();
         trace!("Handling non blocking message");
         match node_msg {
+            SystemMsg::JoinResponse(join_response) => {
+                debug!(
+                    "Ignoring unexpected join response message: {:?}",
+                    join_response
+                );
+                Ok(vec![])
+            }
+            SystemMsg::DkgFailureAgreement(sig_set) => {
+                trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
+                self.handle_dkg_failure_agreement(&src_name, &sig_set).await
+            }
+            SystemMsg::JoinRequest(join_request) => {
+                trace!("Handling msg: JoinRequest from {}", sender);
+                self.handle_join_request(msg_authority.peer(sender)?, *join_request)
+                    .await
+            }
+            SystemMsg::JoinAsRelocatedRequest(join_request) => {
+                trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
+                if self.is_not_elder()
+                    && join_request.section_key == *self.section.chain().last_key()
+                {
+                    return Ok(vec![]);
+                }
+
+                self.handle_join_as_relocated_request(
+                    msg_authority.peer(sender)?,
+                    *join_request,
+                    known_keys,
+                )
+                .await
+            }
+            SystemMsg::BouncedUntrustedMessage {
+                msg: bounced_msg,
+                dst_section_pk,
+            } => {
+                trace!("Handling msg: BouncedUntrustedMessage from {}", sender);
+
+                Ok(self.handle_bounced_untrusted_message(
+                    msg_authority.peer(sender)?,
+                    dst_section_pk,
+                    *bounced_msg,
+                )?)
+            }
             SystemMsg::DkgStart {
                 session_id,
                 elder_candidates,
@@ -718,6 +761,7 @@ impl Core {
             let aggregation = false;
 
             self.send_node_msg_to_targets(msg, target_holders, aggregation)
+                .await
         } else {
             error!("Received unexpected message while Adult");
             Ok(vec![])
@@ -725,7 +769,7 @@ impl Core {
     }
 
     /// Takes a message and forms commands to send to specified targets
-    pub(super) fn send_node_msg_to_targets(
+    pub(super) async fn send_node_msg_to_targets(
         &self,
         msg: SystemMsg,
         targets: BTreeSet<XorName>,
@@ -750,7 +794,7 @@ impl Core {
             let src = our_name;
 
             WireMsg::for_dst_accumulation(
-                self.key_share().map_err(|err| err)?,
+                &self.key_share().await.map_err(|err| err)?,
                 src,
                 dummy_dst_location,
                 msg,

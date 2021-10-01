@@ -94,6 +94,7 @@ impl Core {
         }
 
         self.send_node_msg_to_targets(msg, targets, aggregation)
+            .await
     }
 
     pub(crate) async fn send_error(
@@ -140,5 +141,6 @@ impl Core {
         let aggregation = false;
 
         self.send_node_msg_to_targets(msg, fresh_targets, aggregation)
+            .await
     }
 }

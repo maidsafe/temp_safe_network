@@ -31,7 +31,7 @@ impl Core {
         Ok(vec![])
     }
 
-    pub(crate) fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Command>> {
+    pub(crate) async fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Command>> {
         let name = if let Some(peer) = self.section.find_joined_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
             *peer.name()
@@ -45,16 +45,20 @@ impl Core {
             return Ok(vec![]);
         }
 
-        let mut commands = self.propose_offline(name)?;
+        let mut commands = self.propose_offline(name).await?;
         commands.push(Command::StartConnectivityTest(name));
         Ok(commands)
     }
 
-    pub(crate) fn propose_offline(&self, name: XorName) -> Result<Vec<Command>> {
+    pub(crate) async fn propose_offline(&self, name: XorName) -> Result<Vec<Command>> {
         self.cast_offline_proposals(&iter::once(name).collect())
+            .await
     }
 
-    pub(crate) fn cast_offline_proposals(&self, names: &BTreeSet<XorName>) -> Result<Vec<Command>> {
+    pub(crate) async fn cast_offline_proposals(
+        &self,
+        names: &BTreeSet<XorName>,
+    ) -> Result<Vec<Command>> {
         // Don't send the `Offline` proposal to the peer being lost as that send would fail,
         // triggering a chain of further `Offline` proposals.
         let elders: Vec<_> = self
@@ -67,7 +71,7 @@ impl Core {
         for name in names.iter() {
             if let Some(info) = self.section.members().get(name) {
                 let info = info.leave()?;
-                if let Ok(commands) = self.send_proposal(&elders, Proposal::Offline(info)) {
+                if let Ok(commands) = self.send_proposal(&elders, Proposal::Offline(info)).await {
                     result.extend(commands);
                 }
             }
