@@ -109,11 +109,15 @@ impl Dispatcher {
                 // Send a probe message if we are an elder
                 let core = dispatcher.core.read().await;
                 if core.is_elder() && !core.section().prefix().is_empty() {
-                    if let Ok(command) = core.generate_probe_message().await {
-                        info!("Sending ProbeMessage");
-                        if let Err(e) = dispatcher.handle_command(command).await {
-                            error!("Error sending a Probe message to the network: {:?}", e);
+                    match core.generate_probe_message() {
+                        Ok(command) => {
+                            drop(core);
+                            info!("Sending ProbeMessage");
+                            if let Err(e) = dispatcher.handle_command(command).await {
+                                error!("Error sending a Probe message to the network: {:?}", e);
+                            }
                         }
+                        Err(error) => error!("Problem generating probe message: {:?}", error),
                     }
                 }
             }

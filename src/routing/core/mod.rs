@@ -144,7 +144,7 @@ impl Core {
         }
     }
 
-    pub(crate) async fn generate_probe_message(&self) -> Result<Command> {
+    pub(crate) fn generate_probe_message(&self) -> Result<Command> {
         // Generate a random address not belonging to our Prefix
         let mut dst = XorName::random();
 
