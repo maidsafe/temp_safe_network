@@ -392,11 +392,11 @@ mod tests {
     use std::{collections::HashMap, iter};
     use xor_name::Prefix;
 
-    #[test]
-    fn single_participant() -> Result<()> {
+    #[tokio::test]
+    async fn single_participant() -> Result<()> {
         // If there is only one participant, the DKG should complete immediately.
 
-        let mut voter = DkgVoter::default();
+        let voter = DkgVoter::default();
         let section_pk = bls::SecretKey::random().public_key();
 
         let node = Node::new(
@@ -406,7 +406,9 @@ mod tests {
         let elder_candidates = ElderCandidates::new(iter::once(node.peer()), Prefix::default());
         let session_id = DkgSessionId::new(&elder_candidates, 0);
 
-        let commands = voter.start(&node, session_id, elder_candidates, section_pk)?;
+        let commands = voter
+            .start(&node, session_id, elder_candidates, section_pk)
+            .await?;
         assert_matches!(&commands[..], &[Command::HandleDkgOutcome { .. }]);
 
         Ok(())
@@ -438,12 +440,12 @@ mod tests {
             .collect();
 
         for actor in actors.values_mut() {
-            let commands = actor.voter.start(
+            let commands = futures::executor::block_on(actor.voter.start(
                 &actor.node,
                 session_id,
                 elder_candidates.clone(),
                 section_pk,
-            )?;
+            ))?;
 
             for command in commands {
                 messages.extend(actor.handle(command, &session_id)?)
@@ -468,10 +470,13 @@ mod tests {
             let (addr, message) = messages.swap_remove(index);
 
             let actor = actors.get_mut(&addr).context("Unknown message recipient")?;
-            let commands =
-                actor
-                    .voter
-                    .process_message(&actor.node, &session_id, message, section_pk)?;
+
+            let commands = futures::executor::block_on(actor.voter.process_message(
+                &actor.node,
+                &session_id,
+                message,
+                section_pk,
+            ))?;
 
             for command in commands {
                 messages.extend(actor.handle(command, &session_id)?)
