@@ -14,9 +14,10 @@ mod register_apis;
 
 pub use self::data::{Blob, BlobAddress, Spot, SpotAddress};
 use crate::client::{connections::Session, errors::Error, Config};
-use crate::messaging::data::CmdError;
-use crate::types::{Keypair, PublicKey};
+use crate::messaging::data::{CmdError, DataQuery, ServiceMsg};
+use crate::types::{ChunkAddress, Keypair, PublicKey};
 
+use crate::messaging::{ServiceAuth, WireMsg};
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
@@ -26,6 +27,7 @@ use tokio::{
     time::Duration,
 };
 use tracing::{debug, info};
+use xor_name::XorName;
 
 /// Client object
 #[derive(Clone, Debug)]
@@ -100,6 +102,28 @@ impl Client {
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: config.query_timeout,
         };
+
+        // TODO: The message being sent below is a temporary solution to fetch network info for
+        // the client. Ideally the client should be able to send proper AE-Probe messages to the
+        // trigger the AE flows.
+
+        // Generate a random query to send a dummy message
+        let random_dst_addr = XorName::random();
+        let serialised_cmd = {
+            let msg = ServiceMsg::Query(DataQuery::GetChunk(ChunkAddress(random_dst_addr)));
+            WireMsg::serialize_msg_payload(&msg)?
+        };
+        let signature = client.keypair.sign(&serialised_cmd);
+        let auth = ServiceAuth {
+            public_key: client_pk,
+            signature,
+        };
+
+        // Send the dummy message to probe the network for it's infrastructure details.
+        let _dropped_res = client
+            .session
+            .fire_and_forget_payload(random_dst_addr, auth, serialised_cmd)
+            .await;
 
         Ok(client)
     }
