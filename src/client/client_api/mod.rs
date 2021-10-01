@@ -103,6 +103,10 @@ impl Client {
             query_timeout: config.query_timeout,
         };
 
+        // TODO: The message being sent below is a temporary solution to fetch network info for
+        // the client. Ideally the client should be able to send proper AE-Probe messages to the
+        // trigger the AE flows.
+
         // Generate a random query to send a dummy message
         let random_dst_addr = XorName::random();
         let serialised_cmd = {
