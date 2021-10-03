@@ -8,7 +8,6 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use eyre::Result;
-use safe_network::client::client_api::Blob;
 use safe_network::url::Scope;
 use safe_network::{
     client::{
@@ -22,21 +21,23 @@ use tokio::runtime::Runtime;
 /// This bench requires a network already set up
 async fn upload_bytes(size: usize) -> Result<(), Error> {
     let (genesis_key, bootstrap_nodes) = read_network_conn_info().unwrap();
-    let blob = Blob::new(random_bytes(size))?;
+    let bytes = random_bytes(size);
     let config = Config::new(None, None, genesis_key, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
-    let address = client
-        .write_blob_to_network(blob.clone(), Scope::Public)
-        .await?;
+    let address = client.upload(bytes.clone(), Scope::Public).await?;
 
     // the larger the file, the longer we have to wait before we start querying
     let delay = usize::max(1, size / 2_000_000);
 
     // let's make sure the public chunk is stored
-    let received_data =
-        run_w_backoff_delayed(|| async { Ok(client.read_blob(address).await?) }, 10, delay).await?;
+    let received_bytes = run_w_backoff_delayed(
+        || async { Ok(client.read_bytes(address).await?) },
+        10,
+        delay,
+    )
+    .await?;
 
-    assert_eq!(received_data, blob.bytes());
+    assert_eq!(received_bytes, bytes);
 
     Ok(())
 }
