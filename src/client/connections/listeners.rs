@@ -219,7 +219,7 @@ impl Session {
             sender, target_section_auth
         );
 
-        if let Some((session, elders, service_msg, mut dst_location, auth)) =
+        if let Some((msg_id, session, elders, service_msg, mut dst_location, auth)) =
             Self::new_elder_targets_if_any(
                 session.clone(),
                 bounced_msg.clone(),
@@ -243,7 +243,6 @@ impl Session {
 
             dst_location.set_section_pk(section_pk);
 
-            let msg_id = MessageId::new();
             // Let's rebuild the message with the updated destination details
             let wire_msg = WireMsg::new_msg(
                 msg_id,
@@ -300,7 +299,7 @@ impl Session {
         }
 
         // Extract necessary information for resending
-        if let Some((session, elders, service_msg, mut dst_location, auth)) =
+        if let Some((msg_id, session, elders, service_msg, mut dst_location, auth)) =
             Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), &section_auth)
                 .await?
         {
@@ -316,8 +315,6 @@ impl Session {
             let target_section_pk = section_auth.public_key_set.public_key();
             // Let's rebuild the message with the updated destination details
             dst_location.set_section_pk(target_section_pk);
-
-            let msg_id = MessageId::new();
 
             let wire_msg = WireMsg::new_msg(
                 msg_id,
@@ -341,6 +338,7 @@ impl Session {
         received_auth: &SectionAuthorityProvider,
     ) -> Result<
         Option<(
+            MessageId,
             Session,
             Vec<SocketAddr>,
             ServiceMsg,
@@ -431,6 +429,7 @@ impl Session {
         drop(the_cache_guard);
 
         Ok(Some((
+            msg_id,
             session,
             target_elders,
             service_msg,
