@@ -473,7 +473,7 @@ pub(crate) async fn send_message(
 
             *successes_clone.write().await += 1;
 
-            trace!("Sent cmd with MsgId {:?} to {:?}", msg_id, &socket);
+            trace!("Sent msg with MsgId {:?} to {:?}", msg_id, &socket);
             Ok(())
         });
         tasks.push(task_handle);
@@ -482,9 +482,8 @@ pub(crate) async fn send_message(
     // Let's await for all messages to be sent
     let _ = join_all(tasks).await;
 
-    // wait 5 secs before reporting
+    let failures = elders.len() - *successes.read().await;
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     if failures > 0 {
         error!(
             "Sending the message to {}/{} of the elders failed",

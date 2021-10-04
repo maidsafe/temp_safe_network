@@ -223,7 +223,7 @@ impl Session {
             Self::new_elder_targets_if_any(
                 session.clone(),
                 bounced_msg.clone(),
-                &target_section_auth,
+                Some(&target_section_auth),
             )
             .await?
         {
@@ -299,9 +299,8 @@ impl Session {
         }
 
         // Extract necessary information for resending
-        if let Some((msg_id, session, elders, service_msg, mut dst_location, auth)) =
-            Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), &section_auth)
-                .await?
+        if let Some((msg_id, session, elders, service_msg, dst_location, auth)) =
+            Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), None).await?
         {
             debug!("Received AE-Retry with new SAP: {:?}", section_auth);
 
@@ -311,10 +310,6 @@ impl Session {
             }
 
             let payload = WireMsg::serialize_msg_payload(&service_msg)?;
-
-            let target_section_pk = section_auth.public_key_set.public_key();
-            // Let's rebuild the message with the updated destination details
-            dst_location.set_section_pk(target_section_pk);
 
             let wire_msg = WireMsg::new_msg(
                 msg_id,
@@ -335,7 +330,7 @@ impl Session {
     async fn new_elder_targets_if_any(
         session: Session,
         bounced_msg: Bytes,
-        received_auth: &SectionAuthorityProvider,
+        received_auth: Option<&SectionAuthorityProvider>,
     ) -> Result<
         Option<(
             MessageId,
@@ -387,23 +382,47 @@ impl Session {
             }
         };
 
-        let mut target_elders = received_auth
-            .elders
-            .iter()
-            .sorted_by(|(lhs_name, _), (rhs_name, _)| {
-                dst_address_of_bounced_msg.cmp_distance(lhs_name, rhs_name)
-            })
-            .map(|(_, addr)| addr)
-            .take(target_count)
-            .cloned()
-            .collect::<Vec<SocketAddr>>();
+        let mut target_public_key;
+
+        // We normally have received auth when we're in AE-Redirect (where we could not trust enough to update our prefixmap)
+        let mut target_elders = if let Some(auth) = received_auth {
+            target_public_key = auth.public_key_set.public_key();
+            auth.elders
+                .iter()
+                .sorted_by(|(lhs_name, _), (rhs_name, _)| {
+                    dst_address_of_bounced_msg.cmp_distance(lhs_name, rhs_name)
+                })
+                .map(|(_, addr)| addr)
+                .take(target_count)
+                .cloned()
+                .collect::<Vec<SocketAddr>>()
+        } else {
+            // we use whatever is our latest knowledge at this point
+
+            if let Some(sap) = session
+                .network
+                .closest_or_opposite(&dst_address_of_bounced_msg)
+            {
+                target_public_key = sap.value.public_key_set.public_key();
+
+                sap.value
+                    .elders
+                    .values()
+                    .cloned()
+                    .take(target_count)
+                    .collect::<Vec<SocketAddr>>()
+            } else {
+                error!("Cannot resend, no 'received auth' provided, and nothing relevant in session network prefixmap");
+                return Ok(None);
+            }
+        };
 
         let mut the_cache_guard = session.ae_cache.write().await;
 
         let cache_entry = the_cache_guard.find(|x| {
             x == &(
-                dst_address_of_bounced_msg,
-                received_auth.public_key_set.public_key(),
+                target_elders.clone(),
+                target_public_key,
                 bounced_msg.clone(),
             )
         });
@@ -415,11 +434,14 @@ impl Session {
             target_elders = vec![];
         } else {
             let _old_entry_that_does_not_exist = the_cache_guard.insert((
-                dst_address_of_bounced_msg,
-                received_auth.public_key_set.public_key(),
+                target_elders.clone(),
+                target_public_key,
                 bounced_msg.clone(),
             ));
         }
+
+        // Let's rebuild the message with the updated destination details
+        dst_location.set_section_pk(target_section_pk);
 
         debug!(
             "Final target elders for resending {:?} message are {:?}",
