@@ -273,6 +273,37 @@ impl Session {
         bounced_msg: Bytes,
         proof_chain: SecuredLinkedList,
     ) -> Result<Session, Error> {
+        // Update our network knowledge making sure proof chain
+        // validates the new SAP based on currently known remote section SAP.
+        match session.network.update(
+            SectionAuth {
+                value: section_auth.clone(),
+                sig: section_signed,
+            },
+            &proof_chain,
+        ) {
+            Ok(updated) => {
+                if updated {
+                    debug!(
+                        "Anti-Entropy: updated remote section SAP updated for {:?}",
+                        section_auth.prefix
+                    );
+                } else {
+                    debug!(
+                            "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                            section_auth.prefix, section_auth
+                        );
+                }
+            }
+            Err(err) => {
+                warn!(
+                        "Anti-Entropy: failed to update remote section SAP, bounced msg dropped. Failed section auth was {:?}, {:?}",
+                        err, section_auth
+                    );
+                return Ok(session);
+            }
+        }
+
         // Extract necessary information for resending
         if let Some((session, elders, service_msg, mut dst_location, auth)) =
             Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), &section_auth)
@@ -283,36 +314,6 @@ impl Session {
             if elders.is_empty() {
                 debug!("We have already responded to this message on an AE-Retry response. Dropping this instance");
                 return Ok(session);
-            }
-            // Update our network knowledge making sure proof chain
-            // validates the new SAP based on currently known remote section SAP.
-            match session.network.update(
-                SectionAuth {
-                    value: section_auth.clone(),
-                    sig: section_signed,
-                },
-                &proof_chain,
-            ) {
-                Ok(updated) => {
-                    if updated {
-                        debug!(
-                            "Anti-Entropy: updated remote section SAP updated for {:?}",
-                            section_auth.prefix
-                        );
-                    } else {
-                        debug!(
-                                "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                                section_auth.prefix, section_auth
-                            );
-                    }
-                }
-                Err(err) => {
-                    warn!(
-                            "Anti-Entropy: failed to update remote section SAP, bounced msg dropped: {:?}, {:?}",
-                            err, service_msg
-                        );
-                    return Ok(session);
-                }
             }
 
             let payload = WireMsg::serialize_msg_payload(&service_msg)?;
