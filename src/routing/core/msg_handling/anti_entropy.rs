@@ -300,7 +300,7 @@ impl Core {
             .get_proof_chain_to_current(dst_section_pk)
         {
             Ok(proof_chain) => {
-                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
+                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
                 let section_signed_auth = self.section.section_signed_authority_provider().clone();
                 let section_auth = section_signed_auth.value;
