@@ -114,6 +114,7 @@ impl NetworkPrefixMap {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
     ) -> Result<bool> {
+        trace!("Attempting to update prefixmap");
         let section_key = match self.section_by_prefix(&signed_section_auth.value.prefix()) {
             Ok(sap) => sap.section_key(),
             Err(_) => self.genesis_pk,

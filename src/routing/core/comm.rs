@@ -130,6 +130,7 @@ impl Comm {
         recipients: &[(XorName, SocketAddr)],
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
+        trace!("Sending msg on existing connection to {:?}", recipients);
         for (name, addr) in recipients {
             wire_msg.set_dst_xorname(*name);
 
