@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.36.0](https://github.com/maidsafe/sn_cli/compare/v0.35.0...v0.36.0) (2021-10-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* This is to facilitate the new way that files are stored on the network, which
+was updated to support changes in self encryption.
+
+The `files get` command was updated to support the Spot data type.
+
+There were some misc test updates to support these new changes:
+* All test runs were updated to use a single thread, since multi threading seemed to result in more
+  failures.
+* A new cat test case was added for checking the retrieval of spot files.
+* Files tests were updated to support the addition of a new large file in the test data.
+* Files tests were updated for new file counts upon addition of the new test data file.
+
+Right now, all tests relating to NRS have been marked as ignore, as there is some kind of problem
+with NRS. This will be investigated shortly and once it's resolved, these tests will be re-enabled.
+
+### Features
+
+* support retrieval of spots ([348ebda](https://github.com/maidsafe/sn_cli/commit/348ebda6f1aedad61c84773ec4cf4e3cfab9ab00))
+
 ## [0.35.0](https://github.com/maidsafe/sn_cli/compare/v0.34.0...v0.35.0) (2021-09-28)
 
 
