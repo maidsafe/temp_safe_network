@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.36.0](https://github.com/maidsafe/sn_api/compare/v0.35.1...v0.36.0) (2021-10-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* This is to facilitate the new way that files are stored on the network, which was
+updated to support changes in self encryption.
+
+Self encryption doesn't allow encryption of files less than 3072 bytes in size, so a new type of
+data was created to support storage of smaller files. This data type is known as a 'spot'.
+
+The changes here mark the DataType on the XorUrl as a Spot when it's saved. Then when the data is
+being retrieved, the DataType is queried to determine whether we need to retrieve a blob or a spot.
+
+Since we now have these 2 different storage concepts, the API has been made a bit more general and
+the functions describe storing 'data' rather than 'blobs'. Rather than exposing different spot and
+blob storage methods, the API can expose a single data function, and it can then decide whether a
+blob or a spot is to be stored, based on the size of the data.
+
+### Features
+
+* support retrieval of spots from network ([197eb9d](https://github.com/maidsafe/sn_api/commit/197eb9d0dd4a95f80402ad3c57db0e894fe31efd))
+
 ### [0.35.1](https://github.com/maidsafe/sn_api/compare/v0.35.0...v0.35.1) (2021-09-28)
 
 
