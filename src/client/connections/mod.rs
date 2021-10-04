@@ -46,8 +46,10 @@ pub(super) struct Session {
     incoming_err_sender: Arc<Sender<CmdError>>,
     /// All elders we know about from AE messages
     network: Arc<NetworkPrefixMap>,
-    /// AE message resending cache
-    ae_cache: Arc<RwLock<AeCache>>,
+    /// AE redirect cache
+    ae_redirect_cache: Arc<RwLock<AeCache>>,
+    // AE retry cache
+    ae_retry_cache: Arc<RwLock<AeCache>>,
     /// Our initial bootstrap node
     bootstrap_peer: SocketAddr,
     /// BLS Signature aggregator for aggregating network messages

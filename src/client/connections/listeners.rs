@@ -342,6 +342,7 @@ impl Session {
         )>,
         Error,
     > {
+        let is_retry = received_auth.is_none();
         let (msg_id, service_msg, mut dst_location, auth) =
             match WireMsg::deserialize(bounced_msg.clone())? {
                 MessageType::Service {
@@ -417,7 +418,11 @@ impl Session {
             }
         };
 
-        let mut the_cache_guard = session.ae_cache.write().await;
+        let mut the_cache_guard = if is_retry {
+            session.ae_retry_cache.write().await
+        } else {
+            session.ae_redirect_cache.write().await
+        };
 
         let cache_entry = the_cache_guard.find(|x| {
             x == &(
