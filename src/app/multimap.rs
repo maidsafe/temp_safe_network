@@ -8,10 +8,10 @@
 // Software.
 
 use super::register::EntryHash;
-use crate::{Error, Result, Safe};
+use crate::{app::SELF_ENCRYPTION_MIN_SIZE, Error, Result, Safe};
 use bytes::Bytes;
 use log::debug;
-use safe_network::client::BlobAddress;
+use safe_network::client::{BlobAddress, SpotAddress};
 use safe_network::url::{ContentType, Scope, Url, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -101,12 +101,20 @@ impl Safe {
         })?;
 
         let data = Bytes::copy_from_slice(&serialised_entry);
-        let entry_xorname = self.safe_client.store_data(data, false).await?;
-        let entry_xorurl = Url::encode_blob(
-            BlobAddress::Public(entry_xorname),
-            ContentType::Raw,
-            self.xorurl_base,
-        )?;
+        let entry_xorname = self.safe_client.store_data(data.clone(), false).await?;
+        let entry_xorurl = if data.len() < SELF_ENCRYPTION_MIN_SIZE {
+            Url::encode_spot(
+                SpotAddress::Public(entry_xorname),
+                ContentType::Raw,
+                self.xorurl_base,
+            )?
+        } else {
+            Url::encode_blob(
+                BlobAddress::Public(entry_xorname),
+                ContentType::Raw,
+                self.xorurl_base,
+            )?
+        };
         let entry_ptr = Url::from_xorurl(&entry_xorurl)?;
         let safeurl = Safe::parse_url(url)?;
         let address = safeurl.register_address()?;
