@@ -240,11 +240,13 @@ impl Core {
         dst_name: XorName,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
+        trace!("Checking for entropy");
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
 
         // Let's try to find a section closer to the destination, if it's not for us.
         if !self.section.prefix().matches(&dst_name) {
+            debug!("AE: prefix not matching");
             match self.network.closest_or_opposite(&dst_name) {
                 Some(section_auth) => {
                     info!("Found a better matching section {:?}", section_auth);

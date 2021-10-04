@@ -243,7 +243,7 @@ impl Session {
         if let Ok(op_id) = query.operation_id() {
             let _ = tokio::spawn(async move {
                 // Insert the response sender
-                trace!("Inserting channel for {:?}", op_id);
+                trace!("Inserting channel for op_id {:?}", op_id);
                 let _old = pending_queries_for_thread
                     .write()
                     .await
@@ -482,9 +482,9 @@ pub(crate) async fn send_message(
     // Let's await for all messages to be sent
     let _ = join_all(tasks).await;
 
-    // anything not concretely registered as success here is a failure
-    let failures = elders.len() - *successes.read().await;
+    // wait 5 secs before reporting
 
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     if failures > 0 {
         error!(
             "Sending the message to {}/{} of the elders failed",
