@@ -342,7 +342,7 @@ impl Session {
         )>,
         Error,
     > {
-        let (msg_id, service_msg, dst_location, auth) =
+        let (msg_id, service_msg, mut dst_location, auth) =
             match WireMsg::deserialize(bounced_msg.clone())? {
                 MessageType::Service {
                     msg_id,
@@ -382,7 +382,7 @@ impl Session {
             }
         };
 
-        let mut target_public_key;
+        let target_public_key;
 
         // We normally have received auth when we're in AE-Redirect (where we could not trust enough to update our prefixmap)
         let mut target_elders = if let Some(auth) = received_auth {
@@ -441,7 +441,7 @@ impl Session {
         }
 
         // Let's rebuild the message with the updated destination details
-        dst_location.set_section_pk(target_section_pk);
+        dst_location.set_section_pk(target_public_key);
 
         debug!(
             "Final target elders for resending {:?} message are {:?}",
