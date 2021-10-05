@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.1](https://github.com/maidsafe/safe_network/compare/v0.33.0...v0.33.1) (2021-10-05)
+
+
+### Bug Fixes
+
+* return ae retry when unkown key is provided ([a26814f](https://github.com/maidsafe/safe_network/commit/a26814f9f0ea090786b746739ebc1891030183b9))
+
 ## [0.33.0](https://github.com/maidsafe/safe_network/compare/v0.32.1...v0.33.0) (2021-10-05)
 
 
