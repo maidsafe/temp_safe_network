@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.37.0](https://github.com/maidsafe/sn_api/compare/v0.36.0...v0.37.0) (2021-10-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* Multimap entries will be assigned a different data type when they are created.
+
+In the same way the xorurls for files and serialized files containers needed to have the correct
+data type specified as a spot or a blob, so too did entries for multimaps that get used as part of
+the NRS system.
+
+As per files, if the multimap entry is less than 3072 bytes, it'll be stored as a spot, otherwise,
+it'll be stored as a blob.
+
+### Bug Fixes
+
+* use correct data type on multimap entries ([84f3051](https://github.com/maidsafe/sn_api/commit/84f305196e9a1bb8198b9d9a4bd346d88ca372fa))
+
 ## [0.36.0](https://github.com/maidsafe/sn_api/compare/v0.35.1...v0.36.0) (2021-10-04)
 
 
