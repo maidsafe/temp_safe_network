@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.33.0](https://github.com/maidsafe/safe_network/compare/v0.32.1...v0.33.0) (2021-10-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **bytes:** Public enum `DataType` is modified, and APIs for
+`Blob` and `Spot` are replaced with  corresponding for `Bytes`.
+
+### Features
+
+* **bytes:** encapsulate storage mechanism ([c4cc634](https://github.com/maidsafe/safe_network/commit/c4cc6340e7d6eb6a4692243ad5676aac56ceff70))
+
 ### [0.32.1](https://github.com/maidsafe/safe_network/compare/v0.32.0...v0.32.1) (2021-10-05)
 
 
