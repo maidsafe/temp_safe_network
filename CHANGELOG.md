@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.33.0](https://github.com/maidsafe/safe_network/compare/v0.32.1...v0.33.0) (2021-10-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **bytes:** Public enum `DataType` is modified, and APIs for
+`Blob` and `Spot` are replaced with  corresponding for `Bytes`.
+
+### Features
+
+* **bytes:** encapsulate storage mechanism ([c4cc634](https://github.com/maidsafe/safe_network/commit/c4cc6340e7d6eb6a4692243ad5676aac56ceff70))
+
+### [0.32.1](https://github.com/maidsafe/safe_network/compare/v0.32.0...v0.32.1) (2021-10-05)
+
+
+### Bug Fixes
+
+* ae retry/redirect cache was not always hit when it should have been ([ff9e772](https://github.com/maidsafe/safe_network/commit/ff9e772a5a74da8600a9caad883d1d84a3717793))
+* make prefixmap cloneable with Arc ([3adb613](https://github.com/maidsafe/safe_network/commit/3adb6139b2a649353066b1591bd957caa0e8172f))
+* readd separate ae retry/redirect caches ([6806269](https://github.com/maidsafe/safe_network/commit/68062699c4dabf4c6ad8d8845c851d33340ced25))
+* use current prefixmap on AE retry after any update, NOT what was provided ([7cf4478](https://github.com/maidsafe/safe_network/commit/7cf4478ea31db89e8b5986094342d73567e43b1b))
+
 ## [0.32.0](https://github.com/maidsafe/safe_network/compare/v0.31.39...v0.32.0) (2021-10-01)
 
 

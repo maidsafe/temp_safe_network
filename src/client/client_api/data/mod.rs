@@ -24,7 +24,7 @@ use xor_name::XorName;
 /// A `Spot` cannot be self-encrypted, thus is encrypted using the client encryption keys instead.
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
-pub struct Spot {
+pub(crate) struct Spot {
     bytes: Bytes,
 }
 
@@ -34,13 +34,13 @@ pub struct Spot {
 /// This is done using self-encryption, which produces at least 4 chunks (3 for the contents, 1 for the `DataMap`).
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
-pub struct Blob {
+pub(crate) struct Blob {
     bytes: Bytes,
 }
 
 impl Spot {
     /// Enforces size > 0 and size < [`MIN_ENCRYPTABLE_BYTES`] bytes.
-    pub fn new(bytes: Bytes) -> Result<Self> {
+    pub(crate) fn new(bytes: Bytes) -> Result<Self> {
         if bytes.len() >= MIN_ENCRYPTABLE_BYTES {
             Err(Error::Generic(
                 "The provided bytes is too large to be a `Spot`".to_string(),
@@ -53,14 +53,14 @@ impl Spot {
     }
 
     /// Returns the bytes.
-    pub fn bytes(&self) -> Bytes {
+    pub(crate) fn bytes(&self) -> Bytes {
         self.bytes.clone()
     }
 }
 
 impl Blob {
     /// Enforces size >= [`MIN_ENCRYPTABLE_BYTES`] bytes.
-    pub fn new(bytes: Bytes) -> Result<Self> {
+    pub(crate) fn new(bytes: Bytes) -> Result<Self> {
         if MIN_ENCRYPTABLE_BYTES > bytes.len() {
             Err(Error::Generic(
                 "The provided bytes is too small to be a `Blob`".to_string(),
@@ -71,8 +71,51 @@ impl Blob {
     }
 
     /// Returns the bytes.
-    pub fn bytes(&self) -> Bytes {
+    pub(crate) fn bytes(&self) -> Bytes {
         self.bytes.clone()
+    }
+}
+
+/// Address of Bytes data type.
+#[derive(
+    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, serde::Serialize, serde::Deserialize, Debug,
+)]
+pub enum BytesAddress {
+    /// Blob, bytes of >= 3072 len.
+    Blob(BlobAddress),
+    /// Spot, bytes of < 3072 len.
+    Spot(SpotAddress),
+}
+
+impl BytesAddress {
+    /// The xorname.
+    pub fn name(&self) -> &XorName {
+        match self {
+            Self::Blob(address) => address.name(),
+            Self::Spot(address) => address.name(),
+        }
+    }
+
+    /// The address scope
+    pub fn scope(&self) -> Scope {
+        if self.is_public() {
+            Scope::Public
+        } else {
+            Scope::Private
+        }
+    }
+
+    /// Returns true if public.
+    pub fn is_public(self) -> bool {
+        match self {
+            Self::Blob(address) => address.is_public(),
+            Self::Spot(address) => address.is_public(),
+        }
+    }
+
+    /// Returns true if private.
+    pub fn is_private(self) -> bool {
+        !self.is_public()
     }
 }
 
@@ -95,7 +138,7 @@ impl BlobAddress {
         }
     }
 
-    /// The namespace scope of the Blob
+    /// The address scope of the Blob
     pub fn scope(&self) -> Scope {
         if self.is_public() {
             Scope::Public
@@ -134,7 +177,7 @@ impl SpotAddress {
         }
     }
 
-    /// The namespace scope of the Spot
+    /// The address scope of the Spot
     pub fn scope(&self) -> Scope {
         if self.is_public() {
             Scope::Public
