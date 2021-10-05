@@ -240,11 +240,13 @@ impl Core {
         dst_name: XorName,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
+        trace!("Checking for entropy");
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
 
         // Let's try to find a section closer to the destination, if it's not for us.
         if !self.section.prefix().matches(&dst_name) {
+            debug!("AE: prefix not matching");
             match self.network.closest_or_opposite(&dst_name) {
                 Some(section_auth) => {
                     info!("Found a better matching section {:?}", section_auth);
@@ -286,6 +288,12 @@ impl Core {
             }
         }
 
+        trace!(
+            "Performin AE checks, provided pk was: {:?} ours is: {:?}",
+            dst_section_pk,
+            self.section.chain().last_key()
+        );
+
         if dst_section_pk == self.section.chain().last_key() {
             trace!("Provided Section PK matching our latest. All AE checks passed!");
             // Destination section key matches our current section key
@@ -298,7 +306,12 @@ impl Core {
             .get_proof_chain_to_current(dst_section_pk)
         {
             Ok(proof_chain) => {
-                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
+                debug!(
+                    ">> the proof chain: len: {:?}, chain: {:?}",
+                    proof_chain.len(),
+                    proof_chain
+                );
+                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
                 let section_signed_auth = self.section.section_signed_authority_provider().clone();
                 let section_auth = section_signed_auth.value;
@@ -318,8 +331,20 @@ impl Core {
                     dst_section_pk,
                     sender
                 );
-                // TODO, actually AE retry
-                return Ok(None);
+
+                let proof_chain = self.section.chain().clone();
+
+                let section_signed_auth = self.section.section_signed_authority_provider().clone();
+                let section_auth = section_signed_auth.value;
+                let section_signed = section_signed_auth.sig;
+                let bounced_msg = original_bytes;
+
+                SystemMsg::AntiEntropyRetry {
+                    section_auth,
+                    section_signed,
+                    proof_chain,
+                    bounced_msg,
+                }
             }
         };
 
@@ -549,6 +574,47 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
+        let mut rng = rand::thread_rng();
+        let env = Env::new().await?;
+        let our_prefix = env.core.section().prefix();
+
+        let (msg, src_location) =
+            env.create_message(our_prefix, *env.core.section_chain().last_key())?;
+        let sender = env.core.node().addr;
+        let dst_name = our_prefix.substituted_in(rng.gen());
+
+        let bogus_env = Env::new().await?;
+        let dst_section_pk = *bogus_env.core.section_chain().root_key();
+
+        let command = env
+            .core
+            .check_for_entropy(
+                msg.serialize()?,
+                &src_location,
+                &dst_section_pk,
+                dst_name,
+                sender,
+            )
+            .await?;
+
+        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
+            wire_msg
+                .into_message()
+                .context("failed to deserialised anti-entropy message")?
+        });
+
+        assert_matches!(msg_type, MessageType::System{ msg, .. } => {
+            assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+                assert_eq!(section_auth, env.core.section().authority_provider());
+                assert_eq!(proof_chain, env.core.section_chain());
+            });
+        });
+
+        Ok(())
+    }
+
     struct Env {
         core: Core,
         other_sap: SectionAuth<SectionAuthorityProvider>,
@@ -585,7 +651,8 @@ mod tests {
                 mpsc::channel(1).0,
                 used_space,
                 root_storage_dir,
-            )?;
+            )
+            .await?;
             let core = tmp_core.relocated(node, section).await?;
 
             // generate other SAP for prefix1

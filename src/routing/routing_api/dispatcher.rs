@@ -109,11 +109,15 @@ impl Dispatcher {
                 // Send a probe message if we are an elder
                 let core = dispatcher.core.read().await;
                 if core.is_elder() && !core.section().prefix().is_empty() {
-                    if let Ok(command) = core.generate_probe_message().await {
-                        info!("Sending ProbeMessage");
-                        if let Err(e) = dispatcher.handle_command(command).await {
-                            error!("Error sending a Probe message to the network: {:?}", e);
+                    match core.generate_probe_message() {
+                        Ok(command) => {
+                            drop(core);
+                            info!("Sending ProbeMessage");
+                            if let Err(e) = dispatcher.handle_command(command).await {
+                                error!("Error sending a Probe message to the network: {:?}", e);
+                            }
                         }
+                        Err(error) => error!("Problem generating probe message: {:?}", error),
                     }
                 }
             }
@@ -157,42 +161,38 @@ impl Dispatcher {
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
             // Data node msg that requires no locking
-            Command::HandleVerifiedNodeDataMessage {
+            Command::HandleNonBlockingMessage {
                 msg_id,
                 msg_authority,
                 dst_location,
                 msg,
+                sender,
+                known_keys,
             } => {
                 self.core
                     .read()
                     .await
-                    .handle_verified_data_message(
-                        // sender,
+                    .handle_non_blocking_message(
                         msg_id,
                         msg_authority,
                         dst_location,
                         msg,
+                        sender,
+                        known_keys,
                     )
                     .await
             }
             // Non-data node msg that requires locking
-            Command::HandleVerifiedNodeNonDataMessage {
+            Command::HandleBlockingMessage {
                 sender,
                 msg_id,
                 msg_authority,
                 msg,
-                known_keys,
             } => {
                 self.core
                     .write()
                     .await
-                    .handle_verified_non_data_node_message(
-                        sender,
-                        msg_id,
-                        msg_authority,
-                        msg,
-                        known_keys,
-                    )
+                    .handle_blocking_message(sender, msg_id, msg_authority, msg)
                     .await
             }
             Command::HandleSystemMessage {
@@ -243,15 +243,17 @@ impl Dispatcher {
             Command::HandleConnectionLost(addr) => {
                 self.core.read().await.handle_connection_lost(addr)
             }
-            Command::HandlePeerLost(addr) => self.core.read().await.handle_peer_lost(&addr),
+            Command::HandlePeerLost(addr) => self.core.read().await.handle_peer_lost(&addr).await,
             Command::HandleDkgOutcome {
                 section_auth,
                 outcome,
-            } => self
-                .core
-                .write()
-                .await
-                .handle_dkg_outcome(section_auth, outcome),
+            } => {
+                self.core
+                    .write()
+                    .await
+                    .handle_dkg_outcome(section_auth, outcome)
+                    .await
+            }
             Command::HandleDkgFailure(signeds) => self
                 .core
                 .write()
@@ -284,7 +286,11 @@ impl Dispatcher {
                 Ok(vec![])
             }
             Command::SetJoinsAllowed(joins_allowed) => {
-                self.core.read().await.set_joins_allowed(joins_allowed)
+                self.core
+                    .read()
+                    .await
+                    .set_joins_allowed(joins_allowed)
+                    .await
             }
             Command::ProposeOnline {
                 mut peer,
@@ -299,7 +305,7 @@ impl Dispatcher {
                     .make_online_proposal(peer, previous_name, dst_key)
                     .await
             }
-            Command::ProposeOffline(name) => self.core.read().await.propose_offline(name),
+            Command::ProposeOffline(name) => self.core.read().await.propose_offline(name).await,
             Command::StartConnectivityTest(name) => {
                 let msg = {
                     let core = self.core.read().await;

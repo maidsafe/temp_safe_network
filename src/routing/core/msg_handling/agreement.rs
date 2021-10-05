@@ -37,7 +37,7 @@ impl Core {
             }
             Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
             Proposal::SectionInfo(section_auth) => {
-                self.handle_section_info_agreement(section_auth, sig)
+                self.handle_section_info_agreement(section_auth, sig).await
             }
             Proposal::OurElders(section_auth) => {
                 self.handle_our_elders_agreement(section_auth, sig).await
@@ -78,7 +78,10 @@ impl Core {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
                 commands.push(self.send_node_approval(old_info.clone())?);
-                commands.extend(self.relocate_rejoining_peer(&new_info.peer, new_age)?);
+                commands.extend(
+                    self.relocate_rejoining_peer(&new_info.peer, new_age)
+                        .await?,
+                );
 
                 return Ok(commands);
             }
@@ -103,9 +106,12 @@ impl Core {
         })
         .await;
 
-        commands.extend(self.relocate_peers(new_info.value.peer.name(), &new_info.sig.signature)?);
+        commands.extend(
+            self.relocate_peers(new_info.value.peer.name(), &new_info.sig.signature)
+                .await?,
+        );
 
-        let result = self.promote_and_demote_elders()?;
+        let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
             commands.extend(self.send_ae_update_to_adults()?);
         }
@@ -138,9 +144,9 @@ impl Core {
 
         info!("handle Offline: {:?}", peer);
 
-        commands.extend(self.relocate_peers(peer.name(), &signature)?);
+        commands.extend(self.relocate_peers(peer.name(), &signature).await?);
 
-        let result = self.promote_and_demote_elders()?;
+        let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
             commands.extend(self.send_ae_update_to_adults()?);
         }
@@ -156,7 +162,7 @@ impl Core {
         Ok(commands)
     }
 
-    fn handle_section_info_agreement(
+    async fn handle_section_info_agreement(
         &mut self,
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
@@ -199,10 +205,13 @@ impl Core {
             // Send the `OurElder` proposal to all of the to-be-elders so it's aggregated by them.
             let our_elders_recipients: Vec<_> =
                 infos.iter().flat_map(|info| info.peers()).collect();
-            commands.extend(self.send_proposal(
-                &our_elders_recipients,
-                Proposal::OurElders(signed_section_auth),
-            )?);
+            commands.extend(
+                self.send_proposal(
+                    &our_elders_recipients,
+                    Proposal::OurElders(signed_section_auth),
+                )
+                .await?,
+            );
 
             Ok(commands)
         } else {
@@ -221,9 +230,11 @@ impl Core {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let updates =
-            self.split_barrier
-                .process(self.section.prefix(), signed_section_auth.clone(), key_sig);
+        let updates = self.split_barrier.write().await.process(
+            self.section.prefix(),
+            signed_section_auth.clone(),
+            key_sig,
+        );
         if updates.is_empty() {
             return Ok(vec![]);
         }

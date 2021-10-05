@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::msg_count::MsgCount;
-use crate::messaging::WireMsg;
+use super::{msg_count::MsgCount, BackPressure};
+use crate::messaging::{system::LoadReport, WireMsg};
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
 use futures::{
@@ -24,6 +24,7 @@ use xor_name::XorName;
 pub(crate) struct Comm {
     endpoint: Endpoint<XorName>,
     msg_count: MsgCount,
+    back_pressure: BackPressure,
 }
 
 impl Drop for Comm {
@@ -59,9 +60,12 @@ impl Comm {
             event_tx.clone(),
         ));
 
+        let back_pressure = BackPressure::new();
+
         Ok(Self {
             endpoint,
             msg_count,
+            back_pressure,
         })
     }
 
@@ -94,6 +98,7 @@ impl Comm {
             Self {
                 endpoint,
                 msg_count,
+                back_pressure: BackPressure::new(),
             },
             bootstrap_peer.remote_address(),
         ))
@@ -125,18 +130,20 @@ impl Comm {
         recipients: &[(XorName, SocketAddr)],
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
+        trace!("Sending msg on existing connection to {:?}", recipients);
         for (name, addr) in recipients {
             wire_msg.set_dst_xorname(*name);
-            let bytes = wire_msg.serialize()?;
 
+            let bytes = wire_msg.serialize()?;
             let priority = wire_msg.msg_kind().priority();
+            let retries = self.back_pressure.get(addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
             self.endpoint
                 .get_connection_by_addr(addr)
                 .map(|res| res.ok_or(None))
                 .and_then(|connection| async move {
                     connection
-                        .send_with(bytes, priority, None)
+                        .send_with(bytes, priority, Some(&retries))
                         .await
                         .map_err(Some)
                 })
@@ -235,12 +242,16 @@ impl Comm {
                 delivery_group_size,
             );
 
+            let retries = self.back_pressure.get(&recipient.1).await; // TODO: more laid back retries with lower priority, more aggressive with higher
+
             let result = self
                 .endpoint
                 .connect_to(&recipient.1)
                 .err_into()
                 .and_then(|connection| async move {
-                    connection.send_with(msg_bytes, priority, None).await
+                    connection
+                        .send_with(msg_bytes, priority, Some(&retries))
+                        .await
                 })
                 .await
                 .map_err(|err| match err {
@@ -305,6 +316,17 @@ impl Comm {
         } else {
             Ok(SendStatus::MinDeliveryGroupSizeFailed(failed_recipients))
         }
+    }
+
+    /// Regulates comms with the specified peer
+    /// according to the cpu load report provided by it.
+    pub(crate) async fn regulate(&self, peer: SocketAddr, load_report: LoadReport) {
+        self.back_pressure.set(peer, load_report).await
+    }
+
+    /// Returns cpu load report if being strained.
+    pub(crate) async fn check_strain(&self, caller: SocketAddr) -> Option<LoadReport> {
+        self.back_pressure.load_report(caller).await
     }
 
     pub(crate) fn print_stats(&self) {

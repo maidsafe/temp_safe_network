@@ -205,6 +205,7 @@ mod tests {
         },
         utils, Error, Keypair, Result,
     };
+    use crate::client::{BlobAddress, BytesAddress};
     use crate::url::Url;
     use eyre::eyre;
     use proptest::prelude::*;
@@ -1161,10 +1162,8 @@ mod tests {
 
     fn random_url() -> Result<Url> {
         use crate::url::*;
-        let xor_name = XorName::random();
-        let url = Url::encode_blob(
-            xor_name,
-            Scope::Public,
+        let url = Url::encode_bytes(
+            BytesAddress::Blob(BlobAddress::Public(XorName::random())),
             ContentType::Raw,
             XorUrlBase::Base32z,
         )

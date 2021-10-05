@@ -69,7 +69,8 @@ impl Session {
             incoming_err_sender: Arc::new(err_sender),
             endpoint,
             network: Arc::new(NetworkPrefixMap::new(genesis_key)),
-            ae_cache: Arc::new(RwLock::new(AeCache::default())),
+            ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
+            ae_retry_cache: Arc::new(RwLock::new(AeCache::default())),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             bootstrap_peer: bootstrap_peer.remote_address(),
             genesis_key,
@@ -243,7 +244,7 @@ impl Session {
         if let Ok(op_id) = query.operation_id() {
             let _ = tokio::spawn(async move {
                 // Insert the response sender
-                trace!("Inserting channel for {:?}", op_id);
+                trace!("Inserting channel for op_id {:?}", op_id);
                 let _old = pending_queries_for_thread
                     .write()
                     .await
@@ -390,6 +391,49 @@ impl Session {
         }
     }
 
+    pub(crate) async fn fire_and_forget_payload(
+        &self,
+        dst_address: XorName,
+        auth: ServiceAuth,
+        payload: Bytes,
+    ) -> Result<(), Error> {
+        let endpoint = self.endpoint.clone();
+        // Get DataSection elders details.
+        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
+        {
+            (
+                sap.value
+                    .elders
+                    .values()
+                    .cloned()
+                    .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
+                    .collect::<Vec<SocketAddr>>(),
+                sap.value.public_key_set.public_key(),
+            )
+        } else {
+            // Send message to our bootstrap peer with network's genesis PK.
+            (vec![self.bootstrap_peer], self.genesis_key)
+        };
+
+        let msg_id = MessageId::new();
+
+        debug!(
+            "Firing payload w/id {:?}, from {}, to {} Elders whose result will be dropped",
+            msg_id,
+            endpoint.public_addr(),
+            elders.len()
+        );
+
+        let dst_location = DstLocation::Section {
+            name: dst_address,
+            section_pk,
+        };
+        let msg_kind = MsgKind::ServiceMsg(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+
+        send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await
+    }
+
     #[allow(unused)]
     pub(crate) async fn disconnect_from_peers(&self, peers: Vec<SocketAddr>) -> Result<(), Error> {
         for elder in peers {
@@ -430,7 +474,7 @@ pub(crate) async fn send_message(
 
             *successes_clone.write().await += 1;
 
-            trace!("Sent cmd with MsgId {:?} to {:?}", msg_id, &socket);
+            trace!("Sent msg with MsgId {:?} to {:?}", msg_id, &socket);
             Ok(())
         });
         tasks.push(task_handle);
@@ -439,7 +483,6 @@ pub(crate) async fn send_message(
     // Let's await for all messages to be sent
     let _ = join_all(tasks).await;
 
-    // anything not concretely registered as success here is a failure
     let failures = elders.len() - *successes.read().await;
 
     if failures > 0 {

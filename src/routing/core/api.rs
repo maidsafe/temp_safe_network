@@ -32,7 +32,7 @@ use xor_name::XorName;
 
 impl Core {
     // Creates `Core` for the first node in the network
-    pub(crate) fn first_node(
+    pub(crate) async fn first_node(
         comm: Comm,
         mut node: Node,
         event_tx: mpsc::Sender<Event>,
@@ -52,10 +52,11 @@ impl Core {
             used_space,
             root_storage_dir,
         )
+        .await
     }
 
     pub(crate) async fn relocated(&self, mut new_node: Node, new_section: Section) -> Result<Self> {
-        let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None);
+        let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None).await;
 
         // make sure the new Node has the correct local addr as Comm
         let comm = self.comm.clone();
@@ -74,7 +75,7 @@ impl Core {
             network,
             section_keys_provider,
             proposal_aggregator: ProposalAggregator::default(),
-            split_barrier: SplitBarrier::new(),
+            split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: Arc::new(RwLock::new(SignatureAggregator::default())),
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
@@ -117,21 +118,17 @@ impl Core {
     }
 
     /// Tries to sign with the secret corresponding to the provided BLS public key
-    pub(crate) fn sign_with_section_key_share(
+    pub(crate) async fn sign_with_section_key_share(
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
     ) -> Result<(usize, bls::SignatureShare)> {
-        self.section_keys_provider.sign_with(data, public_key)
+        self.section_keys_provider.sign_with(data, public_key).await
     }
 
     /// Returns the current BLS public key set
-    pub(crate) fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        Ok(self
-            .section_keys_provider
-            .key_share()?
-            .public_key_set
-            .clone())
+    pub(crate) async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+        Ok(self.section_keys_provider.key_share().await?.public_key_set)
     }
 
     /// Returns the info about the section matching the name.
@@ -145,14 +142,14 @@ impl Core {
 
     /// Returns our index in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
-    pub(crate) fn our_index(&self) -> Result<usize> {
-        Ok(self.section_keys_provider.key_share()?.index)
+    pub(crate) async fn our_index(&self) -> Result<usize> {
+        Ok(self.section_keys_provider.key_share().await?.index)
     }
 
     /// Returns our key share in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
-    pub(crate) fn key_share(&self) -> Result<&SectionKeyShare> {
-        self.section_keys_provider.key_share()
+    pub(crate) async fn key_share(&self) -> Result<SectionKeyShare> {
+        self.section_keys_provider.key_share().await
     }
 
     pub(crate) async fn send_event(&self, event: Event) {
@@ -221,26 +218,29 @@ impl Core {
     }
 
     // Setting the JoinsAllowed triggers a round Proposal::SetJoinsAllowed to update the flag.
-    pub(crate) fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
+    pub(crate) async fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();
         if self.is_elder() && joins_allowed != self.joins_allowed {
-            commands
-                .extend(self.propose(Proposal::JoinsAllowed((MessageId::new(), joins_allowed)))?);
+            commands.extend(
+                self.propose(Proposal::JoinsAllowed((MessageId::new(), joins_allowed)))
+                    .await?,
+            );
         }
         Ok(commands)
     }
 
     // Generate a new section info based on the current set of members and if it differs from the
     // current elders, trigger a DKG.
-    pub(crate) fn promote_and_demote_elders(&mut self) -> Result<Vec<Command>> {
+    pub(crate) async fn promote_and_demote_elders(&mut self) -> Result<Vec<Command>> {
         self.promote_and_demote_elders_except(&BTreeSet::new())
+            .await
     }
 
     // Generate a new section info based on the current set of members, but
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
-    pub(crate) fn promote_and_demote_elders_except(
-        &mut self,
+    pub(crate) async fn promote_and_demote_elders_except(
+        &self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
@@ -249,7 +249,7 @@ impl Core {
             .section
             .promote_and_demote_elders(&self.node.name(), excluded_names)
         {
-            commands.extend(self.send_dkg_start(elder_candidates)?);
+            commands.extend(self.send_dkg_start(elder_candidates).await?);
         }
 
         Ok(commands)
@@ -265,5 +265,6 @@ impl Core {
             node_state: NodeState::joined(peer, previous_name),
             dst_key,
         })
+        .await
     }
 }

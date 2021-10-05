@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod api;
+mod back_pressure;
 mod bootstrap;
 mod capacity;
 mod chunk_records;
@@ -21,6 +22,7 @@ mod msg_handling;
 mod register_storage;
 mod split_barrier;
 
+pub(crate) use back_pressure::BackPressure;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL};
 pub(crate) use chunk_store::ChunkStore;
@@ -70,7 +72,7 @@ pub(crate) struct Core {
     section_keys_provider: SectionKeysProvider,
     message_aggregator: Arc<RwLock<SignatureAggregator>>,
     proposal_aggregator: ProposalAggregator,
-    split_barrier: SplitBarrier,
+    split_barrier: Arc<RwLock<SplitBarrier>>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
     relocate_state: Option<RelocateState>,
@@ -87,7 +89,7 @@ pub(crate) struct Core {
 
 impl Core {
     // Creates `Core` for a regular node.
-    pub(crate) fn new(
+    pub(crate) async fn new(
         comm: Comm,
         mut node: Node,
         section: Section,
@@ -96,7 +98,8 @@ impl Core {
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
     ) -> Result<Self> {
-        let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share);
+        let section_keys_provider =
+            SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share).await;
 
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
@@ -115,7 +118,7 @@ impl Core {
             network: NetworkPrefixMap::new(genesis_pk),
             section_keys_provider,
             proposal_aggregator: ProposalAggregator::default(),
-            split_barrier: SplitBarrier::new(),
+            split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: Arc::new(RwLock::new(SignatureAggregator::default())),
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
@@ -144,7 +147,7 @@ impl Core {
         }
     }
 
-    pub(crate) async fn generate_probe_message(&self) -> Result<Command> {
+    pub(crate) fn generate_probe_message(&self) -> Result<Command> {
         // Generate a random address not belonging to our Prefix
         let mut dst = XorName::random();
 
@@ -176,7 +179,8 @@ impl Core {
         let new = self.state_snapshot();
 
         self.section_keys_provider
-            .finalise_dkg(self.section.chain().last_key());
+            .finalise_dkg(self.section.chain().last_key())
+            .await;
 
         if new.prefix != old.prefix {
             info!("Split");
@@ -191,15 +195,18 @@ impl Core {
                     self.section.authority_provider().peers().format(", ")
                 );
 
-                if self.section_keys_provider.has_key_share() {
-                    commands.extend(self.promote_and_demote_elders()?);
+                if self.section_keys_provider.has_key_share().await {
+                    commands.extend(self.promote_and_demote_elders().await?);
 
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
-                    commands.extend(self.propose(Proposal::JoinsAllowed((
-                        MessageId::new(),
-                        self.joins_allowed,
-                    )))?);
+                    commands.extend(
+                        self.propose(Proposal::JoinsAllowed((
+                            MessageId::new(),
+                            self.joins_allowed,
+                        )))
+                        .await?,
+                    );
                 }
 
                 self.print_network_stats();
@@ -228,7 +235,7 @@ impl Core {
             } else if old.is_elder && !new.is_elder {
                 info!("Demoted");
                 self.network = NetworkPrefixMap::new(*self.section.genesis_key());
-                self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None);
+                self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None).await;
                 NodeElderChange::Demoted
             } else {
                 NodeElderChange::None

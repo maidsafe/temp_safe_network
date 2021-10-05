@@ -24,11 +24,7 @@ use tiny_keccak::{Hasher, Sha3};
 
 use eyre::{eyre, Context, Result};
 use safe_network::{
-    client::{
-        client_api::{Blob, BlobAddress},
-        utils::test_utils::read_network_conn_info,
-        Client, Config,
-    },
+    client::{utils::test_utils::read_network_conn_info, BytesAddress, Client, Config},
     types::utils::random_bytes,
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
@@ -190,23 +186,23 @@ pub async fn run_split() -> Result<()> {
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     for (address, hash) in all_data_put {
-        println!("...fetching Blob at address {:?} ...", address);
-        let mut data = client.read_blob(address).await;
+        println!("...reading bytes at address {:?} ...", address);
+        let mut bytes = client.read_bytes(address).await;
 
         let mut attempts = 0;
-        while data.is_err() && attempts < 10 {
+        while bytes.is_err() && attempts < 10 {
             attempts += 1;
             // do some retries to ensure we're not just timing out by chance
             sleep(Duration::from_secs(1)).await;
-            data = client.read_blob(address).await;
+            bytes = client.read_bytes(address).await;
         }
 
-        let data = data?;
-        println!("Blob read from {:?}:", address);
+        let bytes = bytes?;
+        println!("Bytes read from {:?}:", address);
 
         let mut hasher = Sha3::v256();
         let mut output = [0; 32];
-        hasher.update(&data);
+        hasher.update(&bytes);
         hasher.finalize(&mut output);
 
         assert_eq!(output, hash);
@@ -217,7 +213,7 @@ pub async fn run_split() -> Result<()> {
     Ok(())
 }
 
-async fn upload_data() -> Result<(BlobAddress, [u8; 32])> {
+async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
     // Now we upload the data.
     println!("Reading network bootstrap information...");
     let (genesis_key, bootstrap_nodes) =
@@ -227,42 +223,37 @@ async fn upload_data() -> Result<(BlobAddress, [u8; 32])> {
     let config = Config::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT)).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
-    let blob = Blob::new(random_bytes(1024 * 1024))?;
+    let bytes = random_bytes(1024 * 1024);
 
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];
-    hasher.update(&blob.bytes());
+    hasher.update(&bytes);
     hasher.finalize(&mut output);
 
-    println!("Storing data w/ hash {:?}", output);
+    println!("Storing bytes w/ hash {:?}", output);
 
-    let address = client.write_blob_to_network(blob, Scope::Public).await?;
-    let xorurl = Url::encode_blob(
-        *address.name(),
-        address.scope(),
-        ContentType::Raw,
-        DEFAULT_XORURL_BASE,
-    )?;
-    println!("Blob stored at xorurl: {}", xorurl);
+    let address = client.upload(bytes, Scope::Public).await?;
+    let xorurl = Url::encode_bytes(address, ContentType::Raw, DEFAULT_XORURL_BASE)?;
+    println!("Bytes stored at xorurl: {}", xorurl);
 
     let delay = 2;
-    println!("Fetching Blob from the network in {} secs...", delay);
+    println!("Reading bytes from the network in {} secs...", delay);
     sleep(Duration::from_secs(delay)).await;
 
-    println!("...fetching Blob from the network now...");
-    let mut data = client.read_blob(address).await;
+    println!("...reading bytes from the network now...");
+    let mut bytes = client.read_bytes(address).await;
 
     let mut attempts = 0;
-    while data.is_err() && attempts < 10 {
+    while bytes.is_err() && attempts < 10 {
         attempts += 1;
         // do some retries to ensure we're not just timing out by chance
         sleep(Duration::from_secs(1)).await;
-        data = client.read_blob(address).await;
+        bytes = client.read_bytes(address).await;
     }
 
-    let _data = data?;
+    let _bytes = bytes?;
 
-    println!("Blob successfully read from {:?}:", address);
+    println!("Bytes successfully read from {:?}:", address);
 
     Ok((address, output))
 }

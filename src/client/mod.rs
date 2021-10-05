@@ -32,7 +32,7 @@ mod errors;
 
 // Export public API.
 
-pub use client_api::{Blob, BlobAddress, Client, Spot, SpotAddress};
+pub use client_api::{BlobAddress, BytesAddress, Client, SpotAddress};
 pub use config_handler::{Config, DEFAULT_QUERY_TIMEOUT};
 pub use errors::ErrorMessage;
 pub use errors::{Error, Result};

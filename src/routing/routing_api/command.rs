@@ -47,20 +47,21 @@ pub(crate) enum Command {
         known_keys: Vec<BlsPublicKey>,
     },
     /// Handle verified node message after aggregation either directly or notify via event listener
-    HandleVerifiedNodeNonDataMessage {
+    HandleBlockingMessage {
         sender: SocketAddr,
         msg_id: MessageId,
         msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
-        #[debug(skip)]
-        known_keys: Vec<BlsPublicKey>,
     },
     /// Handle Node data messages directly
-    HandleVerifiedNodeDataMessage {
+    HandleNonBlockingMessage {
         msg_id: MessageId,
         msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
+        sender: SocketAddr,
+        #[debug(skip)]
+        known_keys: Vec<BlsPublicKey>,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),

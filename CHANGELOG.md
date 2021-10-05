@@ -2,6 +2,105 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.2](https://github.com/maidsafe/safe_network/compare/v0.33.1...v0.33.2) (2021-10-05)
+
+
+### Features
+
+* make section_keys_provider non blocking ([af2545d](https://github.com/maidsafe/safe_network/commit/af2545dcc6b295bb59289e6a6b24f706d3422ede))
+
+### [0.33.1](https://github.com/maidsafe/safe_network/compare/v0.33.0...v0.33.1) (2021-10-05)
+
+
+### Bug Fixes
+
+* return ae retry when unkown key is provided ([a26814f](https://github.com/maidsafe/safe_network/commit/a26814f9f0ea090786b746739ebc1891030183b9))
+
+## [0.33.0](https://github.com/maidsafe/safe_network/compare/v0.32.1...v0.33.0) (2021-10-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **bytes:** Public enum `DataType` is modified, and APIs for
+`Blob` and `Spot` are replaced with  corresponding for `Bytes`.
+
+### Features
+
+* **bytes:** encapsulate storage mechanism ([c4cc634](https://github.com/maidsafe/safe_network/commit/c4cc6340e7d6eb6a4692243ad5676aac56ceff70))
+
+### [0.32.1](https://github.com/maidsafe/safe_network/compare/v0.32.0...v0.32.1) (2021-10-05)
+
+
+### Bug Fixes
+
+* ae retry/redirect cache was not always hit when it should have been ([ff9e772](https://github.com/maidsafe/safe_network/commit/ff9e772a5a74da8600a9caad883d1d84a3717793))
+* make prefixmap cloneable with Arc ([3adb613](https://github.com/maidsafe/safe_network/commit/3adb6139b2a649353066b1591bd957caa0e8172f))
+* readd separate ae retry/redirect caches ([6806269](https://github.com/maidsafe/safe_network/commit/68062699c4dabf4c6ad8d8845c851d33340ced25))
+* use current prefixmap on AE retry after any update, NOT what was provided ([7cf4478](https://github.com/maidsafe/safe_network/commit/7cf4478ea31db89e8b5986094342d73567e43b1b))
+
+## [0.32.0](https://github.com/maidsafe/safe_network/compare/v0.31.39...v0.32.0) (2021-10-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* This is to facilitate the new way that files are stored on the network, which was
+updated to support changes in self encryption.
+
+Self encryption doesn't allow encryption of files less than 3072 bytes in size, so a new type of
+data was created to support storage of smaller files. This data type is known as a 'spot'.
+
+We need to distinguish between blobs and spots when retrieving files, and the solution is for the
+DataType on XorUrls to be marked as the Spot type when they are saved (which will be done in the
+API).
+
+The `encode_blob` and `encode_spot` functions are both introduced for convenience. These accept a
+BlobAddress and a SpotAddress, respectively. Added a couple of extra tests for checking that
+`encode_spot` was setting fields correctly.
+
+### Features
+
+* add spot entry to datatype enum ([b13125b](https://github.com/maidsafe/safe_network/commit/b13125b33c5224e3dc7a2fa120259221d55a6bba))
+
+### [0.31.39](https://github.com/maidsafe/safe_network/compare/v0.31.38...v0.31.39) (2021-10-01)
+
+
+### Features
+
+* make DKG voter concurrent and cloneable ([468625b](https://github.com/maidsafe/safe_network/commit/468625b35e7986e6ec9045a09f3b47a4964c43f6))
+
+### [0.31.38](https://github.com/maidsafe/safe_network/compare/v0.31.37...v0.31.38) (2021-10-01)
+
+
+### Features
+
+* wrap SplitBarrier in arc/rwlock for better concurrency ([d80bedb](https://github.com/maidsafe/safe_network/commit/d80bedb748721b4fd444c59061b0e966ec40ff0b))
+
+### [0.31.37](https://github.com/maidsafe/safe_network/compare/v0.31.36...v0.31.37) (2021-10-01)
+
+
+### Features
+
+* **backpressure:** add cpu load based adaption ([097eb75](https://github.com/maidsafe/safe_network/commit/097eb757b5e0ae8779dc7ab95627efa84b9789bd))
+* **backpressure:** expire load reports ([d0c9d22](https://github.com/maidsafe/safe_network/commit/d0c9d22bf0eee99045d041fcb98de8eafca4d7be))
+* **backpressure:** send and receive backpressure ([1f9be80](https://github.com/maidsafe/safe_network/commit/1f9be80b2653f0811befc13e8e51f542e3ed6d91))
+* **error:** add info to cannot route error ([da628a1](https://github.com/maidsafe/safe_network/commit/da628a1d81398d7486871a857e9475b472bfc8f6))
+
+
+### Bug Fixes
+
+* **backpressure:** only send once per interval ([b57006b](https://github.com/maidsafe/safe_network/commit/b57006b85f03d2973cbf89dc99be9b67489019d1))
+* **test:** take new cmd into account ([faacb9d](https://github.com/maidsafe/safe_network/commit/faacb9dbf6e01a94a1e8c869c1cc76bc349d0975))
+* **tests:** setup network where expected recipient ([69b395f](https://github.com/maidsafe/safe_network/commit/69b395fc22b293e461dd588e76d630b5282ecf56))
+
+### [0.31.36](https://github.com/maidsafe/safe_network/compare/v0.31.35...v0.31.36) (2021-10-01)
+
+
+### Bug Fixes
+
+* **client:** send a message to probe the network initally ([15c9c72](https://github.com/maidsafe/safe_network/commit/15c9c72ddc7eac56ff6075211762c14fc82356c0))
+
+### [0.31.35](https://github.com/maidsafe/safe_network/compare/v0.31.34...v0.31.35) (2021-10-01)
+
 ### [0.31.34](https://github.com/maidsafe/safe_network/compare/v0.31.33...v0.31.34) (2021-09-30)
 
 

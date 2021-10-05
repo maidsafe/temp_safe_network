@@ -14,6 +14,7 @@ mod url_parts;
 mod version_hash;
 mod xorurl_media_types;
 
+use crate::client::BytesAddress;
 use crate::types::register;
 pub use errors::{Error, Result};
 use multibase::{decode as base_decode, encode as base_encode, Base};
@@ -157,7 +158,7 @@ pub enum DataType {
     #[allow(missing_docs)]
     SafeKey = 0x00,
     #[allow(missing_docs)]
-    Blob = 0x01,
+    Bytes = 0x01,
     #[allow(missing_docs)]
     Register = 0x02,
 }
@@ -509,7 +510,7 @@ impl Url {
 
         let data_type = match xorurl_bytes[4] {
             0 => DataType::SafeKey,
-            1 => DataType::Blob,
+            1 => DataType::Bytes,
             2 => DataType::Register,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
@@ -1029,19 +1030,18 @@ impl Url {
         )
     }
 
-    /// A non-member Blob encoder function for convenience
-    pub fn encode_blob(
-        xor_name: XorName,
-        scope: Scope,
+    /// A non-member bytes encoder function for convenience
+    pub fn encode_bytes(
+        address: BytesAddress,
         content_type: ContentType,
         base: XorUrlBase,
     ) -> Result<String> {
         Url::encode(
-            xor_name,
+            *address.name(),
             None,
             0,
-            scope,
-            DataType::Blob,
+            address.scope(),
+            DataType::Bytes,
             content_type,
             None,
             None,
@@ -1237,6 +1237,7 @@ impl fmt::Display for Url {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::client::BlobAddress;
     use eyre::{bail, eyre, Result};
 
     macro_rules! verify_expected_result {
@@ -1345,7 +1346,7 @@ mod tests {
             None,
             0xa632_3c4d_4a32,
             Scope::Public,
-            DataType::Blob,
+            DataType::Bytes,
             ContentType::Raw,
             None,
             None,
@@ -1363,9 +1364,8 @@ mod tests {
     #[test]
     fn test_url_base32z_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = Url::encode_blob(
-            xor_name,
-            Scope::Public,
+        let xorurl = Url::encode_bytes(
+            BytesAddress::Blob(BlobAddress::Public(xor_name)),
             ContentType::Raw,
             XorUrlBase::Base32z,
         )?;
@@ -1402,9 +1402,8 @@ mod tests {
     fn test_url_default_base_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
-        let xorurl = Url::encode_blob(
-            xor_name,
-            Scope::Public,
+        let xorurl = Url::encode_bytes(
+            BytesAddress::Blob(BlobAddress::Public(xor_name)),
             ContentType::Raw,
             DEFAULT_XORURL_BASE,
         )?;
@@ -1426,7 +1425,7 @@ mod tests {
             None,
             type_tag,
             Scope::Public,
-            DataType::Blob,
+            DataType::Bytes,
             ContentType::Raw,
             Some(subdirs),
             Some(vec!["subname".to_string()]),
@@ -1442,7 +1441,7 @@ mod tests {
         assert_eq!(xor_name, url.xorname());
         assert_eq!(type_tag, url.type_tag());
         assert_eq!(Scope::Public, url.scope());
-        assert_eq!(DataType::Blob, url.data_type());
+        assert_eq!(DataType::Bytes, url.data_type());
         assert_eq!(ContentType::Raw, url.content_type());
         assert_eq!(Some(content_version), url.content_version());
         assert_eq!(query_string_v, url.query_string());
@@ -1484,7 +1483,7 @@ mod tests {
             None,
             type_tag,
             Scope::Public,
-            DataType::Blob,
+            DataType::Bytes,
             ContentType::NrsMapContainer,
             None,
             Some(vec!["sub".to_string()]),
@@ -1513,11 +1512,10 @@ mod tests {
     }
 
     #[test]
-    fn test_url_encoding_decoding_with_media_type() -> Result<()> {
+    fn encode_bytes_should_set_media_type() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = Url::encode_blob(
-            xor_name,
-            Scope::Public,
+        let xorurl = Url::encode_bytes(
+            BytesAddress::Blob(BlobAddress::Public(xor_name)),
             ContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,
         )?;
@@ -1527,6 +1525,20 @@ mod tests {
             ContentType::MediaType("text/html".to_string()),
             url.content_type()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn encode_bytes_should_set_data_type() -> Result<()> {
+        let xor_name = XorName(*b"12345678901234567890123456789012");
+        let xorurl = Url::encode_bytes(
+            BytesAddress::Blob(BlobAddress::Public(xor_name)),
+            ContentType::MediaType("text/html".to_string()),
+            XorUrlBase::Base32z,
+        )?;
+
+        let url = Url::from_url(&xorurl)?;
+        assert_eq!(url.data_type(), DataType::Bytes);
         Ok(())
     }
 
@@ -1550,9 +1562,8 @@ mod tests {
     #[test]
     fn test_url_too_short() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = Url::encode_blob(
-            xor_name,
-            Scope::Public,
+        let xorurl = Url::encode_bytes(
+            BytesAddress::Blob(BlobAddress::Public(xor_name)),
             ContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,
         )?;

@@ -63,15 +63,24 @@ static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
-    let node = create_node(FIRST_SECTION_MIN_AGE, None);
+    let (section_auth, mut nodes, sk_set) = create_section_auth();
+
+    let pk_set = sk_set.public_keys();
+    let section_key = pk_set.public_key();
+
+    let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
-    let core = Core::first_node(
+    let core = Core::new(
         create_comm().await?,
         node,
+        section,
+        Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     let new_node_comm = create_comm().await?;
@@ -79,7 +88,6 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
         new_node_comm.our_connection_info(),
     );
-    let section_key = *dispatcher.core.read().await.section().chain().last_key();
 
     let wire_msg = WireMsg::single_src(
         &new_node,
@@ -105,8 +113,14 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     .await?
     .into_iter();
 
+    let mut next_cmd = commands.next();
+
+    if matches!(next_cmd, Some(Command::SendMessageDeliveryGroup { .. })) {
+        next_cmd = commands.next();
+    }
+
     let response_wire_msg = assert_matches!(
-        commands.next(),
+        next_cmd,
         Some(Command::SendMessage {
             wire_msg,
             ..
@@ -126,22 +140,30 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_with_resource_proof_response() -> Result<()> {
-    let node = create_node(FIRST_SECTION_MIN_AGE, None);
+    let (section_auth, mut nodes, sk_set) = create_section_auth();
+
+    let pk_set = sk_set.public_keys();
+    let section_key = pk_set.public_key();
+
+    let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
-    let core = Core::first_node(
+    let core = Core::new(
         create_comm().await?,
         node,
+        section,
+        Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     let new_node = Node::new(
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
         gen_addr(),
     );
-    let section_key = *dispatcher.core.read().await.section().chain().last_key();
 
     let nonce: [u8; 32] = rand::random();
     let serialized = bincode::serialize(&(new_node.name(), nonce))?;
@@ -222,7 +244,8 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     let relocated_node_old_keypair =
@@ -319,7 +342,8 @@ async fn aggregate_proposals() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     let new_peer = create_peer(MIN_AGE);
@@ -356,7 +380,11 @@ async fn aggregate_proposals() -> Result<()> {
         )
         .await?;
 
-        assert!(commands.is_empty());
+        if !commands.is_empty() {
+            // only possible/expected msg if not empty, is a backpressure msg
+            assert_eq!(1, commands.len());
+            assert_matches!(commands[0], Command::SendMessageDeliveryGroup { .. })
+        }
     }
 
     let sig_share = proposal.prove(
@@ -389,8 +417,14 @@ async fn aggregate_proposals() -> Result<()> {
     .await?
     .into_iter();
 
+    let mut next_cmd = commands.next();
+
+    if matches!(next_cmd, Some(Command::SendMessageDeliveryGroup { .. })) {
+        next_cmd = commands.next();
+    }
+
     assert_matches!(
-        commands.next(),
+        next_cmd,
         Some(Command::HandleAgreement { proposal: agreement, .. }) => {
             assert_eq!(agreement, proposal);
         }
@@ -417,7 +451,8 @@ async fn handle_agreement_on_online() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     let new_peer = create_peer(MIN_AGE);
@@ -477,7 +512,8 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     // Handle agreement on Online of a peer that is older than the youngest
@@ -642,7 +678,8 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         event_tx,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(state);
 
     // Simulate peer with the same name is rejoin and verify resulted behaviours.
@@ -706,7 +743,8 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     let node_state = NodeState {
@@ -762,7 +800,8 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     // Handle agreement on the Offline proposal
@@ -865,7 +904,8 @@ async fn handle_untrusted_accumulated_message() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
 
     // just any non-AE message here as they are handle differently
     let original_node_msg = SystemMsg::NodeMsgError {
@@ -989,7 +1029,8 @@ async fn check_we_send_ae_update_when_msg_bounced_as_untrusted() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
 
     // just any non-AE message here as they are handle differently
     let original_node_msg = SystemMsg::NodeMsgError {
@@ -1090,7 +1131,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
 
     let dispatcher = Dispatcher::new(core);
 
@@ -1193,7 +1235,8 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
 
     let dispatcher = Dispatcher::new(core);
 
@@ -1286,7 +1329,8 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     let relocated_peer = match relocated_peer_role {
@@ -1375,7 +1419,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let comm = Comm::new((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
 
-    let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir)?;
+    let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir).await?;
     let node = core.node().clone();
     let section_pk = *core.section_chain().last_key();
     let dispatcher = Dispatcher::new(core);
@@ -1485,7 +1529,8 @@ async fn handle_elders_update() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     let commands = dispatcher
@@ -1594,7 +1639,8 @@ async fn handle_demote_during_split() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-    )?;
+    )
+    .await?;
     let dispatcher = Dispatcher::new(core);
 
     let sk_set_v1_p0 = SecretKeySet::random();

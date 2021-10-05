@@ -46,6 +46,17 @@ impl Core {
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
+        let mut cmds = vec![];
+
+        // Apply backpressure if needed.
+        if let Some(load_report) = self.comm.check_strain(sender).await {
+            let msg_src = wire_msg.msg_kind().src();
+            cmds.push(Command::PrepareNodeMsgToSend {
+                msg: SystemMsg::BackPressure(load_report),
+                dst: msg_src.to_dst(),
+            })
+        }
+
         // Deserialize the payload of the incoming message
         let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
@@ -57,7 +68,7 @@ impl Core {
                     "Failed to deserialize message payload ({:?}): {:?}",
                     msg_id, error
                 );
-                return Ok(vec![]);
+                return Ok(cmds);
             }
         };
 
@@ -79,17 +90,18 @@ impl Core {
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
                     debug!("Untrusted message from {:?}: {:?} ", sender, msg);
 
-                    return if !matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
+                    if !matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
                         let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
-                        Ok(vec![cmd])
+                        cmds.push(cmd);
                     } else {
                         // otherwise we might loop
                         warn!("Dropping untrusted AE Update");
-                        Ok(vec![])
-                    };
+                    }
+                    return Ok(cmds);
                 }
                 trace!(
-                    "Trusted msg authority in message from {:?}: {:?}",
+                    "Trusted msg authority in message_id {:?} from {:?}: {:?}",
+                    msg_id,
                     sender,
                     msg
                 );
@@ -128,16 +140,17 @@ impl Core {
                                     .await?
                                 {
                                     // short circuit and send those AE responses
-                                    return Ok(vec![ae_command]);
+                                    cmds.push(ae_command);
+                                    return Ok(cmds);
                                 }
                             }
                         },
                     }
 
-                    info!("Entropy check passed. Handling verified msg {}", msg_id);
+                    info!("Entropy check passed. Handling verified msg {:?}", msg_id);
                 }
 
-                Ok(vec![Command::HandleSystemMessage {
+                cmds.push(Command::HandleSystemMessage {
                     sender,
                     msg_id,
                     msg_authority,
@@ -145,7 +158,9 @@ impl Core {
                     msg,
                     payload,
                     known_keys,
-                }])
+                });
+
+                Ok(cmds)
             }
             MessageType::Service {
                 msg_id,
@@ -170,7 +185,7 @@ impl Core {
                             "Service msg has been dropped since client connection id for {} was not found: {:?}",
                             sender, msg
                         );
-                        return Ok(vec![]);
+                        return Ok(cmds);
                     }
                 };
 
@@ -178,7 +193,8 @@ impl Core {
 
                 if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
-                    return Ok(vec![self.ae_redirect(sender, &src_location, &wire_msg)?]);
+                    cmds.push(self.ae_redirect(sender, &src_location, &wire_msg)?);
+                    return Ok(cmds);
                 }
 
                 // First we perform AE checks
@@ -186,12 +202,12 @@ impl Core {
                     Some(section_pk) => section_pk,
                     None => {
                         warn!("Dropping service message as there is no valid dst section_pk.");
-                        return Ok(vec![]);
+                        return Ok(cmds);
                     }
                 };
 
                 let msg_bytes = original_bytes.unwrap_or(wire_msg.serialize()?);
-                if let Some(command) = self
+                if let Some(cmd) = self
                     .check_for_entropy(
                         // a cheap clone w/ Bytes
                         msg_bytes,
@@ -203,11 +219,16 @@ impl Core {
                     .await?
                 {
                     // short circuit and send those AE responses
-                    return Ok(vec![command]);
+                    cmds.push(cmd);
+                    return Ok(cmds);
                 }
 
-                self.handle_service_message(msg_id, auth, msg, dst_location, user)
-                    .await
+                cmds.extend(
+                    self.handle_service_message(msg_id, auth, msg, dst_location, user)
+                        .await?,
+                );
+
+                Ok(cmds)
             }
         }
     }
@@ -233,24 +254,33 @@ impl Core {
         {
             Ok(false) => match msg {
                 SystemMsg::NodeCmd(_)
+                | SystemMsg::JoinResponse(_)
+                | SystemMsg::JoinRequest(_)
+                | SystemMsg::JoinAsRelocatedRequest(_)
+                | SystemMsg::BouncedUntrustedMessage { .. }
+                | SystemMsg::DkgStart { .. }
+                | SystemMsg::DkgFailureAgreement(_)
+                | SystemMsg::DkgMessage { .. }
+                | SystemMsg::DkgFailureObservation { .. }
                 | SystemMsg::NodeQuery(_)
                 | SystemMsg::NodeQueryResponse { .. } => {
-                    let cmd = Command::HandleVerifiedNodeDataMessage {
+                    let cmd = Command::HandleNonBlockingMessage {
                         msg_id,
                         msg,
                         msg_authority,
                         dst_location,
+                        sender,
+                        known_keys,
                     };
 
                     Ok(vec![cmd])
                 }
                 _ => {
-                    let cmd = Command::HandleVerifiedNodeNonDataMessage {
+                    let cmd = Command::HandleBlockingMessage {
                         sender,
                         msg_id,
                         msg,
                         msg_authority,
-                        known_keys,
                     };
 
                     Ok(vec![cmd])
@@ -269,17 +299,16 @@ impl Core {
 
     // Handler for node messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_verified_non_data_node_message(
+    pub(crate) async fn handle_blocking_message(
         &mut self,
         sender: SocketAddr,
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
         node_msg: SystemMsg,
-        known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
-        trace!("Handling verified Non-Data message");
+        trace!("Handling blocking system message");
         match node_msg {
             SystemMsg::AntiEntropyRetry {
                 section_auth,
@@ -332,6 +361,12 @@ impl Core {
                 info!("Received Probe message from {:?}: {:?}", sender, msg_id);
                 Ok(vec![])
             }
+            SystemMsg::BackPressure(load_report) => {
+                trace!("Handling msg: BackPressure from {}", sender);
+                // #TODO: Factor in med/long term backpressure into general node liveness calculations
+                self.comm.regulate(sender, load_report).await;
+                Ok(vec![])
+            }
             SystemMsg::Relocate(ref details) => {
                 trace!("Handling msg: Relocate from {}", sender);
                 if let NodeMsgAuthority::Section(section_signed) = msg_authority {
@@ -355,73 +390,6 @@ impl Core {
                 }
 
                 Ok(vec![Command::TestConnectivity(name)])
-            }
-            SystemMsg::JoinRequest(join_request) => {
-                trace!("Handling msg: JoinRequest from {}", sender);
-                self.handle_join_request(msg_authority.peer(sender)?, *join_request)
-                    .await
-            }
-            SystemMsg::JoinAsRelocatedRequest(join_request) => {
-                trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                if self.is_not_elder()
-                    && join_request.section_key == *self.section.chain().last_key()
-                {
-                    return Ok(vec![]);
-                }
-
-                self.handle_join_as_relocated_request(
-                    msg_authority.peer(sender)?,
-                    *join_request,
-                    known_keys,
-                )
-                .await
-            }
-            SystemMsg::BouncedUntrustedMessage {
-                msg: bounced_msg,
-                dst_section_pk,
-            } => {
-                trace!("Handling msg: BouncedUntrustedMessage from {}", sender);
-
-                Ok(self.handle_bounced_untrusted_message(
-                    msg_authority.peer(sender)?,
-                    dst_section_pk,
-                    *bounced_msg,
-                )?)
-            }
-            SystemMsg::DkgStart {
-                session_id,
-                elder_candidates,
-            } => {
-                trace!("Handling msg: Dkg-Start from {}", sender);
-                if !elder_candidates.elders.contains_key(&self.node.name()) {
-                    return Ok(vec![]);
-                }
-
-                self.handle_dkg_start(session_id, elder_candidates)
-            }
-            SystemMsg::DkgMessage {
-                session_id,
-                message,
-            } => {
-                trace!(
-                    "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
-                    session_id,
-                    message,
-                    sender
-                );
-                self.handle_dkg_message(session_id, message, src_name)
-            }
-            SystemMsg::DkgFailureObservation {
-                session_id,
-                sig,
-                failed_participants,
-            } => {
-                trace!("Handling msg: Dkg-FailureObservation from {}", sender);
-                self.handle_dkg_failure_observation(session_id, &failed_participants, sig)
-            }
-            SystemMsg::DkgFailureAgreement(sig_set) => {
-                trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
-                self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
             SystemMsg::Propose {
                 ref content,
@@ -477,10 +445,6 @@ impl Core {
 
                 Ok(commands)
             }
-            SystemMsg::JoinResponse(join_response) => {
-                debug!("Ignoring unexpected message: {:?}", join_response);
-                Ok(vec![])
-            }
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(RelocateState::InProgress(ref mut joining_as_relocated)) =
@@ -511,7 +475,7 @@ impl Core {
             }
             _ => {
                 warn!(
-                    "!!! Unexpected NodeMsg handled at verified NON DATA nodemsg handling: {:?}",
+                    "!!! Unexpected SystemMsg handled at verified non thread safe nodemsg handling: {:?}",
                     node_msg
                 );
                 Ok(vec![])
@@ -521,14 +485,92 @@ impl Core {
 
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_verified_data_message(
+    pub(crate) async fn handle_non_blocking_message(
         &self,
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
         node_msg: SystemMsg,
+        sender: SocketAddr,
+        known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
+        let src_name = msg_authority.name();
+        trace!("Handling non blocking message");
         match node_msg {
+            SystemMsg::JoinResponse(join_response) => {
+                debug!(
+                    "Ignoring unexpected join response message: {:?}",
+                    join_response
+                );
+                Ok(vec![])
+            }
+            SystemMsg::DkgFailureAgreement(sig_set) => {
+                trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
+                self.handle_dkg_failure_agreement(&src_name, &sig_set).await
+            }
+            SystemMsg::JoinRequest(join_request) => {
+                trace!("Handling msg: JoinRequest from {}", sender);
+                self.handle_join_request(msg_authority.peer(sender)?, *join_request)
+                    .await
+            }
+            SystemMsg::JoinAsRelocatedRequest(join_request) => {
+                trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
+                if self.is_not_elder()
+                    && join_request.section_key == *self.section.chain().last_key()
+                {
+                    return Ok(vec![]);
+                }
+
+                self.handle_join_as_relocated_request(
+                    msg_authority.peer(sender)?,
+                    *join_request,
+                    known_keys,
+                )
+                .await
+            }
+            SystemMsg::BouncedUntrustedMessage {
+                msg: bounced_msg,
+                dst_section_pk,
+            } => {
+                trace!("Handling msg: BouncedUntrustedMessage from {}", sender);
+
+                Ok(self.handle_bounced_untrusted_message(
+                    msg_authority.peer(sender)?,
+                    dst_section_pk,
+                    *bounced_msg,
+                )?)
+            }
+            SystemMsg::DkgStart {
+                session_id,
+                elder_candidates,
+            } => {
+                trace!("Handling msg: Dkg-Start from {}", sender);
+                if !elder_candidates.elders.contains_key(&self.node.name()) {
+                    return Ok(vec![]);
+                }
+
+                self.handle_dkg_start(session_id, elder_candidates).await
+            }
+            SystemMsg::DkgMessage {
+                session_id,
+                message,
+            } => {
+                trace!(
+                    "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
+                    session_id,
+                    message,
+                    sender
+                );
+                self.handle_dkg_message(session_id, message, src_name).await
+            }
+            SystemMsg::DkgFailureObservation {
+                session_id,
+                sig,
+                failed_participants,
+            } => {
+                trace!("Handling msg: Dkg-FailureObservation from {}", sender);
+                self.handle_dkg_failure_observation(session_id, &failed_participants, sig)
+            }
             // The following type of messages are all handled by upper sn_node layer.
             // TODO: In the future the sn-node layer won't be receiving Events but just
             // plugging in msg handlers.
@@ -684,6 +726,7 @@ impl Core {
             let aggregation = false;
 
             self.send_node_msg_to_targets(msg, target_holders, aggregation)
+                .await
         } else {
             error!("Received unexpected message while Adult");
             Ok(vec![])
@@ -691,7 +734,7 @@ impl Core {
     }
 
     /// Takes a message and forms commands to send to specified targets
-    pub(super) fn send_node_msg_to_targets(
+    pub(super) async fn send_node_msg_to_targets(
         &self,
         msg: SystemMsg,
         targets: BTreeSet<XorName>,
@@ -716,7 +759,7 @@ impl Core {
             let src = our_name;
 
             WireMsg::for_dst_accumulation(
-                self.key_share().map_err(|err| err)?,
+                &self.key_share().await.map_err(|err| err)?,
                 src,
                 dummy_dst_location,
                 msg,

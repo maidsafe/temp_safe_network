@@ -238,6 +238,7 @@ impl RegisterStorage {
     ) -> Result<QueryResponse> {
         trace!("Reading register {:?}", read.dst_address());
         let operation_id = read.operation_id().map_err(|_| Error::NoOperationId)?;
+        trace!("Operation of register read: {:?}", operation_id);
         use RegisterRead::*;
         match read {
             Get(address) => self.get(*address, requester_pk, operation_id),

@@ -8,7 +8,7 @@
 
 use eyre::Result;
 use safe_network::{
-    client::{client_api::Blob, utils::test_utils::read_network_conn_info, Client, Config},
+    client::{utils::test_utils::read_network_conn_info, Client, Config},
     types::utils::random_bytes,
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
@@ -33,25 +33,20 @@ async fn main() -> Result<()> {
     let pk = client.public_key();
     println!("Client Public Key: {}", pk);
 
-    let blob = Blob::new(random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES))?;
-    println!("Storing data.. ({} bytes)", blob.bytes().len());
+    let bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES);
+    println!("Storing {} bytes..", bytes.len());
 
-    let address = client.write_blob_to_network(blob, Scope::Public).await?;
-    let xorurl = Url::encode_blob(
-        *address.name(),
-        Scope::Public,
-        ContentType::Raw,
-        DEFAULT_XORURL_BASE,
-    )?;
-    println!("Blob stored at xorurl: {}", xorurl);
+    let address = client.upload(bytes, Scope::Public).await?;
+    let xorurl = Url::encode_bytes(address, ContentType::Raw, DEFAULT_XORURL_BASE)?;
+    println!("Bytes stored at xorurl: {}", xorurl);
 
     let delay = 5;
-    println!("Fetching Blob from the network in {} secs...", delay);
+    println!("Reading bytes from the network in {} secs...", delay);
     sleep(Duration::from_secs(delay)).await;
 
-    println!("...fetching Blob from the network now...");
-    let _ = client.read_blob(address).await?;
-    println!("Blob read from {:?}", address);
+    println!("...reading bytes from the network now...");
+    let _ = client.read_bytes(address).await?;
+    println!("Bytes read from {:?}", address);
 
     println!();
 

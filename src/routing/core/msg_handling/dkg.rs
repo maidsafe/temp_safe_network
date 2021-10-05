@@ -23,38 +23,42 @@ use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Core {
-    pub(crate) fn handle_dkg_start(
-        &mut self,
+    pub(crate) async fn handle_dkg_start(
+        &self,
         session_id: DkgSessionId,
         elder_candidates: ElderCandidates,
     ) -> Result<Vec<Command>> {
         trace!("Received DkgStart for {:?}", elder_candidates);
-        self.dkg_voter.start(
-            &self.node,
-            session_id,
-            elder_candidates,
-            *self.section_chain().last_key(),
-        )
+        self.dkg_voter
+            .start(
+                &self.node,
+                session_id,
+                elder_candidates,
+                *self.section_chain().last_key(),
+            )
+            .await
     }
 
-    pub(crate) fn handle_dkg_message(
-        &mut self,
+    pub(crate) async fn handle_dkg_message(
+        &self,
         session_id: DkgSessionId,
         message: DkgMessage,
         sender: XorName,
     ) -> Result<Vec<Command>> {
         trace!("handle DKG message {:?} from {}", message, sender);
 
-        self.dkg_voter.process_message(
-            &self.node,
-            &session_id,
-            message,
-            *self.section_chain().last_key(),
-        )
+        self.dkg_voter
+            .process_message(
+                &self.node,
+                &session_id,
+                message,
+                *self.section_chain().last_key(),
+            )
+            .await
     }
 
     pub(crate) fn handle_dkg_failure_observation(
-        &mut self,
+        &self,
         session_id: DkgSessionId,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
@@ -68,8 +72,8 @@ impl Core {
         }
     }
 
-    pub(crate) fn handle_dkg_failure_agreement(
-        &mut self,
+    pub(crate) async fn handle_dkg_failure_agreement(
+        &self,
         sender: &XorName,
         failure_set: &DkgFailureSigSet,
     ) -> Result<Vec<Command>> {
@@ -100,7 +104,10 @@ impl Core {
                 failure_set.failed_participants,
                 generation, elder_candidates
             );
-            commands.extend(self.cast_offline_proposals(&failure_set.failed_participants)?);
+            commands.extend(
+                self.cast_offline_proposals(&failure_set.failed_participants)
+                    .await?,
+            );
         }
 
         trace!(
@@ -108,12 +115,15 @@ impl Core {
             elder_candidates, failure_set.failed_participants
         );
 
-        commands.extend(self.promote_and_demote_elders_except(&failure_set.failed_participants)?);
+        commands.extend(
+            self.promote_and_demote_elders_except(&failure_set.failed_participants)
+                .await?,
+        );
         Ok(commands)
     }
 
-    pub(crate) fn handle_dkg_outcome(
-        &mut self,
+    pub(crate) async fn handle_dkg_outcome(
+        &self,
         section_auth: SectionAuthorityProvider,
         key_share: SectionKeyShare,
     ) -> Result<Vec<Command>> {
@@ -126,13 +136,13 @@ impl Core {
         self.section_keys_provider.insert_dkg_outcome(key_share);
 
         if self.section.chain().has_key(&public_key) {
-            self.section_keys_provider.finalise_dkg(&public_key)
+            self.section_keys_provider.finalise_dkg(&public_key).await
         }
 
         result
     }
 
-    pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Result<Command> {
+    pub(crate) fn handle_dkg_failure(&self, failure_set: DkgFailureSigSet) -> Result<Command> {
         let node_msg = SystemMsg::DkgFailureAgreement(failure_set);
         self.send_message_to_our_elders(node_msg)
     }

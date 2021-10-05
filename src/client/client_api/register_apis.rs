@@ -225,6 +225,7 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
+    use crate::client::BytesAddress;
     use crate::messaging::data::Error as ErrorMessage;
     use crate::retry_loop_for_pattern;
     use crate::types::{
@@ -234,7 +235,7 @@ mod tests {
     use crate::{
         client::{
             utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff_delayed},
-            Error,
+            BlobAddress, Error,
         },
         url::Url,
     };
@@ -605,9 +606,8 @@ mod tests {
     fn random_url() -> Result<Url> {
         use crate::url::*;
         let xor_name = XorName::random();
-        let url = match Url::encode_blob(
-            xor_name,
-            Scope::Public,
+        let url = match Url::encode_bytes(
+            BytesAddress::Blob(BlobAddress::Public(xor_name)),
             ContentType::Raw,
             XorUrlBase::Base32z,
         ) {
