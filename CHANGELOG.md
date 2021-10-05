@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.37.0](https://github.com/maidsafe/sn_cli/compare/v0.36.0...v0.37.0) (2021-10-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* Multimap entries for NRS will be assigned a different data type when they are
+created.
+
+Note, the breaking change relates to the previous commit. For some reason the workflow for updating
+the version and deploying a new release didn't trigger.
+
+This commit and PR is just to try and force a new release.
+* Multimap entries for NRS will be assigned a different data type when they are
+created.
+
+Updates to the latest version of sn_api and also removes the ignore attribute from NRS tests, since
+the new version of the API has a fix for NRS issues.
+
+* force new release with readme update ([99c3760](https://github.com/maidsafe/sn_cli/commit/99c37603ba5ab80fac27e7a4752df71376ee16ff))
+* upgrade sn_api to 0.37.0 ([9da8a77](https://github.com/maidsafe/sn_cli/commit/9da8a77cfca5eb99ef4cea6d38de856408624537))
+
 ## [0.36.0](https://github.com/maidsafe/sn_cli/compare/v0.35.0...v0.36.0) (2021-10-04)
 
 
