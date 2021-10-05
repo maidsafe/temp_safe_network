@@ -85,6 +85,11 @@ impl Core {
                     return Ok(vec![]);
                 }
 
+                trace!(
+                    "Responding to regsiter read, msg_id {:?} with {:?}",
+                    msg_id,
+                    response
+                );
                 let msg = ServiceMsg::QueryResponse {
                     response,
                     correlation_id: msg_id,

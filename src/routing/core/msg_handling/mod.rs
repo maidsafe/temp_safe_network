@@ -100,7 +100,8 @@ impl Core {
                     return Ok(cmds);
                 }
                 trace!(
-                    "Trusted msg authority in message from {:?}: {:?}",
+                    "Trusted msg authority in message_id {:?} from {:?}: {:?}",
+                    msg_id,
                     sender,
                     msg
                 );
@@ -146,7 +147,7 @@ impl Core {
                         },
                     }
 
-                    info!("Entropy check passed. Handling verified msg {}", msg_id);
+                    info!("Entropy check passed. Handling verified msg {:?}", msg_id);
                 }
 
                 cmds.push(Command::HandleSystemMessage {
@@ -303,7 +304,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
-        trace!("Handling verified non-thread-safe system message");
+        trace!("Handling blocking system message");
         match node_msg {
             SystemMsg::AntiEntropyRetry {
                 section_auth,
@@ -529,7 +530,7 @@ impl Core {
         sender: SocketAddr,
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
-
+        trace!("Handling non blocking message");
         match node_msg {
             SystemMsg::DkgStart {
                 session_id,

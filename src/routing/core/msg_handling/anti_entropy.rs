@@ -240,11 +240,13 @@ impl Core {
         dst_name: XorName,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
+        trace!("Checking for entropy");
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
 
         // Let's try to find a section closer to the destination, if it's not for us.
         if !self.section.prefix().matches(&dst_name) {
+            debug!("AE: prefix not matching");
             match self.network.closest_or_opposite(&dst_name) {
                 Some(section_auth) => {
                     info!("Found a better matching section {:?}", section_auth);
@@ -298,7 +300,7 @@ impl Core {
             .get_proof_chain_to_current(dst_section_pk)
         {
             Ok(proof_chain) => {
-                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg with up to date SAP info.", sender);
+                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
                 let section_signed_auth = self.section.section_signed_authority_provider().clone();
                 let section_auth = section_signed_auth.value;
