@@ -267,6 +267,18 @@ impl Session {
         bounced_msg: Bytes,
         proof_chain: SecuredLinkedList,
     ) -> Result<Session, Error> {
+        // Check if SAP signature is valid
+        if !bincode::serialize(&section_auth)
+            .map(|bytes| section_signed.verify(&bytes))
+            .unwrap_or(false)
+        {
+            warn!(
+                "Signature returned with SAP in AE-Redirect response is invalid: {:?}",
+                section_auth
+            );
+            return Ok(session);
+        }
+
         // Update our network knowledge making sure proof chain
         // validates the new SAP based on currently known remote section SAP.
         match session.network.update(
