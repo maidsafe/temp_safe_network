@@ -97,7 +97,7 @@ The Safe CLI provides all the tools necessary to interact with the Safe Network,
 
 The latest version of the Safe CLI can be downloaded and installed using the [install script](https://sn-api.s3.amazonaws.com/install.sh).
 
-The [install script](https://sn-api.s3.amazonaws.com/install.sh) will not only download the latest Safe CLI, but it will also unpack the CLI binary into the `~/.safe/cli/` folder (`C:\Users\<user>\.safe\cli` in Windows), as well as set it in the PATH, so you can run the `safe` binary from any location when opening a console.
+The [install script](https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/install.sh) will not only download the latest Safe CLI, but it will also unpack the CLI binary into the `~/.safe/cli/` folder (`C:\Users\<user>\.safe\cli` in Windows), as well as set it in the PATH, so you can run the `safe` binary from any location when opening a console.
 
 ### Linux and Mac
 
