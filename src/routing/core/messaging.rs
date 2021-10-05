@@ -46,7 +46,7 @@ impl Core {
             .key_share()
             .await
             .map_err(|err| {
-                trace!("Can't propose {:?}: {}", proposal, err);
+                trace!("Can't propose {:?}: {:?}", proposal, err);
                 err
             })?;
         self.send_proposal_with(recipients, proposal, &key_share)
@@ -76,12 +76,13 @@ impl Core {
             content: proposal,
             sig_share,
         };
-        let section_pk = *self.section.chain().last_key();
+        // Name of the section_pk may not matches the section prefix.
+        // Carry out a substitution to prevent the dst_location becomes other section.
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
-                name: XorName::from(PublicKey::Bls(section_pk)),
-                section_pk,
+                name: self.section.prefix().name(),
+                section_pk: *self.section.chain().last_key(),
             },
             node_msg,
             self.section.authority_provider().section_key(),
@@ -261,7 +262,7 @@ impl Core {
             .await
             .map_err(|err| {
                 trace!(
-                    "Can't create message {:?} for accumulation at dst {:?}: {}",
+                    "Can't create message {:?} for accumulation at dst {:?}: {:?}",
                     node_msg,
                     dst,
                     err
