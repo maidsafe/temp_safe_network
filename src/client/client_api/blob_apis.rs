@@ -300,6 +300,7 @@ impl Client {
 mod tests {
     use crate::client::client_api::blob_apis::Blob;
     use crate::client::utils::test_utils::create_test_client;
+    use crate::client::BlobAddress;
     use crate::types::{utils::random_bytes, Keypair};
     use crate::url::Scope;
     use bytes::Bytes;
@@ -377,36 +378,42 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn seek_in_data() -> Result<()> {
+        let client = create_test_client().await?;
         let tasks = (1..5)
-            .map(|i| {
+            .map(|i| (i, client.clone()))
+            .map(|(i, client)| {
                 tokio::task::spawn(async move {
                     let size = i * MIN_BLOB_SIZE;
-                    let tasks = (2..5).map(|divisor| {
-                        tokio::task::spawn(async move {
-                            let len = size / divisor;
-                            let blob = Blob::new(random_bytes(size))?;
+                    let tasks = (2..5)
+                        .map(|d| (d, client.clone()))
+                        .map(|(divisor, client)| {
+                            tokio::task::spawn(async move {
+                                let len = size / divisor;
+                                let blob = Blob::new(random_bytes(size))?;
 
-                            // Read first part
-                            let read_data_1 = {
-                                let pos = 0;
-                                seek_for_test(blob.clone(), pos, len).await?
-                            };
+                                let address = store_for_seek(blob.clone(), &client).await?;
 
-                            // Read second part
-                            let read_data_2 = {
-                                let pos = len;
-                                seek_for_test(blob.clone(), pos, len).await?
-                            };
+                                // Read first part
+                                let read_data_1 = {
+                                    let pos = 0;
+                                    get_for_seek(blob.clone(), address, pos, len, &client).await?
+                                };
 
-                            // Join parts
-                            let read_data: Bytes = [read_data_1, read_data_2]
-                                .iter()
-                                .flat_map(|bytes| bytes.clone())
-                                .collect();
+                                // Read second part
+                                let read_data_2 = {
+                                    let pos = len;
+                                    get_for_seek(blob.clone(), address, pos, len, &client).await?
+                                };
 
-                            compare(blob.bytes().slice(0..(2 * len)), read_data)
-                        })
-                    });
+                                // Join parts
+                                let read_data: Bytes = [read_data_1, read_data_2]
+                                    .iter()
+                                    .flat_map(|bytes| bytes.clone())
+                                    .collect();
+
+                                compare(blob.bytes().slice(0..(2 * len)), read_data)
+                            })
+                        });
 
                     join_all(tasks).await
                 })
@@ -544,18 +551,26 @@ mod tests {
         Ok(())
     }
 
-    async fn seek_for_test(blob: Blob, pos: usize, len: usize) -> Result<Bytes> {
-        let client = create_test_client().await?;
+    async fn store_for_seek(blob: Blob, client: &super::Client) -> Result<BlobAddress> {
         let address = client.upload_blob(blob.clone(), Scope::Public).await?;
-
         // the larger the file, the longer we have to wait before we start querying
-        let delay = tokio::time::Duration::from_secs(usize::max(1, len / DELAY_DIVIDER) as u64);
+        let delay = tokio::time::Duration::from_secs(usize::max(
+            1,
+            blob.bytes().len() / DELAY_DIVIDER,
+        ) as u64);
         tokio::time::sleep(delay).await;
+        Ok(address)
+    }
 
+    async fn get_for_seek(
+        blob: Blob,
+        address: BlobAddress,
+        pos: usize,
+        len: usize,
+        client: &super::Client,
+    ) -> Result<Bytes> {
         let read_data = client.read_from(address, pos, len).await?;
-
         compare(blob.bytes().slice(pos..(pos + len)), read_data.clone())?;
-
         Ok(read_data)
     }
 
