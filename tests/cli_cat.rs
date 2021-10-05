@@ -183,7 +183,6 @@ fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
 }
 
 #[test]
-#[ignore = "nrs"]
 fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     let tmp_dir = assert_fs::TempDir::new()?;
     let md_file1 = tmp_dir.child("test.md");

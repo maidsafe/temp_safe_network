@@ -2421,9 +2421,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3d0b9745dc2debf507c8422de05d7226cc1f0644216dfdfead988f9b1ab32a7"
+checksum = "38bc8cc6a5f2e3655e0899c1b848643b2562f853f114bfec7be120678e3ace05"
 dependencies = [
  "proc-macro2",
 ]
@@ -3173,9 +3173,9 @@ checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
 
 [[package]]
 name = "sn_api"
-version = "0.36.0"
+version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9e06ddd5cb41ec4c712da74503e6f85fc81010b0a0a9c0f45d3135c01afa240"
+checksum = "731b117f3c77120fea630799bc45104752d5adb22218f87dd417573619d88c0e"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3215,7 +3215,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.35.0"
+version = "0.36.0"
 dependencies = [
  "ansi_term 0.12.1",
  "assert_cmd",
@@ -3672,9 +3672,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.17"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4f915eb6abf914599c200260efced9203504c4c37380af10cdf3b7d36970650"
+checksum = "98863d0dd09fa59a1b79c6750ad80dbda6b75f4e71c437a6a1a8cb91a8bcbd77"
 dependencies = [
  "proc-macro2",
  "quote",

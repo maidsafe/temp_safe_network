@@ -448,7 +448,6 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
 }
 
 #[test]
-#[ignore = "nrs"]
 fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_dir = assert_fs::TempDir::new()?;
@@ -512,12 +511,11 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
     let output = safe_cmd_stdout(["cat", &versioned_nrsurl, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&output);
     assert_eq!(xorurl, versioned_nrsurl);
-    assert_eq!(files_map.len(), 11);
+    assert_eq!(files_map.len(), 12);
     Ok(())
 }
 
 #[test]
-#[ignore = "nrs"]
 fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_dir = assert_fs::TempDir::new()?;
@@ -789,7 +787,6 @@ fn calling_files_ls_on_single_file() -> Result<()> {
 //
 //    expected result: We find the 2 files beneath testdata/subfolder
 #[test]
-#[ignore = "nrs"]
 fn calling_files_ls_on_nrs_with_path() -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_dir = assert_fs::TempDir::new()?;

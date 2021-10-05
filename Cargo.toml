@@ -67,7 +67,7 @@ xor_name = "3.0.0"
   optional = true
 
   [dependencies.sn_api]
-  version = "~0.36"
+  version = "~0.37"
   default-features = false
   features = [ "app", "authd_client", "testing" ]
 
