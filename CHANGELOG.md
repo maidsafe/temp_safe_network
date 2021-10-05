@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.2](https://github.com/maidsafe/safe_network/compare/v0.33.1...v0.33.2) (2021-10-05)
+
+
+### Features
+
+* make section_keys_provider non blocking ([af2545d](https://github.com/maidsafe/safe_network/commit/af2545dcc6b295bb59289e6a6b24f706d3422ede))
+
 ### [0.33.1](https://github.com/maidsafe/safe_network/compare/v0.33.0...v0.33.1) (2021-10-05)
 
 
