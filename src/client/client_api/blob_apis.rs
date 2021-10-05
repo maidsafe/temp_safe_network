@@ -306,7 +306,6 @@ mod tests {
     use bytes::Bytes;
     use eyre::Result;
     use futures::future::join_all;
-    use itertools::Itertools;
     use rand::rngs::OsRng;
     use tokio::time::Instant;
 
@@ -379,59 +378,33 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn seek_in_data() -> Result<()> {
         let client = create_test_client().await?;
-        let tasks = (1..5)
-            .map(|i| (i, client.clone()))
-            .map(|(i, client)| {
-                tokio::task::spawn(async move {
-                    let size = i * MIN_BLOB_SIZE;
-                    let tasks = (2..5)
-                        .map(|d| (d, client.clone()))
-                        .map(|(divisor, client)| {
-                            tokio::task::spawn(async move {
-                                let len = size / divisor;
-                                let blob = Blob::new(random_bytes(size))?;
+        for i in 1..5 {
+            let size = i * MIN_BLOB_SIZE;
+            for divisor in 2..5 {
+                let len = size / divisor;
+                let blob = Blob::new(random_bytes(size))?;
 
-                                let address = store_for_seek(blob.clone(), &client).await?;
+                let address = store_for_seek(blob.clone(), &client).await?;
 
-                                // Read first part
-                                let read_data_1 = {
-                                    let pos = 0;
-                                    get_for_seek(blob.clone(), address, pos, len, &client).await?
-                                };
+                // Read first part
+                let read_data_1 = {
+                    let pos = 0;
+                    get_for_seek(blob.clone(), address, pos, len, &client).await?
+                };
 
-                                // Read second part
-                                let read_data_2 = {
-                                    let pos = len;
-                                    get_for_seek(blob.clone(), address, pos, len, &client).await?
-                                };
+                // Read second part
+                let read_data_2 = {
+                    let pos = len;
+                    get_for_seek(blob.clone(), address, pos, len, &client).await?
+                };
 
-                                // Join parts
-                                let read_data: Bytes = [read_data_1, read_data_2]
-                                    .iter()
-                                    .flat_map(|bytes| bytes.clone())
-                                    .collect();
+                // Join parts
+                let read_data: Bytes = [read_data_1, read_data_2]
+                    .iter()
+                    .flat_map(|bytes| bytes.clone())
+                    .collect();
 
-                                compare(blob.bytes().slice(0..(2 * len)), read_data)
-                            })
-                        });
-
-                    join_all(tasks).await
-                })
-            })
-            .collect_vec();
-
-        let r_1_vec = join_all(tasks).await;
-        for r_1 in r_1_vec {
-            match r_1 {
-                Ok(r_2_vec) => {
-                    for r_2 in r_2_vec {
-                        match r_2 {
-                            Ok(r_3) => r_3?,
-                            Err(e) => eyre::bail!(e),
-                        }
-                    }
-                }
-                Err(e) => eyre::bail!(e),
+                compare(blob.bytes().slice(0..(2 * len)), read_data)?;
             }
         }
 
