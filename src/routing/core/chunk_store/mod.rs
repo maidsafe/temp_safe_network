@@ -8,7 +8,7 @@
 
 use crate::dbs::{convert_to_error_message, Error, KvStore, Result, Subdir, UsedSpace};
 use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
-use crate::types::{Chunk, ChunkAddress, DataAddress};
+use crate::types::{Chunk, ChunkAddress};
 
 use std::{
     fmt::{self, Display, Formatter},
@@ -51,35 +51,33 @@ impl ChunkStore {
     }
 
     pub(crate) fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
-        debug!("Getting chunk at address {:?}", address);
+        debug!("Getting chunk {:?}", address);
 
         match self.db.get(address) {
             Ok(res) => Ok(res),
             Err(error) => match error {
-                Error::KeyNotFound(_) => Err(Error::NoSuchData(DataAddress::Chunk(*address))),
+                Error::KeyNotFound(_) => Err(Error::ChunkNotFound(*address.name())),
                 something_else => Err(something_else),
             },
         }
     }
 
     // Read chunk from local store and return NodeQueryResponse
-    pub(crate) fn get(&self, address: &ChunkAddress) -> Result<NodeQueryResponse> {
-        Ok(NodeQueryResponse::GetChunk(
-            self.get_chunk(address).map_err(convert_to_error_message),
-        ))
+    pub(crate) fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
+        NodeQueryResponse::GetChunk(self.get_chunk(address).map_err(convert_to_error_message))
     }
 
-    pub(super) async fn store(&self, data: &Chunk) -> Result<Option<StorageLevel>> {
-        if self.db.has(data.address())? {
+    pub(super) async fn store(&self, chunk: &Chunk) -> Result<Option<StorageLevel>> {
+        if self.db.has(chunk.address())? {
             info!(
-                "{}: Immutable chunk already exists, not storing: {:?}",
+                "{}: Chunk already exists, not storing: {:?}",
                 self,
-                data.address()
+                chunk.address()
             );
             // Nothing more to do here
             return Ok(None);
         }
-        self.db.store(data).await?;
+        self.db.store(chunk).await?;
 
         let last_recorded_level = { *self.last_recorded_level.read().await };
         if let Ok(next_level) = last_recorded_level.next() {
@@ -100,7 +98,7 @@ impl ChunkStore {
     pub(crate) async fn store_for_replication(&self, chunk: Chunk) -> Result<Option<StorageLevel>> {
         debug!(
             "Trying to store for replication of chunk: {:?}",
-            chunk.address()
+            chunk.name()
         );
         self.store(&chunk).await
     }

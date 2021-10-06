@@ -10,7 +10,7 @@ use super::{
     super::encoding::{deserialise, serialise},
     Error, Key, Result, Value,
 };
-use crate::types::{register::Address, Chunk, ChunkAddress, Keypair, PublicKey};
+use crate::types::{Chunk, ChunkAddress, Keypair, PublicKey, RegisterAddress};
 use serde::{de::DeserializeOwned, Serialize};
 use xor_name::XorName;
 
@@ -28,7 +28,7 @@ pub(crate) fn from_db_key<T: DeserializeOwned>(key: &str) -> Result<T> {
     deserialise(&decoded)
 }
 
-impl ToDbKey for Address {}
+impl ToDbKey for RegisterAddress {}
 impl ToDbKey for Keypair {}
 impl ToDbKey for ChunkAddress {}
 impl ToDbKey for PublicKey {}

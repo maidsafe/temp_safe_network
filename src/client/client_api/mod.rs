@@ -12,7 +12,6 @@ mod data;
 mod queries;
 mod register_apis;
 
-pub use self::data::{BlobAddress, BytesAddress, SpotAddress};
 use crate::client::{connections::Session, errors::Error, Config};
 use crate::messaging::data::{CmdError, DataQuery, ServiceMsg};
 use crate::types::{ChunkAddress, Keypair, PublicKey};
