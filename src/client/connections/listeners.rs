@@ -365,7 +365,7 @@ impl Session {
             msg_id, service_msg
         );
 
-        let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
+        let (mut target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
             ServiceMsg::Cmd(cmd) => {
                 match &cmd {
                     DataCmd::StoreChunk(_) => (3, cmd.dst_name()), // stored at Adults, so only 1 correctly functioning Elder need to relay
@@ -382,6 +382,12 @@ impl Session {
                 return Ok(None);
             }
         };
+
+        // In case of redirects, we can send the message to only 3 Elders as anyhow we will get back
+        // an AE-Retry for this message consecutively.
+        if !is_retry {
+            target_count = 3;
+        }
 
         let target_public_key;
 
