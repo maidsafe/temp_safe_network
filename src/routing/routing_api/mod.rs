@@ -477,6 +477,11 @@ async fn handle_connection_events(
                     }
                 };
 
+                // let span = {
+                //     let core = dispatcher.core.read().await;
+                //     trace_span!("handle_message", name = %core.node().name(), %sender)
+                // };
+                // let _span_guard = span.enter();
                 let span = {
                     let core = dispatcher.core.read().await;
                     trace_span!("handle_message", name = %core.node().name(), %sender)
