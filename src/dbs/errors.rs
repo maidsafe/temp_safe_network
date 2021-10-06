@@ -10,6 +10,7 @@ use crate::messaging::data::Error as ErrorMessage;
 use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};
 use std::io;
 use thiserror::Error;
+use xor_name::XorName;
 
 /// Specialisation of `std::Result` for dbs.
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
@@ -43,6 +44,9 @@ pub enum Error {
     /// Data not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),
+    /// Chunk not found.
+    #[error("Chunk not found: {0:?}")]
+    ChunkNotFound(XorName),
     /// Chunk already exists for this node
     #[error("Data already exists at this node")]
     DataExists,

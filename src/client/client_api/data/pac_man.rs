@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::BlobAddress;
 use crate::client::{Error, Result};
-use crate::types::{Chunk, Encryption};
+use crate::types::{BytesAddress, Chunk, Encryption};
 use bincode::serialize;
 use bytes::Bytes;
 use rayon::prelude::*;
@@ -30,7 +29,7 @@ pub(crate) enum DataMapLevel {
 pub(crate) fn encrypt_from_path(
     path: &Path,
     encryption: Option<&impl Encryption>,
-) -> Result<(BlobAddress, Vec<Chunk>)> {
+) -> Result<(BytesAddress, Vec<Chunk>)> {
     let (data_map, encrypted_chunks) = encrypt_file(path)?;
     pack(data_map, encrypted_chunks, encryption)
 }
@@ -38,7 +37,7 @@ pub(crate) fn encrypt_from_path(
 pub(crate) fn encrypt_blob(
     data: Bytes,
     encryption: Option<&impl Encryption>,
-) -> Result<(BlobAddress, Vec<Chunk>)> {
+) -> Result<(BytesAddress, Vec<Chunk>)> {
     let (data_map, encrypted_chunks) = encrypt_data(data)?;
     pack(data_map, encrypted_chunks, encryption)
 }
@@ -51,7 +50,7 @@ pub(crate) fn pack(
     data_map: DataMap,
     encrypted_chunks: Vec<EncryptedChunk>,
     encryption: Option<&impl Encryption>,
-) -> Result<(BlobAddress, Vec<Chunk>)> {
+) -> Result<(BytesAddress, Vec<Chunk>)> {
     // Produces a chunk out of the first secret key, which is validated for its size.
     // If the chunk is too big, it is self-encrypted and the resulting (additional level) secret key is put into a chunk.
     // The above step is repeated as many times as required until the chunk size is valid.
@@ -70,9 +69,9 @@ pub(crate) fn pack(
             chunks.push(chunk);
             // returns the address of the last secret key, and all the chunks produced
             let address = if encryption.is_some() {
-                BlobAddress::Private(name)
+                BytesAddress::Private(name)
             } else {
-                BlobAddress::Public(name)
+                BytesAddress::Public(name)
             };
             break (address, chunks);
         } else {

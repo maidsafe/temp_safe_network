@@ -602,7 +602,7 @@ impl Core {
                     NodeCmd::RepublishChunk(chunk) => {
                         info!(
                             "Republishing chunk {:?} with MessageId {:?}",
-                            chunk.address(),
+                            chunk.name(),
                             msg_id
                         );
 
@@ -629,7 +629,7 @@ impl Core {
                         // Send back response to the sending elder
 
                         let sender_xorname = msg_authority.get_auth_xorname();
-                        self.handle_get_chunk_at_adult(msg_id, address, origin, sender_xorname)
+                        self.handle_get_chunk_at_adult(msg_id, &address, origin, sender_xorname)
                             .await
                     }
                     _ => {
@@ -718,7 +718,7 @@ impl Core {
             let target_holders = self.get_chunk_holder_adults(chunk.name()).await;
             info!(
                 "Republishing chunk {:?} to holders {:?}",
-                chunk.address(),
+                chunk.name(),
                 &target_holders,
             );
 
