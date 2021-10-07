@@ -56,7 +56,11 @@ where
 
         used_space.add_dir(&dir);
 
-        let db = sled::open(&dir).map_err(Error::from)?;
+        let db = sled::Config::default()
+            .path(&dir)
+            .flush_every_ms(Some(10000))
+            .open()
+            .map_err(Error::from)?;
 
         Ok(KvStore {
             used_space,
