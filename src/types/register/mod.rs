@@ -165,7 +165,6 @@ impl Register {
     /// Return user permissions, if applicable.
     pub fn permissions(&self, user: User, requester: Option<PublicKey>) -> Result<Permissions> {
         self.check_permissions(Action::Read, requester)?;
-
         self.policy.permissions(user).ok_or(Error::NoSuchEntry)
     }
 
