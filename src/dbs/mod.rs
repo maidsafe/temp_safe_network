@@ -19,6 +19,8 @@ pub use kv_store::used_space::UsedSpace;
 pub(crate) use kv_store::{to_db_key::ToDbKey, KvStore};
 use std::path::Path;
 
+pub(crate) const SLED_FLUSH_TIME_MS: Option<u64> = Some(10000);
+
 pub(crate) trait Subdir {
     fn subdir() -> &'static Path;
 }
