@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.38.0](https://github.com/maidsafe/sn_api/compare/v0.37.0...v0.38.0) (2021-10-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* Blob and Spot entries in the DataType enum are merged into a single Bytes entry.
+
+The client API in the network has now been updated to encapsulate the Blob and Spot data. This makes
+the client API much easier to use, as callers no longer need to be concerned about the size of the
+data they're trying to store and retrieve.
+
+* update api for 0.33.x of safe_network ([4734daf](https://github.com/maidsafe/sn_api/commit/4734dafa040bf61453602e4fcfecdb4bb5709487))
+
 ## [0.37.0](https://github.com/maidsafe/sn_api/compare/v0.36.0...v0.37.0) (2021-10-05)
 
 
