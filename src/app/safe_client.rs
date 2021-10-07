@@ -8,15 +8,14 @@
 // Software.
 
 use super::fetch::Range;
-use crate::{app::SELF_ENCRYPTION_MIN_SIZE, ipc::NodeConfig, Error, Result};
+use crate::{ipc::NodeConfig, Error, Result};
 use bytes::Bytes;
 use hex::encode;
 use log::{debug, info};
-use safe_network::client::client_api::{Blob, BlobAddress, Spot, SpotAddress};
 use safe_network::client::{Client, Config, Error as ClientError};
 use safe_network::types::{
-    register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
-    Error as SafeNdError, Keypair,
+    register::{Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
+    BytesAddress, Error as SafeNdError, Keypair, RegisterAddress,
 };
 use safe_network::url::Scope;
 use std::{
@@ -98,78 +97,40 @@ impl SafeAppClient {
     //
     // Blob operations
     //
-    pub async fn store_data(&self, data: Bytes, dry_run: bool) -> Result<XorName> {
+    pub async fn store_bytes(&self, bytes: Bytes, dry_run: bool) -> Result<XorName> {
         let xorname = if dry_run {
             // I don't see the equivalent API for doing a dry run, so just returning the default
             // address for now.
             XorName::default()
         } else {
+            debug!("Storing {} bytes of data", bytes.len());
             let client = self.get_safe_client()?;
-            if data.len() < SELF_ENCRYPTION_MIN_SIZE {
-                debug!(
-                    "Data to write is {} bytes so a spot will be written",
-                    data.len()
-                );
-                let address = client
-                    .write_spot_to_network(Spot::new(data.to_owned())?, Scope::Public)
-                    .await
-                    .map_err(|e| {
-                        Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e))
-                    })?;
-                *address.name()
-            } else {
-                debug!(
-                    "Data to write is {} bytes so a blob will be written",
-                    data.len()
-                );
-                let address = client
-                    .write_blob_to_network(Blob::new(data.to_owned())?, Scope::Public)
-                    .await
-                    .map_err(|e| {
-                        Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e))
-                    })?;
-                *address.name()
-            }
+            let address = client.upload(bytes, Scope::Public).await?;
+            *address.name()
         };
-
         Ok(xorname)
     }
 
-    pub async fn get_blob(&self, address: BlobAddress, range: Range) -> Result<Bytes> {
-        debug!("Attempting to fetch Blob data from {:?}", address.name());
+    pub async fn get_bytes(&self, address: BytesAddress, range: Range) -> Result<Bytes> {
+        debug!("Attempting to fetch data from {:?}", address.name());
         let client = self.get_safe_client()?;
         let data = if let Some((start, end)) = range {
             let len = end
                 .map(|end_index| end_index - start.unwrap_or(0))
                 .unwrap_or(0);
             client
-                .read_blob_from(
+                .read_from(
                     address,
                     start.map(|val| val as usize).unwrap_or(0),
                     len as usize,
                 )
                 .await
         } else {
-            client.read_blob(address).await
+            client.read_bytes(address).await
         }
         .map_err(|e| Error::NetDataError(format!("Failed to GET Blob: {:?}", e)))?;
         debug!(
-            "{} bytes of Blob data successfully retrieved from: {:?}",
-            data.len(),
-            address.name()
-        );
-        Ok(data)
-    }
-
-    pub async fn get_spot(&self, address: SpotAddress) -> Result<Bytes> {
-        debug!("Attempting to fetch Spot data from {:?}", address.name());
-        let client = self.get_safe_client()?;
-        let data = client
-            .read_spot(address)
-            .await
-            .map_err(|e| Error::NetDataError(format!("Failed to GET Spot: {:?}", e)))?;
-        debug!(
-            "{} bytes of Spot data successfully retrieved from: {:?}",
+            "{} bytes of data successfully retrieved from: {:?}",
             data.len(),
             address.name()
         );
@@ -227,7 +188,10 @@ impl SafeAppClient {
         Ok(xorname)
     }
 
-    pub async fn read_register(&self, address: Address) -> Result<BTreeSet<(EntryHash, Entry)>> {
+    pub async fn read_register(
+        &self,
+        address: RegisterAddress,
+    ) -> Result<BTreeSet<(EntryHash, Entry)>> {
         debug!("Fetching Register data at {:?}", address);
 
         let client = self.get_safe_client()?;
@@ -244,7 +208,11 @@ impl SafeAppClient {
         })
     }
 
-    pub async fn get_register_entry(&self, address: Address, hash: EntryHash) -> Result<Entry> {
+    pub async fn get_register_entry(
+        &self,
+        address: RegisterAddress,
+        hash: EntryHash,
+    ) -> Result<Entry> {
         debug!("Fetching Register hash {:?} at {:?}", hash, address);
 
         let client = self.get_safe_client()?;
@@ -268,7 +236,7 @@ impl SafeAppClient {
 
     pub async fn write_to_register(
         &self,
-        address: Address,
+        address: RegisterAddress,
         entry: Entry,
         parents: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {

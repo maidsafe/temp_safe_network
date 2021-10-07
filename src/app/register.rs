@@ -11,6 +11,7 @@ pub use safe_network::types::register::{Entry, EntryHash};
 
 use crate::{Error, Result, Safe};
 use log::debug;
+use safe_network::types::{DataAddress, RegisterAddress};
 use safe_network::url::{ContentType, Scope, Url, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -60,51 +61,45 @@ impl Safe {
     /// e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
     pub(crate) async fn fetch_register_entries(
         &self,
-        safeurl: &Url,
+        url: &Url,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        let result = match safeurl.content_version() {
+        let result = match url.content_version() {
             Some(v) => {
                 debug!("Take entry with version hash");
                 let hash = v.entry_hash();
-                self.fetch_register_entry(safeurl, hash)
+                self.fetch_register_entry(url, hash)
                     .await
                     .map(|entry| vec![(hash, entry)].into_iter().collect())
             }
             None => {
                 debug!("No version so take latest entry");
-                let address = safeurl.register_address()?;
+                let address = self.get_register_address(url)?;
                 self.safe_client.read_register(address).await
             }
         };
 
         match result {
             Ok(data) => {
-                debug!("Register retrieved from {}...", safeurl);
+                debug!("Register retrieved from {}...", url);
                 Ok(data)
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
                 "Register found at \"{}\" was empty",
-                safeurl
+                url
             ))),
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(format!(
                 "No Register found at \"{}\"",
-                safeurl
+                url
             ))),
             other_err => other_err,
         }
     }
 
     /// Fetch a Register from a Url without performing any type of URL resolution
-    pub(crate) async fn fetch_register_entry(
-        &self,
-        safeurl: &Url,
-        hash: EntryHash,
-    ) -> Result<Entry> {
+    pub(crate) async fn fetch_register_entry(&self, url: &Url, hash: EntryHash) -> Result<Entry> {
         // TODO: allow to specify the hash with the Url as well: safeurl.content_hash(),
         // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
-        let address = safeurl.register_address()?;
-
-        // We fetch a specific entry with provided hash
+        let address = self.get_register_address(url)?;
         self.safe_client.get_register_entry(address, hash).await
     }
 
@@ -127,13 +122,25 @@ impl Safe {
         };
         */
 
-        let (safeurl, _) = self.parse_and_resolve_url(url).await?;
-        let address = safeurl.register_address()?;
-
-        // write the entry to the Register
+        let (url, _) = self.parse_and_resolve_url(url).await?;
+        let address = self.get_register_address(&url)?;
         self.safe_client
             .write_to_register(address, entry, parents)
             .await
+    }
+
+    fn get_register_address(&self, url: &Url) -> Result<RegisterAddress> {
+        let address = match url.address() {
+            DataAddress::Register(reg_address) => reg_address,
+            other => {
+                return Err(Error::ContentError(format!(
+                    "The url {} has an {:?} address.\
+                    To fetch register entries, this url must refer to a register.",
+                    url, other
+                )))
+            }
+        };
+        Ok(address)
     }
 }
 

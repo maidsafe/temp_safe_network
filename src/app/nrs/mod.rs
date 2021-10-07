@@ -320,7 +320,7 @@ impl Safe {
         })?;
 
         let nrs_map_xorurl = self
-            .store_public_data(Bytes::from(serialised_nrs_map), None, false)
+            .store_public_bytes(Bytes::from(serialised_nrs_map), None, false)
             .await?;
 
         Ok(nrs_map_xorurl)

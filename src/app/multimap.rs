@@ -8,10 +8,10 @@
 // Software.
 
 use super::register::EntryHash;
-use crate::{app::SELF_ENCRYPTION_MIN_SIZE, Error, Result, Safe};
+use crate::{Error, Result, Safe};
 use bytes::Bytes;
 use log::debug;
-use safe_network::client::{BlobAddress, SpotAddress};
+use safe_network::types::{BytesAddress, DataAddress};
 use safe_network::url::{ContentType, Scope, Url, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -88,11 +88,11 @@ impl Safe {
     /// Insert a key-value pair into a Multimap on the network
     pub async fn multimap_insert(
         &self,
-        url: &str,
+        multimap_url: &str,
         entry: MultimapKeyValue,
         replace: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {
-        debug!("Inserting '{:?}' into Multimap at {}", entry, url);
+        debug!("Inserting '{:?}' into Multimap at {}", entry, multimap_url);
         let serialised_entry = rmp_serde::to_vec_named(&entry).map_err(|err| {
             Error::Serialisation(format!(
                 "Couldn't serialise the Multimap entry '{:?}': {:?}",
@@ -101,24 +101,24 @@ impl Safe {
         })?;
 
         let data = Bytes::copy_from_slice(&serialised_entry);
-        let entry_xorname = self.safe_client.store_data(data.clone(), false).await?;
-        let entry_xorurl = if data.len() < SELF_ENCRYPTION_MIN_SIZE {
-            Url::encode_spot(
-                SpotAddress::Public(entry_xorname),
-                ContentType::Raw,
-                self.xorurl_base,
-            )?
-        } else {
-            Url::encode_blob(
-                BlobAddress::Public(entry_xorname),
-                ContentType::Raw,
-                self.xorurl_base,
-            )?
-        };
+        let entry_xorname = self.safe_client.store_bytes(data.clone(), false).await?;
+        let entry_xorurl = Url::encode_bytes(
+            BytesAddress::Public(entry_xorname),
+            ContentType::Raw,
+            self.xorurl_base,
+        )?;
         let entry_ptr = Url::from_xorurl(&entry_xorurl)?;
-        let safeurl = Safe::parse_url(url)?;
-        let address = safeurl.register_address()?;
-
+        let safeurl = Safe::parse_url(multimap_url)?;
+        let address = match safeurl.address() {
+            DataAddress::Register(reg_address) => reg_address,
+            other => {
+                return Err(Error::InvalidXorUrl(format!(
+                    "The multimap url {} has an {:?} address.\
+                    To insert an entry into a multimap, the address must be a register address.",
+                    multimap_url, other
+                )))
+            }
+        };
         self.safe_client
             .write_to_register(address, entry_ptr, replace)
             .await

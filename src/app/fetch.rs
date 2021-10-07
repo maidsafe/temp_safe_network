@@ -18,7 +18,7 @@ pub use super::{ContentType, DataType, Scope, Url, VersionHash, XorUrlBase};
 use crate::{Error, Result};
 use bytes::Bytes;
 use log::{debug, info};
-use safe_network::client::{BlobAddress, SpotAddress};
+use safe_network::types::BytesAddress;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, path::Path};
 
@@ -423,7 +423,7 @@ impl Safe {
                         };
                         Ok((safe_data, None))
                     }
-                    DataType::Blob | DataType::Spot => {
+                    DataType::Bytes => {
                         self.retrieve_data(&the_xor, retrieve_data, None, &metadata, range)
                             .await
                     }
@@ -458,7 +458,7 @@ impl Safe {
                 }
 
                 match the_xor.data_type() {
-                    DataType::Blob | DataType::Spot => {
+                    DataType::Bytes => {
                         self.retrieve_data(
                             &the_xor,
                             retrieve_data,
@@ -496,25 +496,9 @@ impl Safe {
         };
 
         let data = if retrieve_data {
-            match the_xor.data_type() {
-                DataType::Blob => {
-                    self.safe_client
-                        .get_blob(BlobAddress::Public(the_xor.xorname()), range)
-                        .await?
-                }
-                DataType::Spot => {
-                    self.safe_client
-                        .get_spot(SpotAddress::Public(the_xor.xorname()))
-                        .await?
-                }
-                other => {
-                    return Err(Error::ContentError(format!(
-                        "Error retrieving content: at this point only Blob or Spot types \
-                                can be retrieved. The {} type is not supported.",
-                        other
-                    )));
-                }
-            }
+            self.safe_client
+                .get_bytes(BytesAddress::Public(the_xor.xorname()), range)
+                .await?
         } else {
             Bytes::new()
         };
@@ -566,6 +550,7 @@ mod tests {
     use crate::{app::test_helpers::new_safe_instance, retry_loop, Scope, Url};
     use anyhow::{anyhow, bail, Context, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
+    use safe_network::types::DataAddress;
     use std::io::Read;
 
     #[tokio::test]
@@ -705,7 +690,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
         let xorurl = safe
-            .store_public_data(data.clone(), Some("text/plain"), false)
+            .store_public_bytes(data.clone(), Some("text/plain"), false)
             .await?;
 
         let safe_url = Url::from_url(&xorurl)?;
@@ -744,7 +729,7 @@ mod tests {
         let saved_data = Bytes::from("Something super immutable");
         let size = saved_data.len();
         let xorurl = safe
-            .store_public_data(saved_data.clone(), Some("text/plain"), false)
+            .store_public_bytes(saved_data.clone(), Some("text/plain"), false)
             .await?;
 
         // Fetch first half and match
@@ -838,11 +823,9 @@ mod tests {
         let xorname = rand::random();
         let type_tag = 575_756_443;
         let xorurl = Url::encode(
-            xorname,
+            DataAddress::register(xorname, Scope::Public, type_tag),
             None,
             type_tag,
-            Scope::Private,
-            DataType::Register,
             ContentType::MediaType("text/html".to_string()),
             None,
             None,
@@ -879,7 +862,7 @@ mod tests {
     async fn test_fetch_public_blob_with_path() -> Result<()> {
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe.store_public_data(data.clone(), None, false).await?;
+        let xorurl = safe.store_public_bytes(data.clone(), None, false).await?;
 
         let mut safe_url = Url::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
@@ -897,7 +880,7 @@ mod tests {
 
         // test the same but a file with some media type
         let xorurl = safe
-            .store_public_data(data.clone(), Some("text/plain"), false)
+            .store_public_bytes(data.clone(), Some("text/plain"), false)
             .await?;
 
         let mut safe_url = Url::from_url(&xorurl)?;
