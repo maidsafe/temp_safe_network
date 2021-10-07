@@ -58,16 +58,22 @@ pub(crate) fn pack(
     // self encrypted into additional chunks, and now we have a new secret key
     // which points to all of those additional chunks.. and so on.
     let mut chunks = vec![];
-    let mut chunk_content = pack_data_map(DataMapLevel::First(data_map), encryption)?;
+    let mut chunk_content = pack_data_map(DataMapLevel::First(data_map))?;
+
+    // appeasing of compiler inference shenanigans..
+    // no need to encrypt what is self-encrypted, thus we pass in `None` for those cases
+    // (however, the compiler could not infer type from the `None`)
+    let mut no_encryption = encryption; // copy the original variable
+    let _ = no_encryption.take(); // make it None
 
     let (address, additional_chunks) = loop {
         let chunk = to_chunk(chunk_content, encryption)?;
-        // If secret key chunk is less that 1MB return it so it can be directly sent to the network
+        // If datamap chunk is less that 1MB return it so it can be directly sent to the network
         if chunk.validate_size() {
             let name = *chunk.name();
             chunks.reverse();
             chunks.push(chunk);
-            // returns the address of the last secret key, and all the chunks produced
+            // returns the address of the last datamap, and all the chunks produced
             let address = if encryption.is_some() {
                 BytesAddress::Private(name)
             } else {
@@ -78,22 +84,33 @@ pub(crate) fn pack(
             let serialized_chunk = Bytes::from(serialize(&chunk)?);
             let (data_map, next_encrypted_chunks) =
                 self_encryption::encrypt(serialized_chunk).map_err(Error::SelfEncryption)?;
+            let expected_total = chunks.len() + next_encrypted_chunks.len();
             chunks = next_encrypted_chunks
                 .par_iter()
-                .map(|c| to_chunk(c.content.clone(), encryption))
+                .map(|c| to_chunk(c.content.clone(), no_encryption)) // no need to encrypt what is self-encrypted
                 .flatten()
                 .chain(chunks)
                 .collect();
-            chunk_content = pack_data_map(DataMapLevel::Additional(data_map), encryption)?;
+            if expected_total > chunks.len() {
+                // as we flatten above, we need to check outcome here
+                return Err(Error::Generic("Not all data was chunked!".to_string()));
+            }
+            chunk_content = pack_data_map(DataMapLevel::Additional(data_map))?;
         }
     };
 
+    let expected_total = encrypted_chunks.len() + additional_chunks.len();
     let all_chunks: Vec<_> = encrypted_chunks
         .par_iter()
-        .map(|c| to_chunk(c.content.clone(), encryption))
+        .map(|c| to_chunk(c.content.clone(), no_encryption)) // no need to encrypt what is self-encrypted
         .flatten() // swallows errors!
-        .chain(additional_chunks) // drops errors
+        .chain(additional_chunks)
         .collect();
+
+    if expected_total > all_chunks.len() {
+        // as we flatten above, we need to check outcome here
+        return Err(Error::Generic("Not all data was chunked!".to_string()));
+    }
 
     Ok((address, all_chunks))
 }
@@ -115,16 +132,8 @@ pub(crate) fn to_chunk(
     Ok(chunk)
 }
 
-fn pack_data_map(data_map: DataMapLevel, encryption: Option<&impl Encryption>) -> Result<Bytes> {
-    let raw_bytes = Bytes::from(serialize(&data_map)?);
-    if let Some(encryption) = encryption {
-        // strictly, we do not need to encrypt this if it's not going to be the
-        // last level, since it will then instead be self-encrypted.
-        // But we can just as well do it, for now.. (which also lets us avoid some edge case handling).
-        Ok(encryption.encrypt(raw_bytes)?)
-    } else {
-        Ok(raw_bytes)
-    }
+fn pack_data_map(data_map: DataMapLevel) -> Result<Bytes> {
+    Ok(Bytes::from(serialize(&data_map)?))
 }
 
 fn encrypt_file(file: &Path) -> Result<(DataMap, Vec<EncryptedChunk>)> {
