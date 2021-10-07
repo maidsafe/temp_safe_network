@@ -2195,7 +2195,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe_network"
-version = "0.33.7"
+version = "0.33.8"
 dependencies = [
  "assert_matches",
  "async-recursion",
@@ -2247,6 +2247,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-appender",
+ "tracing-core",
  "tracing-subscriber",
  "uhttp_uri",
  "uluru",
@@ -2840,9 +2841,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.20"
+version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46125608c26121c81b0c6d693eab5a420e416da7e43c426d2e8f7df8da8a3acf"
+checksum = "1f4ed65637b8390770814083d20756f87bfa2c21bf2f110babdc5438351746e4"
 dependencies = [
  "lazy_static",
 ]
