@@ -17,6 +17,7 @@ pub(super) mod used_space;
 use to_db_key::ToDbKey;
 use used_space::UsedSpace;
 
+use crate::dbs::SLED_FLUSH_TIME_MS;
 use super::{encoding::serialise, Error, Result}; // TODO: FIX
 use data::{Data, DataId};
 use sled::Db;
@@ -52,7 +53,12 @@ where
 
         used_space.add_dir(&dir);
 
-        let sled = sled::open(&dir).map_err(Error::from)?;
+        let sled = sled::Config::default()
+        .path(&dir)
+        .flush_every_ms(SLED_FLUSH_TIME_MS)
+        .open()
+        .map_err(Error::from)?;
+
 
         Ok(DataStore {
             used_space,
