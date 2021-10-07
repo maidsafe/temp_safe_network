@@ -150,7 +150,12 @@ impl Core {
         // the previous PK which is likely what adults know
         let previous_pk = *self.section_chain().prev_key();
         let node_msg = self.generate_ae_update(previous_pk, true)?;
-        let cmd = self.send_direct_message_to_nodes(nodes, node_msg, dst_section_pk)?;
+        let cmd = self.send_direct_message_to_nodes(
+            nodes,
+            node_msg,
+            self.section().prefix().name(),
+            dst_section_pk,
+        )?;
 
         Ok(vec![cmd])
     }
@@ -165,7 +170,12 @@ impl Core {
         let dst_section_pk = *self.section_chain().last_key();
         let node_msg = self.generate_ae_update(dst_section_pk, true)?;
 
-        let cmd = self.send_direct_message_to_nodes(adults, node_msg, dst_section_pk)?;
+        let cmd = self.send_direct_message_to_nodes(
+            adults,
+            node_msg,
+            self.section().prefix().name(),
+            dst_section_pk,
+        )?;
 
         Ok(vec![cmd])
     }
@@ -357,12 +367,13 @@ impl Core {
         &self,
         recipients: Vec<(XorName, SocketAddr)>,
         node_msg: SystemMsg,
+        dst_name: XorName,
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
-                name: XorName::from(PublicKey::Bls(dst_section_pk)),
+                name: dst_name,
                 section_pk: dst_section_pk,
             },
             node_msg,
@@ -387,7 +398,12 @@ impl Core {
             .collect();
 
         let dst_section_pk = *self.section_chain().last_key();
-        let cmd = self.send_direct_message_to_nodes(targets, node_msg, dst_section_pk)?;
+        let cmd = self.send_direct_message_to_nodes(
+            targets,
+            node_msg,
+            self.section.authority_provider().prefix().name(),
+            dst_section_pk,
+        )?;
 
         Ok(cmd)
     }

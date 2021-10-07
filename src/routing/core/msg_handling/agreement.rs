@@ -196,6 +196,7 @@ impl Core {
                 let cmd = self.send_direct_message_to_nodes(
                     ae_update_recipients,
                     node_msg,
+                    self.section.prefix().name(),
                     sig.public_key,
                 )?;
 

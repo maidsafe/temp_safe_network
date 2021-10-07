@@ -160,6 +160,7 @@ impl Core {
 
         let message = SystemMsg::AntiEntropyProbe(dst);
         let section_key = matching_section.section_key();
+        let dst_name = matching_section.prefix().name();
         let recipients = matching_section.elders.into_iter().collect::<Vec<_>>();
 
         info!(
@@ -167,7 +168,7 @@ impl Core {
             matching_section.prefix, section_key
         );
 
-        self.send_direct_message_to_nodes(recipients, message, section_key)
+        self.send_direct_message_to_nodes(recipients, message, dst_name, section_key)
     }
 
     /// Generate commands and fire events based upon any node state changes.
