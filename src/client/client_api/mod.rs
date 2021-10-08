@@ -51,6 +51,7 @@ impl Client {
     ///
     /// TODO: update once data types are crdt compliant
     ///
+    #[instrument(skip_all, level = "debug")]
     pub async fn new(
         config: Config,
         bootstrap_nodes: BTreeSet<SocketAddr>,

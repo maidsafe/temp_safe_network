@@ -32,6 +32,7 @@ struct HeadChunk {
 }
 
 impl Client {
+    #[instrument(level = "debug")]
     /// Reads [`Bytes`] from the network, whose contents are contained within on or more chunks.
     pub async fn read_bytes(&self, address: BytesAddress) -> Result<Bytes> {
         let chunk = self.get_chunk(address.name()).await?;
@@ -60,6 +61,7 @@ impl Client {
     ///
     /// TODO: update once data types are crdt compliant
     ///
+    #[instrument(skip_all, level = "trace")]
     pub async fn read_from(
         &self,
         address: BytesAddress,
@@ -81,9 +83,8 @@ impl Client {
         self.seek(data_map, position, length).await
     }
 
+    #[instrument(level = "trace")]
     pub(crate) async fn get_chunk(&self, name: &XorName) -> Result<Chunk> {
-        trace!("Reading chunk: {:?}", name);
-
         let res = self
             .send_query(DataQuery::GetChunk(ChunkAddress(*name)))
             .await?;
@@ -100,6 +101,7 @@ impl Client {
     }
 
     /// Tries to chunk the bytes, returning an address and chunks, without storing anything to network.
+    #[instrument(skip_all, level = "trace")]
     pub fn chunk_bytes(&self, bytes: Bytes, scope: Scope) -> Result<(BytesAddress, Vec<Chunk>)> {
         if let Ok(blob) = Blob::new(bytes.clone()) {
             self.encrypt_blob(blob, scope)
@@ -112,6 +114,7 @@ impl Client {
 
     /// Encrypts a binary large object (blob) and returns the resulting address and all chunks.
     /// Does not store anything to the network.
+    #[instrument(skip(blob), level = "trace")]
     fn encrypt_blob(&self, blob: Blob, scope: Scope) -> Result<(BytesAddress, Vec<Chunk>)> {
         let owner = encryption(scope, self.public_key());
         encrypt_blob(blob.bytes(), owner.as_ref())
@@ -137,6 +140,7 @@ impl Client {
 
     /// Directly writes [`Bytes`] to the network in the
     /// form of immutable chunks, without any batching.
+    #[instrument(skip(bytes), level = "debug")]
     pub async fn upload(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
         if let Ok(blob) = Blob::new(bytes.clone()) {
             self.upload_blob(blob, scope).await
@@ -148,6 +152,7 @@ impl Client {
 
     /// Directly writes a [`Blob`] to the network in the
     /// form of immutable self encrypted chunks, without any batching.
+    #[instrument(skip_all, level = "trace")]
     async fn upload_blob(&self, blob: Blob, scope: Scope) -> Result<BytesAddress> {
         let (head_address, all_chunks) = self.encrypt_blob(blob, scope)?;
 
@@ -167,6 +172,7 @@ impl Client {
 
     /// Directly writes a [`Spot`] to the network in the
     /// form of a single chunk, without any batching.
+    #[instrument(skip_all, level = "trace")]
     async fn upload_spot(&self, spot: Spot, scope: Scope) -> Result<BytesAddress> {
         let (address, chunk) = self.package_spot(spot, scope)?;
         self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
@@ -186,6 +192,7 @@ impl Client {
 
     // Gets a subset of chunks from the network, decrypts and
     // reads `len` bytes of the data starting at given `pos` of original file.
+    #[instrument(skip_all, level = "trace")]
     async fn seek(&self, data_map: DataMap, pos: usize, len: usize) -> Result<Bytes> {
         let info = self_encryption::seek_info(data_map.file_size(), pos, len);
         let range = &info.index_range;
@@ -204,6 +211,7 @@ impl Client {
             .map_err(Error::SelfEncryption)
     }
 
+    #[instrument(skip_all, level = "trace")]
     async fn try_get_chunks(reader: Client, keys: Vec<ChunkInfo>) -> Result<Vec<EncryptedChunk>> {
         let expected_count = keys.len();
 
@@ -249,6 +257,7 @@ impl Client {
     /// Extracts a blob DataMapLevel from a head chunk.
     /// If the DataMapLevel is not the first level mapping directly to the user's contents,
     /// the process repeats itself until it obtains the first level DataMapLevel.
+    #[instrument(skip_all, level = "trace")]
     async fn unpack_head_chunk(&self, chunk: HeadChunk) -> Result<DataMap> {
         let HeadChunk { mut chunk, address } = chunk;
         loop {
@@ -268,6 +277,7 @@ impl Client {
 
     /// If scope == Scope::Private, decrypts contents with the client encryption keys.
     /// Else returns the content bytes.
+    #[instrument(skip_all, level = "trace")]
     fn get_bytes(&self, chunk: Chunk, scope: Scope) -> Result<Bytes> {
         if matches!(scope, Scope::Public) {
             Ok(chunk.value().clone())
@@ -298,6 +308,8 @@ mod tests {
 
     #[test]
     fn deterministic_chunking() -> Result<()> {
+        let _outer_span = tracing::info_span!("test__register_basics").entered();
+
         let keypair = Keypair::new_ed25519(&mut OsRng);
         let blob = random_bytes(MIN_BLOB_SIZE);
 
@@ -322,6 +334,8 @@ mod tests {
     // Test storing and reading min size blob.
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_3kb() -> Result<()> {
+        let _outer_span = tracing::info_span!("store_and_read_3kb").entered();
+
         let client = create_test_client().await?;
 
         let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
@@ -359,6 +373,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn seek_in_data() -> Result<()> {
+        let _outer_span = tracing::info_span!("seek_in_data").entered();
+
         let client = create_test_client().await?;
         for i in 1..5 {
             let size = i * MIN_BLOB_SIZE;
@@ -395,24 +411,31 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1kb() -> Result<()> {
+        let _outer_span = tracing::info_span!("store_and_read_1kb").entered();
+
         store_and_read_spot(MIN_BLOB_SIZE / 3, Scope::Public).await?;
         store_and_read_spot(MIN_BLOB_SIZE / 3, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1mb() -> Result<()> {
+        let _outer_span = tracing::info_span!("store_and_read_1mb").entered();
+
         store_and_read_blob(1024 * 1024, Scope::Public).await?;
         store_and_read_blob(1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_10mb() -> Result<()> {
+        let _outer_span = tracing::info_span!("store_and_read_10mb").entered();
         store_and_read_blob(10 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn store_and_read_20mb() -> Result<()> {
+        let _outer_span = tracing::info_span!("store_and_read_20mb").entered();
+
         store_and_read_blob(20 * 1024 * 1024, Scope::Private).await
     }
 
@@ -426,6 +449,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn parallel_timings() -> Result<()> {
+        let _outer_span = tracing::info_span!("parallel_timings").entered();
         let client = create_test_client().await?;
 
         let handles = (0..1000_usize)

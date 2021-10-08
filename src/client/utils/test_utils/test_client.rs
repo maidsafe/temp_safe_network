@@ -37,15 +37,18 @@ where
         let target = event.metadata().file().expect("will never be `None`");
         write!(
             writer,
-            "{} [{}:L{}]: ",
+            "{} [{}:L{}]:\n\t",
             level,
             target,
             event.metadata().line().expect("will never be `None`")
         )?;
 
+        let mut indentation = 0;
         // Write spans and fields of each span
         ctx.visit_spans(|span| {
-            write!(writer, "{}", span.name())?;
+            let indentation_string = "\t".repeat(indentation);
+            writeln!(writer, "{}{}", indentation_string, span.name())?;
+            indentation += 1;
 
             let ext = span.extensions();
 
@@ -59,9 +62,10 @@ where
                 .expect("will never be `None`");
 
             if !fields.is_empty() {
-                write!(writer, "{{{}}}", fields)?;
+                writeln!(writer, "{{{}}}", fields)?;
             }
-            write!(writer, ": ")?;
+
+            write!(writer, "{}", indentation_string.repeat(2))?;
 
             Ok(())
         })?;
