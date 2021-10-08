@@ -788,7 +788,7 @@ fn create_dir_all(dir_path: &Path) -> Result<()> {
 /// Get immutable data blobs from the network.
 pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
     match Url::from_url(url)?.data_type() {
-        DataType::Blob | DataType::Spot => {
+        DataType::Bytes => {
             let pub_blob = safe.files_get_public_data(url, range).await?;
             Ok(pub_blob.chunk().to_vec())
         }

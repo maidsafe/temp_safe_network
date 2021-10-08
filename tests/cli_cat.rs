@@ -18,7 +18,6 @@ use sn_cmd_test_utilities::util::{
     test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
-
 const TEST_DATA: &str = "./testdata/";
 const TEST_FILE: &str = "./testdata/test.md";
 const TEST_FILE_CONTENT: &str = "hello tests!";
@@ -43,7 +42,7 @@ fn calling_safe_cat_using_spot_file() -> Result<()> {
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), DataType::Spot);
+    assert_eq!(safeurl.data_type(), DataType::Bytes);
     Ok(())
 }
 
@@ -74,7 +73,7 @@ fn calling_safe_cat_using_blob_file() -> Result<()> {
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), DataType::Blob);
+    assert_eq!(safeurl.data_type(), DataType::Bytes);
     Ok(())
 }
 
@@ -128,7 +127,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), DataType::Spot);
+    assert_eq!(safeurl.data_type(), DataType::Bytes);
     Ok(())
 }
 
