@@ -291,13 +291,12 @@ mod tests {
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let address = client
             .store_private_register(name, tag, owner, perms)
-            .in_current_span()
             .await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
 
-        let register = client.get_register(address).in_current_span().await?;
+        let register = client.get_register(address).await?;
 
         assert!(register.is_private());
         assert_eq!(*register.name(), name);
@@ -310,11 +309,10 @@ mod tests {
         let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
         let address = client
             .store_public_register(name, tag, owner, perms)
-            .in_current_span()
             .await?;
 
         tokio::time::sleep(delay).await;
-        let register = client.get_register(address).in_current_span().await?;
+        let register = client.get_register(address).await?;
 
         assert!(register.is_public());
         assert_eq!(*register.name(), name);
@@ -337,20 +335,18 @@ mod tests {
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let address = client
             .store_private_register(name, tag, owner, perms)
-            .in_current_span()
             .await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
 
-        let register = client.get_register(address).in_current_span().await?;
+        let register = client.get_register(address).await?;
 
         assert_eq!(register.size(None)?, 0);
 
         tokio::time::sleep(delay).await;
         let permissions = client
             .get_register_permissions_for_user(address, owner)
-            .in_current_span()
             .await?;
 
         match permissions {
@@ -365,7 +361,6 @@ mod tests {
 
         match client
             .get_register_permissions_for_user(address, other_user)
-            .in_current_span()
             .await
         {
             Err(Error::NetworkDataError(DtError::NoSuchEntry)) => Ok(()),
@@ -375,7 +370,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_public_permissions() -> Result<()> {
-        let client = create_test_client().in_current_span().await?;
+        let client = create_test_client().await?;
         let _outer_span = tracing::info_span!("test__register_public_permissions").entered();
 
         let name = XorName(rand::random());
@@ -385,7 +380,6 @@ mod tests {
         let _ = perms.insert(User::Key(owner), PublicPermissions::new(None));
         let address = client
             .store_public_register(name, tag, owner, perms)
-            .in_current_span()
             .await?;
 
         let delay = tokio::time::Duration::from_secs(1);
@@ -393,7 +387,6 @@ mod tests {
 
         let permissions = client
             .get_register_permissions_for_user(address, owner)
-            .in_current_span()
             .await?;
 
         match permissions {
@@ -410,7 +403,6 @@ mod tests {
 
         match client
             .get_register_permissions_for_user(address, other_user)
-            .in_current_span()
             .await
         {
             Err(Error::NetworkDataError(DtError::NoSuchEntry)) => Ok(()),
@@ -423,7 +415,7 @@ mod tests {
         let name = XorName(rand::random());
         let tag = 10;
         let client = create_test_client().await?;
-        let _outer_span = tracing::info_span!("test__register_write").entered();
+        let start_span = tracing::info_span!("test__register_write_start").entered();
 
         let owner = client.public_key();
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
@@ -431,7 +423,6 @@ mod tests {
 
         let address = client
             .store_public_register(name, tag, owner, perms)
-            .in_current_span()
             .await?;
 
         let value_1 = random_url()?;
@@ -441,7 +432,6 @@ mod tests {
             || async {
                 Ok(client
                     .write_to_register(address, value_1.clone(), BTreeSet::new())
-                    .in_current_span()
                     .await?)
             },
             10,
@@ -450,7 +440,7 @@ mod tests {
         .await?;
 
         // now check last entry
-        let hashes = retry_loop_for_pattern!(client.read_register(address).in_current_span(), Ok(hashes) if !hashes.is_empty())?;
+        let hashes = retry_loop_for_pattern!(client.read_register(address), Ok(hashes) if !hashes.is_empty())?;
 
         assert_eq!(1, hashes.len());
         let current = hashes.iter().next();
@@ -458,12 +448,13 @@ mod tests {
 
         let value_2 = random_url()?;
 
+        drop(start_span);
+        let _second_span = tracing::info_span!("test__register_write__second_write").entered();
         // write to the register
         let value2_hash = run_w_backoff_delayed(
             || async {
                 Ok(client
                     .write_to_register(address, value_2.clone(), BTreeSet::new())
-                    .in_current_span()
                     .await?)
             },
             10,
@@ -473,7 +464,8 @@ mod tests {
 
         // and then lets check all entries are returned
         // NB: these will not be ordered according to insertion order, but according to the hashes of the values.
-        let hashes = retry_loop_for_pattern!(client.read_register(address).in_current_span(), Ok(hashes) if hashes.len() > 1)?;
+        let hashes =
+            retry_loop_for_pattern!(client.read_register(address), Ok(hashes) if hashes.len() > 1)?;
 
         assert_eq!(2, hashes.len());
 
@@ -482,20 +474,21 @@ mod tests {
         // get_register_entry
         let retrieved_value_1 = client
             .get_register_entry(address, value1_hash)
-            .in_current_span()
+            .instrument(tracing::info_span!("get_value_1"))
             .await?;
         assert_eq!(retrieved_value_1, value_1);
 
         tokio::time::sleep(delay).await;
         let retrieved_value_2 = client
             .get_register_entry(address, value2_hash)
-            .in_current_span()
+            .instrument(tracing::info_span!("get_value_2"))
             .await?;
         assert_eq!(retrieved_value_2, value_2);
 
         // Requesting a hash which desn't exist throws an error
         match client
             .get_register_entry(address, EntryHash::default())
+            .instrument(tracing::info_span!("final get"))
             .await
         {
             Err(_) => Ok(()),
@@ -517,11 +510,10 @@ mod tests {
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let address = client
             .store_private_register(name, tag, owner, perms)
-            .in_current_span()
             .await?;
 
         // Assert that the data is stored.
-        let current_owner = client.get_register_owner(address).in_current_span().await?;
+        let current_owner = client.get_register_owner(address).await?;
 
         assert_eq!(owner, current_owner);
 
@@ -541,25 +533,24 @@ mod tests {
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let address = client
             .store_private_register(name, tag, owner, perms)
-            .in_current_span()
             .await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
 
-        let register = client.get_register(address).in_current_span().await?;
+        let register = client.get_register(address).await?;
 
         assert!(register.is_private());
 
-        client.delete_register(address).in_current_span().await?;
+        client.delete_register(address).await?;
 
         client.query_timeout = Duration::from_secs(5); // override with a short timeout
-        let mut res = client.get_register(address).in_current_span().await;
+        let mut res = client.get_register(address).await;
         while res.is_ok() {
             // attempt to delete register again (perhaps a message was dropped)
-            client.delete_register(address).in_current_span().await?;
+            client.delete_register(address).await?;
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-            res = client.get_register(address).in_current_span().await;
+            res = client.get_register(address).await;
         }
 
         match res {
@@ -586,16 +577,15 @@ mod tests {
         let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
         let address = client
             .store_public_register(name, tag, owner, perms)
-            .in_current_span()
             .await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
 
-        let register = client.get_register(address).in_current_span().await?;
+        let register = client.get_register(address).await?;
         assert!(register.is_public());
 
-        match client.delete_register(address).in_current_span().await {
+        match client.delete_register(address).await {
             Err(Error::ErrorMessage {
                 source: ErrorMessage::InvalidOperation(_),
                 ..
@@ -608,7 +598,7 @@ mod tests {
         }
 
         // Check that our data still exists.
-        let register = client.get_register(address).in_current_span().await?;
+        let register = client.get_register(address).await?;
         assert!(register.is_public());
 
         Ok(())

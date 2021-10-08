@@ -35,20 +35,21 @@ where
         // Write level and target
         let level = *event.metadata().level();
         let target = event.metadata().file().expect("will never be `None`");
-        write!(
+        let span_separation_string = "\t ➤ ";
+        writeln!(
             writer,
-            "{} [{}:L{}]:\n\t",
+            "{} [{}:L{}]:",
             level,
             target,
             event.metadata().line().expect("will never be `None`")
         )?;
 
-        let mut indentation = 0;
+        write!(writer, "{}", span_separation_string)?;
+
+        // let mut span_count = 0;
         // Write spans and fields of each span
         ctx.visit_spans(|span| {
-            let indentation_string = "\t".repeat(indentation);
-            writeln!(writer, "{}{}", indentation_string, span.name())?;
-            indentation += 1;
+            write!(writer, "{} ", span.name())?;
 
             let ext = span.extensions();
 
@@ -62,10 +63,10 @@ where
                 .expect("will never be `None`");
 
             if !fields.is_empty() {
-                writeln!(writer, "{{{}}}", fields)?;
+                write!(writer, "{{{}}}", fields)?;
             }
 
-            write!(writer, "{}", indentation_string.repeat(2))?;
+            write!(writer, "\n{}", span_separation_string)?;
 
             Ok(())
         })?;
