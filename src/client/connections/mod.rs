@@ -12,17 +12,21 @@ mod messaging;
 use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
     signature_aggregator::SignatureAggregator,
+    MessageId,
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use qp2p::Endpoint;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::{mpsc::Sender, RwLock};
 use xor_name::XorName;
 type QueryResponseSender = Sender<QueryResponse>;
-type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
+use dashmap::DashMap;
+
+// Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
+type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MessageId, QueryResponseSender)>>>;
 use uluru::LRUCache;
 
 #[derive(Debug)]

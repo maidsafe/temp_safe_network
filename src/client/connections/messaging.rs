@@ -18,11 +18,12 @@ use crate::messaging::{
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey;
 use bytes::Bytes;
+use dashmap::DashMap;
 use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
 use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
     sync::Arc,
 };
@@ -65,7 +66,7 @@ impl Session {
 
         let session = Session {
             client_pk,
-            pending_queries: Arc::new(RwLock::new(HashMap::default())),
+            pending_queries: Arc::new(DashMap::default()),
             incoming_err_sender: Arc::new(err_sender),
             endpoint,
             network: Arc::new(NetworkPrefixMap::new(genesis_key)),
@@ -191,7 +192,6 @@ impl Session {
         payload: Bytes,
     ) -> Result<QueryResult, Error> {
         let endpoint = self.endpoint.clone();
-        let pending_queries = self.pending_queries.clone();
 
         let chunk_addr = if let DataQuery::GetChunk(address) = query {
             Some(address)
@@ -243,14 +243,17 @@ impl Session {
         let tasks = FuturesUnordered::new();
         let (sender, mut receiver) = channel::<QueryResponse>(7);
 
-        let pending_queries_for_thread = pending_queries.clone();
         if let Ok(op_id) = query.operation_id() {
             // Insert the response sender
-            trace!("Inserting channel for op_id {:?}", op_id);
-            let _old = pending_queries_for_thread
-                .write()
-                .await
-                .insert(op_id.clone(), sender);
+            trace!("Inserting channel for op_id {:?}", (msg_id, op_id.clone()));
+            if let Some(mut entry) = self.pending_queries.get_mut(&op_id) {
+                let senders_vec = entry.value_mut();
+                senders_vec.push((msg_id, sender))
+            } else {
+                let _nonexistant_entry = self
+                    .pending_queries
+                    .insert(op_id.clone(), vec![(msg_id, sender)]);
+            }
 
             trace!("Inserted channel for {:?}", op_id);
         } else {
@@ -375,8 +378,19 @@ impl Session {
         if let Some(query) = &response {
             if let Ok(query_op_id) = query.operation_id() {
                 // Remove the response sender
-                trace!("Removing channel for {:?}", query_op_id);
-                let _old_channel = pending_queries.clone().write().await.remove(&query_op_id);
+                trace!("Removing channel for {:?}", (msg_id, &query_op_id));
+                // let _old_channel =
+                if let Some(mut entry) = self.pending_queries.get_mut(&query_op_id) {
+                    let listeners_for_op = entry.value_mut();
+                    if let Some(index) = listeners_for_op
+                        .iter()
+                        .position(|(id, _sender)| *id == msg_id)
+                    {
+                        let _old_listener = listeners_for_op.swap_remove(index);
+                    }
+                } else {
+                    warn!("No listeners found for our op_id: {:?}", query_op_id)
+                }
             }
         }
 
