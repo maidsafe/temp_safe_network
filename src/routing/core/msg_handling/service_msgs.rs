@@ -143,38 +143,29 @@ impl Core {
     pub(crate) async fn handle_get_chunk_at_adult(
         &self,
         msg_id: MessageId,
-        address: ChunkAddress,
+        address: &ChunkAddress,
         user: EndUser,
         requesting_elder: XorName,
     ) -> Result<Vec<Command>> {
         trace!("Handling chunk read at adult");
         let mut commands = vec![];
 
-        match self.chunk_storage.get(&address) {
-            Ok(response) => {
-                let msg = SystemMsg::NodeQueryResponse {
-                    response,
-                    correlation_id: msg_id,
-                    user,
-                };
+        let msg = SystemMsg::NodeQueryResponse {
+            response: self.chunk_storage.get(address),
+            correlation_id: msg_id,
+            user,
+        };
 
-                // Setup node authority on this response and send this back to our elders
-                let section_pk = *self.section().chain().last_key();
-                let dst = DstLocation::Node {
-                    name: requesting_elder,
-                    section_pk,
-                };
+        // Setup node authority on this response and send this back to our elders
+        let section_pk = *self.section().chain().last_key();
+        let dst = DstLocation::Node {
+            name: requesting_elder,
+            section_pk,
+        };
 
-                commands.push(Command::PrepareNodeMsgToSend { msg, dst });
+        commands.push(Command::PrepareNodeMsgToSend { msg, dst });
 
-                Ok(commands)
-            }
-            Err(error) => {
-                error!("Problem reading chunk from storage! {:?}", error);
-                // Nothing more to do, we've had a bad time here...
-                Ok(commands)
-            }
-        }
+        Ok(commands)
     }
 
     /// Handle chunk read

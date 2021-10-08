@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{register::Address as RegisterAddress, PublicKey};
+use super::{PublicKey, RegisterAddress};
 use crate::messaging::data::Error as ErrorMessage;
 
 use std::{

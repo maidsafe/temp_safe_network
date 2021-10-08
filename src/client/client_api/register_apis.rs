@@ -11,10 +11,10 @@ use crate::client::Error;
 use crate::messaging::data::{DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite};
 use crate::types::{
     register::{
-        Address, Entry, EntryHash, Permissions, Policy, PrivatePermissions, PrivatePolicy,
+        Entry, EntryHash, Permissions, Policy, PrivatePermissions, PrivatePolicy,
         PublicPermissions, PublicPolicy, Register, User,
     },
-    PublicKey,
+    PublicKey, RegisterAddress as Address,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::{debug, trace};
@@ -225,17 +225,16 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::client::BytesAddress;
     use crate::messaging::data::Error as ErrorMessage;
     use crate::retry_loop_for_pattern;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
-        Error as DtError, PublicKey,
+        BytesAddress, Error as DtError, PublicKey,
     };
     use crate::{
         client::{
             utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff_delayed},
-            BlobAddress, Error,
+            Error,
         },
         url::Url,
     };
@@ -607,7 +606,7 @@ mod tests {
         use crate::url::*;
         let xor_name = XorName::random();
         let url = match Url::encode_bytes(
-            BytesAddress::Blob(BlobAddress::Public(xor_name)),
+            BytesAddress::Public(xor_name),
             ContentType::Raw,
             XorUrlBase::Base32z,
         ) {

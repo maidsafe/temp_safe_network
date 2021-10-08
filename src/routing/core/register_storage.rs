@@ -9,8 +9,8 @@
 use crate::dbs::SLED_FLUSH_TIME_MS;
 use crate::dbs::{convert_to_error_message, Error, EventStore, Result, UsedSpace};
 use crate::types::{
-    register::{Action, Address, Register, User},
-    PublicKey,
+    register::{Action, Register, User},
+    PublicKey, RegisterAddress as Address,
 };
 use crate::{
     messaging::{
@@ -404,7 +404,9 @@ impl RegisterStorage {
 /// as well as the tag of the Address.
 fn to_reg_key(address: &Address) -> Result<XorName> {
     Ok(XorName::from_content(
-        address.encode_to_zbase32()?.as_bytes(),
+        DataAddress::Register(*address)
+            .encode_to_zbase32()?
+            .as_bytes(),
     ))
 }
 

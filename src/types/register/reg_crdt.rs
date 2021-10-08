@@ -8,9 +8,9 @@
 // Software.
 
 use super::super::{
-    Signature, {utils, Error, PublicKey, Result},
+    RegisterAddress as Address, Signature, {utils, Error, PublicKey, Result},
 };
-use super::metadata::{Address, Entry};
+use super::metadata::Entry;
 pub use crdts::merkle_reg::Hash as EntryHash;
 use crdts::{
     merkle_reg::{MerkleReg, Node},

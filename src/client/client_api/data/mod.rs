@@ -10,14 +10,10 @@ mod pac_man;
 
 pub(crate) use pac_man::{encrypt_blob, to_chunk, DataMapLevel};
 
-use crate::{
-    client::{Error, Result},
-    url::Scope,
-};
+use crate::client::{Error, Result};
 
 use bytes::Bytes;
 use self_encryption::MIN_ENCRYPTABLE_BYTES;
-use xor_name::XorName;
 
 /// Data of size more than 0 bytes less than [`MIN_ENCRYPTABLE_BYTES`] bytes.
 ///
@@ -73,126 +69,5 @@ impl Blob {
     /// Returns the bytes.
     pub(crate) fn bytes(&self) -> Bytes {
         self.bytes.clone()
-    }
-}
-
-/// Address of Bytes data type.
-#[derive(
-    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, serde::Serialize, serde::Deserialize, Debug,
-)]
-pub enum BytesAddress {
-    /// Blob, bytes of >= 3072 len.
-    Blob(BlobAddress),
-    /// Spot, bytes of < 3072 len.
-    Spot(SpotAddress),
-}
-
-impl BytesAddress {
-    /// The xorname.
-    pub fn name(&self) -> &XorName {
-        match self {
-            Self::Blob(address) => address.name(),
-            Self::Spot(address) => address.name(),
-        }
-    }
-
-    /// The address scope
-    pub fn scope(&self) -> Scope {
-        if self.is_public() {
-            Scope::Public
-        } else {
-            Scope::Private
-        }
-    }
-
-    /// Returns true if public.
-    pub fn is_public(self) -> bool {
-        match self {
-            Self::Blob(address) => address.is_public(),
-            Self::Spot(address) => address.is_public(),
-        }
-    }
-
-    /// Returns true if private.
-    pub fn is_private(self) -> bool {
-        !self.is_public()
-    }
-}
-
-/// Address of a Blob.
-#[derive(
-    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, serde::Serialize, serde::Deserialize, Debug,
-)]
-pub enum BlobAddress {
-    /// Private namespace.
-    Private(XorName),
-    /// Public namespace.
-    Public(XorName),
-}
-
-impl BlobAddress {
-    /// The xorname.
-    pub fn name(&self) -> &XorName {
-        match self {
-            Self::Public(name) | Self::Private(name) => name,
-        }
-    }
-
-    /// The address scope of the Blob
-    pub fn scope(&self) -> Scope {
-        if self.is_public() {
-            Scope::Public
-        } else {
-            Scope::Private
-        }
-    }
-
-    /// Returns true if public.
-    pub fn is_public(self) -> bool {
-        matches!(self, BlobAddress::Public(_))
-    }
-
-    /// Returns true if private.
-    pub fn is_private(self) -> bool {
-        !self.is_public()
-    }
-}
-
-/// Address of a Spot.
-#[derive(
-    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, serde::Serialize, serde::Deserialize, Debug,
-)]
-pub enum SpotAddress {
-    /// Private namespace.
-    Private(XorName),
-    /// Public namespace.
-    Public(XorName),
-}
-
-impl SpotAddress {
-    /// The xorname.
-    pub fn name(&self) -> &XorName {
-        match self {
-            Self::Public(name) | Self::Private(name) => name,
-        }
-    }
-
-    /// The address scope of the Spot
-    pub fn scope(&self) -> Scope {
-        if self.is_public() {
-            Scope::Public
-        } else {
-            Scope::Private
-        }
-    }
-
-    /// Returns true if public.
-    pub fn is_public(self) -> bool {
-        matches!(self, SpotAddress::Public(_))
-    }
-
-    /// Returns true if private.
-    pub fn is_private(self) -> bool {
-        !self.is_public()
     }
 }

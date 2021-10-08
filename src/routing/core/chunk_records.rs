@@ -7,13 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{capacity::CHUNK_COPY_COUNT, Command, Core, Prefix, Result};
-use crate::messaging::{
-    data::{operation_id, ChunkDataExchange, CmdError, Error as ErrorMessage, StorageLevel},
-    system::{NodeCmd, NodeQuery, SystemMsg},
-    AuthorityProof, EndUser, MessageId, ServiceAuth,
-};
 use crate::routing::{error::convert_to_error_message, Error};
-use crate::types::{Chunk, ChunkAddress, PublicKey};
+use crate::types::{Chunk, PublicKey};
+use crate::{
+    messaging::{
+        data::{operation_id, ChunkDataExchange, CmdError, Error as ErrorMessage, StorageLevel},
+        system::{NodeCmd, NodeQuery, SystemMsg},
+        AuthorityProof, EndUser, MessageId, ServiceAuth,
+    },
+    types::ChunkAddress,
+};
 use std::collections::BTreeSet;
 use tracing::info;
 use xor_name::XorName;
