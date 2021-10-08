@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.12](https://github.com/maidsafe/safe_network/compare/v0.33.11...v0.33.12) (2021-10-08)
+
+
+### Features
+
+* **error:** add error for incomplete chunking ([ceb9383](https://github.com/maidsafe/safe_network/commit/ceb9383ef2f1b9487cf7b763788b9b86d6b7e468))
+
+
+### Bug Fixes
+
+* **chunks:** do not double-encrypt in packing step ([376c579](https://github.com/maidsafe/safe_network/commit/376c5799d269d2187ed6faad2bab8cc469236da1))
+
 ### [0.33.11](https://github.com/maidsafe/safe_network/compare/v0.33.10...v0.33.11) (2021-10-08)
 
 
