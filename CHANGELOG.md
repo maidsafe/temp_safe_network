@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.11](https://github.com/maidsafe/safe_network/compare/v0.33.10...v0.33.11) (2021-10-08)
+
+
+### Bug Fixes
+
+* using prefix name as dst_location ([65b312b](https://github.com/maidsafe/safe_network/commit/65b312bcf05257e0ecc439d95d16d26ddef3f492))
+
 ### [0.33.10](https://github.com/maidsafe/safe_network/compare/v0.33.9...v0.33.10) (2021-10-08)
 
 
