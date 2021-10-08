@@ -17,7 +17,6 @@ use crate::types::{
     PublicKey, RegisterAddress as Address,
 };
 use std::collections::{BTreeMap, BTreeSet};
-use tracing::{debug, trace};
 use xor_name::XorName;
 
 impl Client {
@@ -32,6 +31,7 @@ impl Client {
     ///
     /// A tag must be supplied.
     /// A xorname must be supplied, this can be random or deterministic as per your apps needs.
+    #[instrument(level = "debug")]
     pub async fn store_private_register(
         &self,
         name: XorName,
@@ -39,7 +39,6 @@ impl Client {
         owner: PublicKey,
         permissions: BTreeMap<PublicKey, PrivatePermissions>,
     ) -> Result<Address, Error> {
-        trace!("Store Private Register data {:?}", name);
         let pk = self.public_key();
         let policy = PrivatePolicy { owner, permissions };
         let priv_register = Register::new_private(pk, name, tag, Some(policy));
@@ -58,6 +57,7 @@ impl Client {
     ///
     /// A tag must be supplied.
     /// A xorname must be supplied, this can be random or deterministic as per your apps needs.
+    #[instrument(level = "debug")]
     pub async fn store_public_register(
         &self,
         name: XorName,
@@ -65,7 +65,6 @@ impl Client {
         owner: PublicKey,
         permissions: BTreeMap<User, PublicPermissions>,
     ) -> Result<Address, Error> {
-        trace!("Store Public Register data {:?}", name);
         let pk = self.public_key();
         let policy = PublicPolicy { owner, permissions };
         let pub_register = Register::new_public(pk, name, tag, Some(policy));
@@ -79,6 +78,7 @@ impl Client {
     /// Delete Register
     ///
     /// You're only able to delete a PrivateRegister. Public data can no be removed from the network.
+    #[instrument(level = "debug")]
     pub async fn delete_register(&self, address: Address) -> Result<(), Error> {
         let cmd = DataCmd::Register(RegisterWrite::Delete(address));
         self.send_cmd(cmd).await
@@ -88,6 +88,7 @@ impl Client {
     ///
     /// Public or private isn't important for writing, though the data you write will
     /// be Public or Private according to the type of the targeted Register.
+    #[instrument(skip(children), level = "debug")]
     pub async fn write_to_register(
         &self,
         address: Address,
@@ -113,12 +114,11 @@ impl Client {
 
     /// Store a new Register data object
     /// Wraps msg_contents for payment validation and mutation
+    #[instrument(skip_all, level = "trace")]
     pub(crate) async fn pay_and_write_register_to_network(
         &self,
         data: Register,
     ) -> Result<(), Error> {
-        debug!("Attempting to pay and write a Register to the network");
-
         let cmd = DataCmd::Register(RegisterWrite::New(data));
         self.send_cmd(cmd).await
     }
@@ -128,8 +128,8 @@ impl Client {
     //---------------------
 
     /// Get a Register from the Network
+    #[instrument(level = "debug")]
     pub async fn get_register(&self, address: Address) -> Result<Register, Error> {
-        trace!("Get Register data at {:?}", address.name());
         // Let's fetch the Register from the network
         let query = DataQuery::Register(RegisterRead::Get(address));
         let query_result = self.send_query(query).await?;
@@ -142,15 +142,11 @@ impl Client {
     }
 
     /// Get the last data entry from a Register data.
+    #[instrument(level = "debug")]
     pub async fn read_register(
         &self,
         address: Address,
     ) -> Result<BTreeSet<(EntryHash, Entry)>, Error> {
-        trace!(
-            "Get last entry/ies from Register data at {:?}",
-            address.name()
-        );
-
         let register = self.get_register(address).await?;
         let last = register.read(None)?;
 
@@ -158,17 +154,12 @@ impl Client {
     }
 
     /// Get an entry from a Register on the Network by its hash
+    #[instrument(level = "debug")]
     pub async fn get_register_entry(
         &self,
         address: Address,
         hash: EntryHash,
     ) -> Result<Entry, Error> {
-        trace!(
-            "Get entry with hash {:?} from Register data {:?}",
-            hash,
-            address.name()
-        );
-
         let register = self.get_register(address).await?;
         let entry = register
             .get(hash, None)?
@@ -182,9 +173,8 @@ impl Client {
     //---------------------
 
     /// Get the owner of a Register.
+    #[instrument(level = "debug")]
     pub async fn get_register_owner(&self, address: Address) -> Result<PublicKey, Error> {
-        trace!("Get owner of the Register data at {:?}", address.name());
-
         let register = self.get_register(address).await?;
         let owner = register.owner();
 
@@ -196,16 +186,12 @@ impl Client {
     //---------------------
 
     /// Get the set of Permissions in a Register for a specific user.
+    #[instrument(level = "debug")]
     pub async fn get_register_permissions_for_user(
         &self,
         address: Address,
         user: PublicKey,
     ) -> Result<Permissions, Error> {
-        trace!(
-            "Get permissions from Public Register data at {:?}",
-            address.name()
-        );
-
         let register = self.get_register(address).await?;
         let perms = register.permissions(User::Key(user), None)?;
 
@@ -213,9 +199,8 @@ impl Client {
     }
 
     /// Get the Policy of a Register.
+    #[instrument(level = "debug")]
     pub async fn get_register_policy(&self, address: Address) -> Result<Policy, Error> {
-        trace!("Get Policy from Register data at {:?}", address.name());
-
         let register = self.get_register(address).await?;
         let policy = register.policy(None)?;
 
@@ -294,8 +279,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_basics() -> Result<()> {
+        let _outer_span = tracing::info_span!("test__register_basics").entered();
         let client = create_test_client().await?;
-
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key();
@@ -338,7 +323,10 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+
     async fn register_private_permissions() -> Result<()> {
+        let _outer_span = tracing::info_span!("test__register_private_permissions").entered();
+
         let client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
@@ -382,6 +370,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_public_permissions() -> Result<()> {
+        let _outer_span = tracing::info_span!("test__register_public_permissions").entered();
+
         let client = create_test_client().await?;
 
         let name = XorName(rand::random());
@@ -423,6 +413,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_write() -> Result<()> {
+        let _outer_span = tracing::info_span!("test__register_write").entered();
+
         let name = XorName(rand::random());
         let tag = 10;
         let client = create_test_client().await?;
@@ -501,6 +493,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_owner() -> Result<()> {
+        let _outer_span = tracing::info_span!("test__register_owner").entered();
+
         let name = XorName(rand::random());
         let tag = 10;
         let client = create_test_client().await?;
@@ -522,6 +516,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_can_delete_private() -> Result<()> {
+        let _outer_span = tracing::info_span!("test__register_can_delete_private").entered();
+
         let mut client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
@@ -564,6 +560,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_cannot_delete_public() -> Result<()> {
+        let _outer_span = tracing::info_span!("test__register_cannot_delete_public").entered();
+
         let client = create_test_client().await?;
 
         let name = XorName(rand::random());

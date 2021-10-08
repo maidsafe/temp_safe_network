@@ -17,7 +17,6 @@ use crate::messaging::{
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey;
-
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
 use itertools::Itertools;
@@ -32,7 +31,7 @@ use tokio::{
     sync::RwLock,
     task::JoinHandle,
 };
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, instrument::Instrumented, trace, warn, Instrument};
 use xor_name::XorName;
 
 // Number of Elders subset to send queries to
@@ -42,6 +41,7 @@ const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
+    #[instrument(skip_all, level = "debug")]
     pub(crate) async fn bootstrap(
         client_pk: PublicKey,
         genesis_key: bls::PublicKey,
@@ -84,6 +84,7 @@ impl Session {
     /// Tries to bootstrap a client to a section. If there is a failure then it retries.
     /// After a maximum of three attempts if the boostrap process still fails, the unresponsive
     /// node is removed from the list and an error is returned.
+    #[instrument(skip_all, level = "info")]
     pub(crate) async fn attempt_bootstrap(
         client_pk: PublicKey,
         genesis_key: bls::PublicKey,
@@ -126,6 +127,7 @@ impl Session {
     }
 
     /// Send a `ServiceMsg` to the network without awaiting for a response.
+    #[instrument(skip_all, level = "debug")]
     pub(crate) async fn send_cmd(
         &self,
         dst_address: XorName,
@@ -180,6 +182,7 @@ impl Session {
         send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await
     }
 
+    #[instrument(skip_all, level = "debug")]
     /// Send a `ServiceMsg` to the network awaiting for the response.
     pub(crate) async fn send_query(
         &self,
@@ -272,25 +275,29 @@ impl Session {
             let endpoint = endpoint.clone();
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
-            let task_handle = tokio::spawn(async move {
-                trace!("queueing query send task to: {:?}", &socket);
-                let result = endpoint
-                    .connect_to(&socket)
-                    .err_into()
-                    .and_then(|connection| async move {
-                        connection.send_with(msg_bytes, priority, None).await
-                    })
-                    .await;
-                match &result {
-                    Err(err) => {
-                        error!("Error sending Query to elder: {:?} ", err);
-                        let mut a = counter_clone.lock().await;
-                        *a += 1;
+
+            let task_handle = tokio::spawn(
+                async move {
+                    trace!("queueing query send task to: {:?}", &socket);
+                    let result = endpoint
+                        .connect_to(&socket)
+                        .err_into()
+                        .and_then(|connection| async move {
+                            connection.send_with(msg_bytes, priority, None).await
+                        })
+                        .await;
+                    match &result {
+                        Err(err) => {
+                            error!("Error sending Query to elder: {:?} ", err);
+                            let mut a = counter_clone.lock().await;
+                            *a += 1;
+                        }
+                        Ok(()) => trace!("ServiceMsg with id: {:?}, sent to {}", &msg_id, &socket),
                     }
-                    Ok(()) => trace!("ServiceMsg with id: {:?}, sent to {}", &msg_id, &socket),
+                    result
                 }
-                result
-            });
+                .instrument(tracing::debug_span!("sending query message")),
+            );
 
             tasks.push(task_handle);
         }
@@ -391,6 +398,7 @@ impl Session {
         }
     }
 
+    #[instrument(skip_all, level = "debug")]
     pub(crate) async fn fire_and_forget_payload(
         &self,
         dst_address: XorName,
@@ -443,6 +451,7 @@ impl Session {
     }
 }
 
+#[instrument(skip_all, level = "trace")]
 pub(crate) async fn send_message(
     elders: Vec<SocketAddr>,
     wire_msg: WireMsg,
@@ -462,7 +471,7 @@ pub(crate) async fn send_message(
         let successes_clone = successes.clone();
         let msg_bytes_clone = msg_bytes.clone();
         let endpoint = endpoint.clone();
-        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
+        let task_handle: Instrumented<JoinHandle<Result<(), Error>>> = tokio::spawn(async move {
             trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
             endpoint
                 .connect_to(&socket)
@@ -476,7 +485,8 @@ pub(crate) async fn send_message(
 
             trace!("Sent msg with MsgId {:?} to {:?}", msg_id, &socket);
             Ok(())
-        });
+        })
+        .instrument(tracing::trace_span!("sending message"));
         tasks.push(task_handle);
     }
 
