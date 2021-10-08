@@ -11,12 +11,14 @@ mod metadata;
 mod policy;
 mod reg_crdt;
 
-use super::{Error, PublicKey, Result};
-pub use metadata::{Action, Address, Entry, Kind};
+pub use metadata::{Action, Entry};
 pub use policy::{
     Permissions, Policy, PrivatePermissions, PrivatePolicy, PublicPermissions, PublicPolicy, User,
 };
 pub use reg_crdt::EntryHash;
+
+use super::{Error, PublicKey, Result};
+use crate::{types::RegisterAddress as Address, url::Scope};
 use reg_crdt::{CrdtOperation, RegisterCrdt};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -88,9 +90,9 @@ impl Register {
         self.crdt.address()
     }
 
-    /// Return the kind.
-    pub fn kind(&self) -> Kind {
-        self.address().kind()
+    /// Return the scope.
+    pub fn scope(&self) -> Scope {
+        self.address().scope()
     }
 
     /// Return the name.
@@ -105,12 +107,12 @@ impl Register {
 
     /// Return `true` if public.
     pub fn is_public(&self) -> bool {
-        self.kind().is_public()
+        self.address().is_public()
     }
 
     /// Return `true` if private.
     pub fn is_private(&self) -> bool {
-        self.kind().is_private()
+        self.address().is_private()
     }
 
     /// Return the number of items held in the register, optionally
@@ -200,13 +202,16 @@ impl Register {
 mod tests {
     use super::super::{
         register::{
-            Address, Entry, EntryHash, Kind, Permissions, PrivatePermissions, PrivatePolicy,
-            PublicPermissions, PublicPolicy, Register, RegisterOp, User,
+            Entry, EntryHash, Permissions, PrivatePermissions, PrivatePolicy, PublicPermissions,
+            PublicPolicy, Register, RegisterOp, User,
         },
         utils, Error, Keypair, Result,
     };
-    use crate::client::{BlobAddress, BytesAddress};
     use crate::url::Url;
+    use crate::{
+        types::{BytesAddress, RegisterAddress as Address},
+        url::Scope,
+    };
     use eyre::eyre;
     use proptest::prelude::*;
     use rand::{rngs::OsRng, seq::SliceRandom, thread_rng};
@@ -223,7 +228,7 @@ mod tests {
         let (authority_keypair, register) =
             &gen_pub_reg_replicas(None, register_name, register_tag, None, 1)[0];
 
-        assert_eq!(register.kind(), Kind::Public);
+        assert_eq!(register.scope(), Scope::Public);
         assert_eq!(*register.name(), register_name);
         assert_eq!(register.tag(), register_tag);
         assert!(register.is_public());
@@ -233,7 +238,7 @@ mod tests {
         assert_eq!(register.owner(), authority_pk);
         assert_eq!(register.replica_authority(), authority_pk);
 
-        let register_address = Address::from_kind(Kind::Public, register_name, register_tag);
+        let register_address = Address::new(register_name, Scope::Public, register_tag);
         assert_eq!(*register.address(), register_address);
     }
 
@@ -244,7 +249,7 @@ mod tests {
         let (authority_keypair, register) =
             &gen_priv_reg_replicas(None, register_name, register_tag, None, 1)[0];
 
-        assert_eq!(register.kind(), Kind::Private);
+        assert_eq!(register.scope(), Scope::Private);
         assert_eq!(*register.name(), register_name);
         assert_eq!(register.tag(), register_tag);
         assert!(!register.is_public());
@@ -254,7 +259,7 @@ mod tests {
         assert_eq!(register.owner(), authority_pk);
         assert_eq!(register.replica_authority(), authority_pk);
 
-        let register_address = Address::from_kind(Kind::Private, register_name, register_tag);
+        let register_address = Address::new(register_name, Scope::Private, register_tag);
         assert_eq!(*register.address(), register_address);
     }
 
@@ -1163,7 +1168,7 @@ mod tests {
     fn random_url() -> Result<Url> {
         use crate::url::*;
         let url = Url::encode_bytes(
-            BytesAddress::Blob(BlobAddress::Public(XorName::random())),
+            BytesAddress::Public(XorName::random()),
             ContentType::Raw,
             XorUrlBase::Base32z,
         )

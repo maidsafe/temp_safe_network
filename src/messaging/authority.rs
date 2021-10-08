@@ -20,8 +20,6 @@ use ed25519_dalek::{
     Keypair as EdKeypair, PublicKey as EdPublicKey, Signature as EdSignature, Signer as _,
     Verifier as _,
 };
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use xor_name::XorName;
 
 /// Authority of a network peer.
@@ -105,12 +103,13 @@ pub struct SectionAuth {
 impl SectionAuth {
     /// Try to construct verified section authority by aggregating a new share.
     pub(crate) async fn try_authorize(
-        aggregator: Arc<RwLock<SignatureAggregator>>,
+        aggregator: SignatureAggregator,
         share: BlsShareAuth,
         payload: impl AsRef<[u8]>,
     ) -> Result<AuthorityProof<Self>, AggregatorError> {
-        let mut aggregator = aggregator.write().await;
-        let sig = aggregator.add(payload.as_ref(), share.sig_share.clone())?;
+        let sig = aggregator
+            .add(payload.as_ref(), share.sig_share.clone())
+            .await?;
 
         if share.sig_share.public_key_set.public_key() != sig.public_key {
             return Err(AggregatorError::InvalidShare);

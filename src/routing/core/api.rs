@@ -76,7 +76,7 @@ impl Core {
             section_keys_provider,
             proposal_aggregator: ProposalAggregator::default(),
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
-            message_aggregator: Arc::new(RwLock::new(SignatureAggregator::default())),
+            message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
             event_tx: self.event_tx.clone(),

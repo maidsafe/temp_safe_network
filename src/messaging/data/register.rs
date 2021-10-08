@@ -9,8 +9,8 @@
 use super::{CmdError, Error, QueryResponse, Result};
 use crate::messaging::data::OperationId;
 use crate::types::{
-    register::{Address, Entry, Register, RegisterOp, User},
-    PublicKey,
+    register::{Entry, Register, RegisterOp, User},
+    PublicKey, RegisterAddress as Address,
 };
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;

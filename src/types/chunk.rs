@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{utils, Error, XorName};
+use super::{ChunkAddress, XorName};
 use bytes::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -19,7 +19,7 @@ pub const MAX_CHUNK_SIZE_IN_BYTES: usize = 1024 * 1024 + 10 * 1024;
 pub struct Chunk {
     /// Network address. Omitted when serialising and
     /// calculated from the `value` when deserialising.
-    address: Address,
+    address: ChunkAddress,
     /// Contained data.
     #[debug(skip)]
     value: Bytes,
@@ -29,7 +29,7 @@ impl Chunk {
     /// Creates a new instance of `Chunk`.
     pub fn new(value: Bytes) -> Self {
         Self {
-            address: Address(XorName::from_content(value.as_ref())),
+            address: ChunkAddress(XorName::from_content(value.as_ref())),
             value,
         }
     }
@@ -40,7 +40,7 @@ impl Chunk {
     }
 
     /// Returns the address.
-    pub fn address(&self) -> &Address {
+    pub fn address(&self) -> &ChunkAddress {
         &self.address
     }
 
@@ -79,31 +79,9 @@ impl<'de> Deserialize<'de> for Chunk {
     }
 }
 
-/// Address of a Chunk.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub struct Address(pub XorName);
-
-impl Address {
-    /// Returns the name.
-    pub fn name(&self) -> &XorName {
-        &self.0
-    }
-
-    /// Returns the Address serialised and encoded in z-base-32.
-    pub fn encode_to_zbase32(&self) -> Result<String, Error> {
-        utils::encode(&self)
-    }
-
-    /// Creates from z-base-32 encoded string.
-    pub fn decode_from_zbase32<T: AsRef<str>>(encoded: T) -> Result<Self, Error> {
-        utils::decode(encoded)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{super::Result, utils, Error};
-    use super::{Address, Chunk, XorName};
+    use crate::types::{utils, Chunk, Error, Result};
     use bytes::Bytes;
     use hex::encode;
     use rand::{self, Rng, SeedableRng};
@@ -189,15 +167,5 @@ mod tests {
             seed
         );
         XorShiftRng::seed_from_u64(seed)
-    }
-
-    #[test]
-    fn zbase32_encode_decode_chunk_address() -> Result<()> {
-        let name = XorName::random();
-        let address = Address(name);
-        let encoded = address.encode_to_zbase32()?;
-        let decoded = self::Address::decode_from_zbase32(&encoded)?;
-        assert_eq!(address, decoded);
-        Ok(())
     }
 }
