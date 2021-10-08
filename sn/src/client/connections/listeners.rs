@@ -176,11 +176,14 @@ impl Session {
                     // ConnectionManager::send_query
 
                     if let Ok(op_id) = response.operation_id() {
-                        if let Some(sender) = &queries.read().await.get(&op_id) {
-                            trace!("Sending response for query w/{} via channel.", op_id);
-                            let result = sender.send(response).await;
-                            if result.is_err() {
-                                trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
+                        if let Some(entry) = queries.get(&op_id) {
+                            let all_senders = entry.value();
+                            for (_msg_id, sender) in all_senders {
+                                trace!("Sending response for query w/{} via channel.", op_id);
+                                let result = sender.send(response.clone()).await;
+                                if result.is_err() {
+                                    trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
+                                }
                             }
                         } else {
                             // TODO: The trace is only needed when we have an identified case of not finding a channel, but expecting one.
