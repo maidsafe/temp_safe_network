@@ -32,7 +32,7 @@ struct HeadChunk {
 }
 
 impl Client {
-    #[instrument(level = "debug")]
+    #[instrument(skip(self), level = "debug")]
     /// Reads [`Bytes`] from the network, whose contents are contained within on or more chunks.
     pub async fn read_bytes(&self, address: BytesAddress) -> Result<Bytes> {
         let chunk = self.get_chunk(address.name()).await?;
@@ -83,7 +83,7 @@ impl Client {
         self.seek(data_map, position, length).await
     }
 
-    #[instrument(level = "trace")]
+    #[instrument(skip(self), level = "trace")]
     pub(crate) async fn get_chunk(&self, name: &XorName) -> Result<Chunk> {
         let res = self
             .send_query(DataQuery::GetChunk(ChunkAddress(*name)))
@@ -114,7 +114,7 @@ impl Client {
 
     /// Encrypts a binary large object (blob) and returns the resulting address and all chunks.
     /// Does not store anything to the network.
-    #[instrument(skip(blob), level = "trace")]
+    #[instrument(skip(self, blob), level = "trace")]
     fn encrypt_blob(&self, blob: Blob, scope: Scope) -> Result<(BytesAddress, Vec<Chunk>)> {
         let owner = encryption(scope, self.public_key());
         encrypt_blob(blob.bytes(), owner.as_ref())
@@ -140,7 +140,7 @@ impl Client {
 
     /// Directly writes [`Bytes`] to the network in the
     /// form of immutable chunks, without any batching.
-    #[instrument(skip(bytes), level = "debug")]
+    #[instrument(skip(self, bytes), level = "debug")]
     pub async fn upload(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
         if let Ok(blob) = Blob::new(bytes.clone()) {
             self.upload_blob(blob, scope).await
@@ -308,8 +308,6 @@ mod tests {
 
     #[test]
     fn deterministic_chunking() -> Result<()> {
-        let _outer_span = tracing::info_span!("test__register_basics").entered();
-
         let keypair = Keypair::new_ed25519(&mut OsRng);
         let blob = random_bytes(MIN_BLOB_SIZE);
 
@@ -334,9 +332,8 @@ mod tests {
     // Test storing and reading min size blob.
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_3kb() -> Result<()> {
-        let _outer_span = tracing::info_span!("store_and_read_3kb").entered();
-
         let client = create_test_client().await?;
+        let _outer_span = tracing::info_span!("store_and_read_3kb").entered();
 
         let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
 
@@ -373,9 +370,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn seek_in_data() -> Result<()> {
-        let _outer_span = tracing::info_span!("seek_in_data").entered();
-
         let client = create_test_client().await?;
+        let _outer_span = tracing::info_span!("seek_in_data").entered();
         for i in 1..5 {
             let size = i * MIN_BLOB_SIZE;
             for divisor in 2..5 {
@@ -411,31 +407,24 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1kb() -> Result<()> {
-        let _outer_span = tracing::info_span!("store_and_read_1kb").entered();
-
         store_and_read_spot(MIN_BLOB_SIZE / 3, Scope::Public).await?;
         store_and_read_spot(MIN_BLOB_SIZE / 3, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1mb() -> Result<()> {
-        let _outer_span = tracing::info_span!("store_and_read_1mb").entered();
-
         store_and_read_blob(1024 * 1024, Scope::Public).await?;
         store_and_read_blob(1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_10mb() -> Result<()> {
-        let _outer_span = tracing::info_span!("store_and_read_10mb").entered();
         store_and_read_blob(10 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn store_and_read_20mb() -> Result<()> {
-        let _outer_span = tracing::info_span!("store_and_read_20mb").entered();
-
         store_and_read_blob(20 * 1024 * 1024, Scope::Private).await
     }
 
@@ -449,8 +438,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn parallel_timings() -> Result<()> {
-        let _outer_span = tracing::info_span!("parallel_timings").entered();
         let client = create_test_client().await?;
+        let _outer_span = tracing::info_span!("parallel_timings").entered();
 
         let handles = (0..1000_usize)
             .map(|i| (i, client.clone()))
@@ -498,6 +487,14 @@ mod tests {
     async fn store_and_read_blob(size: usize, scope: Scope) -> Result<()> {
         let blob = Blob::new(random_bytes(size))?;
         let client = create_test_client().await?;
+
+        // cannot use scope as var w/ macro
+        let _outer_span = if scope == Scope::Public {
+            tracing::info_span!("store_and_read_public_blob", size).entered()
+        } else {
+            tracing::info_span!("store_and_read_private_blob", size).entered()
+        };
+
         let address = client.upload_blob(blob.clone(), scope).await?;
 
         // the larger the file, the longer we have to wait before we start querying
@@ -515,6 +512,14 @@ mod tests {
     async fn store_and_read_spot(size: usize, scope: Scope) -> Result<()> {
         let spot = Spot::new(random_bytes(size))?;
         let client = create_test_client().await?;
+
+        // cannot use scope as var w/ macro
+        let _outer_span = if scope == Scope::Public {
+            tracing::info_span!("store_and_read_public_spot", size).entered()
+        } else {
+            tracing::info_span!("store_and_read_private_spot", size).entered()
+        };
+
         let address = client.upload_spot(spot.clone(), scope).await?;
 
         // the larger the size, the longer we have to wait before we start querying
