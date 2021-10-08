@@ -145,6 +145,9 @@ pub enum Error {
     /// Could not retrieve all chunks required to decrypt the data. (Expected, Actual)
     #[error("Not enough chunks! Required {}, but we have {}.)", _0, _1)]
     NotEnoughChunks(usize, usize),
+    /// Could not chunk all the data required to encrypt the data. (Expected, Actual)
+    #[error("Not all data was chunked! Required {}, but we have {}.)", _0, _1)]
+    NotAllDataWasChunked(usize, usize),
 }
 
 impl From<(CmdError, OperationId)> for Error {

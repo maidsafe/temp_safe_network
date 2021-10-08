@@ -93,7 +93,7 @@ pub(crate) fn pack(
                 .collect();
             if expected_total > chunks.len() {
                 // as we flatten above, we need to check outcome here
-                return Err(Error::Generic("Not all data was chunked!".to_string()));
+                return Err(Error::NotAllDataWasChunked(expected_total, chunks.len()));
             }
             chunk_content = pack_data_map(DataMapLevel::Additional(data_map))?;
         }
@@ -109,7 +109,10 @@ pub(crate) fn pack(
 
     if expected_total > all_chunks.len() {
         // as we flatten above, we need to check outcome here
-        return Err(Error::Generic("Not all data was chunked!".to_string()));
+        return Err(Error::NotAllDataWasChunked(
+            expected_total,
+            all_chunks.len(),
+        ));
     }
 
     Ok((address, all_chunks))
