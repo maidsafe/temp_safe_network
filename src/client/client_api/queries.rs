@@ -15,12 +15,13 @@ use crate::messaging::{
 };
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
-use tracing::debug;
+use tracing::{debug, info_span, Instrument};
 
 impl Client {
     // Send a Query to the network and await a response.
     // Queries are automatically retried using exponential backoff if the timeout is hit
     // This function is a helper private to this module.
+    #[instrument(skip(self), level = "debug")]
     pub(crate) async fn send_query(&self, query: DataQuery) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
         let msg = ServiceMsg::Query(query.clone());
@@ -38,25 +39,28 @@ impl Client {
             starting_query_timeout
         );
         retry(
-            || async {
-                debug!(
-                    "Attempting {:?} with a query timeout of {:?}",
-                    query, starting_query_timeout
-                );
-                let res = tokio::time::timeout(
-                    // The max timeout is total_timeout / retry_factor, so we should get at least lowest_bound_count retries within the total time (if needed)
-                    starting_query_timeout,
-                    self.send_signed_query(
-                        query.clone(),
-                        client_pk,
-                        serialised_query.clone(),
-                        signature.clone(),
-                    ),
-                )
-                .await;
+            || {
+                async {
+                    debug!(
+                        "Attempting {:?} with a query timeout of {:?}",
+                        query, starting_query_timeout
+                    );
+                    let res = tokio::time::timeout(
+                        // The max timeout is total_timeout / retry_factor, so we should get at least lowest_bound_count retries within the total time (if needed)
+                        starting_query_timeout,
+                        self.send_signed_query(
+                            query.clone(),
+                            client_pk,
+                            serialised_query.clone(),
+                            signature.clone(),
+                        ),
+                    )
+                    .await;
 
-                debug!("Query {:?} result (w/ timeout) was: {:?}", query, res);
-                res.map_err(backoff::Error::Transient)
+                    debug!("Query {:?} result (w/ timeout) was: {:?}", query, res);
+                    res.map_err(backoff::Error::Transient)
+                }
+                .instrument(info_span!("Attempting a query"))
             },
             starting_query_timeout,
             self.query_timeout,
