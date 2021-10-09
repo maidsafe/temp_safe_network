@@ -124,13 +124,7 @@ pub enum SystemMsg {
     /// a DKG failure.
     DkgFailureAgreement(DkgFailureSigSet),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
-    Propose {
-        /// The content of the proposal
-        content: Proposal,
-        // TODO: try to remove this in favor of the msg header MsgKind sig share we already have
-        /// BLS signature share
-        sig_share: SigShare,
-    },
+    Propose(Proposal),
     /// Message that notifies a section to test
     /// the connectivity to a node
     StartConnectivityTest(XorName),

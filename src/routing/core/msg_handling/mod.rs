@@ -72,6 +72,11 @@ impl Core {
             }
         };
 
+        // Collect the section keys we currently are aware to be used in later checks.
+        let mut known_keys: Vec<BlsPublicKey> = self.section.chain().keys().copied().collect();
+        known_keys.extend(self.network.section_keys());
+        known_keys.push(*self.section.genesis_key());
+
         match message_type {
             MessageType::System {
                 msg_id,
@@ -79,25 +84,7 @@ impl Core {
                 dst_location,
                 msg,
             } => {
-                // Let's now verify the section key in the msg authority is trusted
-                // based on our current knowledge of the network and sections chains.
-                let mut known_keys: Vec<BlsPublicKey> =
-                    self.section.chain().keys().copied().collect();
-                known_keys.extend(self.network.section_keys());
-                known_keys.push(*self.section.genesis_key());
-
-                // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
-                if !msg_authority.verify_src_section_key_is_known(&known_keys) {
-                    warn!("Untrusted message dropped from {:?}: {:?} ", sender, msg);
-                    return Ok(cmds);
-                }
-
-                trace!(
-                    "Trusted msg authority in message ({:?}) from {:?}: {:?}",
-                    msg_id,
-                    sender,
-                    msg
-                );
+                trace!("System message received: {:?}", msg_id);
 
                 // Let's check for entropy before we proceed further
                 // Adult nodes don't need to carry out entropy checking,
@@ -279,6 +266,7 @@ impl Core {
                         msg_id,
                         msg,
                         msg_authority,
+                        known_keys,
                     };
 
                     Ok(vec![cmd])
@@ -303,6 +291,7 @@ impl Core {
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
         node_msg: SystemMsg,
+        known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
 
@@ -480,18 +469,35 @@ impl Core {
                 )
                 .await
             }
-            SystemMsg::Propose {
-                ref content,
-                ref sig_share,
-            } => {
+            SystemMsg::Propose(proposal) => {
                 if self.is_not_elder() {
                     trace!("Dropping Propose msg from {}: {:?}", sender, msg_id);
                     return Ok(vec![]);
                 }
 
+                // Let's now verify the section key in the msg authority is trusted
+                // based on our current knowledge of the network and sections chains.
+
+                // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
+                let sig_share_pk = match msg_authority.is_section_signed_with_known_key(&known_keys)
+                {
+                    None => {
+                        warn!("Untrusted message dropped from {:?}: {:?} ", sender, msg_id);
+                        return Ok(vec![]);
+                    }
+                    Some(pk) => pk,
+                };
+
+                trace!(
+                    "Trusted msg authority in message ({:?}) from {:?}: {:?}",
+                    msg_id,
+                    sender,
+                    proposal
+                );
+
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
                 // Any other proposal than SectionInfo needs to be signed by a known key.
-                if let Proposal::SectionInfo(ref section_auth) = content {
+                if let Proposal::SectionInfo(ref section_auth) = proposal {
                     if section_auth.prefix == *self.section.prefix()
                         || section_auth.prefix.is_extension_of(self.section.prefix())
                     {
@@ -502,7 +508,7 @@ impl Core {
                         if !section_auth.contains_elder(&src_name) {
                             trace!(
                                 "Ignoring proposal from src not being a DKG participant: {:?}",
-                                content
+                                proposal
                             );
                             return Ok(vec![]);
                         }
@@ -517,31 +523,33 @@ impl Core {
                         );
                         return Ok(vec![]);
                     }
-
-                    // TODO: should be able to remove the sig_share from the Propose msg
-                    // therefore we won't need to do this check as the sig_share can
-                    // be carried within the msg_kind header.
-                    if !self
-                        .section
-                        .chain()
-                        .has_key(&sig_share.public_key_set.public_key())
-                    {
-                        warn!(
-                            "Dropped Propose msg with untrusted sig share from {:?}: {:?}",
-                            sender, msg_id
-                        );
-                        return Ok(vec![]);
-                    }
                 }
 
                 let mut commands = vec![];
 
-                commands.extend(self.check_lagging((src_name, sender), sig_share)?);
+                commands.extend(self.check_lagging((src_name, sender), sig_share_pk)?);
 
-                commands.extend(
-                    self.handle_proposal(content.clone(), sig_share.clone())
-                        .await?,
-                );
+                match msg_authority {
+                    NodeMsgAuthority::Node(_) => {
+                        trace!(
+                            "Dropping Propose msg from {}, missing BLS share authority: {:?}",
+                            sender,
+                            msg_id
+                        );
+                    }
+                    NodeMsgAuthority::BlsShare(_) => {
+                        trace!(
+                            "Proposal from {} inserted in aggregator, not enough sig shares yet: {:?}",sender,
+                            msg_id
+                        );
+                    }
+                    NodeMsgAuthority::Section(section_auth) => {
+                        commands.push(Command::HandleAgreement {
+                            proposal,
+                            sig: section_auth.sig.clone(),
+                        });
+                    }
+                }
 
                 Ok(commands)
             }

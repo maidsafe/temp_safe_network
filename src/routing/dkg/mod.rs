@@ -16,7 +16,7 @@ mod voter;
 
 pub(crate) use self::{
     dkg_msgs_utils::{DkgFailureSigSetUtils, DkgSessionIdUtils},
-    proposal::{ProposalAggregator, ProposalError, ProposalUtils},
+    proposal::{ProposalAggregator, ProposalError},
     voter::DkgVoter,
 };
 pub(crate) use crate::messaging::system::{KeyedSig, SigShare};

@@ -15,7 +15,7 @@ use crate::messaging::{
     DstLocation, WireMsg,
 };
 use crate::routing::{
-    dkg::{DkgSessionIdUtils, ProposalUtils, SigShare},
+    dkg::DkgSessionIdUtils,
     error::Result,
     messages::WireMsgUtils,
     peer::PeerUtils,
@@ -49,6 +49,7 @@ impl Core {
                 trace!("Can't propose {:?}: {:?}", proposal, err);
                 err
             })?;
+
         self.send_proposal_with(recipients, proposal, &key_share)
     }
 
@@ -65,21 +66,15 @@ impl Core {
             recipients,
         );
 
-        let sig_share = proposal.prove(
-            key_share.public_key_set.clone(),
-            key_share.index,
-            &key_share.secret_key_share,
-        )?;
-
         // Broadcast the proposal to the rest of the section elders.
-        let node_msg = SystemMsg::Propose {
-            content: proposal,
-            sig_share,
-        };
+        let node_msg = SystemMsg::Propose(proposal);
+        let src_name = self.node().name();
+
         // Name of the section_pk may not matches the section prefix.
         // Carry out a substitution to prevent the dst_location becomes other section.
-        let wire_msg = WireMsg::single_src(
-            &self.node,
+        let wire_msg = WireMsg::for_dst_accumulation(
+            key_share,
+            src_name,
             DstLocation::Section {
                 name: self.section.prefix().name(),
                 section_pk: *self.section.chain().last_key(),
@@ -134,17 +129,14 @@ impl Core {
     pub(crate) fn check_lagging(
         &self,
         peer: (XorName, SocketAddr),
-        sig_share: &SigShare,
+        sig_share_pk: BlsPublicKey,
     ) -> Result<Option<Command>> {
-        let public_key = sig_share.public_key_set.public_key();
-
-        if self.section.chain().has_key(&public_key)
-            && public_key != *self.section.chain().last_key()
+        if self.section.chain().has_key(&sig_share_pk)
+            && sig_share_pk != *self.section.chain().last_key()
         {
-            let dst_section_pk = sig_share.public_key_set.public_key();
-            let msg = self.generate_ae_update(dst_section_pk, true)?;
+            let msg = self.generate_ae_update(sig_share_pk, true)?;
 
-            let cmd = self.send_direct_message(peer, msg, dst_section_pk)?;
+            let cmd = self.send_direct_message(peer, msg, sig_share_pk)?;
             Ok(Some(cmd))
         } else {
             Ok(None)

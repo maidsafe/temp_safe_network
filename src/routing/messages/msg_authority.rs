@@ -26,7 +26,8 @@ pub(crate) trait NodeMsgAuthorityUtils {
 
     // Verify if the section key of the NodeMsgAuthority can be trusted
     // based on a set of known keys.
-    fn verify_src_section_key_is_known(&self, known_keys: &[BlsPublicKey]) -> bool;
+    fn is_section_signed_with_known_key(&self, known_keys: &[BlsPublicKey])
+        -> Option<BlsPublicKey>;
 }
 
 impl NodeMsgAuthorityUtils for NodeMsgAuthority {
@@ -67,14 +68,22 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
         }
     }
 
-    // Verify if the section key of the NodeMsgAuthority can be trusted
+    // Verify if it's a section signed authority and if can be trusted
     // based on a set of known keys.
-    fn verify_src_section_key_is_known(&self, known_keys: &[BlsPublicKey]) -> bool {
+    // Returns the public key of the signature if it's trusted.
+    fn is_section_signed_with_known_key(
+        &self,
+        known_keys: &[BlsPublicKey],
+    ) -> Option<BlsPublicKey> {
         let section_pk = match &self {
-            NodeMsgAuthority::Node(_) => return true,
+            NodeMsgAuthority::Node(_) => return None,
             NodeMsgAuthority::BlsShare(bls_share_auth) => &bls_share_auth.section_pk,
             NodeMsgAuthority::Section(section_auth) => &section_auth.sig.public_key,
         };
-        known_keys.iter().any(|key| key == section_pk)
+
+        known_keys
+            .iter()
+            .find(|key| key == &section_pk)
+            .map(|key| *key)
     }
 }

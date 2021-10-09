@@ -188,11 +188,12 @@ impl Dispatcher {
                 msg_id,
                 msg_authority,
                 msg,
+                known_keys,
             } => {
                 self.core
                     .write()
                     .await
-                    .handle_blocking_message(sender, msg_id, msg_authority, msg)
+                    .handle_blocking_message(sender, msg_id, msg_authority, msg, known_keys)
                     .await
             }
             Command::HandleSystemMessage {

@@ -355,18 +355,13 @@ async fn aggregate_proposals() -> Result<()> {
 
     let section_pk = *section.chain().last_key();
     for (index, node) in nodes.iter().enumerate().take(THRESHOLD) {
-        let sig_share = proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
-
         let wire_msg = WireMsg::single_src(
             node,
             DstLocation::Section {
                 name: XorName::from(PublicKey::Bls(section_pk)),
                 section_pk,
             },
-            SystemMsg::Propose {
-                content: proposal.clone(),
-                sig_share,
-            },
+            SystemMsg::Propose(proposal.clone()),
             section_auth.section_key(),
         )?;
 
@@ -387,11 +382,6 @@ async fn aggregate_proposals() -> Result<()> {
         }
     }
 
-    let sig_share = proposal.prove(
-        pk_set.clone(),
-        THRESHOLD,
-        &sk_set.secret_key_share(THRESHOLD),
-    )?;
     let section_pk = *section.chain().last_key();
     let wire_msg = WireMsg::single_src(
         &nodes[THRESHOLD],
@@ -399,10 +389,7 @@ async fn aggregate_proposals() -> Result<()> {
             name: XorName::from(PublicKey::Bls(section_pk)),
             section_pk,
         },
-        SystemMsg::Propose {
-            content: proposal.clone(),
-            sig_share,
-        },
+        SystemMsg::Propose(proposal.clone()),
         section_auth.section_key(),
     )?;
 
@@ -1338,7 +1325,9 @@ async fn handle_elders_update() -> Result<()> {
         assert_eq!(proof_chain.last_key(), &pk1);
 
         // The message is trusted even by peers who don't yet know the new section key.
-        assert!(msg_authority.verify_src_section_key_is_known(&[pk0]));
+        assert!(msg_authority
+            .is_section_signed_with_known_key(&[pk0])
+            .is_some());
 
         // Merging the section contained in the message with the original section succeeds.
         // TODO: how to do this here?
