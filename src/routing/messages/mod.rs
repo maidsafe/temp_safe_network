@@ -10,8 +10,7 @@ mod msg_authority;
 
 pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::messaging::{
-    system::SystemMsg, BlsShareAuth, DstLocation, MessageId, MsgKind, NodeAuth, NodeMsgAuthority,
-    WireMsg,
+    system::SystemMsg, BlsShareAuth, DstLocation, MessageId, MsgKind, NodeAuth, WireMsg,
 };
 use crate::routing::{
     error::{Error, Result},
@@ -19,18 +18,10 @@ use crate::routing::{
     section::SectionKeyShare,
 };
 use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
 use xor_name::XorName;
 
 // Utilities for WireMsg.
 pub(crate) trait WireMsgUtils {
-    /// Creates a signed message where signature is assumed valid.
-    fn new_signed(
-        payload: Bytes,
-        node_msg_authority: NodeMsgAuthority,
-        dst: DstLocation,
-    ) -> Result<WireMsg, Error>;
-
     /// Creates a message signed using a BLS KeyShare for destination accumulation
     fn for_dst_accumulation(
         key_share: &SectionKeyShare,
@@ -50,28 +41,6 @@ pub(crate) trait WireMsgUtils {
 }
 
 impl WireMsgUtils for WireMsg {
-    /// Creates a signed message where signature is known to be valid.
-    fn new_signed(
-        payload: Bytes,
-        node_msg_authority: NodeMsgAuthority,
-        dst: DstLocation,
-    ) -> Result<WireMsg, Error> {
-        // Create message id from msg authority signature
-        let msg_kind = match node_msg_authority {
-            NodeMsgAuthority::Node(node_auth) => MsgKind::NodeAuthMsg(node_auth.into_inner()),
-            NodeMsgAuthority::BlsShare(bls_share_auth) => {
-                MsgKind::NodeBlsShareAuthMsg(bls_share_auth.into_inner())
-            }
-            NodeMsgAuthority::Section(section_auth) => {
-                MsgKind::SectionAuthMsg(section_auth.into_inner())
-            }
-        };
-
-        let msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst)?;
-
-        Ok(msg)
-    }
-
     /// Creates a message signed using a BLS KeyShare for destination accumulation
     fn for_dst_accumulation(
         key_share: &SectionKeyShare,
@@ -83,14 +52,13 @@ impl WireMsgUtils for WireMsg {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let msg_authority = NodeMsgAuthority::BlsShare(BlsShareAuth::authorize(
-            src_section_pk,
-            src_name,
-            key_share,
-            &msg_payload,
-        ));
+        let msg_kind = MsgKind::NodeBlsShareAuthMsg(
+            BlsShareAuth::authorize(src_section_pk, src_name, key_share, &msg_payload).into_inner(),
+        );
 
-        Self::new_signed(msg_payload, msg_authority, dst)
+        let wire_msg = WireMsg::new_msg(MessageId::new(), msg_payload, msg_kind, dst)?;
+
+        Ok(wire_msg)
     }
 
     /// Creates a signed message from single node.
@@ -103,12 +71,12 @@ impl WireMsgUtils for WireMsg {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let msg_authority = NodeMsgAuthority::Node(NodeAuth::authorize(
-            src_section_pk,
-            &node.keypair,
-            &msg_payload,
-        ));
+        let msg_kind = MsgKind::NodeAuthMsg(
+            NodeAuth::authorize(src_section_pk, &node.keypair, &msg_payload).into_inner(),
+        );
 
-        WireMsg::new_signed(msg_payload, msg_authority, dst)
+        let wire_msg = WireMsg::new_msg(MessageId::new(), msg_payload, msg_kind, dst)?;
+
+        Ok(wire_msg)
     }
 }

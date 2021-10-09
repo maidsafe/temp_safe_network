@@ -8,7 +8,6 @@
 
 mod agreement;
 mod anti_entropy;
-mod bad_msgs;
 mod dkg;
 mod join;
 mod proposals;
@@ -87,20 +86,14 @@ impl Core {
                 known_keys.extend(self.network.section_keys());
                 known_keys.push(*self.section.genesis_key());
 
+                // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
-                    debug!("Untrusted message from {:?}: {:?} ", sender, msg);
-
-                    if !matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
-                        let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
-                        cmds.push(cmd);
-                    } else {
-                        // otherwise we might loop
-                        warn!("Dropping untrusted AE Update");
-                    }
+                    warn!("Untrusted message dropped from {:?}: {:?} ", sender, msg);
                     return Ok(cmds);
                 }
+
                 trace!(
-                    "Trusted msg authority in message_id {:?} from {:?}: {:?}",
+                    "Trusted msg authority in message ({:?}) from {:?}: {:?}",
                     msg_id,
                     sender,
                     msg
@@ -143,11 +136,11 @@ impl Core {
                                     cmds.push(ae_command);
                                     return Ok(cmds);
                                 }
+
+                                info!("Entropy check passed. Handling verified msg {:?}", msg_id);
                             }
                         },
                     }
-
-                    info!("Entropy check passed. Handling verified msg {:?}", msg_id);
                 }
 
                 cmds.push(Command::HandleSystemMessage {
@@ -257,7 +250,6 @@ impl Core {
                 | SystemMsg::JoinResponse(_)
                 | SystemMsg::JoinRequest(_)
                 | SystemMsg::JoinAsRelocatedRequest(_)
-                | SystemMsg::BouncedUntrustedMessage { .. }
                 | SystemMsg::DkgStart { .. }
                 | SystemMsg::DkgFailureAgreement(_)
                 | SystemMsg::DkgMessage { .. }
@@ -288,11 +280,11 @@ impl Core {
                 }
             },
             Err(Error::InvalidSignatureShare) => {
-                info!(
-                    "Invalid signature on received system message. Handling as untrusted message."
+                warn!(
+                    "Invalid signature on received system message, dropping the message: {}",
+                    msg_id
                 );
-                let cmd = self.handle_untrusted_message(sender, msg, msg_authority)?;
-                Ok(vec![cmd])
+                Ok(vec![])
             }
             Ok(true) | Err(_) => Ok(vec![]),
         }
@@ -317,7 +309,7 @@ impl Core {
                 proof_chain,
                 bounced_msg,
             } => {
-                trace!("Handling msg: AE-Retry from {}", sender);
+                trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
                 self.handle_anti_entropy_retry_msg(
                     section_auth,
                     section_signed,
@@ -333,7 +325,7 @@ impl Core {
                 section_signed,
                 bounced_msg,
             } => {
-                trace!("Handling msg: AE-Redirect from {}", sender);
+                trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
                 self.handle_anti_entropy_redirect_msg(
                     section_auth,
                     section_signed,
@@ -348,7 +340,7 @@ impl Core {
                 proof_chain,
                 members,
             } => {
-                trace!("Handling msg: AE-Update from {}", sender);
+                trace!("Handling msg: AE-Update from {}: {:?}", sender, msg_id,);
                 self.handle_anti_entropy_update_msg(
                     section_auth,
                     section_signed,
@@ -359,17 +351,17 @@ impl Core {
                 .await
             }
             SystemMsg::AntiEntropyProbe(_dst) => {
-                info!("Received Probe message from {:?}: {:?}", sender, msg_id);
+                trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 Ok(vec![])
             }
             SystemMsg::BackPressure(load_report) => {
-                trace!("Handling msg: BackPressure from {}", sender);
+                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
                 // #TODO: Factor in med/long term backpressure into general node liveness calculations
                 self.comm.regulate(sender, load_report).await;
                 Ok(vec![])
             }
             SystemMsg::Relocate(ref details) => {
-                trace!("Handling msg: Relocate from {}", sender);
+                trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
                 if let NodeMsgAuthority::Section(section_signed) = msg_authority {
                     Ok(self
                         .handle_relocate(details.clone(), node_msg, section_signed)
@@ -381,11 +373,19 @@ impl Core {
                 }
             }
             SystemMsg::RelocatePromise(promise) => {
-                trace!("Handling msg: RelocatePromise from {}", sender);
+                trace!(
+                    "Handling msg: RelocatePromise from {}: {:?}",
+                    sender,
+                    msg_id
+                );
                 self.handle_relocate_promise(promise, node_msg).await
             }
             SystemMsg::StartConnectivityTest(name) => {
-                trace!("Handling msg: StartConnectivityTest from {}", sender);
+                trace!(
+                    "Handling msg: StartConnectivityTest from {}: {:?}",
+                    sender,
+                    msg_id
+                );
                 if self.is_not_elder() {
                     return Ok(vec![]);
                 }
@@ -475,61 +475,56 @@ impl Core {
                 )
                 .await
             }
-            SystemMsg::BouncedUntrustedMessage {
-                msg: bounced_msg,
-                dst_section_pk,
-            } => {
-                trace!("Handling msg: BouncedUntrustedMessage from {}", sender);
-
-                Ok(self.handle_bounced_untrusted_message(
-                    msg_authority.peer(sender)?,
-                    dst_section_pk,
-                    *bounced_msg,
-                )?)
-            }
             SystemMsg::Propose {
                 ref content,
                 ref sig_share,
             } => {
-                trace!("Handling msg: Propose from {}", sender);
+                if self.is_not_elder() {
+                    trace!("Dropping Propose msg from {}: {:?}", sender, msg_id);
+                    return Ok(vec![]);
+                }
+
+                trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
                 // Any other proposal than SectionInfo needs to be signed by a known key.
-                match content {
-                    Proposal::SectionInfo(ref section_auth) => {
-                        if section_auth.prefix == *self.section.prefix()
-                            || section_auth.prefix.is_extension_of(self.section.prefix())
-                        {
-                            // This `SectionInfo` is proposed by the DKG participants and
-                            // it's signed by the new key created by the DKG so we don't
-                            // know it yet. We only require the src_name of the
-                            // proposal to be one of the DKG participants.
-                            if !section_auth.contains_elder(&src_name) {
-                                trace!(
-                                    "Ignoring proposal from src not being a DKG participant: {:?}",
-                                    content
-                                );
-                                return Ok(vec![]);
-                            }
-                        }
-                    }
-                    _ => {
-                        // Proposal from other section shall be ignored.
-                        if !self.section.prefix().matches(&src_name) {
+                if let Proposal::SectionInfo(ref section_auth) = content {
+                    if section_auth.prefix == *self.section.prefix()
+                        || section_auth.prefix.is_extension_of(self.section.prefix())
+                    {
+                        // This `SectionInfo` is proposed by the DKG participants and
+                        // it's signed by the new key created by the DKG so we don't
+                        // know it yet. We only require the src_name of the
+                        // proposal to be one of the DKG participants.
+                        if !section_auth.contains_elder(&src_name) {
                             trace!(
-                                "Ignore proposal from other section, src_name {:?}",
-                                src_name
+                                "Ignoring proposal from src not being a DKG participant: {:?}",
+                                content
                             );
                             return Ok(vec![]);
                         }
+                    }
+                } else {
+                    // Proposal from other section shall be ignored.
+                    if !self.section.prefix().matches(&src_name) {
+                        trace!(
+                            "Ignore proposal from other section, src_name {:?}: {:?}",
+                            src_name,
+                            msg_id
+                        );
+                        return Ok(vec![]);
+                    }
 
-                        if !self
-                            .section
-                            .chain()
-                            .has_key(&sig_share.public_key_set.public_key())
-                        {
-                            let cmd =
-                                self.handle_untrusted_message(sender, node_msg, msg_authority)?;
-                            return Ok(vec![cmd]);
-                        }
+                    // TODO: should be able to remove the sig_share from the Propose msg
+                    // therefore we won't need to do this check.
+                    if !self
+                        .section
+                        .chain()
+                        .has_key(&sig_share.public_key_set.public_key())
+                    {
+                        warn!(
+                            "Dropped Propose msg with untrusted sig share from {:?}: {:?}",
+                            sender, msg_id
+                        );
+                        return Ok(vec![]);
                     }
                 }
 

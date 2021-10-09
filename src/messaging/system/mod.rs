@@ -16,7 +16,6 @@ mod signed;
 
 use crate::messaging::{EndUser, MessageId, SectionAuthorityProvider};
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
-use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
@@ -98,14 +97,6 @@ pub enum SystemMsg {
     JoinAsRelocatedRequest(Box<JoinAsRelocatedRequest>),
     /// Response to a `JoinAsRelocatedRequest`
     JoinAsRelocatedResponse(Box<JoinAsRelocatedResponse>),
-    /// Sent from a node that can't establish the trust of the contained message to its original
-    /// source in order for them to provide new proof that the node would trust.
-    BouncedUntrustedMessage {
-        /// Untrsuted Node message
-        msg: Box<SystemMsg>,
-        /// Currently known section pk of the source
-        dst_section_pk: BlsPublicKey,
-    },
     /// Sent to the new elder candidates to start the DKG process.
     DkgStart {
         /// The identifier of the DKG session to start.
@@ -136,6 +127,7 @@ pub enum SystemMsg {
     Propose {
         /// The content of the proposal
         content: Proposal,
+        // TODO: try to remove this in favor of the msg header MsgKind sig share we already have
         /// BLS signature share
         sig_share: SigShare,
     },
