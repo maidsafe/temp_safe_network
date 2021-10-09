@@ -211,7 +211,6 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use crate::messaging::data::Error as ErrorMessage;
-    use crate::retry_loop_for_pattern;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         BytesAddress, Error as DtError, PublicKey,
@@ -223,6 +222,7 @@ mod tests {
         },
         url::Url,
     };
+    use crate::{retry_loop, retry_loop_for_pattern};
     use eyre::{bail, eyre, Result};
     use std::{
         collections::{BTreeMap, BTreeSet},
@@ -324,7 +324,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-
     async fn register_private_permissions() -> Result<()> {
         let _outer_span = tracing::info_span!("test__register_private_permissions").entered();
         let client = create_test_client().await?;
@@ -479,10 +478,14 @@ mod tests {
         assert_eq!(retrieved_value_1, value_1);
 
         tokio::time::sleep(delay).await;
-        let retrieved_value_2 = client
-            .get_register_entry(address, value2_hash)
-            .instrument(tracing::info_span!("get_value_2"))
-            .await?;
+
+        // loop here until we see the value set...
+        let retrieved_value_2 = retry_loop!(
+            client
+                .get_register_entry(address, value2_hash)
+                .instrument(tracing::info_span!("get_value_2"))
+                .await?
+        );
         assert_eq!(retrieved_value_2, value_2);
 
         // Requesting a hash which desn't exist throws an error
