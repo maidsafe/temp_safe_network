@@ -346,6 +346,7 @@ mod tests {
         tokio::time::sleep(delay).await;
         let permissions = client
             .get_register_permissions_for_user(address, owner)
+            .instrument(tracing::info_span!("first get perms for owner"))
             .await?;
 
         match permissions {
@@ -360,6 +361,7 @@ mod tests {
 
         match client
             .get_register_permissions_for_user(address, other_user)
+            .instrument(tracing::info_span!("second get perms for other"))
             .await
         {
             Err(Error::NetworkDataError(DtError::NoSuchEntry)) => Ok(()),
@@ -386,6 +388,7 @@ mod tests {
 
         let permissions = client
             .get_register_permissions_for_user(address, owner)
+            .instrument(tracing::info_span!("get owner perms"))
             .await?;
 
         match permissions {
@@ -402,6 +405,7 @@ mod tests {
 
         match client
             .get_register_permissions_for_user(address, other_user)
+            .instrument(tracing::info_span!("get other user perms"))
             .await
         {
             Err(Error::NetworkDataError(DtError::NoSuchEntry)) => Ok(()),
@@ -471,10 +475,9 @@ mod tests {
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
         // get_register_entry
-        let retrieved_value_1 = client
+        let retrieved_value_1 = retry_loop!(client
             .get_register_entry(address, value1_hash)
-            .instrument(tracing::info_span!("get_value_1"))
-            .await?;
+            .instrument(tracing::info_span!("get_value_1")));
         assert_eq!(retrieved_value_1, value_1);
 
         tokio::time::sleep(delay).await;
