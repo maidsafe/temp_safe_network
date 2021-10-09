@@ -359,14 +359,9 @@ mod tests {
 
         let other_user = gen_ed_keypair().public_key();
 
-        match client
-            .get_register_permissions_for_user(address, other_user)
-            .instrument(tracing::info_span!("second get perms for other"))
-            .await
-        {
-            Err(Error::NetworkDataError(DtError::NoSuchEntry)) => Ok(()),
-            other => bail!("Unexpected result when querying permissions: {:?}", other),
-        }
+        let _err = retry_loop_for_pattern!(client.get_register_permissions_for_user(address,other_user).instrument(tracing::info_span!("get other user perms")), Err(error) if matches!( error, Error::NetworkDataError(DtError::NoSuchEntry)))?;
+
+        Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -386,10 +381,10 @@ mod tests {
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
 
-        let permissions = client
+        // keep retrying until ok
+        let permissions = retry_loop!(client
             .get_register_permissions_for_user(address, owner)
-            .instrument(tracing::info_span!("get owner perms"))
-            .await?;
+            .instrument(tracing::info_span!("get owner perms")));
 
         match permissions {
             Permissions::Public(user_perms) => {
@@ -403,14 +398,9 @@ mod tests {
 
         let other_user = gen_ed_keypair().public_key();
 
-        match client
-            .get_register_permissions_for_user(address, other_user)
-            .instrument(tracing::info_span!("get other user perms"))
-            .await
-        {
-            Err(Error::NetworkDataError(DtError::NoSuchEntry)) => Ok(()),
-            other => bail!("Unexpected result when querying permissions: {:?}", other),
-        }
+        let _err = retry_loop_for_pattern!(client.get_register_permissions_for_user(address,other_user).instrument(tracing::info_span!("get other user perms")), Err(error) if matches!(error, Error::NetworkDataError(DtError::NoSuchEntry)) )?;
+
+        Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
