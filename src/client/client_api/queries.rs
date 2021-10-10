@@ -38,6 +38,9 @@ impl Client {
             "Setting up query retry, initial interval is: {:?}",
             starting_query_timeout
         );
+
+        // TODO: Do we need to keep each one going? and return the first!?
+
         retry(
             || {
                 async {
