@@ -79,7 +79,7 @@ where
 }
 
 /// Initialise logger for tests, this is run only once, even if called multiple times.
-pub fn init_logger() {
+pub fn init_test_logger() {
     INIT.call_once(|| {
         fmt()
             // NOTE: uncomment this line for pretty printed log output.
@@ -104,7 +104,6 @@ pub async fn create_test_client_with(
     optional_keypair: Option<Keypair>,
     timeout: Option<u64>,
 ) -> Result<Client> {
-    init_logger();
     let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
     let timeout = timeout.map(Duration::from_secs);
     let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;

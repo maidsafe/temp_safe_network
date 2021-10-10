@@ -18,7 +18,7 @@ use std::{
     collections::BTreeSet, fs::File, future::Future, io::BufReader, net::SocketAddr, path::Path,
 };
 #[cfg(test)]
-pub use test_client::{create_test_client, create_test_client_with, init_logger};
+pub use test_client::{create_test_client, create_test_client_with, init_test_logger};
 
 ///
 pub type ClientResult<T> = Result<T, Error>;
