@@ -163,7 +163,10 @@ impl Session {
         let msg_id = MessageId::new();
 
         if elders.len() < targets_count {
-            return Err(Error::NotEnoughElders);
+            return Err(Error::InsufficientElderConnections(
+                elders.len(),
+                targets_count,
+            ));
         }
 
         debug!(
@@ -222,11 +225,10 @@ impl Session {
 
         let elders_len = chosen_elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES && elders_len > 1 {
-            error!(
-                "Not enough Elder connections: {}, minimum required: {}",
-                elders_len, NUM_OF_ELDERS_SUBSET_FOR_QUERIES
-            );
-            return Err(Error::InsufficientElderConnections(elders_len));
+            return Err(Error::InsufficientElderConnections(
+                elders_len,
+                NUM_OF_ELDERS_SUBSET_FOR_QUERIES,
+            ));
         }
 
         let msg_id = MessageId::new();

@@ -217,7 +217,9 @@ mod tests {
     };
     use crate::{
         client::{
-            utils::test_utils::{create_test_client, gen_ed_keypair, run_w_backoff_delayed},
+            utils::test_utils::{
+                create_test_client, gen_ed_keypair, init_test_logger, run_w_backoff_delayed,
+            },
             Error,
         },
         url::Url,
@@ -235,8 +237,10 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn measure_upload_times() -> Result<()> {
-        let mut total = 0;
+        init_test_logger();
+        let _outer_span = tracing::info_span!("test__measure_upload_times").entered();
 
+        let mut total = 0;
         let name = XorName(rand::random());
         let tag = 10;
         let client = create_test_client().await?;
@@ -280,8 +284,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_basics() -> Result<()> {
-        let client = create_test_client().await?;
+        init_test_logger();
         let _outer_span = tracing::info_span!("test__register_basics").entered();
+
+        let client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key();
@@ -325,8 +331,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_private_permissions() -> Result<()> {
-        let client = create_test_client().await?;
+        init_test_logger();
         let _outer_span = tracing::info_span!("test__register_private_permissions").entered();
+
+        let client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key();
@@ -366,8 +374,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_public_permissions() -> Result<()> {
-        let client = create_test_client().await?;
+        init_test_logger();
         let _outer_span = tracing::info_span!("test__register_public_permissions").entered();
+
+        let client = create_test_client().await?;
 
         let name = XorName(rand::random());
         let tag = 15000;
@@ -405,10 +415,12 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_write() -> Result<()> {
-        let name = XorName(rand::random());
-        let tag = 10;
-        let client = create_test_client().await?;
+        init_test_logger();
         let start_span = tracing::info_span!("test__register_write_start").entered();
+
+        let tag = 10;
+        let name = XorName(rand::random());
+        let client = create_test_client().await?;
 
         let owner = client.public_key();
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
@@ -495,10 +507,12 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_owner() -> Result<()> {
-        let name = XorName(rand::random());
-        let tag = 10;
-        let client = create_test_client().await?;
+        init_test_logger();
         let _outer_span = tracing::info_span!("test__register_owner").entered();
+        let tag = 10;
+
+        let name = XorName(rand::random());
+        let client = create_test_client().await?;
 
         let owner = client.public_key();
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
@@ -517,8 +531,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_can_delete_private() -> Result<()> {
-        let mut client = create_test_client().await?;
+        init_test_logger();
         let _outer_span = tracing::info_span!("test__register_can_delete_private").entered();
+
+        let mut client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key();
@@ -560,8 +576,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_cannot_delete_public() -> Result<()> {
-        let client = create_test_client().await?;
+        init_test_logger();
         let _outer_span = tracing::info_span!("test__register_cannot_delete_public").entered();
+
+        let client = create_test_client().await?;
 
         let name = XorName(rand::random());
         let tag = 15000;

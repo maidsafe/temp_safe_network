@@ -154,7 +154,9 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::utils::test_utils::{create_test_client, create_test_client_with};
+    use crate::client::utils::test_utils::{
+        create_test_client, create_test_client_with, init_test_logger,
+    };
     use crate::types::utils::random_bytes;
     use crate::url::Scope;
     use eyre::Result;
@@ -165,6 +167,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn client_creation() -> Result<()> {
+        init_test_logger();
         let _client = create_test_client().await?;
 
         Ok(())
@@ -173,6 +176,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn client_nonsense_bootstrap_fails() -> Result<()> {
+        init_test_logger();
+
         let mut nonsense_bootstrap = HashSet::new();
         let _ = nonsense_bootstrap.insert(SocketAddr::new(
             IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -185,6 +190,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn client_creation_with_existing_keypair() -> Result<()> {
+        init_test_logger();
+
         let mut rng = OsRng;
         let full_id = Keypair::new_ed25519(&mut rng);
         let pk = full_id.public_key();
@@ -197,6 +204,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn long_lived_connection_survives() -> Result<()> {
+        init_test_logger();
+
         let client = create_test_client().await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
         let bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES / 2);
@@ -210,6 +219,8 @@ mod tests {
     // happen that high-level API functions will become non-Send by accident.
     #[test]
     fn client_is_send() {
+        init_test_logger();
+
         fn require_send<T: Send>(_t: T) {}
         require_send(create_test_client());
     }
