@@ -367,9 +367,17 @@ mod tests {
 
         let other_user = gen_ed_keypair().public_key();
 
-        let _err = retry_loop_for_pattern!(client.get_register_permissions_for_user(address,other_user).instrument(tracing::info_span!("get other user perms")), Err(error) if matches!( error, Error::NetworkDataError(DtError::NoSuchEntry)))?;
-
-        Ok(())
+        loop {
+            match client
+                .get_register_permissions_for_user(address, other_user)
+                .instrument(tracing::info_span!("get other user perms"))
+                .await
+            {
+                Ok(_) => bail!("Should not be able to retrive an entry for a random user"),
+                Err(Error::NetworkDataError(DtError::NoSuchEntry)) => return Ok(()),
+                _ => continue,
+            }
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -408,9 +416,17 @@ mod tests {
 
         let other_user = gen_ed_keypair().public_key();
 
-        let _err = retry_loop_for_pattern!(client.get_register_permissions_for_user(address,other_user).instrument(tracing::info_span!("get other user perms")), Err(error) if matches!(error, Error::NetworkDataError(DtError::NoSuchEntry)) )?;
-
-        Ok(())
+        loop {
+            match client
+                .get_register_permissions_for_user(address, other_user)
+                .instrument(tracing::info_span!("get other user perms"))
+                .await
+            {
+                Ok(_) => bail!("Should not be able to retrive an entry for a random user"),
+                Err(Error::NetworkDataError(DtError::NoSuchEntry)) => return Ok(()),
+                _ => continue,
+            }
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -485,8 +501,7 @@ mod tests {
         tokio::time::sleep(delay).await;
 
         // loop here until we see the value set...
-
-        // TODO: writes should be sstable enoupgh that we can remove this...
+        // TODO: writes should be stable enoupgh that we can remove this...
         let retrieved_value_2 = retry_loop!(client
             .get_register_entry(address, value2_hash)
             .instrument(tracing::info_span!("get_value_2")));
