@@ -37,8 +37,6 @@ use xor_name::XorName;
 
 // Number of Elders subset to send queries to
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
-// Number of attempts to make when trying to bootstrap to a section
-const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
@@ -48,7 +46,6 @@ impl Session {
         genesis_key: bls::PublicKey,
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
-        // bootstrap_nodes: BTreeSet<SocketAddr>,
         local_addr: SocketAddr,
     ) -> Result<Session, Error> {
         trace!(
@@ -58,11 +55,6 @@ impl Session {
         debug!("QP2p config: {:?}", qp2p_config);
 
         let (endpoint, incoming_messages, _) = Endpoint::new_client(local_addr, qp2p_config)?;
-        // let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
-        // let bootstrap_peer = endpoint
-        //     .connect_to_any(&bootstrap_nodes)
-        //     .await
-        //     .ok_or(Error::NotBootstrapped)?;
 
         let session = Session {
             client_pk,
@@ -92,7 +84,6 @@ impl Session {
         targets_count: usize,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint.clone();
-
         // TODO: Consider other approach: Keep a session per section!
 
         // Get DataSection elders details.
@@ -101,7 +92,6 @@ impl Session {
             let sap_elders = sap.value.elders.values().cloned();
 
             trace!("{:?} SAP elders found", sap_elders);
-
             (
                 sap_elders.take(targets_count).collect::<Vec<SocketAddr>>(),
                 sap.value.public_key_set.public_key(),
