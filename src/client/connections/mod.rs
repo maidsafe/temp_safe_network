@@ -50,8 +50,6 @@ pub(super) struct Session {
     ae_redirect_cache: Arc<RwLock<AeCache>>,
     // AE retry cache
     ae_retry_cache: Arc<RwLock<AeCache>>,
-    /// Our initial bootstrap node
-    bootstrap_peer: SocketAddr,
     /// BLS Signature aggregator for aggregating network messages
     aggregator: Arc<RwLock<SignatureAggregator>>,
     /// Network's genesis key
