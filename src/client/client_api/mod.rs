@@ -83,7 +83,7 @@ impl Client {
         // Bootstrap to the network, connecting to a section based
         // on a public key of our choice.
         debug!(
-            "Bootstrapping to the network, genesis key: {} ...",
+            "Creating new session with genesis key: {} ...",
             hex::encode(config.genesis_key.to_bytes())
         );
         // Create a session with the network
@@ -91,7 +91,6 @@ impl Client {
             client_pk,
             config.genesis_key,
             config.qp2p,
-            // bootstrap_nodes.clone(),
             err_sender,
             config.local_addr,
         )
@@ -122,6 +121,7 @@ impl Client {
 
         let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
 
+        // TODO: check for the intiial msg id and DO NOT RESEND in ae retry.
         // Send the dummy message to probe the network for it's infrastructure details.
         client
             .session

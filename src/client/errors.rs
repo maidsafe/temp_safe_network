@@ -12,7 +12,7 @@ use crate::messaging::{
     Error as MessagingError,
 };
 use crate::types::Error as DtError;
-use std::{io, net::SocketAddr};
+use std::io;
 use thiserror::Error;
 
 /// Specialisation of `std::Result` for Client.
