@@ -51,6 +51,9 @@ pub enum Error {
     #[error(
         "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. {0} were connected to"
     )]
+    NotEnoughElders,
+    /// Could not connect to sufficient elder for this operation.
+    #[error("Problem connecting to sufficient elders to reliably perform operation.")]
     InsufficientElderConnections(usize),
     /// Could not query elder.
     #[error("Problem receiving query via qp2p")]

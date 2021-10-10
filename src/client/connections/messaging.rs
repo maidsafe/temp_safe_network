@@ -134,7 +134,7 @@ impl Session {
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
-        targets: usize,
+        targets_count: usize,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint.clone();
 
@@ -143,34 +143,35 @@ impl Session {
         // Get DataSection elders details.
         let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
         {
+            let sap_elders = sap.value.elders.values().cloned();
+
+            trace!("{:?} SAP elders found", sap_elders);
+
             (
-                sap.value
-                    .elders
-                    .values()
-                    .cloned()
-                    .take(targets)
-                    .collect::<Vec<SocketAddr>>(),
+                sap_elders.take(targets_count).collect::<Vec<SocketAddr>>(),
                 sap.value.public_key_set.public_key(),
             )
         } else {
+            trace!(
+                "{:?} Session's network could not find _any_ section relating to",
+                dst_address
+            );
             // Send message to our bootstrap peer with network's genesis PK.
             (vec![self.bootstrap_peer], self.genesis_key)
         };
 
         let msg_id = MessageId::new();
 
+        if elders.len() < targets_count {
+            return Err(Error::NotEnoughElders);
+        }
+
         debug!(
-            "Sending command w/id {:?}, from {}, to {} Elders",
+            "Sending command w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
             msg_id,
             endpoint.public_addr(),
-            elders.len()
-        );
-
-        trace!(
-            "Sending (from {}) dst {:?} w/ id: {:?}",
-            endpoint.public_addr(),
-            dst_address,
-            msg_id
+            elders.len(),
+            dst_address
         );
 
         let dst_location = DstLocation::Section {
