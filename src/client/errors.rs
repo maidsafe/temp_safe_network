@@ -45,8 +45,8 @@ pub enum Error {
     #[error("Problem connecting to elder")]
     ElderConnection,
     /// Client has not gone through qp2p bootstrap process yet
-    #[error("Client has failed to bootstrap to the network yet")]
-    NotBootstrapped,
+    #[error("Client has not yet acquired any network knowledge, so anything sent is guaranteed to have a lengthy AE process")]
+    NoNetworkKnowledge,
     /// Could not connect to sufficient elder to retrieve reliable responses.
     #[error(
         "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. {0} were connected to, {1} needed."
@@ -139,9 +139,6 @@ pub enum Error {
     /// Generic Error
     #[error("Generic error")]
     Generic(String),
-    /// Could not bootstrap to an unresponsive peer
-    #[error("Could not bootstrap to an unresponsive peer {0}")]
-    BootstrapToPeerFailed(SocketAddr),
     /// Could not retrieve all chunks required to decrypt the data. (Expected, Actual)
     #[error("Not enough chunks! Required {}, but we have {}.)", _0, _1)]
     NotEnoughChunks(usize, usize),

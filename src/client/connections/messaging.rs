@@ -21,6 +21,7 @@ use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
 use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
+use std::time::Duration;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     net::SocketAddr,
@@ -42,12 +43,12 @@ const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip_all, level = "debug")]
-    pub(crate) async fn bootstrap(
+    pub(crate) async fn new(
         client_pk: PublicKey,
         genesis_key: bls::PublicKey,
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
-        bootstrap_nodes: BTreeSet<SocketAddr>,
+        // bootstrap_nodes: BTreeSet<SocketAddr>,
         local_addr: SocketAddr,
     ) -> Result<Session, Error> {
         trace!(
@@ -57,11 +58,11 @@ impl Session {
         debug!("QP2p config: {:?}", qp2p_config);
 
         let (endpoint, incoming_messages, _) = Endpoint::new_client(local_addr, qp2p_config)?;
-        let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
-        let bootstrap_peer = endpoint
-            .connect_to_any(&bootstrap_nodes)
-            .await
-            .ok_or(Error::NotBootstrapped)?;
+        // let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
+        // let bootstrap_peer = endpoint
+        //     .connect_to_any(&bootstrap_nodes)
+        //     .await
+        //     .ok_or(Error::NotBootstrapped)?;
 
         let session = Session {
             client_pk,
@@ -72,58 +73,13 @@ impl Session {
             ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
             ae_retry_cache: Arc::new(RwLock::new(AeCache::default())),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
-            bootstrap_peer: bootstrap_peer.remote_address(),
+            // bootstrap_peer: bootstrap_peer.remote_address(),
             genesis_key,
         };
 
         Self::spawn_message_listener_thread(session.clone(), incoming_messages).await;
 
         Ok(session)
-    }
-
-    /// Tries to bootstrap a client to a section. If there is a failure then it retries.
-    /// After a maximum of three attempts if the boostrap process still fails, the unresponsive
-    /// node is removed from the list and an error is returned.
-    #[instrument(skip_all, level = "info")]
-    pub(crate) async fn attempt_bootstrap(
-        client_pk: PublicKey,
-        genesis_key: bls::PublicKey,
-        qp2p_config: qp2p::Config,
-        mut bootstrap_nodes: BTreeSet<SocketAddr>,
-        local_addr: SocketAddr,
-        err_sender: Sender<CmdError>,
-    ) -> Result<Session, Error> {
-        let mut attempts = 0;
-        loop {
-            match Session::bootstrap(
-                client_pk,
-                genesis_key,
-                qp2p_config.clone(),
-                err_sender.clone(),
-                bootstrap_nodes.clone(),
-                local_addr,
-            )
-            .await
-            {
-                Ok(session) => break Ok(session),
-                Err(err) => {
-                    attempts += 1;
-                    if let Error::BootstrapToPeerFailed(failed_peer) = err {
-                        // Remove the unresponsive peer we boostrapped to and bootstrap again
-                        let _ = bootstrap_nodes.remove(&failed_peer);
-                    }
-                    if attempts < NUM_OF_BOOTSTRAPPING_ATTEMPTS {
-                        trace!(
-                            "Error connecting to network! {:?}\nRetrying... ({})",
-                            err,
-                            attempts
-                        );
-                    } else {
-                        break Err(err);
-                    }
-                }
-            }
-        }
     }
 
     /// Send a `ServiceMsg` to the network without awaiting for a response.
@@ -151,12 +107,7 @@ impl Session {
                 sap.value.public_key_set.public_key(),
             )
         } else {
-            trace!(
-                "{:?} Session's network could not find _any_ section relating to",
-                dst_address
-            );
-            // Send message to our bootstrap peer with network's genesis PK.
-            (vec![self.bootstrap_peer], self.genesis_key)
+            return Err(Error::NoNetworkKnowledge);
         };
 
         let msg_id = MessageId::new();
@@ -209,10 +160,7 @@ impl Session {
         let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst) {
             (sap.value.elders, sap.value.public_key_set.public_key())
         } else {
-            let mut bootstrapped_peer = BTreeMap::new();
-            let _ = bootstrapped_peer.insert(XorName::random(), self.bootstrap_peer);
-            // Send message to our bootstrap peer with the network's genesis PK.
-            (bootstrapped_peer, self.genesis_key)
+            return Err(Error::NoNetworkKnowledge);
         };
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
@@ -401,40 +349,50 @@ impl Session {
         }
     }
 
+    // /// This tells us if we've seen at least _one_ AE-Retry msg (and attempted to resend it + cached that)
+    // /// This can be useful to know if we're still working with _only_ genesis key knowledge
+    // #[instrument(skip_all, level = "debug")]
+    // pub(crate) async fn has_seen_ae_retry(&self) -> bool {
+
+    // }
+
     #[instrument(skip_all, level = "debug")]
-    pub(crate) async fn fire_and_forget_payload(
+    pub(crate) async fn make_contact_with_nodes(
         &self,
+        nodes: Vec<SocketAddr>,
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint.clone();
         // Get DataSection elders details.
-        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
-        {
-            (
-                sap.value
-                    .elders
-                    .values()
-                    .cloned()
-                    .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-                    .collect::<Vec<SocketAddr>>(),
-                sap.value.public_key_set.public_key(),
-            )
-        } else {
-            // Send message to our bootstrap peer with network's genesis PK.
-            (vec![self.bootstrap_peer], self.genesis_key)
-        };
+        // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
+        let (elders_or_adults, section_pk) =
+            if let Some(sap) = self.network.closest_or_opposite(&dst_address) {
+                (
+                    sap.value
+                        .elders
+                        .values()
+                        .cloned()
+                        .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
+                        .collect::<Vec<SocketAddr>>(),
+                    sap.value.public_key_set.public_key(),
+                )
+            } else {
+                // Send message to our bootstrap peer with network's genesis PK.
+                (nodes, self.genesis_key)
+            };
 
         let msg_id = MessageId::new();
 
         debug!(
-            "Firing payload w/id {:?}, from {}, to {} Elders whose result will be dropped",
-            msg_id,
+            "Making initial contact with nodes. Our PublicAddr: {:?}. Using {:?} to {} nodes",
             endpoint.public_addr(),
-            elders.len()
+            msg_id,
+            elders_or_adults.len()
         );
 
+        // TODO: Don't use genesis key if we have a full section
         let dst_location = DstLocation::Section {
             name: dst_address,
             section_pk,
@@ -442,7 +400,24 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await
+        send_message(
+            elders_or_adults.clone(),
+            wire_msg,
+            self.endpoint.clone(),
+            msg_id,
+        )
+        .await?;
+
+        // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
+        if section_pk == self.genesis_key {
+            // wait until we have _some_ network knowledge
+            while let None = self.network.closest_or_opposite(&dst_address) {
+                tokio::time::sleep(Duration::from_secs(1)).await
+            }
+            // while self.network
+        }
+
+        Ok(())
     }
 
     #[allow(unused)]

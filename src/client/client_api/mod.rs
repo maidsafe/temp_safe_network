@@ -17,6 +17,7 @@ use crate::messaging::data::{CmdError, DataQuery, ServiceMsg};
 use crate::types::{ChunkAddress, Keypair, PublicKey};
 
 use crate::messaging::{ServiceAuth, WireMsg};
+use itertools::Itertools;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
@@ -86,13 +87,13 @@ impl Client {
             hex::encode(config.genesis_key.to_bytes())
         );
         // Create a session with the network
-        let session = Session::attempt_bootstrap(
+        let session = Session::new(
             client_pk,
             config.genesis_key,
             config.qp2p,
-            bootstrap_nodes.clone(),
-            config.local_addr,
+            // bootstrap_nodes.clone(),
             err_sender,
+            config.local_addr,
         )
         .await?;
 
@@ -119,11 +120,18 @@ impl Client {
             signature,
         };
 
+        let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
+
         // Send the dummy message to probe the network for it's infrastructure details.
-        let _dropped_res = client
+        client
             .session
-            .fire_and_forget_payload(random_dst_addr, auth, serialised_cmd)
-            .await;
+            .make_contact_with_nodes(
+                bootstrap_nodes.clone(),
+                random_dst_addr,
+                auth,
+                serialised_cmd,
+            )
+            .await?;
 
         Ok(client)
     }
