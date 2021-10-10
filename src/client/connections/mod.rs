@@ -12,6 +12,7 @@ mod messaging;
 use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
     signature_aggregator::SignatureAggregator,
+    MessageId,
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey;
@@ -54,4 +55,6 @@ pub(super) struct Session {
     aggregator: Arc<RwLock<SignatureAggregator>>,
     /// Network's genesis key
     genesis_key: bls::PublicKey,
+    /// Initial network comms messageId
+    initial_connection_check_msg_id: Arc<RwLock<Option<MessageId>>>,
 }

@@ -444,7 +444,7 @@ impl Dispatcher {
                 Ok(vec![command])
             } else {
                 error!(
-                        "End user msg dropped. Could not find socketaddr corresponding to xorname {:?}: {:?}",
+                        "End user msg dropped at send. Could not find socketaddr corresponding to xorname {:?}: {:?}",
                         name, wire_msg
                     );
                 Ok(vec![])

@@ -299,12 +299,12 @@ mod tests {
     };
     use crate::types::{utils::random_bytes, BytesAddress, Keypair};
     use crate::url::Scope;
-
     use bytes::Bytes;
     use eyre::Result;
     use futures::future::join_all;
     use rand::rngs::OsRng;
     use tokio::time::Instant;
+    use tracing::Instrument;
 
     const MIN_BLOB_SIZE: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
     const DELAY_DIVIDER: usize = 500_000;
@@ -337,7 +337,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_3kb() -> Result<()> {
         init_test_logger();
-        let _outer_span = tracing::info_span!("store_and_read_3kb").entered();
+        let _start_span = tracing::info_span!("store_and_read_3kb").entered();
 
         let client = create_test_client().await?;
 
@@ -360,14 +360,27 @@ mod tests {
 
         // Test storing private blob with the same value.
         // Should not conflict and return same address
-        let address = client.upload_blob(blob.clone(), Scope::Private).await?;
+        let address = client
+            .upload_blob(blob.clone(), Scope::Private)
+            .instrument(tracing::info_span!(
+                "checking no conflict on same private upload"
+            ))
+            .await?;
         assert_eq!(address, private_address);
 
         // Test storing public blob with the same value. Should not conflict.
-        let public_address = client.upload_blob(blob.clone(), Scope::Public).await?;
+        let public_address = client
+            .upload_blob(blob.clone(), Scope::Public)
+            .instrument(tracing::info_span!("checking no conflict on public upload"))
+            .await?;
+
+        assert_ne!(public_address, private_address);
 
         // Assert that the public blob is stored.
-        let read_data = client.read_bytes(public_address).await?;
+        let read_data = client
+            .read_bytes(public_address)
+            .instrument(tracing::info_span!("reading_public"))
+            .await?;
 
         compare(blob.bytes(), read_data)?;
 
@@ -378,11 +391,14 @@ mod tests {
     async fn seek_in_data() -> Result<()> {
         init_test_logger();
         let _outer_span = tracing::info_span!("seek_in_data").entered();
-
         let client = create_test_client().await?;
+
         for i in 1..5 {
+            // let _outer_span = tracing::info_span!("seek_in_data").entered();
             let size = i * MIN_BLOB_SIZE;
+            let _outer_span = tracing::info_span!("size:", size).entered();
             for divisor in 2..5 {
+                let _outer_span = tracing::info_span!("divisor", divisor).entered();
                 let len = size / divisor;
                 let blob = Blob::new(random_bytes(size))?;
 

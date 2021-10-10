@@ -22,11 +22,7 @@ use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
 use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
 use std::time::Duration;
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::mpsc::{channel, Sender},
     sync::RwLock,
@@ -67,6 +63,7 @@ impl Session {
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             // bootstrap_peer: bootstrap_peer.remote_address(),
             genesis_key,
+            initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
         };
 
         Self::spawn_message_listener_thread(session.clone(), incoming_messages).await;
@@ -389,20 +386,44 @@ impl Session {
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let contacts_to_ping_per_batch = 5;
 
+        let initial_contacts = elders_or_adults[0..contacts_to_ping_per_batch].to_vec();
         send_message(
-            elders_or_adults.clone(),
-            wire_msg,
+            initial_contacts,
+            wire_msg.clone(),
             self.endpoint.clone(),
             msg_id,
         )
         .await?;
 
+        *self.initial_connection_check_msg_id.write().await = Some(msg_id);
+
+        let mut knowledge_checks = 0;
+        let mut outgoing_msg_rounds = 1;
+
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
             // wait until we have _some_ network knowledge
-            while let None = self.network.closest_or_opposite(&dst_address) {
-                tokio::time::sleep(Duration::from_secs(1)).await
+            while self.network.closest_or_opposite(&dst_address).is_none() {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+
+                knowledge_checks += 1;
+
+                if knowledge_checks > 2 {
+                    let start_pos = outgoing_msg_rounds * contacts_to_ping_per_batch;
+                    let next_contacts = elders_or_adults
+                        [start_pos..start_pos + contacts_to_ping_per_batch]
+                        .to_vec();
+                    outgoing_msg_rounds += 1;
+                    send_message(
+                        next_contacts,
+                        wire_msg.clone(),
+                        self.endpoint.clone(),
+                        msg_id,
+                    )
+                    .await?;
+                }
             }
             // while self.network
         }
