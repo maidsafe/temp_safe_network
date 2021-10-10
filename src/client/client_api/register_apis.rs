@@ -325,8 +325,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_private_permissions() -> Result<()> {
-        let _outer_span = tracing::info_span!("test__register_private_permissions").entered();
         let client = create_test_client().await?;
+        let _outer_span = tracing::info_span!("test__register_private_permissions").entered();
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key();
@@ -473,12 +473,11 @@ mod tests {
         tokio::time::sleep(delay).await;
 
         // loop here until we see the value set...
-        let retrieved_value_2 = retry_loop!(
-            client
-                .get_register_entry(address, value2_hash)
-                .instrument(tracing::info_span!("get_value_2"))
-                .await?
-        );
+
+        // TODO: writes should be sstable enoupgh that we can remove this...
+        let retrieved_value_2 = retry_loop!(client
+            .get_register_entry(address, value2_hash)
+            .instrument(tracing::info_span!("get_value_2")));
         assert_eq!(retrieved_value_2, value_2);
 
         // Requesting a hash which desn't exist throws an error
