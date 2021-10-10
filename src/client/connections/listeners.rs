@@ -25,6 +25,7 @@ use xor_name::XorName;
 
 impl Session {
     // Listen for incoming messages on a connection
+    #[instrument(skip_all, level = "debug")]
     pub(crate) async fn spawn_message_listener_thread(
         mut session: Session,
         mut incoming_messages: IncomingMessages<XorName>,
@@ -54,6 +55,7 @@ impl Session {
         });
     }
 
+    #[instrument(skip_all, level = "debug")]
     pub(crate) async fn listen_for_incoming_message(
         incoming_messages: &mut IncomingMessages<XorName>,
     ) -> Result<(SocketAddr, MessageType), Error> {
@@ -68,12 +70,12 @@ impl Session {
         }
     }
 
+    #[instrument(skip_all, level = "debug")]
     pub(crate) async fn handle_msg(
         msg: MessageType,
         src: SocketAddr,
         session: Session,
     ) -> Result<Session, Error> {
-        trace!("client handle msg afoot");
         match msg {
             MessageType::Service { msg_id, msg, .. } => {
                 Self::handle_client_msg(session, msg_id, msg, src).await
@@ -131,6 +133,7 @@ impl Session {
     }
 
     // Handle messages intended for client consumption (re: queries + commands)
+    #[instrument(skip(session), level = "debug")]
     async fn handle_client_msg(
         session: Session,
         msg_id: MessageId,
@@ -152,9 +155,13 @@ impl Session {
                     if let Ok(op_id) = response.operation_id() {
                         if let Some(entry) = queries.get(&op_id) {
                             let all_senders = entry.value();
-                            for (_msg_id, sender) in all_senders {
+                            for (msg_id, sender) in all_senders {
                                 trace!("Sending response for query w/{} via channel.", op_id);
-                                let _ = sender.send(response.clone()).await;
+                                let result = sender.send(response.clone()).await;
+
+                                if result.is_err() {
+                                    warn!("Error sending query response on a channel for {:?} op_id {:?}: {:?}", msg_id, op_id, result)
+                                }
                             }
                         } else {
                             // TODO: The trace is only needed when we have an identified case of not finding a channel, but expecting one.
@@ -198,6 +205,7 @@ impl Session {
     }
 
     // Handle Anti-Entropy Redirect messages
+    #[instrument(skip_all, level = "debug")]
     async fn handle_ae_redirect_msg(
         session: Session,
         target_section_auth: SectionAuthorityProvider,
@@ -263,6 +271,7 @@ impl Session {
     }
 
     // Handle Anti-Entropy Retry messages
+    #[instrument(skip_all, level = "debug")]
     async fn handle_ae_retry_msg(
         session: Session,
         section_auth: SectionAuthorityProvider,
@@ -330,6 +339,7 @@ impl Session {
     }
 
     /// Checks AE cache to see if we should be forwarding this message (and to whom) or if it has already been dealt with
+    #[instrument(skip_all, level = "debug")]
     async fn new_elder_targets_if_any(
         session: Session,
         bounced_msg: Bytes,
@@ -362,6 +372,16 @@ impl Session {
                     return Ok(None);
                 }
             };
+
+        if let Some(id) = *session.initial_connection_check_msg_id.read().await {
+            if id == msg_id {
+                trace!(
+                    "Retry message from original contact probe ({:?}). No need to retry this",
+                    msg_id
+                );
+                return Ok(None);
+            }
+        }
 
         debug!(
             "Bounced message ({:?}) received in an AE response: {:?}",
