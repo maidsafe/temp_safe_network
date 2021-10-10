@@ -293,7 +293,10 @@ impl Client {
 mod tests {
     use super::Spot;
 
-    use crate::client::{client_api::blob_apis::Blob, utils::test_utils::create_test_client};
+    use crate::client::{
+        client_api::blob_apis::Blob,
+        utils::test_utils::{create_test_client, init_test_logger},
+    };
     use crate::types::{utils::random_bytes, BytesAddress, Keypair};
     use crate::url::Scope;
 
@@ -308,6 +311,7 @@ mod tests {
 
     #[test]
     fn deterministic_chunking() -> Result<()> {
+        init_test_logger();
         let keypair = Keypair::new_ed25519(&mut OsRng);
         let blob = random_bytes(MIN_BLOB_SIZE);
 
@@ -332,8 +336,10 @@ mod tests {
     // Test storing and reading min size blob.
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_3kb() -> Result<()> {
-        let client = create_test_client().await?;
+        init_test_logger();
         let _outer_span = tracing::info_span!("store_and_read_3kb").entered();
+
+        let client = create_test_client().await?;
 
         let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
 
@@ -370,8 +376,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn seek_in_data() -> Result<()> {
-        let client = create_test_client().await?;
+        init_test_logger();
         let _outer_span = tracing::info_span!("seek_in_data").entered();
+
+        let client = create_test_client().await?;
         for i in 1..5 {
             let size = i * MIN_BLOB_SIZE;
             for divisor in 2..5 {
@@ -438,8 +446,10 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn parallel_timings() -> Result<()> {
-        let client = create_test_client().await?;
+        init_test_logger();
         let _outer_span = tracing::info_span!("parallel_timings").entered();
+
+        let client = create_test_client().await?;
 
         let handles = (0..1000_usize)
             .map(|i| (i, client.clone()))
@@ -471,6 +481,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn one_by_one_timings() -> Result<()> {
+        init_test_logger();
+        let _outer_span = tracing::info_span!("test__one_by_one_timings").entered();
+
         let client = create_test_client().await?;
 
         for i in 0..1000_usize {
@@ -485,15 +498,16 @@ mod tests {
     }
 
     async fn store_and_read_blob(size: usize, scope: Scope) -> Result<()> {
-        let blob = Blob::new(random_bytes(size))?;
-        let client = create_test_client().await?;
-
+        init_test_logger();
         // cannot use scope as var w/ macro
         let _outer_span = if scope == Scope::Public {
             tracing::info_span!("store_and_read_public_blob", size).entered()
         } else {
             tracing::info_span!("store_and_read_private_blob", size).entered()
         };
+
+        let blob = Blob::new(random_bytes(size))?;
+        let client = create_test_client().await?;
 
         let address = client.upload_blob(blob.clone(), scope).await?;
 
@@ -510,15 +524,16 @@ mod tests {
     }
 
     async fn store_and_read_spot(size: usize, scope: Scope) -> Result<()> {
-        let spot = Spot::new(random_bytes(size))?;
-        let client = create_test_client().await?;
-
+        init_test_logger();
         // cannot use scope as var w/ macro
         let _outer_span = if scope == Scope::Public {
             tracing::info_span!("store_and_read_public_spot", size).entered()
         } else {
             tracing::info_span!("store_and_read_private_spot", size).entered()
         };
+
+        let spot = Spot::new(random_bytes(size))?;
+        let client = create_test_client().await?;
 
         let address = client.upload_spot(spot.clone(), scope).await?;
 
