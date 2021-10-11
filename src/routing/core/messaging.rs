@@ -94,7 +94,8 @@ impl Core {
     // ------------------------------------------------------------------------------------------------------------
     // ------------------------------------------------------------------------------------------------------------
 
-    /// Generate message to update a peer with our current section chain
+    /// Generate AntiEntropyUpdate message to update a peer with proof_chain,
+    /// and members_info if required.
     pub(crate) fn generate_ae_update(
         &self,
         dst_section_key: BlsPublicKey,
