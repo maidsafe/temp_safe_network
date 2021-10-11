@@ -21,6 +21,8 @@ use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
 use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
+use rand::rngs::OsRng;
+use rand::seq::SliceRandom;
 use std::time::Duration;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{
@@ -356,15 +358,17 @@ impl Session {
         // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
         let (elders_or_adults, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address) {
-                (
-                    sap.value
-                        .elders
-                        .values()
-                        .cloned()
-                        .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-                        .collect::<Vec<SocketAddr>>(),
-                    sap.value.public_key_set.public_key(),
-                )
+                let mut nodes = sap
+                    .value
+                    .elders
+                    .values()
+                    .cloned()
+                    .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
+                    .collect::<Vec<SocketAddr>>();
+
+                nodes.shuffle(&mut OsRng);
+
+                (nodes, sap.value.public_key_set.public_key())
             } else {
                 // Send message to our bootstrap peer with network's genesis PK.
                 (nodes, self.genesis_key)
