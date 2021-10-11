@@ -44,24 +44,6 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if !section_key_matches || !self.section.prefix().matches(peer.name()) {
-            debug!(
-                "JoinRequest from {} - name doesn't match our prefix {:?}.",
-                peer,
-                self.section.prefix()
-            );
-
-            let redirect_sap = self.matching_section(peer.name())?;
-
-            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(redirect_sap)));
-            trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                node_msg,
-                *self.section.chain().last_key(),
-            )?]);
-        }
-
         if self.section.members().is_joined(peer.name()) {
             debug!(
                 "Ignoring JoinRequest from {} - already member of our section.",
@@ -79,6 +61,33 @@ impl Core {
                 JoinRejectionReason::JoinsDisallowed,
             )));
 
+            trace!("Sending {:?} to {}", node_msg, peer);
+            return Ok(vec![self.send_direct_message(
+                (*peer.name(), *peer.addr()),
+                node_msg,
+                *self.section.chain().last_key(),
+            )?]);
+        }
+
+        if !section_key_matches || !self.section.prefix().matches(peer.name()) {
+            if section_key_matches {
+                debug!(
+                    "JoinRequest from {} - name doesn't match our prefix {:?}.",
+                    peer,
+                    self.section.prefix()
+                );
+            } else {
+                debug!(
+                    "JoinRequest from {} - doesn't have our latest section_key {:?}, presented {:?}.",
+                    peer,
+                    self.section.chain().last_key(),
+                    join_request.section_key
+                );
+            }
+
+            let retry_sap = self.matching_section(peer.name())?;
+
+            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(retry_sap)));
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![self.send_direct_message(
                 (*peer.name(), *peer.addr()),
