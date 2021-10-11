@@ -85,12 +85,6 @@ jobs:
             src:
               - 'src/prefix_map/**'
 
-      - name: Mac setup timeout
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install coreutils
-          alias timeout=gtimeout
-
       - name: Mac install ripgrep
         if: matrix.os == 'macos-latest'
         run: brew install ripgrep
@@ -200,23 +194,27 @@ jobs:
       - name: Initial client tests...
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: timeout 5m cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob && sleep 5
+        timeout-minutes: 5
 
       # register api
       - name: Client reg tests against local network
         shell: bash
-        run: timeout 15m cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+        timeout-minutes: 15
         env:
           RUST_LOG: safe_network=trace,qp2p=trace
       # blob api
       - name: Client blob tests against local network
         shell: bash
-        run: timeout 15m cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
+        timeout-minutes: 15
         env:
             RUST_LOG: safe_network=trace,qp2p=trace
       - name: Run example app for Blob API against local network
+        timeout-minutes: 5
         shell: bash
-        run: timeout 5m cargo run --release  --features=always-joinable,test-utils --example client_blob
+        run: cargo run --release  --features=always-joinable,test-utils --example client_blob
 
       - name: Kill the current network (not needed for next test)
         if: matrix.os != 'windows-latest'
@@ -243,7 +241,8 @@ jobs:
 
       # - name: Run example of split and chunk check
       #   shell: bash
-      #   run: timeout 10m cargo run --release  --features=always-joinable,test-utils --example network_split
+      #   run: cargo run --release  --features=always-joinable,test-utils --example network_split
+      #   timeout-minutes: 5
 
       # - name: Was there a section split?
       #   run: ./scripts/has_split.sh
