@@ -412,9 +412,13 @@ impl Session {
 
                 if knowledge_checks > 2 {
                     let start_pos = outgoing_msg_rounds * contacts_to_ping_per_batch;
-                    let next_contacts = elders_or_adults
-                        [start_pos..start_pos + contacts_to_ping_per_batch]
-                        .to_vec();
+                    let next_batch_end = start_pos + contacts_to_ping_per_batch;
+                    let next_contacts = if next_batch_end > elders_or_adults.len() {
+                        elders_or_adults[start_pos..].to_vec()
+                    } else {
+                        elders_or_adults[start_pos..start_pos + contacts_to_ping_per_batch].to_vec()
+                    };
+
                     outgoing_msg_rounds += 1;
                     send_message(
                         next_contacts,
