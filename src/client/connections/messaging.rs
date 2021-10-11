@@ -401,6 +401,7 @@ impl Session {
 
         let mut knowledge_checks = 0;
         let mut outgoing_msg_rounds = 1;
+        let mut last_start_pos = 0;
 
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
@@ -411,7 +412,14 @@ impl Session {
                 knowledge_checks += 1;
 
                 if knowledge_checks > 2 {
-                    let start_pos = outgoing_msg_rounds * contacts_to_ping_per_batch;
+                    let mut start_pos = outgoing_msg_rounds * contacts_to_ping_per_batch;
+
+                    if start_pos > elders_or_adults.len() {
+                        start_pos = last_start_pos;
+                    }
+
+                    last_start_pos = start_pos;
+
                     let next_batch_end = start_pos + contacts_to_ping_per_batch;
                     let next_contacts = if next_batch_end > elders_or_adults.len() {
                         elders_or_adults[start_pos..].to_vec()
@@ -429,7 +437,6 @@ impl Session {
                     .await?;
                 }
             }
-            // while self.network
         }
 
         Ok(())
