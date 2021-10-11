@@ -35,7 +35,6 @@ use crate::messaging::system::SystemMsg;
 use crate::messaging::{
     signature_aggregator::SignatureAggregator,
     system::{Proposal, Section},
-    MessageId,
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
@@ -202,11 +201,8 @@ impl Core {
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
                     commands.extend(
-                        self.propose(Proposal::JoinsAllowed((
-                            MessageId::new(),
-                            self.joins_allowed,
-                        )))
-                        .await?,
+                        self.propose(Proposal::JoinsAllowed(self.joins_allowed))
+                            .await?,
                     );
                 }
 
