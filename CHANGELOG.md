@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.15](https://github.com/maidsafe/safe_network/compare/v0.33.14...v0.33.15) (2021-10-11)
+
+
+### Bug Fixes
+
+* more accurate log for JoinRequest retry ([2b18d98](https://github.com/maidsafe/safe_network/commit/2b18d989aac0a5bf68077ae3dfe2410f762a0d9e))
+
 ### [0.33.14](https://github.com/maidsafe/safe_network/compare/v0.33.13...v0.33.14) (2021-10-11)
 
 
