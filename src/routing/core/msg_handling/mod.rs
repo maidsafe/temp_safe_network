@@ -115,7 +115,12 @@ impl Core {
                         | SystemMsg::AntiEntropyRedirect { .. }
                         | SystemMsg::AntiEntropyProbe(_)
                         | SystemMsg::JoinRequest(_)
-                        | SystemMsg::JoinAsRelocatedRequest(_) => {}
+                        | SystemMsg::JoinAsRelocatedRequest(_) => {
+                            trace!(
+                                "Entropy check skipped for {:?}, handling message directly",
+                                msg_id
+                            );
+                        }
                         _ => match dst_location.section_pk() {
                             None => {}
                             Some(dst_section_pk) => {
@@ -137,7 +142,7 @@ impl Core {
                                     return Ok(cmds);
                                 }
 
-                                info!("Entropy check passed. Handling verified msg {:?}", msg_id);
+                                trace!("Entropy check passed. Handling verified msg {:?}", msg_id);
                             }
                         },
                     }
@@ -514,7 +519,8 @@ impl Core {
                     }
 
                     // TODO: should be able to remove the sig_share from the Propose msg
-                    // therefore we won't need to do this check.
+                    // therefore we won't need to do this check as the sig_share can
+                    // be carried within the msg_kind header.
                     if !self
                         .section
                         .chain()
