@@ -161,6 +161,9 @@ jobs:
           NODE_COUNT: 43
           RUST_LOG: safe_network=trace
 
+      - name: Extra wait on CI for split organisation
+        run: sleep 60
+
       - name: Was there a section split?
         run: ./scripts/has_split.sh
         id: split-check-1
@@ -189,6 +192,9 @@ jobs:
       - name: Was there a section split?
         run: ./scripts/has_split.sh
         id: split-check-2
+
+      - name: Extra wait on CI for split organisation
+        run: sleep 60
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests...

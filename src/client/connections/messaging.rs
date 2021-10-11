@@ -39,6 +39,9 @@ pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
 pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 
+// Number of seconds to wait between initial contact attempts with nodes
+pub(crate) const WAIT_FOR_CONTANT_SECS: u64 = 3;
+
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip_all, level = "debug")]
@@ -413,7 +416,7 @@ impl Session {
         if section_pk == self.genesis_key {
             // wait until we have _some_ network knowledge
             while self.network.closest_or_opposite(&dst_address).is_none() {
-                tokio::time::sleep(Duration::from_secs(5)).await;
+                tokio::time::sleep(Duration::from_secs(WAIT_FOR_CONTANT_SECS)).await;
 
                 knowledge_checks += 1;
 
