@@ -63,18 +63,18 @@ impl<'a> Serialize for SignableView<'a> {
 }
 
 // Aggregator of `Proposal`s.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct ProposalAggregator(SignatureAggregator);
 
 impl ProposalAggregator {
-    pub(crate) fn add(
-        &mut self,
+    pub(crate) async fn add(
+        &self,
         proposal: Proposal,
         sig_share: SigShare,
     ) -> Result<(Proposal, KeyedSig), ProposalError> {
         let bytes =
             bincode::serialize(&SignableView(&proposal)).map_err(|_| ProposalError::Invalid)?;
-        let sig = self.0.add(&bytes, sig_share)?;
+        let sig = self.0.add(&bytes, sig_share).await?;
         Ok((proposal, sig))
     }
 }

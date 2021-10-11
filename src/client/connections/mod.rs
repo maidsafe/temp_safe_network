@@ -12,6 +12,7 @@ mod messaging;
 use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
     signature_aggregator::SignatureAggregator,
+    MessageId,
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey;
@@ -50,10 +51,10 @@ pub(super) struct Session {
     ae_redirect_cache: Arc<RwLock<AeCache>>,
     // AE retry cache
     ae_retry_cache: Arc<RwLock<AeCache>>,
-    /// Our initial bootstrap node
-    bootstrap_peer: SocketAddr,
     /// BLS Signature aggregator for aggregating network messages
     aggregator: Arc<RwLock<SignatureAggregator>>,
     /// Network's genesis key
     genesis_key: bls::PublicKey,
+    /// Initial network comms messageId
+    initial_connection_check_msg_id: Arc<RwLock<Option<MessageId>>>,
 }

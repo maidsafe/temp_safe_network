@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::data::{to_chunk, Blob, BlobAddress, Spot, SpotAddress};
-use super::BytesAddress;
-use super::{data::encrypt_blob, Client};
-use crate::messaging::data::{DataCmd, DataQuery, QueryResponse};
-use crate::types::{Chunk, ChunkAddress, Encryption};
+use super::{
+    data::{encrypt_blob, to_chunk, Blob, Spot},
+    Client,
+};
 use crate::{
     client::{client_api::data::DataMapLevel, utils::encryption, Error, Result},
+    messaging::data::{DataCmd, DataQuery, QueryResponse},
+    types::{BytesAddress, Chunk, ChunkAddress, Encryption},
     url::Scope,
 };
 
@@ -27,42 +28,28 @@ use xor_name::XorName;
 
 struct HeadChunk {
     chunk: Chunk,
-    address: BlobAddress,
+    address: BytesAddress,
 }
 
 impl Client {
+    #[instrument(skip(self), level = "debug")]
     /// Reads [`Bytes`] from the network, whose contents are contained within on or more chunks.
     pub async fn read_bytes(&self, address: BytesAddress) -> Result<Bytes> {
-        match address {
-            BytesAddress::Blob(blob) => self.read_blob(blob).await,
-            BytesAddress::Spot(spot) => self.read_spot(spot).await,
+        let chunk = self.get_chunk(address.name()).await?;
+        if let Ok(data_map) = self
+            .unpack_head_chunk(HeadChunk {
+                chunk: chunk.clone(),
+                address,
+            })
+            .await
+        {
+            self.read_all(data_map).await
+        } else {
+            self.get_bytes(chunk, address.scope())
         }
     }
 
-    /// Read the contents of a blob from the network. The contents are spread across
-    /// multiple chunks in the network. This function invokes the self-encryptor and returns
-    /// the data that was initially stored.
-    ///
-    /// # Examples
-    ///
-    /// TODO: update once data types are crdt compliant
-    ///
-    async fn read_blob(&self, address: BlobAddress) -> Result<Bytes>
-    where
-        Self: Sized,
-    {
-        let chunk = self.read_from_network(address.name()).await?;
-        let data_map = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
-        self.read_all(data_map).await
-    }
-
-    /// Reads a spot from the network. The contents are contained within a single chunk.
-    async fn read_spot(&self, address: SpotAddress) -> Result<Bytes> {
-        let chunk = self.read_from_network(address.name()).await?;
-        self.get_bytes(chunk, address.scope())
-    }
-
-    /// Read the contents of a blob from the network. The contents are spread across
+    /// Read bytes from the network. The contents are spread across
     /// multiple chunks in the network. This function invokes the self-encryptor and returns
     /// the data that was initially stored.
     ///
@@ -74,9 +61,10 @@ impl Client {
     ///
     /// TODO: update once data types are crdt compliant
     ///
+    #[instrument(skip_all, level = "trace")]
     pub async fn read_from(
         &self,
-        address: BlobAddress,
+        address: BytesAddress,
         position: usize,
         length: usize,
     ) -> Result<Bytes>
@@ -90,14 +78,13 @@ impl Client {
             &position,
         );
 
-        let chunk = self.read_from_network(address.name()).await?;
+        let chunk = self.get_chunk(address.name()).await?;
         let data_map = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
         self.seek(data_map, position, length).await
     }
 
-    pub(crate) async fn read_from_network(&self, name: &XorName) -> Result<Chunk> {
-        trace!("Reading chunk: {:?}", name);
-
+    #[instrument(skip(self), level = "trace")]
+    pub(crate) async fn get_chunk(&self, name: &XorName) -> Result<Chunk> {
         let res = self
             .send_query(DataQuery::GetChunk(ChunkAddress(*name)))
             .await?;
@@ -114,20 +101,21 @@ impl Client {
     }
 
     /// Tries to chunk the bytes, returning an address and chunks, without storing anything to network.
+    #[instrument(skip_all, level = "trace")]
     pub fn chunk_bytes(&self, bytes: Bytes, scope: Scope) -> Result<(BytesAddress, Vec<Chunk>)> {
         if let Ok(blob) = Blob::new(bytes.clone()) {
-            let (address, chunks) = self.encrypt_blob(blob, scope)?;
-            Ok((BytesAddress::Blob(address), chunks))
+            self.encrypt_blob(blob, scope)
         } else {
             let spot = Spot::new(bytes)?;
             let (address, chunk) = self.package_spot(spot, scope)?;
-            Ok((BytesAddress::Spot(address), vec![chunk]))
+            Ok((address, vec![chunk]))
         }
     }
 
     /// Encrypts a binary large object (blob) and returns the resulting address and all chunks.
     /// Does not store anything to the network.
-    fn encrypt_blob(&self, blob: Blob, scope: Scope) -> Result<(BlobAddress, Vec<Chunk>)> {
+    #[instrument(skip(self, blob), level = "trace")]
+    fn encrypt_blob(&self, blob: Blob, scope: Scope) -> Result<(BytesAddress, Vec<Chunk>)> {
         let owner = encryption(scope, self.public_key());
         encrypt_blob(blob.bytes(), owner.as_ref())
     }
@@ -135,7 +123,7 @@ impl Client {
     /// Packages a small piece of t(d)ata (spot) and returns the resulting address and the chunk.
     /// The chunk content will be in plain text if it has public scope, or encrypted if it is instead private.
     /// Does not store anything to the network.
-    fn package_spot(&self, spot: Spot, scope: Scope) -> Result<(SpotAddress, Chunk)> {
+    fn package_spot(&self, spot: Spot, scope: Scope) -> Result<(BytesAddress, Chunk)> {
         let encryption = encryption(scope, self.public_key());
         let chunk = to_chunk(spot.bytes(), encryption.as_ref())?;
         if chunk.value().len() >= self_encryption::MIN_ENCRYPTABLE_BYTES {
@@ -143,29 +131,29 @@ impl Client {
         }
         let name = *chunk.name();
         let address = if encryption.is_some() {
-            SpotAddress::Private(name)
+            BytesAddress::Private(name)
         } else {
-            SpotAddress::Public(name)
+            BytesAddress::Public(name)
         };
         Ok((address, chunk))
     }
 
     /// Directly writes [`Bytes`] to the network in the
     /// form of immutable chunks, without any batching.
+    #[instrument(skip(self, bytes), level = "debug")]
     pub async fn upload(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
         if let Ok(blob) = Blob::new(bytes.clone()) {
-            let head_address = self.upload_blob(blob, scope).await?;
-            Ok(BytesAddress::Blob(head_address))
+            self.upload_blob(blob, scope).await
         } else {
             let spot = Spot::new(bytes)?;
-            let address = self.upload_spot(spot, scope).await?;
-            Ok(BytesAddress::Spot(address))
+            self.upload_spot(spot, scope).await
         }
     }
 
     /// Directly writes a [`Blob`] to the network in the
     /// form of immutable self encrypted chunks, without any batching.
-    async fn upload_blob(&self, blob: Blob, scope: Scope) -> Result<BlobAddress> {
+    #[instrument(skip_all, level = "trace")]
+    async fn upload_blob(&self, blob: Blob, scope: Scope) -> Result<BytesAddress> {
         let (head_address, all_chunks) = self.encrypt_blob(blob, scope)?;
 
         let tasks = all_chunks.into_iter().map(|chunk| {
@@ -184,7 +172,8 @@ impl Client {
 
     /// Directly writes a [`Spot`] to the network in the
     /// form of a single chunk, without any batching.
-    async fn upload_spot(&self, spot: Spot, scope: Scope) -> Result<SpotAddress> {
+    #[instrument(skip_all, level = "trace")]
+    async fn upload_spot(&self, spot: Spot, scope: Scope) -> Result<BytesAddress> {
         let (address, chunk) = self.package_spot(spot, scope)?;
         self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
         Ok(address)
@@ -203,6 +192,7 @@ impl Client {
 
     // Gets a subset of chunks from the network, decrypts and
     // reads `len` bytes of the data starting at given `pos` of original file.
+    #[instrument(skip_all, level = "trace")]
     async fn seek(&self, data_map: DataMap, pos: usize, len: usize) -> Result<Bytes> {
         let info = self_encryption::seek_info(data_map.file_size(), pos, len);
         let range = &info.index_range;
@@ -221,13 +211,14 @@ impl Client {
             .map_err(Error::SelfEncryption)
     }
 
+    #[instrument(skip_all, level = "trace")]
     async fn try_get_chunks(reader: Client, keys: Vec<ChunkInfo>) -> Result<Vec<EncryptedChunk>> {
         let expected_count = keys.len();
 
         let tasks = keys.into_iter().map(|key| {
             let reader = reader.clone();
             task::spawn(async move {
-                match reader.read_from_network(&key.dst_hash).await {
+                match reader.get_chunk(&key.dst_hash).await {
                     Ok(chunk) => Some(EncryptedChunk {
                         index: key.index,
                         content: chunk.value().clone(),
@@ -266,6 +257,7 @@ impl Client {
     /// Extracts a blob DataMapLevel from a head chunk.
     /// If the DataMapLevel is not the first level mapping directly to the user's contents,
     /// the process repeats itself until it obtains the first level DataMapLevel.
+    #[instrument(skip_all, level = "trace")]
     async fn unpack_head_chunk(&self, chunk: HeadChunk) -> Result<DataMap> {
         let HeadChunk { mut chunk, address } = chunk;
         loop {
@@ -285,6 +277,7 @@ impl Client {
 
     /// If scope == Scope::Private, decrypts contents with the client encryption keys.
     /// Else returns the content bytes.
+    #[instrument(skip_all, level = "trace")]
     fn get_bytes(&self, chunk: Chunk, scope: Scope) -> Result<Bytes> {
         if matches!(scope, Scope::Public) {
             Ok(chunk.value().clone())
@@ -298,23 +291,27 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::client::client_api::blob_apis::Blob;
-    use crate::client::utils::test_utils::create_test_client;
-    use crate::types::{utils::random_bytes, Keypair};
+    use super::Spot;
+
+    use crate::client::{
+        client_api::blob_apis::Blob,
+        utils::test_utils::{create_test_client, init_test_logger},
+    };
+    use crate::types::{utils::random_bytes, BytesAddress, Keypair};
     use crate::url::Scope;
     use bytes::Bytes;
     use eyre::Result;
     use futures::future::join_all;
     use rand::rngs::OsRng;
     use tokio::time::Instant;
-
-    use super::Spot;
+    use tracing::Instrument;
 
     const MIN_BLOB_SIZE: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
     const DELAY_DIVIDER: usize = 500_000;
 
     #[test]
     fn deterministic_chunking() -> Result<()> {
+        init_test_logger();
         let keypair = Keypair::new_ed25519(&mut OsRng);
         let blob = random_bytes(MIN_BLOB_SIZE);
 
@@ -339,6 +336,9 @@ mod tests {
     // Test storing and reading min size blob.
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_3kb() -> Result<()> {
+        init_test_logger();
+        let _start_span = tracing::info_span!("store_and_read_3kb").entered();
+
         let client = create_test_client().await?;
 
         let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
@@ -354,20 +354,33 @@ mod tests {
         tokio::time::sleep(delay).await;
 
         // Assert that the blob is stored.
-        let read_data = client.read_blob(private_address).await?;
+        let read_data = client.read_bytes(private_address).await?;
 
         compare(blob.bytes(), read_data)?;
 
         // Test storing private blob with the same value.
         // Should not conflict and return same address
-        let address = client.upload_blob(blob.clone(), Scope::Private).await?;
+        let address = client
+            .upload_blob(blob.clone(), Scope::Private)
+            .instrument(tracing::info_span!(
+                "checking no conflict on same private upload"
+            ))
+            .await?;
         assert_eq!(address, private_address);
 
         // Test storing public blob with the same value. Should not conflict.
-        let public_address = client.upload_blob(blob.clone(), Scope::Public).await?;
+        let public_address = client
+            .upload_blob(blob.clone(), Scope::Public)
+            .instrument(tracing::info_span!("checking no conflict on public upload"))
+            .await?;
+
+        assert_ne!(public_address, private_address);
 
         // Assert that the public blob is stored.
-        let read_data = client.read_blob(public_address).await?;
+        let read_data = client
+            .read_bytes(public_address)
+            .instrument(tracing::info_span!("reading_public"))
+            .await?;
 
         compare(blob.bytes(), read_data)?;
 
@@ -376,23 +389,31 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn seek_in_data() -> Result<()> {
-        for i in 1..5 {
-            let size = i * MIN_BLOB_SIZE;
+        init_test_logger();
+        let _outer_span = tracing::info_span!("seek_in_data").entered();
+        let client = create_test_client().await?;
 
+        for i in 1..5 {
+            // let _outer_span = tracing::info_span!("seek_in_data").entered();
+            let size = i * MIN_BLOB_SIZE;
+            let _outer_span = tracing::info_span!("size:", size).entered();
             for divisor in 2..5 {
+                let _outer_span = tracing::info_span!("divisor", divisor).entered();
                 let len = size / divisor;
                 let blob = Blob::new(random_bytes(size))?;
+
+                let address = store_for_seek(blob.clone(), &client).await?;
 
                 // Read first part
                 let read_data_1 = {
                     let pos = 0;
-                    seek_for_test(blob.clone(), pos, len).await?
+                    get_for_seek(blob.clone(), address, pos, len, &client).await?
                 };
 
                 // Read second part
                 let read_data_2 = {
                     let pos = len;
-                    seek_for_test(blob.clone(), pos, len).await?
+                    get_for_seek(blob.clone(), address, pos, len, &client).await?
                 };
 
                 // Join parts
@@ -401,7 +422,7 @@ mod tests {
                     .flat_map(|bytes| bytes.clone())
                     .collect();
 
-                compare(blob.bytes().slice(0..(2 * len)), read_data)?
+                compare(blob.bytes().slice(0..(2 * len)), read_data)?;
             }
         }
 
@@ -441,6 +462,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn parallel_timings() -> Result<()> {
+        init_test_logger();
+        let _outer_span = tracing::info_span!("parallel_timings").entered();
+
         let client = create_test_client().await?;
 
         let handles = (0..1000_usize)
@@ -473,6 +497,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn one_by_one_timings() -> Result<()> {
+        init_test_logger();
+        let _outer_span = tracing::info_span!("test__one_by_one_timings").entered();
+
         let client = create_test_client().await?;
 
         for i in 0..1000_usize {
@@ -487,8 +514,17 @@ mod tests {
     }
 
     async fn store_and_read_blob(size: usize, scope: Scope) -> Result<()> {
+        init_test_logger();
+        // cannot use scope as var w/ macro
+        let _outer_span = if scope == Scope::Public {
+            tracing::info_span!("store_and_read_public_blob", size).entered()
+        } else {
+            tracing::info_span!("store_and_read_private_blob", size).entered()
+        };
+
         let blob = Blob::new(random_bytes(size))?;
         let client = create_test_client().await?;
+
         let address = client.upload_blob(blob.clone(), scope).await?;
 
         // the larger the file, the longer we have to wait before we start querying
@@ -496,7 +532,7 @@ mod tests {
         tokio::time::sleep(delay).await;
 
         // now that it was written to the network we should be able to retrieve it
-        let read_data = client.read_blob(address).await?;
+        let read_data = client.read_bytes(address).await?;
         // then the content should be what we stored
         compare(blob.bytes(), read_data)?;
 
@@ -504,8 +540,17 @@ mod tests {
     }
 
     async fn store_and_read_spot(size: usize, scope: Scope) -> Result<()> {
+        init_test_logger();
+        // cannot use scope as var w/ macro
+        let _outer_span = if scope == Scope::Public {
+            tracing::info_span!("store_and_read_public_spot", size).entered()
+        } else {
+            tracing::info_span!("store_and_read_private_spot", size).entered()
+        };
+
         let spot = Spot::new(random_bytes(size))?;
         let client = create_test_client().await?;
+
         let address = client.upload_spot(spot.clone(), scope).await?;
 
         // the larger the size, the longer we have to wait before we start querying
@@ -513,7 +558,7 @@ mod tests {
         tokio::time::sleep(delay).await;
 
         // now that it was written to the network we should be able to retrieve it
-        let read_data = client.read_spot(address).await?;
+        let read_data = client.read_bytes(address).await?;
 
         // then the content should be what we stored
         compare(spot.bytes(), read_data)?;
@@ -521,18 +566,26 @@ mod tests {
         Ok(())
     }
 
-    async fn seek_for_test(blob: Blob, pos: usize, len: usize) -> Result<Bytes> {
-        let client = create_test_client().await?;
+    async fn store_for_seek(blob: Blob, client: &super::Client) -> Result<BytesAddress> {
         let address = client.upload_blob(blob.clone(), Scope::Public).await?;
-
         // the larger the file, the longer we have to wait before we start querying
-        let delay = tokio::time::Duration::from_secs(usize::max(1, len / DELAY_DIVIDER) as u64);
+        let delay = tokio::time::Duration::from_secs(usize::max(
+            1,
+            blob.bytes().len() / DELAY_DIVIDER,
+        ) as u64);
         tokio::time::sleep(delay).await;
+        Ok(address)
+    }
 
+    async fn get_for_seek(
+        blob: Blob,
+        address: BytesAddress,
+        pos: usize,
+        len: usize,
+        client: &super::Client,
+    ) -> Result<Bytes> {
         let read_data = client.read_from(address, pos, len).await?;
-
         compare(blob.bytes().slice(pos..(pos + len)), read_data.clone())?;
-
         Ok(read_data)
     }
 

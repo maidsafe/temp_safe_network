@@ -6,11 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    data::{DataCmd, DataExchange, DataQuery, Result, StorageLevel},
-    EndUser, ServiceAuth,
+use crate::types::{Chunk, PublicKey};
+use crate::{
+    messaging::{
+        data::{DataCmd, DataExchange, DataQuery, Result, StorageLevel},
+        EndUser, ServiceAuth,
+    },
+    types::ChunkAddress,
 };
-use crate::types::{Chunk, ChunkAddress, PublicKey};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 

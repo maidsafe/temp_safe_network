@@ -17,37 +17,39 @@ use crate::messaging::{
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey;
-
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
 use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
-    net::SocketAddr,
-    sync::Arc,
-};
+use rand::rngs::OsRng;
+use rand::seq::SliceRandom;
+use std::time::Duration;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::mpsc::{channel, Sender},
     sync::RwLock,
     task::JoinHandle,
 };
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, instrument::Instrumented, trace, warn, Instrument};
 use xor_name::XorName;
 
 // Number of Elders subset to send queries to
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
-// Number of attempts to make when trying to bootstrap to a section
-const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 3;
+
+// Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
+pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
+
+// Number of seconds to wait between initial contact attempts with nodes
+pub(crate) const WAIT_FOR_CONTANT_SECS: u64 = 3;
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
-    pub(crate) async fn bootstrap(
+    #[instrument(skip_all, level = "debug")]
+    pub(crate) async fn new(
         client_pk: PublicKey,
         genesis_key: bls::PublicKey,
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
-        bootstrap_nodes: BTreeSet<SocketAddr>,
         local_addr: SocketAddr,
     ) -> Result<Session, Error> {
         trace!(
@@ -57,11 +59,6 @@ impl Session {
         debug!("QP2p config: {:?}", qp2p_config);
 
         let (endpoint, incoming_messages, _) = Endpoint::new_client(local_addr, qp2p_config)?;
-        let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
-        let bootstrap_peer = endpoint
-            .connect_to_any(&bootstrap_nodes)
-            .await
-            .ok_or(Error::NotBootstrapped)?;
 
         let session = Session {
             client_pk,
@@ -72,8 +69,9 @@ impl Session {
             ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
             ae_retry_cache: Arc::new(RwLock::new(AeCache::default())),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
-            bootstrap_peer: bootstrap_peer.remote_address(),
+            // bootstrap_peer: bootstrap_peer.remote_address(),
             genesis_key,
+            initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
         };
 
         Self::spawn_message_listener_thread(session.clone(), incoming_messages).await;
@@ -81,93 +79,47 @@ impl Session {
         Ok(session)
     }
 
-    /// Tries to bootstrap a client to a section. If there is a failure then it retries.
-    /// After a maximum of three attempts if the boostrap process still fails, the unresponsive
-    /// node is removed from the list and an error is returned.
-    pub(crate) async fn attempt_bootstrap(
-        client_pk: PublicKey,
-        genesis_key: bls::PublicKey,
-        qp2p_config: qp2p::Config,
-        mut bootstrap_nodes: BTreeSet<SocketAddr>,
-        local_addr: SocketAddr,
-        err_sender: Sender<CmdError>,
-    ) -> Result<Session, Error> {
-        let mut attempts = 0;
-        loop {
-            match Session::bootstrap(
-                client_pk,
-                genesis_key,
-                qp2p_config.clone(),
-                err_sender.clone(),
-                bootstrap_nodes.clone(),
-                local_addr,
-            )
-            .await
-            {
-                Ok(session) => break Ok(session),
-                Err(err) => {
-                    attempts += 1;
-                    if let Error::BootstrapToPeerFailed(failed_peer) = err {
-                        // Remove the unresponsive peer we boostrapped to and bootstrap again
-                        let _ = bootstrap_nodes.remove(&failed_peer);
-                    }
-                    if attempts < NUM_OF_BOOTSTRAPPING_ATTEMPTS {
-                        trace!(
-                            "Error connecting to network! {:?}\nRetrying... ({})",
-                            err,
-                            attempts
-                        );
-                    } else {
-                        break Err(err);
-                    }
-                }
-            }
-        }
-    }
-
     /// Send a `ServiceMsg` to the network without awaiting for a response.
+    #[instrument(skip_all, level = "debug")]
     pub(crate) async fn send_cmd(
         &self,
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
-        targets: usize,
+        targets_count: usize,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint.clone();
-
         // TODO: Consider other approach: Keep a session per section!
 
         // Get DataSection elders details.
         let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
         {
+            let sap_elders = sap.value.elders.values().cloned();
+
+            trace!("{:?} SAP elders found", sap_elders);
             (
-                sap.value
-                    .elders
-                    .values()
-                    .cloned()
-                    .take(targets)
-                    .collect::<Vec<SocketAddr>>(),
+                sap_elders.take(targets_count).collect::<Vec<SocketAddr>>(),
                 sap.value.public_key_set.public_key(),
             )
         } else {
-            // Send message to our bootstrap peer with network's genesis PK.
-            (vec![self.bootstrap_peer], self.genesis_key)
+            return Err(Error::NoNetworkKnowledge);
         };
 
         let msg_id = MessageId::new();
 
+        if elders.len() < targets_count {
+            return Err(Error::InsufficientElderConnections(
+                elders.len(),
+                targets_count,
+            ));
+        }
+
         debug!(
-            "Sending command w/id {:?}, from {}, to {} Elders",
+            "Sending command w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
             msg_id,
             endpoint.public_addr(),
-            elders.len()
-        );
-
-        trace!(
-            "Sending (from {}) dst {:?} w/ id: {:?}",
-            endpoint.public_addr(),
-            dst_address,
-            msg_id
+            elders.len(),
+            dst_address
         );
 
         let dst_location = DstLocation::Section {
@@ -180,6 +132,7 @@ impl Session {
         send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await
     }
 
+    #[instrument(skip_all, level = "debug")]
     /// Send a `ServiceMsg` to the network awaiting for the response.
     pub(crate) async fn send_query(
         &self,
@@ -202,10 +155,7 @@ impl Session {
         let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst) {
             (sap.value.elders, sap.value.public_key_set.public_key())
         } else {
-            let mut bootstrapped_peer = BTreeMap::new();
-            let _ = bootstrapped_peer.insert(XorName::random(), self.bootstrap_peer);
-            // Send message to our bootstrap peer with the network's genesis PK.
-            (bootstrapped_peer, self.genesis_key)
+            return Err(Error::NoNetworkKnowledge);
         };
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
@@ -218,11 +168,10 @@ impl Session {
 
         let elders_len = chosen_elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES && elders_len > 1 {
-            error!(
-                "Not enough Elder connections: {}, minimum required: {}",
-                elders_len, NUM_OF_ELDERS_SUBSET_FOR_QUERIES
-            );
-            return Err(Error::InsufficientElderConnections(elders_len));
+            return Err(Error::InsufficientElderConnections(
+                elders_len,
+                NUM_OF_ELDERS_SUBSET_FOR_QUERIES,
+            ));
         }
 
         let msg_id = MessageId::new();
@@ -272,25 +221,29 @@ impl Session {
             let endpoint = endpoint.clone();
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
-            let task_handle = tokio::spawn(async move {
-                trace!("queueing query send task to: {:?}", &socket);
-                let result = endpoint
-                    .connect_to(&socket)
-                    .err_into()
-                    .and_then(|connection| async move {
-                        connection.send_with(msg_bytes, priority, None).await
-                    })
-                    .await;
-                match &result {
-                    Err(err) => {
-                        error!("Error sending Query to elder: {:?} ", err);
-                        let mut a = counter_clone.lock().await;
-                        *a += 1;
+
+            let task_handle = tokio::spawn(
+                async move {
+                    trace!("queueing query send task to: {:?}", &socket);
+                    let result = endpoint
+                        .connect_to(&socket)
+                        .err_into()
+                        .and_then(|connection| async move {
+                            connection.send_with(msg_bytes, priority, None).await
+                        })
+                        .await;
+                    match &result {
+                        Err(err) => {
+                            error!("Error sending Query to elder: {:?} ", err);
+                            let mut a = counter_clone.lock().await;
+                            *a += 1;
+                        }
+                        Ok(()) => trace!("ServiceMsg with id: {:?}, sent to {}", &msg_id, &socket),
                     }
-                    Ok(()) => trace!("ServiceMsg with id: {:?}, sent to {}", &msg_id, &socket),
+                    result
                 }
-                result
-            });
+                .instrument(tracing::debug_span!("sending query message")),
+            );
 
             tasks.push(task_handle);
         }
@@ -391,39 +344,52 @@ impl Session {
         }
     }
 
-    pub(crate) async fn fire_and_forget_payload(
+    // /// This tells us if we've seen at least _one_ AE-Retry msg (and attempted to resend it + cached that)
+    // /// This can be useful to know if we're still working with _only_ genesis key knowledge
+    // #[instrument(skip_all, level = "debug")]
+    // pub(crate) async fn has_seen_ae_retry(&self) -> bool {
+
+    // }
+
+    #[instrument(skip_all, level = "debug")]
+    pub(crate) async fn make_contact_with_nodes(
         &self,
+        nodes: Vec<SocketAddr>,
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint.clone();
         // Get DataSection elders details.
-        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
-        {
-            (
-                sap.value
+        // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
+        let (elders_or_adults, section_pk) =
+            if let Some(sap) = self.network.closest_or_opposite(&dst_address) {
+                let mut nodes = sap
+                    .value
                     .elders
                     .values()
                     .cloned()
                     .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-                    .collect::<Vec<SocketAddr>>(),
-                sap.value.public_key_set.public_key(),
-            )
-        } else {
-            // Send message to our bootstrap peer with network's genesis PK.
-            (vec![self.bootstrap_peer], self.genesis_key)
-        };
+                    .collect::<Vec<SocketAddr>>();
+
+                nodes.shuffle(&mut OsRng);
+
+                (nodes, sap.value.public_key_set.public_key())
+            } else {
+                // Send message to our bootstrap peer with network's genesis PK.
+                (nodes, self.genesis_key)
+            };
 
         let msg_id = MessageId::new();
 
         debug!(
-            "Firing payload w/id {:?}, from {}, to {} Elders whose result will be dropped",
-            msg_id,
+            "Making initial contact with nodes. Our PublicAddr: {:?}. Using {:?} to {} nodes",
             endpoint.public_addr(),
-            elders.len()
+            msg_id,
+            elders_or_adults.len()
         );
 
+        // TODO: Don't use genesis key if we have a full section
         let dst_location = DstLocation::Section {
             name: dst_address,
             section_pk,
@@ -431,7 +397,59 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await
+        let initial_contacts = elders_or_adults[0..NODES_TO_CONTACT_PER_STARTUP_BATCH].to_vec();
+        send_message(
+            initial_contacts,
+            wire_msg.clone(),
+            self.endpoint.clone(),
+            msg_id,
+        )
+        .await?;
+
+        *self.initial_connection_check_msg_id.write().await = Some(msg_id);
+
+        let mut knowledge_checks = 0;
+        let mut outgoing_msg_rounds = 1;
+        let mut last_start_pos = 0;
+
+        // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
+        if section_pk == self.genesis_key {
+            // wait until we have _some_ network knowledge
+            while self.network.closest_or_opposite(&dst_address).is_none() {
+                tokio::time::sleep(Duration::from_secs(WAIT_FOR_CONTANT_SECS)).await;
+
+                knowledge_checks += 1;
+
+                if knowledge_checks > 2 {
+                    let mut start_pos = outgoing_msg_rounds * NODES_TO_CONTACT_PER_STARTUP_BATCH;
+
+                    if start_pos > elders_or_adults.len() {
+                        start_pos = last_start_pos;
+                    }
+
+                    last_start_pos = start_pos;
+
+                    let next_batch_end = start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH;
+                    let next_contacts = if next_batch_end > elders_or_adults.len() {
+                        elders_or_adults[start_pos..].to_vec()
+                    } else {
+                        elders_or_adults[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH]
+                            .to_vec()
+                    };
+
+                    outgoing_msg_rounds += 1;
+                    send_message(
+                        next_contacts,
+                        wire_msg.clone(),
+                        self.endpoint.clone(),
+                        msg_id,
+                    )
+                    .await?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     #[allow(unused)]
@@ -443,6 +461,7 @@ impl Session {
     }
 }
 
+#[instrument(skip_all, level = "trace")]
 pub(crate) async fn send_message(
     elders: Vec<SocketAddr>,
     wire_msg: WireMsg,
@@ -462,7 +481,7 @@ pub(crate) async fn send_message(
         let successes_clone = successes.clone();
         let msg_bytes_clone = msg_bytes.clone();
         let endpoint = endpoint.clone();
-        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
+        let task_handle: Instrumented<JoinHandle<Result<(), Error>>> = tokio::spawn(async move {
             trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
             endpoint
                 .connect_to(&socket)
@@ -476,7 +495,8 @@ pub(crate) async fn send_message(
 
             trace!("Sent msg with MsgId {:?} to {:?}", msg_id, &socket);
             Ok(())
-        });
+        })
+        .instrument(tracing::trace_span!("sending message"));
         tasks.push(task_handle);
     }
 

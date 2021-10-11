@@ -12,12 +12,12 @@ mod data;
 mod queries;
 mod register_apis;
 
-pub use self::data::{BlobAddress, BytesAddress, SpotAddress};
 use crate::client::{connections::Session, errors::Error, Config};
 use crate::messaging::data::{CmdError, DataQuery, ServiceMsg};
 use crate::types::{ChunkAddress, Keypair, PublicKey};
 
 use crate::messaging::{ServiceAuth, WireMsg};
+use itertools::Itertools;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
@@ -52,6 +52,7 @@ impl Client {
     ///
     /// TODO: update once data types are crdt compliant
     ///
+    #[instrument(skip_all, level = "debug", name = "New client")]
     pub async fn new(
         config: Config,
         bootstrap_nodes: BTreeSet<SocketAddr>,
@@ -82,17 +83,16 @@ impl Client {
         // Bootstrap to the network, connecting to a section based
         // on a public key of our choice.
         debug!(
-            "Bootstrapping to the network, genesis key: {} ...",
+            "Creating new session with genesis key: {} ...",
             hex::encode(config.genesis_key.to_bytes())
         );
         // Create a session with the network
-        let session = Session::attempt_bootstrap(
+        let session = Session::new(
             client_pk,
             config.genesis_key,
             config.qp2p,
-            bootstrap_nodes.clone(),
-            config.local_addr,
             err_sender,
+            config.local_addr,
         )
         .await?;
 
@@ -119,11 +119,19 @@ impl Client {
             signature,
         };
 
+        let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
+
+        // TODO: check for the intiial msg id and DO NOT RESEND in ae retry.
         // Send the dummy message to probe the network for it's infrastructure details.
-        let _dropped_res = client
+        client
             .session
-            .fire_and_forget_payload(random_dst_addr, auth, serialised_cmd)
-            .await;
+            .make_contact_with_nodes(
+                bootstrap_nodes.clone(),
+                random_dst_addr,
+                auth,
+                serialised_cmd,
+            )
+            .await?;
 
         Ok(client)
     }
@@ -154,7 +162,9 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::utils::test_utils::{create_test_client, create_test_client_with};
+    use crate::client::utils::test_utils::{
+        create_test_client, create_test_client_with, init_test_logger,
+    };
     use crate::types::utils::random_bytes;
     use crate::url::Scope;
     use eyre::Result;
@@ -165,6 +175,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn client_creation() -> Result<()> {
+        init_test_logger();
         let _client = create_test_client().await?;
 
         Ok(())
@@ -173,6 +184,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn client_nonsense_bootstrap_fails() -> Result<()> {
+        init_test_logger();
+
         let mut nonsense_bootstrap = HashSet::new();
         let _ = nonsense_bootstrap.insert(SocketAddr::new(
             IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -185,6 +198,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn client_creation_with_existing_keypair() -> Result<()> {
+        init_test_logger();
+
         let mut rng = OsRng;
         let full_id = Keypair::new_ed25519(&mut rng);
         let pk = full_id.public_key();
@@ -197,6 +212,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn long_lived_connection_survives() -> Result<()> {
+        init_test_logger();
+
         let client = create_test_client().await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
         let bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES / 2);
@@ -210,6 +227,8 @@ mod tests {
     // happen that high-level API functions will become non-Send by accident.
     #[test]
     fn client_is_send() {
+        init_test_logger();
+
         fn require_send<T: Send>(_t: T) {}
         require_send(create_test_client());
     }

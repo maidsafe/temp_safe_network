@@ -6,10 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::dbs::SLED_FLUSH_TIME_MS;
 use crate::dbs::{convert_to_error_message, Error, EventStore, Result, UsedSpace};
 use crate::types::{
-    register::{Action, Address, Register, User},
-    PublicKey,
+    register::{Action, Register, User},
+    PublicKey, RegisterAddress as Address,
 };
 use crate::{
     messaging::{
@@ -58,10 +59,11 @@ impl RegisterStorage {
         used_space.add_dir(path);
         let db_dir = path.join("db").join(DATABASE_NAME.to_string());
 
-        let db = sled::open(db_dir).map_err(|error| {
-            trace!("Sled Error: {:?}", error);
-            Error::Sled(error)
-        })?;
+        let db = sled::Config::default()
+            .path(&db_dir)
+            .flush_every_ms(SLED_FLUSH_TIME_MS)
+            .open()
+            .map_err(Error::from)?;
 
         Ok(Self {
             path: path.to_path_buf(),
@@ -402,7 +404,9 @@ impl RegisterStorage {
 /// as well as the tag of the Address.
 fn to_reg_key(address: &Address) -> Result<XorName> {
     Ok(XorName::from_content(
-        address.encode_to_zbase32()?.as_bytes(),
+        DataAddress::Register(*address)
+            .encode_to_zbase32()?
+            .as_bytes(),
     ))
 }
 

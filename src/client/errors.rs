@@ -12,7 +12,7 @@ use crate::messaging::{
     Error as MessagingError,
 };
 use crate::types::Error as DtError;
-use std::{io, net::SocketAddr};
+use std::io;
 use thiserror::Error;
 
 /// Specialisation of `std::Result` for Client.
@@ -45,13 +45,13 @@ pub enum Error {
     #[error("Problem connecting to elder")]
     ElderConnection,
     /// Client has not gone through qp2p bootstrap process yet
-    #[error("Client has failed to bootstrap to the network yet")]
-    NotBootstrapped,
+    #[error("Client has not yet acquired any network knowledge, so anything sent is guaranteed to have a lengthy AE process")]
+    NoNetworkKnowledge,
     /// Could not connect to sufficient elder to retrieve reliable responses.
     #[error(
-        "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. {0} were connected to"
+        "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. {0} were connected to, {1} needed."
     )]
-    InsufficientElderConnections(usize),
+    InsufficientElderConnections(usize, usize),
     /// Could not query elder.
     #[error("Problem receiving query via qp2p")]
     ReceivingQuery,
@@ -139,12 +139,12 @@ pub enum Error {
     /// Generic Error
     #[error("Generic error")]
     Generic(String),
-    /// Could not bootstrap to an unresponsive peer
-    #[error("Could not bootstrap to an unresponsive peer {0}")]
-    BootstrapToPeerFailed(SocketAddr),
     /// Could not retrieve all chunks required to decrypt the data. (Expected, Actual)
     #[error("Not enough chunks! Required {}, but we have {}.)", _0, _1)]
     NotEnoughChunks(usize, usize),
+    /// Could not chunk all the data required to encrypt the data. (Expected, Actual)
+    #[error("Not all data was chunked! Required {}, but we have {}.)", _0, _1)]
+    NotAllDataWasChunked(usize, usize),
 }
 
 impl From<(CmdError, OperationId)> for Error {

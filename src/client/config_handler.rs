@@ -122,7 +122,7 @@ fn project_dirs() -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::utils::test_utils::init_logger;
+    use crate::client::utils::test_utils::init_test_logger;
     use bincode::serialize;
     use eyre::Result;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -138,7 +138,7 @@ mod tests {
     // 4. Verify that `Config::new()` returns the correct default config when no path is provided.
     #[tokio::test(flavor = "multi_thread")]
     async fn custom_config_path() -> Result<()> {
-        init_logger();
+        init_test_logger();
 
         let temp_dir = tempdir().map_err(|e| Error::Generic(e.to_string()))?;
         let root_dir = temp_dir.path().to_path_buf();

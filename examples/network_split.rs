@@ -24,8 +24,8 @@ use tiny_keccak::{Hasher, Sha3};
 
 use eyre::{eyre, Context, Result};
 use safe_network::{
-    client::{utils::test_utils::read_network_conn_info, BytesAddress, Client, Config},
-    types::utils::random_bytes,
+    client::{utils::test_utils::read_network_conn_info, Client, Config},
+    types::{utils::random_bytes, BytesAddress},
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
 

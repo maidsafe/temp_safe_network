@@ -25,10 +25,13 @@ pub use self::{
     register::{RegisterCmd, RegisterRead, RegisterWrite},
 };
 
-use crate::messaging::{data::Error as ErrorMessage, MessageId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     Chunk, ChunkAddress, DataAddress, PublicKey,
+};
+use crate::{
+    messaging::{data::Error as ErrorMessage, MessageId},
+    types::utils,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -41,9 +44,7 @@ pub type OperationId = String;
 
 /// Return operation Id of a chunk
 pub fn operation_id(address: &ChunkAddress) -> Result<OperationId> {
-    address
-        .encode_to_zbase32()
-        .map_err(|_| Error::NoOperationId)
+    utils::encode(address).map_err(|_| Error::NoOperationId)
 }
 
 /// A message indicating that an error occurred as a node was handling a client's message.
@@ -200,15 +201,10 @@ impl QueryResponse {
         // TODO: Operation Id should eventually encompass _who_ the op is for.
         match self {
             GetChunk(result) => match result {
-                Ok(chunk) => chunk
-                    .address()
-                    .encode_to_zbase32()
-                    .map_err(|_| Error::NoOperationId),
+                Ok(chunk) => operation_id(chunk.address()),
                 Err(error) => match error {
                     ErrorMessage::DataNotFound(address) => match address {
-                        DataAddress::Chunk(address) => address
-                            .encode_to_zbase32()
-                            .map_err(|_| Error::NoOperationId),
+                        DataAddress::Bytes(address) => operation_id(&ChunkAddress(*address.name())),
                         _ => Err(Error::NoOperationId),
                     },
                     _ => Err(Error::InvalidQueryResponseErrorForOperationId),

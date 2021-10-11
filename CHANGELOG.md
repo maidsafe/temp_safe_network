@@ -2,6 +2,76 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.14](https://github.com/maidsafe/safe_network/compare/v0.33.13...v0.33.14) (2021-10-11)
+
+
+### Features
+
+* contact all known nodes and await AE-Retry if we only knew genesis ([3ee44b9](https://github.com/maidsafe/safe_network/commit/3ee44b919703f14fcd0019e1ffd92dc97bc8cd87))
+* initial contact handling updates ([8657f55](https://github.com/maidsafe/safe_network/commit/8657f55f8b828bed402aa0c07fd017a0ab2e8534))
+
+
+### Bug Fixes
+
+* dont try and contact more elders in batch than vec length ([e436942](https://github.com/maidsafe/safe_network/commit/e43694219af20ca36a70b2171350bf605d991dde))
+* initial contact batching, dont allow excessive start pos ([e341e8c](https://github.com/maidsafe/safe_network/commit/e341e8c45a1a1446e20b88cb93b03429e2dd092e))
+* register permissions tests, loop for final perms ([9a1b965](https://github.com/maidsafe/safe_network/commit/9a1b965c9d6713c054ef302570104663c9e1577a))
+* register perms test success condition ([0d6fa14](https://github.com/maidsafe/safe_network/commit/0d6fa145022bf7fb7e1beda91514eb85d0c4b149))
+* register write test ([2089754](https://github.com/maidsafe/safe_network/commit/2089754f057addaf0b876d43f82bc1b5b2f73aa2))
+* register_write_test could fail on second get ([de2b715](https://github.com/maidsafe/safe_network/commit/de2b7150d54e100159e6086ab6007192d841d1d1))
+
+### [0.33.13](https://github.com/maidsafe/safe_network/compare/v0.33.12...v0.33.13) (2021-10-08)
+
+### [0.33.12](https://github.com/maidsafe/safe_network/compare/v0.33.11...v0.33.12) (2021-10-08)
+
+
+### Features
+
+* **error:** add error for incomplete chunking ([ceb9383](https://github.com/maidsafe/safe_network/commit/ceb9383ef2f1b9487cf7b763788b9b86d6b7e468))
+
+
+### Bug Fixes
+
+* **chunks:** do not double-encrypt in packing step ([376c579](https://github.com/maidsafe/safe_network/commit/376c5799d269d2187ed6faad2bab8cc469236da1))
+
+### [0.33.11](https://github.com/maidsafe/safe_network/compare/v0.33.10...v0.33.11) (2021-10-08)
+
+
+### Bug Fixes
+
+* using prefix name as dst_location ([65b312b](https://github.com/maidsafe/safe_network/commit/65b312bcf05257e0ecc439d95d16d26ddef3f492))
+
+### [0.33.10](https://github.com/maidsafe/safe_network/compare/v0.33.9...v0.33.10) (2021-10-08)
+
+
+### Features
+
+* make SignatureAggregatore thread safe ([3353b85](https://github.com/maidsafe/safe_network/commit/3353b85f03e56fb0a2ccd57b9ffed36958474acd))
+
+### [0.33.9](https://github.com/maidsafe/safe_network/compare/v0.33.8...v0.33.9) (2021-10-07)
+
+### [0.33.8](https://github.com/maidsafe/safe_network/compare/v0.33.7...v0.33.8) (2021-10-07)
+
+### [0.33.7](https://github.com/maidsafe/safe_network/compare/v0.33.6...v0.33.7) (2021-10-07)
+
+
+### Features
+
+* lower sled db flush time ([62d867e](https://github.com/maidsafe/safe_network/commit/62d867e1bf51850c621c24740321badcaad8d092))
+
+### [0.33.6](https://github.com/maidsafe/safe_network/compare/v0.33.5...v0.33.6) (2021-10-06)
+
+### [0.33.5](https://github.com/maidsafe/safe_network/compare/v0.33.4...v0.33.5) (2021-10-06)
+
+
+### Bug Fixes
+
+* send proposal to proper dst_location ([9c90366](https://github.com/maidsafe/safe_network/commit/9c90366e612679b7db5d155eb7f14a2cdb88c993))
+
+### [0.33.4](https://github.com/maidsafe/safe_network/compare/v0.33.3...v0.33.4) (2021-10-06)
+
+### [0.33.3](https://github.com/maidsafe/safe_network/compare/v0.33.2...v0.33.3) (2021-10-05)
+
 ### [0.33.2](https://github.com/maidsafe/safe_network/compare/v0.33.1...v0.33.2) (2021-10-05)
 
 

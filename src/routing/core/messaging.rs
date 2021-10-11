@@ -46,7 +46,7 @@ impl Core {
             .key_share()
             .await
             .map_err(|err| {
-                trace!("Can't propose {:?}: {}", proposal, err);
+                trace!("Can't propose {:?}: {:?}", proposal, err);
                 err
             })?;
         self.send_proposal_with(recipients, proposal, &key_share)
@@ -76,12 +76,13 @@ impl Core {
             content: proposal,
             sig_share,
         };
-        let section_pk = *self.section.chain().last_key();
+        // Name of the section_pk may not matches the section prefix.
+        // Carry out a substitution to prevent the dst_location becomes other section.
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
-                name: XorName::from(PublicKey::Bls(section_pk)),
-                section_pk,
+                name: self.section.prefix().name(),
+                section_pk: *self.section.chain().last_key(),
             },
             node_msg,
             self.section.authority_provider().section_key(),
@@ -149,7 +150,12 @@ impl Core {
         // the previous PK which is likely what adults know
         let previous_pk = *self.section_chain().prev_key();
         let node_msg = self.generate_ae_update(previous_pk, true)?;
-        let cmd = self.send_direct_message_to_nodes(nodes, node_msg, dst_section_pk)?;
+        let cmd = self.send_direct_message_to_nodes(
+            nodes,
+            node_msg,
+            self.section().prefix().name(),
+            dst_section_pk,
+        )?;
 
         Ok(vec![cmd])
     }
@@ -164,7 +170,12 @@ impl Core {
         let dst_section_pk = *self.section_chain().last_key();
         let node_msg = self.generate_ae_update(dst_section_pk, true)?;
 
-        let cmd = self.send_direct_message_to_nodes(adults, node_msg, dst_section_pk)?;
+        let cmd = self.send_direct_message_to_nodes(
+            adults,
+            node_msg,
+            self.section().prefix().name(),
+            dst_section_pk,
+        )?;
 
         Ok(vec![cmd])
     }
@@ -261,7 +272,7 @@ impl Core {
             .await
             .map_err(|err| {
                 trace!(
-                    "Can't create message {:?} for accumulation at dst {:?}: {}",
+                    "Can't create message {:?} for accumulation at dst {:?}: {:?}",
                     node_msg,
                     dst,
                     err
@@ -356,12 +367,13 @@ impl Core {
         &self,
         recipients: Vec<(XorName, SocketAddr)>,
         node_msg: SystemMsg,
+        dst_name: XorName,
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
-                name: XorName::from(PublicKey::Bls(dst_section_pk)),
+                name: dst_name,
                 section_pk: dst_section_pk,
             },
             node_msg,
@@ -386,7 +398,12 @@ impl Core {
             .collect();
 
         let dst_section_pk = *self.section_chain().last_key();
-        let cmd = self.send_direct_message_to_nodes(targets, node_msg, dst_section_pk)?;
+        let cmd = self.send_direct_message_to_nodes(
+            targets,
+            node_msg,
+            self.section.authority_provider().prefix().name(),
+            dst_section_pk,
+        )?;
 
         Ok(cmd)
     }
