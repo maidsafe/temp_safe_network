@@ -407,7 +407,7 @@ impl Session {
         if section_pk == self.genesis_key {
             // wait until we have _some_ network knowledge
             while self.network.closest_or_opposite(&dst_address).is_none() {
-                tokio::time::sleep(Duration::from_secs(2)).await;
+                tokio::time::sleep(Duration::from_secs(5)).await;
 
                 knowledge_checks += 1;
 
