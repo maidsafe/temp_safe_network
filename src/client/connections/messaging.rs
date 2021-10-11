@@ -36,6 +36,9 @@ use xor_name::XorName;
 // Number of Elders subset to send queries to
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
+// Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
+pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
+
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip_all, level = "debug")]
@@ -390,9 +393,8 @@ impl Session {
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
-        let contacts_to_ping_per_batch = 5;
 
-        let initial_contacts = elders_or_adults[0..contacts_to_ping_per_batch].to_vec();
+        let initial_contacts = elders_or_adults[0..NODES_TO_CONTACT_PER_STARTUP_BATCH].to_vec();
         send_message(
             initial_contacts,
             wire_msg.clone(),
@@ -416,7 +418,7 @@ impl Session {
                 knowledge_checks += 1;
 
                 if knowledge_checks > 2 {
-                    let mut start_pos = outgoing_msg_rounds * contacts_to_ping_per_batch;
+                    let mut start_pos = outgoing_msg_rounds * NODES_TO_CONTACT_PER_STARTUP_BATCH;
 
                     if start_pos > elders_or_adults.len() {
                         start_pos = last_start_pos;
@@ -424,11 +426,12 @@ impl Session {
 
                     last_start_pos = start_pos;
 
-                    let next_batch_end = start_pos + contacts_to_ping_per_batch;
+                    let next_batch_end = start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH;
                     let next_contacts = if next_batch_end > elders_or_adults.len() {
                         elders_or_adults[start_pos..].to_vec()
                     } else {
-                        elders_or_adults[start_pos..start_pos + contacts_to_ping_per_batch].to_vec()
+                        elders_or_adults[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH]
+                            .to_vec()
                     };
 
                     outgoing_msg_rounds += 1;
