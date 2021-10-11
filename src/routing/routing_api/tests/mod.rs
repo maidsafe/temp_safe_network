@@ -22,10 +22,7 @@ use crate::messaging::{
 use crate::routing::{
     core::{ConnectionEvent, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     create_test_used_space_and_root_storage,
-    dkg::{
-        test_utils::{prove, section_signed},
-        ProposalUtils,
-    },
+    dkg::test_utils::{prove, section_signed},
     ed25519,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
@@ -1579,7 +1576,7 @@ fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<(Proposal, 
 // Wrapper for `bls::SecretKeySet` that also allows to retrieve the corresponding `bls::SecretKey`.
 // Note: `bls::SecretKeySet` does have a `secret_key` method, but it's test-only and not available
 // for the consumers of the crate.
-pub(crate) struct SecretKeySet {
+pub struct SecretKeySet {
     set: bls::SecretKeySet,
     key: bls::SecretKey,
 }

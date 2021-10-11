@@ -51,21 +51,21 @@ impl Core {
 
     async fn handle_online_agreement(
         &mut self,
-        new_info: NodeState,
+        node_state: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
         if let Some(old_info) = self
             .section
             .members()
-            .get_section_signed(new_info.peer.name())
+            .get_section_signed(node_state.peer.name())
         {
             // This node is rejoin with same name.
 
             if old_info.value.state != MembershipState::Left {
                 debug!(
                     "Ignoring Online node {} - {:?} not Left.",
-                    new_info.peer.name(),
+                    node_state.peer.name(),
                     old_info.value.state,
                 );
 
@@ -79,7 +79,7 @@ impl Core {
                 // having to send this `NodeApproval`.
                 commands.push(self.send_node_approval(old_info.clone())?);
                 commands.extend(
-                    self.relocate_rejoining_peer(&new_info.peer, new_age)
+                    self.relocate_rejoining_peer(&node_state.peer, new_age)
                         .await?,
                 );
 
@@ -87,27 +87,27 @@ impl Core {
             }
         }
 
-        let new_info = SectionAuth {
-            value: new_info,
+        let node_state = SectionAuth {
+            value: node_state,
             sig,
         };
 
-        if !self.section.update_member(new_info.clone()) {
-            info!("ignore Online: {:?}", new_info.value.peer);
+        if !self.section.update_member(node_state.clone()) {
+            info!("ignore Online: {:?}", node_state.value.peer);
             return Ok(vec![]);
         }
 
-        info!("handle Online: {:?}", new_info.value.peer);
+        info!("handle Online: {:?}", node_state.value.peer);
 
         self.send_event(Event::MemberJoined {
-            name: *new_info.value.peer.name(),
-            previous_name: new_info.value.previous_name,
-            age: new_info.value.peer.age(),
+            name: *node_state.value.peer.name(),
+            previous_name: node_state.value.previous_name,
+            age: node_state.value.peer.age(),
         })
         .await;
 
         commands.extend(
-            self.relocate_peers(new_info.value.peer.name(), &new_info.sig.signature)
+            self.relocate_peers(node_state.value.peer.name(), &node_state.sig.signature)
                 .await?,
         );
 
@@ -117,7 +117,7 @@ impl Core {
         }
 
         commands.extend(result);
-        commands.push(self.send_node_approval(new_info)?);
+        commands.push(self.send_node_approval(node_state)?);
 
         self.print_network_stats();
 

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{verify_sig, KeyedSig};
+use super::KeyedSig;
 use crate::messaging::system::SectionAuth;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
@@ -33,6 +33,9 @@ impl<T: Serialize> SectionAuthUtils<T> for SectionAuth<T> {
     }
 
     fn self_verify(&self) -> bool {
-        verify_sig(&self.sig, &self.value)
+        // Verify the integrity of `message` against `sig`.
+        bincode::serialize(&self.value)
+            .map(|bytes| self.sig.verify(&bytes))
+            .unwrap_or(false)
     }
 }

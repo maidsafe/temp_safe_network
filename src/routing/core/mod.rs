@@ -38,7 +38,7 @@ use crate::messaging::{
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
-    dkg::{DkgVoter, ProposalAggregator},
+    dkg::DkgVoter,
     error::Result,
     node::Node,
     relocation::RelocateState,
@@ -70,7 +70,6 @@ pub(crate) struct Core {
     network: NetworkPrefixMap,
     section_keys_provider: SectionKeysProvider,
     message_aggregator: SignatureAggregator,
-    proposal_aggregator: ProposalAggregator,
     split_barrier: Arc<RwLock<SplitBarrier>>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
@@ -116,7 +115,6 @@ impl Core {
             section,
             network: NetworkPrefixMap::new(genesis_pk),
             section_keys_provider,
-            proposal_aggregator: ProposalAggregator::default(),
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),

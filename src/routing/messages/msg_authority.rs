@@ -81,9 +81,6 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
             NodeMsgAuthority::Section(section_auth) => &section_auth.sig.public_key,
         };
 
-        known_keys
-            .iter()
-            .find(|key| key == &section_pk)
-            .map(|key| *key)
+        known_keys.iter().find(|key| key == &section_pk).copied()
     }
 }

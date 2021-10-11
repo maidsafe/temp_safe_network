@@ -52,8 +52,6 @@ pub(crate) enum Command {
         msg_id: MessageId,
         msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
-        #[debug(skip)]
-        known_keys: Vec<BlsPublicKey>,
     },
     /// Handle Node data messages directly
     HandleNonBlockingMessage {

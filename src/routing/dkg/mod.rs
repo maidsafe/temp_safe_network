@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod dkg_msgs_utils;
-pub(super) mod proposal;
 mod section_signed;
 mod session;
 #[cfg(test)]
@@ -16,16 +15,7 @@ mod voter;
 
 pub(crate) use self::{
     dkg_msgs_utils::{DkgFailureSigSetUtils, DkgSessionIdUtils},
-    proposal::{ProposalAggregator, ProposalError},
     voter::DkgVoter,
 };
-pub(crate) use crate::messaging::system::{KeyedSig, SigShare};
+pub(crate) use crate::messaging::system::KeyedSig;
 pub use section_signed::SectionAuthUtils;
-use serde::Serialize;
-
-// Verify the integrity of `message` against `sig`.
-pub(crate) fn verify_sig<T: Serialize>(sig: &KeyedSig, message: &T) -> bool {
-    bincode::serialize(message)
-        .map(|bytes| sig.verify(&bytes))
-        .unwrap_or(false)
-}
