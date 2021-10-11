@@ -13,7 +13,7 @@ use super::{
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     system::{NodeState, Peer, Proposal, Section},
-    MessageId, SectionAuthorityProvider, WireMsg,
+    SectionAuthorityProvider, WireMsg,
 };
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
@@ -221,10 +221,7 @@ impl Core {
     pub(crate) async fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();
         if self.is_elder() && joins_allowed != self.joins_allowed {
-            commands.extend(
-                self.propose(Proposal::JoinsAllowed((MessageId::new(), joins_allowed)))
-                    .await?,
-            );
+            commands.extend(self.propose(Proposal::JoinsAllowed(joins_allowed)).await?);
         }
         Ok(commands)
     }

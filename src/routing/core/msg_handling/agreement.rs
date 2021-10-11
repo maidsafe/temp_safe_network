@@ -43,7 +43,7 @@ impl Core {
                 self.handle_our_elders_agreement(section_auth, sig).await
             }
             Proposal::JoinsAllowed(joins_allowed) => {
-                self.joins_allowed = joins_allowed.1;
+                self.joins_allowed = joins_allowed;
                 Ok(vec![])
             }
         }
