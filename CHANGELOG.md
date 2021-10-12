@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.34.1](https://github.com/maidsafe/safe_network/compare/v0.34.0...v0.34.1) (2021-10-12)
+
+
+### Bug Fixes
+
+* add error message type for ChunkNotFound ([13c9630](https://github.com/maidsafe/safe_network/commit/13c96309cd0fd3b09daedfde0a160f31b9b483e3))
+
 ## [0.34.0](https://github.com/maidsafe/safe_network/compare/v0.33.18...v0.34.0) (2021-10-12)
 
 
