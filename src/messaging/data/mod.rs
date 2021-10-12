@@ -205,9 +205,18 @@ impl QueryResponse {
                 Err(error) => match error {
                     ErrorMessage::DataNotFound(address) => match address {
                         DataAddress::Bytes(address) => operation_id(&ChunkAddress(*address.name())),
-                        _ => Err(Error::NoOperationId),
+                        another_address => {
+                            error!(
+                                "{:?} address returned when we were expecting a ChunkAddress",
+                                another_address
+                            );
+                            Err(Error::NoOperationId)
+                        }
                     },
-                    _ => Err(Error::InvalidQueryResponseErrorForOperationId),
+                    another_error => {
+                        error!("Could not form operation id: {:?}", another_error);
+                        Err(Error::InvalidQueryResponseErrorForOperationId)
+                    }
                 },
             },
 
