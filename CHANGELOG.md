@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.34.0](https://github.com/maidsafe/safe_network/compare/v0.33.18...v0.34.0) (2021-10-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messaging:** Proposal::JoinsAllowed msg type changed
+* **messaging:** SystemMsg::BouncedUntrustedMessage msg type removed from messaging protocol.
+
+### Bug Fixes
+
+* **messaging:** remove BouncedUntrustedMessage message type and drop untrusted msgs ([adf362c](https://github.com/maidsafe/safe_network/commit/adf362cf65ac0272653e1666dd700bf3f830e5ae))
+
+
+* **messaging:** remove unnecessary msg id from Proposal::JoinsAllowed msg type ([21b4e6c](https://github.com/maidsafe/safe_network/commit/21b4e6cb1a16651e752097e56567abcfc40ecc56))
+
 ### [0.33.18](https://github.com/maidsafe/safe_network/compare/v0.33.17...v0.33.18) (2021-10-12)
 
 ### [0.33.17](https://github.com/maidsafe/safe_network/compare/v0.33.16...v0.33.17) (2021-10-12)
