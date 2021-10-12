@@ -482,14 +482,17 @@ impl Core {
                 )
                 .await
             }
-            SystemMsg::Propose { content, sig_share } => {
+            SystemMsg::Propose {
+                proposal,
+                sig_share,
+            } => {
                 if self.is_not_elder() {
                     trace!("Dropping Propose msg from {}: {:?}", sender, msg_id);
                     return Ok(vec![]);
                 }
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
-                self.handle_proposal(msg_id, content, sig_share, src_name, sender)
+                self.handle_proposal(msg_id, proposal, sig_share, src_name, sender)
                     .await
             }
             SystemMsg::DkgStart {
