@@ -14,7 +14,8 @@ use crate::messaging::{
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, NodeAuth, ServiceAuth, WireMsg,
 };
 use crate::routing::{
-    core::capacity::CHUNK_COPY_COUNT, error::Result, peer::PeerUtils, routing_api::command::Command,
+    core::capacity::CHUNK_COPY_COUNT, error::Result, log_markers::LogMarker, peer::PeerUtils,
+    routing_api::command::Command,
 };
 use crate::types::{ChunkAddress, PublicKey};
 use itertools::Itertools;
@@ -335,7 +336,7 @@ impl Core {
         dst_location: DstLocation,
         user: EndUser,
     ) -> Result<Vec<Command>> {
-        trace!("Service msg received being handled: {:?}", msg);
+        trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
         if let DstLocation::EndUser(_) = dst_location {
             warn!(
                 "Service msg has been dropped as its destination location ({:?}) is invalid: {:?}",

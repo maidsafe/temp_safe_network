@@ -69,7 +69,6 @@ impl Session {
             ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
             ae_retry_cache: Arc::new(RwLock::new(AeCache::default())),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
-            // bootstrap_peer: bootstrap_peer.remote_address(),
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
         };
@@ -418,6 +417,7 @@ impl Session {
             while self.network.closest_or_opposite(&dst_address).is_none() {
                 tokio::time::sleep(Duration::from_secs(WAIT_FOR_CONTANT_SECS)).await;
 
+                debug!("Client still has not received any AE-Retry message...");
                 knowledge_checks += 1;
 
                 if knowledge_checks > 2 {
@@ -501,7 +501,20 @@ pub(crate) async fn send_message(
     }
 
     // Let's await for all messages to be sent
-    let _ = join_all(tasks).await;
+    let results = join_all(tasks).await;
+
+    for r in results {
+        match r {
+            Ok(send_result) => {
+                if send_result.is_err() {
+                    error!("Error during {:?} send: {:?}", msg_id, send_result);
+                }
+            }
+            Err(join_error) => {
+                warn!("Tokio join error as we send: {:?}", join_error)
+            }
+        }
+    }
 
     let failures = elders.len() - *successes.read().await;
 

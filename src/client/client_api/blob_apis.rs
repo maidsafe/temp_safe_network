@@ -297,6 +297,7 @@ mod tests {
         client_api::blob_apis::Blob,
         utils::test_utils::{create_test_client, init_test_logger},
     };
+    use crate::routing::log_markers::LogMarker;
     use crate::types::{utils::random_bytes, BytesAddress, Keypair};
     use crate::url::Scope;
     use bytes::Bytes;
@@ -425,6 +426,67 @@ mod tests {
                 compare(blob.bytes().slice(0..(2 * len)), read_data)?;
             }
         }
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
+    async fn network_assert_expected_count_service_msgs_handled_for_put_and_read() -> Result<()> {
+        let _outer_span = tracing::info_span!("blob_network_assertions").entered();
+
+        let mut the_logs = crate::testnet_assert::NetworkLogState::new()?;
+
+        let network_assert_delay: u64 = std::env::var("NETWORK_ASSERT_DELAY")
+            .unwrap_or_else(|_| "3".to_string())
+            .parse()?;
+
+        let bytes = random_bytes(MIN_BLOB_SIZE / 3);
+        let client = create_test_client().await?;
+        let address = client.upload(bytes.clone(), Scope::Public).await?;
+
+        let delay = tokio::time::Duration::from_secs(network_assert_delay);
+
+        debug!("Running network asserts with delay of {:?}", delay);
+        // small delay to ensure logs have written
+        tokio::time::sleep(delay).await;
+
+        // 3 elders were chosen by the client (should only be 3 as even if client chooses adults, AE should kick in prior to them attempting any of this)
+        the_logs
+            .assert_count(LogMarker::ChunkStoreReceivedAtElder, 3)
+            .await?;
+
+        // 3 elders were chosen by the client (should only be 3 as even if client chooses adults, AE should kick in prior to them attempting any of this)
+        the_logs
+            .assert_count(LogMarker::ServiceMsgToBeHandled, 3)
+            .await?;
+
+        // 4 adults * reqs from 3 elders storing the chunk
+        the_logs.assert_count(LogMarker::StoringChunk, 12).await?;
+
+        // Here we can see that each write thinks it's new, so there's 12... but we let Sled handle this later.
+        // 4 adults storing the chunk * 3 messages, so we'll still see this due to the rapid/ concurrent nature here...
+        the_logs.assert_count(LogMarker::StoredNewChunk, 12).await?;
+
+        // now that it was written to the network we should be able to retrieve it
+        let _ = client.read_bytes(address).await?;
+
+        // small delay to ensure logs have written
+        tokio::time::sleep(delay).await;
+
+        // client send msg to 3 elders
+        the_logs
+            .assert_count(LogMarker::ChunkQueryReceviedAtElder, 3)
+            .await?;
+        // client send msg to 3 elders
+        the_logs
+            .assert_count(LogMarker::ChunkQueryReceviedAtAdult, 12)
+            .await?;
+
+        // 4 adults * 3 requests back at elders
+        the_logs
+            .assert_count(LogMarker::ChunkQueryResponseReceviedFromAdult, 12)
+            .await?;
 
         Ok(())
     }
