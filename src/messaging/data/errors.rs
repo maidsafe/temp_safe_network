@@ -11,7 +11,7 @@ use crate::types::PublicKey;
 use serde::{Deserialize, Serialize};
 use std::result;
 use thiserror::Error;
-use xor_name::Prefix;
+use xor_name::{Prefix, XorName};
 
 /// A specialised `Result` type.
 pub type Result<T, E = Error> = result::Result<T, E>;
@@ -24,6 +24,9 @@ pub enum Error {
     /// Access denied for supplied PublicKey
     #[error("Access denied for PublicKey: {0}")]
     AccessDenied(PublicKey),
+    /// Requested data not found
+    #[error("Requested chunk not found: {0:?}")]
+    ChunkNotFound(XorName),
     /// Requested data not found
     #[error("Requested data not found: {0:?}")]
     DataNotFound(DataAddress),
