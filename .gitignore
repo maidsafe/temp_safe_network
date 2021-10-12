@@ -25,7 +25,8 @@ build-tests/
 *.bk
 *.swp
 *.sublime-*
-.idea/
+.vscode/
+.idea
 
 # Manual
 .cargo/
@@ -61,3 +62,5 @@ installer/docker/sn_node
 installer/docker/sn_node.*.config
 installer/docker/.env
 nodes
+fake_node_data.json
+*.orig
