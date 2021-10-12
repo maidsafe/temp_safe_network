@@ -211,6 +211,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use crate::messaging::data::Error as ErrorMessage;
+    use crate::routing::log_markers::LogMarker;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         BytesAddress, Error as DtError, PublicKey,
@@ -233,6 +234,53 @@ mod tests {
     use tokio::time::Duration;
     use tracing::Instrument;
     use xor_name::XorName;
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
+    async fn register_network_assert_expected_log_counts() -> Result<()> {
+        init_test_logger();
+        let _outer_span = tracing::info_span!("register_network_assert").entered();
+
+        let mut the_logs = crate::testnet_assert::NetworkLogState::new()?;
+
+        let network_assert_delay: u64 = std::env::var("NETWORK_ASSERT_DELAY")
+            .unwrap_or_else(|_| "3".to_string())
+            .parse()?;
+
+        let client = create_test_client().await?;
+
+        let delay = tokio::time::Duration::from_secs(network_assert_delay);
+        debug!("Running network asserts with delay of {:?}", delay);
+
+        let name = XorName(rand::random());
+        let tag = 15000;
+        let owner = client.public_key();
+
+        // store a Private Register
+        let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
+        let _ = perms.insert(owner, PrivatePermissions::new(true, true));
+        let address = client
+            .store_private_register(name, tag, owner, perms)
+            .await?;
+
+        // small delay to ensure logs have written
+        tokio::time::sleep(delay).await;
+
+        // All elders should have been written to
+        the_logs.assert_count(LogMarker::RegisterWrite, 7).await?;
+
+        let _ = client.get_register(address).await?;
+
+        // small delay to ensure logs have written
+        tokio::time::sleep(delay).await;
+
+        // All elders should receive the query
+        the_logs
+            .assert_count(LogMarker::RegisterQueryReceived, 3)
+            .await?;
+
+        Ok(())
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]

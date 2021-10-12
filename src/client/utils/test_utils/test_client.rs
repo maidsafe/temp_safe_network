@@ -38,13 +38,15 @@ where
         let target = event.metadata().file().expect("will never be `None`");
         let span_separation_string = "\t ➤ ";
         let time = SystemTime::default();
+        write!(writer, " {} ", level)?;
+
         time.format_time(writer)?;
+
         writeln!(
             writer,
-            " {} [{}:L{}]:",
-            level,
+            " [{}:L{}]:",
             target,
-            event.metadata().line().expect("will never be `None`")
+            event.metadata().line().expect("will never be `None`"),
         )?;
 
         write!(writer, "{}", span_separation_string)?;

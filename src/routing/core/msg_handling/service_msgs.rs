@@ -56,6 +56,12 @@ impl Core {
         user: EndUser,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
+        trace!(
+            "{:?} preparing to write register {:?}",
+            LogMarker::RegisterWrite,
+            register_write.address(),
+        );
+
         match self.register_storage.write(register_write, auth).await {
             Ok(_) => {
                 info!("Successfully wrote Register from Message: {:?}", msg_id);
@@ -79,6 +85,12 @@ impl Core {
         user: EndUser,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
+        trace!(
+            "{:?} preparing to read {:?}",
+            LogMarker::RegisterQueryReceived,
+            query.dst_address(),
+        );
+
         match self.register_storage.read(&query, auth.public_key) {
             Ok(response) => {
                 if response.failed_with_data_not_found() {

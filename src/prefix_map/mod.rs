@@ -245,6 +245,11 @@ impl NetworkPrefixMap {
         self.section_by_name(&prefix.name())
     }
 
+    /// Get total number of known sections
+    pub(crate) fn known_sections_count(&self) -> usize {
+        self.sections.len()
+    }
+
     /// Returns network statistics.
     pub(crate) fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
         // Let's compute an estimate of the total number of elders in the network
