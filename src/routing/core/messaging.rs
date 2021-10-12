@@ -73,7 +73,7 @@ impl Core {
 
         // Broadcast the proposal to the rest of the section elders.
         let node_msg = SystemMsg::Propose {
-            content: proposal,
+            proposal,
             sig_share,
         };
         // Name of the section_pk may not matches the section prefix.
