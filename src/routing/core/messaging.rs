@@ -94,6 +94,43 @@ impl Core {
     // ------------------------------------------------------------------------------------------------------------
     // ------------------------------------------------------------------------------------------------------------
 
+    /// Generate AntiEntropyUpdate message to update a peer with proof_chain,
+    /// and members_info if required.
+    pub(crate) fn generate_ae_update(
+        &self,
+        dst_section_key: BlsPublicKey,
+        add_peer_info_to_update: bool,
+    ) -> Result<SystemMsg> {
+        let section_signed_auth = self.section.section_signed_authority_provider().clone();
+        let section_auth = section_signed_auth.value;
+        let section_signed = section_signed_auth.sig;
+
+        let proof_chain = match self
+            .section
+            .chain()
+            .get_proof_chain_to_current(&dst_section_key)
+        {
+            Ok(chain) => chain,
+            Err(_) => {
+                // error getting chain from key, so lets send the whole thing
+                self.section.chain().clone()
+            }
+        };
+
+        let members = if add_peer_info_to_update {
+            Some(self.section.members().clone())
+        } else {
+            None
+        };
+
+        Ok(SystemMsg::AntiEntropyUpdate {
+            section_auth,
+            section_signed,
+            proof_chain,
+            members,
+        })
+    }
+
     pub(crate) fn check_lagging(
         &self,
         peer: (XorName, SocketAddr),
