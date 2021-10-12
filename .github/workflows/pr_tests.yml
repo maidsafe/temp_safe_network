@@ -190,6 +190,16 @@ jobs:
       - name: Extra wait on CI for split organisation
         run: sleep 60
 
+      - name: Run network asserts one by one
+        shell: bash
+        # FIXME: windows has an issue w/ locking of log files
+        if: matrix.os != 'windows-latest'
+        # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
+        run: timeout 5m cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 && sleep 5
+        continue-on-error: true
+        env:
+          NETWORK_ASSERT_DELAY: 60
+      
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests...
         shell: bash
@@ -211,10 +221,12 @@ jobs:
         timeout-minutes: 15
         env:
             RUST_LOG: safe_network=trace,qp2p=trace
+
       - name: Run example app for Blob API against local network
         timeout-minutes: 5
         shell: bash
         run: cargo run --release  --features=always-joinable,test-utils --example client_blob
+
 
       - name: Kill the current network (not needed for next test)
         if: matrix.os != 'windows-latest'
