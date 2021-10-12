@@ -194,7 +194,8 @@ jobs:
         # FIXME: windows has an issue w/ locking of log files
         if: matrix.os != 'windows-latest'
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: timeout 5m cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 && sleep 5
+        timeout-minutes: 5
         continue-on-error: true
         env:
           NETWORK_ASSERT_DELAY: 80

@@ -30,7 +30,7 @@ use tokio::{
     sync::RwLock,
     task::JoinHandle,
 };
-use tracing::{debug, error, instrument::Instrumented, trace, warn, Instrument};
+use tracing::{debug, error, trace, warn, Instrument};
 use xor_name::XorName;
 
 // Number of Elders subset to send queries to
@@ -38,9 +38,6 @@ pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
 // Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
 pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
-
-// Number of seconds to wait between initial contact attempts with nodes
-pub(crate) const WAIT_FOR_CONTANT_SECS: u64 = 3;
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
@@ -51,6 +48,7 @@ impl Session {
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
         local_addr: SocketAddr,
+        standard_wait: Duration,
     ) -> Result<Session, Error> {
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
@@ -71,6 +69,7 @@ impl Session {
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
+            standard_wait,
         };
 
         Self::spawn_message_listener_thread(session.clone(), incoming_messages).await;
@@ -79,7 +78,7 @@ impl Session {
     }
 
     /// Send a `ServiceMsg` to the network without awaiting for a response.
-    #[instrument(skip_all, level = "debug")]
+    #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
     pub(crate) async fn send_cmd(
         &self,
         dst_address: XorName,
@@ -128,7 +127,15 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await
+        let res = send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await;
+
+        // lets wait for any potential AE response while we're here.
+        // TODO: be smart about this. Check AE Retry cache for related msg id eg, continue early if we've seen some.
+        // (cannot continue earlier if everything goes okay first time though, which is a shame)
+        tokio::time::sleep(self.standard_wait).await;
+
+        trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
+        res
     }
 
     #[instrument(skip_all, level = "debug")]
@@ -411,13 +418,16 @@ impl Session {
         let mut outgoing_msg_rounds = 1;
         let mut last_start_pos = 0;
 
+        // wait here to give a chance for AE responses to come in and be parsed
+        tokio::time::sleep(self.standard_wait).await;
+
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
             // wait until we have _some_ network knowledge
             while self.network.closest_or_opposite(&dst_address).is_none() {
-                tokio::time::sleep(Duration::from_secs(WAIT_FOR_CONTANT_SECS)).await;
+                let stats = self.network.known_sections_count();
+                debug!("Client still has not received any AE-Retry message... {:?}. Current sections known", stats);
 
-                debug!("Client still has not received any AE-Retry message...");
                 knowledge_checks += 1;
 
                 if knowledge_checks > 2 {
@@ -438,6 +448,8 @@ impl Session {
                     };
 
                     outgoing_msg_rounds += 1;
+
+                    trace!("Sending out another batch of initial contact msgs to new nodes");
                     send_message(
                         next_contacts,
                         wire_msg.clone(),
@@ -445,6 +457,8 @@ impl Session {
                         msg_id,
                     )
                     .await?;
+
+                    tokio::time::sleep(self.standard_wait).await;
                 }
             }
         }
@@ -481,22 +495,25 @@ pub(crate) async fn send_message(
         let successes_clone = successes.clone();
         let msg_bytes_clone = msg_bytes.clone();
         let endpoint = endpoint.clone();
-        let task_handle: Instrumented<JoinHandle<Result<(), Error>>> = tokio::spawn(async move {
-            trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
-            endpoint
-                .connect_to(&socket)
-                .err_into()
-                .and_then(|connection| async move {
-                    connection.send_with(msg_bytes_clone, priority, None).await
-                })
-                .await?;
+        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(
+            async move {
+                // trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
+                endpoint
+                    .connect_to(&socket)
+                    .err_into()
+                    .and_then(|connection| async move {
+                        connection.send_with(msg_bytes_clone, priority, None).await
+                    })
+                    .await?;
 
-            *successes_clone.write().await += 1;
+                *successes_clone.write().await += 1;
 
-            trace!("Sent msg with MsgId {:?} to {:?}", msg_id, &socket);
-            Ok(())
-        })
-        .instrument(tracing::trace_span!("sending message"));
+                trace!("Sent msg with MsgId {:?} to {:?}", msg_id, &socket);
+                Ok(())
+            }
+            .instrument(tracing::trace_span!("sending message"))
+            .in_current_span(),
+        );
         tasks.push(task_handle);
     }
 

@@ -40,6 +40,7 @@ impl Client {
 
     // Send a DataCmd to the network without awaiting for a response.
     // This function is a helper private to this module.
+    #[instrument(skip_all, level = "debug", name = "client-api send cmd")]
     pub(crate) async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name();
