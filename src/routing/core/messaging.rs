@@ -15,7 +15,7 @@ use crate::messaging::{
     DstLocation, WireMsg,
 };
 use crate::routing::{
-    dkg::{DkgSessionIdUtils, ProposalUtils, SigShare},
+    dkg::{DkgSessionIdUtils, ProposalUtils},
     error::Result,
     messages::WireMsgUtils,
     peer::PeerUtils,
@@ -134,17 +134,13 @@ impl Core {
     pub(crate) fn check_lagging(
         &self,
         peer: (XorName, SocketAddr),
-        sig_share: &SigShare,
+        public_key: &BlsPublicKey,
     ) -> Result<Option<Command>> {
-        let public_key = sig_share.public_key_set.public_key();
-
-        if self.section.chain().has_key(&public_key)
-            && public_key != *self.section.chain().last_key()
+        if self.section.chain().has_key(public_key) && public_key != self.section.chain().last_key()
         {
-            let dst_section_pk = sig_share.public_key_set.public_key();
-            let msg = self.generate_ae_update(dst_section_pk, true)?;
+            let msg = self.generate_ae_update(*public_key, true)?;
 
-            let cmd = self.send_direct_message(peer, msg, dst_section_pk)?;
+            let cmd = self.send_direct_message(peer, msg, *public_key)?;
             Ok(Some(cmd))
         } else {
             Ok(None)
