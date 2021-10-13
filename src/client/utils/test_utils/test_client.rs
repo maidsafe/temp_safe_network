@@ -13,6 +13,7 @@ use eyre::Result;
 use std::{sync::Once, time::Duration};
 use tempfile::tempdir;
 use tracing_core::{Event, Subscriber};
+use tracing_subscriber::fmt::time::{FormatTime, SystemTime};
 use tracing_subscriber::fmt::{fmt, FmtContext, FormatEvent, FormatFields, FormattedFields};
 use tracing_subscriber::{registry::LookupSpan, EnvFilter};
 
@@ -36,9 +37,11 @@ where
         let level = *event.metadata().level();
         let target = event.metadata().file().expect("will never be `None`");
         let span_separation_string = "\t ➤ ";
+        let time = SystemTime::default();
+        time.format_time(writer)?;
         writeln!(
             writer,
-            "{} [{}:L{}]:",
+            " {} [{}:L{}]:",
             level,
             target,
             event.metadata().line().expect("will never be `None`")
