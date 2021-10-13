@@ -1846,9 +1846,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.22.1"
+version = "0.22.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dc237722b53dbb2e80992848000559c37ff64a2dc760d716dabfbb43cac98e7"
+checksum = "4acdf3cc5e6b1ce36b973502f3c27547b256bcf09088e78c655c3bb7fedddbb0"
 dependencies = [
  "backoff",
  "bincode",
@@ -1860,6 +1860,7 @@ dependencies = [
  "rcgen",
  "rustls",
  "serde",
+ "stability",
  "thiserror",
  "tiny-keccak 2.0.2",
  "tokio",
@@ -2316,7 +2317,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe_network"
-version = "0.35.2"
+version = "0.35.3"
 dependencies = [
  "assert_matches",
  "async-recursion",
@@ -2648,6 +2649,16 @@ name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
+
+[[package]]
+name = "stability"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "838797127e39da39d216bc65b954eb857eae7e5b8b49e5e51acef0b4caa7332b"
+dependencies = [
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "strsim"
