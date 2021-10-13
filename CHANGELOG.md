@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.2](https://github.com/maidsafe/safe_network/compare/v0.35.1...v0.35.2) (2021-10-13)
+
+
+### Bug Fixes
+
+* move initial contact ae discard-retry to ae-retry only ([372d68e](https://github.com/maidsafe/safe_network/commit/372d68e9ad6c4f0bc98c8352fb36fd30f6332220))
+
 ### [0.35.1](https://github.com/maidsafe/safe_network/compare/v0.35.0...v0.35.1) (2021-10-13)
 
 ## [0.35.0](https://github.com/maidsafe/safe_network/compare/v0.34.1...v0.35.0) (2021-10-13)
