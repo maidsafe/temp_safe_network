@@ -285,7 +285,7 @@ impl Session {
                     debug!("Chunk QueryResponse received is: {:#?}", chunk);
 
                     if chunk_addr.name() == chunk.name() {
-                        trace!("Valid Chunk received for {}", msg_id);
+                        trace!("Valid Chunk received for {:?}", msg_id);
                         break Some(QueryResponse::GetChunk(Ok(chunk)));
                     } else {
                         // the Chunk content doesn't match its XorName,

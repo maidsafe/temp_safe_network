@@ -32,6 +32,7 @@ use crate::routing::{
     core::{join_network, ChunkStore, Comm, ConnectionEvent, Core, RegisterStorage},
     ed25519,
     error::{Error, Result},
+    log_markers::LogMarker,
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
@@ -235,13 +236,13 @@ impl Routing {
     /// Sets the JoinsAllowed flag.
     pub async fn set_joins_allowed(&self, joins_allowed: bool) -> Result<()> {
         let command = Command::SetJoinsAllowed(joins_allowed);
-        self.dispatcher.clone().handle_commands(command).await
+        self.dispatcher.clone().handle_commands(command, None).await
     }
 
     /// Signals the Elders of our section to test connectivity to a node.
     pub async fn start_connectivity_test(&self, name: XorName) -> Result<()> {
         let command = Command::StartConnectivityTest(name);
-        self.dispatcher.clone().handle_commands(command).await
+        self.dispatcher.clone().handle_commands(command, None).await
     }
 
     /// Returns the current age of this node.
@@ -421,9 +422,14 @@ impl Routing {
     /// Send a message.
     /// Messages sent here, either section to section or node to node.
     pub async fn send_message(&self, wire_msg: WireMsg) -> Result<()> {
+        trace!(
+            "{:?} {:?}",
+            LogMarker::DispatchSendMsgCmd,
+            wire_msg.msg_id()
+        );
         self.dispatcher
             .clone()
-            .handle_commands(Command::ParseAndSendWireMsg(wire_msg))
+            .handle_commands(Command::ParseAndSendWireMsg(wire_msg), None)
             .await
     }
 
@@ -451,7 +457,7 @@ async fn handle_connection_events(
                 trace!("Lost connection to {:?}", addr);
                 let _ = dispatcher
                     .clone()
-                    .handle_commands(Command::HandleConnectionLost(addr))
+                    .handle_commands(Command::HandleConnectionLost(addr), None)
                     .await;
             }
             ConnectionEvent::Received((sender, bytes)) => {
@@ -472,16 +478,23 @@ async fn handle_connection_events(
 
                 let span = {
                     let core = dispatcher.core.read().await;
-                    trace_span!("handle_message", name = %core.node().name(), %sender)
+                    trace_span!("handle_message", name = %core.node().name(), %sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
-
+                let len = bytes.len();
                 let command = Command::HandleMessage {
                     sender,
                     wire_msg,
                     original_bytes: Some(bytes),
                 };
-                let _ = task::spawn(dispatcher.clone().handle_commands(command));
+                trace!(
+                    "{:?} from {} length {}",
+                    LogMarker::DispatchHandleMsgCmd,
+                    sender,
+                    len,
+                );
+
+                let _ = dispatcher.clone().handle_commands(command, None).await;
             }
         }
     }

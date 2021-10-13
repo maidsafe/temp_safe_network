@@ -16,6 +16,7 @@ use crate::routing::{
     core::{ChunkStore, RegisterStorage},
     core::{Core, SendStatus},
     error::Result,
+    log_markers::LogMarker,
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
@@ -86,13 +87,36 @@ impl Dispatcher {
 
     /// Handles the given command and transitively any new commands that are produced during its
     /// handling.
-    pub(super) async fn handle_commands(self: Arc<Self>, command: Command) -> Result<()> {
-        let commands = self.handle_command(command).await?;
-        for command in commands {
-            self.clone().spawn_handle_commands(command)
-        }
+    pub(super) async fn handle_commands(
+        self: Arc<Self>,
+        command: Command,
+        cmd_id: Option<String>,
+    ) -> Result<()> {
+        let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
+        let cmd_id_clone = cmd_id.clone();
+        let command_display = command.to_string();
+        let _ = tokio::spawn(async move {
+            let commands = self.handle_command(command, cmd_id.clone()).await;
 
+            for (sub_cmd_count, command) in commands.into_iter().enumerate() {
+                let sub_cmd_id = format!("{}.{}", cmd_id, sub_cmd_count);
+                self.clone().spawn_handle_commands(command, sub_cmd_id);
+            }
+        });
+
+        trace!(
+            "{:?} {} cmd_id={}",
+            LogMarker::CommandHandleSpawned,
+            command_display,
+            cmd_id_clone
+        );
         Ok(())
+    }
+
+    // Note: this indirecton is needed. Trying to call `spawn(self.handle_commands(...))` directly
+    // inside `handle_commands` causes compile error about type check cycle.
+    fn spawn_handle_commands(self: Arc<Self>, command: Command, cmd_id: String) {
+        let _ = tokio::spawn(self.handle_commands(command, Some(cmd_id)));
     }
 
     pub(super) async fn start_network_probing(self: Arc<Self>) {
@@ -112,7 +136,8 @@ impl Dispatcher {
                         Ok(command) => {
                             drop(core);
                             info!("Sending ProbeMessage");
-                            if let Err(e) = dispatcher.handle_command(command).await {
+                            if let Err(e) = dispatcher.clone().handle_commands(command, None).await
+                            {
                                 error!("Error sending a Probe message to the network: {:?}", e);
                             }
                         }
@@ -123,14 +148,8 @@ impl Dispatcher {
         });
     }
 
-    // Note: this indirecton is needed. Trying to call `spawn(self.handle_commands(...))` directly
-    // inside `handle_commands` causes compile error about type check cycle.
-    pub(super) fn spawn_handle_commands(self: Arc<Self>, command: Command) {
-        let _ = tokio::spawn(self.handle_commands(command));
-    }
-
     /// Handles a single command.
-    pub(super) async fn handle_command(&self, command: Command) -> Result<Vec<Command>> {
+    pub(super) async fn handle_command(&self, command: Command, cmd_id: String) -> Vec<Command> {
         // Create a tracing span containing info about the current node. This is very useful when
         // analyzing logs produced by running multiple nodes within the same process, for example
         // from integration tests.
@@ -142,16 +161,31 @@ impl Dispatcher {
                 prefix = format_args!("({:b})", core.section().prefix()),
                 age = core.node().age(),
                 elder = core.is_elder(),
+                cmd_id = %cmd_id,
             )
         };
 
         async {
+            trace!("{:?} {}", LogMarker::CommandHandleStart, command);
             trace!(?command);
 
-            self.try_handle_command(command).await.map_err(|error| {
-                error!("Error encountered when handling command: {:?}", error);
-                error
-            })
+            let command_display = command.to_string();
+            match self.try_handle_command(command).await {
+                Ok(outcome) => {
+                    trace!("{:?} {}", LogMarker::CommandHandleEnd, command_display);
+                    outcome
+                }
+                Err(error) => {
+                    error!("Error encountered when handling command: {:?}", error);
+                    trace!(
+                        "{:?} {}: {:?}",
+                        LogMarker::CommandHandleError,
+                        command_display,
+                        error
+                    );
+                    vec![]
+                }
+            }
         }
         .instrument(span)
         .await
