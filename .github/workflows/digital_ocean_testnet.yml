@@ -3,24 +3,11 @@ name: Deploy testnet on Digital Ocean
 on: 
   workflow_dispatch:
     inputs:
-      start-network:
-        description: 'Run the start network script? (y/n)'
-        required: false
-        default: 'n'
       node-count:
         description: 'Number of nodes to be deployed'
         required: false
         default: 50
-      run-client-tests:
-        description: 'Run client tests? (y/n)'
-        required: false
-        default: 'n'
-      stop-network:
-        description: 'Kill network after client tests? (y/n)'
-        required: false
-        default: 'n'
-  pull_request_review:
-    types: [submitted, edited]
+  pull_request_target:
 
 env:
   CARGO_INCREMENTAL: '0'
@@ -29,9 +16,9 @@ env:
 
 jobs:
   launch-testnet:
+    environment: approved_action
     name: Launch Digital Ocean testnet
     runs-on: ubuntu-latest
-    if: github.event.inputs.start-network == 'y' || (github.event_name == 'pull_request_review' && github.event.review.body == 'launch-testnet')
     steps:
       - name: Launch testnet
         uses: maidsafe/sn_testnet_action@master
@@ -44,17 +31,19 @@ jobs:
           node-count: ${{ github.event.inputs.node-count || 50 }}
   
   run-client-tests:
+    environment: approved_action
     name: Run Client tests
     runs-on: ubuntu-latest
     needs: [launch-testnet]
-    if: always() && (github.event.inputs.run-client-tests == 'y' || (github.event_name == 'pull_request_review' && github.event.review.body == 'launch-testnet'))
+    if: always()
     steps:
       - uses: actions/checkout@v2
-
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set TESTNET_ID env
         shell: bash
-        run: echo "TESTNET_ID=gha-testnet-$(echo $GITHUB_SHA | cut -c 1-7)" >> $GITHUB_ENV
+        run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
 
       # Install Rust and required components
       - uses: actions-rs/toolchain@v1
@@ -101,10 +90,11 @@ jobs:
         run: cargo run --release  --features=always-joinable,test-utils --example client_blob
 
   kill-testnet:
+    environment: approved_action
     name: Destroy Digital Ocean testnet
     runs-on: ubuntu-latest
     needs: [launch-testnet, run-client-tests]
-    if: always() && (github.event.inputs.stop-network == 'y' || (github.event_name == 'pull_request_review' && github.event.review.body == 'launch-testnet'))
+    if: always()
     steps:
       - name: Kill testnet
         uses: maidsafe/sn_testnet_action@master
