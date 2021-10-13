@@ -58,7 +58,7 @@ use tokio::{
 use xor_name::{Prefix, XorName};
 
 static TEST_EVENT_CHANNEL_SIZE: usize = 20;
-
+/*
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let (section_auth, mut nodes, sk_set) = create_section_auth();
@@ -1076,9 +1076,9 @@ async fn get_internal_commands(
 async fn relocation_of_non_elder() -> Result<()> {
     relocation(RelocatedPeerRole::NonElder).await
 }
-
+*/
 const THRESHOLD: usize = supermajority(ELDER_SIZE) - 1;
-
+/*
 #[allow(dead_code)]
 enum RelocatedPeerRole {
     NonElder,
@@ -1492,7 +1492,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
     Ok(())
 }
-
+*/
 fn create_peer(age: u8) -> Peer {
     let name = ed25519::gen_name_with_age(age);
     let mut peer = Peer::new(name, gen_addr());

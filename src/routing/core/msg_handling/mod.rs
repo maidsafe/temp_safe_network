@@ -289,7 +289,7 @@ impl Core {
             },
             Err(Error::InvalidSignatureShare) => {
                 warn!(
-                    "Invalid signature on received system message, dropping the message: {}",
+                    "Invalid signature on received system message, dropping the message: {:?}",
                     msg_id
                 );
                 Ok(vec![])

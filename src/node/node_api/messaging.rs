@@ -75,7 +75,7 @@ pub(crate) async fn send_to_nodes(
 ) -> Result<()> {
     let our_prefix = network.our_prefix().await;
     trace!(
-        "{:?}, Sending msg ({}) to nodes: {:?}: {:?}",
+        "{:?}, Sending msg ({:?}) to nodes: {:?}: {:?}",
         our_prefix,
         msg_id,
         targets,
