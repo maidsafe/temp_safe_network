@@ -9,6 +9,7 @@ env:
 
 jobs:
   checks:
+    environment: test
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Rustfmt-Clippy
     runs-on: ubuntu-latest
@@ -43,6 +44,7 @@ jobs:
         run: cargo clippy --all-targets
 
   cargo-udeps:
+    environment: test
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unused dependency check
     runs-on: ubuntu-latest
@@ -62,6 +64,7 @@ jobs:
           args: '--all-targets --features test-utils'
 
   cargo-deny:
+    environment: test
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     runs-on: ubuntu-latest
     steps:
@@ -74,6 +77,7 @@ jobs:
     - uses: EmbarkStudios/cargo-deny-action@v1
 
   check_pr_size:
+      environment: test
       if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
       name: Check PR size doesn't break set limit
       runs-on: ubuntu-latest
@@ -87,6 +91,7 @@ jobs:
 
   # Test publish using --dry-run.
   test-publish:
+    environment: test
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Test Publish
     runs-on: ubuntu-latest
