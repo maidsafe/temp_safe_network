@@ -310,6 +310,16 @@ impl Session {
         if let Some((msg_id, session, elders, service_msg, dst_location, auth)) =
             Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), None).await?
         {
+            if let Some(id) = *session.clone().initial_connection_check_msg_id.read().await {
+                if id == msg_id {
+                    trace!(
+                        "Retry message recevied from intial client contact probe ({:?}). No need to retry this",
+                        msg_id
+                    );
+                    return Ok(session);
+                }
+            }
+
             debug!("Received AE-Retry with new SAP: {:?}", section_auth);
 
             if elders.is_empty() {
@@ -369,19 +379,10 @@ impl Session {
                 }
             };
 
-        if let Some(id) = *session.initial_connection_check_msg_id.read().await {
-            if id == msg_id {
-                trace!(
-                    "Retry message from original contact probe ({:?}). No need to retry this",
-                    msg_id
-                );
-                return Ok(None);
-            }
-        }
-
-        debug!(
+        trace!(
             "Bounced message ({:?}) received in an AE response: {:?}",
-            msg_id, service_msg
+            msg_id,
+            service_msg
         );
 
         let (mut target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
@@ -394,7 +395,8 @@ impl Session {
             ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),
             _ => {
                 warn!(
-                    "Invalid bounced message received in AE response: {:?}. Message is of invalid type",
+                    "Invalid bounced message {:?} received in AE response: {:?}. Message is of invalid type",
+                    msg_id,
                     service_msg
                 );
                 // Early return with random name as we will discard the message at the caller func
@@ -438,7 +440,7 @@ impl Session {
                     .take(target_count)
                     .collect::<Vec<SocketAddr>>()
             } else {
-                error!("Cannot resend, no 'received auth' provided, and nothing relevant in session network prefixmap");
+                error!("Cannot resend {:?}, no 'received auth' provided, and nothing relevant in session network prefixmap", msg_id);
                 return Ok(None);
             }
         };
@@ -459,7 +461,7 @@ impl Session {
 
         if cache_entry.is_some() {
             // an elder group corresponds to a PK, so as we've sent to this PK, we've sent to these elders...
-            debug!("Cache hit! We have sent this message before, removing target elders");
+            debug!("Cache hit! we've sent {:?} before", msg_id);
 
             target_elders = vec![];
         } else {
@@ -473,10 +475,12 @@ impl Session {
         // Let's rebuild the message with the updated destination details
         dst_location.set_section_pk(target_public_key);
 
-        debug!(
-            "Final target elders for resending {:?} message are {:?}",
-            service_msg, target_elders
-        );
+        if !target_elders.is_empty() {
+            debug!(
+                "Final target elders for resending {:?} : {:?} message are {:?}",
+                msg_id, service_msg, target_elders
+            );
+        }
 
         drop(the_cache_guard);
 
