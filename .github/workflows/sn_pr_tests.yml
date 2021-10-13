@@ -1,4 +1,4 @@
-name: Run All Tests
+name: 'sn: PR Tests'
 
 on: pull_request
 
@@ -26,64 +26,64 @@ jobs:
         with:
           filters: |
             src:
-              - 'src/messaging/**'
-              - 'src/types/**'
+              - 'sn/src/messaging/**'
+              - 'sn/src/types/**'
       - uses: dorny/paths-filter@v2
         id: node_changes
         with:
           filters: |
             src:
-              - 'src/node/**'
-              - 'src/routing/**'
-              - 'src/messaging/**'
-              - 'src/types/**'
-              - 'src/dbs/**'
-              - 'src/prefix_map/**'
-              - 'src/url/**'
+              - 'sn/src/node/**'
+              - 'sn/src/routing/**'
+              - 'sn/src/messaging/**'
+              - 'sn/src/types/**'
+              - 'sn/src/dbs/**'
+              - 'sn/src/prefix_map/**'
+              - 'sn/src/url/**'
       - uses: dorny/paths-filter@v2
         id: client_changes
         with:
           filters: |
             src:
-              - 'src/client/**'
-              - 'src/messaging/**'
-              - 'src/types/**'
-              - 'src/dbs/**'
-              - 'src/prefix_map/**'
-              - 'src/url/**'
+              - 'sn/src/client/**'
+              - 'sn/src/messaging/**'
+              - 'sn/src/types/**'
+              - 'sn/src/dbs/**'
+              - 'sn/src/prefix_map/**'
+              - 'sn/src/url/**'
       - uses: dorny/paths-filter@v2
         id: routing_changes
         with:
           filters: |
             src:
-              - 'src/routing/**'
-              - 'src/messaging/**'
-              - 'src/types/**'
-              - 'src/prefix_map/**'
+              - 'sn/src/routing/**'
+              - 'sn/src/messaging/**'
+              - 'sn/src/types/**'
+              - 'sn/src/prefix_map/**'
       - uses: dorny/paths-filter@v2
         id: url_changes
         with:
           filters: |
             src:
-              - 'src/url/**'
+              - 'sn/src/url/**'
       - uses: dorny/paths-filter@v2
         id: data_types_changes
         with:
           filters: |
             src:
-              - 'src/types/**'
+              - 'sn/src/types/**'
       - uses: dorny/paths-filter@v2
         id: dbs_changes
         with:
           filters: |
             src:
-              - 'src/dbs/**'
+              - 'sn/src/dbs/**'
       - uses: dorny/paths-filter@v2
         id: prefix_map_changes
         with:
           filters: |
             src:
-              - 'src/prefix_map/**'
+              - 'sn/src/prefix_map/**'
 
       - name: Mac install ripgrep
         if: matrix.os == 'macos-latest'
