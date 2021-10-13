@@ -126,7 +126,7 @@ pub enum SystemMsg {
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
         /// The content of the proposal
-        content: Proposal,
+        proposal: Proposal,
         // TODO: try to remove this in favor of the msg header MsgKind sig share we already have
         /// BLS signature share
         sig_share: SigShare,

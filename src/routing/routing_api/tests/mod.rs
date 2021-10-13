@@ -364,7 +364,7 @@ async fn aggregate_proposals() -> Result<()> {
                 section_pk,
             },
             SystemMsg::Propose {
-                content: proposal.clone(),
+                proposal: proposal.clone(),
                 sig_share,
             },
             section_auth.section_key(),
@@ -400,7 +400,7 @@ async fn aggregate_proposals() -> Result<()> {
             section_pk,
         },
         SystemMsg::Propose {
-            content: proposal.clone(),
+            proposal: proposal.clone(),
             sig_share,
         },
         section_auth.section_key(),

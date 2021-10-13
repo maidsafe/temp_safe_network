@@ -155,24 +155,6 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::SectionAuthMsg(section_signed) => {
-                let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!(
-                        "Node message payload (section signed) as Msgpack: {}",
-                        err
-                    ))
-                })?;
-
-                Ok(MessageType::System {
-                    msg_id: self.header.msg_envelope.msg_id,
-                    msg_authority: NodeMsgAuthority::Section(AuthorityProof::verify(
-                        section_signed,
-                        &self.payload,
-                    )?),
-                    dst_location: self.header.msg_envelope.dst_location,
-                    msg,
-                })
-            }
         }
     }
 
@@ -217,7 +199,6 @@ impl WireMsg {
         match &self.header.msg_envelope.msg_kind {
             MsgKind::NodeAuthMsg(node_signed) => Some(node_signed.section_pk),
             MsgKind::NodeBlsShareAuthMsg(bls_share_signed) => Some(bls_share_signed.section_pk),
-            MsgKind::SectionAuthMsg(section_signed) => Some(section_signed.sig.public_key),
             _ => None,
         }
     }

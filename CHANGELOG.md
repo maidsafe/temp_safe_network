@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.2](https://github.com/maidsafe/safe_network/compare/v0.35.1...v0.35.2) (2021-10-13)
+
+
+### Bug Fixes
+
+* move initial contact ae discard-retry to ae-retry only ([372d68e](https://github.com/maidsafe/safe_network/commit/372d68e9ad6c4f0bc98c8352fb36fd30f6332220))
+
+### [0.35.1](https://github.com/maidsafe/safe_network/compare/v0.35.0...v0.35.1) (2021-10-13)
+
+## [0.35.0](https://github.com/maidsafe/safe_network/compare/v0.34.1...v0.35.0) (2021-10-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messaging:** SystemMsg::Propose::content was renamed to SystemMsg::Propose::proposal.
+* **messaging:** change in messaging protocol.
+
+* **messaging:** removing unused MsgKind::SectionAuthMsg ([c295b3c](https://github.com/maidsafe/safe_network/commit/c295b3c14318823e37f129f81d082275104e101f))
+* **messaging:** rename field in SysmteMsg::Propose msg type ([f01af8b](https://github.com/maidsafe/safe_network/commit/f01af8bf27656c6ea201bd5230b561abc6177e33))
+
+### [0.34.1](https://github.com/maidsafe/safe_network/compare/v0.34.0...v0.34.1) (2021-10-12)
+
+
+### Bug Fixes
+
+* add error message type for ChunkNotFound ([13c9630](https://github.com/maidsafe/safe_network/commit/13c96309cd0fd3b09daedfde0a160f31b9b483e3))
+
 ## [0.34.0](https://github.com/maidsafe/safe_network/compare/v0.33.18...v0.34.0) (2021-10-12)
 
 

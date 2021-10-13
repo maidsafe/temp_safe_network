@@ -322,7 +322,7 @@ impl<'a> Join<'a> {
                 ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) => continue,
-                        MsgKind::NodeBlsShareAuthMsg(_) | MsgKind::SectionAuthMsg(_) => {
+                        MsgKind::NodeBlsShareAuthMsg(_) => {
                             trace!(
                                 "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
                                 sender,

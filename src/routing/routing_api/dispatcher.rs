@@ -368,9 +368,7 @@ impl Dispatcher {
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
         let cmds = match wire_msg.msg_kind() {
-            MsgKind::NodeAuthMsg(_)
-            | MsgKind::NodeBlsShareAuthMsg(_)
-            | MsgKind::SectionAuthMsg(_) => {
+            MsgKind::NodeAuthMsg(_) | MsgKind::NodeBlsShareAuthMsg(_) => {
                 self.deliver_messages(recipients, delivery_group_size, wire_msg)
                     .await?
             }

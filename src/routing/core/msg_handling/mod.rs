@@ -20,7 +20,7 @@ use super::Core;
 use crate::messaging::{
     data::{ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
-    system::{NodeCmd, NodeQuery, Proposal, SystemMsg},
+    system::{NodeCmd, NodeQuery, SystemMsg},
     DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
     ServiceAuth, SrcLocation, WireMsg,
 };
@@ -86,9 +86,11 @@ impl Core {
                 known_keys.extend(self.network.section_keys());
                 known_keys.push(*self.section.genesis_key());
 
-                // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
-                    warn!("Untrusted message dropped from {:?}: {:?} ", sender, msg);
+                    warn!(
+                        "Untrusted message ({:?}) dropped from {:?}: {:?} ",
+                        msg_id, sender, msg
+                    );
                     return Ok(cmds);
                 }
 
@@ -481,8 +483,8 @@ impl Core {
                 .await
             }
             SystemMsg::Propose {
-                ref content,
-                ref sig_share,
+                proposal,
+                sig_share,
             } => {
                 if self.is_not_elder() {
                     trace!("Dropping Propose msg from {}: {:?}", sender, msg_id);
@@ -490,60 +492,8 @@ impl Core {
                 }
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
-                // Any other proposal than SectionInfo needs to be signed by a known key.
-                if let Proposal::SectionInfo(ref section_auth) = content {
-                    if section_auth.prefix == *self.section.prefix()
-                        || section_auth.prefix.is_extension_of(self.section.prefix())
-                    {
-                        // This `SectionInfo` is proposed by the DKG participants and
-                        // it's signed by the new key created by the DKG so we don't
-                        // know it yet. We only require the src_name of the
-                        // proposal to be one of the DKG participants.
-                        if !section_auth.contains_elder(&src_name) {
-                            trace!(
-                                "Ignoring proposal from src not being a DKG participant: {:?}",
-                                content
-                            );
-                            return Ok(vec![]);
-                        }
-                    }
-                } else {
-                    // Proposal from other section shall be ignored.
-                    if !self.section.prefix().matches(&src_name) {
-                        trace!(
-                            "Ignore proposal from other section, src_name {:?}: {:?}",
-                            src_name,
-                            msg_id
-                        );
-                        return Ok(vec![]);
-                    }
-
-                    // TODO: should be able to remove the sig_share from the Propose msg
-                    // therefore we won't need to do this check as the sig_share can
-                    // be carried within the msg_kind header.
-                    if !self
-                        .section
-                        .chain()
-                        .has_key(&sig_share.public_key_set.public_key())
-                    {
-                        warn!(
-                            "Dropped Propose msg with untrusted sig share from {:?}: {:?}",
-                            sender, msg_id
-                        );
-                        return Ok(vec![]);
-                    }
-                }
-
-                let mut commands = vec![];
-
-                commands.extend(self.check_lagging((src_name, sender), sig_share)?);
-
-                commands.extend(
-                    self.handle_proposal(content.clone(), sig_share.clone())
-                        .await?,
-                );
-
-                Ok(commands)
+                self.handle_proposal(msg_id, proposal, sig_share, src_name, sender)
+                    .await
             }
             SystemMsg::DkgStart {
                 session_id,

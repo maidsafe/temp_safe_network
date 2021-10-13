@@ -97,6 +97,7 @@ pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
         Error::NotEnoughSpace => ErrorMessage::FailedToWriteFile,
         Error::DataIdNotFound(address) => ErrorMessage::DataNotFound(address),
         Error::NoSuchData(address) => ErrorMessage::DataNotFound(address),
+        Error::ChunkNotFound(xorname) => ErrorMessage::ChunkNotFound(xorname),
         Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
         Error::DataExists => ErrorMessage::DataExists,
         Error::NetworkData(error) => convert_dt_error_to_error_message(error),
