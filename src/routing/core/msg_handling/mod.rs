@@ -40,6 +40,7 @@ use xor_name::XorName;
 
 // Message handling
 impl Core {
+    #[instrument(skip(self, original_bytes))]
     pub(crate) async fn handle_message(
         &self,
         sender: SocketAddr,
@@ -47,7 +48,7 @@ impl Core {
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
         let mut cmds = vec![];
-
+        trace!("handling msg");
         // Apply backpressure if needed.
         if let Some(load_report) = self.comm.check_strain(sender).await {
             let msg_src = wire_msg.msg_kind().src();

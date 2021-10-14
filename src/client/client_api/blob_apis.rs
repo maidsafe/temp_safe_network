@@ -432,8 +432,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
-    async fn network_assert_expected_count_service_msgs_handled_for_put_and_read() -> Result<()> {
-        let _outer_span = tracing::info_span!("blob_network_assertions").entered();
+    async fn blob_network_assert_expected_log_counts() -> Result<()> {
+        init_test_logger();
+
+        let _outer_span = tracing::info_span!("blob_network_assert").entered();
 
         let mut the_logs = crate::testnet_assert::NetworkLogState::new()?;
 
@@ -443,6 +445,8 @@ mod tests {
 
         let bytes = random_bytes(MIN_BLOB_SIZE / 3);
         let client = create_test_client().await?;
+
+        // TODO: Await for all things to have happened here!!!!!
         let address = client.upload(bytes.clone(), Scope::Public).await?;
 
         let delay = tokio::time::Duration::from_secs(network_assert_delay);

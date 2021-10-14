@@ -21,6 +21,7 @@ use itertools::Itertools;
 use qp2p::IncomingMessages;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
+use tracing::Instrument;
 use xor_name::XorName;
 
 impl Session {
@@ -52,7 +53,7 @@ impl Session {
                     }
                 }
             }
-        });
+        }.instrument(info_span!("Listening for incoming msgs"))).in_current_span();
     }
 
     #[instrument(skip_all, level = "debug")]
@@ -62,7 +63,6 @@ impl Session {
         if let Some((connection, message)) = incoming_messages.next().await {
             trace!("Incoming message from {:?}", connection.remote_address());
             let msg_type = WireMsg::deserialize(message)?;
-            trace!("Incoming message deserialized fine");
 
             Ok((connection.remote_address(), msg_type))
         } else {
@@ -157,7 +157,7 @@ impl Session {
                             trace!("Sending response for query w/{} via channel.", op_id);
                             let result = sender.send(response).await;
                             if result.is_err() {
-                                warn!("Error sending query response on a channel for {:?} op_id {:?}: {:?}", msg_id, op_id, result)
+                                trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
                             }
                         } else {
                             // TODO: The trace is only needed when we have an identified case of not finding a channel, but expecting one.

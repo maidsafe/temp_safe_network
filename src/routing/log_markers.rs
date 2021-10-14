@@ -26,4 +26,6 @@ pub(crate) enum LogMarker {
     ChunkQueryResponseReceviedFromAdult,
     ChunkQueryReceviedAtElder,
     ChunkQueryReceviedAtAdult,
+    RegisterWrite,
+    RegisterQueryReceived,
 }
