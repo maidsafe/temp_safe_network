@@ -22,7 +22,6 @@ use crate::routing::{
     peer::PeerUtils,
     SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
-use crate::types::PublicKey;
 
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
@@ -66,6 +65,7 @@ struct Join<'a> {
     // Receiver for incoming messages.
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
+    prefix: Prefix,
 }
 
 impl<'a> Join<'a> {
@@ -78,6 +78,7 @@ impl<'a> Join<'a> {
             send_tx,
             recv_rx,
             node,
+            prefix: Prefix::default(),
         }
     }
 
@@ -171,7 +172,19 @@ impl<'a> Join<'a> {
 
                     // For the first section, using age random among 6 to 100 to avoid
                     // relocating too many nodes at the same time.
-                    if prefix.is_empty() && self.node.age() < FIRST_SECTION_MIN_AGE {
+                    // To avoid recursive due to received outdated SAP, self prefix shall be default
+                    // as well when re-generate for a new age.
+                    trace!(
+                        "Joining node {:?} - {:?}/{:?} received a Retry with SAP {:?}",
+                        self.prefix,
+                        self.node.name(),
+                        self.node.age(),
+                        section_auth
+                    );
+                    if prefix.is_empty()
+                        && self.prefix.is_empty()
+                        && self.node.age() < FIRST_SECTION_MIN_AGE
+                    {
                         let age: u8 = (FIRST_SECTION_MIN_AGE..FIRST_SECTION_MAX_AGE)
                             .choose(&mut rand::thread_rng())
                             .unwrap_or(FIRST_SECTION_MAX_AGE);
@@ -185,6 +198,7 @@ impl<'a> Join<'a> {
                     }
 
                     if prefix.matches(&self.node.name()) {
+                        self.prefix = prefix;
                         // After section split, new node must join with the age of MIN_ADULT_AGE.
                         if !prefix.is_empty() && self.node.age() != MIN_ADULT_AGE {
                             let new_keypair =
@@ -240,6 +254,7 @@ impl<'a> Join<'a> {
                     }
 
                     if section_auth.prefix.matches(&self.node.name()) {
+                        self.prefix = section_auth.prefix;
                         info!(
                             "Newer Join response for our prefix {:?} from {:?}",
                             section_auth, sender
@@ -301,7 +316,7 @@ impl<'a> Join<'a> {
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
-                name: XorName::from(PublicKey::Bls(section_key)),
+                name: self.node.name(),
                 section_pk: section_key,
             },
             node_msg,
