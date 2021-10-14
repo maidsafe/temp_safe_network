@@ -85,8 +85,10 @@ impl Dispatcher {
         self.core.read().await.retain_members_only(members).await
     }
 
-    /// Handles the given command and transitively any new commands that are produced during its
-    /// handling.
+    /// Handles the given command and transitively any new commands that are
+    /// produced during its handling. Trace logs will include the provided command id,
+    /// and any sub-commands produced will have it as a common root cmd id.
+    /// If a command id string is not provided a random one will be generated.
     pub(super) async fn handle_commands(
         self: Arc<Self>,
         command: Command,
@@ -96,11 +98,11 @@ impl Dispatcher {
         let cmd_id_clone = cmd_id.clone();
         let command_display = command.to_string();
         let _ = tokio::spawn(async move {
-            let commands = self.handle_command(command, cmd_id.clone()).await;
-
-            for (sub_cmd_count, command) in commands.into_iter().enumerate() {
-                let sub_cmd_id = format!("{}.{}", cmd_id, sub_cmd_count);
-                self.clone().spawn_handle_commands(command, sub_cmd_id);
+            if let Ok(commands) = self.handle_command(command, &cmd_id).await {
+                for (sub_cmd_count, command) in commands.into_iter().enumerate() {
+                    let sub_cmd_id = format!("{}.{}", cmd_id, sub_cmd_count);
+                    self.clone().spawn_handle_commands(command, sub_cmd_id);
+                }
             }
         });
 
@@ -149,7 +151,11 @@ impl Dispatcher {
     }
 
     /// Handles a single command.
-    pub(super) async fn handle_command(&self, command: Command, cmd_id: String) -> Vec<Command> {
+    pub(super) async fn handle_command(
+        &self,
+        command: Command,
+        cmd_id: &str,
+    ) -> Result<Vec<Command>> {
         // Create a tracing span containing info about the current node. This is very useful when
         // analyzing logs produced by running multiple nodes within the same process, for example
         // from integration tests.
@@ -173,7 +179,7 @@ impl Dispatcher {
             match self.try_handle_command(command).await {
                 Ok(outcome) => {
                     trace!("{:?} {}", LogMarker::CommandHandleEnd, command_display);
-                    outcome
+                    Ok(outcome)
                 }
                 Err(error) => {
                     error!("Error encountered when handling command: {:?}", error);
@@ -183,7 +189,7 @@ impl Dispatcher {
                         command_display,
                         error
                     );
-                    vec![]
+                    Err(error)
                 }
             }
         }
