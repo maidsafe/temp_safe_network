@@ -76,7 +76,7 @@ pub(crate) struct Core {
     dkg_voter: DkgVoter,
     relocate_state: Option<RelocateState>,
     pub(super) event_tx: mpsc::Sender<Event>,
-    joins_allowed: bool,
+    joins_allowed: Arc<RwLock<bool>>,
     resource_proof: ResourceProof,
     used_space: UsedSpace,
     pub(super) register_storage: RegisterStorage,
@@ -122,7 +122,7 @@ impl Core {
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
             event_tx,
-            joins_allowed: true,
+            joins_allowed: Arc::new(RwLock::new(true)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage,
             chunk_storage,
@@ -201,7 +201,7 @@ impl Core {
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
                     commands.extend(
-                        self.propose(Proposal::JoinsAllowed(self.joins_allowed))
+                        self.propose(Proposal::JoinsAllowed(*self.joins_allowed.read().await))
                             .await?,
                     );
                 }
