@@ -44,7 +44,7 @@ impl Comm {
         // the incoming messages from other nodes.
         // This also returns the a channel where we can listen for
         // disconnection events.
-        let (endpoint, _incoming_connections, incoming_messages, disconnections, _) =
+        let (endpoint, _incoming_connections, incoming_messages, _) =
             Endpoint::new(local_addr, Default::default(), config).await?;
 
         let msg_count = MsgCount::new();
@@ -53,11 +53,6 @@ impl Comm {
             incoming_messages,
             event_tx.clone(),
             msg_count.clone(),
-        ));
-
-        let _ = task::spawn(handle_disconnection_events(
-            disconnections,
-            event_tx.clone(),
         ));
 
         let back_pressure = BackPressure::new();
@@ -77,7 +72,7 @@ impl Comm {
     ) -> Result<(Self, SocketAddr)> {
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
-        let (endpoint, _, incoming_messages, disconnections, bootstrap_peer) =
+        let (endpoint, _, incoming_messages, bootstrap_peer) =
             Endpoint::new(local_addr, bootstrap_nodes, config).await?;
         let bootstrap_peer = bootstrap_peer.ok_or(Error::BootstrapFailed)?;
 
@@ -87,11 +82,6 @@ impl Comm {
             incoming_messages,
             event_tx.clone(),
             msg_count.clone(),
-        ));
-
-        let _ = task::spawn(handle_disconnection_events(
-            disconnections,
-            event_tx.clone(),
         ));
 
         Ok((
@@ -173,7 +163,7 @@ impl Comm {
             ..Default::default()
         };
 
-        let (connectivity_endpoint, _, _) =
+        let (connectivity_endpoint, _) =
             Endpoint::<XorName>::new_client((self.endpoint.local_addr().ip(), 0), qp2p_config)?;
 
         let result = connectivity_endpoint
@@ -340,18 +330,6 @@ impl Comm {
 #[derive(Debug)]
 pub(crate) enum ConnectionEvent {
     Received((SocketAddr, Bytes)),
-    Disconnected(SocketAddr),
-}
-
-async fn handle_disconnection_events(
-    mut disconnections: qp2p::DisconnectionEvents,
-    event_tx: mpsc::Sender<ConnectionEvent>,
-) {
-    while let Some(peer_addr) = disconnections.next().await {
-        let _ = event_tx
-            .send(ConnectionEvent::Disconnected(peer_addr))
-            .await;
-    }
 }
 
 async fn handle_incoming_messages(
@@ -555,7 +533,7 @@ mod tests {
         let (tx, _rx) = mpsc::channel(1);
         let send_comm = Comm::new(local_addr(), Config::default(), tx).await?;
 
-        let (recv_endpoint, _, mut incoming_msgs, _, _) =
+        let (recv_endpoint, _, mut incoming_msgs, _) =
             Endpoint::<XorName>::new(local_addr(), &[], Config::default()).await?;
         let recv_addr = recv_endpoint.public_addr();
         let name = XorName::random();
@@ -605,7 +583,6 @@ mod tests {
 
         let (tx, _rx) = mpsc::channel(1);
         let comm1 = Comm::new(local_addr(), Config::default(), tx).await?;
-        let addr1 = comm1.our_connection_info();
 
         // Send a message to establish the connection
         let _ = comm1
@@ -616,10 +593,7 @@ mod tests {
         // Drop `comm1` to cause connection lost.
         drop(comm1);
 
-        assert_matches!(
-            time::timeout(TIMEOUT, rx0.recv()).await?,
-            Some(ConnectionEvent::Disconnected(addr)) => assert_eq!(addr, addr1)
-        );
+        assert_matches!(time::timeout(TIMEOUT, rx0.recv()).await, Err(_));
 
         Ok(())
     }
@@ -657,7 +631,7 @@ mod tests {
 
     impl Peer {
         async fn new() -> Result<Self> {
-            let (endpoint, _, mut incoming_messages, _, _) =
+            let (endpoint, _, mut incoming_messages, _) =
                 Endpoint::<XorName>::new(local_addr(), &[], Config::default()).await?;
             let addr = endpoint.public_addr();
 

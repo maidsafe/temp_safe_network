@@ -381,7 +381,6 @@ impl<'a> Join<'a> {
                         continue;
                     }
                 },
-                ConnectionEvent::Disconnected(_) => continue,
             };
 
             match join_response {

@@ -56,7 +56,7 @@ impl Session {
         );
         debug!("QP2p config: {:?}", qp2p_config);
 
-        let (endpoint, incoming_messages, _) = Endpoint::new_client(local_addr, qp2p_config)?;
+        let (endpoint, incoming_messages) = Endpoint::new_client(local_addr, qp2p_config)?;
 
         let session = Session {
             client_pk,
