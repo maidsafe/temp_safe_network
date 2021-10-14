@@ -46,7 +46,7 @@ pub(crate) async fn join_network(
 ) -> Result<(Node, Section)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
-    let span = trace_span!("bootstrap", name = %node.name());
+    let span = trace_span!("bootstrap");
 
     let state = Join::new(node, send_tx, incoming_conns);
 
@@ -210,8 +210,10 @@ impl<'a> Join<'a> {
                         }
 
                         info!(
-                            "Newer Join response for our prefix {:?} from {:?}",
-                            section_auth, sender
+                            "Newer Join response for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender
                         );
                         section_key = section_auth.section_key();
                         let join_request = JoinRequest {
@@ -224,8 +226,10 @@ impl<'a> Join<'a> {
                             .await?;
                     } else {
                         warn!(
-                            "Newer Join response not for our prefix {:?} from {:?}",
-                            section_auth, sender,
+                            "Newer Join response not for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender,
                         );
                     }
                 }
@@ -256,8 +260,10 @@ impl<'a> Join<'a> {
                     if section_auth.prefix.matches(&self.node.name()) {
                         self.prefix = section_auth.prefix;
                         info!(
-                            "Newer Join response for our prefix {:?} from {:?}",
-                            section_auth, sender
+                            "Newer Join response for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender
                         );
                         section_key = section_auth.section_key();
                         let join_request = JoinRequest {
@@ -271,8 +277,10 @@ impl<'a> Join<'a> {
                             .await?;
                     } else {
                         warn!(
-                            "Newer Join response not for our prefix {:?} from {:?}",
-                            section_auth, sender,
+                            "Newer Join response not for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender,
                         );
                     }
                 }

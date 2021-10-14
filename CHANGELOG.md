@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.7](https://github.com/maidsafe/safe_network/compare/v0.35.6...v0.35.7) (2021-10-14)
+
+
+### Bug Fixes
+
+* remove trace_span name field during bootstrap due to outdate ([4dee3d5](https://github.com/maidsafe/safe_network/commit/4dee3d52c2edf96246d5b474540b5e2e969ba49a))
+
 ### [0.35.6](https://github.com/maidsafe/safe_network/compare/v0.35.5...v0.35.6) (2021-10-14)
 
 
