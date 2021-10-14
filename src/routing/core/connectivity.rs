@@ -9,10 +9,7 @@
 use super::Core;
 use crate::messaging::system::Proposal;
 use crate::routing::{
-    error::Result,
-    peer::PeerUtils,
-    routing_api::command::Command,
-    section::{NodeStateUtils, SectionPeersUtils},
+    error::Result, peer::PeerUtils, routing_api::command::Command, section::NodeStateUtils,
     SectionAuthorityProviderUtils,
 };
 use std::{collections::BTreeSet, iter, net::SocketAddr};

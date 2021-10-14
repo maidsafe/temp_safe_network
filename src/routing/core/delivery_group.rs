@@ -14,7 +14,6 @@ use crate::messaging::{
 use crate::routing::{
     error::{Error, Result},
     peer::PeerUtils,
-    section::SectionPeersUtils,
     supermajority, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use itertools::Itertools;

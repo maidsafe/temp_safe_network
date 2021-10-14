@@ -19,7 +19,6 @@ use crate::routing::{
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
-    section::SectionPeersUtils,
     Error, Prefix, XorName,
 };
 use crate::types::PublicKey;
