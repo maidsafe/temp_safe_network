@@ -20,62 +20,14 @@ use std::{
 };
 use xor_name::{Prefix, XorName};
 
-/// Container for storing information about members of our section.
-pub(crate) trait SectionPeersUtils {
+impl SectionPeers {
     /// Returns an iterator over all current (joined) and past (left) members.
-    fn all(&self) -> Box<dyn Iterator<Item = &NodeState> + '_>;
-
-    /// Returns an iterator over the members that have state == `Joined`.
-    fn joined(&self) -> Box<dyn Iterator<Item = &NodeState> + '_>;
-
-    /// Returns joined nodes from our section with age greater than `MIN_AGE`
-    fn mature(&self) -> Box<dyn Iterator<Item = &Peer> + '_>;
-
-    /// Get info for the member with the given name.
-    fn get(&self, name: &XorName) -> Option<&NodeState>;
-
-    /// Get section_signed info for the member with the given name.
-    fn get_section_signed(&self, name: &XorName) -> Option<&SectionAuth<NodeState>>;
-
-    /// Returns the candidates for elders out of all the nodes in this section.
-    fn elder_candidates(
-        &self,
-        elder_size: usize,
-        current_elders: &SectionAuthorityProvider,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> Vec<Peer>;
-
-    /// Returns the candidates for elders out of all nodes matching the prefix.
-    fn elder_candidates_matching_prefix(
-        &self,
-        prefix: &Prefix,
-        elder_size: usize,
-        current_elders: &SectionAuthorityProvider,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> Vec<Peer>;
-
-    /// Returns whether the given peer is a joined member of our section.
-    fn is_joined(&self, name: &XorName) -> bool;
-
-    /// Returns whether the given peer is already relocated to our section.
-    fn is_relocated(&self, name: &XorName) -> bool;
-
-    /// Update a member of our section.
-    /// Returns whether anything actually changed.
-    fn update(&mut self, new_info: SectionAuth<NodeState>) -> bool;
-
-    /// Remove all members whose name does not match `prefix`.
-    fn prune_not_matching(&mut self, prefix: &Prefix);
-}
-
-impl SectionPeersUtils for SectionPeers {
-    /// Returns an iterator over all current (joined) and past (left) members.
-    fn all(&self) -> Box<dyn Iterator<Item = &NodeState> + '_> {
+    pub(crate) fn all(&self) -> Box<dyn Iterator<Item = &NodeState> + '_> {
         Box::new(self.members.values().map(|info| &info.value))
     }
 
     /// Returns an iterator over the members that have state == `Joined`.
-    fn joined(&self) -> Box<dyn Iterator<Item = &NodeState> + '_> {
+    pub(crate) fn joined(&self) -> Box<dyn Iterator<Item = &NodeState> + '_> {
         Box::new(
             self.members
                 .values()
@@ -85,7 +37,7 @@ impl SectionPeersUtils for SectionPeers {
     }
 
     /// Returns joined nodes from our section with age greater than `MIN_AGE`
-    fn mature(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
+    pub(crate) fn mature(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
         Box::new(
             self.joined()
                 .filter(|info| info.is_mature())
@@ -94,17 +46,17 @@ impl SectionPeersUtils for SectionPeers {
     }
 
     /// Get info for the member with the given name.
-    fn get(&self, name: &XorName) -> Option<&NodeState> {
+    pub(crate) fn get(&self, name: &XorName) -> Option<&NodeState> {
         self.members.get(name).map(|info| &info.value)
     }
 
     /// Get section_signed info for the member with the given name.
-    fn get_section_signed(&self, name: &XorName) -> Option<&SectionAuth<NodeState>> {
+    pub(crate) fn get_section_signed(&self, name: &XorName) -> Option<&SectionAuth<NodeState>> {
         self.members.get(name)
     }
 
     /// Returns the candidates for elders out of all the nodes in this section.
-    fn elder_candidates(
+    pub(crate) fn elder_candidates(
         &self,
         elder_size: usize,
         current_elders: &SectionAuthorityProvider,
@@ -123,7 +75,7 @@ impl SectionPeersUtils for SectionPeers {
     }
 
     /// Returns the candidates for elders out of all nodes matching the prefix.
-    fn elder_candidates_matching_prefix(
+    pub(crate) fn elder_candidates_matching_prefix(
         &self,
         prefix: &Prefix,
         elder_size: usize,
@@ -144,7 +96,7 @@ impl SectionPeersUtils for SectionPeers {
     }
 
     /// Returns whether the given peer is a joined member of our section.
-    fn is_joined(&self, name: &XorName) -> bool {
+    pub(crate) fn is_joined(&self, name: &XorName) -> bool {
         self.members
             .get(name)
             .map(|info| info.value.state == MembershipState::Joined)
@@ -152,7 +104,7 @@ impl SectionPeersUtils for SectionPeers {
     }
 
     /// Returns whether the given peer is already relocated to our section.
-    fn is_relocated(&self, name: &XorName) -> bool {
+    pub(crate) fn is_relocated(&self, name: &XorName) -> bool {
         self.members
             .values()
             .any(|info| info.value.previous_name == Some(*name))
@@ -160,7 +112,7 @@ impl SectionPeersUtils for SectionPeers {
 
     /// Update a member of our section.
     /// Returns whether anything actually changed.
-    fn update(&mut self, new_info: SectionAuth<NodeState>) -> bool {
+    pub(crate) fn update(&mut self, new_info: SectionAuth<NodeState>) -> bool {
         match self.members.entry(*new_info.value.peer.name()) {
             Entry::Vacant(entry) => {
                 let _ = entry.insert(new_info);
@@ -188,7 +140,7 @@ impl SectionPeersUtils for SectionPeers {
     }
 
     /// Remove all members whose name does not match `prefix`.
-    fn prune_not_matching(&mut self, prefix: &Prefix) {
+    pub(crate) fn prune_not_matching(&mut self, prefix: &Prefix) {
         self.members = mem::take(&mut self.members)
             .into_iter()
             .filter(|(name, _)| prefix.matches(name))

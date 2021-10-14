@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.6](https://github.com/maidsafe/safe_network/compare/v0.35.5...v0.35.6) (2021-10-14)
+
+
+### Features
+
+* make joins_allowds in routing core RwLocked ([ba018a9](https://github.com/maidsafe/safe_network/commit/ba018a950ad46fd492c516daeb1011bdaf1a931f))
+
+### [0.35.5](https://github.com/maidsafe/safe_network/compare/v0.35.4...v0.35.5) (2021-10-14)
+
 ### [0.35.4](https://github.com/maidsafe/safe_network/compare/v0.35.3...v0.35.4) (2021-10-14)
 
 

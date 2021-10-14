@@ -13,12 +13,8 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils,
-    error::Result,
-    peer::PeerUtils,
-    routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionPeersUtils},
-    Event, SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils, error::Result, peer::PeerUtils, routing_api::command::Command,
+    section::ElderCandidatesUtils, Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
 
 use super::Core;
@@ -43,7 +39,7 @@ impl Core {
                 self.handle_our_elders_agreement(section_auth, sig).await
             }
             Proposal::JoinsAllowed(joins_allowed) => {
-                self.joins_allowed = joins_allowed;
+                *self.joins_allowed.write().await = joins_allowed;
                 Ok(vec![])
             }
         }

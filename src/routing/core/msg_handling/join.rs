@@ -16,8 +16,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     error::Result, peer::PeerUtils, relocation::RelocatePayloadUtils,
-    routing_api::command::Command, section::SectionPeersUtils, FIRST_SECTION_MAX_AGE,
-    FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+    routing_api::command::Command, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
 use bls::PublicKey as BlsPublicKey;
 
@@ -52,7 +51,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if !self.joins_allowed {
+        if !*self.joins_allowed.read().await {
             debug!(
                 "Rejecting JoinRequest from {} - joins currently not allowed.",
                 peer,
