@@ -52,7 +52,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if !self.joins_allowed {
+        if !*self.joins_allowed.read().await {
             debug!(
                 "Rejecting JoinRequest from {} - joins currently not allowed.",
                 peer,
