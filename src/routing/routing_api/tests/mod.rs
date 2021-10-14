@@ -77,6 +77,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -154,6 +155,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -242,6 +244,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -340,6 +343,7 @@ async fn aggregate_proposals() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -449,6 +453,7 @@ async fn handle_agreement_on_online() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -510,6 +515,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -676,6 +682,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(state);
@@ -741,6 +748,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -798,6 +806,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -906,6 +915,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
 
@@ -1010,6 +1020,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
 
@@ -1040,7 +1051,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     match commands {
         Err(Error::UntrustedProofChain(_)) => Ok(()),
         Err(other_err) => bail!(
-            "AE update handling produced unexpected error with bad AE update: {}",
+            "AE update handling produced unexpected error with bad AE update: {:?}",
             other_err
         ),
         Ok(_) => bail!("AE update handling should error due to bad signing."),
@@ -1104,6 +1115,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -1307,6 +1319,7 @@ async fn handle_elders_update() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -1417,6 +1430,7 @@ async fn handle_demote_during_split() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);

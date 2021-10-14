@@ -99,7 +99,8 @@ impl Routing {
             )
             .await?;
             let node = Node::new(keypair, comm.our_connection_info());
-            let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir).await?;
+            let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir.clone())
+                .await?;
 
             let section = core.section();
 
@@ -178,6 +179,7 @@ impl Routing {
                 event_tx,
                 used_space,
                 root_storage_dir.to_path_buf(),
+                false,
             )
             .await?;
             info!("{} Joined the network!", core.node().name());
@@ -195,6 +197,7 @@ impl Routing {
         ));
 
         dispatcher.clone().start_network_probing().await;
+        dispatcher.clone().write_prefixmap_to_disk().await;
 
         let routing = Self { dispatcher };
 
