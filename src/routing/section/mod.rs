@@ -29,7 +29,6 @@ use crate::routing::{
 pub(crate) use node_state::NodeStateUtils;
 pub(crate) use section_authority_provider::ElderCandidatesUtils;
 use section_authority_provider::SectionAuthorityProviderUtils;
-pub(super) use section_peers::SectionPeersUtils;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr};
