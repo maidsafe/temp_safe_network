@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.9](https://github.com/maidsafe/safe_network/compare/v0.35.8...v0.35.9) (2021-10-14)
+
+
+### Features
+
+* **actions:** run Digital Ocean testnet action on PRs with approval ([c18f40f](https://github.com/maidsafe/safe_network/commit/c18f40f34abc874f8d6ce6c66b762fc6a018d1b9))
+
 ### [0.35.8](https://github.com/maidsafe/safe_network/compare/v0.35.7...v0.35.8) (2021-10-14)
 
 
