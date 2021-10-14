@@ -19,7 +19,7 @@ on:
         description: 'Kill network after client tests? (y/n)'
         required: false
         default: 'n'
-  pull_request:
+  pull_request_target:
 
 env:
   CARGO_INCREMENTAL: '0'
@@ -31,7 +31,7 @@ jobs:
     environment: approved_action
     name: Launch Digital Ocean testnet
     runs-on: ubuntu-latest
-    if: github.event.inputs.start-network == 'y' || github.event_name == 'pull_request'
+    if: github.event.inputs.start-network == 'y' || github.event_name == 'pull_request_target'
     steps:
       - name: Launch testnet
         uses: maidsafe/sn_testnet_action@master
@@ -48,10 +48,11 @@ jobs:
     name: Run Client tests
     runs-on: ubuntu-latest
     needs: [launch-testnet]
-    if: always() && (github.event.inputs.run-client-tests == 'y' || github.event_name == 'pull_request')
+    if: always() && (github.event.inputs.run-client-tests == 'y' || github.event_name == 'pull_request_target')
     steps:
       - uses: actions/checkout@v2
-
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set TESTNET_ID env
         shell: bash
@@ -106,7 +107,7 @@ jobs:
     name: Destroy Digital Ocean testnet
     runs-on: ubuntu-latest
     needs: [launch-testnet, run-client-tests]
-    if: always() && (github.event.inputs.stop-network == 'y' || github.event_name == 'pull_request')
+    if: always() && (github.event.inputs.stop-network == 'y' || github.event_name == 'pull_request_target')
     steps:
       - name: Kill testnet
         uses: maidsafe/sn_testnet_action@master
