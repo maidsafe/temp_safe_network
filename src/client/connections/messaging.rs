@@ -49,6 +49,7 @@ impl Session {
         err_sender: Sender<CmdError>,
         local_addr: SocketAddr,
         standard_wait: Duration,
+        prefix_map: NetworkPrefixMap,
     ) -> Result<Session, Error> {
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
@@ -63,7 +64,7 @@ impl Session {
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
             endpoint,
-            network: Arc::new(NetworkPrefixMap::new(genesis_key)),
+            network: Arc::new(prefix_map),
             ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
             ae_retry_cache: Arc::new(RwLock::new(AeCache::default())),
             aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),

@@ -17,11 +17,14 @@ use crate::messaging::data::{CmdError, DataQuery, ServiceMsg};
 use crate::types::{ChunkAddress, Keypair, PublicKey};
 
 use crate::messaging::{ServiceAuth, WireMsg};
+use crate::prefix_map::NetworkPrefixMap;
 use itertools::Itertools;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::{
     sync::{mpsc::Receiver, RwLock},
     time::Duration,
@@ -75,6 +78,36 @@ impl Client {
             }
         };
 
+        let mut safe_dir = dirs_next::home_dir()
+            .ok_or_else(|| Error::Generic("Error opening home dir".to_string()))?;
+        safe_dir.push(".safe");
+        safe_dir.push("prefix_map");
+
+        // Read NetworkPrefixMap from disk if present else create a new one
+        let prefix_map = if let Ok(mut prefix_map_file) = File::open(safe_dir).await {
+            let mut prefix_map_contents = vec![];
+            let _ = prefix_map_file
+                .read_to_end(&mut prefix_map_contents)
+                .await?;
+
+            let prefix_map: NetworkPrefixMap = rmp_serde::from_slice(&prefix_map_contents)
+                .map_err(|err| {
+                    Error::Generic(format!(
+                        "Error deserializing PrefixMap from disk: {:?}",
+                        err
+                    ))
+                })?;
+            prefix_map
+        } else {
+            NetworkPrefixMap::new(config.genesis_key)
+        };
+
+        if config.genesis_key != prefix_map.genesis_key() {
+            return Err(Error::Generic(
+                "Genesis Key from the config and the PrefixMap mismatch".to_string(),
+            ));
+        }
+
         // Incoming error notifiers
         let (err_sender, err_receiver) = tokio::sync::mpsc::channel::<CmdError>(10);
 
@@ -98,6 +131,7 @@ impl Client {
             err_sender,
             config.local_addr,
             standard_wait,
+            prefix_map,
         )
         .await?;
 
