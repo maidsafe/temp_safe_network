@@ -46,6 +46,11 @@ impl NetworkPrefixMap {
         }
     }
 
+    /// Returns the genesis key of the Network
+    pub(crate) fn genesis_key(&self) -> BlsPublicKey {
+        self.genesis_pk
+    }
+
     /// Inserts new entry into the map. Replaces previous entry at the same prefix.
     /// Removes those ancestors of the inserted prefix that are now fully covered by their
     /// descendants.
