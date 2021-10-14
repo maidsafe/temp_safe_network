@@ -453,13 +453,6 @@ async fn handle_connection_events(
 ) {
     while let Some(event) = incoming_conns.recv().await {
         match event {
-            ConnectionEvent::Disconnected(addr) => {
-                trace!("Lost connection to {:?}", addr);
-                let _ = dispatcher
-                    .clone()
-                    .handle_commands(Command::HandleConnectionLost(addr), None)
-                    .await;
-            }
             ConnectionEvent::Received((sender, bytes)) => {
                 trace!(
                     "New message ({} bytes) received from: {}",

@@ -279,9 +279,6 @@ impl Dispatcher {
                     .handle_agreement(proposal, sig)
                     .await
             }
-            Command::HandleConnectionLost(addr) => {
-                self.core.read().await.handle_connection_lost(addr)
-            }
             Command::HandlePeerLost(addr) => self.core.read().await.handle_peer_lost(&addr).await,
             Command::HandleDkgOutcome {
                 section_auth,
