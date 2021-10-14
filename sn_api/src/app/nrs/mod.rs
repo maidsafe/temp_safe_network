@@ -12,7 +12,7 @@ mod nrs_map;
 use nrs_map::NrsMap;
 pub use safe_network::url::{ContentType, VersionHash};
 
-use crate::{app::Safe, register::EntryHash, Error, Result, Url, XorUrl};
+use crate::{app::Safe, register::EntryHash, Error, Result, Url};
 
 use bytes::{Buf, Bytes};
 use log::{debug, info, warn};
@@ -90,7 +90,7 @@ impl Safe {
 
         // check public_name
         let safe_url = validate_nrs_public_name(public_name)?;
-        let xorurl = safe_url.to_string();
+        let url_str = safe_url.to_string();
 
         // fetch and edit nrs_map
         let (mut nrs_map, version) = self.fetch_latest_nrs_map(public_name).await?;
@@ -108,10 +108,10 @@ impl Safe {
         let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
         let reg_entry = Url::from_xorurl(&nrs_map_xorurl)?;
         let entry_hash = self
-            .write_to_register(&xorurl, reg_entry, old_values)
+            .write_to_register(&url_str, reg_entry, old_values)
             .await?;
 
-        Ok(versionned_nmc_url(xorurl, entry_hash)?)
+        Ok(versionned_nmc_url(url_str, entry_hash)?)
     }
 
     /// # Removes a public name
@@ -130,7 +130,7 @@ impl Safe {
 
         // check public_name
         let safe_url = validate_nrs_public_name(public_name)?;
-        let xorurl = safe_url.to_string();
+        let url_str = safe_url.to_string();
 
         // fetch and edit nrs_map
         let (mut nrs_map, version) = self.fetch_latest_nrs_map(public_name).await?;
@@ -147,10 +147,10 @@ impl Safe {
         let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
         let reg_entry = Url::from_xorurl(&nrs_map_xorurl)?;
         let entry_hash = self
-            .write_to_register(&xorurl, reg_entry, old_values)
+            .write_to_register(&url_str, reg_entry, old_values)
             .await?;
 
-        Ok(versionned_nmc_url(xorurl, entry_hash)?)
+        Ok(versionned_nmc_url(url_str, entry_hash)?)
     }
 
     /// # Gets a public name's associated link
@@ -239,8 +239,8 @@ impl Safe {
 }
 
 // Makes a versionned Nrs Map Container Url from a Url and EntryHash
-fn versionned_nmc_url(xorurl: XorUrl, entry_hash: EntryHash) -> Result<Url> {
-    let mut url = Url::from_xorurl(&xorurl)?;
+fn versionned_nmc_url(url: String, entry_hash: EntryHash) -> Result<Url> {
+    let mut url = Url::from_url(&url)?;
     url.set_content_version(Some(VersionHash::from(&entry_hash)));
     url.set_content_type(ContentType::NrsMapContainer)?;
     Ok(url)
@@ -316,7 +316,7 @@ mod tests {
         url_v0.set_content_version(Some(version0));
 
         let nrs_map_url =
-            retry_loop!(safe.nrs_map_container_create(&format!("b.{}", site_name), &url_v0, false));
+            retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false));
 
         let _ = retry_loop!(safe.fetch(&nrs_map_url.to_string(), None));
 
