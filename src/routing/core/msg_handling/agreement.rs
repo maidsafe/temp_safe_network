@@ -204,7 +204,7 @@ impl Core {
                 infos.iter().flat_map(|info| info.peers()).collect();
             commands.extend(
                 self.send_proposal(
-                    &our_elders_recipients,
+                    our_elders_recipients,
                     Proposal::OurElders(signed_section_auth),
                 )
                 .await?,

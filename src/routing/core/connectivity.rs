@@ -68,7 +68,10 @@ impl Core {
         for name in names.iter() {
             if let Some(info) = self.section.members().get(name) {
                 let info = info.leave()?;
-                if let Ok(commands) = self.send_proposal(&elders, Proposal::Offline(info)).await {
+                if let Ok(commands) = self
+                    .send_proposal(elders.clone(), Proposal::Offline(info))
+                    .await
+                {
                     result.extend(commands);
                 }
             }

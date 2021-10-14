@@ -15,6 +15,7 @@ impl Core {
         let old_adults: BTreeSet<_> = self
             .section
             .live_adults()
+            .iter()
             .map(|p| p.name())
             .copied()
             .collect();
@@ -23,6 +24,7 @@ impl Core {
             let current_adults: BTreeSet<_> = self
                 .section
                 .live_adults()
+                .iter()
                 .map(|p| p.name())
                 .copied()
                 .collect();

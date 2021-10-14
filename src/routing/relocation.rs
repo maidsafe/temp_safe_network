@@ -33,11 +33,14 @@ pub(crate) fn actions(
 ) -> Vec<(NodeState, RelocateAction)> {
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
-    let candidates: Vec<_> = section
+
+    let filtered = section
         .members()
         .joined()
-        .filter(|info| check(info.peer.age(), churn_signature))
-        .collect();
+        .into_iter()
+        .filter(|info| check(info.peer.age(), churn_signature));
+
+    let candidates: Vec<_> = filtered.collect();
 
     let max_age = if let Some(age) = candidates.iter().map(|info| (*info).peer.age()).max() {
         age
@@ -45,16 +48,18 @@ pub(crate) fn actions(
         return vec![];
     };
 
-    candidates
-        .into_iter()
-        .filter(|info| info.peer.age() == max_age)
-        .map(|info| {
-            (
-                *info,
-                RelocateAction::new(section, network, &info.peer, churn_name),
-            )
-        })
-        .collect()
+    let mut relocating_nodes = vec![];
+
+    for node_state in candidates {
+        if node_state.peer.age() == max_age {
+            relocating_nodes.push((
+                node_state,
+                RelocateAction::new(section, network, &node_state.peer, churn_name),
+            ))
+        }
+    }
+
+    relocating_nodes
 }
 
 /// Details of a relocation: which node to relocate, where to relocate it to and what age it should
