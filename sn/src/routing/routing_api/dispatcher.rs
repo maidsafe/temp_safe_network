@@ -133,8 +133,8 @@ impl Dispatcher {
 
                 // Send a probe message if we are an elder
                 let core = dispatcher.core.read().await;
-                if core.is_elder() && !core.section().prefix().is_empty() {
-                    match core.generate_probe_message() {
+                if core.is_elder().await && !core.section().prefix().await.is_empty() {
+                    match core.generate_probe_message().await {
                         Ok(command) => {
                             drop(core);
                             info!("Sending ProbeMessage");
@@ -166,12 +166,15 @@ impl Dispatcher {
         // from integration tests.
         let span = {
             let core = self.core.read().await;
+
+            let prefix = core.section().prefix().await;
+            let is_elder = core.is_elder().await;
             trace_span!(
                 "handle_command",
                 name = %core.node().name(),
-                prefix = format_args!("({:b})", core.section().prefix()),
+                prefix = format_args!("({:b})", prefix),
                 age = core.node().age(),
-                elder = core.is_elder(),
+                elder = is_elder,
                 cmd_id = %cmd_id,
             )
         };
@@ -263,7 +266,7 @@ impl Dispatcher {
                     .await
             }
             Command::PrepareNodeMsgToSend { msg, dst } => {
-                self.core.read().await.prepare_node_msg(msg, dst)
+                self.core.read().await.prepare_node_msg(msg, dst).await
             }
             Command::HandleMessage {
                 sender,
@@ -276,7 +279,7 @@ impl Dispatcher {
                     .handle_message(sender, wire_msg, original_bytes)
                     .await
             }
-            Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
+            Command::HandleTimeout(token) => self.core.read().await.handle_timeout(token).await,
             Command::HandleAgreement { proposal, sig } => {
                 self.core
                     .write()
@@ -300,6 +303,7 @@ impl Dispatcher {
                 .write()
                 .await
                 .handle_dkg_failure(signeds)
+                .await
                 .map(|command| vec![command]),
             Command::SendMessage {
                 recipients,
@@ -351,7 +355,7 @@ impl Dispatcher {
                 let msg = {
                     let core = self.core.read().await;
                     let node = core.node();
-                    let section_pk = *core.section().chain.last_key();
+                    let section_pk = *core.section().chain.read().await.last_key();
                     WireMsg::single_src(
                         node,
                         DstLocation::Section {
@@ -369,11 +373,12 @@ impl Dispatcher {
                     .await
                     .section()
                     .active_members()
+                    .await
                     .iter()
                     .filter(|peer| peer.name() != &name && peer.name() != &our_name)
                     .cloned()
                     .collect_vec();
-                Ok(self.core.read().await.send_or_handle(msg, peers))
+                Ok(self.core.read().await.send_or_handle(msg, peers).await)
             }
             Command::TestConnectivity(name) => {
                 let mut commands = vec![];
@@ -473,8 +478,16 @@ impl Dispatcher {
                 debug!("Sending client msg to {:?}: {:?}", socket_addr, wire_msg);
 
                 let recipients = vec![(*name, socket_addr)];
-                wire_msg
-                    .set_dst_section_pk(*self.core.read().await.section_chain().clone().last_key());
+                wire_msg.set_dst_section_pk(
+                    *self
+                        .core
+                        .read()
+                        .await
+                        .section_chain()
+                        .await
+                        .clone()
+                        .last_key(),
+                );
 
                 let command = Command::SendMessage {
                     recipients,
@@ -491,7 +504,7 @@ impl Dispatcher {
             }
         } else {
             // This message is not for an end user, then send it to peer/s over the network
-            let cmd = self.core.read().await.send_msg_to_peers(wire_msg)?;
+            let cmd = self.core.read().await.send_msg_to_peers(wire_msg).await?;
             Ok(vec![cmd])
         }
     }

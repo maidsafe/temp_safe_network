@@ -33,8 +33,10 @@ impl Core {
 
         // Any other proposal than SectionInfo needs to be signed by a known section key.
         if let Proposal::SectionInfo(ref section_auth) = proposal {
-            if section_auth.prefix == *self.section.prefix()
-                || section_auth.prefix.is_extension_of(self.section.prefix())
+            if section_auth.prefix == self.section.prefix().await
+                || section_auth
+                    .prefix
+                    .is_extension_of(&self.section.prefix().await)
             {
                 // This `SectionInfo` is proposed by the DKG participants and
                 // it's signed by the new key created by the DKG so we don't
@@ -51,7 +53,7 @@ impl Core {
         } else {
             // Proposal from other section shall be ignored.
             // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
-            if !self.section.prefix().matches(&src_name) {
+            if !self.section.prefix().await.matches(&src_name) {
                 trace!(
                     "Ignore proposal from other section, src_name {:?}: {:?}",
                     src_name,
@@ -62,7 +64,7 @@ impl Core {
 
             // Let's now verify the section key in the msg authority is trusted
             // based on our current knowledge of the network and sections chains.
-            if !self.section.chain().has_key(sig_share_pk) {
+            if !self.section.chain().await.has_key(sig_share_pk) {
                 warn!(
                     "Dropped Propose msg with untrusted sig share from {:?}: {:?}",
                     sender, msg_id
@@ -72,7 +74,7 @@ impl Core {
         }
 
         let mut commands = vec![];
-        commands.extend(self.check_lagging((src_name, sender), sig_share_pk)?);
+        commands.extend(self.check_lagging((src_name, sender), sig_share_pk).await?);
 
         match self.proposal_aggregator.add(proposal, sig_share).await {
             Ok((proposal, sig)) => commands.push(Command::HandleAgreement { proposal, sig }),

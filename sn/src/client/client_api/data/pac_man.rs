@@ -64,7 +64,7 @@ pub(crate) fn pack(
     // no need to encrypt what is self-encrypted, thus we pass in `None` for those cases
     // (however, the compiler could not infer type from the `None`)
     let mut no_encryption = encryption; // copy the original variable
-    let _ = no_encryption.take(); // make it None
+    let _value = no_encryption.take(); // make it None
 
     let (address, additional_chunks) = loop {
         let chunk = to_chunk(chunk_content, encryption)?;

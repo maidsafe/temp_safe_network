@@ -21,6 +21,7 @@ use super::Core;
 
 // Agreement
 impl Core {
+    #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_agreement(
         &mut self,
         proposal: Proposal,
@@ -36,6 +37,8 @@ impl Core {
                 self.handle_section_info_agreement(section_auth, sig).await
             }
             Proposal::OurElders(section_auth) => {
+                // TODO: this is the only agreement needing self mut.
+                // Separate this out
                 self.handle_our_elders_agreement(section_auth, sig).await
             }
             Proposal::JoinsAllowed(joins_allowed) => {
@@ -46,7 +49,7 @@ impl Core {
     }
 
     async fn handle_online_agreement(
-        &mut self,
+        &self,
         new_info: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
@@ -73,7 +76,7 @@ impl Core {
             if new_age > MIN_AGE {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
-                commands.push(self.send_node_approval(old_info.clone())?);
+                commands.push(self.send_node_approval(old_info.clone()).await?);
                 commands.extend(
                     self.relocate_rejoining_peer(&new_info.peer, new_age)
                         .await?,
@@ -88,7 +91,7 @@ impl Core {
             sig,
         };
 
-        if !self.section.update_member(new_info.clone()) {
+        if !self.section.update_member(new_info.clone()).await {
             info!("ignore Online: {:?}", new_info.value.peer);
             return Ok(vec![]);
         }
@@ -109,19 +112,19 @@ impl Core {
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            commands.extend(self.send_ae_update_to_adults()?);
+            commands.extend(self.send_ae_update_to_adults().await?);
         }
 
         commands.extend(result);
-        commands.push(self.send_node_approval(new_info)?);
+        commands.push(self.send_node_approval(new_info).await?);
 
-        self.print_network_stats();
+        self.print_network_stats().await;
 
         Ok(commands)
     }
 
     async fn handle_offline_agreement(
-        &mut self,
+        &self,
         node_state: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
@@ -130,10 +133,14 @@ impl Core {
         let age = peer.age();
         let signature = sig.signature.clone();
 
-        if !self.section.update_member(SectionAuth {
-            value: node_state,
-            sig,
-        }) {
+        if !self
+            .section
+            .update_member(SectionAuth {
+                value: node_state,
+                sig,
+            })
+            .await
+        {
             info!("ignore Offline: {:?}", peer);
             return Ok(commands);
         }
@@ -144,7 +151,7 @@ impl Core {
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            commands.extend(self.send_ae_update_to_adults()?);
+            commands.extend(self.send_ae_update_to_adults().await?);
         }
 
         commands.extend(result);
@@ -159,19 +166,22 @@ impl Core {
     }
 
     async fn handle_section_info_agreement(
-        &mut self,
+        &self,
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let equal_or_extension = section_auth.prefix() == *self.section.prefix()
-            || section_auth.prefix().is_extension_of(self.section.prefix());
+        let equal_or_extension = section_auth.prefix() == self.section.prefix().await
+            || section_auth
+                .prefix()
+                .is_extension_of(&self.section.prefix().await);
 
         if equal_or_extension {
             // Our section or sub-section
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let infos = self
                 .section
-                .promote_and_demote_elders(&self.node.name(), &BTreeSet::new());
+                .promote_and_demote_elders(&self.node.name(), &BTreeSet::new())
+                .await;
             if !infos.contains(&signed_section_auth.value.elder_candidates()) {
                 // SectionInfo out of date, ignore.
                 return Ok(vec![]);
@@ -179,29 +189,38 @@ impl Core {
 
             // Send a `AE Update` message to all the to-be-promoted members so they have the full
             // section and network data.
-            let ae_update_recipients: Vec<_> = infos
-                .iter()
-                .flat_map(|info| info.peers())
-                .filter(|peer| !self.section.is_elder(peer.name()))
-                .map(|peer| (*peer.name(), *peer.addr()))
-                .collect();
+            let mut ae_update_recipients = vec![];
+
+            let mut peers = vec![];
+
+            for elder_candidate in infos.clone() {
+                peers.extend(elder_candidate.peers())
+            }
+
+            for peer in peers {
+                if !self.section.is_elder(peer.name()).await {
+                    ae_update_recipients.push((*peer.name(), *peer.addr()));
+                }
+            }
 
             let mut commands = vec![];
             if !ae_update_recipients.is_empty() {
-                let node_msg = self.generate_ae_update(sig.public_key, true)?;
-                let cmd = self.send_direct_message_to_nodes(
-                    ae_update_recipients,
-                    node_msg,
-                    self.section.prefix().name(),
-                    sig.public_key,
-                )?;
+                let node_msg = self.generate_ae_update(sig.public_key, true).await?;
+                let cmd = self
+                    .send_direct_message_to_nodes(
+                        ae_update_recipients,
+                        node_msg,
+                        self.section.prefix().await.name(),
+                        sig.public_key,
+                    )
+                    .await?;
 
                 commands.push(cmd);
             }
 
             // Send the `OurElder` proposal to all of the to-be-elders so it's aggregated by them.
             let our_elders_recipients: Vec<_> =
-                infos.iter().flat_map(|info| info.peers()).collect();
+                infos.clone().iter().flat_map(|info| info.peers()).collect();
             commands.extend(
                 self.send_proposal(
                     our_elders_recipients,
@@ -222,13 +241,14 @@ impl Core {
         }
     }
 
+    #[instrument(skip(self), level = "trace")]
     async fn handle_our_elders_agreement(
         &mut self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let updates = self.split_barrier.write().await.process(
-            self.section.prefix(),
+            &self.section.prefix().await,
             signed_section_auth.clone(),
             key_sig,
         );
@@ -236,20 +256,26 @@ impl Core {
             return Ok(vec![]);
         }
 
-        let snapshot = self.state_snapshot();
-        let mut old_chain = self.section.chain.clone();
+        let snapshot = self.state_snapshot().await;
+        let old_chain = self.section.chain.read().await.clone();
 
         for (section_auth, key_sig) in updates {
-            info!("Updating {:?}", &section_auth);
+            info!("Updating elders to: {:?}", &section_auth);
             if section_auth.value.prefix.matches(&self.node.name()) {
-                let _ = self.section.update_elders(section_auth.clone(), key_sig);
-                if self.network.update(section_auth, self.section_chain())? {
+                let _updated = self
+                    .section
+                    .update_elders(section_auth.clone(), key_sig)
+                    .await;
+                if self
+                    .network
+                    .update(section_auth, &self.section_chain().await)?
+                {
                     info!("Updated our section's state in network's NetworkPrefixMap");
                     self.write_prefix_map().await;
                 }
             } else {
                 // Update the old chain to become the neighbour's chain.
-                if let Err(e) = old_chain.insert(
+                if let Err(e) = self.section.chain.write().await.insert(
                     &key_sig.public_key,
                     section_auth.value.section_key(),
                     key_sig.signature,
@@ -268,7 +294,7 @@ impl Core {
 
         info!("Prefixes we know about: {:?}", self.network);
 
-        self.update_for_new_node_state_and_fire_events(snapshot)
+        self.update_self_for_new_node_state_and_fire_events(snapshot)
             .await
     }
 }

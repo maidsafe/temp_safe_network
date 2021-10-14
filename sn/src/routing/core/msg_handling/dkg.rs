@@ -34,7 +34,7 @@ impl Core {
                 &self.node,
                 session_id,
                 elder_candidates,
-                *self.section_chain().last_key(),
+                *self.section_chain().await.last_key(),
             )
             .await
     }
@@ -52,7 +52,7 @@ impl Core {
                 &self.node,
                 &session_id,
                 message,
-                *self.section_chain().last_key(),
+                *self.section_chain().await.last_key(),
             )
             .await
     }
@@ -81,11 +81,12 @@ impl Core {
             return Err(Error::InvalidSrcLocation);
         }
 
-        let generation = self.section.chain().main_branch_len() as u64;
+        let generation = self.section.chain().await.main_branch_len() as u64;
 
         let elder_candidates = if let Some(elder_candidates) = self
             .section
             .promote_and_demote_elders(&self.node.name(), &BTreeSet::new())
+            .await
             .into_iter()
             .find(|elder_candidates| failure_set.verify(elder_candidates, generation))
         {
@@ -128,22 +129,27 @@ impl Core {
         key_share: SectionKeyShare,
     ) -> Result<Vec<Command>> {
         let proposal = Proposal::SectionInfo(section_auth);
-        let recipients: Vec<_> = self.section.authority_provider().peers().collect();
-        let result = self.send_proposal_with(recipients, proposal, &key_share);
+        let recipients: Vec<_> = self.section.authority_provider().await.peers();
+        let result = self
+            .send_proposal_with(recipients, proposal, &key_share)
+            .await;
 
         let public_key = key_share.public_key_set.public_key();
 
         self.section_keys_provider.insert_dkg_outcome(key_share);
 
-        if self.section.chain().has_key(&public_key) {
+        if self.section.chain().await.has_key(&public_key) {
             self.section_keys_provider.finalise_dkg(&public_key).await
         }
 
         result
     }
 
-    pub(crate) fn handle_dkg_failure(&self, failure_set: DkgFailureSigSet) -> Result<Command> {
+    pub(crate) async fn handle_dkg_failure(
+        &self,
+        failure_set: DkgFailureSigSet,
+    ) -> Result<Command> {
         let node_msg = SystemMsg::DkgFailureAgreement(failure_set);
-        self.send_message_to_our_elders(node_msg)
+        self.send_message_to_our_elders(node_msg).await
     }
 }
