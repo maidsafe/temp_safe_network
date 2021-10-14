@@ -430,7 +430,7 @@ pub async fn set_connection_info(genesis_key: bls::PublicKey, contact: SocketAdd
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
 pub async fn add_connection_info(contact: SocketAddr) -> Result<()> {
     let (genesis_key_hex, mut bootstrap_nodes) = read_conn_info_from_file().await?;
-    let _ = bootstrap_nodes.insert(contact);
+    let _prev = bootstrap_nodes.insert(contact);
     write_file(CONNECTION_INFO_FILE, &(genesis_key_hex, bootstrap_nodes)).await
 }
 

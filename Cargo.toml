@@ -41,6 +41,7 @@ chaos = []
 test-utils = []
 
 [dependencies]
+async-trait = "^0.1.51"
 async-recursion = "0.3.2"
 base64 = "~0.10.1"
 bincode = "1.3.1"

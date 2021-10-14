@@ -183,7 +183,7 @@ impl Session {
                         correlation_id
                     );
                     warn!("CmdError received is: {:?}", error);
-                    let _ = error_sender.send(error.clone()).await;
+                    let _error_from_sender = error_sender.send(error.clone()).await;
 
                     match error {
                         CmdError::Data(_error) => {

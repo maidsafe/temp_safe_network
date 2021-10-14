@@ -57,10 +57,110 @@ pub mod types;
 pub mod url;
 
 #[cfg(test)]
+use std::sync::Once;
+#[cfg(test)]
+use tracing_core::{Event, Subscriber};
+#[cfg(test)]
+use tracing_subscriber::{
+    fmt::{
+        fmt,
+        time::{FormatTime, SystemTime},
+        FmtContext, FormatEvent, FormatFields, FormattedFields,
+    },
+    registry::LookupSpan,
+    EnvFilter,
+};
+
+#[cfg(test)]
 #[ctor::ctor]
 fn test_setup() {
     // If you look down the call stack for `color_eyre::install`, the only error can come from
     // `OnceCell::set` if it's called twice. We could ignore the error, but it would be better to
     // ensure we only call it once.
     color_eyre::install().expect("color_eyre::install can only be called once");
+}
+
+#[cfg(test)]
+static INIT: Once = Once::new();
+
+#[cfg(test)]
+#[derive(Default)]
+struct MyFormatter;
+
+#[cfg(test)]
+impl<S, N> FormatEvent<S, N> for MyFormatter
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'a> FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        writer: &mut dyn std::fmt::Write,
+        event: &Event<'_>,
+    ) -> std::fmt::Result {
+        // Write level and target
+        let level = *event.metadata().level();
+        let target = event.metadata().file().expect("will never be `None`");
+        let span_separation_string = "\t ➤ ";
+        let time = SystemTime::default();
+        write!(writer, " {} ", level)?;
+
+        time.format_time(writer)?;
+
+        writeln!(
+            writer,
+            " [{}:L{}]:",
+            target,
+            event.metadata().line().expect("will never be `None`"),
+        )?;
+
+        write!(writer, "{}", span_separation_string)?;
+
+        // let mut span_count = 0;
+        // Write spans and fields of each span
+        ctx.visit_spans(|span| {
+            write!(writer, "{} ", span.name())?;
+
+            let ext = span.extensions();
+
+            // `FormattedFields` is a a formatted representation of the span's
+            // fields, which is stored in its extensions by the `fmt` layer's
+            // `new_span` method. The fields will have been formatted
+            // by the same field formatter that's provided to the event
+            // formatter in the `FmtContext`.
+            let fields = &ext
+                .get::<FormattedFields<N>>()
+                .expect("will never be `None`");
+
+            if !fields.is_empty() {
+                write!(writer, "{{{}}}", fields)?;
+            }
+
+            write!(writer, "\n{}", span_separation_string)?;
+
+            Ok(())
+        })?;
+
+        // Write fields on the event
+        ctx.field_format().format_fields(writer, event)?;
+
+        writeln!(writer)
+    }
+}
+
+#[cfg(test)]
+/// Initialise logger for tests, this is run only once, even if called multiple times.
+pub fn init_test_logger() {
+    INIT.call_once(|| {
+        fmt()
+            // NOTE: uncomment this line for pretty printed log output.
+            //.pretty()
+            .with_thread_names(true)
+            .with_ansi(false)
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_target(false)
+            .event_format(MyFormatter::default())
+            .init()
+    });
 }

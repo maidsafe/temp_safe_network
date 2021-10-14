@@ -18,6 +18,11 @@ use std::{cmp::Ordering, collections::BTreeSet};
 use xor_name::{Prefix, XorName};
 
 impl SectionPeers {
+    /// Returns joined nodes from our section`
+    pub(crate) fn all_members(&self) -> Vec<Peer> {
+        self.joined().into_iter().map(|info| info.peer).collect()
+    }
+
     /// Returns members that have state == `Joined`.
     pub(crate) fn joined(&self) -> Vec<NodeState> {
         let mut joined = vec![];
