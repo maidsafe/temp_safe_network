@@ -43,7 +43,7 @@ impl AdultRole {
                 .republish_and_cache(addr, &our_name, &new_adults, &lost_adults, &remaining)
                 .await
             {
-                let _ = data_for_replication.insert(data, holders);
+                let _prev = data_for_replication.insert(data, holders);
             }
         }
         Ok(data_for_replication

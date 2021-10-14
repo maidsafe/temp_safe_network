@@ -105,10 +105,10 @@ impl Routing {
             let section = core.section();
 
             let elders = Elders {
-                prefix: *section.prefix(),
-                key: *section.chain().last_key(),
+                prefix: section.prefix().await,
+                key: *section.chain().await.last_key(),
                 remaining: BTreeSet::new(),
-                added: section.authority_provider().names(),
+                added: section.authority_provider().await.names(),
                 removed: BTreeSet::new(),
             };
 
@@ -308,7 +308,13 @@ impl Routing {
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
-        self.dispatcher.core.read().await.section_chain().clone()
+        self.dispatcher
+            .core
+            .read()
+            .await
+            .section_chain()
+            .await
+            .clone()
     }
 
     /// Returns the Section Chain's genesis key
@@ -318,7 +324,7 @@ impl Routing {
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        *self.dispatcher.core.read().await.section().prefix()
+        self.dispatcher.core.read().await.section().prefix().await
     }
 
     /// Finds out if the given XorName matches our prefix.
@@ -328,7 +334,7 @@ impl Routing {
 
     /// Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
-        self.dispatcher.core.read().await.is_elder()
+        self.dispatcher.core.read().await.is_elder().await
     }
 
     /// Returns the information of all the current section elders.
@@ -339,8 +345,8 @@ impl Routing {
             .await
             .section()
             .authority_provider()
+            .await
             .peers()
-            .collect()
     }
 
     /// Returns the elders of our section sorted by their distance to `name` (closest first).
@@ -354,7 +360,7 @@ impl Routing {
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.dispatcher.core.read().await.section().adults()
+        self.dispatcher.core.read().await.section().adults().await
     }
 
     /// Returns the adults of our section sorted by their distance to `name` (closest first).
@@ -375,12 +381,18 @@ impl Routing {
             .await
             .section()
             .authority_provider()
+            .await
             .clone()
     }
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.dispatcher.core.read().await.matching_section(name)
+        self.dispatcher
+            .core
+            .read()
+            .await
+            .matching_section(name)
+            .await
     }
 
     /// Builds a WireMsg signed by this Node

@@ -15,15 +15,17 @@ impl Core {
         let old_adults: BTreeSet<_> = self
             .section
             .live_adults()
+            .await
             .iter()
             .map(|p| p.name())
             .copied()
             .collect();
 
-        if self.is_not_elder() {
+        if self.is_not_elder().await {
             let current_adults: BTreeSet<_> = self
                 .section
                 .live_adults()
+                .await
                 .iter()
                 .map(|p| p.name())
                 .copied()

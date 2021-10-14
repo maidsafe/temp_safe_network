@@ -29,6 +29,7 @@ impl SplitBarrier {
     //
     // Note: in case of a fork, it can return more than two proposals. In that case one of the
     // proposals will be for one subsection and all the others for the other subsection.
+    #[instrument(skip(self), level = "trace", name = "split barrier processing")]
     pub(crate) fn process(
         &mut self,
         our_prefix: &Prefix,

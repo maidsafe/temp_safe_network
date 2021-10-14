@@ -79,8 +79,8 @@ pub trait SectionAuthorityProviderUtils {
     /// Returns `ElderCandidates`, which doesn't have key related infos.
     fn elder_candidates(&self) -> ElderCandidates;
 
-    /// Returns an iterator to the list of peers.
-    fn peers(&'_ self) -> Box<dyn Iterator<Item = Peer> + '_>;
+    /// Returns a vec of the list of peers.
+    fn peers(&'_ self) -> Vec<Peer>;
 
     /// Returns the number of elders in the section.
     fn elder_count(&self) -> usize;
@@ -150,15 +150,17 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
         }
     }
 
-    fn peers(&'_ self) -> Box<dyn Iterator<Item = Peer> + '_> {
+    fn peers(&'_ self) -> Vec<Peer> {
         // The `reachable` flag of Peer is defaulted to `false` during the construction.
         // As the SectionAuthorityProvider only holds the list of alive elders, it shall be safe
         // to set the flag as true here during the mapping.
-        Box::new(self.elders.iter().map(|(name, addr)| {
+        let mut peers = vec![];
+        for (name, addr) in self.elders.iter() {
             let mut peer = Peer::new(*name, *addr);
             peer.set_reachable(true);
-            peer
-        }))
+            peers.push(peer);
+        }
+        peers
     }
 
     /// Returns the number of elders in the section.

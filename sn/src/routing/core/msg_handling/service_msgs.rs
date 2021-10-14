@@ -131,14 +131,14 @@ impl Core {
     }
 
     /// Sign and serialize node message to be sent
-    pub(crate) fn prepare_node_msg(
+    pub(crate) async fn prepare_node_msg(
         &self,
         msg: SystemMsg,
         dst: DstLocation,
     ) -> Result<Vec<Command>> {
         let msg_id = MessageId::new();
 
-        let section_pk = *self.section().chain().last_key();
+        let section_pk = *self.section().chain().await.last_key();
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
 
@@ -170,7 +170,7 @@ impl Core {
         };
 
         // Setup node authority on this response and send this back to our elders
-        let section_pk = *self.section().chain().last_key();
+        let section_pk = *self.section().chain().await.last_key();
         let dst = DstLocation::Node {
             name: requesting_elder,
             section_pk,
@@ -300,7 +300,7 @@ impl Core {
     pub(crate) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = self.section().adults();
+        let adults = self.section().adults().await;
 
         let adults_names = adults.iter().map(|p2p_node| *p2p_node.name());
 

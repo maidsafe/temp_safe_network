@@ -94,7 +94,7 @@ async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
     let mut file = File::open(filepath).await?;
 
     let mut contents = vec![];
-    let _ = file.read_to_end(&mut contents).await?;
+    let _size = file.read_to_end(&mut contents).await?;
 
     serde_json::from_slice(&contents).map_err(|err| {
         warn!(
@@ -170,7 +170,7 @@ mod tests {
             .to_string();
         // normalise for mac
         if str_path.ends_with('/') {
-            let _ = str_path.pop();
+            let _some_last_char = str_path.pop();
         }
 
         let expected_config = Config {

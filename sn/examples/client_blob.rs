@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_secs(delay)).await;
 
     println!("...reading bytes from the network now...");
-    let _ = client.read_bytes(address).await?;
+    let _bytes = client.read_bytes(address).await?;
     println!("Bytes read from {:?}", address);
 
     println!();

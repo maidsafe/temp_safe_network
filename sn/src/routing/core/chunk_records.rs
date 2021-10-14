@@ -93,7 +93,9 @@ impl Core {
         let aggregation = false;
 
         if self.get_copy_count() > targets.len() {
-            let error = CmdError::Data(ErrorMessage::InsufficientAdults(*self.section().prefix()));
+            let error = CmdError::Data(ErrorMessage::InsufficientAdults(
+                self.section().prefix().await,
+            ));
             return self.send_cmd_error_response(error, origin, msg_id);
         }
 
@@ -130,7 +132,11 @@ impl Core {
 
         if targets.is_empty() {
             return self
-                .send_error(Error::NoAdults(*self.section().prefix()), msg_id, origin)
+                .send_error(
+                    Error::NoAdults(self.section().prefix().await),
+                    msg_id,
+                    origin,
+                )
                 .await;
         }
 
