@@ -9,7 +9,7 @@
 
 use bytes::Buf;
 use color_eyre::{eyre::eyre, Result};
-use sn_api::{fetch::SafeData, PublicKey, Safe, Url};
+use sn_api::{resolver::SafeData, PublicKey, Safe, Url};
 use std::{
     collections::BTreeSet, env::temp_dir, fs::File, io::Write, net::SocketAddr, path::PathBuf,
 };

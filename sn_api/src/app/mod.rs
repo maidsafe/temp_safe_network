@@ -25,11 +25,11 @@ use std::time::Duration;
 
 // The following is what's meant to be the public API
 
-pub mod fetch;
 pub mod files;
 pub mod multimap;
 pub mod nrs;
 pub mod register;
+pub mod resolver;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use helpers::parse_tokens_amount;
 pub use safe_network::url::*;

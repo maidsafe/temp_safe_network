@@ -13,7 +13,7 @@ mod metadata;
 mod realpath;
 
 use crate::{
-    app::consts::*, app::nrs::VersionHash, fetch::Range, ContentType, DataType, Error, Result,
+    app::consts::*, app::nrs::VersionHash, resolver::Range, ContentType, DataType, Error, Result,
     Safe, Scope, Url, XorUrl,
 };
 use bytes::{Buf, Bytes};
@@ -26,10 +26,11 @@ use std::collections::{BTreeMap, HashSet};
 use std::iter::FromIterator;
 use std::{fs, path::Path};
 
+pub(crate) use files_map::{file_map_for_path, get_file_link_and_metadata};
 pub(crate) use metadata::FileMeta;
 pub(crate) use realpath::RealPath;
 
-pub use files_map::{FileItem, FilesMap, GetAttr};
+pub use files_map::{FileInfo, FilesMap, GetAttr};
 
 // List of files uploaded with details if they were added, updated or deleted from FilesContainer
 pub type ProcessedFiles = BTreeMap<String, (String, String)>;
@@ -138,7 +139,7 @@ impl Safe {
     /// ```
     pub async fn files_container_get(&mut self, url: &str) -> Result<(VersionHash, FilesMap)> {
         debug!("Getting files container from: {:?}", url);
-        let (safe_url, _) = self.parse_and_resolve_url(url).await?;
+        let safe_url = self.parse_and_resolve_url(url).await?;
 
         self.fetch_files_container(&safe_url).await
     }
@@ -247,7 +248,7 @@ impl Safe {
             ));
         }
 
-        let (mut safe_url, _) = self.parse_and_resolve_url(url).await?;
+        let mut safe_url = self.parse_and_resolve_url(url).await?;
 
         // If the FilesContainer URL was resolved from an NRS name we need to remove
         // the version from it so we can fetch latest version of it for sync-ing
@@ -466,7 +467,7 @@ impl Safe {
             ));
         }
 
-        let (mut safe_url, _) = self.parse_and_resolve_url(url).await?;
+        let mut safe_url = self.parse_and_resolve_url(url).await?;
 
         // If the FilesContainer URL was resolved from an NRS name we need to remove
         // the version from it so we can fetch latest version of it
@@ -528,9 +529,10 @@ impl Safe {
             // We need to update the link in the NRS container as well,
             // to link it to the new new_version of the FilesContainer we just generated
             safe_url.set_content_version(Some(new_version));
-            let new_link_for_nrs = safe_url.to_string();
+            let nrs_url = Url::from_url(url)?;
+            let top_name = nrs_url.top_name();
             let _ = self
-                .nrs_map_container_add(url, &new_link_for_nrs, false, true, false)
+                .nrs_map_container_associate(top_name, &safe_url, false)
                 .await?;
         }
 
@@ -603,7 +605,7 @@ impl Safe {
     /// ```
     pub async fn files_get_public_data(&mut self, url: &str, range: Range) -> Result<Bytes> {
         // TODO: do we want ownership from other PKs yet?
-        let (safe_url, _) = self.parse_and_resolve_url(url).await?;
+        let safe_url = self.parse_and_resolve_url(url).await?;
         self.fetch_public_data(&safe_url, range).await
     }
 
@@ -664,7 +666,7 @@ async fn validate_files_add_params(
         ));
     }
 
-    let (mut safe_url, _) = safe.parse_and_resolve_url(url).await?;
+    let mut safe_url = safe.parse_and_resolve_url(url).await?;
 
     // If the FilesContainer URL was resolved from an NRS name we need to remove
     // the version from it so we can fetch latest version of it for sync-ing
@@ -778,10 +780,10 @@ async fn files_map_sync(
             normalised_file_name = "/".to_string();
         }
 
-        // Let's update FileItem if there is a change or it doesn't exist in current_files_map
+        // Let's update FileInfo if there is a change or it doesn't exist in current_files_map
         match current_files_map.get(&normalised_file_name) {
             None => {
-                // We need to add a new FileItem
+                // We need to add a new FileInfo
                 if add_or_update_file_item(
                     safe,
                     local_file_name,
@@ -821,7 +823,7 @@ async fn files_map_sync(
                 let is_modified =
                     is_file_item_modified(safe, Path::new(local_file_name), file_item).await;
                 if force || (compare_file_content && is_modified) {
-                    // We need to update the current FileItem
+                    // We need to update the current FileInfo
                     if add_or_update_file_item(
                         safe,
                         local_file_name,
@@ -839,7 +841,7 @@ async fn files_map_sync(
                         success_count += 1;
                     }
                 } else {
-                    // No need to update FileItem just copy the existing one
+                    // No need to update FileInfo just copy the existing one
                     updated_files_map.insert(normalised_file_name.to_string(), file_item.clone());
 
                     if !force && !compare_file_content {
@@ -910,7 +912,7 @@ async fn files_map_sync(
 async fn is_file_item_modified(
     safe: &mut Safe,
     local_filename: &Path,
-    file_item: &FileItem,
+    file_item: &FileInfo,
 ) -> bool {
     if FileMeta::filetype_is_file(&file_item[PREDICATE_TYPE]) {
         match upload_file_to_net(safe, local_filename, true /* dry-run */).await {
@@ -954,7 +956,7 @@ async fn files_map_add_link(
             };
             let file_size = ""; // unknown
 
-            // Let's update FileItem if the link is different or it doesn't exist in the files_map
+            // Let's update FileInfo if the link is different or it doesn't exist in the files_map
             match files_map.get(file_name) {
                 Some(current_file_item) => {
                     let mut file_meta = FileMeta::from_file_item(current_file_item);
@@ -1156,7 +1158,7 @@ async fn files_map_create(
             .trim_end_matches('/')
             .to_string();
 
-        debug!("FileItem item name: {:?}", &file_name);
+        debug!("FileInfo item name: {:?}", &file_name);
 
         add_or_update_file_item(
             safe,
@@ -1876,9 +1878,9 @@ mod tests {
         let nrsurl = random_nrs_name();
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(None);
-        let unversioned_link = safe_url.to_string();
+        let unversioned_link = safe_url;
         match safe
-            .nrs_map_container_create(&nrsurl, &unversioned_link, false, true, false)
+            .nrs_map_container_create(&nrsurl, &unversioned_link, false)
             .await
         {
             Ok(_) => Err(anyhow!(
@@ -1889,7 +1891,7 @@ mod tests {
                 msg,
                 format!(
                     "The linked content (FilesContainer) is versionable, therefore NRS requires the link to specify a hash: \"{}\"",
-                    unversioned_link
+                    unversioned_link.to_string()
                 )
             );
                 Ok(())
@@ -1951,15 +1953,9 @@ mod tests {
         let nrsurl = random_nrs_name();
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let (nrs_xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
-            &nrsurl,
-            &safe_url.to_string(),
-            false,
-            true,
-            false
-        ));
+        let nrs_xorurl = retry_loop!(safe.nrs_map_container_create(&nrsurl, &safe_url, false));
 
-        let _ = retry_loop!(safe.fetch(&nrs_xorurl, None));
+        let _ = retry_loop!(safe.fetch(&nrs_xorurl.to_string(), None));
 
         let (version1, _, _) = retry_loop!(safe.files_container_sync(
             "./testdata/subfolder/",
@@ -1977,7 +1973,7 @@ mod tests {
 
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version1));
-        let (new_link, _) = retry_loop!(safe.parse_and_resolve_url(&nrsurl));
+        let new_link = retry_loop!(safe.parse_and_resolve_url(&nrsurl));
         // NRS points to the v0: check if different from v1 url
         assert_ne!(new_link.to_string(), safe_url.to_string());
 
@@ -2281,14 +2277,8 @@ mod tests {
         let nrsurl = random_nrs_name();
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let (nrs_xorurl, _, _) = retry_loop!(safe.nrs_map_container_create(
-            &nrsurl,
-            &safe_url.to_string(),
-            false,
-            true,
-            false
-        ));
-        let _ = retry_loop!(safe.fetch(&nrs_xorurl, None));
+        let nrs_xorurl = retry_loop!(safe.nrs_map_container_create(&nrsurl, &safe_url, false));
+        let _ = retry_loop!(safe.fetch(&nrs_xorurl.to_string(), None));
 
         let _ = retry_loop!(safe.files_container_sync(
             "./testdata/subfolder/",

@@ -35,7 +35,7 @@ impl Safe {
             }
         };
 
-        let (safeurl, _) = self.parse_and_resolve_url(url).await?;
+        let safeurl = self.parse_and_resolve_url(url).await?;
         if safeurl.xorname() != derived_xorname {
             Err(Error::InvalidInput(
                 "The URL doesn't correspond to the public key derived from the provided secret key"

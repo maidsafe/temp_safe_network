@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::files_map::FileItem;
+use super::files_map::FileInfo;
 use crate::{
     app::{
         consts::*,
@@ -23,7 +23,7 @@ use std::os::unix::fs::PermissionsExt;
 
 // Represents file metadata.  Simplifies passing it around.
 // note: all values are String or Option<String>
-// to facilitate use with FileItem.
+// to facilitate use with FileInfo.
 pub(crate) struct FileMeta {
     created: String,
     modified: String,
@@ -79,8 +79,8 @@ impl FileMeta {
         Ok(s)
     }
 
-    // Instantiates FileMeta from a FileItem
-    pub(crate) fn from_file_item(file_item: &FileItem) -> Self {
+    // Instantiates FileMeta from a FileInfo
+    pub(crate) fn from_file_item(file_item: &FileInfo) -> Self {
         // The first 4 must be present, else a crash.
         // lots of other code relies on this, so big refactor
         // would be needed to change it.
@@ -125,9 +125,9 @@ impl FileMeta {
         }
     }
 
-    // converts Self to FileItem
-    pub(crate) fn to_file_item(&self) -> FileItem {
-        let mut file_item = FileItem::new();
+    // converts Self to FileInfo
+    pub(crate) fn to_file_item(&self) -> FileInfo {
+        let mut file_item = FileInfo::new();
         Self::add_to_fileitem(
             &mut file_item,
             PREDICATE_CREATED,
@@ -187,8 +187,8 @@ impl FileMeta {
         Self::filetype_is_dir(&self.file_type)
     }
 
-    // helper: adds property to FileItem if val.is_some()
-    fn add_to_fileitem(file_item: &mut FileItem, key: &str, val: Option<String>) {
+    // helper: adds property to FileInfo if val.is_some()
+    fn add_to_fileitem(file_item: &mut FileInfo, key: &str, val: Option<String>) {
         if let Some(v) = val {
             file_item.insert(key.to_string(), v);
         }
