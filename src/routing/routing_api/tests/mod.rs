@@ -525,7 +525,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -584,7 +584,7 @@ async fn handle_online_command(
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -754,7 +754,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let _ = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     assert_matches!(event_rx.recv().await, Some(Event::MemberLeft { name, age, }) => {
@@ -807,7 +807,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -1052,20 +1052,20 @@ async fn get_internal_commands(
     command: Command,
     dispatcher: &Dispatcher,
 ) -> RoutingResult<Vec<Command>> {
-    let commands = dispatcher.handle_command(command).await?;
+    let commands = dispatcher.handle_command(command, "cmd-id").await?;
 
     let mut node_msg_handling = vec![];
     let mut inner_handling = vec![];
 
     for command in commands {
         // first pass gets us into node msg handling
-        let commands = dispatcher.handle_command(command).await?;
+        let commands = dispatcher.handle_command(command, "cmd-id").await?;
         node_msg_handling.extend(commands);
     }
 
     for command in node_msg_handling {
         // second pass gets us into non-data handling
-        let commands = dispatcher.handle_command(command).await?;
+        let commands = dispatcher.handle_command(command, "cmd-id").await?;
         inner_handling.extend(commands);
     }
 
@@ -1115,7 +1115,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
     let (proposal, sig) = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut relocate_sent = false;
@@ -1217,10 +1217,13 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let wire_msg = WireMsg::single_src(&node, dst_location, node_msg.clone(), section_pk)?;
 
     let commands = dispatcher
-        .handle_command(Command::SendMessage {
-            recipients: vec![(node.name(), node.addr)],
-            wire_msg,
-        })
+        .handle_command(
+            Command::SendMessage {
+                recipients: vec![(node.name(), node.addr)],
+                wire_msg,
+            },
+            "cmd-id",
+        )
         .await?;
 
     assert!(commands.is_empty());
@@ -1309,7 +1312,7 @@ async fn handle_elders_update() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut update_actual_recipients = HashSet::new();
@@ -1443,14 +1446,14 @@ async fn handle_demote_during_split() -> Result<()> {
         sk_set_v1_p0.public_keys(),
     );
     let command = create_our_elders_command(sk_set_v1_p0.secret_key(), section_auth)?;
-    let commands = dispatcher.handle_command(command).await?;
+    let commands = dispatcher.handle_command(command, "cmd-id").await?;
     assert_matches!(&commands[..], &[]);
 
     // Handle agreement on `OurElders` for prefix-1.
     let section_auth =
         SectionAuthorityProvider::new(peers_b.iter().copied(), prefix1, sk_set_v1_p1.public_keys());
     let command = create_our_elders_command(sk_set_v1_p1.secret_key(), section_auth)?;
-    let commands = dispatcher.handle_command(command).await?;
+    let commands = dispatcher.handle_command(command, "cmd-id").await?;
 
     let mut update_recipients = HashSet::new();
 

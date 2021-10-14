@@ -26,19 +26,19 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-use std::{net::SocketAddr, slice};
+use std::net::SocketAddr;
 use xor_name::XorName;
 impl Core {
     // Send proposal to all our elders.
     pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
         let elders: Vec<_> = self.section.authority_provider().peers().collect();
-        self.send_proposal(&elders, proposal).await
+        self.send_proposal(elders, proposal).await
     }
 
     // Send `proposal` to `recipients`.
     pub(crate) async fn send_proposal(
         &self,
-        recipients: &[Peer],
+        recipients: Vec<Peer>,
         proposal: Proposal,
     ) -> Result<Vec<Command>> {
         let key_share = self
@@ -54,7 +54,7 @@ impl Core {
 
     pub(crate) fn send_proposal_with(
         &self,
-        recipients: &[Peer],
+        recipients: Vec<Peer>,
         proposal: Proposal,
         key_share: &SectionKeyShare,
     ) -> Result<Vec<Command>> {
@@ -174,6 +174,7 @@ impl Core {
     pub(crate) fn send_ae_update_to_our_section(&self, section: &Section) -> Result<Vec<Command>> {
         let nodes: Vec<_> = section
             .active_members()
+            .iter()
             .filter(|peer| peer.name() != &self.node.name())
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
@@ -197,6 +198,7 @@ impl Core {
         let adults: Vec<_> = self
             .section
             .live_adults()
+            .iter()
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
 
@@ -215,7 +217,7 @@ impl Core {
 
     pub(crate) async fn send_relocate(
         &self,
-        recipient: &Peer,
+        recipient: Peer,
         details: RelocateDetails,
     ) -> Result<Vec<Command>> {
         let src = details.pub_id;
@@ -225,13 +227,13 @@ impl Core {
         };
         let node_msg = SystemMsg::Relocate(details);
 
-        self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
+        self.send_message_for_dst_accumulation(src, dst, node_msg, vec![recipient])
             .await
     }
 
     pub(crate) async fn send_relocate_promise(
         &self,
-        recipient: &Peer,
+        recipient: Peer,
         promise: RelocatePromise,
     ) -> Result<Vec<Command>> {
         // Note: this message is first sent to a single node who then sends it back to the section
@@ -244,7 +246,7 @@ impl Core {
         };
         let node_msg = SystemMsg::RelocatePromise(promise);
 
-        self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
+        self.send_message_for_dst_accumulation(src, dst, node_msg, vec![recipient])
             .await
     }
 
@@ -287,7 +289,7 @@ impl Core {
                 section_pk,
             },
             node_msg,
-            &recipients,
+            recipients,
         )
         .await
     }
@@ -297,7 +299,7 @@ impl Core {
         src: XorName,
         dst: DstLocation,
         node_msg: SystemMsg,
-        recipients: &[Peer],
+        recipients: Vec<Peer>,
     ) -> Result<Vec<Command>> {
         let key_share = self
             .section_keys_provider
@@ -335,7 +337,7 @@ impl Core {
     pub(crate) fn send_or_handle(
         &self,
         mut wire_msg: WireMsg,
-        recipients: &[Peer],
+        recipients: Vec<Peer>,
     ) -> Vec<Command> {
         let mut commands = vec![];
         let mut others = Vec::new();

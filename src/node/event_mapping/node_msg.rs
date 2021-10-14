@@ -26,7 +26,7 @@ pub(super) fn map_node_msg(
     msg: MessageReceived,
 ) -> Mapping {
     debug!(
-        "Handling Node message received event with id {}: {:?}",
+        "Handling Node message received event with id {:?}: {:?}",
         msg_id, msg
     );
 

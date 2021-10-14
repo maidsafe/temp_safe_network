@@ -129,7 +129,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let proposal = Proposal::SectionInfo(section_auth);
         let recipients: Vec<_> = self.section.authority_provider().peers().collect();
-        let result = self.send_proposal_with(&recipients, proposal, &key_share);
+        let result = self.send_proposal_with(recipients, proposal, &key_share);
 
         let public_key = key_share.public_key_set.public_key();
 

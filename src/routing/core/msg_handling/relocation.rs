@@ -67,10 +67,10 @@ impl Core {
 
             match action {
                 RelocateAction::Instant(details) => {
-                    commands.extend(self.send_relocate(&peer, details).await?)
+                    commands.extend(self.send_relocate(peer, details).await?)
                 }
                 RelocateAction::Delayed(promise) => {
-                    commands.extend(self.send_relocate_promise(&peer, promise).await?)
+                    commands.extend(self.send_relocate_promise(peer, promise).await?)
                 }
             }
         }
@@ -93,7 +93,7 @@ impl Core {
             details.age
         );
 
-        self.send_relocate(peer, details).await
+        self.send_relocate(*peer, details).await
     }
 
     pub(crate) async fn handle_relocate(
@@ -209,7 +209,7 @@ impl Core {
         if let Some(info) = self.section.members().get(&promise.name) {
             let details =
                 RelocateDetails::new(&self.section, &self.network, &info.peer, promise.dst);
-            commands.extend(self.send_relocate(&info.peer, details).await?);
+            commands.extend(self.send_relocate(info.peer, details).await?);
         } else {
             error!(
                 "ignore returned RelocatePromise from {} - unknown node",

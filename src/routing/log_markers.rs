@@ -28,4 +28,10 @@ pub(crate) enum LogMarker {
     ChunkQueryReceviedAtAdult,
     RegisterWrite,
     RegisterQueryReceived,
+    DispatchHandleMsgCmd,
+    DispatchSendMsgCmd,
+    CommandHandleSpawned,
+    CommandHandleStart,
+    CommandHandleEnd,
+    CommandHandleError,
 }
