@@ -245,6 +245,7 @@ impl Core {
                 let _ = self.section.update_elders(section_auth.clone(), key_sig);
                 if self.network.update(section_auth, self.section_chain())? {
                     info!("Updated our section's state in network's NetworkPrefixMap");
+                    self.write_prefix_map().await;
                 }
             } else {
                 // Update the old chain to become the neighbour's chain.
@@ -259,6 +260,8 @@ impl Core {
                 info!("Updating neighbouring section's SAP");
                 if let Err(e) = self.network.update(section_auth, &old_chain) {
                     error!("Error updating neighbouring section's details on our NetworkPrefixMap: {:?}", e);
+                } else {
+                    self.write_prefix_map().await;
                 }
             }
         }

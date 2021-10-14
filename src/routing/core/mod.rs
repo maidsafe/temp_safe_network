@@ -55,6 +55,8 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::{mpsc, RwLock};
 use xor_name::{Prefix, XorName};
 
@@ -77,6 +79,7 @@ pub(crate) struct Core {
     relocate_state: Option<RelocateState>,
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: Arc<RwLock<bool>>,
+    is_genesis_node: bool,
     resource_proof: ResourceProof,
     used_space: UsedSpace,
     pub(super) register_storage: RegisterStorage,
@@ -88,6 +91,7 @@ pub(crate) struct Core {
 
 impl Core {
     // Creates `Core` for a regular node.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn new(
         comm: Comm,
         mut node: Node,
@@ -96,6 +100,7 @@ impl Core {
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
+        is_genesis_node: bool,
     ) -> Result<Self> {
         let section_keys_provider =
             SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share).await;
@@ -123,6 +128,7 @@ impl Core {
             relocate_state: None,
             event_tx,
             joins_allowed: Arc::new(RwLock::new(true)),
+            is_genesis_node,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage,
             chunk_storage,
@@ -168,6 +174,39 @@ impl Core {
         );
 
         self.send_direct_message_to_nodes(recipients, message, dst_name, section_key)
+    }
+
+    pub(crate) async fn write_prefix_map(&self) {
+        info!("Writing our latest PrefixMap to disk");
+
+        // TODO: Make this serialization human readable
+        match rmp_serde::to_vec(&self.network) {
+            Ok(serialized) => {
+                if let Ok(mut node_dir_file) =
+                    File::create(&self.root_storage_dir.join("prefix_map")).await
+                {
+                    if let Err(e) = node_dir_file.write_all(&serialized).await {
+                        error!("Error writing PrefixMap in our node dir: {:?}", e);
+                    }
+                }
+                if self.is_genesis_node {
+                    if let Some(mut safe_dir) = dirs_next::home_dir() {
+                        safe_dir.push(".safe");
+                        safe_dir.push("prefix_map");
+                        if let Ok(mut safe_dir_file) = File::create(safe_dir).await {
+                            if let Err(e) = safe_dir_file.write_all(&serialized).await {
+                                error!("Error writing PrefixMap at `~/.safe`: {:?}", e);
+                            }
+                        }
+                    } else {
+                        error!("Could not write PrefixMap in SAFE dir: Home directory not found");
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Error serializing PrefixMap {:?}", e);
+            }
+        }
     }
 
     /// Generate commands and fire events based upon any node state changes.

@@ -23,12 +23,13 @@ use crate::routing::{Error, Result, SectionAuthUtils, SectionAuthorityProviderUt
 use bls::PublicKey as BlsPublicKey;
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use secured_linked_list::SecuredLinkedList;
+use serde::{Deserialize, Serialize};
 use std::iter::{self, Iterator};
 use std::sync::Arc;
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NetworkPrefixMap {
     /// Map of sections prefixes to their latest signed section authority providers.
     sections: Arc<DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>>,

@@ -150,6 +150,11 @@ impl Dispatcher {
         });
     }
 
+    pub(super) async fn write_prefixmap_to_disk(self: Arc<Self>) {
+        info!("Writing our PrefixMap to disk");
+        self.clone().core.read().await.write_prefix_map().await
+    }
+
     /// Handles a single command.
     pub(super) async fn handle_command(
         &self,
