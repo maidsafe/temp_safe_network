@@ -20,7 +20,7 @@ use crate::routing::{
     ed25519::{self, Keypair, Verifier},
     error::Error,
     peer::PeerUtils,
-    section::{section_authority_provider::SectionAuthorityProviderUtils, SectionPeersUtils},
+    section::section_authority_provider::SectionAuthorityProviderUtils,
 };
 use xor_name::XorName;
 

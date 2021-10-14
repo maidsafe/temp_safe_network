@@ -15,7 +15,7 @@ use crate::routing::{
     dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
     routing_api::command::Command,
-    section::{SectionKeyShare, SectionPeersUtils},
+    section::SectionKeyShare,
     SectionAuthorityProviderUtils,
 };
 use bls_dkg::key_gen::message::Message as DkgMessage;
