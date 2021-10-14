@@ -286,7 +286,11 @@ impl Core {
         let previous_name = Some(details.pub_id);
         let dst_key = Some(details.dst_key);
 
-        if self.section.members().is_relocated(&details.pub_id) {
+        if self
+            .section
+            .members()
+            .is_relocated_to_our_section(&details.pub_id)
+        {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - original node {:?} already relocated to us.",
                 peer, previous_name

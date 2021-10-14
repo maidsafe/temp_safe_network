@@ -327,10 +327,11 @@ impl Dispatcher {
                     .await
                     .section()
                     .active_members()
+                    .iter()
                     .filter(|peer| peer.name() != &name && peer.name() != &our_name)
                     .cloned()
                     .collect_vec();
-                Ok(self.core.read().await.send_or_handle(msg, &peers))
+                Ok(self.core.read().await.send_or_handle(msg, peers))
             }
             Command::TestConnectivity(name) => {
                 let mut commands = vec![];

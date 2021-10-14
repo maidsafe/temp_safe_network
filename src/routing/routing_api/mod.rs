@@ -349,14 +349,7 @@ impl Routing {
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.dispatcher
-            .core
-            .read()
-            .await
-            .section()
-            .adults()
-            .copied()
-            .collect()
+        self.dispatcher.core.read().await.section().adults()
     }
 
     /// Returns the adults of our section sorted by their distance to `name` (closest first).
