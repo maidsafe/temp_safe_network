@@ -27,7 +27,7 @@ use xor_name::XorName;
 impl Session {
     // Listen for incoming messages on a connection
     #[instrument(skip_all, level = "debug")]
-    pub(crate) async fn spawn_message_listener_thread(
+    pub(crate) fn spawn_message_listener_thread(
         session: Session,
         mut incoming_messages: IncomingMessages<XorName>,
     ) {
@@ -76,7 +76,7 @@ impl Session {
     ) -> Result<(), Error> {
         match msg {
             MessageType::Service { msg_id, msg, .. } => {
-                Self::handle_client_msg(session, msg_id, msg, src).await
+                Self::handle_client_msg(session, msg_id, msg, src)
             }
             MessageType::System {
                 msg:
@@ -132,7 +132,7 @@ impl Session {
 
     // Handle messages intended for client consumption (re: queries + commands)
     #[instrument(skip(session), level = "debug")]
-    async fn handle_client_msg(
+    fn handle_client_msg(
         session: Session,
         msg_id: MessageId,
         msg: ServiceMsg,
@@ -140,7 +140,7 @@ impl Session {
     ) -> Result<(), Error> {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = session.pending_queries.clone();
-        let error_sender = session.incoming_err_sender.clone();
+        let error_sender = session.incoming_err_sender;
 
         let _ = tokio::spawn(async move {
             match msg {
