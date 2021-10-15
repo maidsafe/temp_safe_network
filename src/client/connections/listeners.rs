@@ -28,18 +28,17 @@ impl Session {
     // Listen for incoming messages on a connection
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn spawn_message_listener_thread(
-        mut session: Session,
+        session: Session,
         mut incoming_messages: IncomingMessages<XorName>,
     ) {
         debug!("Listening for incoming messages");
         let _ = tokio::spawn(async move {
             loop {
-                session = match Self::listen_for_incoming_message(&mut incoming_messages).await {
+                match Self::listen_for_incoming_message(&mut incoming_messages).await {
                     Ok((src, msg)) => match Self::handle_msg(msg, src, session.clone()).await {
-                        Ok(session) => session,
+                        Ok(()) => {},
                         Err(err) => {
                             error!("Error while processing incoming message: {:?}. Listening for next message...", err);
-                            session
                         }
                     },
                     Err(Error::Generic(_)) => {
@@ -49,7 +48,6 @@ impl Session {
                     }
                     Err(err) => {
                         error!("Error while getting incoming message: {:?}. Listening for next message...", err);
-                        session
                     }
                 }
             }
@@ -75,7 +73,7 @@ impl Session {
         msg: MessageType,
         src: SocketAddr,
         session: Session,
-    ) -> Result<Session, Error> {
+    ) -> Result<(), Error> {
         match msg {
             MessageType::Service { msg_id, msg, .. } => {
                 Self::handle_client_msg(session, msg_id, msg, src).await
@@ -127,7 +125,7 @@ impl Session {
             }
             msg_type => {
                 warn!("Unexpected message type received: {:?}", msg_type);
-                Ok(session)
+                Ok(())
             }
         }
     }
@@ -139,7 +137,7 @@ impl Session {
         msg_id: MessageId,
         msg: ServiceMsg,
         src: SocketAddr,
-    ) -> Result<Session, Error> {
+    ) -> Result<(), Error> {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = session.pending_queries.clone();
         let error_sender = session.incoming_err_sender.clone();
@@ -197,7 +195,7 @@ impl Session {
             };
         });
 
-        Ok(session)
+        Ok(())
     }
 
     // Handle Anti-Entropy Redirect messages
@@ -208,7 +206,7 @@ impl Session {
         section_signed: KeyedSig,
         bounced_msg: Bytes,
         sender: SocketAddr,
-    ) -> Result<Session, Error> {
+    ) -> Result<(), Error> {
         // Check if SAP signature is valid
         if !bincode::serialize(&target_section_auth)
             .map(|bytes| section_signed.verify(&bytes))
@@ -218,7 +216,7 @@ impl Session {
                 "Signature returned with SAP in AE-Redirect response is invalid: {:?}",
                 target_section_auth
             );
-            return Ok(session);
+            return Ok(());
         }
 
         debug!(
@@ -226,7 +224,7 @@ impl Session {
             sender, target_section_auth
         );
 
-        if let Some((msg_id, session, elders, service_msg, mut dst_location, auth)) =
+        if let Some((msg_id, elders, service_msg, mut dst_location, auth)) =
             Self::new_elder_targets_if_any(
                 session.clone(),
                 bounced_msg.clone(),
@@ -236,7 +234,7 @@ impl Session {
         {
             if elders.is_empty() {
                 debug!("We have already resent this message on an AE-Redirect response. Dropping this instance");
-                return Ok(session);
+                return Ok(());
             }
 
             let message = WireMsg::serialize_msg_payload(&service_msg)?;
@@ -263,7 +261,7 @@ impl Session {
             send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
         }
 
-        Ok(session)
+        Ok(())
     }
 
     // Handle Anti-Entropy Retry messages
@@ -274,7 +272,7 @@ impl Session {
         section_signed: KeyedSig,
         bounced_msg: Bytes,
         proof_chain: SecuredLinkedList,
-    ) -> Result<Session, Error> {
+    ) -> Result<(), Error> {
         // Update our network knowledge making sure proof chain
         // validates the new SAP based on currently known remote section SAP.
         match session.network.update(
@@ -302,12 +300,12 @@ impl Session {
                         "Anti-Entropy: failed to update remote section SAP, bounced msg dropped. Failed section auth was {:?}, {:?}",
                         err, section_auth
                     );
-                return Ok(session);
+                return Ok(());
             }
         }
 
         // Extract necessary information for resending
-        if let Some((msg_id, session, elders, service_msg, dst_location, auth)) =
+        if let Some((msg_id, elders, service_msg, dst_location, auth)) =
             Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), None).await?
         {
             if let Some(id) = *session.clone().initial_connection_check_msg_id.read().await {
@@ -316,7 +314,7 @@ impl Session {
                         "Retry message recevied from intial client contact probe ({:?}). No need to retry this",
                         msg_id
                     );
-                    return Ok(session);
+                    return Ok(());
                 }
             }
 
@@ -324,7 +322,7 @@ impl Session {
 
             if elders.is_empty() {
                 debug!("We have already responded to this message on an AE-Retry response. Dropping this instance");
-                return Ok(session);
+                return Ok(());
             }
 
             let payload = WireMsg::serialize_msg_payload(&service_msg)?;
@@ -341,7 +339,7 @@ impl Session {
             send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
         }
 
-        Ok(session)
+        Ok(())
     }
 
     /// Checks AE cache to see if we should be forwarding this message (and to whom) or if it has already been dealt with
@@ -353,7 +351,6 @@ impl Session {
     ) -> Result<
         Option<(
             MessageId,
-            Session,
             Vec<SocketAddr>,
             ServiceMsg,
             DstLocation,
@@ -486,7 +483,6 @@ impl Session {
 
         Ok(Some((
             msg_id,
-            session,
             target_elders,
             service_msg,
             dst_location,
