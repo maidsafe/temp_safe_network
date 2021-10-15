@@ -66,8 +66,6 @@ pub(crate) enum Command {
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
-    /// Handle lost connection to a peer.
-    HandleConnectionLost(SocketAddr),
     /// Handle peer that's been detected as lost.
     HandlePeerLost(SocketAddr),
     /// Handle agreement on a proposal.
@@ -129,7 +127,6 @@ impl fmt::Display for Command {
         match self {
             Command::HandleTimeout(_) => write!(f, "HandlePeerLost"),
             Command::ScheduleTimeout { .. } => write!(f, "ScheduleTimeout"),
-            Command::HandleConnectionLost(_) => write!(f, "HandleConnectionLost"),
             Command::HandleSystemMessage { msg_id, .. } => {
                 write!(f, "HandleSystemMessage {:?}", msg_id)
             }

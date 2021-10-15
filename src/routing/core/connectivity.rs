@@ -16,18 +16,6 @@ use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
 impl Core {
-    pub(crate) fn handle_connection_lost(&self, addr: SocketAddr) -> Result<Vec<Command>> {
-        if let Some(peer) = self.section.find_joined_member_by_addr(&addr) {
-            debug!(
-                "Possible connection loss detected with known peer {:?}",
-                peer
-            )
-        } else {
-            debug!("Possible connection loss detected with addr: {:?}", addr);
-        }
-        Ok(vec![])
-    }
-
     pub(crate) async fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Command>> {
         let name = if let Some(peer) = self.section.find_joined_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
