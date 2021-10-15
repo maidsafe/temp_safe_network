@@ -18,7 +18,7 @@ use crate::messaging::{
 use crate::messaging::{AuthorityProof, ServiceAuth};
 use bytes::Bytes;
 use itertools::Itertools;
-use qp2p::IncomingMessages;
+use qp2p::ConnectionIncoming;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use tracing::Instrument;
@@ -29,13 +29,14 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     pub(crate) fn spawn_message_listener_thread(
         session: Session,
-        mut incoming_messages: IncomingMessages<XorName>,
+        src: SocketAddr,
+        mut incoming_messages: ConnectionIncoming<XorName>,
     ) {
         debug!("Listening for incoming messages");
         let _ = tokio::spawn(async move {
             loop {
-                match Self::listen_for_incoming_message(&mut incoming_messages).await {
-                    Ok((src, msg)) => match Self::handle_msg(msg, src, session.clone()).await {
+                match Self::listen_for_incoming_message(src, &mut incoming_messages).await {
+                    Ok(msg) => match Self::handle_msg(msg, src, session.clone()).await {
                         Ok(()) => {},
                         Err(err) => {
                             error!("Error while processing incoming message: {:?}. Listening for next message...", err);
@@ -56,13 +57,14 @@ impl Session {
 
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn listen_for_incoming_message(
-        incoming_messages: &mut IncomingMessages<XorName>,
-    ) -> Result<(SocketAddr, MessageType), Error> {
-        if let Some((connection, message)) = incoming_messages.next().await {
-            trace!("Incoming message from {:?}", connection.remote_address());
+        src: SocketAddr,
+        incoming_messages: &mut ConnectionIncoming<XorName>,
+    ) -> Result<MessageType, Error> {
+        if let Some(message) = incoming_messages.next().await? {
+            trace!("Incoming message from {:?}", src);
             let msg_type = WireMsg::deserialize(message)?;
 
-            Ok((connection.remote_address(), msg_type))
+            Ok(msg_type)
         } else {
             Err(Error::Generic("Nothing..".to_string())) // TODO: FIX error type
         }
@@ -258,7 +260,14 @@ impl Session {
 
             debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 
-            send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
+            send_message(
+                session.clone(),
+                elders.clone(),
+                wire_msg,
+                session.endpoint.clone(),
+                msg_id,
+            )
+            .await?;
         }
 
         Ok(())
@@ -336,7 +345,8 @@ impl Session {
 
             debug!("Resending original message via AE-Retry");
 
-            send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
+            let endpoint = session.endpoint.clone();
+            send_message(session, elders.clone(), wire_msg, endpoint, msg_id).await?;
         }
 
         Ok(())
