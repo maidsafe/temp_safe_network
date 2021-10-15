@@ -56,7 +56,7 @@ impl Session {
         );
         debug!("QP2p config: {:?}", qp2p_config);
 
-        let (endpoint, incoming_messages) = Endpoint::new_client(local_addr, qp2p_config)?;
+        let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
 
         let session = Session {
             client_pk,
@@ -71,8 +71,6 @@ impl Session {
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             standard_wait,
         };
-
-        Self::spawn_message_listener_thread(session.clone(), incoming_messages).await;
 
         Ok(session)
     }
@@ -127,7 +125,14 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        let res = send_message(elders.clone(), wire_msg, self.endpoint.clone(), msg_id).await;
+        let res = send_message(
+            self.clone(),
+            elders.clone(),
+            wire_msg,
+            self.endpoint.clone(),
+            msg_id,
+        )
+        .await;
 
         // lets wait for any potential AE response while we're here.
         // TODO: be smart about this. Check AE Retry cache for related msg id eg, continue early if we've seen some.
@@ -228,13 +233,21 @@ impl Session {
             let msg_bytes = msg_bytes.clone();
             let counter_clone = discarded_responses.clone();
 
-            let task_handle = tokio::spawn(
+            let task_handle = tokio::spawn({
+                let session = self.clone();
                 async move {
                     trace!("queueing query send task to: {:?}", &socket);
                     let result = endpoint
                         .connect_to(&socket)
                         .err_into()
-                        .and_then(|connection| async move {
+                        .and_then(|(connection, connection_incoming)| async move {
+                            if let Some(connection_incoming) = connection_incoming {
+                                Self::spawn_message_listener_thread(
+                                    session,
+                                    connection.remote_address(),
+                                    connection_incoming,
+                                );
+                            }
                             connection.send_with(msg_bytes, priority, None).await
                         })
                         .await;
@@ -248,8 +261,8 @@ impl Session {
                     }
                     result
                 }
-                .instrument(tracing::debug_span!("sending query message")),
-            );
+                .instrument(tracing::debug_span!("sending query message"))
+            });
 
             tasks.push(task_handle);
         }
@@ -405,6 +418,7 @@ impl Session {
 
         let initial_contacts = elders_or_adults[0..NODES_TO_CONTACT_PER_STARTUP_BATCH].to_vec();
         send_message(
+            self.clone(),
             initial_contacts,
             wire_msg.clone(),
             self.endpoint.clone(),
@@ -451,6 +465,7 @@ impl Session {
 
                     trace!("Sending out another batch of initial contact msgs to new nodes");
                     send_message(
+                        self.clone(),
                         next_contacts,
                         wire_msg.clone(),
                         self.endpoint.clone(),
@@ -476,7 +491,8 @@ impl Session {
 }
 
 #[instrument(skip_all, level = "trace")]
-pub(crate) async fn send_message(
+pub(super) async fn send_message(
+    session: Session,
     elders: Vec<SocketAddr>,
     wire_msg: WireMsg,
     endpoint: Endpoint<XorName>,
@@ -495,13 +511,21 @@ pub(crate) async fn send_message(
         let successes_clone = successes.clone();
         let msg_bytes_clone = msg_bytes.clone();
         let endpoint = endpoint.clone();
-        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(
+        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn({
+            let session = session.clone();
             async move {
                 // trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
                 endpoint
                     .connect_to(&socket)
                     .err_into()
-                    .and_then(|connection| async move {
+                    .and_then(|(connection, connection_incoming)| async move {
+                        if let Some(connection_incoming) = connection_incoming {
+                            Session::spawn_message_listener_thread(
+                                session,
+                                connection.remote_address(),
+                                connection_incoming,
+                            );
+                        }
                         connection.send_with(msg_bytes_clone, priority, None).await
                     })
                     .await?;
@@ -512,8 +536,8 @@ pub(crate) async fn send_message(
                 Ok(())
             }
             .instrument(tracing::trace_span!("sending message"))
-            .in_current_span(),
-        );
+            .in_current_span()
+        });
         tasks.push(task_handle);
     }
 
