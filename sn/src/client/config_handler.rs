@@ -177,10 +177,15 @@ mod tests {
             local_addr: (Ipv4Addr::UNSPECIFIED, 0).into(),
             root_dir: root_dir.clone(),
             genesis_key,
-            qp2p: QuicP2pConfig::default(),
+            qp2p: QuicP2pConfig {
+                idle_timeout: Some(Duration::from_secs(5)),
+                keep_alive_interval: Some(Duration::from_secs(1)),
+                ..Default::default()
+            },
             query_timeout: DEFAULT_QUERY_TIMEOUT,
             standard_wait: DEFAULT_QUERY_TIMEOUT / 10,
         };
+        assert_eq!(format!("{:?}", config), format!("{:?}", expected_config));
         assert_eq!(serialize(&config)?, serialize(&expected_config)?);
 
         create_dir_all(&root_dir).await?;
