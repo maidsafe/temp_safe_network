@@ -16,7 +16,7 @@ lazy_static! {
         let mut populate = |subtypes: &[&'static str], range| {
             for (i, subtype) in subtypes.iter().enumerate() {
                 let code = range + (i as u16);
-                let _ = m.insert(code, *subtype);
+                let _prev = m.insert(code, *subtype);
             }
         };
         populate(&APPLICATION_SUBTYPES, 0x5000);
@@ -33,7 +33,7 @@ lazy_static! {
         let mut populate = |subtypes: &[&'static str], range| {
             for (i, subtype) in subtypes.iter().enumerate() {
                 let code = range + (i as u16);
-                let _ = m.insert((*subtype).to_string(), code);
+                let _prev = m.insert((*subtype).to_string(), code);
             }
         };
         populate(&APPLICATION_SUBTYPES, 0x5000);

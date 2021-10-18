@@ -192,7 +192,7 @@ impl Routing {
         let event_stream = EventStream::new(event_rx);
 
         // Start listening to incoming connections.
-        let _ = task::spawn(handle_connection_events(
+        let _handle = task::spawn(handle_connection_events(
             dispatcher.clone(),
             connection_event_rx,
         ));
@@ -503,7 +503,7 @@ async fn handle_connection_events(
                     len,
                 );
 
-                let _ = dispatcher.clone().handle_commands(command, None).await;
+                let _handle = dispatcher.clone().handle_commands(command, None).await;
             }
         }
     }

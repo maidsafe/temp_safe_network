@@ -50,7 +50,7 @@ impl Comm {
 
         let msg_count = MsgCount::new();
 
-        let _ = task::spawn(handle_incoming_connections(
+        let _handle = task::spawn(handle_incoming_connections(
             incoming_connections,
             event_tx.clone(),
             msg_count.clone(),
@@ -80,7 +80,7 @@ impl Comm {
 
         let msg_count = MsgCount::new();
 
-        let _ = task::spawn(handle_incoming_connections(
+        let _handle = task::spawn(handle_incoming_connections(
             incoming_connections,
             event_tx.clone(),
             msg_count.clone(),
@@ -376,7 +376,7 @@ async fn handle_incoming_messages(
     while let Some(result) = incoming_msgs.next().await.transpose() {
         match result {
             Ok(msg) => {
-                let _ = event_tx.send(ConnectionEvent::Received((src, msg))).await;
+                let _send_res = event_tx.send(ConnectionEvent::Received((src, msg))).await;
                 // count incoming msgs..
                 msg_count.increase_incoming(src);
             }
@@ -686,7 +686,7 @@ mod tests {
 
             let (tx, rx) = mpsc::channel(1);
 
-            let _ = tokio::spawn(async move {
+            let _handle = tokio::spawn(async move {
                 while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
                     while let Ok(Some(msg)) = incoming_messages.next().await {
                         let _ = tx.send(msg).await;
@@ -708,7 +708,7 @@ mod tests {
 
         // Keep the socket alive to keep the address bound, but don't read/write to it so any
         // attempt to connect to it will fail.
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             future::pending::<()>().await;
             let _ = socket;
         });
