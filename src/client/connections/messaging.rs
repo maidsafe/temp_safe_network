@@ -537,10 +537,12 @@ pub(crate) async fn send_message(
 
     if failures > 0 {
         error!(
-            "Sending the message ({:?}) to {}/{} of the elders failed",
+            "Sending the message ({:?}) from {} to {}/{} of the elders failed: {:?}",
             msg_id,
+            endpoint.public_addr(),
             failures,
-            elders.len()
+            elders.len(),
+            elders,
         );
     }
 

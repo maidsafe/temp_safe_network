@@ -140,6 +140,9 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
     let regex_cmd_end = Regex::new(r".*CommandHandleEnd.*cmd_id=(.*)$")?;
     let regex_cmd_error = Regex::new(r".*CommandHandleError.*cmd_id=(.*)$")?;
     let regex_handle_msg = Regex::new(r".*DispatchHandleMsgCmd.*msg_id=MessageId\((.*)\)$")?;
+    let regex_send_msg =
+        Regex::new(r".*CommandHandleSpawned SendMessage MessageId\((.*)\) cmd_id=(.*)$")?;
+
     let regex_node_is_elder = Regex::new(r".*elder=true.*")?;
 
     // Iterate over each of the testnet nodes log files
@@ -222,7 +225,19 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
                             let msg_id = cap[1].to_string();
                             commands
                                 .handle_msg
-                                .insert(msg_id, (log_file_path.clone(), log_entry));
+                                .insert(msg_id, (log_file_path.clone(), log_entry.clone()));
+                        }
+
+                        // Let's also map any msg id to correlated commands for outgoing messages
+                        if let Some(cap) = regex_send_msg.captures_iter(&log_entry).next() {
+                            let msg_id = cap[1].to_string();
+                            let cmd_id = cap[2].to_string();
+                            let root_cmd_id = get_root_cmd_id(&cmd_id);
+                            commands
+                                .msg_id_to_cmds
+                                .entry(msg_id)
+                                .or_insert_with(Vec::new)
+                                .push(root_cmd_id);
                         }
                     }
                 }
@@ -419,18 +434,20 @@ fn populate_commands_tree_for_msgs(
     msg_id: &str,
 ) {
     println!("Looking for commands spawned from msg id {}", msg_id);
-    commands.handle_msg.get(msg_id).map(|(logfile, log_entry)| {
-        commands.msg_id_to_cmds.get(msg_id).map(|ids| {
-            ids.iter().for_each(|root_cmd_id| {
+    let incoming_msg_log_entry = commands.handle_msg.get(msg_id);
+
+    if let Some(ids) = commands.msg_id_to_cmds.get(msg_id) {
+        ids.iter().for_each(|root_cmd_id| {
+            if let Some((logfile, log_entry)) = incoming_msg_log_entry {
                 report
                     .entry(root_cmd_id.clone())
                     .or_insert_with(Vec::new)
                     .push(format!("{}: {}", logfile.display(), log_entry));
+            }
 
-                populate_commands_tree(commands, report, root_cmd_id);
-            })
-        })
-    });
+            populate_commands_tree(commands, report, root_cmd_id);
+        });
+    }
 }
 
 // Given a command id, return the root id, e.g. the root cmd id of 'abc.1.0.2' is 'a.b.c'.
