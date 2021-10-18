@@ -9,7 +9,7 @@
 use super::{Command, Event};
 use crate::messaging::{
     data::{ChunkDataExchange, StorageLevel},
-    system::{Section, SystemMsg},
+    system::{Proposal, Section, SystemMsg},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
 use crate::routing::{
@@ -282,25 +282,38 @@ impl Dispatcher {
             Command::HandleTimeout(token) => self.core.read().await.handle_timeout(token).await,
             Command::HandleAgreement { proposal, sig } => {
                 self.core
-                    .write()
+                    .read()
                     .await
-                    .handle_agreement(proposal, sig)
+                    .handle_non_elder_agreement(proposal, sig)
                     .await
             }
+            Command::HandleElderAgreement { proposal, sig } => match proposal {
+                Proposal::OurElders(section_auth) => {
+                    self.core
+                        .write()
+                        .await
+                        .handle_our_elders_agreement(section_auth, sig)
+                        .await
+                }
+                _ => {
+                    error!("Other agreement messages should be handled in `HandleAgreement`, which is non-blocking ");
+                    Ok(vec![])
+                }
+            },
             Command::HandlePeerLost(addr) => self.core.read().await.handle_peer_lost(&addr).await,
             Command::HandleDkgOutcome {
                 section_auth,
                 outcome,
             } => {
                 self.core
-                    .write()
+                    .read()
                     .await
                     .handle_dkg_outcome(section_auth, outcome)
                     .await
             }
             Command::HandleDkgFailure(signeds) => self
                 .core
-                .write()
+                .read()
                 .await
                 .handle_dkg_failure(signeds)
                 .await

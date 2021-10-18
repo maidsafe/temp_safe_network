@@ -255,6 +255,10 @@ impl Core {
         {
             Ok(false) => match msg {
                 SystemMsg::NodeCmd(_)
+                | SystemMsg::AntiEntropyProbe(_)
+                | SystemMsg::AntiEntropyRedirect { .. }
+                | SystemMsg::AntiEntropyRetry { .. }
+                | SystemMsg::BackPressure(_)
                 | SystemMsg::JoinResponse(_)
                 | SystemMsg::JoinRequest(_)
                 | SystemMsg::JoinAsRelocatedRequest(_)
@@ -307,41 +311,8 @@ impl Core {
         msg_authority: NodeMsgAuthority,
         node_msg: SystemMsg,
     ) -> Result<Vec<Command>> {
-        let src_name = msg_authority.name();
-
         trace!("Handling blocking system message");
         match node_msg {
-            SystemMsg::AntiEntropyRetry {
-                section_auth,
-                section_signed,
-                proof_chain,
-                bounced_msg,
-            } => {
-                trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
-                self.handle_anti_entropy_retry_msg(
-                    section_auth,
-                    section_signed,
-                    proof_chain,
-                    bounced_msg,
-                    sender,
-                    src_name,
-                )
-                .await
-            }
-            SystemMsg::AntiEntropyRedirect {
-                section_auth,
-                section_signed,
-                bounced_msg,
-            } => {
-                trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
-                self.handle_anti_entropy_redirect_msg(
-                    section_auth,
-                    section_signed,
-                    bounced_msg,
-                    sender,
-                )
-                .await
-            }
             SystemMsg::AntiEntropyUpdate {
                 section_auth,
                 section_signed,
@@ -357,16 +328,6 @@ impl Core {
                     sender,
                 )
                 .await
-            }
-            SystemMsg::AntiEntropyProbe(_dst) => {
-                trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                Ok(vec![])
-            }
-            SystemMsg::BackPressure(load_report) => {
-                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
-                // #TODO: Factor in med/long term backpressure into general node liveness calculations
-                self.comm.regulate(sender, load_report).await;
-                Ok(vec![])
             }
             SystemMsg::Relocate(ref details) => {
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
@@ -452,6 +413,47 @@ impl Core {
         let src_name = msg_authority.name();
         trace!("Handling non blocking message");
         match node_msg {
+            SystemMsg::AntiEntropyRetry {
+                section_auth,
+                section_signed,
+                proof_chain,
+                bounced_msg,
+            } => {
+                trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
+                self.handle_anti_entropy_retry_msg(
+                    section_auth,
+                    section_signed,
+                    proof_chain,
+                    bounced_msg,
+                    sender,
+                    src_name,
+                )
+                .await
+            }
+            SystemMsg::AntiEntropyRedirect {
+                section_auth,
+                section_signed,
+                bounced_msg,
+            } => {
+                trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
+                self.handle_anti_entropy_redirect_msg(
+                    section_auth,
+                    section_signed,
+                    bounced_msg,
+                    sender,
+                )
+                .await
+            }
+            SystemMsg::AntiEntropyProbe(_dst) => {
+                trace!("Received Probe message from {}: {:?}", sender, msg_id);
+                Ok(vec![])
+            }
+            SystemMsg::BackPressure(load_report) => {
+                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
+                // #TODO: Factor in med/long term backpressure into general node liveness calculations
+                self.comm.regulate(sender, load_report).await;
+                Ok(vec![])
+            }
             SystemMsg::JoinResponse(join_response) => {
                 debug!(
                     "Ignoring unexpected join response message: {:?}",

@@ -22,8 +22,8 @@ use super::Core;
 // Agreement
 impl Core {
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn handle_agreement(
-        &mut self,
+    pub(crate) async fn handle_non_elder_agreement(
+        &self,
         proposal: Proposal,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
@@ -36,10 +36,10 @@ impl Core {
             Proposal::SectionInfo(section_auth) => {
                 self.handle_section_info_agreement(section_auth, sig).await
             }
-            Proposal::OurElders(section_auth) => {
-                // TODO: this is the only agreement needing self mut.
-                // Separate this out
-                self.handle_our_elders_agreement(section_auth, sig).await
+            Proposal::OurElders(_) => {
+                error!("Elders agreement should be handled in a separate blocking fashion");
+                Ok(vec![])
+                // self.handle_our_elders_agreement(section_auth, sig).await
             }
             Proposal::JoinsAllowed(joins_allowed) => {
                 *self.joins_allowed.write().await = joins_allowed;
@@ -242,7 +242,7 @@ impl Core {
     }
 
     #[instrument(skip(self), level = "trace")]
-    async fn handle_our_elders_agreement(
+    pub(crate) async fn handle_our_elders_agreement(
         &mut self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,

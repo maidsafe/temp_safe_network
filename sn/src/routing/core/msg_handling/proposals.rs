@@ -77,7 +77,12 @@ impl Core {
         commands.extend(self.check_lagging((src_name, sender), sig_share_pk).await?);
 
         match self.proposal_aggregator.add(proposal, sig_share).await {
-            Ok((proposal, sig)) => commands.push(Command::HandleAgreement { proposal, sig }),
+            Ok((proposal, sig)) => match proposal {
+                Proposal::OurElders(_) => {
+                    commands.push(Command::HandleElderAgreement { proposal, sig })
+                }
+                _ => commands.push(Command::HandleAgreement { proposal, sig }),
+            },
             Err(ProposalError::Aggregation(AggregatorError::NotEnoughShares)) => {
                 trace!(
                     "Proposal from {} inserted in aggregator, not enough sig shares yet: {:?}",

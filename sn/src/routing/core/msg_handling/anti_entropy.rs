@@ -81,7 +81,7 @@ impl Core {
             .await
     }
     pub(crate) async fn handle_anti_entropy_retry_msg(
-        &mut self,
+        &self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
@@ -148,7 +148,7 @@ impl Core {
     }
 
     pub(crate) async fn handle_anti_entropy_redirect_msg(
-        &mut self,
+        &self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         bounced_msg: Bytes,
