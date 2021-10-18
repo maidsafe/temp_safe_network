@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
         )
         .await?
     };
-    let _ = join_all(handles).await;
+    let _res = join_all(handles).await;
 
     Ok(())
 }

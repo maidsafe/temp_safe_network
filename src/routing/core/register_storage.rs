@@ -83,12 +83,12 @@ impl RegisterStorage {
             let (key, cache) = entry.pair();
             if let Some(entry) = cache {
                 if prefix.matches(entry.state.name()) {
-                    let _ = the_data.insert(*key, entry.store.get_all()?);
+                    let _prev = the_data.insert(*key, entry.store.get_all()?);
                 }
             } else {
                 let entry = self.load_state(*key)?;
                 if prefix.matches(entry.state.name()) {
-                    let _ = the_data.insert(*key, entry.store.get_all()?);
+                    let _prev = the_data.insert(*key, entry.store.get_all()?);
                 }
             }
         }
@@ -110,7 +110,7 @@ impl RegisterStorage {
                     ServiceMsg::Cmd(DataCmd::Register(op.write.clone())),
                 )
                 .map_err(|_| Error::InvalidSignature(op.auth.public_key))?;
-                let _ = self.apply(op, auth)?;
+                let _res = self.apply(op, auth)?;
             }
         }
 
@@ -149,8 +149,8 @@ impl RegisterStorage {
                 }
                 trace!("Creating new register");
                 let mut store = self.load_store(key)?;
-                let _ = store.append(op)?;
-                let _ = self
+                let _res = store.append(op)?;
+                let _prev = self
                     .registers
                     .insert(key, Some(StateEntry { state: map, store }));
 
@@ -160,7 +160,7 @@ impl RegisterStorage {
                 let result = match self.registers.get_mut(&key) {
                     None => {
                         trace!("Attempting to delete register if it exists");
-                        let _ = self.db.drop_tree(key)?;
+                        let _res = self.db.drop_tree(key)?;
                         Ok(())
                     }
                     Some(mut entry) => {
@@ -177,12 +177,12 @@ impl RegisterStorage {
                                 Err(Error::InvalidOwner(auth.public_key))
                             } else {
                                 info!("Deleting Register");
-                                let _ = self.db.drop_tree(key)?;
+                                let _res = self.db.drop_tree(key)?;
                                 Ok(())
                             }
                         } else if self.load_store(key).is_ok() {
                             info!("Deleting Register");
-                            let _ = self.db.drop_tree(key)?;
+                            let _res = self.db.drop_tree(key)?;
                             Ok(())
                         } else {
                             Ok(())
@@ -191,7 +191,7 @@ impl RegisterStorage {
                 };
 
                 if result.is_ok() {
-                    let _ = self.registers.remove(&key);
+                    let _prev = self.registers.remove(&key);
                 }
 
                 result
@@ -205,7 +205,7 @@ impl RegisterStorage {
                     cached_entry
                 } else {
                     let fresh_entry = self.load_state(key)?;
-                    let _ = cache.replace(fresh_entry);
+                    let _prev = cache.replace(fresh_entry);
                     if let Some(entry) = cache.as_mut() {
                         entry
                     } else {
@@ -453,7 +453,7 @@ mod test {
 
         let mut permissions = BTreeMap::default();
         let user_perms = PublicPermissions::new(true);
-        let _ = permissions.insert(User::Key(pk), user_perms);
+        let _prev = permissions.insert(User::Key(pk), user_perms);
 
         let replica1 = Register::new_public(
             pk,
