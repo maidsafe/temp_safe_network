@@ -56,20 +56,17 @@ pub mod routing;
 pub mod types;
 pub mod url;
 
-#[cfg(test)]
-use std::sync::Once;
-#[cfg(test)]
 use tracing_core::{Event, Subscriber};
-#[cfg(test)]
 use tracing_subscriber::{
     fmt::{
-        fmt,
         time::{FormatTime, SystemTime},
         FmtContext, FormatEvent, FormatFields, FormattedFields,
     },
     registry::LookupSpan,
-    EnvFilter,
 };
+
+#[cfg(test)]
+use std::sync::Once;
 
 #[cfg(test)]
 #[ctor::ctor]
@@ -80,15 +77,11 @@ fn test_setup() {
     color_eyre::install().expect("color_eyre::install can only be called once");
 }
 
-#[cfg(test)]
-static INIT: Once = Once::new();
+#[derive(Default, Debug)]
+/// Tracing log formatter setup for easier span viewing
+pub struct LogFormatter;
 
-#[cfg(test)]
-#[derive(Default)]
-struct MyFormatter;
-
-#[cfg(test)]
-impl<S, N> FormatEvent<S, N> for MyFormatter
+impl<S, N> FormatEvent<S, N> for LogFormatter
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
     N: for<'a> FormatFields<'a> + 'static,
@@ -150,17 +143,20 @@ where
 }
 
 #[cfg(test)]
+static INIT: Once = Once::new();
+
+#[cfg(test)]
 /// Initialise logger for tests, this is run only once, even if called multiple times.
 pub fn init_test_logger() {
     INIT.call_once(|| {
-        fmt()
+        tracing_subscriber::fmt::fmt()
             // NOTE: uncomment this line for pretty printed log output.
             //.pretty()
             .with_thread_names(true)
             .with_ansi(false)
-            .with_env_filter(EnvFilter::from_default_env())
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .with_target(false)
-            .event_format(MyFormatter::default())
+            .event_format(LogFormatter::default())
             .init()
     });
 }
