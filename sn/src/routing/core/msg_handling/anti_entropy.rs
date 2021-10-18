@@ -301,7 +301,7 @@ impl Core {
         }
 
         trace!(
-            "Performin AE checks, provided pk was: {:?} ours is: {:?}",
+            "Performing AE checks, provided pk was: {:?} ours is: {:?}",
             dst_section_pk,
             self.section.chain().await.last_key()
         );

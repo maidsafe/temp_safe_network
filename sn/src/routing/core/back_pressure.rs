@@ -187,7 +187,7 @@ impl BackPressure {
         };
 
         for addr in expired {
-            let _ = self.our_reports.write().await.remove(&addr);
+            let _prev = self.our_reports.write().await.remove(&addr);
         }
     }
 }

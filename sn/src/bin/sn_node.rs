@@ -30,6 +30,7 @@
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
+use safe_network::LogFormatter;
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
@@ -108,23 +109,31 @@ async fn run_node() -> Result<()> {
             .finish(file_appender);
 
         let builder = tracing_subscriber::fmt()
-            .with_writer(non_blocking)
-            // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
+        // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
             .with_env_filter(filter)
             .with_thread_names(true)
-            .with_ansi(false);
+            .with_ansi(false)
+            .with_writer(non_blocking);
 
         if config.json_logs {
             builder.json().init();
         } else {
-            builder.compact().init();
+            builder
+                // .event_format(LogFormatter::default())
+                .init();
         }
 
         Some(guard)
     } else {
         println!("Starting logging to stdout");
 
-        tracing_subscriber::fmt::init();
+        tracing_subscriber::fmt()
+            .with_thread_names(true)
+            .with_ansi(false)
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_target(false)
+            .event_format(LogFormatter::default())
+            .init();
 
         None
     };
