@@ -537,7 +537,8 @@ pub(crate) async fn send_message(
 
     if failures > 0 {
         error!(
-            "Sending the message to {}/{} of the elders failed",
+            "Sending the message ({:?}) to {}/{} of the elders failed",
+            msg_id,
             failures,
             elders.len()
         );
