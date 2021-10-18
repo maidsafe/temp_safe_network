@@ -136,7 +136,7 @@ impl SectionPeers {
     pub(crate) fn update(&self, new_info: SectionAuth<NodeState>) -> bool {
         match self.members.entry(*new_info.value.peer.name()) {
             Entry::Vacant(entry) => {
-                let _ = entry.insert(new_info);
+                let _prev = entry.insert(new_info);
                 true
             }
             Entry::Occupied(mut entry) => {
@@ -154,7 +154,7 @@ impl SectionPeers {
                     _ => return false,
                 };
 
-                let _ = entry.insert(new_info);
+                let _prev = entry.insert(new_info);
                 true
             }
         }

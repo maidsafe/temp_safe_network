@@ -54,7 +54,7 @@ macro_rules! btree_set {
     ($($item:expr),*) => {{
         let mut _set = ::std::collections::BTreeSet::new();
         $(
-            let _ = _set.insert($item);
+            let _prev = _set.insert($item);
         )*
         _set
     }};
@@ -74,7 +74,7 @@ macro_rules! btree_map {
     ($($key:expr => $value:expr),*) => {{
         let mut _map = ::std::collections::BTreeMap::new();
         $(
-            let _ = _map.insert($key, $value);
+            let _prev = _map.insert($key, $value);
         )*
         _map
     }};

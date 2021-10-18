@@ -203,7 +203,7 @@ impl Session {
 
         let pending_queries_for_thread = pending_queries.clone();
         if let Ok(op_id) = query.operation_id() {
-            let _ = tokio::spawn(async move {
+            let _handle = tokio::spawn(async move {
                 // Insert the response sender
                 trace!("Inserting channel for op_id {:?}", op_id);
                 let _old = pending_queries_for_thread
@@ -342,7 +342,7 @@ impl Session {
 
         if let Some(query) = &response {
             if let Ok(query_op_id) = query.operation_id() {
-                let _ = tokio::spawn(async move {
+                let _handle = tokio::spawn(async move {
                     // Remove the response sender
                     trace!("Removing channel for {:?}", query_op_id);
                     let _old_channel = pending_queries.clone().write().await.remove(&query_op_id);

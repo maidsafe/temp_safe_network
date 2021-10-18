@@ -145,7 +145,7 @@ impl Core {
             self.liveness
                 .add_a_pending_request_operation(target, operation_id(&address)?)
                 .await;
-            let _ = fresh_targets.insert(target);
+            let _existed = fresh_targets.insert(target);
         }
 
         let msg = SystemMsg::NodeQuery(NodeQuery::GetChunk { address, origin });

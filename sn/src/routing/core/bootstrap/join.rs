@@ -331,7 +331,7 @@ impl<'a> Join<'a> {
             section_key,
         )?;
 
-        let _ = self.send_tx.send((wire_msg, recipients.to_vec())).await;
+        let _res = self.send_tx.send((wire_msg, recipients.to_vec())).await;
 
         Ok(())
     }

@@ -112,7 +112,7 @@ impl Section {
         for peer in section.section_auth.read().await.value.peers() {
             let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
-            let _ = section.section_peers.update(SectionAuth {
+            let _changed = section.section_peers.update(SectionAuth {
                 value: node_state,
                 sig,
             });
@@ -136,7 +136,7 @@ impl Section {
         if let Some(peers) = members {
             for refmulti in peers.members.iter() {
                 let info = refmulti.value().clone();
-                let _ = self.update_member(info);
+                let _changed = self.update_member(info).await;
             }
         }
 

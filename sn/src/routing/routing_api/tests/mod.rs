@@ -502,7 +502,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             })
             .await;
         if peer.age() == MIN_AGE + 2 {
-            let _ = expected_new_elders.insert(peer);
+            let _changed = expected_new_elders.insert(peer);
         }
     }
 
@@ -539,7 +539,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
-    let _ = expected_new_elders.insert(new_peer);
+    let _changed = expected_new_elders.insert(new_peer);
 
     for command in commands {
         let (recipients, wire_msg) = match command {
@@ -764,7 +764,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let proposal = Proposal::Offline(node_state);
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
-    let _ = dispatcher
+    let _commands = dispatcher
         .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
@@ -980,7 +980,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         src_section_pk,
     )?;
 
-    let _ = get_internal_commands(
+    let _commands = get_internal_commands(
         Command::HandleMessage {
             sender: old_node.addr,
             wire_msg,

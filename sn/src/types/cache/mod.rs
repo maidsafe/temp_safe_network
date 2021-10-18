@@ -128,7 +128,7 @@ where
         }
 
         for key in expired_keys {
-            let _ = self.items.write().await.remove(&key);
+            let _prev = self.items.write().await.remove(&key);
         }
     }
 
@@ -149,7 +149,7 @@ where
                 excess_keys = items.iter().take(excess).map(|(key, _)| **key).collect();
             }
             for key in excess_keys {
-                let _ = self.items.write().await.remove(&key);
+                let _prev = self.items.write().await.remove(&key);
             }
         }
     }
@@ -179,7 +179,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn set_and_get_value_with_default_duration() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
-        let _ = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
         let value = cache.get(&KEY).await;
         assert_eq!(value, Some(VALUE), "value was not found in cache");
     }
@@ -187,7 +187,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn set_and_get_value_without_duration() {
         let cache = Cache::with_capacity(usize::MAX);
-        let _ = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
         let value = cache.get(&KEY).await;
         assert_eq!(value, Some(VALUE), "value was not found in cache");
     }
@@ -195,7 +195,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn set_and_get_value_with_custom_duration() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(0));
-        let _ = cache.set(KEY, VALUE, Some(Duration::from_secs(2))).await;
+        let _prev = cache.set(KEY, VALUE, Some(Duration::from_secs(2))).await;
         let value = cache.get(&KEY).await;
         assert_eq!(value, Some(VALUE), "value was not found in cache");
     }
@@ -203,7 +203,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn set_do_not_get_expired_value() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(0));
-        let _ = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
         let value = cache.get(&KEY).await;
         assert!(value.is_none(), "found expired value in cache");
     }
@@ -212,7 +212,7 @@ mod tests {
     async fn set_do_not_return_expired_value() {
         let timeout = Duration::from_millis(1);
         let cache = Cache::with_expiry_duration(timeout);
-        let _ = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
         tokio::time::sleep(timeout).await;
         let value = cache.get(&KEY).await;
         assert!(value.is_none(), "found expired value in cache");
@@ -224,8 +224,8 @@ mod tests {
     async fn set_replace_existing_value() {
         const NEW_VALUE: &str = "NEW_VALUE";
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
-        let _ = cache.set(KEY, VALUE, None).await;
-        let _ = cache.set(KEY, NEW_VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, NEW_VALUE, None).await;
         let value = cache.get(&KEY).await;
         assert_eq!(value, Some(NEW_VALUE), "value was not found in cache");
     }
@@ -244,7 +244,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn remove_expired_do_not_remove_not_expired_item() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
-        let _ = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
         cache.remove_expired().await;
         assert!(
             cache.items.read().await.get(&KEY).is_some(),
@@ -255,7 +255,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn clear_not_expired_item() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
-        let _ = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
         cache.clear().await;
         assert!(
             cache.items.read().await.get(&KEY).is_none(),
@@ -266,7 +266,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn remove_remove_expired_item() {
         let cache = Cache::with_expiry_duration(Duration::from_secs(2));
-        let _ = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
         assert!(
             cache.remove(&KEY).await.is_some(),
             "none returned from removing existing value"
@@ -289,17 +289,17 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn drop_excess_entry_zero_entry() {
         let cache = Cache::with_capacity(0);
-        let _ = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
         assert!(cache.get(&KEY).await.is_none());
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn drop_excess_entry_one_entry() {
         let cache = Cache::with_capacity(1);
-        let _ = cache.set(KEY, VALUE, None).await;
+        let _prev = cache.set(KEY, VALUE, None).await;
         let key: i8 = 1;
         let value: &str = "hello";
-        let _ = cache.set(key, value, None).await;
+        let _prev = cache.set(key, value, None).await;
         assert!(cache.get(&KEY).await.is_none());
         assert_eq!(cache.get(&key).await, Some(value));
     }

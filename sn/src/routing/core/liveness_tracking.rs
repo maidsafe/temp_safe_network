@@ -65,8 +65,8 @@ impl Liveness {
 
         for key in &all_keys {
             if !current_members.contains(key) {
-                let _ = self.unfulfilled_requests.remove(key);
-                let _ = self.closest_nodes_to.remove(key);
+                let _prev = self.unfulfilled_requests.remove(key);
+                let _prev = self.closest_nodes_to.remove(key);
             }
         }
 

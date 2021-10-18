@@ -46,7 +46,7 @@ pub(super) struct Dispatcher {
 impl Drop for Dispatcher {
     fn drop(&mut self) {
         // Cancel all scheduled timers including any future ones.
-        let _ = self.cancel_timer_tx.send(true);
+        let _res = self.cancel_timer_tx.send(true);
     }
 }
 
@@ -123,14 +123,14 @@ impl Dispatcher {
 
     pub(super) async fn start_network_probing(self: Arc<Self>) {
         info!("Starting to probe network");
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(PROBE_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
-                let _ = interval.tick().await;
-
+                let _instant = interval.tick().await;
+                drop(_instant);
                 // Send a probe message if we are an elder
                 let core = dispatcher.core.read().await;
                 if core.is_elder().await && !core.section().prefix().await.is_empty() {
@@ -420,7 +420,7 @@ impl Dispatcher {
                     .await?
             }
             MsgKind::ServiceMsg(_) => {
-                let _ = self
+                let _res = self
                     .core
                     .read()
                     .await
