@@ -94,8 +94,7 @@ impl Core {
 
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(retry_sap)));
             trace!("Sending {:?} to {}", node_msg, peer);
-            trace!("{}", LogMarker::SendJoinRetry);
-
+            trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
             return Ok(vec![
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
@@ -117,7 +116,7 @@ impl Core {
                 let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
                     self.section.authority_provider().await.clone(),
                 )));
-                trace!("{}", LogMarker::SendJoinRetry);
+                trace!("{}", LogMarker::SendJoinRetryFirstSectionAgeIssue);
                 trace!("New node in first section should join with age greater than MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
                 return Ok(vec![
                     self.send_direct_message(
@@ -136,7 +135,7 @@ impl Core {
                 self.section.authority_provider().await.clone(),
             )));
 
-            trace!("{}", LogMarker::SendJoinRetry);
+            trace!("{}", LogMarker::SendJoinRetryNotAdult);
 
             trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
