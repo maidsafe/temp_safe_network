@@ -18,6 +18,7 @@ use crate::routing::{
     core::StateSnapshot,
     dkg::{DkgSessionIdUtils, ProposalUtils},
     error::Result,
+    log_markers::LogMarker,
     messages::WireMsgUtils,
     peer::PeerUtils,
     relocation::RelocateState,
@@ -141,6 +142,7 @@ impl Core {
         if self.section.chain().has_key(public_key) && public_key != self.section.chain().last_key()
         {
             let msg = self.generate_ae_update(*public_key, true)?;
+            trace!("{}", LogMarker::SendingAeUpdateAfterLagCheck);
 
             let cmd = self.send_direct_message(peer, msg, *public_key)?;
             Ok(Some(cmd))
@@ -168,6 +170,7 @@ impl Core {
         }));
 
         let dst_section_pk = *self.section.chain().last_key();
+        trace!("{}", LogMarker::SendNodeApproval);
         let cmd = self.send_direct_message((name, addr), node_msg, dst_section_pk)?;
 
         Ok(cmd)
@@ -406,6 +409,8 @@ impl Core {
         if !others.is_empty() {
             let dst_section_pk = self.section_key_by_name(&others[0].0);
             wire_msg.set_dst_section_pk(dst_section_pk);
+
+            trace!("{}", LogMarker::SendOrHandle);
             commands.push(Command::SendMessage {
                 recipients: others,
                 wire_msg: wire_msg.clone(),
@@ -442,6 +447,8 @@ impl Core {
             self.section.authority_provider().section_key(),
         )?;
 
+        trace!("{}", LogMarker::SendDirect);
+
         Ok(Command::SendMessage {
             recipients: vec![recipient],
             wire_msg,
@@ -464,6 +471,8 @@ impl Core {
             node_msg,
             self.section.authority_provider().section_key(),
         )?;
+
+        trace!("{}", LogMarker::SendDirectToNodes);
 
         Ok(Command::SendMessage {
             recipients,
