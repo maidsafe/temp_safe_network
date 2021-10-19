@@ -478,13 +478,16 @@ mod tests {
         let name = XorName::random();
 
         let message = new_test_message()?;
-        let _ = comm
+        let status = comm
             .send(
                 &[(name, invalid_addr), (peer.name, peer.addr)],
                 1,
                 message.clone(),
             )
             .await?;
+        assert_matches!(status, SendStatus::MinDeliveryGroupSizeReached(failed_recipients) => {
+            assert_eq!(&failed_recipients, &[invalid_addr])
+        });
 
         if let Some(bytes) = peer.rx.recv().await {
             assert_eq!(WireMsg::from(bytes)?, message);
@@ -539,9 +542,10 @@ mod tests {
         let name = XorName::random();
 
         let msg0 = new_test_message()?;
-        let _ = send_comm
+        let status = send_comm
             .send(&[(name, recv_addr)], 1, msg0.clone())
             .await?;
+        assert_matches!(status, SendStatus::AllRecipients);
 
         let mut msg0_received = false;
 
@@ -559,9 +563,10 @@ mod tests {
         }
 
         let msg1 = new_test_message()?;
-        let _ = send_comm
+        let status = send_comm
             .send(&[(name, recv_addr)], 1, msg1.clone())
             .await?;
+        assert_matches!(status, SendStatus::AllRecipients);
 
         let mut msg1_received = false;
 
@@ -585,9 +590,10 @@ mod tests {
         let comm1 = Comm::new(local_addr(), Config::default(), tx).await?;
 
         // Send a message to establish the connection
-        let _ = comm1
+        let status = comm1
             .send(&[(XorName::random(), addr0)], 1, new_test_message()?)
             .await?;
+        assert_matches!(status, SendStatus::AllRecipients);
 
         assert_matches!(rx0.recv().await, Some(ConnectionEvent::Received(_)));
         // Drop `comm1` to cause connection lost.
