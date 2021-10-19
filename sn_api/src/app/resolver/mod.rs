@@ -387,7 +387,10 @@ impl Safe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{app::test_helpers::new_safe_instance, retry_loop, Scope, Url};
+    use crate::{
+        app::test_helpers::new_safe_instance, retry_loop, Scope, Url,
+        app::files,
+    };
     use anyhow::{anyhow, bail, Context, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use safe_network::types::DataAddress;
@@ -411,19 +414,19 @@ mod tests {
                 type_tag,
                 version,
                 files_map,
+                data_type,
                 metadata,
                 resolves_into,
-                data_type,
                 resolved_from,
             } => {
-                assert!(metadata.is_some());
-                assert!(resolves_into.is_some());
                 assert_eq!(xorurl, fc_xorurl.clone());
                 assert_eq!(xorname, safe_url.xorname());
-                assert_eq!(type_tag, 1_100);
+                assert_eq!(type_tag, files::FILES_CONTAINER_TYPE_TAG);
                 assert_eq!(version, version0);
                 assert_eq!(files_map, original_files_map);
                 assert_eq!(data_type, DataType::Register);
+                assert!(metadata.is_none()); // no path so no metadata
+                assert!(resolves_into.is_none()); // no path so no next resolution
                 assert_eq!(resolved_from, fc_xorurl.clone());
             }
             _ => bail!("Invalid SafeData type! Expected SafeData::FileContainer!"),
@@ -445,24 +448,24 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_resolvable_container() -> Result<()> {
-        let random_str: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let site_name = format!("subname.{}", random_str);
-
         let mut safe = new_safe_instance().await?;
 
+        // create file container
         let (xorurl, _, the_files_map) = safe
             .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
+        // link to an nrs map
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
+        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
         let _nrs_map_url = safe
             .nrs_map_container_create(&site_name, &safe_url, false)
             .await?;
-
         let nrs_url = format!("safe://{}", site_name);
+
         let content = retry_loop!(safe.fetch(&nrs_url, None));
 
         safe_url.set_sub_names("")?;
@@ -477,7 +480,9 @@ mod tests {
                 version,
                 files_map,
                 data_type,
-                ..
+                metadata,
+                resolves_into,
+                resolved_from,
             } => {
                 assert_eq!(*xorurl, xorurl_without_subname);
                 assert_eq!(*xorname, safe_url.xorname());
@@ -485,39 +490,44 @@ mod tests {
                 assert_eq!(*version, version0);
                 assert_eq!(*data_type, DataType::Register);
                 assert_eq!(*files_map, the_files_map);
-
-                // let's also compare it with the result from inspecting the URL
-                let inspected_content = safe.inspect(&nrs_url).await?;
-                assert_eq!(inspected_content.len(), 2);
-                assert_eq!(content, inspected_content[1]);
-                Ok(())
-            }
-            _ => Err(anyhow!("NRS map container was not returned".to_string(),)),
+                assert!(metadata.is_none());
+                assert!(resolves_into.is_none());
+                assert_eq!(resolved_from, &safe_url.to_string());
+            },
+            _ => {bail!("FilesContainer was not returned".to_string())},
         }
+
+        // let's also compare it with the result from inspecting the URL
+        let inspected_content = safe.inspect(&nrs_url).await?;
+        assert_eq!(inspected_content.len(), 2);
+        assert_eq!(content, inspected_content[1]);
+
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_fetch_resolvable_map_data() -> Result<()> {
-        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-
         let mut safe = new_safe_instance().await?;
+
+        // create file container
         let (xorurl, _, _the_files_map) = safe
             .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
+        // link to an nrs map
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let files_container_url = safe_url;
+        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
         let nrs_resolution_url = safe
             .nrs_map_container_create(&site_name, &files_container_url, false)
             .await?;
-
         let nrs_url = format!("safe://{}", site_name);
-        let content = retry_loop!(safe.fetch(&nrs_url, None));
 
         // this should resolve to a FilesContainer
+        let content = retry_loop!(safe.fetch(&nrs_url, None));
         match &content {
             SafeData::FilesContainer {
                 xorurl,
@@ -527,16 +537,34 @@ mod tests {
             } => {
                 assert_eq!(*xorurl, files_container_url.to_string());
                 assert_eq!(*resolved_from, files_container_url.to_string());
-                assert_eq!(*resolves_into, Some(nrs_resolution_url));
-
-                // let's also compare it with the result from inspecting the URL
-                let inspected_content = safe.inspect(&nrs_url).await?;
-                assert_eq!(inspected_content.len(), 2);
-                assert_eq!(content, inspected_content[1]);
-                Ok(())
-            }
-            _ => Err(anyhow!("Nrs map container was not returned".to_string(),)),
+                assert!(resolves_into.is_none());
+            },
+            _ => {bail!("FilesContainer was not returned".to_string());},
         }
+
+        // let's also compare it with the result from inspecting the URL
+        let inspected_content = safe.inspect(&nrs_url).await?;
+        assert_eq!(inspected_content.len(), 2);
+        assert_eq!(&content, &inspected_content[1]);
+
+        // check NRS map container step
+        match &inspected_content[0] {
+            SafeData::NrsMapContainer {
+                xorurl,
+                resolved_from,
+                resolves_into,
+                ..
+            } => {
+                let mut unversionned_nrs_res_url = nrs_resolution_url.clone();
+                unversionned_nrs_res_url.set_content_version(None);
+                assert_eq!(*xorurl, unversionned_nrs_res_url.to_xorurl_string());
+                assert_eq!(*resolved_from, unversionned_nrs_res_url.to_string());
+                assert_eq!(*resolves_into, Some(files_container_url));
+            },
+            _ => {bail!("Nrs map container was not returned".to_string());},
+        }
+
+        Ok(())
     }
 
     #[tokio::test]
@@ -615,22 +643,24 @@ mod tests {
     async fn test_fetch_range_from_files_container() -> Result<()> {
         use std::fs::File;
         let mut safe = new_safe_instance().await?;
-        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
+        // create file container
         let (xorurl, _, _files_map) = safe
             .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
+        // map to nrs name
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let _nrs_map_xorurl = safe
+        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let _ = safe
             .nrs_map_container_create(&site_name, &safe_url, false)
             .await?;
-
         let nrs_url = format!("safe://{}/test.md", site_name);
 
+        // read a local file content (for comparison)
         let mut file = File::open("./testdata/test.md")
             .context("Failed to open local file: ./testdata/test.md".to_string())?;
         let mut file_data = Vec::new();
@@ -638,7 +668,7 @@ mod tests {
             .context("Failed to read local file: ./testdata/test.md".to_string())?;
         let file_size = file_data.len();
 
-        // Fetch full file and match
+        // fetch full file and compare
         let content = retry_loop!(safe.fetch(&nrs_url, None));
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), file_data.clone());
@@ -646,29 +676,25 @@ mod tests {
             bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
 
-        // Fetch first half and match
-        let fetch_first_half = Some((None, Some(file_size as u64 / 2)));
+        // fetch first half and match
+        let fetch_first_half = Some((Some(0), Some(file_size as u64 / 2)));
         let content = safe.fetch(&nrs_url, fetch_first_half).await?;
-
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), file_data[0..file_size / 2].to_vec());
         } else {
             bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
 
-        // Fetch second half and match
+        // fetch second half and match
         let fetch_second_half = Some((Some(file_size as u64 / 2), Some(file_size as u64)));
         let content = safe.fetch(&nrs_url, fetch_second_half).await?;
-
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), file_data[file_size / 2..file_size].to_vec());
-            Ok(())
         } else {
-            Err(anyhow!(
-                "Content fetched is not a PublicBlob: {:?}",
-                content
-            ))
+            bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
+
+        Ok(())
     }
 
     #[tokio::test]

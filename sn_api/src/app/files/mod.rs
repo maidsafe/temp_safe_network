@@ -37,7 +37,7 @@ pub type ProcessedFiles = BTreeMap<String, (String, String)>;
 
 const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
 // Type tag to use for the FilesContainer stored on Register
-const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
+pub(crate) const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
 
 impl Safe {
     /// # Create a FilesContainer.

@@ -624,7 +624,8 @@ impl Url {
 
     /// sets sub_names portion of URL
     pub fn set_sub_names(&mut self, sub_names: &str) -> Result<()> {
-        let tmpurl = format!("{}{}.{}", URL_PROTOCOL, sub_names, self.top_name());
+        let sep = if sub_names.is_empty() { "" } else { "." };
+        let tmpurl = format!("{}{}{}{}", URL_PROTOCOL, sub_names, sep, self.top_name());
         let parts = UrlParts::parse(&tmpurl, true)?;
         self.sub_names = parts.sub_names;
         self.sub_names_vec = parts.sub_names_vec;
