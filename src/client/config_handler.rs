@@ -40,6 +40,8 @@ pub struct Config {
     pub qp2p: QuicP2pConfig,
     /// The amount of time to wait for responses to queries before giving up and returning an error.
     pub query_timeout: Duration,
+    /// The amount of time to wait after a command is sent for AE flows to complete.
+    pub standard_wait: Duration,
 }
 
 impl Config {
@@ -59,6 +61,7 @@ impl Config {
         genesis_key: bls::PublicKey,
         config_file_path: Option<&Path>,
         query_timeout: Option<Duration>,
+        standard_wait: Option<Duration>,
     ) -> Self {
         let root_dir = root_dir
             .map(|p| p.to_path_buf())
@@ -70,6 +73,8 @@ impl Config {
             Some(path) => read_config_file(path).await.unwrap_or_default(),
         };
 
+        let query_timeout = query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
+
         qp2p.idle_timeout = Some(Duration::from_secs(5));
         qp2p.keep_alive_interval = Some(Duration::from_secs(1));
 
@@ -78,7 +83,8 @@ impl Config {
             root_dir: root_dir.clone(),
             genesis_key,
             qp2p,
-            query_timeout: query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT),
+            query_timeout,
+            standard_wait: standard_wait.unwrap_or(query_timeout / 10),
         }
     }
 }
@@ -154,6 +160,7 @@ mod tests {
             genesis_key,
             Some(&config_filepath),
             None,
+            None,
         )
         .await;
         // convert to string for assert
@@ -172,6 +179,7 @@ mod tests {
             genesis_key,
             qp2p: QuicP2pConfig::default(),
             query_timeout: DEFAULT_QUERY_TIMEOUT,
+            standard_wait: DEFAULT_QUERY_TIMEOUT / 10,
         };
         assert_eq!(serialize(&config)?, serialize(&expected_config)?);
 
@@ -179,11 +187,11 @@ mod tests {
         let mut file = File::create(&config_filepath)?;
 
         let config_on_disk =
-            Config::new(None, None, genesis_key, Some(&config_filepath), None).await;
+            Config::new(None, None, genesis_key, Some(&config_filepath), None, None).await;
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = Config::new(None, None, genesis_key, None, None).await;
+        let read_cfg = Config::new(None, None, genesis_key, None, None, None).await;
         assert_eq!(serialize(&config_on_disk)?, serialize(&read_cfg)?);
 
         Ok(())

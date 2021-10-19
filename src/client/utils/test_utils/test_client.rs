@@ -113,7 +113,15 @@ pub async fn create_test_client_with(
     let timeout = timeout.map(Duration::from_secs);
     let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
 
-    let config = Config::new(Some(root_dir.path()), None, genesis_key, None, timeout).await;
+    let config = Config::new(
+        Some(root_dir.path()),
+        None,
+        genesis_key,
+        None,
+        timeout,
+        Some(Duration::from_secs(0)),
+    )
+    .await;
     let client = Client::new(config, bootstrap_nodes, optional_keypair.clone()).await?;
 
     Ok(client)
