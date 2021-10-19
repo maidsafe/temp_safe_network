@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.16](https://github.com/maidsafe/safe_network/compare/v0.35.15...v0.35.16) (2021-10-19)
+
+
+### Features
+
+* **logs-inspector-tool:** allow to generate commands reports for a provided msg id or cmd id ([3af31d0](https://github.com/maidsafe/safe_network/commit/3af31d08bb48e47ea8d8f42775c0b08d326baf1e))
+* **logs-inspector-tool:** include full log filepath in the reports ([093143d](https://github.com/maidsafe/safe_network/commit/093143dedb8946b6976afc9edbff0a8a38f5626b))
+* **logs-inspector-tool:** match msg ids also to SendMessage commands ([18398ca](https://github.com/maidsafe/safe_network/commit/18398ca199531baa2f4374975308cf56222dc77e))
+
 ### [0.35.15](https://github.com/maidsafe/safe_network/compare/v0.35.14...v0.35.15) (2021-10-15)
 
 ### [0.35.14](https://github.com/maidsafe/safe_network/compare/v0.35.13...v0.35.14) (2021-10-15)
