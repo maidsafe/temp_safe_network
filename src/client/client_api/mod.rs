@@ -120,9 +120,6 @@ impl Client {
             hex::encode(config.genesis_key.to_bytes())
         );
 
-        // Session wait time. We want this relative to query timeout for now. Which defaults to 90s
-        let standard_wait = config.query_timeout / 10;
-
         // Create a session with the network
         let session = Session::new(
             client_pk,
@@ -130,7 +127,7 @@ impl Client {
             config.qp2p,
             err_sender,
             config.local_addr,
-            standard_wait,
+            config.standard_wait,
             prefix_map,
         )
         .await?;
