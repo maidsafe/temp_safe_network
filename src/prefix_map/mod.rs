@@ -107,6 +107,14 @@ impl NetworkPrefixMap {
             .map(|entry| entry.value().value.clone())
     }
 
+    /// Get signed `SectionAuthorityProvider` of a known section with the given prefix.
+    pub(crate) fn get_signed(
+        &self,
+        prefix: &Prefix,
+    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
+        self.sections.get(prefix).map(|entry| entry.value().clone())
+    }
+
     /// Update our knowledge of a remote section's SAP only
     /// if it's verifiable with the provided proof chain and the
     /// currently known SAP we are aware of for the Prefix.
