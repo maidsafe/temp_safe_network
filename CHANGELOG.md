@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.17](https://github.com/maidsafe/safe_network/compare/v0.35.16...v0.35.17) (2021-10-20)
+
 ### [0.35.16](https://github.com/maidsafe/safe_network/compare/v0.35.15...v0.35.16) (2021-10-19)
 
 
