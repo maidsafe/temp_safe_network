@@ -315,8 +315,7 @@ mod tests {
         let mut url_v0 = Url::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
-        let nrs_url =
-            retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false));
+        let nrs_url = retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false));
 
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
 
@@ -353,8 +352,7 @@ mod tests {
         let mut url_v0 = Url::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
-        let nrs_url =
-            retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false));
+        let nrs_url = retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false));
 
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
 
@@ -420,8 +418,7 @@ mod tests {
         let mut url_v0 = Url::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
-        let nrs_url =
-            retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false));
+        let nrs_url = retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false));
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
 
         // associate a second name
@@ -467,16 +464,11 @@ mod tests {
         let mut url_v0 = Url::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
-        let xorurl = retry_loop!(safe.nrs_map_container_create(
-            &site_name,
-            &url_v0,
-            false,
-        ));
+        let xorurl = retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false,));
         let _ = retry_loop!(safe.fetch(&xorurl.to_string(), None));
 
         // remove subname
-        let versionned_url =
-            retry_loop!(safe.nrs_map_container_remove(&site_name, false));
+        let versionned_url = retry_loop!(safe.nrs_map_container_remove(&site_name, false));
         assert!(versionned_url.content_version().is_some());
 
         // try to get it again
@@ -498,8 +490,7 @@ mod tests {
         let mut url_v0 = Url::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
-        let nrs_url =
-            retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false,));
+        let nrs_url = retry_loop!(safe.nrs_map_container_create(&site_name, &url_v0, false,));
 
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
 

@@ -387,10 +387,7 @@ impl Safe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        app::test_helpers::new_safe_instance, retry_loop, Scope, Url,
-        app::files,
-    };
+    use crate::{app::files, app::test_helpers::new_safe_instance, retry_loop, Scope, Url};
     use anyhow::{anyhow, bail, Context, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use safe_network::types::DataAddress;
@@ -493,8 +490,10 @@ mod tests {
                 assert!(metadata.is_none());
                 assert!(resolves_into.is_none());
                 assert_eq!(resolved_from, &safe_url.to_string());
-            },
-            _ => {bail!("FilesContainer was not returned".to_string())},
+            }
+            _ => {
+                bail!("FilesContainer was not returned".to_string())
+            }
         }
 
         // let's also compare it with the result from inspecting the URL
@@ -538,8 +537,10 @@ mod tests {
                 assert_eq!(*xorurl, files_container_url.to_string());
                 assert_eq!(*resolved_from, files_container_url.to_string());
                 assert!(resolves_into.is_none());
-            },
-            _ => {bail!("FilesContainer was not returned".to_string());},
+            }
+            _ => {
+                bail!("FilesContainer was not returned".to_string());
+            }
         }
 
         // let's also compare it with the result from inspecting the URL
@@ -560,8 +561,10 @@ mod tests {
                 assert_eq!(*xorurl, unversionned_nrs_res_url.to_xorurl_string());
                 assert_eq!(*resolved_from, unversionned_nrs_res_url.to_string());
                 assert_eq!(*resolves_into, Some(files_container_url));
-            },
-            _ => {bail!("Nrs map container was not returned".to_string());},
+            }
+            _ => {
+                bail!("Nrs map container was not returned".to_string());
+            }
         }
 
         Ok(())
