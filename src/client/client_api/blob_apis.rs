@@ -505,6 +505,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1mb() -> Result<()> {
+        init_test_logger();
         let client = create_test_client().await?;
         store_and_read_blob(&client, 1024 * 1024, Scope::Public).await?;
         store_and_read_blob(&client, 1024 * 1024, Scope::Private).await
@@ -512,12 +513,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn skip_reading_prefix_map_blob_test() -> Result<()> {
+        init_test_logger();
         let client = create_test_client_with(None, None, false).await?;
         store_and_read_blob(&client, 10 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_10mb() -> Result<()> {
+        init_test_logger();
         let client = create_test_client().await?;
         store_and_read_blob(&client, 10 * 1024 * 1024, Scope::Private).await
     }
@@ -525,6 +528,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn store_and_read_20mb() -> Result<()> {
+        init_test_logger();
         let client = create_test_client().await?;
         store_and_read_blob(&client, 20 * 1024 * 1024, Scope::Private).await
     }
@@ -532,6 +536,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn store_and_read_40mb() -> Result<()> {
+        init_test_logger();
         let client = create_test_client().await?;
         store_and_read_blob(&client, 40 * 1024 * 1024, Scope::Private).await
     }
@@ -592,7 +597,6 @@ mod tests {
     }
 
     async fn store_and_read_blob(client: &Client, size: usize, scope: Scope) -> Result<()> {
-        init_test_logger();
         // cannot use scope as var w/ macro
         let _outer_span = if scope == Scope::Public {
             tracing::info_span!("store_and_read_public_blob", size).entered()
