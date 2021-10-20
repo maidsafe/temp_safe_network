@@ -55,11 +55,21 @@ impl Client {
     ///
     /// TODO: update once data types are crdt compliant
     ///
+    ///
     #[instrument(skip_all, level = "debug", name = "New client")]
     pub async fn new(
         config: Config,
         bootstrap_nodes: BTreeSet<SocketAddr>,
         optional_keypair: Option<Keypair>,
+    ) -> Result<Self, Error> {
+        Client::create_with(config, bootstrap_nodes, optional_keypair, true).await
+    }
+
+    pub(crate) async fn create_with(
+        config: Config,
+        bootstrap_nodes: BTreeSet<SocketAddr>,
+        optional_keypair: Option<Keypair>,
+        read_prefixmap: bool,
     ) -> Result<Self, Error> {
         let mut rng = OsRng;
 
@@ -78,13 +88,15 @@ impl Client {
             }
         };
 
-        let mut safe_dir = dirs_next::home_dir()
+        let mut prefix_map_dir = dirs_next::home_dir()
             .ok_or_else(|| Error::Generic("Error opening home dir".to_string()))?;
-        safe_dir.push(".safe");
-        safe_dir.push("prefix_map");
+        prefix_map_dir.push(".safe");
+        prefix_map_dir.push("prefix_map");
 
         // Read NetworkPrefixMap from disk if present else create a new one
-        let prefix_map = if let Ok(mut prefix_map_file) = File::open(safe_dir).await {
+        let prefix_map = if let (Ok(mut prefix_map_file), true) =
+            (File::open(prefix_map_dir).await, read_prefixmap)
+        {
             let mut prefix_map_contents = vec![];
             let _ = prefix_map_file
                 .read_to_end(&mut prefix_map_contents)
@@ -157,7 +169,7 @@ impl Client {
 
         let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
 
-        // TODO: check for the intiial msg id and DO NOT RESEND in ae retry.
+        // TODO: check for the initial msg id and DO NOT RESEND in ae retry.
         // Send the dummy message to probe the network for it's infrastructure details.
         client
             .session
@@ -240,7 +252,7 @@ mod tests {
         let full_id = Keypair::new_ed25519(&mut rng);
         let pk = full_id.public_key();
 
-        let client = create_test_client_with(Some(full_id), None).await?;
+        let client = create_test_client_with(Some(full_id), None, true).await?;
         assert_eq!(pk, client.public_key());
 
         Ok(())
