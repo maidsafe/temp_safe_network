@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{msg_count::MsgCount, BackPressure};
+use super::{connected_peers::ConnectedPeers, msg_count::MsgCount, BackPressure};
 use crate::messaging::{system::LoadReport, WireMsg};
 use crate::routing::error::{Error, Result};
 use bytes::Bytes;
@@ -15,22 +15,24 @@ use futures::{
     stream::{FuturesUnordered, StreamExt},
 };
 use qp2p::Endpoint;
-use std::net::SocketAddr;
+use std::{future, net::SocketAddr};
 use tokio::{sync::mpsc, task};
 use xor_name::XorName;
 
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
 pub(crate) struct Comm {
-    endpoint: Endpoint<XorName>,
+    endpoint: Endpoint,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
     back_pressure: BackPressure,
+    connected_peers: ConnectedPeers,
 }
 
 impl Drop for Comm {
     fn drop(&mut self) {
         // Close all existing connections and stop accepting new ones.
+        // FIXME: this may be broken – `Comm` is clone, so this will break any clones?
         self.endpoint.close();
     }
 }
@@ -49,11 +51,13 @@ impl Comm {
             Endpoint::new(local_addr, Default::default(), config).await?;
 
         let msg_count = MsgCount::new();
+        let connected_peers = ConnectedPeers::default();
 
         let _handle = task::spawn(handle_incoming_connections(
             incoming_connections,
             event_tx.clone(),
             msg_count.clone(),
+            connected_peers.clone(),
         ));
 
         let back_pressure = BackPressure::new();
@@ -63,6 +67,7 @@ impl Comm {
             event_tx,
             msg_count,
             back_pressure,
+            connected_peers,
         })
     }
 
@@ -79,21 +84,22 @@ impl Comm {
         let (bootstrap_peer, peer_incoming) = bootstrap_peer.ok_or(Error::BootstrapFailed)?;
 
         let msg_count = MsgCount::new();
+        let connected_peers = ConnectedPeers::default();
 
         let _handle = task::spawn(handle_incoming_connections(
             incoming_connections,
             event_tx.clone(),
             msg_count.clone(),
+            connected_peers.clone(),
         ));
 
-        if let Some(incoming_messages) = peer_incoming {
-            let _ = task::spawn(handle_incoming_messages(
-                bootstrap_peer.remote_address(),
-                incoming_messages,
-                event_tx.clone(),
-                msg_count.clone(),
-            ));
-        }
+        let _ = task::spawn(handle_incoming_messages(
+            bootstrap_peer.remote_address(),
+            peer_incoming,
+            event_tx.clone(),
+            msg_count.clone(),
+            connected_peers.clone(),
+        ));
 
         Ok((
             Self {
@@ -101,6 +107,7 @@ impl Comm {
                 event_tx,
                 msg_count,
                 back_pressure: BackPressure::new(),
+                connected_peers,
             },
             bootstrap_peer.remote_address(),
         ))
@@ -111,19 +118,15 @@ impl Comm {
     }
 
     /// Get the connection ID (XorName) of an existing connection with the provided socket address
-    pub(crate) async fn get_connection_id(&self, addr: &SocketAddr) -> Option<XorName> {
-        self.endpoint
-            .get_connection_by_addr(addr)
-            .await
-            .map(|connection| connection.id())
+    pub(crate) async fn get_peer_connection_id(&self, address: &SocketAddr) -> Option<XorName> {
+        let peer = self.connected_peers.get_by_address(address).await?;
+        Some(peer.id())
     }
 
     /// Get the SocketAddr of a connection using the connection ID (XorName)
-    pub(crate) async fn get_socket_addr_by_id(&self, xorname: &XorName) -> Option<SocketAddr> {
-        self.endpoint
-            .get_connection_by_id(xorname)
-            .await
-            .map(|connection| connection.remote_address())
+    pub(crate) async fn get_peer_address(&self, connection_id: &XorName) -> Option<SocketAddr> {
+        let peer = self.connected_peers.get_by_id(connection_id).await?;
+        Some(peer.address())
     }
 
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
@@ -140,11 +143,12 @@ impl Comm {
             let priority = wire_msg.msg_kind().priority();
             let retries = self.back_pressure.get(addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-            self.endpoint
-                .get_connection_by_addr(addr)
+            self.connected_peers
+                .get_by_address(addr)
                 .map(|res| res.ok_or(None))
-                .and_then(|connection| async move {
-                    connection
+                .and_then(|client| async move {
+                    client
+                        .connection()
                         .send_with(bytes, priority, Some(&retries))
                         .await
                         .map_err(Some)
@@ -176,7 +180,7 @@ impl Comm {
         };
 
         let connectivity_endpoint =
-            Endpoint::<XorName>::new_client((self.endpoint.local_addr().ip(), 0), qp2p_config)?;
+            Endpoint::new_client((self.endpoint.local_addr().ip(), 0), qp2p_config)?;
 
         let result = connectivity_endpoint
             .is_reachable(peer)
@@ -246,19 +250,27 @@ impl Comm {
 
             let retries = self.back_pressure.get(&recipient.1).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-            let result = self
-                .endpoint
-                .connect_to(&recipient.1)
+            let connection =
+                if let Some(connection) = self.connected_peers.get_by_address(&recipient.1).await {
+                    Ok(connection.connection().clone())
+                } else {
+                    self.endpoint.connect_to(&recipient.1).await.map(
+                        |(connection, connection_incoming)| {
+                            let _ = task::spawn(handle_incoming_messages(
+                                connection.remote_address(),
+                                connection_incoming,
+                                self.event_tx.clone(),
+                                self.msg_count.clone(),
+                                self.connected_peers.clone(),
+                            ));
+                            connection
+                        },
+                    )
+                };
+
+            let result = future::ready(connection)
                 .err_into()
-                .and_then(|(connection, connection_incoming)| async move {
-                    if let Some(connection_incoming) = connection_incoming {
-                        let _ = task::spawn(handle_incoming_messages(
-                            connection.remote_address(),
-                            connection_incoming,
-                            self.event_tx.clone(),
-                            self.msg_count.clone(),
-                        ));
-                    }
+                .and_then(|connection| async move {
                     connection
                         .send_with(msg_bytes, priority, Some(&retries))
                         .await
@@ -269,7 +281,7 @@ impl Comm {
                         qp2p::Close::Local,
                     )) => Error::ConnectionClosed,
                     _ => {
-                        trace!("during sending, received error {:?}", err);
+                        warn!("during sending, received error {:?}", err);
                         err.into()
                     }
                 });
@@ -353,25 +365,31 @@ pub(crate) enum ConnectionEvent {
 }
 
 async fn handle_incoming_connections(
-    mut incoming_connections: qp2p::IncomingConnections<XorName>,
+    mut incoming_connections: qp2p::IncomingConnections,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
+    connected_peers: ConnectedPeers,
 ) {
     while let Some((connection, connection_incoming)) = incoming_connections.next().await {
+        let src = connection.remote_address();
+        connected_peers.insert(connection).await;
+
         let _ = task::spawn(handle_incoming_messages(
-            connection.remote_address(),
+            src,
             connection_incoming,
             event_tx.clone(),
             msg_count.clone(),
+            connected_peers.clone(),
         ));
     }
 }
 
 async fn handle_incoming_messages(
     src: SocketAddr,
-    mut incoming_msgs: qp2p::ConnectionIncoming<XorName>,
+    mut incoming_msgs: qp2p::ConnectionIncoming,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
+    connected_peers: ConnectedPeers,
 ) {
     while let Some(result) = incoming_msgs.next().await.transpose() {
         match result {
@@ -386,6 +404,9 @@ async fn handle_incoming_messages(
             }
         }
     }
+
+    // remove the connection once we notice it end
+    connected_peers.remove_by_address(&src).await;
 }
 
 /// Returns the status of the send operation.
@@ -577,7 +598,7 @@ mod tests {
         let send_comm = Comm::new(local_addr(), Config::default(), tx).await?;
 
         let (recv_endpoint, mut incoming_connections, _) =
-            Endpoint::<XorName>::new(local_addr(), &[], Config::default()).await?;
+            Endpoint::new(local_addr(), &[], Config::default()).await?;
         let recv_addr = recv_endpoint.public_addr();
         let name = XorName::random();
 
@@ -591,15 +612,13 @@ mod tests {
 
         // Receive one message and disconnect from the peer
         {
-            if let Some((connection, mut incoming_msgs)) = incoming_connections.next().await {
+            if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
                 if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
                     assert_eq!(WireMsg::from(msg)?, msg0);
                     msg0_received = true;
-                    recv_endpoint
-                        .disconnect_from(&connection.remote_address())
-                        .await;
-                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
+
+                // connection dropped here
             }
             assert!(msg0_received);
         }
@@ -648,6 +667,42 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn connected_peers() -> Result<()> {
+        let (node_tx, mut node_rx) = mpsc::channel(1);
+        let node_comm = Comm::new(local_addr(), Config::default(), node_tx).await?;
+        let node_addr = node_comm.our_connection_info();
+
+        let (client_tx, mut client_rx) = mpsc::channel(1);
+        let client_comm = Comm::new(local_addr(), Config::default(), client_tx).await?;
+        let client_addr = client_comm.our_connection_info();
+
+        // Establish a connection by sending a message
+        let status = client_comm
+            .send(&[(XorName::random(), node_addr)], 1, new_test_message()?)
+            .await?;
+        assert_matches!(status, SendStatus::AllRecipients);
+
+        // We should have recorded the connection
+        assert_matches!(node_rx.recv().await, Some(ConnectionEvent::Received(_)));
+        assert!(
+            node_comm
+                .get_peer_connection_id(&client_addr)
+                .await
+                .is_some(),
+            "did not find expected connection"
+        );
+
+        // We can reply to the client over the existing connection
+        node_comm
+            .send_on_existing_connection(&[(XorName::random(), client_addr)], new_test_message()?)
+            .await?;
+
+        assert_matches!(client_rx.recv().await, Some(ConnectionEvent::Received(_)));
+
+        Ok(())
+    }
+
     fn new_test_message() -> Result<WireMsg> {
         let dst_location = DstLocation::Node {
             name: XorName::random(),
@@ -684,7 +739,7 @@ mod tests {
     impl Peer {
         async fn new() -> Result<Self> {
             let (endpoint, mut incoming_connections, _) =
-                Endpoint::<XorName>::new(local_addr(), &[], Config::default()).await?;
+                Endpoint::new(local_addr(), &[], Config::default()).await?;
             let addr = endpoint.public_addr();
 
             let (tx, rx) = mpsc::channel(1);

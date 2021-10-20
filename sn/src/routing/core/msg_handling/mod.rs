@@ -179,7 +179,7 @@ impl Core {
                         return Ok(vec![]);
                     }
                 };
-                let user = match self.comm.get_connection_id(&sender).await {
+                let user = match self.comm.get_peer_connection_id(&sender).await {
                     Some(name) => EndUser(name),
                     None => {
                         error!(

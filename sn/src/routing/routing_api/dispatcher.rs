@@ -431,7 +431,7 @@ impl Dispatcher {
     /// Send a message, either section to section, node to node, or to an end user.
     pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
         if let DstLocation::EndUser(EndUser(name)) = wire_msg.dst_location() {
-            let addr = self.core.comm.get_socket_addr_by_id(name).await;
+            let addr = self.core.comm.get_peer_address(name).await;
 
             if let Some(socket_addr) = addr {
                 // Send a message to a client peer.
