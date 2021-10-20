@@ -238,13 +238,11 @@ impl Session {
                         .connect_to(&socket)
                         .err_into()
                         .and_then(|(connection, connection_incoming)| async move {
-                            if let Some(connection_incoming) = connection_incoming {
-                                Self::spawn_message_listener_thread(
-                                    session,
-                                    connection.remote_address(),
-                                    connection_incoming,
-                                );
-                            }
+                            Self::spawn_message_listener_thread(
+                                session,
+                                connection.remote_address(),
+                                connection_incoming,
+                            );
                             connection.send_with(msg_bytes, priority, None).await
                         })
                         .await;
@@ -478,14 +476,6 @@ impl Session {
 
         Ok(())
     }
-
-    #[allow(unused)]
-    pub(crate) async fn disconnect_from_peers(&self, peers: Vec<SocketAddr>) -> Result<(), Error> {
-        for elder in peers {
-            self.endpoint.disconnect_from(&elder).await;
-        }
-        Ok(())
-    }
 }
 
 #[instrument(skip_all, level = "trace")]
@@ -493,7 +483,7 @@ pub(super) async fn send_message(
     session: Session,
     elders: Vec<SocketAddr>,
     wire_msg: WireMsg,
-    endpoint: Endpoint<XorName>,
+    endpoint: Endpoint,
     msg_id: MessageId,
 ) -> Result<(), Error> {
     let priority = wire_msg.msg_kind().priority();
@@ -517,13 +507,11 @@ pub(super) async fn send_message(
                     .connect_to(&socket)
                     .err_into()
                     .and_then(|(connection, connection_incoming)| async move {
-                        if let Some(connection_incoming) = connection_incoming {
-                            Session::spawn_message_listener_thread(
-                                session,
-                                connection.remote_address(),
-                                connection_incoming,
-                            );
-                        }
+                        Session::spawn_message_listener_thread(
+                            session,
+                            connection.remote_address(),
+                            connection_incoming,
+                        );
                         connection.send_with(msg_bytes_clone, priority, None).await
                     })
                     .await?;

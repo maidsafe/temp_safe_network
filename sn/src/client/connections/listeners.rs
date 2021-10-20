@@ -22,7 +22,6 @@ use qp2p::ConnectionIncoming;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use tracing::Instrument;
-use xor_name::XorName;
 
 impl Session {
     // Listen for incoming messages on a connection
@@ -30,7 +29,7 @@ impl Session {
     pub(crate) fn spawn_message_listener_thread(
         session: Session,
         src: SocketAddr,
-        mut incoming_messages: ConnectionIncoming<XorName>,
+        mut incoming_messages: ConnectionIncoming,
     ) {
         debug!("Listening for incoming messages");
         let _handle = tokio::spawn(async move {
@@ -58,7 +57,7 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn listen_for_incoming_message(
         src: SocketAddr,
-        incoming_messages: &mut ConnectionIncoming<XorName>,
+        incoming_messages: &mut ConnectionIncoming,
     ) -> Result<MessageType, Error> {
         if let Some(message) = incoming_messages.next().await? {
             trace!("Incoming message from {:?}", src);
