@@ -15,6 +15,7 @@ use crate::messaging::{
     DstLocation, WireMsg,
 };
 use crate::routing::{
+    core::StateSnapshot,
     dkg::{DkgSessionIdUtils, ProposalUtils},
     error::Result,
     messages::WireMsgUtils,
@@ -26,6 +27,7 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
+use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use xor_name::XorName;
 impl Core {
@@ -192,6 +194,54 @@ impl Core {
         )?;
 
         Ok(vec![cmd])
+    }
+
+    pub(crate) fn send_ae_update_to_sibling_section(
+        &self,
+        old: &StateSnapshot,
+    ) -> Result<Vec<Command>> {
+        if let Some(sibling_sec_auth) = self.network.get_signed(&self.section().prefix().sibling())
+        {
+            let promoted_sibling_elders: Vec<_> = sibling_sec_auth
+                .value
+                .peers()
+                .filter(|peer| !old.elders.contains(peer.name()))
+                .map(|peer| (*peer.name(), *peer.addr()))
+                .collect();
+
+            // Using previous_key as dst_section_key as newly promoted sibling elders shall still
+            // in the state of pre-split.
+            let previous_pk = sibling_sec_auth.sig.public_key;
+
+            // Compose a min sibling proof_chain.
+            let mut proof_chain = SecuredLinkedList::new(previous_pk);
+            let _ = proof_chain.insert(
+                &previous_pk,
+                sibling_sec_auth.value.section_key(),
+                sibling_sec_auth.sig.signature.clone(),
+            );
+
+            // Those promoted elders shall already know about other adult members.
+            // TODO: confirm no need to populate the members.
+            let node_msg = SystemMsg::AntiEntropyUpdate {
+                section_auth: sibling_sec_auth.value.clone(),
+                section_signed: sibling_sec_auth.sig,
+                proof_chain,
+                members: None,
+            };
+
+            let cmd = self.send_direct_message_to_nodes(
+                promoted_sibling_elders,
+                node_msg,
+                sibling_sec_auth.value.prefix().name(),
+                previous_pk,
+            )?;
+
+            Ok(vec![cmd])
+        } else {
+            error!("Failed to get sibling SAP during split.");
+            Ok(vec![])
+        }
     }
 
     pub(crate) fn send_ae_update_to_adults(&mut self) -> Result<Vec<Command>> {
