@@ -100,7 +100,7 @@ pub fn init_test_logger() {
 
 /// Create a test client without providing any specific keypair, bootstrap_config, or timeout.
 pub async fn create_test_client() -> Result<Client> {
-    create_test_client_with(None, None).await
+    create_test_client_with(None, None, true).await
 }
 
 /// Create a test client optionally providing keypair and/or bootstrap_config
@@ -108,6 +108,7 @@ pub async fn create_test_client() -> Result<Client> {
 pub async fn create_test_client_with(
     optional_keypair: Option<Keypair>,
     timeout: Option<u64>,
+    read_prefix_map: bool,
 ) -> Result<Client> {
     let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
     let timeout = timeout.map(Duration::from_secs);
@@ -122,7 +123,13 @@ pub async fn create_test_client_with(
         Some(Duration::from_secs(0)),
     )
     .await;
-    let client = Client::new(config, bootstrap_nodes, optional_keypair.clone()).await?;
+    let client = Client::create_with(
+        config,
+        bootstrap_nodes,
+        optional_keypair.clone(),
+        read_prefix_map,
+    )
+    .await?;
 
     Ok(client)
 }

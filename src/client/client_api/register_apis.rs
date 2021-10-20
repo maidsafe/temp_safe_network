@@ -210,6 +210,7 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
+    use crate::client::utils::test_utils::create_test_client_with;
     use crate::messaging::data::Error as ErrorMessage;
     use crate::routing::log_markers::LogMarker;
     use crate::types::{
@@ -680,6 +681,30 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn skip_reading_prefix_map_register_test() -> Result<()> {
+        init_test_logger();
+        let _outer_span = tracing::info_span!("skip_reading_prefix_map_register_test").entered();
+
+        let client = create_test_client_with(None, None, false).await?;
+
+        let name = XorName::random();
+
+        // store a Public Register
+        let mut perms = BTreeMap::<User, PublicPermissions>::new();
+        let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
+        let address = client
+            .store_public_register(name, 15000, client.public_key(), perms)
+            .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        let register = client.get_register(address).await?;
+        assert!(register.is_public());
+
+        Ok(())
+    }
+
     fn random_url() -> Result<Url> {
         use crate::url::*;
         let xor_name = XorName::random();
@@ -690,7 +715,7 @@ mod tests {
         ) {
             Ok(url) => url,
             Err(e) => bail!(
-                "Unexpected error returned when attempting to encode blob: {}",
+                "Unexpected error returned when attempting to encode blob: {:?}",
                 e
             ),
         };
@@ -698,7 +723,7 @@ mod tests {
         match Url::from_url(&url) {
             Ok(url) => Ok(url),
             Err(e) => bail!(
-                "Unexpected error returned when attempting to parse url string: {}",
+                "Unexpected error returned when attempting to parse url string: {:?}",
                 e
             ),
         }

@@ -225,7 +225,7 @@ impl Client {
                     }),
                     Err(e) => {
                         warn!(
-                            "Reading chunk {} from network, resulted in error {}.",
+                            "Reading chunk {} from network, resulted in error {:?}.",
                             &key.dst_hash, e
                         );
                         None
@@ -293,9 +293,11 @@ impl Client {
 mod tests {
     use super::Spot;
 
+    use crate::client::utils::test_utils::create_test_client_with;
     use crate::client::{
         client_api::blob_apis::Blob,
         utils::test_utils::{create_test_client, init_test_logger},
+        Client,
     };
     use crate::routing::log_markers::LogMarker;
     use crate::types::{utils::random_bytes, BytesAddress, Keypair};
@@ -503,25 +505,35 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1mb() -> Result<()> {
-        store_and_read_blob(1024 * 1024, Scope::Public).await?;
-        store_and_read_blob(1024 * 1024, Scope::Private).await
+        let client = create_test_client().await?;
+        store_and_read_blob(&client, 1024 * 1024, Scope::Public).await?;
+        store_and_read_blob(&client, 1024 * 1024, Scope::Private).await
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn skip_reading_prefix_map_blob_test() -> Result<()> {
+        let client = create_test_client_with(None, None, false).await?;
+        store_and_read_blob(&client, 10 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_10mb() -> Result<()> {
-        store_and_read_blob(10 * 1024 * 1024, Scope::Private).await
+        let client = create_test_client().await?;
+        store_and_read_blob(&client, 10 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn store_and_read_20mb() -> Result<()> {
-        store_and_read_blob(20 * 1024 * 1024, Scope::Private).await
+        let client = create_test_client().await?;
+        store_and_read_blob(&client, 20 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn store_and_read_40mb() -> Result<()> {
-        store_and_read_blob(40 * 1024 * 1024, Scope::Private).await
+        let client = create_test_client().await?;
+        store_and_read_blob(&client, 40 * 1024 * 1024, Scope::Private).await
     }
 
     // Essentially a load test, seeing how much parallel batting the nodes can take.
@@ -579,7 +591,7 @@ mod tests {
         Ok(())
     }
 
-    async fn store_and_read_blob(size: usize, scope: Scope) -> Result<()> {
+    async fn store_and_read_blob(client: &Client, size: usize, scope: Scope) -> Result<()> {
         init_test_logger();
         // cannot use scope as var w/ macro
         let _outer_span = if scope == Scope::Public {
@@ -589,7 +601,6 @@ mod tests {
         };
 
         let blob = Blob::new(random_bytes(size))?;
-        let client = create_test_client().await?;
 
         let address = client.upload_blob(blob.clone(), scope).await?;
 
@@ -632,7 +643,7 @@ mod tests {
         Ok(())
     }
 
-    async fn store_for_seek(blob: Blob, client: &super::Client) -> Result<BytesAddress> {
+    async fn store_for_seek(blob: Blob, client: &Client) -> Result<BytesAddress> {
         let address = client.upload_blob(blob.clone(), Scope::Public).await?;
         // the larger the file, the longer we have to wait before we start querying
         let delay = tokio::time::Duration::from_secs(usize::max(
@@ -648,7 +659,7 @@ mod tests {
         address: BytesAddress,
         pos: usize,
         len: usize,
-        client: &super::Client,
+        client: &Client,
     ) -> Result<Bytes> {
         let read_data = client.read_from(address, pos, len).await?;
         compare(blob.bytes().slice(pos..(pos + len)), read_data.clone())?;
