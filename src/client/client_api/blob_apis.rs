@@ -506,14 +506,16 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1mb() -> Result<()> {
         init_test_logger();
+        let _outer_span = tracing::info_span!("store_and_read_1mb").entered();
         let client = create_test_client().await?;
         store_and_read_blob(&client, 1024 * 1024, Scope::Public).await?;
         store_and_read_blob(&client, 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn skip_reading_prefix_map_blob_test() -> Result<()> {
+    async fn ae_checks_blob_test() -> Result<()> {
         init_test_logger();
+        let _outer_span = tracing::info_span!("ae_checks_blob_test").entered();
         let client = create_test_client_with(None, None, false).await?;
         store_and_read_blob(&client, 10 * 1024 * 1024, Scope::Private).await
     }
@@ -521,6 +523,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_10mb() -> Result<()> {
         init_test_logger();
+        let _outer_span = tracing::info_span!("store_and_read_10mb").entered();
         let client = create_test_client().await?;
         store_and_read_blob(&client, 10 * 1024 * 1024, Scope::Private).await
     }
@@ -529,6 +532,7 @@ mod tests {
     #[ignore = "too heavy for CI"]
     async fn store_and_read_20mb() -> Result<()> {
         init_test_logger();
+        let _outer_span = tracing::info_span!("store_and_read_20mb").entered();
         let client = create_test_client().await?;
         store_and_read_blob(&client, 20 * 1024 * 1024, Scope::Private).await
     }
@@ -537,6 +541,7 @@ mod tests {
     #[ignore = "too heavy for CI"]
     async fn store_and_read_40mb() -> Result<()> {
         init_test_logger();
+        let _outer_span = tracing::info_span!("store_and_read_40mb").entered();
         let client = create_test_client().await?;
         store_and_read_blob(&client, 40 * 1024 * 1024, Scope::Private).await
     }

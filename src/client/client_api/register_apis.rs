@@ -682,10 +682,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn skip_reading_prefix_map_register_test() -> Result<()> {
+    async fn ae_checks_register_test() -> Result<()> {
         init_test_logger();
-        let _outer_span = tracing::info_span!("skip_reading_prefix_map_register_test").entered();
-
+        let _outer_span = tracing::info_span!("ae_checks_register_test").entered();
         let client = create_test_client_with(None, None, false).await?;
 
         let name = XorName::random();
