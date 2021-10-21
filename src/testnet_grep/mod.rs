@@ -190,7 +190,6 @@ pub fn search_logfile_get_whole_line(
 pub fn get_count_in_logfile(logfile: &Path, pattern: &str) -> Result<usize, Error> {
     let paths = [logfile];
     let matcher = RegexMatcher::new_line_matcher(pattern)?;
-    // let mut matches: MatchesWithPath = vec![];
     let mut count: usize = 0;
 
     for path in paths {
@@ -211,7 +210,6 @@ pub fn get_count_in_logfile(logfile: &Path, pattern: &str) -> Result<usize, Erro
                 dent.path(),
                 UTF8(|_lnum, _line| {
                     count += 1;
-                    // matches.push((lnum, line.to_string(), dent.path().to_path_buf()));
                     Ok(true)
                 }),
             )?;

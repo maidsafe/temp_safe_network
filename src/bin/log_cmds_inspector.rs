@@ -260,13 +260,10 @@ pub fn update_commands_info_for_markers(
                                 .or_insert_with(Vec::new)
                                 .push(root_cmd_id);
 
-                            // if stats_per_node {
-
                             info.msgs_per_node
                                 .entry(node_name)
                                 .or_insert_with(Vec::new)
                                 .push(msg_id.to_string());
-                            // }
                         }
                     }
 
@@ -301,6 +298,7 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
         .by_marker
         .get(&LogMarker::CommandHandleSpawned)
         .unwrap_or(&default_map);
+
     let started = info
         .by_marker
         .get(&LogMarker::CommandHandleStart)
@@ -313,17 +311,6 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
         .by_marker
         .get(&LogMarker::CommandHandleError)
         .unwrap_or(&default_map);
-
-    println!(
-        "Commands Spawned: {}, Started: {}, Succeeded: {}, Produced an error: {}",
-        spawned.len(),
-        started.len(),
-        succeeded.len(),
-        failed.len()
-    );
-    println!();
-    println!();
-    println!("-------------------------");
 
     match args.cmd {
         SubCommands::Commands { ref cmd_id } => {
@@ -408,7 +395,7 @@ fn check_completed_cmds(
 
         if started
             .get(&root_cmd_id)
-            .map(|subcmds| subcmds.cmds_logs.get(cmd_id))
+            .and_then(|subcmds| subcmds.cmds_logs.get(cmd_id))
             .is_none()
         {
             println!(
@@ -425,12 +412,12 @@ fn check_completed_cmds(
             // Command spwned and started, let's see if it completed...
             if succeeded
                 .get(&root_cmd_id)
-                .map(|subcmds| subcmds.cmds_logs.get(cmd_id))
+                .and_then(|subcmds| subcmds.cmds_logs.get(cmd_id))
                 .is_none()
             {
                 if failed
                     .get(&root_cmd_id)
-                    .map(|subcmds| subcmds.cmds_logs.get(cmd_id))
+                    .and_then(|subcmds| subcmds.cmds_logs.get(cmd_id))
                     .is_none()
                 {
                     cmds_with_error.push((cmd_id, logfile, log_entry));
@@ -480,65 +467,28 @@ fn check_completed_cmds(
 
 // Populate the report with the list of commands/sub-commands correlated to the provided cmd id.
 fn populate_commands_tree(
-    spawned: &BTreeMap<String, SubCommandsInfo>,
-    started: &BTreeMap<String, SubCommandsInfo>,
-    succeeded: &BTreeMap<String, SubCommandsInfo>,
-    failed: &BTreeMap<String, SubCommandsInfo>,
+    spawned: &CommandsInfoList,
+    started: &CommandsInfoList,
+    succeeded: &CommandsInfoList,
+    failed: &CommandsInfoList,
     report: &mut BTreeMap<String, Vec<String>>,
     cmd_id: &str,
 ) {
     println!("Looking for commands spawned from cmd id {}", cmd_id);
     let root_cmd_id = get_root_cmd_id(cmd_id);
 
-    if let Some(matching_cmds) = spawned.get(&root_cmd_id) {
-        matching_cmds
-            .cmds_logs
-            .iter()
-            .for_each(|(cmd_id, log_entry)| {
-                report
-                    .entry(cmd_id.clone())
-                    .or_insert_with(Vec::new)
-                    .push(format!(
-                        "{}: {}",
-                        matching_cmds.logfile.display(),
-                        log_entry
-                    ));
-            });
-    }
+    populate_tree_for(spawned, &root_cmd_id, report);
+    populate_tree_for(started, &root_cmd_id, report);
+    populate_tree_for(succeeded, &root_cmd_id, report);
+    populate_tree_for(failed, &root_cmd_id, report);
+}
 
-    if let Some(matching_cmds) = started.get(&root_cmd_id) {
-        matching_cmds
-            .cmds_logs
-            .iter()
-            .for_each(|(cmd_id, log_entry)| {
-                report
-                    .entry(cmd_id.clone())
-                    .or_insert_with(Vec::new)
-                    .push(format!(
-                        "{}: {}",
-                        matching_cmds.logfile.display(),
-                        log_entry
-                    ));
-            });
-    }
-
-    if let Some(matching_cmds) = succeeded.get(&root_cmd_id) {
-        matching_cmds
-            .cmds_logs
-            .iter()
-            .for_each(|(cmd_id, log_entry)| {
-                report
-                    .entry(cmd_id.clone())
-                    .or_insert_with(Vec::new)
-                    .push(format!(
-                        "{}: {}",
-                        matching_cmds.logfile.display(),
-                        log_entry
-                    ));
-            });
-    }
-
-    if let Some(matching_cmds) = failed.get(&root_cmd_id) {
+fn populate_tree_for(
+    command_list: &CommandsInfoList,
+    root_cmd_id: &str,
+    report: &mut BTreeMap<String, Vec<String>>,
+) {
+    if let Some(matching_cmds) = command_list.get(root_cmd_id) {
         matching_cmds
             .cmds_logs
             .iter()
@@ -575,7 +525,7 @@ fn populate_commands_tree_for_msgs(
 }
 
 // Given a command id, return the root id, e.g. the root cmd id of 'abc.1.0.2' is 'a.b.c'.
-fn get_root_cmd_id(cmd_id: &str) -> String {
+fn get_root_cmd_id(cmd_id: &str) -> CmdId {
     let mut root_cmd_id = cmd_id.to_string();
     root_cmd_id.truncate(cmd_id.find('.').unwrap_or_else(|| cmd_id.len()));
     root_cmd_id
