@@ -74,6 +74,7 @@ impl SafeAppClient {
             None,
             node_config.0,
             self.config_path.as_deref(),
+            None,
             Some(self.timeout),
         )
         .await;
