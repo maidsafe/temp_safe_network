@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.36.0](https://github.com/maidsafe/safe_network/compare/v0.35.19...v0.36.0) (2021-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **client:** introduces a new configurable field to client config
+
+### Features
+
+* **client:** add standard_wait time to config ([6583694](https://github.com/maidsafe/safe_network/commit/6583694be04f95658ed6aadfb709d6be8940e72b))
+* **client:** read prefixMap from disk if present ([f21cd64](https://github.com/maidsafe/safe_network/commit/f21cd6449e45b7c6949c80693dd904de5d4f0275))
+* **node:** write PrefixMap to node dir ([5dee36c](https://github.com/maidsafe/safe_network/commit/5dee36c1f1b6af5f8cb8cde6a94fd1321dedb8c9))
+
+
+### Bug Fixes
+
+* update examples to use new client config ([2fd9b49](https://github.com/maidsafe/safe_network/commit/2fd9b497265d1722c22b2db7944733f5be51d217))
+
 ### [0.35.19](https://github.com/maidsafe/safe_network/compare/v0.35.18...v0.35.19) (2021-10-20)
 
 ### [0.35.18](https://github.com/maidsafe/safe_network/compare/v0.35.17...v0.35.18) (2021-10-20)
