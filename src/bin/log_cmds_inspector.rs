@@ -5,7 +5,10 @@ use grep::searcher::sinks::UTF8;
 use grep::searcher::Searcher;
 use safe_network::routing::log_markers::LogMarker;
 use std::str::FromStr;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use strum::IntoEnumIterator;
 use walkdir::WalkDir;
@@ -18,8 +21,10 @@ struct CmdArgs {
     #[structopt(subcommand)]
     pub cmd: SubCommands,
     /// Path to the testnet logs folder, e.g. ~/.safe/node/local-test-network
-    // #[structopt(default_value="$HOME/.safe/node/local-test-network/")]
     pub logs_path: PathBuf,
+    /// Show stats per node? (this is slower)
+    #[structopt(short)]
+    pub nodes: bool,
 }
 
 #[derive(StructOpt, Debug)]
@@ -145,7 +150,10 @@ pub struct ScannedInfo {
 }
 
 /// Search the local-test-network log file and return count
-pub fn update_commands_info_for_markers(path: &PathBuf) -> Result<ScannedInfo, Error> {
+pub fn update_commands_info_for_markers(
+    path: &Path,
+    stats_per_node: bool,
+) -> Result<ScannedInfo, Error> {
     let paths = [path];
     let mut info = ScannedInfo {
         by_marker: BTreeMap::default(),
@@ -160,7 +168,7 @@ pub fn update_commands_info_for_markers(path: &PathBuf) -> Result<ScannedInfo, E
     for (i, marker) in LogMarker::iter().enumerate() {
         if i > 0 {
             // lets add an OR
-            pattern.push_str(r"|");
+            pattern.push('|');
         }
         pattern.push_str(&marker.to_string())
     }
@@ -190,7 +198,7 @@ pub fn update_commands_info_for_markers(path: &PathBuf) -> Result<ScannedInfo, E
                     let the_match = matcher.find(line.as_bytes())?.unwrap();
                     let matched_marker = &line[the_match].to_string();
                     let matched_marker =
-                        LogMarker::from_str(&matched_marker).expect("match to be log marker");
+                        LogMarker::from_str(matched_marker).expect("match to be log marker");
 
                     // update the total count for this match
                     let count = info.counts.entry(matched_marker.clone()).or_insert(0);
@@ -198,13 +206,13 @@ pub fn update_commands_info_for_markers(path: &PathBuf) -> Result<ScannedInfo, E
 
                     if let Some(cmd_id_match) = cmd_id_regex.find(line.as_bytes())? {
                         let cmd_id = &line[cmd_id_match].to_string();
-                        let root_cmd_id = get_root_cmd_id(&cmd_id);
+                        let root_cmd_id = get_root_cmd_id(cmd_id);
 
                         // update the specifics of this marker
                         let marker_map = info
                             .by_marker
                             .entry(matched_marker.clone())
-                            .or_insert(BTreeMap::default());
+                            .or_insert_with(BTreeMap::default);
 
                         let subcommand_info = marker_map
                             .entry(root_cmd_id.clone())
@@ -225,21 +233,23 @@ pub fn update_commands_info_for_markers(path: &PathBuf) -> Result<ScannedInfo, E
                             .expect("node dir name can be parsed to str")
                             .to_string();
 
-                        let nodes_map = info
-                            .by_node
-                            .entry(node_name.clone())
-                            .or_insert_with(|| BTreeMap::default());
+                        if stats_per_node {
+                            let nodes_map = info
+                                .by_node
+                                .entry(node_name.clone())
+                                .or_insert_with(BTreeMap::default);
 
-                        let nodes_markers_map = nodes_map
-                            .entry(matched_marker.clone())
-                            .or_insert_with(|| BTreeMap::default());
+                            let nodes_markers_map = nodes_map
+                                .entry(matched_marker)
+                                .or_insert_with(BTreeMap::default);
 
-                        // nodes_markers_map.insert(root_cmd_id.clone(), value)
-                        let per_node_subcommand_info = nodes_markers_map
-                            .entry(root_cmd_id.clone())
-                            .or_insert_with(|| SubCommandsInfo::new(path.clone()));
+                            // nodes_markers_map.insert(root_cmd_id.clone(), value)
+                            let per_node_subcommand_info = nodes_markers_map
+                                .entry(root_cmd_id.clone())
+                                .or_insert_with(|| SubCommandsInfo::new(path.clone()));
 
-                        per_node_subcommand_info.insert(cmd_id.clone(), line.to_string());
+                            per_node_subcommand_info.insert(cmd_id.clone(), line.to_string());
+                        }
 
                         // And messaging related tracking...
                         if let Some(msg_id_match) = msg_id_regex.find(line.as_bytes())? {
@@ -250,10 +260,13 @@ pub fn update_commands_info_for_markers(path: &PathBuf) -> Result<ScannedInfo, E
                                 .or_insert_with(Vec::new)
                                 .push(root_cmd_id);
 
+                            // if stats_per_node {
+
                             info.msgs_per_node
                                 .entry(node_name)
                                 .or_insert_with(Vec::new)
                                 .push(msg_id.to_string());
+                            // }
                         }
                     }
 
@@ -274,7 +287,7 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
 
     let mut report = BTreeMap::<String, Vec<String>>::new();
 
-    let info = update_commands_info_for_markers(&args.logs_path)?;
+    let info = update_commands_info_for_markers(&args.logs_path, args.nodes)?;
 
     println!("-------------------------");
     println!("LogMarker Stats: (markers found across all log files): ");
@@ -308,8 +321,8 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
         succeeded.len(),
         failed.len()
     );
-    println!("");
-    println!("");
+    println!();
+    println!();
     println!("-------------------------");
 
     match args.cmd {
@@ -340,7 +353,7 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
         if markers.get(&LogMarker::PromotedToElder).is_some() {
             println!("** Has been an elder **");
         }
-        println!("");
+        println!();
         if let Some(commands) = markers.get(&LogMarker::CommandHandleSpawned) {
             println!("Spawned commands: {:?}", commands.len());
         }
@@ -357,8 +370,8 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
         if let Some(msgs) = info.msgs_per_node.get(&node_name) {
             println!("Messages handled by the node: {:?}", msgs.len());
         }
-        println!("");
-        println!("");
+        println!();
+        println!();
     }
 
     Ok(report)
@@ -447,15 +460,15 @@ fn check_completed_cmds(
     );
     println!("Incoming messages handled: {}", info.cmd_by_msg_id.len());
 
-    if cmds_not_completed.len() > 0 {
+    if !cmds_not_completed.is_empty() {
         println!("\n!!! ERROR !!!: Some command/s were not completed in log:");
         for (id, file, line) in cmds_not_completed {
             println!("{}{}{}", id, file, line);
         }
     }
-    println!("");
+    println!();
 
-    if cmds_with_error.len() > 0 {
+    if !cmds_with_error.is_empty() {
         println!("\n!!! ERROR !!!: Some commands produced errors:");
         for (id, file, line) in cmds_with_error {
             println!("{} {} {}", id, file, line);
@@ -472,7 +485,7 @@ fn populate_commands_tree(
     succeeded: &BTreeMap<String, SubCommandsInfo>,
     failed: &BTreeMap<String, SubCommandsInfo>,
     report: &mut BTreeMap<String, Vec<String>>,
-    cmd_id: &CmdId,
+    cmd_id: &str,
 ) {
     println!("Looking for commands spawned from cmd id {}", cmd_id);
     let root_cmd_id = get_root_cmd_id(cmd_id);
@@ -562,8 +575,8 @@ fn populate_commands_tree_for_msgs(
 }
 
 // Given a command id, return the root id, e.g. the root cmd id of 'abc.1.0.2' is 'a.b.c'.
-fn get_root_cmd_id(cmd_id: &CmdId) -> String {
+fn get_root_cmd_id(cmd_id: &str) -> String {
     let mut root_cmd_id = cmd_id.to_string();
-    root_cmd_id.truncate(cmd_id.find('.').unwrap_or(cmd_id.len()));
+    root_cmd_id.truncate(cmd_id.find('.').unwrap_or_else(|| cmd_id.len()));
     root_cmd_id
 }
