@@ -36,6 +36,8 @@ impl Client {
     /// Reads [`Bytes`] from the network, whose contents are contained within on or more chunks.
     pub async fn read_bytes(&self, address: BytesAddress) -> Result<Bytes> {
         let chunk = self.get_chunk(address.name()).await?;
+
+        // first try to serialise a blob, if it works, we go and seek it
         if let Ok(data_map) = self
             .unpack_head_chunk(HeadChunk {
                 chunk: chunk.clone(),
@@ -45,6 +47,7 @@ impl Client {
         {
             self.read_all(data_map).await
         } else {
+            // if an error occurs, we consider its a spot
             self.get_bytes(chunk, address.scope())
         }
     }
@@ -55,7 +58,6 @@ impl Client {
     ///
     /// Takes `position` and `len` arguments which specify the start position
     /// and the length of bytes to be read. Passing `0` to position reads the data from the beginning.
-    /// Passing `None` to length reads the full length of the data.
     ///
     /// # Examples
     ///
@@ -79,8 +81,33 @@ impl Client {
         );
 
         let chunk = self.get_chunk(address.name()).await?;
-        let data_map = self.unpack_head_chunk(HeadChunk { chunk, address }).await?;
-        self.seek(data_map, position, length).await
+
+        // first try to serialise a blob, if it works, we go and seek it
+        if let Ok(data_map) = self
+            .unpack_head_chunk(HeadChunk {
+                chunk: chunk.clone(),
+                address,
+            })
+            .await
+        {
+            return self.seek(data_map, position, length).await;
+        }
+
+        // if an error occurs, we consider its a spot
+        // the error above is ignored to avoid leaking the storage format detail of spots and blobs
+        // the basic idea is that we're trying to deserialize as one, and then the other.
+        // the cost of it is that some errors will not be seen without a refactor.
+        let bytes = self.get_bytes(chunk, address.scope())?;
+
+        let chunk_size = bytes.len();
+        if chunk_size < position + length {
+            return Err(Error::InvalidPositionOrLength(format!(
+                "slicing from chunk at: {:?} of size: {}, with position: {}, and length: {}",
+                &address, chunk_size, position, length
+            )));
+        }
+
+        Ok(bytes.slice(position..length))
     }
 
     #[instrument(skip(self), level = "trace")]
