@@ -2520,9 +2520,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.25.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e27f655bb646411a11a360fe519dd309733254b1eb86a0657c3f1f8d50a299d1"
+checksum = "b1802bbb3de12ad65eb06c744227fe73f75437de0af0555a19fa4d7b1fc95c14"
 dependencies = [
  "backoff",
  "bincode",
@@ -3081,7 +3081,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
- "sn_launch_tool 0.8.1",
+ "sn_launch_tool 0.9.0",
  "structopt",
  "strum",
  "strum_macros",
@@ -3517,9 +3517,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57d48820c86e325de841371569691fb8b78216cf83d0a514eb620367a08a511a"
+checksum = "761c4089dc417b6b004c70ac44e9e70777004c59bbcbd8b6ecdef95b1e7f4982"
 dependencies = [
  "color-eyre",
  "dirs-next 1.0.2",
