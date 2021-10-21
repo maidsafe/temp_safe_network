@@ -13,12 +13,8 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils,
-    error::Result,
-    peer::PeerUtils,
-    routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionPeersUtils},
-    Event, SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils, error::Result, peer::PeerUtils, routing_api::command::Command,
+    section::ElderCandidatesUtils, Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
 
 use super::Core;
@@ -43,7 +39,7 @@ impl Core {
                 self.handle_our_elders_agreement(section_auth, sig).await
             }
             Proposal::JoinsAllowed(joins_allowed) => {
-                self.joins_allowed = joins_allowed;
+                *self.joins_allowed.write().await = joins_allowed;
                 Ok(vec![])
             }
         }
@@ -208,7 +204,7 @@ impl Core {
                 infos.iter().flat_map(|info| info.peers()).collect();
             commands.extend(
                 self.send_proposal(
-                    &our_elders_recipients,
+                    our_elders_recipients,
                     Proposal::OurElders(signed_section_auth),
                 )
                 .await?,
@@ -249,6 +245,7 @@ impl Core {
                 let _ = self.section.update_elders(section_auth.clone(), key_sig);
                 if self.network.update(section_auth, self.section_chain())? {
                     info!("Updated our section's state in network's NetworkPrefixMap");
+                    self.write_prefix_map().await;
                 }
             } else {
                 // Update the old chain to become the neighbour's chain.
@@ -263,6 +260,8 @@ impl Core {
                 info!("Updating neighbouring section's SAP");
                 if let Err(e) = self.network.update(section_auth, &old_chain) {
                     error!("Error updating neighbouring section's details on our NetworkPrefixMap: {:?}", e);
+                } else {
+                    self.write_prefix_map().await;
                 }
             }
         }

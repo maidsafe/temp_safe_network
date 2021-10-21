@@ -13,6 +13,7 @@ use eyre::Result;
 use std::{sync::Once, time::Duration};
 use tempfile::tempdir;
 use tracing_core::{Event, Subscriber};
+use tracing_subscriber::fmt::time::{FormatTime, SystemTime};
 use tracing_subscriber::fmt::{fmt, FmtContext, FormatEvent, FormatFields, FormattedFields};
 use tracing_subscriber::{registry::LookupSpan, EnvFilter};
 
@@ -36,12 +37,16 @@ where
         let level = *event.metadata().level();
         let target = event.metadata().file().expect("will never be `None`");
         let span_separation_string = "\t ➤ ";
+        let time = SystemTime::default();
+        write!(writer, " {} ", level)?;
+
+        time.format_time(writer)?;
+
         writeln!(
             writer,
-            "{} [{}:L{}]:",
-            level,
+            " [{}:L{}]:",
             target,
-            event.metadata().line().expect("will never be `None`")
+            event.metadata().line().expect("will never be `None`"),
         )?;
 
         write!(writer, "{}", span_separation_string)?;
@@ -95,7 +100,7 @@ pub fn init_test_logger() {
 
 /// Create a test client without providing any specific keypair, bootstrap_config, or timeout.
 pub async fn create_test_client() -> Result<Client> {
-    create_test_client_with(None, None).await
+    create_test_client_with(None, None, true).await
 }
 
 /// Create a test client optionally providing keypair and/or bootstrap_config
@@ -103,13 +108,28 @@ pub async fn create_test_client() -> Result<Client> {
 pub async fn create_test_client_with(
     optional_keypair: Option<Keypair>,
     timeout: Option<u64>,
+    read_prefix_map: bool,
 ) -> Result<Client> {
     let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
     let timeout = timeout.map(Duration::from_secs);
     let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
 
-    let config = Config::new(Some(root_dir.path()), None, genesis_key, None, timeout).await;
-    let client = Client::new(config, bootstrap_nodes, optional_keypair.clone()).await?;
+    let config = Config::new(
+        Some(root_dir.path()),
+        None,
+        genesis_key,
+        None,
+        timeout,
+        Some(Duration::from_secs(0)),
+    )
+    .await;
+    let client = Client::create_with(
+        config,
+        bootstrap_nodes,
+        optional_keypair.clone(),
+        read_prefix_map,
+    )
+    .await?;
 
     Ok(client)
 }

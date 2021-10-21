@@ -56,6 +56,12 @@ impl Core {
         user: EndUser,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
+        trace!(
+            "{:?} preparing to write register {:?}",
+            LogMarker::RegisterWrite,
+            register_write.address(),
+        );
+
         match self.register_storage.write(register_write, auth).await {
             Ok(_) => {
                 info!("Successfully wrote Register from Message: {:?}", msg_id);
@@ -79,6 +85,12 @@ impl Core {
         user: EndUser,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
+        trace!(
+            "{:?} preparing to read {:?}",
+            LogMarker::RegisterQueryReceived,
+            query.dst_address(),
+        );
+
         match self.register_storage.read(&query, auth.public_key) {
             Ok(response) => {
                 if response.failed_with_data_not_found() {
@@ -224,7 +236,8 @@ impl Core {
                 && self
                     .capacity
                     .is_full(&XorName::from(sending_nodes_pk))
-                    .await)
+                    .await
+                    .unwrap_or(false))
         {
             // we don't return data not found errors.
             trace!("Node {:?}, reported data not found", sending_nodes_pk);
@@ -287,15 +300,14 @@ impl Core {
     pub(crate) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = self
-            .section()
-            .adults()
-            .copied()
-            .map(|p2p_node| *p2p_node.name());
+        let adults = self.section().adults();
 
-        let mut candidates = adults
+        let adults_names = adults.iter().map(|p2p_node| *p2p_node.name());
+
+        let mut candidates = adults_names
+            .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
-            .filter(|name| !full_adults.contains(name))
+            .filter(|peer| !full_adults.contains(peer))
             .take(CHUNK_COPY_COUNT)
             .collect::<BTreeSet<_>>();
         trace!(

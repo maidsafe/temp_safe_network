@@ -110,10 +110,13 @@ impl Core {
         ) {
             Ok(updated) => {
                 if updated {
+                    // Update the Prefixmap written on our disk
                     info!(
                         "Anti-Entropy: updated remote section SAP updated for {:?}",
                         section_auth.prefix
                     );
+                    self.write_prefix_map().await;
+                    info!("PrefixMap written to disk");
                 } else {
                     debug!(
                         "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",

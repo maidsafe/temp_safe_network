@@ -51,6 +51,7 @@ impl Core {
             event_tx,
             used_space,
             root_storage_dir,
+            true,
         )
         .await
     }
@@ -80,7 +81,8 @@ impl Core {
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
             event_tx: self.event_tx.clone(),
-            joins_allowed: true,
+            joins_allowed: Arc::new(RwLock::new(true)),
+            is_genesis_node: false,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage: self.register_storage.clone(),
             root_storage_dir: self.root_storage_dir.clone(),
@@ -220,7 +222,7 @@ impl Core {
     // Setting the JoinsAllowed triggers a round Proposal::SetJoinsAllowed to update the flag.
     pub(crate) async fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();
-        if self.is_elder() && joins_allowed != self.joins_allowed {
+        if self.is_elder() && joins_allowed != *self.joins_allowed.read().await {
             commands.extend(self.propose(Proposal::JoinsAllowed(joins_allowed)).await?);
         }
         Ok(commands)

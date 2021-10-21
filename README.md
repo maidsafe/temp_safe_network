@@ -2,7 +2,7 @@
 
 The Safe Network Core. API message definitions, routing and nodes, client core api.
 
-| [![](http://meritbadge.herokuapp.com/sn_client)](https://crates.io/crates/sn_client) | [![Documentation](https://docs.rs/sn_client/badge.svg)](https://docs.rs/sn_client) |
+| [![](https://img.shields.io/crates/v/safe_network)](https://crates.io/crates/sn_client) | [![Documentation](https://docs.rs/sn_client/badge.svg)](https://docs.rs/sn_client) |
 |:----------:|:----------:|
 
 

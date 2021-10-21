@@ -22,7 +22,6 @@ use crate::routing::{
     peer::PeerUtils,
     SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
-use crate::types::PublicKey;
 
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
@@ -47,7 +46,7 @@ pub(crate) async fn join_network(
 ) -> Result<(Node, Section)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
-    let span = trace_span!("bootstrap", name = %node.name());
+    let span = trace_span!("bootstrap");
 
     let state = Join::new(node, send_tx, incoming_conns);
 
@@ -66,6 +65,7 @@ struct Join<'a> {
     // Receiver for incoming messages.
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
+    prefix: Prefix,
 }
 
 impl<'a> Join<'a> {
@@ -78,6 +78,7 @@ impl<'a> Join<'a> {
             send_tx,
             recv_rx,
             node,
+            prefix: Prefix::default(),
         }
     }
 
@@ -171,7 +172,19 @@ impl<'a> Join<'a> {
 
                     // For the first section, using age random among 6 to 100 to avoid
                     // relocating too many nodes at the same time.
-                    if prefix.is_empty() && self.node.age() < FIRST_SECTION_MIN_AGE {
+                    // To avoid recursive due to received outdated SAP, self prefix shall be default
+                    // as well when re-generate for a new age.
+                    trace!(
+                        "Joining node {:?} - {:?}/{:?} received a Retry with SAP {:?}",
+                        self.prefix,
+                        self.node.name(),
+                        self.node.age(),
+                        section_auth
+                    );
+                    if prefix.is_empty()
+                        && self.prefix.is_empty()
+                        && self.node.age() < FIRST_SECTION_MIN_AGE
+                    {
                         let age: u8 = (FIRST_SECTION_MIN_AGE..FIRST_SECTION_MAX_AGE)
                             .choose(&mut rand::thread_rng())
                             .unwrap_or(FIRST_SECTION_MAX_AGE);
@@ -185,6 +198,7 @@ impl<'a> Join<'a> {
                     }
 
                     if prefix.matches(&self.node.name()) {
+                        self.prefix = prefix;
                         // After section split, new node must join with the age of MIN_ADULT_AGE.
                         if !prefix.is_empty() && self.node.age() != MIN_ADULT_AGE {
                             let new_keypair =
@@ -196,8 +210,10 @@ impl<'a> Join<'a> {
                         }
 
                         info!(
-                            "Newer Join response for our prefix {:?} from {:?}",
-                            section_auth, sender
+                            "Newer Join response for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender
                         );
                         section_key = section_auth.section_key();
                         let join_request = JoinRequest {
@@ -210,8 +226,10 @@ impl<'a> Join<'a> {
                             .await?;
                     } else {
                         warn!(
-                            "Newer Join response not for our prefix {:?} from {:?}",
-                            section_auth, sender,
+                            "Newer Join response not for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender,
                         );
                     }
                 }
@@ -240,9 +258,12 @@ impl<'a> Join<'a> {
                     }
 
                     if section_auth.prefix.matches(&self.node.name()) {
+                        self.prefix = section_auth.prefix;
                         info!(
-                            "Newer Join response for our prefix {:?} from {:?}",
-                            section_auth, sender
+                            "Newer Join response for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender
                         );
                         section_key = section_auth.section_key();
                         let join_request = JoinRequest {
@@ -256,8 +277,10 @@ impl<'a> Join<'a> {
                             .await?;
                     } else {
                         warn!(
-                            "Newer Join response not for our prefix {:?} from {:?}",
-                            section_auth, sender,
+                            "Newer Join response not for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender,
                         );
                     }
                 }
@@ -301,7 +324,7 @@ impl<'a> Join<'a> {
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
-                name: XorName::from(PublicKey::Bls(section_key)),
+                name: self.node.name(),
                 section_pk: section_key,
             },
             node_msg,
@@ -322,7 +345,7 @@ impl<'a> Join<'a> {
                 ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) => continue,
-                        MsgKind::NodeBlsShareAuthMsg(_) | MsgKind::SectionAuthMsg(_) => {
+                        MsgKind::NodeBlsShareAuthMsg(_) => {
                             trace!(
                                 "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
                                 sender,
@@ -358,7 +381,6 @@ impl<'a> Join<'a> {
                         continue;
                     }
                 },
-                ConnectionEvent::Disconnected(_) => continue,
             };
 
             match join_response {

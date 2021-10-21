@@ -18,27 +18,28 @@ use crate::messaging::{
 use crate::messaging::{AuthorityProof, ServiceAuth};
 use bytes::Bytes;
 use itertools::Itertools;
-use qp2p::IncomingMessages;
+use qp2p::ConnectionIncoming;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
+use tracing::Instrument;
 use xor_name::XorName;
 
 impl Session {
     // Listen for incoming messages on a connection
     #[instrument(skip_all, level = "debug")]
-    pub(crate) async fn spawn_message_listener_thread(
-        mut session: Session,
-        mut incoming_messages: IncomingMessages<XorName>,
+    pub(crate) fn spawn_message_listener_thread(
+        session: Session,
+        src: SocketAddr,
+        mut incoming_messages: ConnectionIncoming<XorName>,
     ) {
         debug!("Listening for incoming messages");
         let _ = tokio::spawn(async move {
             loop {
-                session = match Self::listen_for_incoming_message(&mut incoming_messages).await {
-                    Ok((src, msg)) => match Self::handle_msg(msg, src, session.clone()).await {
-                        Ok(session) => session,
+                match Self::listen_for_incoming_message(src, &mut incoming_messages).await {
+                    Ok(msg) => match Self::handle_msg(msg, src, session.clone()).await {
+                        Ok(()) => {},
                         Err(err) => {
                             error!("Error while processing incoming message: {:?}. Listening for next message...", err);
-                            session
                         }
                     },
                     Err(Error::Generic(_)) => {
@@ -48,23 +49,22 @@ impl Session {
                     }
                     Err(err) => {
                         error!("Error while getting incoming message: {:?}. Listening for next message...", err);
-                        session
                     }
                 }
             }
-        });
+        }.instrument(info_span!("Listening for incoming msgs"))).in_current_span();
     }
 
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn listen_for_incoming_message(
-        incoming_messages: &mut IncomingMessages<XorName>,
-    ) -> Result<(SocketAddr, MessageType), Error> {
-        if let Some((connection, message)) = incoming_messages.next().await {
-            trace!("Incoming message from {:?}", connection.remote_address());
+        src: SocketAddr,
+        incoming_messages: &mut ConnectionIncoming<XorName>,
+    ) -> Result<MessageType, Error> {
+        if let Some(message) = incoming_messages.next().await? {
+            trace!("Incoming message from {:?}", src);
             let msg_type = WireMsg::deserialize(message)?;
-            trace!("Incoming message deserialized fine");
 
-            Ok((connection.remote_address(), msg_type))
+            Ok(msg_type)
         } else {
             Err(Error::Generic("Nothing..".to_string())) // TODO: FIX error type
         }
@@ -75,10 +75,10 @@ impl Session {
         msg: MessageType,
         src: SocketAddr,
         session: Session,
-    ) -> Result<Session, Error> {
+    ) -> Result<(), Error> {
         match msg {
             MessageType::Service { msg_id, msg, .. } => {
-                Self::handle_client_msg(session, msg_id, msg, src).await
+                Self::handle_client_msg(session, msg_id, msg, src)
             }
             MessageType::System {
                 msg:
@@ -127,22 +127,22 @@ impl Session {
             }
             msg_type => {
                 warn!("Unexpected message type received: {:?}", msg_type);
-                Ok(session)
+                Ok(())
             }
         }
     }
 
     // Handle messages intended for client consumption (re: queries + commands)
     #[instrument(skip(session), level = "debug")]
-    async fn handle_client_msg(
+    fn handle_client_msg(
         session: Session,
         msg_id: MessageId,
         msg: ServiceMsg,
         src: SocketAddr,
-    ) -> Result<Session, Error> {
+    ) -> Result<(), Error> {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = session.pending_queries.clone();
-        let error_sender = session.incoming_err_sender.clone();
+        let error_sender = session.incoming_err_sender;
 
         let _ = tokio::spawn(async move {
             match msg {
@@ -157,7 +157,7 @@ impl Session {
                             trace!("Sending response for query w/{} via channel.", op_id);
                             let result = sender.send(response).await;
                             if result.is_err() {
-                                warn!("Error sending query response on a channel for {:?} op_id {:?}: {:?}", msg_id, op_id, result)
+                                trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
                             }
                         } else {
                             // TODO: The trace is only needed when we have an identified case of not finding a channel, but expecting one.
@@ -197,7 +197,7 @@ impl Session {
             };
         });
 
-        Ok(session)
+        Ok(())
     }
 
     // Handle Anti-Entropy Redirect messages
@@ -208,7 +208,7 @@ impl Session {
         section_signed: KeyedSig,
         bounced_msg: Bytes,
         sender: SocketAddr,
-    ) -> Result<Session, Error> {
+    ) -> Result<(), Error> {
         // Check if SAP signature is valid
         if !bincode::serialize(&target_section_auth)
             .map(|bytes| section_signed.verify(&bytes))
@@ -218,7 +218,7 @@ impl Session {
                 "Signature returned with SAP in AE-Redirect response is invalid: {:?}",
                 target_section_auth
             );
-            return Ok(session);
+            return Ok(());
         }
 
         debug!(
@@ -226,7 +226,7 @@ impl Session {
             sender, target_section_auth
         );
 
-        if let Some((msg_id, session, elders, service_msg, mut dst_location, auth)) =
+        if let Some((msg_id, elders, service_msg, mut dst_location, auth)) =
             Self::new_elder_targets_if_any(
                 session.clone(),
                 bounced_msg.clone(),
@@ -236,7 +236,7 @@ impl Session {
         {
             if elders.is_empty() {
                 debug!("We have already resent this message on an AE-Redirect response. Dropping this instance");
-                return Ok(session);
+                return Ok(());
             }
 
             let message = WireMsg::serialize_msg_payload(&service_msg)?;
@@ -260,10 +260,17 @@ impl Session {
 
             debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 
-            send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
+            send_message(
+                session.clone(),
+                elders.clone(),
+                wire_msg,
+                session.endpoint.clone(),
+                msg_id,
+            )
+            .await?;
         }
 
-        Ok(session)
+        Ok(())
     }
 
     // Handle Anti-Entropy Retry messages
@@ -274,7 +281,7 @@ impl Session {
         section_signed: KeyedSig,
         bounced_msg: Bytes,
         proof_chain: SecuredLinkedList,
-    ) -> Result<Session, Error> {
+    ) -> Result<(), Error> {
         // Update our network knowledge making sure proof chain
         // validates the new SAP based on currently known remote section SAP.
         match session.network.update(
@@ -302,19 +309,29 @@ impl Session {
                         "Anti-Entropy: failed to update remote section SAP, bounced msg dropped. Failed section auth was {:?}, {:?}",
                         err, section_auth
                     );
-                return Ok(session);
+                return Ok(());
             }
         }
 
         // Extract necessary information for resending
-        if let Some((msg_id, session, elders, service_msg, dst_location, auth)) =
+        if let Some((msg_id, elders, service_msg, dst_location, auth)) =
             Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), None).await?
         {
+            if let Some(id) = *session.clone().initial_connection_check_msg_id.read().await {
+                if id == msg_id {
+                    trace!(
+                        "Retry message recevied from intial client contact probe ({:?}). No need to retry this",
+                        msg_id
+                    );
+                    return Ok(());
+                }
+            }
+
             debug!("Received AE-Retry with new SAP: {:?}", section_auth);
 
             if elders.is_empty() {
                 debug!("We have already responded to this message on an AE-Retry response. Dropping this instance");
-                return Ok(session);
+                return Ok(());
             }
 
             let payload = WireMsg::serialize_msg_payload(&service_msg)?;
@@ -328,10 +345,11 @@ impl Session {
 
             debug!("Resending original message via AE-Retry");
 
-            send_message(elders.clone(), wire_msg, session.endpoint.clone(), msg_id).await?;
+            let endpoint = session.endpoint.clone();
+            send_message(session, elders.clone(), wire_msg, endpoint, msg_id).await?;
         }
 
-        Ok(session)
+        Ok(())
     }
 
     /// Checks AE cache to see if we should be forwarding this message (and to whom) or if it has already been dealt with
@@ -343,7 +361,6 @@ impl Session {
     ) -> Result<
         Option<(
             MessageId,
-            Session,
             Vec<SocketAddr>,
             ServiceMsg,
             DstLocation,
@@ -369,19 +386,10 @@ impl Session {
                 }
             };
 
-        if let Some(id) = *session.initial_connection_check_msg_id.read().await {
-            if id == msg_id {
-                trace!(
-                    "Retry message from original contact probe ({:?}). No need to retry this",
-                    msg_id
-                );
-                return Ok(None);
-            }
-        }
-
-        debug!(
+        trace!(
             "Bounced message ({:?}) received in an AE response: {:?}",
-            msg_id, service_msg
+            msg_id,
+            service_msg
         );
 
         let (mut target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
@@ -394,7 +402,8 @@ impl Session {
             ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),
             _ => {
                 warn!(
-                    "Invalid bounced message received in AE response: {:?}. Message is of invalid type",
+                    "Invalid bounced message {:?} received in AE response: {:?}. Message is of invalid type",
+                    msg_id,
                     service_msg
                 );
                 // Early return with random name as we will discard the message at the caller func
@@ -438,7 +447,7 @@ impl Session {
                     .take(target_count)
                     .collect::<Vec<SocketAddr>>()
             } else {
-                error!("Cannot resend, no 'received auth' provided, and nothing relevant in session network prefixmap");
+                error!("Cannot resend {:?}, no 'received auth' provided, and nothing relevant in session network prefixmap", msg_id);
                 return Ok(None);
             }
         };
@@ -459,7 +468,7 @@ impl Session {
 
         if cache_entry.is_some() {
             // an elder group corresponds to a PK, so as we've sent to this PK, we've sent to these elders...
-            debug!("Cache hit! We have sent this message before, removing target elders");
+            debug!("Cache hit! we've sent {:?} before", msg_id);
 
             target_elders = vec![];
         } else {
@@ -473,16 +482,17 @@ impl Session {
         // Let's rebuild the message with the updated destination details
         dst_location.set_section_pk(target_public_key);
 
-        debug!(
-            "Final target elders for resending {:?} message are {:?}",
-            service_msg, target_elders
-        );
+        if !target_elders.is_empty() {
+            debug!(
+                "Final target elders for resending {:?} : {:?} message are {:?}",
+                msg_id, service_msg, target_elders
+            );
+        }
 
         drop(the_cache_guard);
 
         Ok(Some((
             msg_id,
-            session,
             target_elders,
             service_msg,
             dst_location,

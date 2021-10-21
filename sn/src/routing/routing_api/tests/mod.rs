@@ -31,9 +31,7 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     relocation::{self, RelocatePayloadUtils},
-    section::{
-        test_utils::*, ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionPeersUtils,
-    },
+    section::{test_utils::*, ElderCandidatesUtils, NodeStateUtils, SectionKeyShare},
     supermajority, Error, Event, Result as RoutingResult, SectionAuthorityProviderUtils,
     ELDER_SIZE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
@@ -79,6 +77,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -156,6 +155,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -244,6 +244,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -342,6 +343,7 @@ async fn aggregate_proposals() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -364,7 +366,7 @@ async fn aggregate_proposals() -> Result<()> {
                 section_pk,
             },
             SystemMsg::Propose {
-                content: proposal.clone(),
+                proposal: proposal.clone(),
                 sig_share,
             },
             section_auth.section_key(),
@@ -400,7 +402,7 @@ async fn aggregate_proposals() -> Result<()> {
             section_pk,
         },
         SystemMsg::Propose {
-            content: proposal.clone(),
+            proposal: proposal.clone(),
             sig_share,
         },
         section_auth.section_key(),
@@ -451,6 +453,7 @@ async fn handle_agreement_on_online() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -512,6 +515,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -527,7 +531,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -586,7 +590,7 @@ async fn handle_online_command(
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -678,6 +682,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(state);
@@ -743,6 +748,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -756,7 +762,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let _ = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     assert_matches!(event_rx.recv().await, Some(Event::MemberLeft { name, age, }) => {
@@ -800,6 +806,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -809,7 +816,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -908,6 +915,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
 
@@ -1012,6 +1020,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
 
@@ -1042,7 +1051,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     match commands {
         Err(Error::UntrustedProofChain(_)) => Ok(()),
         Err(other_err) => bail!(
-            "AE update handling produced unexpected error with bad AE update: {}",
+            "AE update handling produced unexpected error with bad AE update: {:?}",
             other_err
         ),
         Ok(_) => bail!("AE update handling should error due to bad signing."),
@@ -1054,20 +1063,20 @@ async fn get_internal_commands(
     command: Command,
     dispatcher: &Dispatcher,
 ) -> RoutingResult<Vec<Command>> {
-    let commands = dispatcher.handle_command(command).await?;
+    let commands = dispatcher.handle_command(command, "cmd-id").await?;
 
     let mut node_msg_handling = vec![];
     let mut inner_handling = vec![];
 
     for command in commands {
         // first pass gets us into node msg handling
-        let commands = dispatcher.handle_command(command).await?;
+        let commands = dispatcher.handle_command(command, "cmd-id").await?;
         node_msg_handling.extend(commands);
     }
 
     for command in node_msg_handling {
         // second pass gets us into non-data handling
-        let commands = dispatcher.handle_command(command).await?;
+        let commands = dispatcher.handle_command(command, "cmd-id").await?;
         inner_handling.extend(commands);
     }
 
@@ -1106,6 +1115,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -1117,7 +1127,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
     let (proposal, sig) = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut relocate_sent = false;
@@ -1219,10 +1229,13 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let wire_msg = WireMsg::single_src(&node, dst_location, node_msg.clone(), section_pk)?;
 
     let commands = dispatcher
-        .handle_command(Command::SendMessage {
-            recipients: vec![(node.name(), node.addr)],
-            wire_msg,
-        })
+        .handle_command(
+            Command::SendMessage {
+                recipients: vec![(node.name(), node.addr)],
+                wire_msg,
+            },
+            "cmd-id",
+        )
         .await?;
 
     assert!(commands.is_empty());
@@ -1306,12 +1319,13 @@ async fn handle_elders_update() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut update_actual_recipients = HashSet::new();
@@ -1416,6 +1430,7 @@ async fn handle_demote_during_split() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -1445,14 +1460,14 @@ async fn handle_demote_during_split() -> Result<()> {
         sk_set_v1_p0.public_keys(),
     );
     let command = create_our_elders_command(sk_set_v1_p0.secret_key(), section_auth)?;
-    let commands = dispatcher.handle_command(command).await?;
+    let commands = dispatcher.handle_command(command, "cmd-id").await?;
     assert_matches!(&commands[..], &[]);
 
     // Handle agreement on `OurElders` for prefix-1.
     let section_auth =
         SectionAuthorityProvider::new(peers_b.iter().copied(), prefix1, sk_set_v1_p1.public_keys());
     let command = create_our_elders_command(sk_set_v1_p1.secret_key(), section_auth)?;
-    let commands = dispatcher.handle_command(command).await?;
+    let commands = dispatcher.handle_command(command, "cmd-id").await?;
 
     let mut update_recipients = HashSet::new();
 

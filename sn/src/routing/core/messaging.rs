@@ -15,7 +15,8 @@ use crate::messaging::{
     DstLocation, WireMsg,
 };
 use crate::routing::{
-    dkg::{DkgSessionIdUtils, ProposalUtils, SigShare},
+    core::StateSnapshot,
+    dkg::{DkgSessionIdUtils, ProposalUtils},
     error::Result,
     messages::WireMsgUtils,
     peer::PeerUtils,
@@ -26,19 +27,20 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-use std::{net::SocketAddr, slice};
+use secured_linked_list::SecuredLinkedList;
+use std::net::SocketAddr;
 use xor_name::XorName;
 impl Core {
     // Send proposal to all our elders.
     pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
         let elders: Vec<_> = self.section.authority_provider().peers().collect();
-        self.send_proposal(&elders, proposal).await
+        self.send_proposal(elders, proposal).await
     }
 
     // Send `proposal` to `recipients`.
     pub(crate) async fn send_proposal(
         &self,
-        recipients: &[Peer],
+        recipients: Vec<Peer>,
         proposal: Proposal,
     ) -> Result<Vec<Command>> {
         let key_share = self
@@ -54,7 +56,7 @@ impl Core {
 
     pub(crate) fn send_proposal_with(
         &self,
-        recipients: &[Peer],
+        recipients: Vec<Peer>,
         proposal: Proposal,
         key_share: &SectionKeyShare,
     ) -> Result<Vec<Command>> {
@@ -73,7 +75,7 @@ impl Core {
 
         // Broadcast the proposal to the rest of the section elders.
         let node_msg = SystemMsg::Propose {
-            content: proposal,
+            proposal,
             sig_share,
         };
         // Name of the section_pk may not matches the section prefix.
@@ -134,17 +136,13 @@ impl Core {
     pub(crate) fn check_lagging(
         &self,
         peer: (XorName, SocketAddr),
-        sig_share: &SigShare,
+        public_key: &BlsPublicKey,
     ) -> Result<Option<Command>> {
-        let public_key = sig_share.public_key_set.public_key();
-
-        if self.section.chain().has_key(&public_key)
-            && public_key != *self.section.chain().last_key()
+        if self.section.chain().has_key(public_key) && public_key != self.section.chain().last_key()
         {
-            let dst_section_pk = sig_share.public_key_set.public_key();
-            let msg = self.generate_ae_update(dst_section_pk, true)?;
+            let msg = self.generate_ae_update(*public_key, true)?;
 
-            let cmd = self.send_direct_message(peer, msg, dst_section_pk)?;
+            let cmd = self.send_direct_message(peer, msg, *public_key)?;
             Ok(Some(cmd))
         } else {
             Ok(None)
@@ -178,6 +176,7 @@ impl Core {
     pub(crate) fn send_ae_update_to_our_section(&self, section: &Section) -> Result<Vec<Command>> {
         let nodes: Vec<_> = section
             .active_members()
+            .iter()
             .filter(|peer| peer.name() != &self.node.name())
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
@@ -197,10 +196,59 @@ impl Core {
         Ok(vec![cmd])
     }
 
+    pub(crate) fn send_ae_update_to_sibling_section(
+        &self,
+        old: &StateSnapshot,
+    ) -> Result<Vec<Command>> {
+        if let Some(sibling_sec_auth) = self.network.get_signed(&self.section().prefix().sibling())
+        {
+            let promoted_sibling_elders: Vec<_> = sibling_sec_auth
+                .value
+                .peers()
+                .filter(|peer| !old.elders.contains(peer.name()))
+                .map(|peer| (*peer.name(), *peer.addr()))
+                .collect();
+
+            // Using previous_key as dst_section_key as newly promoted sibling elders shall still
+            // in the state of pre-split.
+            let previous_pk = sibling_sec_auth.sig.public_key;
+
+            // Compose a min sibling proof_chain.
+            let mut proof_chain = SecuredLinkedList::new(previous_pk);
+            let _ = proof_chain.insert(
+                &previous_pk,
+                sibling_sec_auth.value.section_key(),
+                sibling_sec_auth.sig.signature.clone(),
+            );
+
+            // Those promoted elders shall already know about other adult members.
+            // TODO: confirm no need to populate the members.
+            let node_msg = SystemMsg::AntiEntropyUpdate {
+                section_auth: sibling_sec_auth.value.clone(),
+                section_signed: sibling_sec_auth.sig,
+                proof_chain,
+                members: None,
+            };
+
+            let cmd = self.send_direct_message_to_nodes(
+                promoted_sibling_elders,
+                node_msg,
+                sibling_sec_auth.value.prefix().name(),
+                previous_pk,
+            )?;
+
+            Ok(vec![cmd])
+        } else {
+            error!("Failed to get sibling SAP during split.");
+            Ok(vec![])
+        }
+    }
+
     pub(crate) fn send_ae_update_to_adults(&mut self) -> Result<Vec<Command>> {
         let adults: Vec<_> = self
             .section
             .live_adults()
+            .iter()
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
 
@@ -219,7 +267,7 @@ impl Core {
 
     pub(crate) async fn send_relocate(
         &self,
-        recipient: &Peer,
+        recipient: Peer,
         details: RelocateDetails,
     ) -> Result<Vec<Command>> {
         let src = details.pub_id;
@@ -229,13 +277,13 @@ impl Core {
         };
         let node_msg = SystemMsg::Relocate(details);
 
-        self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
+        self.send_message_for_dst_accumulation(src, dst, node_msg, vec![recipient])
             .await
     }
 
     pub(crate) async fn send_relocate_promise(
         &self,
-        recipient: &Peer,
+        recipient: Peer,
         promise: RelocatePromise,
     ) -> Result<Vec<Command>> {
         // Note: this message is first sent to a single node who then sends it back to the section
@@ -248,7 +296,7 @@ impl Core {
         };
         let node_msg = SystemMsg::RelocatePromise(promise);
 
-        self.send_message_for_dst_accumulation(src, dst, node_msg, slice::from_ref(recipient))
+        self.send_message_for_dst_accumulation(src, dst, node_msg, vec![recipient])
             .await
     }
 
@@ -291,7 +339,7 @@ impl Core {
                 section_pk,
             },
             node_msg,
-            &recipients,
+            recipients,
         )
         .await
     }
@@ -301,7 +349,7 @@ impl Core {
         src: XorName,
         dst: DstLocation,
         node_msg: SystemMsg,
-        recipients: &[Peer],
+        recipients: Vec<Peer>,
     ) -> Result<Vec<Command>> {
         let key_share = self
             .section_keys_provider
@@ -339,7 +387,7 @@ impl Core {
     pub(crate) fn send_or_handle(
         &self,
         mut wire_msg: WireMsg,
-        recipients: &[Peer],
+        recipients: Vec<Peer>,
     ) -> Vec<Command> {
         let mut commands = vec![];
         let mut others = Vec::new();

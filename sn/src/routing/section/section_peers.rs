@@ -12,139 +12,102 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{peer::PeerUtils, SectionAuthorityProviderUtils};
+use dashmap::mapref::entry::Entry;
 use itertools::Itertools;
-use std::{
-    cmp::Ordering,
-    collections::{btree_map::Entry, BTreeSet},
-    mem,
-};
+use std::{cmp::Ordering, collections::BTreeSet};
 use xor_name::{Prefix, XorName};
 
-/// Container for storing information about members of our section.
-pub(crate) trait SectionPeersUtils {
-    /// Returns an iterator over all current (joined) and past (left) members.
-    fn all(&self) -> Box<dyn Iterator<Item = &NodeState> + '_>;
+impl SectionPeers {
+    /// Returns members that have state == `Joined`.
+    pub(crate) fn joined(&self) -> Vec<NodeState> {
+        let mut joined = vec![];
+        let members = &*self.members;
+        for entry in members.into_iter() {
+            let (_, state) = entry.pair();
+            let info = state.value;
+            if info.state == MembershipState::Joined {
+                joined.push(info)
+            }
+        }
 
-    /// Returns an iterator over the members that have state == `Joined`.
-    fn joined(&self) -> Box<dyn Iterator<Item = &NodeState> + '_>;
-
-    /// Returns joined nodes from our section with age greater than `MIN_AGE`
-    fn mature(&self) -> Box<dyn Iterator<Item = &Peer> + '_>;
-
-    /// Get info for the member with the given name.
-    fn get(&self, name: &XorName) -> Option<&NodeState>;
-
-    /// Get section_signed info for the member with the given name.
-    fn get_section_signed(&self, name: &XorName) -> Option<&SectionAuth<NodeState>>;
-
-    /// Returns the candidates for elders out of all the nodes in this section.
-    fn elder_candidates(
-        &self,
-        elder_size: usize,
-        current_elders: &SectionAuthorityProvider,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> Vec<Peer>;
-
-    /// Returns the candidates for elders out of all nodes matching the prefix.
-    fn elder_candidates_matching_prefix(
-        &self,
-        prefix: &Prefix,
-        elder_size: usize,
-        current_elders: &SectionAuthorityProvider,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> Vec<Peer>;
-
-    /// Returns whether the given peer is a joined member of our section.
-    fn is_joined(&self, name: &XorName) -> bool;
-
-    /// Returns whether the given peer is already relocated to our section.
-    fn is_relocated(&self, name: &XorName) -> bool;
-
-    /// Update a member of our section.
-    /// Returns whether anything actually changed.
-    fn update(&mut self, new_info: SectionAuth<NodeState>) -> bool;
-
-    /// Remove all members whose name does not match `prefix`.
-    fn prune_not_matching(&mut self, prefix: &Prefix);
-}
-
-impl SectionPeersUtils for SectionPeers {
-    /// Returns an iterator over all current (joined) and past (left) members.
-    fn all(&self) -> Box<dyn Iterator<Item = &NodeState> + '_> {
-        Box::new(self.members.values().map(|info| &info.value))
-    }
-
-    /// Returns an iterator over the members that have state == `Joined`.
-    fn joined(&self) -> Box<dyn Iterator<Item = &NodeState> + '_> {
-        Box::new(
-            self.members
-                .values()
-                .map(|info| &info.value)
-                .filter(|member| member.state == MembershipState::Joined),
-        )
+        joined
     }
 
     /// Returns joined nodes from our section with age greater than `MIN_AGE`
-    fn mature(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
-        Box::new(
-            self.joined()
-                .filter(|info| info.is_mature())
-                .map(|info| &info.peer),
-        )
+    pub(crate) fn mature(&self) -> Vec<Peer> {
+        self.joined()
+            .into_iter()
+            .filter(|info| info.is_mature())
+            .map(|info| info.peer)
+            .collect()
     }
 
     /// Get info for the member with the given name.
-    fn get(&self, name: &XorName) -> Option<&NodeState> {
-        self.members.get(name).map(|info| &info.value)
+    pub(crate) fn get(&self, name: &XorName) -> Option<NodeState> {
+        self.members.get(name).map(|info| info.value)
     }
 
     /// Get section_signed info for the member with the given name.
-    fn get_section_signed(&self, name: &XorName) -> Option<&SectionAuth<NodeState>> {
-        self.members.get(name)
+    pub(crate) fn get_section_signed(&self, name: &XorName) -> Option<SectionAuth<NodeState>> {
+        if let Some(oneref) = self.members.get(name) {
+            return Some(oneref.value().clone());
+        }
+
+        None
     }
 
     /// Returns the candidates for elders out of all the nodes in this section.
-    fn elder_candidates(
+    pub(crate) fn elder_candidates(
         &self,
         elder_size: usize,
         current_elders: &SectionAuthorityProvider,
         excluded_names: &BTreeSet<XorName>,
     ) -> Vec<Peer> {
-        elder_candidates(
-            elder_size,
-            current_elders,
-            self.members
-                .iter()
-                .filter(|(_, info)| is_active(&info.value, current_elders))
-                .filter(|(_, info)| info.value.peer.is_reachable())
-                .filter(|(name, _)| !excluded_names.contains(name))
-                .map(|(_, info)| info),
-        )
+        let mut candidates = vec![];
+        let members = &*self.members;
+
+        for entry in members.into_iter() {
+            let (name, info) = entry.pair();
+
+            if is_active(&info.value, current_elders)
+                && info.value.peer.is_reachable()
+                && !excluded_names.contains(name)
+            {
+                candidates.push(info.clone())
+            }
+        }
+
+        elder_candidates(elder_size, current_elders, candidates)
     }
 
     /// Returns the candidates for elders out of all nodes matching the prefix.
-    fn elder_candidates_matching_prefix(
+    pub(crate) fn elder_candidates_matching_prefix(
         &self,
         prefix: &Prefix,
         elder_size: usize,
         current_elders: &SectionAuthorityProvider,
         excluded_names: &BTreeSet<XorName>,
     ) -> Vec<Peer> {
-        elder_candidates(
-            elder_size,
-            current_elders,
-            self.members
-                .iter()
-                .filter(|(_, info)| info.value.state == MembershipState::Joined)
-                .filter(|(name, _)| prefix.matches(name))
-                .filter(|(_, info)| info.value.peer.is_reachable())
-                .filter(|(name, _)| !excluded_names.contains(name))
-                .map(|(_, info)| info),
-        )
+        let mut candidates = vec![];
+        let members = &*self.members;
+
+        for entry in members.into_iter() {
+            let (name, info) = entry.pair();
+
+            if info.value.state == MembershipState::Joined
+                && prefix.matches(name)
+                && info.value.peer.is_reachable()
+                && !excluded_names.contains(name)
+            {
+                candidates.push(info.clone())
+            }
+        }
+
+        elder_candidates(elder_size, current_elders, candidates)
     }
 
     /// Returns whether the given peer is a joined member of our section.
-    fn is_joined(&self, name: &XorName) -> bool {
+    pub(crate) fn is_joined(&self, name: &XorName) -> bool {
         self.members
             .get(name)
             .map(|info| info.value.state == MembershipState::Joined)
@@ -152,15 +115,20 @@ impl SectionPeersUtils for SectionPeers {
     }
 
     /// Returns whether the given peer is already relocated to our section.
-    fn is_relocated(&self, name: &XorName) -> bool {
-        self.members
-            .values()
-            .any(|info| info.value.previous_name == Some(*name))
+    pub(crate) fn is_relocated_to_our_section(&self, name: &XorName) -> bool {
+        for peer in self.members.iter() {
+            let state = peer.value();
+            if state.value.previous_name == Some(*name) {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Update a member of our section.
     /// Returns whether anything actually changed.
-    fn update(&mut self, new_info: SectionAuth<NodeState>) -> bool {
+    pub(crate) fn update(&self, new_info: SectionAuth<NodeState>) -> bool {
         match self.members.entry(*new_info.value.peer.name()) {
             Entry::Vacant(entry) => {
                 let _ = entry.insert(new_info);
@@ -188,29 +156,23 @@ impl SectionPeersUtils for SectionPeers {
     }
 
     /// Remove all members whose name does not match `prefix`.
-    fn prune_not_matching(&mut self, prefix: &Prefix) {
-        self.members = mem::take(&mut self.members)
-            .into_iter()
-            .filter(|(name, _)| prefix.matches(name))
-            .collect();
+    pub(crate) fn retain(&self, prefix: &Prefix) {
+        self.members.retain(|name, _value| prefix.matches(name))
     }
 }
 
 // Returns the nodes that should become the next elders out of the given members, sorted by names.
 // It is assumed that `members` contains only "active" peers (see the `is_active` function below
 // for explanation)
-fn elder_candidates<'a, I>(
+fn elder_candidates(
     elder_size: usize,
     current_elders: &SectionAuthorityProvider,
-    members: I,
-) -> Vec<Peer>
-where
-    I: IntoIterator<Item = &'a SectionAuth<NodeState>>,
-{
+    members: Vec<SectionAuth<NodeState>>,
+) -> Vec<Peer> {
     members
         .into_iter()
         .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
-        .map(|info| info.value.peer)
+        .map(|auth| auth.value.peer)
         .take(elder_size)
         .collect()
 }

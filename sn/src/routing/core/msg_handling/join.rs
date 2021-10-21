@@ -16,8 +16,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     error::Result, peer::PeerUtils, relocation::RelocatePayloadUtils,
-    routing_api::command::Command, section::SectionPeersUtils, FIRST_SECTION_MAX_AGE,
-    FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+    routing_api::command::Command, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
 use bls::PublicKey as BlsPublicKey;
 
@@ -52,7 +51,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if !self.joins_allowed {
+        if !*self.joins_allowed.read().await {
             debug!(
                 "Rejecting JoinRequest from {} - joins currently not allowed.",
                 peer,
@@ -287,7 +286,11 @@ impl Core {
         let previous_name = Some(details.pub_id);
         let dst_key = Some(details.dst_key);
 
-        if self.section.members().is_relocated(&details.pub_id) {
+        if self
+            .section
+            .members()
+            .is_relocated_to_our_section(&details.pub_id)
+        {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - original node {:?} already relocated to us.",
                 peer, previous_name

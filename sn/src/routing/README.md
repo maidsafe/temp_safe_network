@@ -4,7 +4,7 @@ sn_routing - a specialised storage DHT
 
 |Crate|LoC|
 |:---:|:--:|
-|[![](http://meritbadge.herokuapp.com/sn_routing)](https://crates.io/crates/sn_routing)|[![LoC](https://tokei.rs/b1/github/maidsafe/sn_routing)](https://github.com/maidsafe/sn_routing)|
+|[![](https://img.shields.io/crates/v/sn_routing)](https://crates.io/crates/sn_routing)|[![LoC](https://tokei.rs/b1/github/maidsafe/sn_routing)](https://github.com/maidsafe/sn_routing)|
 
 | [Documentation](https://maidsafe.github.io/sn_routing/sn_routing) | [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|

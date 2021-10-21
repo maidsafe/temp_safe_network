@@ -1984,9 +1984,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.22.2"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4acdf3cc5e6b1ce36b973502f3c27547b256bcf09088e78c655c3bb7fedddbb0"
+checksum = "1dc237722b53dbb2e80992848000559c37ff64a2dc760d716dabfbb43cac98e7"
 dependencies = [
  "backoff",
  "bincode",
@@ -2774,51 +2774,7 @@ dependencies = [
 name = "smallvec"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
-
-[[package]]
-name = "sn_api"
-version = "0.38.0"
-dependencies = [
- "anyhow",
- "async-recursion",
- "async-trait",
- "bincode",
- "blsttc",
- "bytes",
- "chrono",
- "color-eyre",
- "dirs-next 2.0.0",
- "ed25519-dalek",
- "env_logger 0.8.4",
- "futures",
- "hex 0.4.3",
- "hmac",
- "lazy_static",
- "log",
- "mime_guess",
- "multibase 0.9.1",
- "pbkdf2",
- "proptest",
- "qjsonrpc",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "relative-path",
- "rmp-serde",
- "safe_network",
- "serde",
- "serde_json",
- "sha3",
- "thiserror",
- "tiny-keccak 2.0.2",
- "tokio",
- "tracing-subscriber",
- "uhttp_uri",
- "url",
- "urlencoding",
- "walkdir",
- "xor_name",
-]
+checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "sn_launch_tool"

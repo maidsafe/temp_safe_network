@@ -23,12 +23,13 @@ use crate::routing::{Error, Result, SectionAuthUtils, SectionAuthorityProviderUt
 use bls::PublicKey as BlsPublicKey;
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use secured_linked_list::SecuredLinkedList;
+use serde::{Deserialize, Serialize};
 use std::iter::{self, Iterator};
 use std::sync::Arc;
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NetworkPrefixMap {
     /// Map of sections prefixes to their latest signed section authority providers.
     sections: Arc<DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>>,
@@ -43,6 +44,11 @@ impl NetworkPrefixMap {
             sections: Arc::new(DashMap::new()),
             genesis_pk,
         }
+    }
+
+    /// Returns the genesis key of the Network
+    pub(crate) fn genesis_key(&self) -> BlsPublicKey {
+        self.genesis_pk
     }
 
     /// Inserts new entry into the map. Replaces previous entry at the same prefix.
@@ -105,6 +111,14 @@ impl NetworkPrefixMap {
         self.sections
             .get(prefix)
             .map(|entry| entry.value().value.clone())
+    }
+
+    /// Get signed `SectionAuthorityProvider` of a known section with the given prefix.
+    pub(crate) fn get_signed(
+        &self,
+        prefix: &Prefix,
+    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
+        self.sections.get(prefix).map(|entry| entry.value().clone())
     }
 
     /// Update our knowledge of a remote section's SAP only
@@ -243,6 +257,11 @@ impl NetworkPrefixMap {
     /// one with the longest prefix.
     pub(crate) fn section_by_prefix(&self, prefix: &Prefix) -> Result<SectionAuthorityProvider> {
         self.section_by_name(&prefix.name())
+    }
+
+    /// Get total number of known sections
+    pub(crate) fn known_sections_count(&self) -> usize {
+        self.sections.len()
     }
 
     /// Returns network statistics.

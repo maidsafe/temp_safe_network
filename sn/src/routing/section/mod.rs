@@ -29,7 +29,6 @@ use crate::routing::{
 pub(crate) use node_state::NodeStateUtils;
 pub(crate) use section_authority_provider::ElderCandidatesUtils;
 use section_authority_provider::SectionAuthorityProviderUtils;
-pub(super) use section_peers::SectionPeersUtils;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr};
@@ -89,7 +88,7 @@ impl Section {
             genesis_key,
             chain,
             section_auth,
-            members: SectionPeers::default(),
+            section_peers: SectionPeers::default(),
         })
     }
 
@@ -102,7 +101,7 @@ impl Section {
         let section_auth =
             create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
 
-        let mut section = Section::new(
+        let section = Section::new(
             section_auth.sig.public_key,
             SecuredLinkedList::new(section_auth.sig.public_key),
             section_auth,
@@ -111,7 +110,7 @@ impl Section {
         for peer in section.section_auth.value.peers() {
             let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
-            let _ = section.members.update(SectionAuth {
+            let _ = section.section_peers.update(SectionAuth {
                 value: node_state,
                 sig,
             });
@@ -132,14 +131,14 @@ impl Section {
 
     /// Try to merge this `Section` members with `other`. .
     pub(super) fn merge_members(&mut self, members: Option<SectionPeers>) -> Result<()> {
-        if let Some(members) = members {
-            for info in members {
+        if let Some(peers) = members {
+            for refmulti in peers.members.iter() {
+                let info = refmulti.value().clone();
                 let _ = self.update_member(info);
             }
         }
 
-        self.members
-            .prune_not_matching(&self.section_auth.value.prefix());
+        self.section_peers.retain(&self.section_auth.value.prefix());
 
         Ok(())
     }
@@ -195,8 +194,7 @@ impl Section {
             self.section_auth = new_section_auth;
         }
 
-        self.members
-            .prune_not_matching(&self.section_auth.value.prefix());
+        self.section_peers.retain(&self.section_auth.value.prefix());
 
         true
     }
@@ -208,7 +206,7 @@ impl Section {
             return false;
         }
 
-        self.members.update(node_state)
+        self.section_peers.update(node_state)
     }
 
     pub(super) fn chain(&self) -> &SecuredLinkedList {
@@ -245,9 +243,11 @@ impl Section {
 
         // Candidates for elders out of all the nodes in the section, even out of the
         // relocating nodes if there would not be enough instead.
-        let expected_peers =
-            self.members
-                .elder_candidates(ELDER_SIZE, self.authority_provider(), excluded_names);
+        let expected_peers = self.section_peers.elder_candidates(
+            ELDER_SIZE,
+            self.authority_provider(),
+            excluded_names,
+        );
 
         let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).cloned().collect();
         let current_names: BTreeSet<_> = self.authority_provider().names();
@@ -270,46 +270,52 @@ impl Section {
     }
 
     pub(super) fn members(&self) -> &SectionPeers {
-        &self.members
+        &self.section_peers
     }
 
     /// Returns members that are either joined or are left but still elders.
-    pub(super) fn active_members(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
-        Box::new(
-            self.members
-                .all()
-                .filter(move |info| {
-                    self.members.is_joined(info.peer.name()) || self.is_elder(info.peer.name())
-                })
-                .map(|info| &info.peer),
-        )
+    pub(super) fn active_members(&self) -> Vec<Peer> {
+        self.section_peers
+            .members
+            .iter()
+            .filter(move |refmulti| {
+                let info = refmulti.value;
+                self.section_peers.is_joined(info.peer.name()) || self.is_elder(info.peer.name())
+            })
+            .map(|refmulti| {
+                let info = refmulti.value;
+                info.peer
+            })
+            .collect()
     }
 
     /// Returns adults from our section.
-    pub(super) fn adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
-        Box::new(
-            self.members
-                .mature()
-                .filter(move |peer| !self.is_elder(peer.name())),
-        )
+    pub(super) fn adults(&self) -> Vec<Peer> {
+        self.section_peers
+            .mature()
+            .into_iter()
+            .filter(move |peer| !self.is_elder(peer.name()))
+            .collect()
     }
 
     /// Returns live adults from our section.
-    pub(super) fn live_adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
-        Box::new(self.members.joined().filter_map(move |info| {
-            if !self.is_elder(info.peer.name()) {
-                Some(&info.peer)
-            } else {
-                None
+    pub(super) fn live_adults(&self) -> Vec<Peer> {
+        let mut live_adults = vec![];
+
+        for node_state in self.section_peers.joined() {
+            if !self.is_elder(node_state.peer.name()) {
+                live_adults.push(node_state.peer)
             }
-        }))
+        }
+        live_adults
     }
 
-    pub(super) fn find_joined_member_by_addr(&self, addr: &SocketAddr) -> Option<&Peer> {
-        self.members
+    pub(super) fn find_joined_member_by_addr(&self, addr: &SocketAddr) -> Option<Peer> {
+        self.section_peers
             .joined()
+            .into_iter()
             .find(|info| info.peer.addr() == addr)
-            .map(|info| &info.peer)
+            .map(|info| info.peer)
     }
 
     // Tries to split our section.
@@ -330,8 +336,9 @@ impl Section {
         let next_bit = our_name.bit(next_bit_index);
 
         let (our_new_size, sibling_new_size) = self
-            .members
+            .section_peers
             .mature()
+            .iter()
             .filter(|peer| !excluded_names.contains(peer.name()))
             .map(|peer| peer.name().bit(next_bit_index) == next_bit)
             .fold((0, 0), |(ours, siblings), is_our_prefix| {
@@ -350,13 +357,13 @@ impl Section {
         let our_prefix = self.prefix().pushed(next_bit);
         let other_prefix = self.prefix().pushed(!next_bit);
 
-        let our_elders = self.members.elder_candidates_matching_prefix(
+        let our_elders = self.section_peers.elder_candidates_matching_prefix(
             &our_prefix,
             ELDER_SIZE,
             self.authority_provider(),
             excluded_names,
         );
-        let other_elders = self.members.elder_candidates_matching_prefix(
+        let other_elders = self.section_peers.elder_candidates_matching_prefix(
             &other_prefix,
             ELDER_SIZE,
             self.authority_provider(),
