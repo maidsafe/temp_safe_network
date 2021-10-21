@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.36.1](https://github.com/maidsafe/safe_network/compare/v0.36.0...v0.36.1) (2021-10-21)
+
+
+### Bug Fixes
+
+* **messaging:** return operation id for Chunk not found responses ([92a5a44](https://github.com/maidsafe/safe_network/commit/92a5a44589143f9147c5613f79e2531eaba84aee))
+
 ## [0.36.0](https://github.com/maidsafe/safe_network/compare/v0.35.19...v0.36.0) (2021-10-21)
 
 
