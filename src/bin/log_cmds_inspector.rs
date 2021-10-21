@@ -104,6 +104,8 @@ type CmdId = String;
 type LogEntry = String;
 //  A message id, e.g. "68fe..b776"
 type MsgId = String;
+//  A nodes id, as oer log folder, eg sn-node-14
+type NodeId = String;
 
 #[derive(Default, Clone)]
 // Tuple with log filepath, and the list of sommands/sub-commands and corresponding log entry.
@@ -130,13 +132,15 @@ type CommandsInfoList = BTreeMap<CmdId, SubCommandsInfo>;
 
 #[derive(Default, Clone)]
 pub struct ScannedInfo {
-    // TODO: by node
+    // markers per node node
+    pub by_node: BTreeMap<NodeId, BTreeMap<LogMarker, CommandsInfoList>>,
+    // msgs handled per node
+    pub msgs_per_node: BTreeMap<NodeId, Vec<MsgId>>,
+    // log marker to cmd info
     pub by_marker: BTreeMap<LogMarker, CommandsInfoList>,
     // msg id to cmd root ids (can be same msg id received many times)
     pub cmd_by_msg_id: BTreeMap<MsgId, Vec<CmdId>>,
     // msg id tied to a command that it spawned
-    // pub msg_id_to_cmd_id: BTreeMap<String, String>,
-    // pub by_file: BTreeMap<String, BTreeMap<String, SubCommandsInfo>>,
     pub counts: BTreeMap<LogMarker, usize>,
 }
 
@@ -144,11 +148,11 @@ pub struct ScannedInfo {
 pub fn update_commands_info_for_markers(path: &PathBuf) -> Result<ScannedInfo, Error> {
     let paths = [path];
     let mut info = ScannedInfo {
-        // by_file: BTreeMap::default(),
         by_marker: BTreeMap::default(),
         counts: BTreeMap::default(),
         cmd_by_msg_id: BTreeMap::default(),
-        // msg_id_to_cmd_id: BTreeMap::default(),
+        by_node: BTreeMap::default(),
+        msgs_per_node: BTreeMap::default(),
     };
 
     let mut pattern = r"".to_owned();
@@ -209,6 +213,35 @@ pub fn update_commands_info_for_markers(path: &PathBuf) -> Result<ScannedInfo, E
                         // track the entry
                         subcommand_info.insert(cmd_id.clone(), line.to_string());
 
+                        // Now per node
+                        let mut node_file_path = dent.path().to_path_buf();
+                        // get the containing dir
+                        node_file_path.pop();
+
+                        let node_name = node_file_path
+                            .file_name()
+                            .expect("node dir name can be parsed")
+                            .to_str()
+                            .expect("node dir name can be parsed to str")
+                            .to_string();
+
+                        let nodes_map = info
+                            .by_node
+                            .entry(node_name.clone())
+                            .or_insert_with(|| BTreeMap::default());
+
+                        let nodes_markers_map = nodes_map
+                            .entry(matched_marker.clone())
+                            .or_insert_with(|| BTreeMap::default());
+
+                        // nodes_markers_map.insert(root_cmd_id.clone(), value)
+                        let per_node_subcommand_info = nodes_markers_map
+                            .entry(root_cmd_id.clone())
+                            .or_insert_with(|| SubCommandsInfo::new(path.clone()));
+
+                        per_node_subcommand_info.insert(cmd_id.clone(), line.to_string());
+
+                        // And messaging related tracking...
                         if let Some(msg_id_match) = msg_id_regex.find(line.as_bytes())? {
                             let msg_id = &line[msg_id_match].to_string();
 
@@ -217,7 +250,10 @@ pub fn update_commands_info_for_markers(path: &PathBuf) -> Result<ScannedInfo, E
                                 .or_insert_with(Vec::new)
                                 .push(root_cmd_id);
 
-                            // info.
+                            info.msgs_per_node
+                                .entry(node_name)
+                                .or_insert_with(Vec::new)
+                                .push(msg_id.to_string());
                         }
                     }
 
@@ -247,12 +283,6 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
     }
     println!("-------------------------");
 
-    //     if is_elder {
-    //         println!("************************");
-    //         println!("Node is Elder");
-    //         println!("************************");
-
-    //     }
     let default_map = BTreeMap::default();
     let spawned = info
         .by_marker
@@ -278,6 +308,8 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
         succeeded.len(),
         failed.len()
     );
+    println!("");
+    println!("");
     println!("-------------------------");
 
     match args.cmd {
@@ -300,6 +332,35 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
         }
     }
 
+    for (node_name, markers) in info.by_node {
+        println!("///////////////////////");
+        println!("Node {:?}", node_name);
+        println!("///////////////////////");
+
+        if markers.get(&LogMarker::PromotedToElder).is_some() {
+            println!("** Has been an elder **");
+        }
+        println!("");
+        if let Some(commands) = markers.get(&LogMarker::CommandHandleSpawned) {
+            println!("Spawned commands: {:?}", commands.len());
+        }
+        if let Some(commands) = markers.get(&LogMarker::CommandHandleStart) {
+            println!("Started commands: {:?}", commands.len());
+        }
+        if let Some(commands) = markers.get(&LogMarker::CommandHandleEnd) {
+            println!("Succeeded commands: {:?}", commands.len());
+        }
+        if let Some(commands) = markers.get(&LogMarker::CommandHandleError) {
+            println!("Errored commands: {:?}", commands.len());
+        }
+
+        if let Some(msgs) = info.msgs_per_node.get(&node_name) {
+            println!("Messages handled by the node: {:?}", msgs.len());
+        }
+        println!("");
+        println!("");
+    }
+
     Ok(report)
 }
 
@@ -312,7 +373,6 @@ fn check_completed_cmds(
     succeeded: &CommandsInfoList,
     failed: &CommandsInfoList,
     report: &mut BTreeMap<String, Vec<String>>,
-    // node_log_filepath: &Path,
 ) {
     let mut cmds_with_error = vec![];
     let mut cmds_not_completed = vec![];
@@ -393,14 +453,15 @@ fn check_completed_cmds(
             println!("{}{}{}", id, file, line);
         }
     }
-    println!("-------------------------");
+    println!("");
 
     if cmds_with_error.len() > 0 {
-        println!("\n!!! ERROR !!!: Some commands errored but were not handled?:");
+        println!("\n!!! ERROR !!!: Some commands produced errors:");
         for (id, file, line) in cmds_with_error {
-            println!("{}{}{}", id, file, line);
+            println!("{} {} {}", id, file, line);
         }
     }
+
     println!("-------------------------");
 }
 
