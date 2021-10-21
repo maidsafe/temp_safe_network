@@ -13,7 +13,7 @@ use grep::matcher::Matcher;
 use grep::regex::RegexMatcher;
 use grep::searcher::sinks::UTF8;
 use grep::searcher::Searcher;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[cfg(test)]
 use std::collections::BTreeMap;
@@ -152,7 +152,7 @@ pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches, Error> {
 }
 /// Search the local-test-network dir for matches.
 pub fn search_logfile_get_whole_line(
-    logfile: &PathBuf,
+    logfile: &Path,
     pattern: &LogMarker,
 ) -> Result<MatchesWithPath, Error> {
     let paths = [logfile];
@@ -187,7 +187,7 @@ pub fn search_logfile_get_whole_line(
 }
 
 /// Search the local-test-network log file and return count
-pub fn get_count_in_logfile(logfile: &PathBuf, pattern: &str) -> Result<usize, Error> {
+pub fn get_count_in_logfile(logfile: &Path, pattern: &str) -> Result<usize, Error> {
     let paths = [logfile];
     let matcher = RegexMatcher::new_line_matcher(pattern)?;
     // let mut matches: MatchesWithPath = vec![];
