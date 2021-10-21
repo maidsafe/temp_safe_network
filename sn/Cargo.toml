@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "safe_network"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.34.1"
+version = "0.36.3"
 
 #[profile.release]
 #incremental = true
@@ -63,7 +63,7 @@ itertools = "0.10.0"
 lazy_static = "1"
 multibase = "~0.8.0"
 num_cpus = "1.13.0"
-qp2p = "0.22.0"
+qp2p = "0.24.0"
 rand = "~0.7.3"
 rayon = "1.5.1"
 resource_proof = "0.8.0"
@@ -89,6 +89,10 @@ uhttp_uri = "~0.5"
 url = "2.2.0"
 urlencoding = "1.1.1"
 xor_name = "3.1.0"
+grep="~0.2.8"
+walkdir = "2"
+strum = "0.21"
+strum_macros = "0.21"
 
 [dependencies.backoff]
 version = "0.3.0"
@@ -112,7 +116,6 @@ rand = { version = "0.7.3", features = ["small_rng"] }
 rand_xorshift = "~0.2.0"
 tokio-util = { version = "0.6.7", features = ["time"] }
 yansi = "~0.5.0"
-grep="~0.2.8"
 walkdir = "2"
 termcolor="1.1.2"
 strum = "0.21"
