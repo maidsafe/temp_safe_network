@@ -149,7 +149,7 @@ jobs:
 
       - name: Run Doc tests
         if: steps.node_changes.outputs.src == 'true'
-        run: cargo test --release client --doc
+        run: cargo test --release --features=always-joinable,test-utils client --doc
 
       - run: ./target/release/testnet
         env:
