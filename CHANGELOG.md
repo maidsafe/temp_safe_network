@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.36.3](https://github.com/maidsafe/safe_network/compare/v0.36.2...v0.36.3) (2021-10-21)
+
+
+### Features
+
+* readd stats per node ([d8ca562](https://github.com/maidsafe/safe_network/commit/d8ca562e0849aec571a0bd9407d22f388c7a8933))
+* **log inspector:** more heavily use ripgrep and store context from there ([1a96ca7](https://github.com/maidsafe/safe_network/commit/1a96ca76fc66a01beef105a2acda81034cb4eaa8))
+* count how frequent routing commands are ([0d945da](https://github.com/maidsafe/safe_network/commit/0d945dad73b3af7643cb600b2015fa9a6cb4f85d))
+* use grep for searching logfiles ([d795de6](https://github.com/maidsafe/safe_network/commit/d795de65d75a2fcfa0a52b4f021d453278b299f8))
+
 ### [0.36.2](https://github.com/maidsafe/safe_network/compare/v0.36.1...v0.36.2) (2021-10-21)
 
 
