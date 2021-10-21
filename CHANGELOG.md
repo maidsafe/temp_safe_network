@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.36.2](https://github.com/maidsafe/safe_network/compare/v0.36.1...v0.36.2) (2021-10-21)
+
+
+### Bug Fixes
+
+* handle the case where we don't know an adult's capacity ([cac3b48](https://github.com/maidsafe/safe_network/commit/cac3b48e1f1b1c50e0aa70600d619bde1654a6ff))
+
 ### [0.36.1](https://github.com/maidsafe/safe_network/compare/v0.36.0...v0.36.1) (2021-10-21)
 
 
