@@ -236,7 +236,8 @@ impl Core {
                 && self
                     .capacity
                     .is_full(&XorName::from(sending_nodes_pk))
-                    .await)
+                    .await
+                    .unwrap_or(false))
         {
             // we don't return data not found errors.
             trace!("Node {:?}, reported data not found", sending_nodes_pk);
