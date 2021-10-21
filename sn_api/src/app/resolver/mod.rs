@@ -12,6 +12,7 @@ mod handlers;
 use super::{
     files::{FileInfo, FilesMap},
     multimap::MultimapKeyValues,
+    nrs::NrsMap,
     register::{Entry, EntryHash},
     Safe, XorName,
 };
@@ -21,7 +22,7 @@ use async_recursion::async_recursion;
 use bytes::Bytes;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 pub type Range = Option<(Option<u64>, Option<u64>)>;
 
@@ -61,7 +62,7 @@ pub enum SafeData {
         xorname: XorName,
         type_tag: u64,
         version: VersionHash,
-        subnames_map: Option<BTreeMap<String, Url>>,
+        nrs_map: Option<NrsMap>,
         data_type: DataType,
         resolves_into: Option<Url>,
         resolved_from: String,
@@ -458,9 +459,7 @@ mod tests {
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _nrs_map_url = safe
-            .nrs_map_container_create(&site_name, &safe_url, false)
-            .await?;
+        let _nrs_map_url = safe.nrs_create(&site_name, &safe_url, false).await?;
         let nrs_url = format!("safe://{}", site_name);
 
         let content = retry_loop!(safe.fetch(&nrs_url, None));
@@ -521,7 +520,7 @@ mod tests {
         let files_container_url = safe_url;
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
         let nrs_resolution_url = safe
-            .nrs_map_container_create(&site_name, &files_container_url, false)
+            .nrs_create(&site_name, &files_container_url, false)
             .await?;
         let nrs_url = format!("safe://{}", site_name);
 
@@ -658,9 +657,7 @@ mod tests {
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = safe
-            .nrs_map_container_create(&site_name, &safe_url, false)
-            .await?;
+        let _ = safe.nrs_create(&site_name, &safe_url, false).await?;
         let nrs_url = format!("safe://{}/test.md", site_name);
 
         // read a local file content (for comparison)

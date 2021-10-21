@@ -531,9 +531,7 @@ impl Safe {
             safe_url.set_content_version(Some(new_version));
             let nrs_url = Url::from_url(url)?;
             let top_name = nrs_url.top_name();
-            let _ = self
-                .nrs_map_container_associate(top_name, &safe_url, false)
-                .await?;
+            let _ = self.nrs_associate(top_name, &safe_url, false).await?;
         }
 
         Ok(new_version)
@@ -1879,14 +1877,11 @@ mod tests {
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(None);
         let unversioned_link = safe_url;
-        match safe
-            .nrs_map_container_create(&nrsurl, &unversioned_link, false)
-            .await
-        {
+        match safe.nrs_create(&nrsurl, &unversioned_link, false).await {
             Ok(_) => Err(anyhow!(
                 "NRS create was unexpectedly successful".to_string(),
             )),
-            Err(Error::InvalidInput(msg)) => {
+            Err(Error::UnversionedContentError(msg)) => {
                 assert_eq!(
                 msg,
                 format!(
@@ -1953,7 +1948,7 @@ mod tests {
         let nrsurl = random_nrs_name();
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let nrs_xorurl = retry_loop!(safe.nrs_map_container_create(&nrsurl, &safe_url, false));
+        let nrs_xorurl = retry_loop!(safe.nrs_create(&nrsurl, &safe_url, false));
 
         let _ = retry_loop!(safe.fetch(&nrs_xorurl.to_string(), None));
 
@@ -2277,7 +2272,7 @@ mod tests {
         let nrsurl = random_nrs_name();
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let nrs_xorurl = retry_loop!(safe.nrs_map_container_create(&nrsurl, &safe_url, false));
+        let nrs_xorurl = retry_loop!(safe.nrs_create(&nrsurl, &safe_url, false));
         let _ = retry_loop!(safe.fetch(&nrs_xorurl.to_string(), None));
 
         let _ = retry_loop!(safe.files_container_sync(

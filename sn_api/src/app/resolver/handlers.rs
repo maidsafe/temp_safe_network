@@ -17,13 +17,10 @@ impl Safe {
         include_subnames_map: bool,
     ) -> Result<SafeData> {
         // get NRS resolution
-        let mut target_url = self
-            .nrs_map_container_get(input_url.top_name())
-            .await
-            .map_err(|e| {
-                warn!("NRS failed to resolve {}: {}", input_url.to_string(), e);
-                Error::ContentNotFound(format!("Content not found at {}", input_url.to_string()))
-            })?;
+        let mut target_url = self.nrs_get(input_url.top_name()).await.map_err(|e| {
+            warn!("NRS failed to resolve {}: {}", input_url.to_string(), e);
+            Error::ContentNotFound(format!("Content not found at {}", input_url.to_string()))
+        })?;
         debug!(
             "NRS Resolved {} => {}",
             input_url.to_string(),
@@ -35,8 +32,8 @@ impl Safe {
         let target_path = target_url.path_decoded()?;
         target_url.set_path(&format!("{}{}", target_path, url_path));
 
-        // get subnames_map if requested
-        let subnames_map = if include_subnames_map {
+        // get nrs_map if requested
+        let nrs_map = if include_subnames_map {
             Some(self.nrs_get_subnames_map(input_url.top_name()).await?)
         } else {
             None
@@ -63,7 +60,7 @@ impl Safe {
             xorname: nrs_url.xorname(),
             type_tag: nrs_url.type_tag(),
             version,
-            subnames_map,
+            nrs_map,
             data_type: nrs_url.data_type(),
             resolves_into: Some(target_url),
             resolved_from: nrs_url.to_string(),

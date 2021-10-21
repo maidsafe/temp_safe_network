@@ -95,6 +95,9 @@ pub enum Error {
     /// UrlError
     #[error("UrlError: {0}")]
     UrlError(#[from] UrlError),
+    /// UnversionedContentError
+    #[error("UnversionedContentError: {0}")]
+    UnversionedContentError(String),
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),

@@ -93,7 +93,6 @@ pub(crate) async fn add_or_update_file_item(
 }
 
 // Generate a FileInfo for a file which can then be added to a FilesMap
-// This is now a pseudo-RDF but will eventually be converted to be an RDF graph
 async fn gen_new_file_item(
     safe: &mut Safe,
     file_path: &Path,
@@ -171,7 +170,7 @@ pub(crate) fn file_map_for_path(files_map: FilesMap, path: &str) -> Result<Files
     }
 
     // chroot
-    let chrooted_file_map = gen_filtered_filesmap(&realpath, &files_map)?;
+    let chrooted_file_map = filesmap_chroot(&realpath, &files_map)?;
     Ok(chrooted_file_map)
 }
 
@@ -219,7 +218,7 @@ pub(crate) fn get_file_link_and_metadata(
     Ok((None, None))
 }
 
-fn gen_filtered_filesmap(urlpath: &str, files_map: &FilesMap) -> Result<FilesMap> {
+fn filesmap_chroot(urlpath: &str, files_map: &FilesMap) -> Result<FilesMap> {
     let mut filtered_filesmap = FilesMap::default();
     let folder_path = if !urlpath.ends_with('/') {
         format!("{}/", urlpath)
