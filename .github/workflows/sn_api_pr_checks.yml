@@ -1,0 +1,151 @@
+name: 'sn_api: PR Checks'
+
+on: pull_request
+
+env:
+  CARGO_TERM_VERBOSE: true
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  checks:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run rustfmt and clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        
+      - uses: dorny/paths-filter@v2
+        id: sn_api_changes
+        with:
+          filters: |
+            src:
+              - 'sn_api/src/**'
+
+      - uses: actions-rs/toolchain@v1
+        if: steps.sn_api_changes.outputs.src == 'true'
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Cargo cache registry, index and build
+        if: steps.sn_api_changes.outputs.src == 'true'
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
+
+      - name: Check formatting
+        if: steps.sn_api_changes.outputs.src == 'true'
+        run: cargo fmt --all -- --check
+
+      - name: Clippy checks
+        if: steps.sn_api_changes.outputs.src == 'true'
+        run: cargo clippy --all-targets --all-features
+
+  coverage:
+    # Disabled cooverage & test stage for now as tests require work
+    # if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: false
+    name: Code coverage check
+    runs-on: ubuntu-latest
+    env: 
+      PROPTEST_CASES: 1
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: dorny/paths-filter@v2
+        id: sn_api_changes
+        with:
+          filters: |
+            src:
+              - 'sn_api/src/**'
+
+      - uses: actions-rs/toolchain@v1
+        if: steps.sn_api_changes.outputs.src == 'true'
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cargo cache registry, index and build
+        if: steps.sn_api_changes.outputs.src == 'true'
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
+
+      - name: rust-tarpaulin code coverage check
+        if: steps.sn_api_changes.outputs.src == 'true'
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          args: '-v --release --out Lcov -- --test-threads=1'
+
+      - name: Push code coverage results to coveralls.io
+        if: steps.sn_api_changes.outputs.src == 'true'
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel: true
+          path-to-lcov: ./lcov.info
+
+      - name: Coveralls Finished
+        if: steps.sn_api_changes.outputs.src == 'true'
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+
+  test:
+    # Disabled coverage & test stage for now as tests require work
+    # if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: false
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
+      
+      - shell: bash
+        run: ./resources/test-scripts/api-tests
+
+  test-publish:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Test Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cargo publish dry run
+        run: cd sn_api && cargo publish --dry-run

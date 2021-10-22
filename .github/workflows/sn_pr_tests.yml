@@ -1,4 +1,4 @@
-name: Run All Tests
+name: 'sn: PR Tests'
 
 on: pull_request
 
@@ -27,64 +27,64 @@ jobs:
         with:
           filters: |
             src:
-              - 'src/messaging/**'
-              - 'src/types/**'
+              - 'sn/src/messaging/**'
+              - 'sn/src/types/**'
       - uses: dorny/paths-filter@v2
         id: node_changes
         with:
           filters: |
             src:
-              - 'src/node/**'
-              - 'src/routing/**'
-              - 'src/messaging/**'
-              - 'src/types/**'
-              - 'src/dbs/**'
-              - 'src/prefix_map/**'
-              - 'src/url/**'
+              - 'sn/src/node/**'
+              - 'sn/src/routing/**'
+              - 'sn/src/messaging/**'
+              - 'sn/src/types/**'
+              - 'sn/src/dbs/**'
+              - 'sn/src/prefix_map/**'
+              - 'sn/src/url/**'
       - uses: dorny/paths-filter@v2
         id: client_changes
         with:
           filters: |
             src:
-              - 'src/client/**'
-              - 'src/messaging/**'
-              - 'src/types/**'
-              - 'src/dbs/**'
-              - 'src/prefix_map/**'
-              - 'src/url/**'
+              - 'sn/src/client/**'
+              - 'sn/src/messaging/**'
+              - 'sn/src/types/**'
+              - 'sn/src/dbs/**'
+              - 'sn/src/prefix_map/**'
+              - 'sn/src/url/**'
       - uses: dorny/paths-filter@v2
         id: routing_changes
         with:
           filters: |
             src:
-              - 'src/routing/**'
-              - 'src/messaging/**'
-              - 'src/types/**'
-              - 'src/prefix_map/**'
+              - 'sn/src/routing/**'
+              - 'sn/src/messaging/**'
+              - 'sn/src/types/**'
+              - 'sn/src/prefix_map/**'
       - uses: dorny/paths-filter@v2
         id: url_changes
         with:
           filters: |
             src:
-              - 'src/url/**'
+              - 'sn/src/url/**'
       - uses: dorny/paths-filter@v2
         id: data_types_changes
         with:
           filters: |
             src:
-              - 'src/types/**'
+              - 'sn/src/types/**'
       - uses: dorny/paths-filter@v2
         id: dbs_changes
         with:
           filters: |
             src:
-              - 'src/dbs/**'
+              - 'sn/src/dbs/**'
       - uses: dorny/paths-filter@v2
         id: prefix_map_changes
         with:
           filters: |
             src:
-              - 'src/prefix_map/**'
+              - 'sn/src/prefix_map/**'
 
       - name: Mac install ripgrep
         if: matrix.os == 'macos-latest'
@@ -114,42 +114,42 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
 
       - name: Build all safe_network targets
         run: cargo build --all-targets --release --features=always-joinable,test-utils
 
       - name: Run Data Types tests
         if: steps.data_types_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- types
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- types
 
       - name: Run DBs tests
         if: steps.dbs_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- dbs
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- dbs
 
       - name: Run PrefixMap tests
         if: steps.prefix_map_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- prefix_map
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- prefix_map
 
       - name: Run URL tests
         if: steps.url_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- url
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- url
 
       - name: Run Messaging tests
         if: steps.messaging_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- messaging
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- messaging
 
       - name: Run Node tests
         if: steps.node_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- node
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- node
 
       - name: Run Routing tests
         if: steps.routing_changes.outputs.src == 'true'
-        run: cargo test --release --features=always-joinable,test-utils -- routing
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
 
       - name: Run Doc tests
         if: steps.node_changes.outputs.src == 'true'
-        run: cargo test --release client --doc
+        run: cd sn && cargo test --release client --doc
 
       - run: ./target/release/testnet
         env:
@@ -194,7 +194,7 @@ jobs:
         # FIXME: windows has an issue w/ locking of log files
         if: matrix.os != 'windows-latest'
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 && sleep 5
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 && sleep 5
         timeout-minutes: 5
         continue-on-error: true
         env:
@@ -204,25 +204,25 @@ jobs:
       - name: Initial client tests...
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob && sleep 5
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob && sleep 5
         timeout-minutes: 5
 
       # register api
       - name: Client reg tests against local network
         shell: bash
-        run: cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
         timeout-minutes: 15
 
       # blob api
       - name: Client blob tests against local network
         shell: bash
-        run: cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
         timeout-minutes: 15
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 5
         shell: bash
-        run: cargo run --release  --features=always-joinable,test-utils --example client_blob
+        run: cd sn && cargo run --release  --features=always-joinable,test-utils --example client_blob
 
 
       - name: Kill the current network (not needed for next test)
