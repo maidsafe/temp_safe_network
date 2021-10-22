@@ -289,19 +289,6 @@ impl Section {
         }
 
         active_members
-
-        // self.section_peers
-        //     .members
-        //     .iter()
-        //     .filter(move |refmulti| {
-        //         let info = refmulti.value;
-        //         self.section_peers.is_joined(info.peer.name()) || self.is_elder(info.peer.name())
-        //     })
-        // .map(|refmulti| {
-        //     let info = refmulti.value;
-        //     info.peer
-        // })
-        // .collect()
     }
 
     /// Returns adults from our section.
