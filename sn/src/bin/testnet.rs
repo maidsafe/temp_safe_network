@@ -154,6 +154,8 @@ pub async fn run_network() -> Result<()> {
         "--interval",
         &interval_str,
         "--local",
+        "--idle-timeout-msec",
+        "70000",
     ];
 
     if adding_nodes {
