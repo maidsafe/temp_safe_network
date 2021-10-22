@@ -19,7 +19,7 @@ use walkdir::WalkDir;
 struct CmdArgs {
     /// subcommands
     #[structopt(subcommand)]
-    pub cmd: SubCommands,
+    pub cmd: Option<SubCommands>,
     /// Path to the testnet logs folder, e.g. ~/.safe/node/local-test-network
     pub logs_path: PathBuf,
     /// Show stats per node? (this is slower)
@@ -50,50 +50,52 @@ fn main() -> Result<()> {
     let report = inspect_log_files(&args)?;
 
     println!();
-    match args.cmd {
-        SubCommands::Commands { cmd_id } => {
-            if report.is_empty() {
-                println!("** No commands were found for cmd id {} **", cmd_id);
-            } else {
-                println!(
-                    "*** REPORT: The following commands were found for cmd id {} ***",
-                    cmd_id
-                );
-                for (cmd_id, log_entries) in report.iter() {
-                    println!("==> Log entries for sub-command {}:", cmd_id);
-                    for log_entry in log_entries.iter() {
-                        println!("{}", log_entry);
+    if let Some(cmd) = args.cmd {
+        match cmd {
+            SubCommands::Commands { cmd_id } => {
+                if report.is_empty() {
+                    println!("** No commands were found for cmd id {} **", cmd_id);
+                } else {
+                    println!(
+                        "*** REPORT: The following commands were found for cmd id {} ***",
+                        cmd_id
+                    );
+                    for (cmd_id, log_entries) in report.iter() {
+                        println!("==> Log entries for sub-command {}:", cmd_id);
+                        for log_entry in log_entries.iter() {
+                            println!("{}", log_entry);
+                        }
+                        println!();
                     }
-                    println!();
                 }
             }
-        }
-        SubCommands::Messages { msg_id } => {
-            if report.is_empty() {
-                println!("** No commands were found for msg id {} **", msg_id);
-            } else {
-                println!(
-                    "*** REPORT: The following commands were found for msg id {} ***",
-                    msg_id
-                );
-                for (cmd_id, log_entries) in report.iter() {
-                    println!("==> Log entries for sub-command {}:", cmd_id);
-                    for log_entry in log_entries.iter() {
-                        println!("{}", log_entry);
+            SubCommands::Messages { msg_id } => {
+                if report.is_empty() {
+                    println!("** No commands were found for msg id {} **", msg_id);
+                } else {
+                    println!(
+                        "*** REPORT: The following commands were found for msg id {} ***",
+                        msg_id
+                    );
+                    for (cmd_id, log_entries) in report.iter() {
+                        println!("==> Log entries for sub-command {}:", cmd_id);
+                        for log_entry in log_entries.iter() {
+                            println!("{}", log_entry);
+                        }
+                        println!();
                     }
-                    println!();
                 }
             }
-        }
-        SubCommands::IncompleteCmds => {
-            if report.is_empty() {
-                println!("** No errors detected in any of the logs scanned! **");
-            } else {
-                println!("*** REPORT: The following issues were detected ***");
-                for (logfile, log_entries) in report.iter() {
-                    println!("Commands not completed in log {}:", logfile);
-                    for log_entry in log_entries.iter() {
-                        println!("{}", log_entry);
+            SubCommands::IncompleteCmds => {
+                if report.is_empty() {
+                    println!("** No errors detected in any of the logs scanned! **");
+                } else {
+                    println!("*** REPORT: The following issues were detected ***");
+                    for (logfile, log_entries) in report.iter() {
+                        println!("Commands not completed in log {}:", logfile);
+                        for log_entry in log_entries.iter() {
+                            println!("{}", log_entry);
+                        }
                     }
                 }
             }
@@ -312,23 +314,25 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
         .get(&LogMarker::CommandHandleError)
         .unwrap_or(&default_map);
 
-    match args.cmd {
-        SubCommands::Commands { ref cmd_id } => {
-            populate_commands_tree(spawned, started, succeeded, failed, &mut report, cmd_id);
-        }
-        SubCommands::Messages { ref msg_id } => {
-            populate_commands_tree_for_msgs(
-                &info,
-                spawned,
-                started,
-                succeeded,
-                failed,
-                &mut report,
-                msg_id,
-            );
-        }
-        SubCommands::IncompleteCmds => {
-            check_completed_cmds(&info, spawned, started, succeeded, failed, &mut report);
+    if let Some(cmd) = &args.cmd {
+        match cmd {
+            SubCommands::Commands { ref cmd_id } => {
+                populate_commands_tree(spawned, started, succeeded, failed, &mut report, cmd_id);
+            }
+            SubCommands::Messages { ref msg_id } => {
+                populate_commands_tree_for_msgs(
+                    &info,
+                    spawned,
+                    started,
+                    succeeded,
+                    failed,
+                    &mut report,
+                    msg_id,
+                );
+            }
+            SubCommands::IncompleteCmds => {
+                check_completed_cmds(&info, spawned, started, succeeded, failed, &mut report);
+            }
         }
     }
 

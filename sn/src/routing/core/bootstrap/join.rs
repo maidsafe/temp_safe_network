@@ -331,7 +331,7 @@ impl<'a> Join<'a> {
             section_key,
         )?;
 
-        let _res = self.send_tx.send((wire_msg, recipients.to_vec())).await;
+        let _ = self.send_tx.send((wire_msg, recipients.to_vec())).await;
 
         Ok(())
     }
@@ -583,8 +583,8 @@ mod tests {
         // Drive both tasks to completion concurrently (but on the same thread).
         let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
-        assert_eq!(section.authority_provider().await, section_auth);
-        assert_eq!(*section.chain().await.last_key(), pk);
+        assert_eq!(*section.authority_provider(), section_auth);
+        assert_eq!(*section.chain().last_key(), pk);
         assert_eq!(node.age(), node_age);
 
         Ok(())
