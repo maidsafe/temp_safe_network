@@ -10,7 +10,7 @@ publish = false
 license = "MIT OR BSD-3-Clause"
 default-run = "safe"
 repository = "https://github.com/maidsafe/sn_cli"
-edition = "2018"
+edition = "2021"
 
 [[bin]]
 name = "safe"

@@ -6,7 +6,7 @@ authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.c
 publish = false
 license = "MIT OR BSD-3-Clause"
 repository = "https://github.com/maidsafe/safe_network/sn_cmd_test_utilities"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 assert_cmd = "~2.0"

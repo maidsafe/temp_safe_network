@@ -9,7 +9,7 @@ authors = [
 license = "MIT OR BSD-3-Clause"
 repository = "https://github.com/maidsafe/sn_api"
 include = [ "Cargo.toml", "src/*" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 async-recursion = "0.3.2"
