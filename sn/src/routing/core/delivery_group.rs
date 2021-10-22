@@ -81,7 +81,7 @@ async fn section_candidates(
     let info = iter::once(default_sap.clone())
         .chain(network_sections)
         .min_by(|lhs, rhs| lhs.prefix.cmp_distance(&rhs.prefix, target_name))
-        .unwrap_or_else(|| default_sap);
+        .unwrap_or(default_sap);
 
     if info.prefix == section.prefix().await {
         // Exclude our name since we don't need to send to ourself

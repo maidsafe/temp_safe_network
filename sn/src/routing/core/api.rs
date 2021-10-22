@@ -140,7 +140,7 @@ impl Core {
         name: &XorName,
     ) -> Result<SectionAuthorityProvider> {
         if self.section.prefix().await.matches(name) {
-            Ok(self.section.authority_provider().await.clone())
+            Ok(self.section.authority_provider().await)
         } else {
             self.network.section_by_name(name)
         }
