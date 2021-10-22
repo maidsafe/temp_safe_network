@@ -17,7 +17,6 @@ use crate::routing::{
     dkg::SectionAuthUtils,
     ed25519,
     error::{Error, Result},
-    log_markers::LogMarker,
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
@@ -260,8 +259,6 @@ impl JoiningAsRelocated {
             node_msg,
             self.genesis_key,
         )?;
-
-        trace!("{}", LogMarker::SendJoinRequest);
 
         let cmd = Command::SendMessage {
             recipients: recipients.to_vec(),
