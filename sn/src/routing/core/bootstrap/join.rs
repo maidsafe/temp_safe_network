@@ -27,7 +27,7 @@ use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
-use std::{collections::HashSet, fmt::Debug, net::SocketAddr};
+use std::{collections::HashSet, net::SocketAddr};
 use tokio::sync::mpsc;
 use tracing::Instrument;
 use xor_name::{Prefix, XorName};
