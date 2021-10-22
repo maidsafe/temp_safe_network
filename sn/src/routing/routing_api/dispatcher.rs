@@ -130,7 +130,7 @@ impl Dispatcher {
 
             loop {
                 let _instant = interval.tick().await;
-                drop(_instant);
+
                 // Send a probe message if we are an elder
                 let core = dispatcher.core.read().await;
                 if core.is_elder().await && !core.section().prefix().await.is_empty() {
@@ -491,16 +491,8 @@ impl Dispatcher {
                 debug!("Sending client msg to {:?}: {:?}", socket_addr, wire_msg);
 
                 let recipients = vec![(*name, socket_addr)];
-                wire_msg.set_dst_section_pk(
-                    *self
-                        .core
-                        .read()
-                        .await
-                        .section_chain()
-                        .await
-                        .clone()
-                        .last_key(),
-                );
+                wire_msg
+                    .set_dst_section_pk(*self.core.read().await.section_chain().await.last_key());
 
                 let command = Command::SendMessage {
                     recipients,

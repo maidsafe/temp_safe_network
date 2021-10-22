@@ -308,13 +308,7 @@ impl Routing {
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
-        self.dispatcher
-            .core
-            .read()
-            .await
-            .section_chain()
-            .await
-            .clone()
+        self.dispatcher.core.read().await.section_chain().await
     }
 
     /// Returns the Section Chain's genesis key
@@ -382,7 +376,6 @@ impl Routing {
             .section()
             .authority_provider()
             .await
-            .clone()
     }
 
     /// Returns the info about the section matching the name.

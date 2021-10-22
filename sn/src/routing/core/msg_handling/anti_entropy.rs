@@ -353,11 +353,7 @@ impl Core {
                 );
                 info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
-                let section_signed_auth = self
-                    .section
-                    .section_signed_authority_provider()
-                    .await
-                    .clone();
+                let section_signed_auth = self.section.section_signed_authority_provider().await;
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
                 let bounced_msg = original_bytes;
@@ -380,11 +376,7 @@ impl Core {
 
                 let proof_chain = self.section.chain().await.clone();
 
-                let section_signed_auth = self
-                    .section
-                    .section_signed_authority_provider()
-                    .await
-                    .clone();
+                let section_signed_auth = self.section.section_signed_authority_provider().await;
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
                 let bounced_msg = original_bytes;
@@ -461,7 +453,7 @@ impl Core {
             let better_sap = self
                 .network
                 .closest_or_opposite(&data_name)
-                .unwrap_or_else(|| backup_sap);
+                .unwrap_or(backup_sap);
 
             trace!("Our SAP: {:?}", our_section);
             trace!("Better SAP for data {:?}: {:?}", data_name, better_sap);

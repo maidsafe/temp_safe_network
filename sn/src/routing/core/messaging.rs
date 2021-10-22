@@ -122,7 +122,7 @@ impl Core {
             Ok(chain) => chain,
             Err(_) => {
                 // error getting chain from key, so lets send the whole thing
-                self.section.chain().await.clone()
+                self.section.chain().await
             }
         };
 
@@ -180,7 +180,7 @@ impl Core {
                 .await
                 .clone(),
             node_state,
-            section_chain: self.section.chain().await.clone(),
+            section_chain: self.section.chain().await,
         }));
 
         let dst_section_pk = *self.section.chain().await.last_key();

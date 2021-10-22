@@ -284,7 +284,7 @@ impl Section {
         let nodes = self.section_peers.all_members();
         for peer in nodes {
             if self.section_peers.is_joined(peer.name()) || self.is_elder(peer.name()).await {
-                active_members.push(peer.clone());
+                active_members.push(peer);
             }
         }
 

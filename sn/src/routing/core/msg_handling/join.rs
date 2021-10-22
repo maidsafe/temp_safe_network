@@ -114,7 +114,7 @@ impl Core {
         if self.section.prefix().await.is_empty() {
             if peer.age() < FIRST_SECTION_MIN_AGE || peer.age() > FIRST_SECTION_MAX_AGE {
                 let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                    self.section.authority_provider().await.clone(),
+                    self.section.authority_provider().await,
                 )));
                 trace!("{}", LogMarker::SendJoinRetryFirstSectionAgeIssue);
                 trace!("New node in first section should join with age greater than MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
@@ -132,7 +132,7 @@ impl Core {
         } else if peer.age() != MIN_ADULT_AGE {
             // After section split, new node has to join with age of MIN_ADULT_AGE.
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                self.section.authority_provider().await.clone(),
+                self.section.authority_provider().await,
             )));
 
             trace!("{}", LogMarker::SendJoinRetryNotAdult);
@@ -214,7 +214,7 @@ impl Core {
                 ))
             } else {
                 SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                    self.section.authority_provider().await.clone(),
+                    self.section.authority_provider().await,
                 )))
             };
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
@@ -240,7 +240,7 @@ impl Core {
             );
 
             let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::Retry(self.section.authority_provider().await.clone()),
+                JoinAsRelocatedResponse::Retry(self.section.authority_provider().await),
             ));
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
