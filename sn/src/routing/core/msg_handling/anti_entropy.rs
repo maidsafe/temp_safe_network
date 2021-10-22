@@ -20,6 +20,7 @@ use crate::routing::{
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
+use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
@@ -134,7 +135,9 @@ impl Core {
                 // from the received new SAP key, to prevent from endlessly resending a msg
                 // if a sybil/corrupt peer keeps sending us the same AE msg.
                 let dst_section_pk = section_auth.public_key_set.public_key();
-                trace!("{}", LogMarker::ResendAfterAeRetry);
+                trace!("{}", LogMarker::AeResendAfterRetry);
+
+                self.create_or_wait_for_backoff(&src_name, &sender).await;
 
                 let cmd = self
                     .send_direct_message((src_name, sender), bounced_msg, dst_section_pk)
@@ -212,6 +215,9 @@ impl Core {
                 Ok(vec![])
             } else {
                 trace!("{}", LogMarker::AeResendAfterAeRedirect);
+
+                self.create_or_wait_for_backoff(name, addr).await;
+
                 let cmd = self
                     .send_direct_message((*name, *addr), bounced_msg, dst_section_pk)
                     .await?;
@@ -239,6 +245,26 @@ impl Core {
                 );
                 Ok(vec![])
             }
+        }
+    }
+
+    /// Checks AeBackoffCache for backoff, or creates a new instance
+    /// waits for any required backoff duration
+    async fn create_or_wait_for_backoff(&self, name: &XorName, addr: &SocketAddr) {
+        let mut ae_backoff_guard = self.ae_backoff_cache.write().await;
+
+        if let Some(backoff) = ae_backoff_guard
+            .find(|(node_name, socket, _)| node_name == name && socket == addr)
+            .map(|(_, _, backoff)| backoff)
+        {
+            if let Some(next_wait) = backoff.next_backoff() {
+                tokio::time::sleep(next_wait).await;
+            } else {
+                // TODO: we've done all backoffs and are _still_ getting messages?
+                // we should probably penalise the node here.
+            }
+        } else {
+            let _res = ae_backoff_guard.insert((*name, *addr, ExponentialBackoff::default()));
         }
     }
 

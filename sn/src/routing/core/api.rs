@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    delivery_group, split_barrier::SplitBarrier, Comm, Core, SignatureAggregator, KEY_CACHE_SIZE,
-    RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+    delivery_group, split_barrier::SplitBarrier, AeBackoffCache, Comm, Core, SignatureAggregator,
+    KEY_CACHE_SIZE, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
 use crate::dbs::UsedSpace;
 use crate::messaging::{
@@ -90,6 +90,7 @@ impl Core {
             capacity: self.capacity.clone(),
             chunk_storage: self.chunk_storage.clone(),
             liveness: self.liveness.clone(),
+            ae_backoff_cache: AeBackoffCache::default(),
         })
     }
 

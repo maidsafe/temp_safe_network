@@ -47,23 +47,32 @@ use crate::routing::{
     section::{SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
+use backoff::ExponentialBackoff;
 use capacity::Capacity;
 use itertools::Itertools;
 use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
 };
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{mpsc, RwLock};
+use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
+
+const BACKOFF_CACHE_LIMIT: usize = 100;
 const KEY_CACHE_SIZE: u8 = 5;
+
+// store up to 100 in use backoffs
+pub(crate) type AeBackoffCache =
+    Arc<RwLock<LRUCache<(XorName, SocketAddr, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
 
 // State + logic of a routing node.
 pub(crate) struct Core {
@@ -88,6 +97,7 @@ pub(crate) struct Core {
     root_storage_dir: PathBuf,
     capacity: Capacity,
     liveness: Liveness,
+    ae_backoff_cache: AeBackoffCache,
 }
 
 impl Core {
@@ -137,6 +147,7 @@ impl Core {
             liveness: adult_liveness,
             root_storage_dir,
             used_space,
+            ae_backoff_cache: AeBackoffCache::default(),
         })
     }
 

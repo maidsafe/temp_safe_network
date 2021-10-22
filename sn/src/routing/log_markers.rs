@@ -33,7 +33,7 @@ pub enum LogMarker {
     DemotedFromElder,
     DkgSendFailureObservation,
     DkgBroadcastMsg,
-    ResendAfterAeRetry,
+    AeResendAfterRetry,
     AeResendAfterAeRedirect,
     BounceAfterNewElderNotKnownLocally,
     SendingAeUpdateAfterLagCheck,
