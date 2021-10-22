@@ -119,25 +119,26 @@ impl Core {
                     );
                     self.write_prefix_map().await;
                     info!("PrefixMap written to disk");
-
-                    
-                    // TODO: we may need to check if 'bounced_msg' dest section pk is different
-                    // from the received new SAP key, to prevent from endlessly resending a msg
-                    // if a sybil/corrupt peer keeps sending us the same AE msg.
-                    let dst_section_pk = section_auth.public_key_set.public_key();
-                    trace!("{}", LogMarker::ResendAfterAeRetry);
-
-                    let cmd = self
-                        .send_direct_message((src_name, sender), bounced_msg, dst_section_pk)
-                        .await?;
-                    Ok(vec![cmd])
                 } else {
                     debug!(
                         "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
                         section_auth.prefix, section_auth
                     );
-                    Ok(vec![])
                 }
+
+                // Regardless if the SAP already existed, it may have been just updated by
+                // a concurrent handler of another bounced msg, so we still resend this message.
+                //
+                // TODO: we may need to check if 'bounced_msg' dest section pk is different
+                // from the received new SAP key, to prevent from endlessly resending a msg
+                // if a sybil/corrupt peer keeps sending us the same AE msg.
+                let dst_section_pk = section_auth.public_key_set.public_key();
+                trace!("{}", LogMarker::ResendAfterAeRetry);
+
+                let cmd = self
+                    .send_direct_message((src_name, sender), bounced_msg, dst_section_pk)
+                    .await?;
+                Ok(vec![cmd])
             }
             Err(err) => {
                 warn!("Anti-Entropy: failed to update remote section SAP, bounced msg from {:?} dropped: {:?}, {:?}", sender, bounced_msg, err);
