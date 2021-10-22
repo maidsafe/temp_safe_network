@@ -39,7 +39,6 @@ impl Core {
             Proposal::OurElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
                 Ok(vec![])
-                // self.handle_our_elders_agreement(section_auth, sig).await
             }
             Proposal::JoinsAllowed(joins_allowed) => {
                 *self.joins_allowed.write().await = joins_allowed;
