@@ -126,8 +126,9 @@ impl Core {
                     );
                 }
 
-                // Regardless if the SAP already existed, it may have been just updated by
-                // a concurrent handler of another bounced msg, so we still resend this message.
+                // Regardless if the SAP already existed, as long as it was valid
+                // (it may have been just updated by a concurrent handler of another bounced msg),
+                //we still resend this message.
                 //
                 // TODO: we may need to check if 'bounced_msg' dest section pk is different
                 // from the received new SAP key, to prevent from endlessly resending a msg
