@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.36.4](https://github.com/maidsafe/safe_network/compare/v0.36.3...v0.36.4) (2021-10-22)
+
+
+### Bug Fixes
+
+* **scripts:** change regex in has_split.sh to properly match prefix logs ([046a213](https://github.com/maidsafe/safe_network/commit/046a2133fcfdfd11019e943534788bfae1c301c5))
+
 ### [0.36.3](https://github.com/maidsafe/safe_network/compare/v0.36.2...v0.36.3) (2021-10-21)
 
 
