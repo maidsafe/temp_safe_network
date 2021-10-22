@@ -22,12 +22,12 @@ use crate::routing::{
     peer::PeerUtils,
     SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
-
+use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
-use std::{collections::HashSet, net::SocketAddr};
+use std::{collections::HashSet, fmt::Debug, net::SocketAddr};
 use tokio::sync::mpsc;
 use tracing::Instrument;
 use xor_name::{Prefix, XorName};
@@ -125,8 +125,18 @@ impl<'a> Join<'a> {
         // Avoid sending more than one request to the same peer.
         let mut used_recipient = HashSet::<SocketAddr>::new();
 
+        // use some backoff here as we try and join
+        let mut our_backoff = ExponentialBackoff::default();
+
         loop {
             used_recipient.extend(recipients.iter().map(|(_, addr)| addr));
+
+            // use exponential backoff here to delay our responses and avoid any intensive join reqs
+            let next_wait = our_backoff.next_backoff();
+
+            if let Some(wait) = next_wait {
+                tokio::time::sleep(wait).await;
+            }
 
             let (response, sender, src_name) = self.receive_join_response().await?;
 
@@ -331,7 +341,7 @@ impl<'a> Join<'a> {
             section_key,
         )?;
 
-        let _ = self.send_tx.send((wire_msg, recipients.to_vec())).await;
+        let _res = self.send_tx.send((wire_msg, recipients.to_vec())).await;
 
         Ok(())
     }
@@ -583,8 +593,8 @@ mod tests {
         // Drive both tasks to completion concurrently (but on the same thread).
         let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
-        assert_eq!(*section.authority_provider(), section_auth);
-        assert_eq!(*section.chain().last_key(), pk);
+        assert_eq!(section.authority_provider().await, section_auth);
+        assert_eq!(*section.chain().await.last_key(), pk);
         assert_eq!(node.age(), node_age);
 
         Ok(())
