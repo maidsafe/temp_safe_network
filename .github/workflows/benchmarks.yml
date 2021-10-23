@@ -54,7 +54,7 @@ jobs:
 
       - name: Have we had a section split?
         if: matrix.os != 'windows-latest'
-        run: ./scripts/has_split.sh
+        run: ./resources/scripts/has_split.sh
 
       - name: Bench
         run: cargo bench
