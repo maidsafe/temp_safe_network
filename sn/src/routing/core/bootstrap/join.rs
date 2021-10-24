@@ -127,15 +127,19 @@ impl<'a> Join<'a> {
 
         // use some backoff here as we try and join
         let mut our_backoff = ExponentialBackoff::default();
-
+        let mut has_started = false;
         loop {
             used_recipient.extend(recipients.iter().map(|(_, addr)| addr));
 
-            // use exponential backoff here to delay our responses and avoid any intensive join reqs
-            let next_wait = our_backoff.next_backoff();
+            if has_started {
+                // use exponential backoff here to delay our responses and avoid any intensive join reqs
+                let next_wait = our_backoff.next_backoff();
 
-            if let Some(wait) = next_wait {
-                tokio::time::sleep(wait).await;
+                if let Some(wait) = next_wait {
+                    tokio::time::sleep(wait).await;
+                }
+            } else {
+                has_started = true;
             }
 
             let (response, sender, src_name) = self.receive_join_response().await?;
@@ -696,6 +700,9 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn join_invalid_redirect_response() -> Result<()> {
+        crate::init_test_logger();
+        let _span = tracing::info_span!("join_invalid_redirect_response").entered();
+
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
@@ -716,7 +723,7 @@ mod tests {
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
-                        assert_matches!(msg, SystemMsg::JoinRequest{..}));
+            assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
             let (new_section_auth, _, new_sk_set) =
                 gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
@@ -760,7 +767,7 @@ mod tests {
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
-                            assert_matches!(msg, SystemMsg::JoinRequest{..}));
+            assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
             Ok(())
         };
@@ -824,6 +831,9 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn join_invalid_retry_prefix_response() -> Result<()> {
+        crate::init_test_logger();
+        let _span = tracing::info_span!("join_invalid_retry_prefix_response").entered();
+
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
@@ -909,6 +919,7 @@ mod tests {
     }
 
     // test helper
+    #[instrument]
     fn send_response(
         recv_tx: &mpsc::Sender<ConnectionEvent>,
         node_msg: SystemMsg,
@@ -924,6 +935,8 @@ mod tests {
             node_msg,
             section_pk,
         )?;
+
+        debug!("wire msg built");
 
         recv_tx.try_send(ConnectionEvent::Received((
             bootstrap_node.addr,
