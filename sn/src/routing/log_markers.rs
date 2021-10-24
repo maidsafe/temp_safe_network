@@ -48,6 +48,7 @@ pub enum LogMarker {
     SendResourceProofChallenge,
     SendJoinAsRelocatedResponse,
     SendJoinRejected,
+    ReceivedJoinApproved,
     SendJoinRetryNotCorrectKey,
     SendJoinRetryFirstSectionAgeIssue,
     SendJoinRetryNotAdult,
