@@ -13,27 +13,35 @@ use strum_macros::{Display as StrumDisplay, EnumIter, EnumString};
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, EnumIter, StrumDisplay, EnumString)]
 #[allow(missing_docs)]
 pub enum LogMarker {
+    // split
     Split,
+    NewPrefix,
+    // messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,
+    // chunks
     StoringChunk,
     ChunkStoreReceivedAtElder,
     StoredNewChunk,
     ChunkQueryResponseReceviedFromAdult,
     ChunkQueryReceviedAtElder,
     ChunkQueryReceviedAtAdult,
+    // register
     RegisterWrite,
     RegisterQueryReceived,
+    // routing commands
     DispatchHandleMsgCmd,
     DispatchSendMsgCmd,
     CommandHandleSpawned,
     CommandHandleStart,
     CommandHandleEnd,
     CommandHandleError,
+    // dkg + promotion
     PromotedToElder,
     DemotedFromElder,
     DkgSendFailureObservation,
     DkgBroadcastMsg,
+    // ae
     AeResendAfterRetry,
     AeResendAfterAeRedirect,
     BounceAfterNewElderNotKnownLocally,
@@ -41,17 +49,19 @@ pub enum LogMarker {
     AeSendRedirect,
     AeSendRetryAsOutdated,
     AeSendRetryDstPkFail,
-    SendJoinRequest,
+    // Sending messages
     SendOrHandle,
     SendDirect,
     SendDirectToNodes,
     SendResourceProofChallenge,
+    SendJoinRequest,
     SendJoinAsRelocatedResponse,
     SendJoinRejected,
-    ReceivedJoinApproved,
     SendJoinRetryNotCorrectKey,
     SendJoinRetryFirstSectionAgeIssue,
     SendJoinRetryNotAdult,
     SendJoinsDisallowed,
     SendNodeApproval,
+    // approved to join
+    ReceivedJoinApproved,
 }

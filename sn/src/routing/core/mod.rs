@@ -293,6 +293,8 @@ impl Core {
             };
 
             let sibling_elders = if new.prefix != old.prefix {
+                info!("{}", LogMarker::NewPrefix);
+
                 self.network.get(&new.prefix.sibling()).map(|sec_auth| {
                     let current: BTreeSet<_> = sec_auth.names();
                     let added = current.difference(&old.elders).copied().collect();
