@@ -17,6 +17,7 @@ use crate::routing::{
     dkg::SectionAuthUtils,
     ed25519,
     error::{Error, Result},
+    log_markers::LogMarker,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
     peer::PeerUtils,
@@ -29,6 +30,7 @@ use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
 use std::{collections::HashSet, net::SocketAddr};
 use tokio::sync::mpsc;
+use tokio::time::Duration;
 use tracing::Instrument;
 use xor_name::{Prefix, XorName};
 
@@ -126,7 +128,13 @@ impl<'a> Join<'a> {
         let mut used_recipient = HashSet::<SocketAddr>::new();
 
         // use some backoff here as we try and join
-        let mut our_backoff = ExponentialBackoff::default();
+        let mut our_backoff = ExponentialBackoff {
+            initial_interval: Duration::from_millis(50),
+            max_interval: Duration::from_secs(5),
+            max_elapsed_time: Some(Duration::from_secs(180)),
+            ..Default::default()
+        };
+
         let mut has_started = false;
         loop {
             used_recipient.extend(recipients.iter().map(|(_, addr)| addr));
@@ -169,6 +177,8 @@ impl<'a> Join<'a> {
                         );
                         continue;
                     }
+
+                    trace!("{}", LogMarker::ReceivedJoinApproved);
 
                     return Ok((
                         self.node,
