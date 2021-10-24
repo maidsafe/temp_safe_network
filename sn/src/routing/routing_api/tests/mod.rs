@@ -1349,7 +1349,7 @@ async fn handle_elders_update() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
+        .handle_command(Command::HandleElderAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut update_actual_recipients = HashSet::new();
@@ -1393,7 +1393,6 @@ async fn handle_elders_update() -> Result<()> {
         .chain(iter::once((*adult_peer.name(), *adult_peer.addr())))
         .collect();
 
-    debug!(">>>>>>");
     assert_eq!(update_actual_recipients, update_expected_recipients);
 
     assert_matches!(
@@ -1475,7 +1474,7 @@ async fn handle_demote_during_split() -> Result<()> {
             public_key: sk_set_v0.secret_key().public_key(),
         };
 
-        Ok(Command::HandleAgreement { proposal, sig })
+        Ok(Command::HandleElderAgreement { proposal, sig })
     };
 
     // Handle agreement on `OurElders` for prefix-0.
