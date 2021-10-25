@@ -172,7 +172,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn split_network_assert_expected_elder_counts() -> Result<()> {
-        let split_count = search_testnet(&LogMarker::Split)?.len();
+        let split_count = search_testnet(&LogMarker::SplitSuccess)?.len();
         assert_eq!(split_count, 7);
 
         let promoted_count = search_testnet(&LogMarker::PromotedToElder)?.len();

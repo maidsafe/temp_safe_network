@@ -23,6 +23,7 @@ use crate::messaging::{
 use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
+    log_markers::LogMarker,
     peer::PeerUtils,
     ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
 };
@@ -332,9 +333,11 @@ impl Section {
         our_name: &XorName,
         excluded_names: &BTreeSet<XorName>,
     ) -> Option<(ElderCandidates, ElderCandidates)> {
+        trace!("{}", LogMarker::SplitAttempt);
         let next_bit_index = if let Ok(index) = self.prefix().await.bit_count().try_into() {
             index
         } else {
+            debug!("at longest prefix");
             // Already at the longest prefix, can't split further.
             return None;
         };
@@ -355,8 +358,14 @@ impl Section {
                 }
             });
 
+        debug!(
+            ">>>> our size {:?}, theirs {:?}",
+            our_new_size, sibling_new_size
+        );
+
         // If none of the two new sections would contain enough entries, return `None`.
         if our_new_size < RECOMMENDED_SECTION_SIZE || sibling_new_size < RECOMMENDED_SECTION_SIZE {
+            debug!(">>>> returning here TOO SMALLLLLLLLL hmmmmmm");
             return None;
         }
 
@@ -379,6 +388,7 @@ impl Section {
         let our_elder_candidates = ElderCandidates::new(our_elders, our_prefix);
         let other_elder_candidates = ElderCandidates::new(other_elders, other_prefix);
 
+        debug!(">>>>> end of split attempt");
         Some((our_elder_candidates, other_elder_candidates))
     }
 }
