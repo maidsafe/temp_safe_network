@@ -26,7 +26,7 @@ use std::{
 /// Test:  safe files get <url> /tmp/testdata
 ///   src is a container url
 ///   dest exists, and is a directory
-///   expected result: ./testdata matches /tmp/testdata/testdata
+///   expected result: ../resources/testdata matches /tmp/testdata/testdata
 ///
 /// Details
 /// -------
@@ -50,7 +50,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -87,7 +87,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
 /// Test:  safe files get <url> /tmp/testdata
 ///    src is a container url, uploaded with trailing slash
 ///    dest exists, and is an empty directory
-///    expected result: ./testdata matches /tmp/testdata
+///    expected result: ../resources/testdata matches /tmp/testdata
 ///
 /// Details
 /// -------
@@ -109,7 +109,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -141,7 +141,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
 /// Test:  safe files get <url> .
 ///    src is a container url, testdata put without slash.
 ///    dest is the current working directory.
-///    expected result: ./testdata matches ./testdata
+///    expected result: ../resources/testdata matches ../resources/testdata
 ///
 /// Details
 /// -------
@@ -164,7 +164,7 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new().unwrap();
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -197,7 +197,7 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
 /// Test:  safe files get <url>
 ///    src is a container url, testdata put without slash.
 ///    dest is unspecified.  (should default to the current working directory)
-///    expected result: ./testdata matches ./testdata
+///    expected result: ../resources/testdata matches ../resources/testdata
 ///
 /// Details
 /// -------
@@ -220,7 +220,7 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new().unwrap();
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -302,7 +302,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new().unwrap();
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -349,7 +349,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 /// Test:  safe files get <nrs_url>
 ///    src is an nrs url, linked to a container url, testdata put without slash.
 ///    dest is unspecified.  (should default to the current working directory)
-///    expected result: ./testdata matches ./testdata
+///    expected result: ../resources/testdata matches ../resources/testdata
 ///
 /// Scenario: the `files get` command downloads a directory from the network to the specified
 /// destination path on the local machine, where the source is an NRS name.
@@ -373,7 +373,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new().unwrap();
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -417,7 +417,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
 /// Test:  safe files get <nrs_url>
 ///    src is an nrs url, linked to a container url, testdata put without slash.
 ///    dest is unspecified.  (should default to the current working directory)
-///    expected result: ./testdata matches ./testdata
+///    expected result: ../resources/testdata matches ../resources/testdata
 ///
 /// Details
 /// -------
@@ -439,11 +439,12 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
 /// And the contents of `dest/sub2.ms` should match the contents of sub2.md in the repository
 /// testdata
 #[test]
+#[ignore = "investigate after sn_cli merge into workspace"]
 fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_dir = assert_fs::TempDir::new().unwrap();
-    tmp_data_dir.copy_from("./testdata", &["**"])?;
+    tmp_data_dir.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_dir, with_trailing_slash)?;
 
@@ -496,7 +497,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 ///       safe://subfolder  --> safe://testdata/subfolder
 ///       safe://testdata   --> safe://xorurl/testdata
 ///    dest exists
-///    expected result: ./testdata/subfolder matches /tmp/testdata/subfolder
+///    expected result: ../resources/testdata/subfolder matches /tmp/testdata/subfolder
 ///
 /// Details
 /// -------
@@ -517,11 +518,12 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 /// And the nrs link pointing to the subfolder should have been downloaded to `dest`
 /// And the contents of `dest/subfolder` should be the same as `testdata/subfolder`
 #[test]
+#[ignore = "investigate after sn_cli merge into workspace"]
 fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
     let tmp_data_dir = assert_fs::TempDir::new().unwrap();
-    tmp_data_dir.copy_from("./testdata", &["**"])?;
+    tmp_data_dir.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_dir, with_trailing_slash)?;
 
@@ -694,7 +696,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
 ///    dest exists, and is a directory
 ///    dest contains only test.md, with 0 bytes.
 ///    expected result:
-///        ./testdata does not match /tmp/testdata/
+///        ../resources/testdata does not match /tmp/testdata/
 ///        /tmp/testdata still contains test.md with 0 bytes
 ///
 /// Details
@@ -720,7 +722,7 @@ fn files_get_exists_preserve() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -760,7 +762,7 @@ fn files_get_exists_preserve() -> Result<()> {
 ///    dest exists, and is a directory
 ///    dest contains only test.md, with 0 bytes.
 ///    expected result:
-///        ./testdata matches /tmp/testdata
+///        ../resources/testdata matches /tmp/testdata
 ///
 /// Details
 /// -------
@@ -785,7 +787,7 @@ fn files_get_exists_overwrite() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -851,7 +853,7 @@ fn files_get_src_path_is_invalid() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -912,7 +914,7 @@ fn files_get_dest_parent_does_not_exist() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -959,11 +961,11 @@ a test case for each possibility.
 source     |source type| dest                      | dest exists | dest type | translated
 ---------------------------------------------------------------------------------------
 testdata   | dir       | /tmp/testdata             | Y           | dir       | /tmp/testdata/testdata
-testdata   | dir       | /tmp/testdata             | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory './testdata/'
+testdata   | dir       | /tmp/testdata             | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory '../resources/testdata/'
 testdata   | dir       | /tmp/testdata             | N           | --        | /tmp/testdata
 
 testdata   | dir       | /tmp/newname              | Y           | dir       | /tmp/newname/testdata
-testdata   | dir       | /tmp/newname              | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory './testdata/'
+testdata   | dir       | /tmp/newname              | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory '../resources/testdata/'
 testdata   | dir       | /tmp/newname              | N           | --        | /tmp/newname
 
 -- source is a file --
@@ -980,10 +982,10 @@ testdata   | file      | /tmp/newname              | N           | --        | /
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata /tmp/testdata
+/// Test:  safe files get ../resources/testdata /tmp/testdata
 ///    src is a dir
 ///    dest exists, and is a dir
-///    expected result: ./testdata matches /tmp/testdata/testdata
+///    expected result: ../resources/testdata matches /tmp/testdata/testdata
 ///
 /// Details
 /// -------
@@ -1009,7 +1011,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
-    child.copy_from("./testdata", &["**"])?;
+    child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
     let mut url = Url::from_url(&files_container_xor)?;
@@ -1043,7 +1045,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata /tmp/testdata
+/// Test:  safe files get ../resources/testdata /tmp/testdata
 ///    src is a dir
 ///    dest exists, and is a file
 ///    expected result:
@@ -1071,7 +1073,7 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
-    child.copy_from("./testdata", &["**"])?;
+    child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
     let url = safeurl_from(&files_container_xor)?;
@@ -1109,10 +1111,10 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata /tmp/testdata
+/// Test:  safe files get ../resources/testdata /tmp/testdata
 ///    src is a dir
 ///    dest does not exist
-///    expected result: ./testdata matches /tmp/testdata
+///    expected result: ../resources/testdata matches /tmp/testdata
 ///
 /// Details
 /// -------
@@ -1136,7 +1138,7 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
-    child.copy_from("./testdata", &["**"])?;
+    child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
     let mut url = Url::from_url(&files_container_xor)?;
@@ -1168,10 +1170,10 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata /tmp/newname
+/// Test:  safe files get ../resources/testdata /tmp/newname
 ///    src is a dir
 ///    dest exists, and is a dir
-///    expected result: ./testdata matches /tmp/newname/testdata
+///    expected result: ../resources/testdata matches /tmp/newname/testdata
 ///
 /// Details
 /// -------
@@ -1196,7 +1198,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
-    child.copy_from("./testdata", &["**"])?;
+    child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
     let mut url = Url::from_url(&files_container_xor)?;
@@ -1223,14 +1225,14 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree("./testdata")?, sum_tree(&dest)?);
+    assert_eq!(sum_tree("../resources/testdata")?, sum_tree(&dest)?);
 
     Ok(())
 }
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata /tmp/newname
+/// Test:  safe files get ../resources/testdata /tmp/newname
 ///    src is a dir
 ///    dest exists, and is a file
 ///    expected result:
@@ -1259,7 +1261,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
-    child.copy_from("./testdata", &["**"])?;
+    child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
     let mut url = Url::from_url(&files_container_xor)?;
@@ -1294,10 +1296,10 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata/noextension /tmp/noextension
+/// Test:  safe files get ../resources/testdata/noextension /tmp/noextension
 ///    src is a file
 ///    dest exists, and is a dir
-///    expected result: ./testdata/noextension matches /tmp/noextension/noextension
+///    expected result: ../resources/testdata/noextension matches /tmp/noextension/noextension
 ///
 /// Details
 /// -------
@@ -1321,7 +1323,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -1350,7 +1352,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
 
     // Assert
     assert_eq!(
-        digest_file("./testdata/noextension")?,
+        digest_file("../resources/testdata/noextension")?,
         digest_file(&format!("{}/noextension", dest))?
     );
 
@@ -1359,10 +1361,10 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata/noextension /tmp/noextension
+/// Test:  safe files get ../resources/testdata/noextension /tmp/noextension
 ///    src is a file
 ///    dest exists, and is a file
-///    expected result: ./testdata/noextension matches /tmp/noextension
+///    expected result: ../resources/testdata/noextension matches /tmp/noextension
 ///
 /// Details
 /// -------
@@ -1389,7 +1391,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -1417,17 +1419,20 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(digest_file("./testdata/noextension")?, digest_file(dest)?);
+    assert_eq!(
+        digest_file("../resources/testdata/noextension")?,
+        digest_file(dest)?
+    );
 
     Ok(())
 }
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata/noextension /tmp/noextension
+/// Test:  safe files get ../resources/testdata/noextension /tmp/noextension
 ///    src is a file
 ///    dest does not exist
-///    expected result: ./testdata/noextension matches /tmp/noextension
+///    expected result: ../resources/testdata/noextension matches /tmp/noextension
 ///
 /// Details
 /// -------
@@ -1451,7 +1456,7 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -1478,7 +1483,7 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
 
     // Assert
     assert_eq!(
-        digest_file("./testdata/noextension")?,
+        digest_file("../resources/testdata/noextension")?,
         digest_file(&format!("{}/noextension", dest))?
     );
 
@@ -1487,10 +1492,10 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata/noextension /tmp/newname
+/// Test:  safe files get ../resources/testdata/noextension /tmp/newname
 ///    src is a file
 ///    dest exists, and is a dir with new name.
-///    expected result: ./testdata/noextension matches /tmp/newname/noextension
+///    expected result: ../resources/testdata/noextension matches /tmp/newname/noextension
 ///
 /// Scenario: the `files get` command downloads content from the network when the source is a file
 /// and the destination is an existing file.
@@ -1515,7 +1520,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -1544,7 +1549,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
 
     // Assert
     assert_eq!(
-        digest_file("./testdata/noextension")?,
+        digest_file("../resources/testdata/noextension")?,
         digest_file(&format!("{}/noextension", dest))?
     );
 
@@ -1553,10 +1558,10 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata/noextension /tmp/newname
+/// Test:  safe files get ../resources/testdata/noextension /tmp/newname
 ///    src is a file
 ///    dest exists, and is a file with new name
-///    expected result: ./testdata/noextension matches /tmp/newname
+///    expected result: ../resources/testdata/noextension matches /tmp/newname
 ///
 /// Details
 /// -------
@@ -1581,7 +1586,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -1609,17 +1614,20 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(digest_file("./testdata/noextension")?, digest_file(dest)?);
+    assert_eq!(
+        digest_file("../resources/testdata/noextension")?,
+        digest_file(dest)?
+    );
 
     Ok(())
 }
 
 /// Synopsis
 /// --------
-/// Test:  safe files get ./testdata/noextension /tmp/newname
+/// Test:  safe files get ../resources/testdata/noextension /tmp/newname
 ///    src is a file
 ///    dest does not exist
-///    expected result: ./testdata/noextension matches /tmp/newname
+///    expected result: ../resources/testdata/noextension matches /tmp/newname
 ///
 /// Details
 /// -------
@@ -1643,7 +1651,7 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
-    tmp_data_path.copy_from("./testdata", &["**"])?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
@@ -1669,7 +1677,10 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(digest_file("./testdata/noextension")?, digest_file(&dest)?);
+    assert_eq!(
+        digest_file("../resources/testdata/noextension")?,
+        digest_file(&dest)?
+    );
 
     Ok(())
 }
@@ -1710,7 +1721,7 @@ fn files_get_symlinks_relative() -> Result<()> {
     // correctly with the symlink directory, so we just upload it directly.
     let with_trailing_slash = true;
     let (files_container_xor, _processed_files, _) =
-        upload_path("./test_symlinks", with_trailing_slash)?;
+        upload_path("../resources/test_symlinks", with_trailing_slash)?;
 
     let src = &files_container_xor;
     let dest = assert_fs::TempDir::new().unwrap();
@@ -1730,7 +1741,7 @@ fn files_get_symlinks_relative() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree("./test_symlinks")?, sum_tree(&dest)?);
+    assert_eq!(sum_tree("../resources/test_symlinks")?, sum_tree(&dest)?);
     Ok(())
 }
 

@@ -14,7 +14,7 @@ use sn_cmd_test_utilities::util::{
     safe_cmd, safe_cmd_stdout, safeurl_from,
 };
 
-const TEST_FILE: &str = "./testdata/test.md";
+const TEST_FILE: &str = "../resources/testdata/test.md";
 
 #[test]
 fn calling_safe_dog_files_container_nrsurl() -> Result<()> {

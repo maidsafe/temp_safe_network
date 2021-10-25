@@ -21,10 +21,10 @@ pub mod util {
     pub const CLI: &str = "safe";
     pub const SAFE_PROTOCOL: &str = "safe://";
 
-    pub const TEST_FOLDER: &str = "./testdata/";
-    pub const TEST_FOLDER_NO_TRAILING_SLASH: &str = "./testdata";
-    pub const TEST_SYMLINKS_FOLDER: &str = "./test_symlinks";
-    pub const TEST_SYMLINK: &str = "./test_symlinks/file_link";
+    pub const TEST_FOLDER: &str = "../resources/testdata/";
+    pub const TEST_FOLDER_NO_TRAILING_SLASH: &str = "../resources/testdata";
+    pub const TEST_SYMLINKS_FOLDER: &str = "../resources/test_symlinks";
+    pub const TEST_SYMLINK: &str = "../resources/test_symlinks/file_link";
 
     #[ctor::ctor]
     fn init() {

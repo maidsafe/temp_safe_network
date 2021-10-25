@@ -18,8 +18,8 @@ use sn_cmd_test_utilities::util::{
     test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
-const TEST_DATA: &str = "./testdata/";
-const TEST_FILE: &str = "./testdata/test.md";
+const TEST_DATA: &str = "../resources/testdata/";
+const TEST_FILE: &str = "../resources/testdata/test.md";
 const TEST_FILE_CONTENT: &str = "hello tests!";
 const ID_RELATIVE_FILE_ERROR: &str = "Cannot get relative path of Immutable Data";
 const TEST_FILE_HEXDUMP_CONTENT: &str = "Length: 12 (0xc) bytes\n0000:   68 65 6c 6c  6f 20 74 65  73 74 73 21                hello tests!\n";
@@ -28,16 +28,19 @@ const TEST_FILE_HEXDUMP_CONTENT: &str = "Length: 12 (0xc) bytes\n0000:   68 65 6
 /// These small files are rejected by self encryption and need another way to be stored.
 #[test]
 fn calling_safe_cat_using_spot_file() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", "./testdata/test.md", "--json"], Some(0))?;
+    let content = safe_cmd_stdout(
+        ["files", "put", "../resources/testdata/test.md", "--json"],
+        Some(0),
+    )?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &map["./testdata/test.md"].1])
+    cmd.args(&vec!["cat", &map["../resources/testdata/test.md"].1])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
-    let safeurl = safeurl_from(&map["./testdata/test.md"].1)?;
+    let safeurl = safeurl_from(&map["../resources/testdata/test.md"].1)?;
     assert_eq!(
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
@@ -54,21 +57,24 @@ fn calling_safe_cat_using_blob_file() -> Result<()> {
         [
             "files",
             "put",
-            "./testdata/large_markdown_file.md",
+            "../resources/testdata/large_markdown_file.md",
             "--json",
         ],
         Some(0),
     )?;
 
-    let content = std::fs::read_to_string("./testdata/large_markdown_file.md")?;
+    let content = std::fs::read_to_string("../resources/testdata/large_markdown_file.md")?;
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&output);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &map["./testdata/large_markdown_file.md"].1])
-        .assert()
-        .stdout(predicate::str::contains(content))
-        .success();
+    cmd.args(&vec![
+        "cat",
+        &map["../resources/testdata/large_markdown_file.md"].1,
+    ])
+    .assert()
+    .stdout(predicate::str::contains(content))
+    .success();
 
-    let safeurl = safeurl_from(&map["./testdata/large_markdown_file.md"].1)?;
+    let safeurl = safeurl_from(&map["../resources/testdata/large_markdown_file.md"].1)?;
     assert_eq!(
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
