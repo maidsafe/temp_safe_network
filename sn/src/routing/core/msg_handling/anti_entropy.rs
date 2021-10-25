@@ -44,6 +44,11 @@ impl Core {
             sig: section_signed,
         };
 
+        // During the split, there is chance that new candidates rely on the AEUpdate from
+        // existing elders to update it's knowledge of own section's SAP (as such SAP
+        // needs to be signed by the old elders). Hence we have to carry out an update even
+        // self is part of the SAP. This might cause a glitch that self is an elder without
+        // secretshare when DKG is not completed. However the glitch shall be tiny.
         match self.network.verify_with_chain_and_update(
             signed_section_auth.clone(),
             &proof_chain,
@@ -52,8 +57,8 @@ impl Core {
             Ok(updated) => {
                 if updated {
                     info!(
-                        "Anti-Entropy: updated remote section SAP updated for {:?}",
-                        section_auth.prefix
+                        "Anti-Entropy: section {:?} updated to {:?}",
+                        section_auth.prefix, section_auth
                     );
                     self.section
                         .merge_chain(&signed_section_auth, proof_chain)

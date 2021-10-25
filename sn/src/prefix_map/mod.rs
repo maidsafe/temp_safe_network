@@ -142,9 +142,10 @@ impl NetworkPrefixMap {
         )
     }
 
-    /// Update our knowledge of a remote section's SAP only
-    /// if it's verifiable with the provided proof chain and section chain.
-    /// Returns true if an udpate was made
+    /// Update our knowledge of a section's SAP,
+    /// when it's verifiable with the provided proof chain and section chain.
+    /// The section could be our own or a remote one.
+    /// Returns true if an udpate was made.
     pub(crate) fn verify_with_chain_and_update(
         &self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,

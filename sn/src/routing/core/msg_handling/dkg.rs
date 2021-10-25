@@ -128,6 +128,7 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         key_share: SectionKeyShare,
     ) -> Result<Vec<Command>> {
+        trace!("Handle DKG outcome for {:?}", section_auth);
         let proposal = Proposal::SectionInfo(section_auth);
         let recipients: Vec<_> = self.section.authority_provider().await.peers();
         let result = self
@@ -138,9 +139,12 @@ impl Core {
 
         self.section_keys_provider.insert_dkg_outcome(key_share);
 
-        if self.section.chain().await.has_key(&public_key) {
-            self.section_keys_provider.finalise_dkg(&public_key).await
-        }
+        // Checking whether the section_key is in the chain can prevent the case that DKG outcome
+        // gave an outdated result. Which saves the cache size within the section_keys_provider.
+        // However, the AEUpdate could get self updated with the new key inserted into the chain
+        // already. Hence here we don't carry out a check anymore. The risk of outdated DKG draining
+        // the cache size shall be tiny.
+        self.section_keys_provider.finalise_dkg(&public_key).await;
 
         result
     }
