@@ -23,6 +23,7 @@ use xor_name::XorName;
 #[derive(Clone)]
 pub(crate) struct Comm {
     endpoint: Endpoint<XorName>,
+    event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
     back_pressure: BackPressure,
 }
@@ -44,26 +45,22 @@ impl Comm {
         // the incoming messages from other nodes.
         // This also returns the a channel where we can listen for
         // disconnection events.
-        let (endpoint, _incoming_connections, incoming_messages, disconnections, _) =
+        let (endpoint, incoming_connections, _) =
             Endpoint::new(local_addr, Default::default(), config).await?;
 
         let msg_count = MsgCount::new();
 
-        let _ = task::spawn(handle_incoming_messages(
-            incoming_messages,
+        let _handle = task::spawn(handle_incoming_connections(
+            incoming_connections,
             event_tx.clone(),
             msg_count.clone(),
-        ));
-
-        let _ = task::spawn(handle_disconnection_events(
-            disconnections,
-            event_tx.clone(),
         ));
 
         let back_pressure = BackPressure::new();
 
         Ok(Self {
             endpoint,
+            event_tx,
             msg_count,
             back_pressure,
         })
@@ -77,26 +74,31 @@ impl Comm {
     ) -> Result<(Self, SocketAddr)> {
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
-        let (endpoint, _, incoming_messages, disconnections, bootstrap_peer) =
+        let (endpoint, incoming_connections, bootstrap_peer) =
             Endpoint::new(local_addr, bootstrap_nodes, config).await?;
-        let bootstrap_peer = bootstrap_peer.ok_or(Error::BootstrapFailed)?;
+        let (bootstrap_peer, peer_incoming) = bootstrap_peer.ok_or(Error::BootstrapFailed)?;
 
         let msg_count = MsgCount::new();
 
-        let _ = task::spawn(handle_incoming_messages(
-            incoming_messages,
+        let _handle = task::spawn(handle_incoming_connections(
+            incoming_connections,
             event_tx.clone(),
             msg_count.clone(),
         ));
 
-        let _ = task::spawn(handle_disconnection_events(
-            disconnections,
-            event_tx.clone(),
-        ));
+        if let Some(incoming_messages) = peer_incoming {
+            let _ = task::spawn(handle_incoming_messages(
+                bootstrap_peer.remote_address(),
+                incoming_messages,
+                event_tx.clone(),
+                msg_count.clone(),
+            ));
+        }
 
         Ok((
             Self {
                 endpoint,
+                event_tx,
                 msg_count,
                 back_pressure: BackPressure::new(),
             },
@@ -173,7 +175,7 @@ impl Comm {
             ..Default::default()
         };
 
-        let (connectivity_endpoint, _, _) =
+        let connectivity_endpoint =
             Endpoint::<XorName>::new_client((self.endpoint.local_addr().ip(), 0), qp2p_config)?;
 
         let result = connectivity_endpoint
@@ -248,7 +250,15 @@ impl Comm {
                 .endpoint
                 .connect_to(&recipient.1)
                 .err_into()
-                .and_then(|connection| async move {
+                .and_then(|(connection, connection_incoming)| async move {
+                    if let Some(connection_incoming) = connection_incoming {
+                        let _ = task::spawn(handle_incoming_messages(
+                            connection.remote_address(),
+                            connection_incoming,
+                            self.event_tx.clone(),
+                            self.msg_count.clone(),
+                        ));
+                    }
                     connection
                         .send_with(msg_bytes, priority, Some(&retries))
                         .await
@@ -340,34 +350,41 @@ impl Comm {
 #[derive(Debug)]
 pub(crate) enum ConnectionEvent {
     Received((SocketAddr, Bytes)),
-    Disconnected(SocketAddr),
 }
 
-async fn handle_disconnection_events(
-    mut disconnections: qp2p::DisconnectionEvents,
+async fn handle_incoming_connections(
+    mut incoming_connections: qp2p::IncomingConnections<XorName>,
     event_tx: mpsc::Sender<ConnectionEvent>,
+    msg_count: MsgCount,
 ) {
-    while let Some(peer_addr) = disconnections.next().await {
-        let _ = event_tx
-            .send(ConnectionEvent::Disconnected(peer_addr))
-            .await;
+    while let Some((connection, connection_incoming)) = incoming_connections.next().await {
+        let _ = task::spawn(handle_incoming_messages(
+            connection.remote_address(),
+            connection_incoming,
+            event_tx.clone(),
+            msg_count.clone(),
+        ));
     }
 }
 
 async fn handle_incoming_messages(
-    mut incoming_msgs: qp2p::IncomingMessages<XorName>,
+    src: SocketAddr,
+    mut incoming_msgs: qp2p::ConnectionIncoming<XorName>,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
 ) {
-    while let Some((connection, msg)) = incoming_msgs.next().await {
-        let _ = event_tx
-            .send(ConnectionEvent::Received((
-                connection.remote_address(),
-                msg,
-            )))
-            .await;
-        // count incoming msgs..
-        msg_count.increase_incoming(connection.remote_address());
+    while let Some(result) = incoming_msgs.next().await.transpose() {
+        match result {
+            Ok(msg) => {
+                let _send_res = event_tx.send(ConnectionEvent::Received((src, msg))).await;
+                // count incoming msgs..
+                msg_count.increase_incoming(src);
+            }
+            Err(error) => {
+                // TODO: should we propagate this?
+                warn!("error on connection with {}: {:?}", src, error);
+            }
+        }
     }
 }
 
@@ -500,13 +517,16 @@ mod tests {
         let name = XorName::random();
 
         let message = new_test_message()?;
-        let _ = comm
+        let status = comm
             .send(
                 &[(name, invalid_addr), (peer.name, peer.addr)],
                 1,
                 message.clone(),
             )
             .await?;
+        assert_matches!(status, SendStatus::MinDeliveryGroupSizeReached(failed_recipients) => {
+            assert_eq!(&failed_recipients, &[invalid_addr])
+        });
 
         if let Some(bytes) = peer.rx.recv().await {
             assert_eq!(WireMsg::from(bytes)?, message);
@@ -555,41 +575,47 @@ mod tests {
         let (tx, _rx) = mpsc::channel(1);
         let send_comm = Comm::new(local_addr(), Config::default(), tx).await?;
 
-        let (recv_endpoint, _, mut incoming_msgs, _, _) =
+        let (recv_endpoint, mut incoming_connections, _) =
             Endpoint::<XorName>::new(local_addr(), &[], Config::default()).await?;
         let recv_addr = recv_endpoint.public_addr();
         let name = XorName::random();
 
         let msg0 = new_test_message()?;
-        let _ = send_comm
+        let status = send_comm
             .send(&[(name, recv_addr)], 1, msg0.clone())
             .await?;
+        assert_matches!(status, SendStatus::AllRecipients);
 
         let mut msg0_received = false;
 
         // Receive one message and disconnect from the peer
         {
-            if let Some((connection, msg)) = time::timeout(TIMEOUT, incoming_msgs.next()).await? {
-                assert_eq!(WireMsg::from(msg)?, msg0);
-                msg0_received = true;
-                recv_endpoint
-                    .disconnect_from(&connection.remote_address())
-                    .await;
-                tokio::time::sleep(Duration::from_secs(1)).await;
+            if let Some((connection, mut incoming_msgs)) = incoming_connections.next().await {
+                if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
+                    assert_eq!(WireMsg::from(msg)?, msg0);
+                    msg0_received = true;
+                    recv_endpoint
+                        .disconnect_from(&connection.remote_address())
+                        .await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
             }
             assert!(msg0_received);
         }
 
         let msg1 = new_test_message()?;
-        let _ = send_comm
+        let status = send_comm
             .send(&[(name, recv_addr)], 1, msg1.clone())
             .await?;
+        assert_matches!(status, SendStatus::AllRecipients);
 
         let mut msg1_received = false;
 
-        if let Some((_src, msg)) = time::timeout(TIMEOUT, incoming_msgs.next()).await? {
-            assert_eq!(WireMsg::from(msg)?, msg1);
-            msg1_received = true;
+        if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
+            if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
+                assert_eq!(WireMsg::from(msg)?, msg1);
+                msg1_received = true;
+            }
         }
 
         assert!(msg1_received);
@@ -605,21 +631,18 @@ mod tests {
 
         let (tx, _rx) = mpsc::channel(1);
         let comm1 = Comm::new(local_addr(), Config::default(), tx).await?;
-        let addr1 = comm1.our_connection_info();
 
         // Send a message to establish the connection
-        let _ = comm1
+        let status = comm1
             .send(&[(XorName::random(), addr0)], 1, new_test_message()?)
             .await?;
+        assert_matches!(status, SendStatus::AllRecipients);
 
         assert_matches!(rx0.recv().await, Some(ConnectionEvent::Received(_)));
         // Drop `comm1` to cause connection lost.
         drop(comm1);
 
-        assert_matches!(
-            time::timeout(TIMEOUT, rx0.recv()).await?,
-            Some(ConnectionEvent::Disconnected(addr)) => assert_eq!(addr, addr1)
-        );
+        assert_matches!(time::timeout(TIMEOUT, rx0.recv()).await, Err(_));
 
         Ok(())
     }
@@ -657,15 +680,17 @@ mod tests {
 
     impl Peer {
         async fn new() -> Result<Self> {
-            let (endpoint, _, mut incoming_messages, _, _) =
+            let (endpoint, mut incoming_connections, _) =
                 Endpoint::<XorName>::new(local_addr(), &[], Config::default()).await?;
             let addr = endpoint.public_addr();
 
             let (tx, rx) = mpsc::channel(1);
 
-            let _ = tokio::spawn(async move {
-                while let Some((_src, msg)) = incoming_messages.next().await {
-                    let _ = tx.send(msg).await;
+            let _handle = tokio::spawn(async move {
+                while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
+                    while let Ok(Some(msg)) = incoming_messages.next().await {
+                        let _ = tx.send(msg).await;
+                    }
                 }
             });
 
@@ -683,7 +708,7 @@ mod tests {
 
         // Keep the socket alive to keep the address bound, but don't read/write to it so any
         // attempt to connect to it will fail.
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             future::pending::<()>().await;
             let _ = socket;
         });

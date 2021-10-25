@@ -624,7 +624,8 @@ impl Url {
 
     /// sets sub_names portion of URL
     pub fn set_sub_names(&mut self, sub_names: &str) -> Result<()> {
-        let tmpurl = format!("{}{}.{}", URL_PROTOCOL, sub_names, self.top_name());
+        let sep = if sub_names.is_empty() { "" } else { "." };
+        let tmpurl = format!("{}{}{}{}", URL_PROTOCOL, sub_names, sep, self.top_name());
         let parts = UrlParts::parse(&tmpurl, true)?;
         self.sub_names = parts.sub_names;
         self.sub_names_vec = parts.sub_names_vec;
@@ -725,17 +726,17 @@ impl Url {
                 // note: this will consolidate multiple ?k= into just one.
                 if let Some(v) = val {
                     if !set_key {
-                        let _ = pairs.append_pair(key, v);
+                        let _res = pairs.append_pair(key, v);
                         set_key = true;
                     }
                 }
             } else {
-                let _ = pairs.append_pair(&k, &v);
+                let _res = pairs.append_pair(&k, &v);
             }
         }
         if !set_key {
             if let Some(v) = val {
-                let _ = pairs.append_pair(key, v);
+                let _res = pairs.append_pair(key, v);
             }
         }
 
@@ -1815,16 +1816,16 @@ mod tests {
 
         // note: ?? is actually ok in a standard url.  I suppose no harm in allowing for safe
         // see:  https://stackoverflow.com/questions/2924160/is-it-valid-to-have-more-than-one-question-mark-in-a-url
-        let _ = Url::from_url("safe://name??foo=bar")?;
+        let _url = Url::from_url("safe://name??foo=bar")?;
 
         // note: ## and #frag1#frag2 are accepted by rust URL parser.
         // tbd: if we want to disallow.
         // see: https://stackoverflow.com/questions/10850781/multiple-hash-signs-in-url
-        let _ = Url::from_url("safe://name?foo=bar##fragment")?;
+        let _url = Url::from_url("safe://name?foo=bar##fragment")?;
 
         // note: single%percent/in/path is accepted by rust URL parser.
         // tbd: if we want to disallow.
-        let _ = Url::from_nrsurl("safe://name/single%percent/in/path")?;
+        let _url = Url::from_nrsurl("safe://name/single%percent/in/path")?;
 
         Ok(())
     }

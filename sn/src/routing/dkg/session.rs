@@ -14,6 +14,7 @@ use crate::routing::{
     dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
     ed25519,
     error::Result,
+    log_markers::LogMarker,
     messages::WireMsgUtils,
     node::Node,
     routing_api::command::{next_timer_token, Command},
@@ -122,6 +123,7 @@ impl Session {
                 node_msg,
                 section_pk,
             )?;
+            trace!("{}", LogMarker::DkgBroadcastMsg);
 
             commands.push(Command::SendMessage {
                 recipients,
@@ -282,7 +284,7 @@ impl Session {
                     node_msg,
                     section_pk,
                 )?;
-
+                trace!("{}", LogMarker::DkgSendFailureObservation);
                 Command::SendMessage {
                     recipients: self.recipients(),
                     wire_msg,
@@ -346,7 +348,7 @@ impl Backlog {
 
     pub(crate) fn push(&mut self, session_id: DkgSessionId, message: DkgMessage) {
         if self.0.len() == self.0.capacity() {
-            let _ = self.0.pop_front();
+            let _prev = self.0.pop_front();
         }
 
         self.0.push_back((session_id, message))

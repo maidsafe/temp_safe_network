@@ -9,7 +9,7 @@
 
 use bytes::Buf;
 use color_eyre::{eyre::eyre, Result};
-use sn_api::{fetch::SafeData, PublicKey, Safe};
+use sn_api::{resolver::SafeData, PublicKey, Safe};
 use std::{collections::BTreeSet, env::args, net::SocketAddr};
 
 // To be executed passing Safe network contact address and Blob Safe URL, e.g.:

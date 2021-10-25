@@ -19,61 +19,78 @@ use crate::messaging::{system::agreement::SectionAuth, SectionAuthorityProvider}
 use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{btree_map, BTreeMap},
-    hash::{Hash, Hasher},
-};
+use std::collections::BTreeMap;
+
+use dashmap::DashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use xor_name::XorName;
 
+mod arc_rwlock_serde {
+    use serde::de::Deserializer;
+    use serde::ser::Serializer;
+    use serde::{Deserialize, Serialize};
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    pub(crate) fn serialize<S, T>(val: &Arc<RwLock<T>>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize,
+    {
+        T::serialize(&futures::executor::block_on(val.read()), s)
+    }
+
+    pub(crate) fn deserialize<'de, D, T>(d: D) -> Result<Arc<RwLock<T>>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        Ok(Arc::new(RwLock::new(T::deserialize(d)?)))
+    }
+}
+
 /// Container for storing information about a section.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 /// All information about a section
 pub struct Section {
     /// Network genesis key
     pub genesis_key: BlsPublicKey,
     /// The secured linked list of previous section keys
-    pub chain: SecuredLinkedList,
+    #[serde(with = "arc_rwlock_serde")]
+    pub chain: Arc<RwLock<SecuredLinkedList>>,
     /// Signed section authority
-    pub section_auth: SectionAuth<SectionAuthorityProvider>,
+    #[serde(with = "arc_rwlock_serde")]
+    pub section_auth: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
     /// Members of the section
-    pub members: SectionPeers,
+    pub section_peers: SectionPeers,
 }
 
 /// Container for storing information about members of our section.
-#[derive(Clone, Default, Debug, Eq, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct SectionPeers {
     /// Members of the section
-    pub members: BTreeMap<XorName, SectionAuth<NodeState>>,
+    pub members: Arc<DashMap<XorName, SectionAuth<NodeState>>>,
 }
+
+impl Eq for SectionPeers {}
 
 impl PartialEq for SectionPeers {
-    fn eq(&self, other: &Self) -> bool {
-        self.members == other.members
-    }
-}
+    fn eq(&self, _other: &Self) -> bool {
+        // TODO: there must be a better way of doing this...
+        let mut us: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
+        let mut them: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
 
-impl Hash for SectionPeers {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.members.hash(state)
-    }
-}
+        for refmulti in self.members.iter() {
+            let (key, value) = refmulti.pair();
+            let _prev = us.insert(*key, value.clone());
+        }
 
-#[derive(Debug)]
-pub struct IntoIter(btree_map::IntoIter<XorName, SectionAuth<NodeState>>);
+        for refmulti in self.members.iter() {
+            let (key, value) = refmulti.pair();
+            let _prev = them.insert(*key, value.clone());
+        }
 
-impl Iterator for IntoIter {
-    type Item = SectionAuth<NodeState>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(_, info)| info)
-    }
-}
-
-impl IntoIterator for SectionPeers {
-    type IntoIter = IntoIter;
-    type Item = <Self::IntoIter as Iterator>::Item;
-
-    fn into_iter(self) -> Self::IntoIter {
-        IntoIter(self.members.into_iter())
+        us == them
     }
 }

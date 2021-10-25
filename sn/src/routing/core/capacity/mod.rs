@@ -43,11 +43,10 @@ impl Capacity {
 
     /// Whether the adult is considered full.
     /// This happens when it has reported at least `MIN_LEVEL_WHEN_FULL`.
-    pub(super) async fn is_full(&self, adult: &XorName) -> bool {
-        match self.adult_levels.read().await.get(adult) {
-            Some(level) => level.read().await.value() >= MIN_LEVEL_WHEN_FULL,
-            None => todo!(),
-        }
+    pub(super) async fn is_full(&self, adult: &XorName) -> Option<bool> {
+        let adult_levels = self.adult_levels.read().await;
+        let level = adult_levels.get(adult)?.read().await.value();
+        Some(level >= MIN_LEVEL_WHEN_FULL)
     }
 
     /// Avg usage by nodes in the section, a value between 0 and 10.
@@ -70,7 +69,7 @@ impl Capacity {
     pub(super) async fn levels(&self) -> BTreeMap<XorName, StorageLevel> {
         let mut map = BTreeMap::new();
         for (name, level) in self.adult_levels.read().await.iter() {
-            let _ = map.insert(*name, *level.read().await);
+            let _prev = map.insert(*name, *level.read().await);
         }
         map
     }
@@ -90,7 +89,7 @@ impl Capacity {
         let mut set = BTreeSet::new();
         for (name, level) in self.adult_levels.read().await.iter() {
             if level.read().await.value() >= MIN_LEVEL_WHEN_FULL {
-                let _ = set.insert(*name);
+                let _changed = set.insert(*name);
             }
         }
         set
@@ -98,7 +97,7 @@ impl Capacity {
 
     pub(super) async fn set_adult_levels(&self, levels: BTreeMap<XorName, StorageLevel>) {
         for (name, level) in levels {
-            let _ = self.set_adult_level(name, level).await;
+            let _changed = self.set_adult_level(name, level).await;
         }
     }
 
@@ -134,7 +133,7 @@ impl Capacity {
             }
             false // no change
         } else {
-            let _ = all_levels.insert(adult, Arc::new(RwLock::new(new_level)));
+            let _level = all_levels.insert(adult, Arc::new(RwLock::new(new_level)));
             info!("New value inserted.");
             true // value changed
         }
@@ -151,7 +150,7 @@ impl Capacity {
             .collect();
 
         for adult in &absent_adults {
-            let _ = adult_levels.remove(adult);
+            let _level = adult_levels.remove(adult);
         }
     }
 }

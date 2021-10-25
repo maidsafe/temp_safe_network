@@ -31,9 +31,7 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     relocation::{self, RelocatePayloadUtils},
-    section::{
-        test_utils::*, ElderCandidatesUtils, NodeStateUtils, SectionKeyShare, SectionPeersUtils,
-    },
+    section::{test_utils::*, ElderCandidatesUtils, NodeStateUtils, SectionKeyShare},
     supermajority, Error, Event, Result as RoutingResult, SectionAuthorityProviderUtils,
     ELDER_SIZE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
@@ -42,6 +40,7 @@ use assert_matches::assert_matches;
 use bls_dkg::message::Message;
 use ed25519_dalek::Signer;
 use eyre::{bail, eyre, Context, Result};
+use itertools::Itertools;
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
@@ -68,7 +67,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
 
-    let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
@@ -79,6 +78,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -145,7 +145,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
 
-    let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
@@ -156,6 +156,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -232,7 +233,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
 
-    let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let node_name = node.name();
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
@@ -244,6 +245,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -332,7 +334,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 async fn aggregate_proposals() -> Result<()> {
     let (section_auth, nodes, sk_set) = create_section_auth();
     let pk_set = sk_set.public_keys();
-    let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
@@ -342,6 +344,7 @@ async fn aggregate_proposals() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -353,7 +356,7 @@ async fn aggregate_proposals() -> Result<()> {
         dst_key: None,
     };
 
-    let section_pk = *section.chain().last_key();
+    let section_pk = *section.chain().await.last_key();
     for (index, node) in nodes.iter().enumerate().take(THRESHOLD) {
         let sig_share = proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
 
@@ -364,7 +367,7 @@ async fn aggregate_proposals() -> Result<()> {
                 section_pk,
             },
             SystemMsg::Propose {
-                content: proposal.clone(),
+                proposal: proposal.clone(),
                 sig_share,
             },
             section_auth.section_key(),
@@ -392,7 +395,7 @@ async fn aggregate_proposals() -> Result<()> {
         THRESHOLD,
         &sk_set.secret_key_share(THRESHOLD),
     )?;
-    let section_pk = *section.chain().last_key();
+    let section_pk = *section.chain().await.last_key();
     let wire_msg = WireMsg::single_src(
         &nodes[THRESHOLD],
         DstLocation::Section {
@@ -400,7 +403,7 @@ async fn aggregate_proposals() -> Result<()> {
             section_pk,
         },
         SystemMsg::Propose {
-            content: proposal.clone(),
+            proposal: proposal.clone(),
             sig_share,
         },
         section_auth.section_key(),
@@ -440,7 +443,7 @@ async fn handle_agreement_on_online() -> Result<()> {
     let prefix = Prefix::default();
 
     let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, ELDER_SIZE);
-    let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
@@ -451,6 +454,7 @@ async fn handle_agreement_on_online() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -483,7 +487,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     );
     let section_signed_section_auth = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let mut section = Section::new(*chain.root_key(), chain, section_signed_section_auth)?;
+    let section = Section::new(*chain.root_key(), chain, section_signed_section_auth)?;
     let mut expected_new_elders = BTreeSet::new();
 
     for peer in section_auth.peers() {
@@ -491,12 +495,14 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         peer.set_reachable(true);
         let node_state = NodeState::joined(peer, None);
         let sig = prove(sk_set.secret_key(), &node_state)?;
-        let _ = section.update_member(SectionAuth {
-            value: node_state,
-            sig,
-        });
+        let _updated = section
+            .update_member(SectionAuth {
+                value: node_state,
+                sig,
+            })
+            .await;
         if peer.age() == MIN_AGE + 2 {
-            let _ = expected_new_elders.insert(peer);
+            let _changed = expected_new_elders.insert(peer);
         }
     }
 
@@ -512,6 +518,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -527,12 +534,12 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
-    let _ = expected_new_elders.insert(new_peer);
+    let _changed = expected_new_elders.insert(new_peer);
 
     for command in commands {
         let (recipients, wire_msg) = match command {
@@ -586,7 +593,7 @@ async fn handle_online_command(
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -654,7 +661,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         NetworkPhase::Regular => "0".parse().unwrap(),
     };
     let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, ELDER_SIZE);
-    let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
     // Make a left peer.
     let peer = create_peer(age);
@@ -664,7 +671,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         previous_name: None,
     };
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
-    let _ = section.update_member(node_state);
+    let _updated = section.update_member(node_state).await;
 
     // Make a Node
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
@@ -678,6 +685,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(state);
@@ -725,12 +733,12 @@ async fn handle_agreement_on_online_of_rejoined_node_with_low_age_after_startup(
 async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let (section_auth, mut nodes, sk_set) = create_section_auth();
 
-    let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
     let existing_peer = create_peer(MIN_AGE);
     let node_state = NodeState::joined(existing_peer, None);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
-    let _ = section.update_member(node_state);
+    let _updated = section.update_member(node_state).await;
 
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
@@ -743,6 +751,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -755,8 +764,8 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let proposal = Proposal::Offline(node_state);
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
-    let _ = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+    let _commands = dispatcher
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     assert_matches!(event_rx.recv().await, Some(Event::MemberLeft { name, age, }) => {
@@ -771,16 +780,21 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let (section_auth, mut nodes, sk_set) = create_section_auth();
 
-    let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
     let existing_peer = create_peer(MIN_AGE);
     let node_state = NodeState::joined(existing_peer, None);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
-    let _ = section.update_member(node_state);
+    let _updated = section.update_member(node_state).await;
 
     // Pick the elder to remove.
-    let remove_peer = section_auth.peers().last().expect("section_auth is empty");
-
+    let auth_peers = section_auth.peers();
+    let remove_peer = auth_peers.last().expect("section_auth is empty");
+    println!(
+        "remove peeer????? {:?} and authpeers {:?}",
+        remove_peer, auth_peers
+    );
+    println!("and members: {:?}", section.members());
     let remove_node_state = section
         .members()
         .get(remove_peer.name())
@@ -800,16 +814,19 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
+
+    println!("11111?????????");
 
     // Handle agreement on the Offline proposal
     let proposal = Proposal::Offline(remove_node_state);
     let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -838,7 +855,8 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
         let expected_new_elders: BTreeSet<_> = section_auth
             .peers()
-            .filter(|peer| *peer != remove_peer)
+            .into_iter()
+            .filter(|peer| peer != remove_peer)
             .chain(iter::once(existing_peer))
             .collect();
         itertools::assert_equal(actual_elder_candidates.peers(), expected_new_elders.clone());
@@ -848,10 +866,15 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             .filter(|peer| *peer.name() != node_name)
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
+
+        println!("22222????????");
+
         assert_eq!(recipients, expected_dkg_start_recipients);
 
         dkg_start_sent = true;
     }
+
+    println!("?????????");
 
     assert!(dkg_start_sent);
 
@@ -866,6 +889,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .await
         .section()
         .authority_provider()
+        .await
         .contains_elder(remove_peer.name()));
 
     Ok(())
@@ -908,6 +932,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
 
@@ -928,8 +953,9 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let new_section_auth = SectionAuthorityProvider::new(
         old_section_auth
             .peers()
+            .into_iter()
             .take(old_section_auth.elder_count() - 1)
-            .chain(iter::once(new_peer)),
+            .chain(vec![new_peer]),
         old_section_auth.prefix,
         sk2_set.public_keys(),
     );
@@ -938,7 +964,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let new_section = Section::new(pk0, chain, section_signed_new_section_auth)?;
 
     // Create the `Sync` message containing the new `Section`.
-    let proof_chain = new_section.chain().clone();
+    let proof_chain = new_section.chain().await.clone();
     let wire_msg = WireMsg::single_src(
         &old_node,
         DstLocation::Node {
@@ -948,13 +974,13 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         SystemMsg::AntiEntropyUpdate {
             section_auth: new_section_auth,
             members: Some(new_section.members().clone()),
-            section_signed: new_section.section_auth.sig,
+            section_signed: new_section.section_auth.read().await.sig.clone(),
             proof_chain,
         },
         src_section_pk,
     )?;
 
-    let _ = get_internal_commands(
+    let _commands = get_internal_commands(
         Command::HandleMessage {
             sender: old_node.addr,
             wire_msg,
@@ -1012,6 +1038,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
 
@@ -1042,7 +1069,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     match commands {
         Err(Error::UntrustedProofChain(_)) => Ok(()),
         Err(other_err) => bail!(
-            "AE update handling produced unexpected error with bad AE update: {}",
+            "AE update handling produced unexpected error with bad AE update: {:?}",
             other_err
         ),
         Ok(_) => bail!("AE update handling should error due to bad signing."),
@@ -1054,20 +1081,20 @@ async fn get_internal_commands(
     command: Command,
     dispatcher: &Dispatcher,
 ) -> RoutingResult<Vec<Command>> {
-    let commands = dispatcher.handle_command(command).await?;
+    let commands = dispatcher.handle_command(command, "cmd-id").await?;
 
     let mut node_msg_handling = vec![];
     let mut inner_handling = vec![];
 
     for command in commands {
         // first pass gets us into node msg handling
-        let commands = dispatcher.handle_command(command).await?;
+        let commands = dispatcher.handle_command(command, "cmd-id").await?;
         node_msg_handling.extend(commands);
     }
 
     for command in node_msg_handling {
         // second pass gets us into non-data handling
-        let commands = dispatcher.handle_command(command).await?;
+        let commands = dispatcher.handle_command(command, "cmd-id").await?;
         inner_handling.extend(commands);
     }
 
@@ -1090,12 +1117,12 @@ enum RelocatedPeerRole {
 async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let prefix: Prefix = "0".parse().unwrap();
     let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, ELDER_SIZE);
-    let (mut section, section_key_share) = create_section(&sk_set, &section_auth)?;
+    let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
     let non_elder_peer = create_peer(MIN_AGE);
     let node_state = NodeState::joined(non_elder_peer, None);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
-    assert!(section.update_member(node_state));
+    assert!(section.update_member(node_state).await);
     let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
@@ -1106,18 +1133,23 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
 
     let relocated_peer = match relocated_peer_role {
-        RelocatedPeerRole::Elder => section_auth.peers().nth(1).expect("too few elders"),
+        RelocatedPeerRole::Elder => section_auth
+            .peers()
+            .into_iter()
+            .nth(1)
+            .expect("too few elders"),
         RelocatedPeerRole::NonElder => non_elder_peer,
     };
 
     let (proposal, sig) = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut relocate_sent = false;
@@ -1198,7 +1230,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
 
     let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir).await?;
     let node = core.node().clone();
-    let section_pk = *core.section_chain().last_key();
+    let section_pk = *core.section_chain().await.last_key();
     let dispatcher = Dispatcher::new(core);
 
     let dst_location = match dst {
@@ -1219,10 +1251,13 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let wire_msg = WireMsg::single_src(&node, dst_location, node_msg.clone(), section_pk)?;
 
     let commands = dispatcher
-        .handle_command(Command::SendMessage {
-            recipients: vec![(node.name(), node.addr)],
-            wire_msg,
-        })
+        .handle_command(
+            Command::SendMessage {
+                recipients: vec![(node.name(), node.addr)],
+                wire_msg,
+            },
+            "cmd-id",
+        )
         .await?;
 
     assert!(commands.is_empty());
@@ -1245,6 +1280,8 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_elders_update() -> Result<()> {
+    crate::init_test_logger();
+    let _span = tracing::info_span!("handle_elders_update").entered();
     // Start with section that has `ELDER_SIZE` elders with age 6, 1 non-elder with age 5 and one
     // to-be-elder with age 7:
     let node = create_node(MIN_AGE + 2, None);
@@ -1263,12 +1300,12 @@ async fn handle_elders_update() -> Result<()> {
         sk_set0.public_keys(),
     );
 
-    let (mut section0, section_key_share) = create_section(&sk_set0, &section_auth0)?;
+    let (section0, section_key_share) = create_section(&sk_set0, &section_auth0).await?;
 
     for peer in &[adult_peer, promoted_peer] {
         let node_state = NodeState::joined(*peer, None);
         let node_state = section_signed(sk_set0.secret_key(), node_state)?;
-        assert!(section0.update_member(node_state));
+        assert!(section0.update_member(node_state).await);
     }
 
     let demoted_peer = other_elder_peers.remove(0);
@@ -1306,12 +1343,13 @@ async fn handle_elders_update() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig })
+        .handle_command(Command::HandleElderAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut update_actual_recipients = HashSet::new();
@@ -1398,12 +1436,12 @@ async fn handle_demote_during_split() -> Result<()> {
         sk_set_v0.public_keys(),
     );
 
-    let (mut section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0)?;
+    let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
 
     for peer in peers_b.iter().chain(iter::once(&peer_c)) {
         let node_state = NodeState::joined(*peer, None);
         let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
-        assert!(section.update_member(node_state));
+        assert!(section.update_member(node_state).await);
     }
 
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
@@ -1416,6 +1454,7 @@ async fn handle_demote_during_split() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
+        false,
     )
     .await?;
     let dispatcher = Dispatcher::new(core);
@@ -1435,7 +1474,7 @@ async fn handle_demote_during_split() -> Result<()> {
             public_key: sk_set_v0.secret_key().public_key(),
         };
 
-        Ok(Command::HandleAgreement { proposal, sig })
+        Ok(Command::HandleElderAgreement { proposal, sig })
     };
 
     // Handle agreement on `OurElders` for prefix-0.
@@ -1445,14 +1484,14 @@ async fn handle_demote_during_split() -> Result<()> {
         sk_set_v1_p0.public_keys(),
     );
     let command = create_our_elders_command(sk_set_v1_p0.secret_key(), section_auth)?;
-    let commands = dispatcher.handle_command(command).await?;
+    let commands = dispatcher.handle_command(command, "cmd-id").await?;
     assert_matches!(&commands[..], &[]);
 
     // Handle agreement on `OurElders` for prefix-1.
     let section_auth =
         SectionAuthorityProvider::new(peers_b.iter().copied(), prefix1, sk_set_v1_p1.public_keys());
     let command = create_our_elders_command(sk_set_v1_p1.secret_key(), section_auth)?;
-    let commands = dispatcher.handle_command(command).await?;
+    let commands = dispatcher.handle_command(command, "cmd-id").await?;
 
     let mut update_recipients = HashSet::new();
 
@@ -1536,14 +1575,14 @@ fn create_section_key_share(sk_set: &bls::SecretKeySet, index: usize) -> Section
     }
 }
 
-fn create_section(
+async fn create_section(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(Section, SectionKeyShare)> {
     let section_chain = SecuredLinkedList::new(sk_set.secret_key().public_key());
     let section_signed_section_auth = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let mut section = Section::new(
+    let section = Section::new(
         *section_chain.root_key(),
         section_chain,
         section_signed_section_auth,
@@ -1554,7 +1593,7 @@ fn create_section(
         peer.set_reachable(true);
         let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(sk_set.secret_key(), node_state)?;
-        let _ = section.update_member(node_state);
+        let _updated = section.update_member(node_state).await;
     }
 
     let section_key_share = create_section_key_share(sk_set, 0);

@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
         "Network's genesis key: {}",
         hex::encode(genesis_key.to_bytes())
     );
-    let config = Config::new(None, None, genesis_key, None, None).await;
+    let config = Config::new(None, None, genesis_key, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     let pk = client.public_key();
@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_secs(delay)).await;
 
     println!("...reading bytes from the network now...");
-    let _ = client.read_bytes(address).await?;
+    let _bytes = client.read_bytes(address).await?;
     println!("Bytes read from {:?}", address);
 
     println!();

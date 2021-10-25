@@ -217,7 +217,7 @@ impl Network {
         let bootstrap_nodes = self.get_bootstrap_nodes().await;
 
         let id = self.new_node_id();
-        let _ = self.nodes.insert(id, Node::Joining);
+        let _prev = self.nodes.insert(id, Node::Joining);
         self.stats.join_attempts += 1;
 
         let config = Config {
@@ -226,7 +226,7 @@ impl Network {
             ..Default::default()
         };
 
-        let _ = task::spawn(add_node(id, config, event_tx));
+        let _handle = task::spawn(add_node(id, config, event_tx));
 
         self.try_print_status();
     }
@@ -278,7 +278,7 @@ impl Network {
                 let age = node.age().await;
                 let prefix = node.our_prefix().await;
 
-                let _ = self.nodes.insert(
+                let _prev = self.nodes.insert(
                     id,
                     Node::Joined {
                         node,
@@ -293,7 +293,7 @@ impl Network {
             }
             Event::JoinFailure { id, error } => {
                 println!("{}: {}", self.theme.error.paint("join failure"), error);
-                let _ = self.nodes.remove(&id);
+                let _prev = self.nodes.remove(&id);
                 self.stats.join_failures += 1;
             }
             Event::Routing { id, event } => match event {
@@ -403,7 +403,7 @@ impl Network {
             .sorted_by(|(_, lhs_age), (_, rhs_age)| lhs_age.cmp(rhs_age).reverse())
             .take(COUNT)
         {
-            let _ = nodes.insert(node.our_connection_info().await);
+            let _prev = nodes.insert(node.our_connection_info().await);
         }
 
         nodes
@@ -637,7 +637,7 @@ async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) -> Result<()
     let (node, mut events) = match Routing::new(config, storage, root_dir).await {
         Ok(output) => output,
         Err(error) => {
-            let _ = event_tx
+            let _res = event_tx
                 .send(Event::JoinFailure {
                     id,
                     error: error.into(),
@@ -647,7 +647,7 @@ async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) -> Result<()
         }
     };
 
-    let _ = event_tx.send(Event::JoinSuccess { id, node }).await;
+    let _res = event_tx.send(Event::JoinSuccess { id, node }).await;
 
     while let Some(event) = events.next().await {
         if event_tx.send(Event::Routing { id, event }).await.is_err() {
@@ -814,7 +814,7 @@ impl ProbeTracker {
             .collect();
 
         for prefix in remove {
-            let _ = self.sections.remove(&prefix);
+            let _prev = self.sections.remove(&prefix);
         }
     }
 }

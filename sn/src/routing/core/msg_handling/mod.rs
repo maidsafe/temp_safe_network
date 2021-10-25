@@ -20,7 +20,7 @@ use super::Core;
 use crate::messaging::{
     data::{ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
-    system::{NodeCmd, NodeQuery, Proposal, SystemMsg},
+    system::{NodeCmd, NodeQuery, SystemMsg},
     DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
     ServiceAuth, SrcLocation, WireMsg,
 };
@@ -40,6 +40,7 @@ use xor_name::XorName;
 
 // Message handling
 impl Core {
+    #[instrument(skip(self, original_bytes))]
     pub(crate) async fn handle_message(
         &self,
         sender: SocketAddr,
@@ -47,7 +48,7 @@ impl Core {
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
         let mut cmds = vec![];
-
+        trace!("handling msg");
         // Apply backpressure if needed.
         if let Some(load_report) = self.comm.check_strain(sender).await {
             let msg_src = wire_msg.msg_kind().src();
@@ -82,13 +83,15 @@ impl Core {
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
                 let mut known_keys: Vec<BlsPublicKey> =
-                    self.section.chain().keys().copied().collect();
+                    self.section.chain().await.keys().copied().collect();
                 known_keys.extend(self.network.section_keys());
                 known_keys.push(*self.section.genesis_key());
 
-                // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
-                    warn!("Untrusted message dropped from {:?}: {:?} ", sender, msg);
+                    warn!(
+                        "Untrusted message ({:?}) dropped from {:?}: {:?} ",
+                        msg_id, sender, msg
+                    );
                     return Ok(cmds);
                 }
 
@@ -102,7 +105,7 @@ impl Core {
                 // Let's check for entropy before we proceed further
                 // Adult nodes don't need to carry out entropy checking,
                 // however the message shall always be handled.
-                if self.is_elder() {
+                if self.is_elder().await {
                     // For the case of receiving a join request not matching our prefix,
                     // we just let the join request handler to deal with it later on.
                     // We also skip AE check on Anti-Entropy messages
@@ -189,9 +192,9 @@ impl Core {
 
                 let src_location = SrcLocation::EndUser(user);
 
-                if self.is_not_elder() {
+                if self.is_not_elder().await {
                     trace!("Redirecting from adult to section elders");
-                    cmds.push(self.ae_redirect(sender, &src_location, &wire_msg)?);
+                    cmds.push(self.ae_redirect(sender, &src_location, &wire_msg).await?);
                     return Ok(cmds);
                 }
 
@@ -252,6 +255,10 @@ impl Core {
         {
             Ok(false) => match msg {
                 SystemMsg::NodeCmd(_)
+                | SystemMsg::AntiEntropyProbe(_)
+                | SystemMsg::AntiEntropyRedirect { .. }
+                | SystemMsg::AntiEntropyRetry { .. }
+                | SystemMsg::BackPressure(_)
                 | SystemMsg::JoinResponse(_)
                 | SystemMsg::JoinRequest(_)
                 | SystemMsg::JoinAsRelocatedRequest(_)
@@ -286,7 +293,7 @@ impl Core {
             },
             Err(Error::InvalidSignatureShare) => {
                 warn!(
-                    "Invalid signature on received system message, dropping the message: {}",
+                    "Invalid signature on received system message, dropping the message: {:?}",
                     msg_id
                 );
                 Ok(vec![])
@@ -304,41 +311,8 @@ impl Core {
         msg_authority: NodeMsgAuthority,
         node_msg: SystemMsg,
     ) -> Result<Vec<Command>> {
-        let src_name = msg_authority.name();
-
         trace!("Handling blocking system message");
         match node_msg {
-            SystemMsg::AntiEntropyRetry {
-                section_auth,
-                section_signed,
-                proof_chain,
-                bounced_msg,
-            } => {
-                trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
-                self.handle_anti_entropy_retry_msg(
-                    section_auth,
-                    section_signed,
-                    proof_chain,
-                    bounced_msg,
-                    sender,
-                    src_name,
-                )
-                .await
-            }
-            SystemMsg::AntiEntropyRedirect {
-                section_auth,
-                section_signed,
-                bounced_msg,
-            } => {
-                trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
-                self.handle_anti_entropy_redirect_msg(
-                    section_auth,
-                    section_signed,
-                    bounced_msg,
-                    sender,
-                )
-                .await
-            }
             SystemMsg::AntiEntropyUpdate {
                 section_auth,
                 section_signed,
@@ -354,16 +328,6 @@ impl Core {
                     sender,
                 )
                 .await
-            }
-            SystemMsg::AntiEntropyProbe(_dst) => {
-                trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                Ok(vec![])
-            }
-            SystemMsg::BackPressure(load_report) => {
-                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
-                // #TODO: Factor in med/long term backpressure into general node liveness calculations
-                self.comm.regulate(sender, load_report).await;
-                Ok(vec![])
             }
             SystemMsg::Relocate(ref details) => {
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
@@ -391,7 +355,7 @@ impl Core {
                     sender,
                     msg_id
                 );
-                if self.is_not_elder() {
+                if self.is_not_elder().await {
                     return Ok(vec![]);
                 }
 
@@ -449,6 +413,47 @@ impl Core {
         let src_name = msg_authority.name();
         trace!("Handling non blocking message");
         match node_msg {
+            SystemMsg::AntiEntropyRetry {
+                section_auth,
+                section_signed,
+                proof_chain,
+                bounced_msg,
+            } => {
+                trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
+                self.handle_anti_entropy_retry_msg(
+                    section_auth,
+                    section_signed,
+                    proof_chain,
+                    bounced_msg,
+                    sender,
+                    src_name,
+                )
+                .await
+            }
+            SystemMsg::AntiEntropyRedirect {
+                section_auth,
+                section_signed,
+                bounced_msg,
+            } => {
+                trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
+                self.handle_anti_entropy_redirect_msg(
+                    section_auth,
+                    section_signed,
+                    bounced_msg,
+                    sender,
+                )
+                .await
+            }
+            SystemMsg::AntiEntropyProbe(_dst) => {
+                trace!("Received Probe message from {}: {:?}", sender, msg_id);
+                Ok(vec![])
+            }
+            SystemMsg::BackPressure(load_report) => {
+                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
+                // #TODO: Factor in med/long term backpressure into general node liveness calculations
+                self.comm.regulate(sender, load_report).await;
+                Ok(vec![])
+            }
             SystemMsg::JoinResponse(join_response) => {
                 debug!(
                     "Ignoring unexpected join response message: {:?}",
@@ -467,8 +472,8 @@ impl Core {
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                if self.is_not_elder()
-                    && join_request.section_key == *self.section.chain().last_key()
+                if self.is_not_elder().await
+                    && join_request.section_key == *self.section.chain().await.last_key()
                 {
                     return Ok(vec![]);
                 }
@@ -481,69 +486,17 @@ impl Core {
                 .await
             }
             SystemMsg::Propose {
-                ref content,
-                ref sig_share,
+                proposal,
+                sig_share,
             } => {
-                if self.is_not_elder() {
+                if self.is_not_elder().await {
                     trace!("Dropping Propose msg from {}: {:?}", sender, msg_id);
                     return Ok(vec![]);
                 }
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
-                // Any other proposal than SectionInfo needs to be signed by a known key.
-                if let Proposal::SectionInfo(ref section_auth) = content {
-                    if section_auth.prefix == *self.section.prefix()
-                        || section_auth.prefix.is_extension_of(self.section.prefix())
-                    {
-                        // This `SectionInfo` is proposed by the DKG participants and
-                        // it's signed by the new key created by the DKG so we don't
-                        // know it yet. We only require the src_name of the
-                        // proposal to be one of the DKG participants.
-                        if !section_auth.contains_elder(&src_name) {
-                            trace!(
-                                "Ignoring proposal from src not being a DKG participant: {:?}",
-                                content
-                            );
-                            return Ok(vec![]);
-                        }
-                    }
-                } else {
-                    // Proposal from other section shall be ignored.
-                    if !self.section.prefix().matches(&src_name) {
-                        trace!(
-                            "Ignore proposal from other section, src_name {:?}: {:?}",
-                            src_name,
-                            msg_id
-                        );
-                        return Ok(vec![]);
-                    }
-
-                    // TODO: should be able to remove the sig_share from the Propose msg
-                    // therefore we won't need to do this check as the sig_share can
-                    // be carried within the msg_kind header.
-                    if !self
-                        .section
-                        .chain()
-                        .has_key(&sig_share.public_key_set.public_key())
-                    {
-                        warn!(
-                            "Dropped Propose msg with untrusted sig share from {:?}: {:?}",
-                            sender, msg_id
-                        );
-                        return Ok(vec![]);
-                    }
-                }
-
-                let mut commands = vec![];
-
-                commands.extend(self.check_lagging((src_name, sender), sig_share)?);
-
-                commands.extend(
-                    self.handle_proposal(content.clone(), sig_share.clone())
-                        .await?,
-                );
-
-                Ok(commands)
+                self.handle_proposal(msg_id, proposal, sig_share, src_name, sender)
+                    .await
             }
             SystemMsg::DkgStart {
                 session_id,
@@ -593,7 +546,7 @@ impl Core {
                             msg_id
                         );
 
-                        return if self.is_elder() {
+                        return if self.is_elder().await {
                             self.republish_chunk(chunk).await
                         } else {
                             // We are an adult here, so just store away!
@@ -709,7 +662,7 @@ impl Core {
 
             let dst = DstLocation::Section {
                 name: node_xorname,
-                section_pk: self.section.section_auth.value.section_key(),
+                section_pk: self.section.section_auth.read().await.value.section_key(),
             };
 
             cmds.push(Command::PrepareNodeMsgToSend { msg, dst });
@@ -719,7 +672,7 @@ impl Core {
 
     // Locate ideal chunk holders for this chunk, line up wiremsgs for those to instruct them to store the chunk
     async fn republish_chunk(&self, chunk: Chunk) -> Result<Vec<Command>> {
-        if self.is_elder() {
+        if self.is_elder().await {
             let target_holders = self.get_chunk_holder_adults(chunk.name()).await;
             info!(
                 "Republishing chunk {:?} to holders {:?}",
@@ -752,7 +705,7 @@ impl Core {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         // let name = network.our_name().await;
-        let section_pk = *self.section_chain().last_key();
+        let section_pk = *self.section_chain().await.last_key();
 
         let dummy_dst_location = DstLocation::Node {
             name: our_name,
@@ -781,7 +734,7 @@ impl Core {
         for target in targets {
             debug!("sending {:?} to {:?}", wire_msg, target);
             let mut wire_msg = wire_msg.clone();
-            let dst_section_pk = self.section_key_by_name(&target);
+            let dst_section_pk = self.section_key_by_name(&target).await;
             wire_msg.set_dst_section_pk(dst_section_pk);
             wire_msg.set_dst_xorname(target);
 

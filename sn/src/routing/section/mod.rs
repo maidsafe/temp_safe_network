@@ -29,10 +29,11 @@ use crate::routing::{
 pub(crate) use node_state::NodeStateUtils;
 pub(crate) use section_authority_provider::ElderCandidatesUtils;
 use section_authority_provider::SectionAuthorityProviderUtils;
-pub(super) use section_peers::SectionPeersUtils;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
+use std::sync::Arc;
 use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr};
+use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
 impl Section {
@@ -71,7 +72,7 @@ impl Section {
         // Check if SAP's section key matches SAP signature's key
         if section_auth.sig.public_key != section_auth.value.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
-                "section key doesn't match signature's key: {:?}",
+                "section key doesn't match signature'ssss key: {:?}",
                 section_auth.value
             )));
         }
@@ -87,14 +88,14 @@ impl Section {
 
         Ok(Self {
             genesis_key,
-            chain,
-            section_auth,
-            members: SectionPeers::default(),
+            chain: Arc::new(RwLock::new(chain)),
+            section_auth: Arc::new(RwLock::new(section_auth)),
+            section_peers: SectionPeers::default(),
         })
     }
 
     /// Creates `Section` for the first node in the network
-    pub(super) fn first_node(peer: Peer) -> Result<(Section, SectionKeyShare)> {
+    pub(super) async fn first_node(peer: Peer) -> Result<(Section, SectionKeyShare)> {
         let secret_key_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
         let public_key_set = secret_key_set.public_keys();
         let secret_key_share = secret_key_set.secret_key_share(0);
@@ -102,16 +103,16 @@ impl Section {
         let section_auth =
             create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
 
-        let mut section = Section::new(
+        let section = Section::new(
             section_auth.sig.public_key,
             SecuredLinkedList::new(section_auth.sig.public_key),
             section_auth,
         )?;
 
-        for peer in section.section_auth.value.peers() {
+        for peer in section.section_auth.read().await.value.peers() {
             let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
-            let _ = section.members.update(SectionAuth {
+            let _changed = section.section_peers.update(SectionAuth {
                 value: node_state,
                 sig,
             });
@@ -131,45 +132,46 @@ impl Section {
     }
 
     /// Try to merge this `Section` members with `other`. .
-    pub(super) fn merge_members(&mut self, members: Option<SectionPeers>) -> Result<()> {
-        if let Some(members) = members {
-            for info in members {
-                let _ = self.update_member(info);
+    pub(super) async fn merge_members(&self, members: Option<SectionPeers>) -> Result<()> {
+        if let Some(peers) = members {
+            for refmulti in peers.members.iter() {
+                let info = refmulti.value().clone();
+                let _changed = self.update_member(info).await;
             }
         }
 
-        self.members
-            .prune_not_matching(&self.section_auth.value.prefix());
+        self.section_peers
+            .retain(&self.section_auth.read().await.value.prefix());
 
         Ok(())
     }
     /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or
     /// its chain is not compatible with the chain of `self`.
-    pub(super) fn merge_chain(
-        &mut self,
+    pub(super) async fn merge_chain(
+        &self,
         other: &SectionAuth<SectionAuthorityProvider>,
         proof_chain: SecuredLinkedList,
     ) -> Result<()> {
         // We've been AE validated here.
-        self.chain.merge(proof_chain)?;
+        self.chain.write().await.merge(proof_chain)?;
 
-        if &other.sig.public_key == self.chain.last_key() {
-            self.section_auth = other.clone();
+        if &other.sig.public_key == self.chain.read().await.last_key() {
+            *self.section_auth.write().await = other.clone();
         }
         Ok(())
     }
 
     /// Update the `SectionAuthorityProvider` of our section.
-    pub(super) fn update_elders(
-        &mut self,
+    pub(super) async fn update_elders(
+        &self,
         new_section_auth: SectionAuth<SectionAuthorityProvider>,
         new_key_sig: KeyedSig,
     ) -> bool {
-        if new_section_auth.value.prefix() != *self.prefix()
+        if new_section_auth.value.prefix() != self.prefix().await
             && !new_section_auth
                 .value
                 .prefix()
-                .is_extension_of(self.prefix())
+                .is_extension_of(&self.prefix().await)
         {
             return false;
         }
@@ -179,7 +181,7 @@ impl Section {
         }
 
         // TODO: dont chain insert here
-        if let Err(error) = self.chain.insert(
+        if let Err(error) = self.chain.write().await.insert(
             &new_key_sig.public_key,
             new_section_auth.sig.public_key,
             new_key_sig.signature,
@@ -191,66 +193,69 @@ impl Section {
             return false;
         }
 
-        if &new_section_auth.sig.public_key == self.chain.last_key() {
-            self.section_auth = new_section_auth;
+        if &new_section_auth.sig.public_key == self.chain.read().await.last_key() {
+            *self.section_auth.write().await = new_section_auth;
         }
 
-        self.members
-            .prune_not_matching(&self.section_auth.value.prefix());
+        self.section_peers
+            .retain(&self.section_auth.read().await.value.prefix());
 
         true
     }
 
     /// Update the member. Returns whether it actually changed anything.
-    pub(super) fn update_member(&mut self, node_state: SectionAuth<NodeState>) -> bool {
-        if !node_state.verify(&self.chain) {
+    pub(super) async fn update_member(&self, node_state: SectionAuth<NodeState>) -> bool {
+        if !node_state.verify(&*self.chain.read().await) {
             error!("can't merge member {:?}", node_state.value);
             return false;
         }
 
-        self.members.update(node_state)
+        self.section_peers.update(node_state)
     }
 
-    pub(super) fn chain(&self) -> &SecuredLinkedList {
-        &self.chain
+    pub(super) async fn chain(&self) -> SecuredLinkedList {
+        self.chain.read().await.clone()
     }
 
-    pub(super) fn authority_provider(&self) -> &SectionAuthorityProvider {
-        &self.section_auth.value
+    pub(super) async fn authority_provider(&self) -> SectionAuthorityProvider {
+        self.section_auth.read().await.value.clone()
     }
 
-    pub(super) fn section_signed_authority_provider(
+    pub(super) async fn section_signed_authority_provider(
         &self,
-    ) -> &SectionAuth<SectionAuthorityProvider> {
-        &self.section_auth
+    ) -> SectionAuth<SectionAuthorityProvider> {
+        let auth = self.section_auth.read().await.clone();
+        auth
     }
 
-    pub(super) fn is_elder(&self, name: &XorName) -> bool {
-        self.authority_provider().contains_elder(name)
+    pub(super) async fn is_elder(&self, name: &XorName) -> bool {
+        self.authority_provider().await.contains_elder(name)
     }
 
     /// Generate a new section info(s) based on the current set of members,
     /// excluding any member matching a name in the provided `excluded_names` set.
     /// Returns a set of candidate SectionAuthorityProviders.
-    pub(super) fn promote_and_demote_elders(
+    pub(super) async fn promote_and_demote_elders(
         &self,
         our_name: &XorName,
         excluded_names: &BTreeSet<XorName>,
     ) -> Vec<ElderCandidates> {
         if let Some((our_elder_candidates, other_elder_candidates)) =
-            self.try_split(our_name, excluded_names)
+            self.try_split(our_name, excluded_names).await
         {
             return vec![our_elder_candidates, other_elder_candidates];
         }
 
         // Candidates for elders out of all the nodes in the section, even out of the
         // relocating nodes if there would not be enough instead.
-        let expected_peers =
-            self.members
-                .elder_candidates(ELDER_SIZE, self.authority_provider(), excluded_names);
+        let expected_peers = self.section_peers.elder_candidates(
+            ELDER_SIZE,
+            &self.authority_provider().await,
+            excluded_names,
+        );
 
         let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).cloned().collect();
-        let current_names: BTreeSet<_> = self.authority_provider().names();
+        let current_names: BTreeSet<_> = self.authority_provider().await.names();
 
         if expected_names == current_names {
             vec![]
@@ -259,68 +264,75 @@ impl Section {
             vec![]
         } else {
             let elder_candidates =
-                ElderCandidates::new(expected_peers, self.authority_provider().prefix());
+                ElderCandidates::new(expected_peers, self.authority_provider().await.prefix());
             vec![elder_candidates]
         }
     }
 
     // Prefix of our section.
-    pub(super) fn prefix(&self) -> &Prefix {
-        &self.authority_provider().prefix
+    pub(super) async fn prefix(&self) -> Prefix {
+        self.authority_provider().await.prefix
     }
 
     pub(super) fn members(&self) -> &SectionPeers {
-        &self.members
+        &self.section_peers
     }
 
     /// Returns members that are either joined or are left but still elders.
-    pub(super) fn active_members(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
-        Box::new(
-            self.members
-                .all()
-                .filter(move |info| {
-                    self.members.is_joined(info.peer.name()) || self.is_elder(info.peer.name())
-                })
-                .map(|info| &info.peer),
-        )
+    pub(super) async fn active_members(&self) -> Vec<Peer> {
+        let mut active_members = vec![];
+        let nodes = self.section_peers.all_members();
+        for peer in nodes {
+            if self.section_peers.is_joined(peer.name()) || self.is_elder(peer.name()).await {
+                active_members.push(peer);
+            }
+        }
+
+        active_members
     }
 
     /// Returns adults from our section.
-    pub(super) fn adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
-        Box::new(
-            self.members
-                .mature()
-                .filter(move |peer| !self.is_elder(peer.name())),
-        )
+    pub(super) async fn adults(&self) -> Vec<Peer> {
+        let mut adults = vec![];
+        let nodes = self.section_peers.mature();
+        for peer in nodes {
+            if !self.is_elder(peer.name()).await {
+                adults.push(peer);
+            }
+        }
+
+        adults
     }
 
     /// Returns live adults from our section.
-    pub(super) fn live_adults(&self) -> Box<dyn Iterator<Item = &Peer> + '_> {
-        Box::new(self.members.joined().filter_map(move |info| {
-            if !self.is_elder(info.peer.name()) {
-                Some(&info.peer)
-            } else {
-                None
+    pub(super) async fn live_adults(&self) -> Vec<Peer> {
+        let mut live_adults = vec![];
+
+        for node_state in self.section_peers.joined() {
+            if !self.is_elder(node_state.peer.name()).await {
+                live_adults.push(node_state.peer)
             }
-        }))
+        }
+        live_adults
     }
 
-    pub(super) fn find_joined_member_by_addr(&self, addr: &SocketAddr) -> Option<&Peer> {
-        self.members
+    pub(super) fn find_joined_member_by_addr(&self, addr: &SocketAddr) -> Option<Peer> {
+        self.section_peers
             .joined()
+            .into_iter()
             .find(|info| info.peer.addr() == addr)
-            .map(|info| &info.peer)
+            .map(|info| info.peer)
     }
 
     // Tries to split our section.
     // If we have enough mature nodes for both subsections, returns the SectionAuthorityProviders
     // of the two subsections. Otherwise returns `None`.
-    pub(super) fn try_split(
+    pub(super) async fn try_split(
         &self,
         our_name: &XorName,
         excluded_names: &BTreeSet<XorName>,
     ) -> Option<(ElderCandidates, ElderCandidates)> {
-        let next_bit_index = if let Ok(index) = self.prefix().bit_count().try_into() {
+        let next_bit_index = if let Ok(index) = self.prefix().await.bit_count().try_into() {
             index
         } else {
             // Already at the longest prefix, can't split further.
@@ -330,8 +342,9 @@ impl Section {
         let next_bit = our_name.bit(next_bit_index);
 
         let (our_new_size, sibling_new_size) = self
-            .members
+            .section_peers
             .mature()
+            .iter()
             .filter(|peer| !excluded_names.contains(peer.name()))
             .map(|peer| peer.name().bit(next_bit_index) == next_bit)
             .fold((0, 0), |(ours, siblings), is_our_prefix| {
@@ -347,19 +360,19 @@ impl Section {
             return None;
         }
 
-        let our_prefix = self.prefix().pushed(next_bit);
-        let other_prefix = self.prefix().pushed(!next_bit);
+        let our_prefix = self.prefix().await.pushed(next_bit);
+        let other_prefix = self.prefix().await.pushed(!next_bit);
 
-        let our_elders = self.members.elder_candidates_matching_prefix(
+        let our_elders = self.section_peers.elder_candidates_matching_prefix(
             &our_prefix,
             ELDER_SIZE,
-            self.authority_provider(),
+            &self.authority_provider().await,
             excluded_names,
         );
-        let other_elders = self.members.elder_candidates_matching_prefix(
+        let other_elders = self.section_peers.elder_candidates_matching_prefix(
             &other_prefix,
             ELDER_SIZE,
-            self.authority_provider(),
+            &self.authority_provider().await,
             excluded_names,
         );
 

@@ -7,8 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+mod handlers;
+
 use super::{
-    files::{FileItem, FileMeta, FilesMap, RealPath},
+    files::{FileInfo, FilesMap},
     multimap::MultimapKeyValues,
     nrs::NrsMap,
     register::{Entry, EntryHash},
@@ -16,17 +18,18 @@ use super::{
 };
 pub use super::{ContentType, DataType, Scope, Url, VersionHash, XorUrlBase};
 use crate::{Error, Result};
+use async_recursion::async_recursion;
 use bytes::Bytes;
 use log::{debug, info};
-use safe_network::types::BytesAddress;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, path::Path};
+use std::collections::BTreeSet;
 
 pub type Range = Option<(Option<u64>, Option<u64>)>;
 
 // Maximum number of indirections allowed when resolving a safe:// URL following links
-const INDIRECTION_LIMIT: u8 = 10;
+const INDIRECTION_LIMIT: usize = 10;
 
+/// SafeData contains the data types fetchable using the Safe Network resolver
 #[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub enum SafeData {
     SafeKey {
@@ -41,6 +44,8 @@ pub enum SafeData {
         version: VersionHash,
         files_map: FilesMap,
         data_type: DataType,
+        metadata: Option<FileInfo>,
+        resolves_into: Option<Url>,
         resolved_from: String,
     },
     PublicBlob {
@@ -48,7 +53,7 @@ pub enum SafeData {
         xorname: XorName,
         data: Bytes,
         media_type: Option<String>,
-        metadata: Option<FileItem>,
+        metadata: Option<FileInfo>,
         resolved_from: String,
     },
     NrsMapContainer {
@@ -57,8 +62,9 @@ pub enum SafeData {
         xorname: XorName,
         type_tag: u64,
         version: VersionHash,
-        nrs_map: NrsMap,
+        nrs_map: Option<NrsMap>,
         data_type: DataType,
+        resolves_into: Option<Url>,
         resolved_from: String,
     },
     Multimap {
@@ -82,6 +88,7 @@ pub enum SafeData {
         data: BTreeSet<(EntryHash, Entry)>,
         resolved_from: String,
     },
+    // TODO? Suggestion: Error type for easy error tracking in a resolution chain?
 }
 
 impl SafeData {
@@ -110,9 +117,65 @@ impl SafeData {
             | PrivateRegister { resolved_from, .. } => resolved_from.clone(),
         }
     }
+
+    pub fn resolves_into(&self) -> Option<Url> {
+        use SafeData::*;
+        match self {
+            SafeKey { .. }
+            | PublicBlob { .. }
+            | Multimap { .. }
+            | PublicRegister { .. }
+            | PrivateRegister { .. } => None,
+            FilesContainer { resolves_into, .. } | NrsMapContainer { resolves_into, .. } => {
+                resolves_into.clone()
+            }
+        }
+    }
+
+    pub fn metadata(&self) -> Option<FileInfo> {
+        use SafeData::*;
+        match self {
+            SafeKey { .. }
+            | Multimap { .. }
+            | PublicRegister { .. }
+            | PrivateRegister { .. }
+            | NrsMapContainer { .. } => None,
+            FilesContainer { metadata, .. } | PublicBlob { metadata, .. } => metadata.clone(),
+        }
+    }
 }
 
 impl Safe {
+    /// Parses a string URL "safe://url" and returns a safe URL
+    /// Recursively resolves until it reaches the final URL
+    pub async fn parse_and_resolve_url(&self, url: &str) -> Result<Url> {
+        let safe_url = Safe::parse_url(url)?;
+        let orig_path = safe_url.path_decoded()?;
+
+        // Obtain the resolution chain without resolving the URL's path
+        let mut resolution_chain = self
+            .recursive_resolve_url(
+                safe_url,
+                None,
+                false,
+                None,
+                false, // don't resolve the URL's path
+                INDIRECTION_LIMIT,
+            )
+            .await?;
+
+        // The resolved content is the last item in the resolution chain we obtained
+        let safe_data = resolution_chain
+            .pop()
+            .ok_or_else(|| Error::ContentNotFound(format!("Failed to resolve {}", url)))?;
+
+        // Set the original path so we return the Url with it
+        let mut new_safe_url = Url::from_url(&safe_data.xorurl())?;
+        new_safe_url.set_path(&orig_path);
+
+        Ok(new_safe_url)
+    }
+
     /// # Retrieve data from a safe:// URL
     ///
     /// ## Examples
@@ -145,8 +208,13 @@ impl Safe {
     /// # });
     /// ```
     pub async fn fetch(&self, url: &str, range: Range) -> Result<SafeData> {
-        let mut resolution_chain = self.retrieve_from_url(url, true, range, true).await?;
-        // Construct return data using the last and first items from the resolution chain
+        let safe_url = Safe::parse_url(url)?;
+        info!("URL parsed successfully, fetching: {}", url);
+
+        let mut resolution_chain = self
+            .recursive_resolve_url(safe_url, None, true, range, true, INDIRECTION_LIMIT)
+            .await?;
+
         resolution_chain
             .pop()
             .ok_or_else(|| Error::ContentNotFound(format!("Failed to resolve {}", url)))
@@ -194,360 +262,133 @@ impl Safe {
     /// # });
     /// ```
     pub async fn inspect(&mut self, url: &str) -> Result<Vec<SafeData>> {
-        self.retrieve_from_url(url, false, None, true).await
+        let safe_url = Safe::parse_url(url)?;
+        info!("URL parsed successfully, inspecting: {}", url);
+        self.recursive_resolve_url(safe_url, None, false, None, true, INDIRECTION_LIMIT)
+            .await
     }
 
     // Retrieves all pieces of data that resulted from resolving the given URL.
-    // An optional 'while_is' argment can be set as a filter to stop reslution process
-    // upon the first non-matching content type.
-    pub(crate) async fn retrieve_from_url(
+    // Keeping a copy of the intermediary steps when indirections occur
+    // Recursively resolves the given URL until
+    // - it reaches the final piece of data
+    // - or reaches the indirection limit
+    // Returns a Vector with the data for all steps
+    //
+    // NB: When resolving a Blob, metadata can be attached to it (attached_metadata)
+    // Blobs don't have metadata on SAFE but the FileContainers linking to them have it
+    // attached_metadata is used to attach metadata to Blobs linked by their FilesContainers
+    // URL -> FileContainer (has metadata..) -> Actual File in a Blob (..that we attach here)
+    // devs can leave a None there when using this function
+    //
+    // NB: recursive (resolutions that resolve to themselves) aren't managed but since the
+    // indirections are limited, it's probably not worth the overhead check.
+    // Will need it if we allow infinite indirections though.
+    #[async_recursion]
+    async fn recursive_resolve_url(
         &self,
-        url: &str,
+        input_url: Url,
+        attached_metadata: Option<FileInfo>,
         retrieve_data: bool,
         range: Range,
         resolve_path: bool,
+        indirections_limit: usize,
     ) -> Result<Vec<SafeData>> {
-        let current_safe_url = Safe::parse_url(url)?;
-        info!("URL parsed successfully, fetching: {}", current_safe_url);
         debug!(
-            "Fetching content of type: {:?}, data type: {:?}",
-            current_safe_url.content_type(),
-            current_safe_url.data_type()
+            "Fetching URL: {} with content of type: {:?}, data type: {:?}",
+            input_url.to_string(),
+            input_url.content_type(),
+            input_url.data_type()
         );
 
-        // Let's create a list keeping track each of the resolution hops we go through
-        // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
-        let mut resolution_chain = Vec::<SafeData>::default();
-        let mut next_to_resolve = Some((current_safe_url, None));
-        let mut indirections_count = 0;
-        while let Some((next_safe_url, metadata)) = next_to_resolve {
-            if indirections_count == INDIRECTION_LIMIT {
-                return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
-            }
+        // fetch safe_data from URL
+        let safe_data = self
+            .resolve_url(
+                input_url,
+                attached_metadata,
+                retrieve_data,
+                range,
+                resolve_path,
+            )
+            .await?;
+        let next_step = safe_data.resolves_into();
 
-            let (step, next) = self
-                .resolve_one_indirection(
-                    next_safe_url,
-                    metadata,
-                    retrieve_data,
-                    range,
-                    resolve_path,
-                )
-                .await?;
-
-            resolution_chain.push(step);
-            next_to_resolve = next;
-            indirections_count += 1;
+        // stop cases
+        let next_url;
+        match next_step {
+            None => return Ok(vec![safe_data]),
+            Some(url) => next_url = url,
+        }
+        if indirections_limit == 0 {
+            return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
         }
 
-        Ok(resolution_chain)
+        // fetch next (and attach current metadata to it)
+        let next_safe_data = self
+            .recursive_resolve_url(
+                next_url,
+                safe_data.metadata(),
+                retrieve_data,
+                range,
+                resolve_path,
+                indirections_limit - 1,
+            )
+            .await?;
+
+        let mut safe_data_vec = vec![safe_data];
+        safe_data_vec.extend(next_safe_data);
+        Ok(safe_data_vec)
     }
 
-    async fn resolve_one_indirection(
+    // Private helper that resolves an URL to some data, but not recursively
+    // it stops at the first resolution
+    async fn resolve_url(
         &self,
-        mut the_xor: Url,
-        metadata: Option<FileItem>,
-        retrieve_data: bool,
+        input_url: Url,
+        attached_metadata: Option<FileInfo>,
+        fetch_mode: bool,
         range: Range,
         resolve_path: bool,
-    ) -> Result<(SafeData, Option<NextStepInfo>)> {
-        let url = the_xor.to_string();
-        let xorurl = the_xor.to_xorurl_string();
-        debug!("Going into a new step in the URL resolution for {}, content type: {:?}, data type: {:?}", xorurl, the_xor.content_type(), the_xor.data_type());
-        match the_xor.content_type() {
+    ) -> Result<SafeData> {
+        debug!(
+            "Resolving URL: {}, of content type: {:?}, and data type: {:?}",
+            input_url.to_xorurl_string(),
+            input_url.content_type(),
+            input_url.data_type()
+        );
+        match input_url.content_type() {
             ContentType::FilesContainer => {
-                if !the_xor.sub_names_vec().is_empty() {
-                    let msg = format!(
-                        "Cannot resolve FilesContainer URL as it contains subnames: {}",
-                        xorurl
-                    );
-                    debug!("{}", msg);
-                    return Err(Error::InvalidXorUrl(msg));
-                }
-
-                let (version, files_map) = self.fetch_files_container(&the_xor).await?;
-                debug!(
-                    "Files container found with v:{}, on data type: {}, containing: {:?}",
-                    version,
-                    the_xor.data_type(),
-                    files_map
-                );
-
-                let path = the_xor.path_decoded()?;
-                let (files_map, next) = if resolve_path && path != "/" && !path.is_empty() {
-                    // TODO: Move this logic (path resolver) to the FilesMap struct
-                    let realpath = files_map.realpath(&path)?;
-                    match &files_map.get(&realpath) {
-                        Some(file_item) => match file_item.get("type") {
-                            Some(file_type) => {
-                                if FileMeta::filetype_is_file(file_type) {
-                                    match file_item.get("link") {
-                                        Some(link) => {
-                                            let new_target_xorurl = Url::from_url(link)?;
-                                            let mut metadata = (*file_item).clone();
-                                            Path::new(&path).file_name().map(|name| {
-                                                name.to_str().map(|str| {
-                                                    metadata
-                                                        .insert("name".to_string(), str.to_string())
-                                                })
-                                            });
-                                            (files_map, Some((new_target_xorurl, Some(metadata))))
-                                        }
-                                        None => {
-                                            let msg = format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl);
-                                            return Err(Error::ContentError(msg));
-                                        }
-                                    }
-                                } else if FileMeta::filetype_is_symlink(file_type) {
-                                    let msg = format!(
-                                        "symlink should not be present in resolved real path. {}",
-                                        realpath
-                                    );
-                                    return Err(Error::ContentError(msg));
-                                } else {
-                                    // Must be a directory.
-                                    (gen_filtered_filesmap(&realpath, &files_map, &xorurl)?, None)
-                                }
-                            }
-                            None => {
-                                let msg = format!("FileItem is corrupt. It is missing a \"type\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl);
-                                return Err(Error::ContentError(msg));
-                            }
-                        },
-                        None => (gen_filtered_filesmap(&realpath, &files_map, &xorurl)?, None),
-                    }
-                } else {
-                    (files_map, None)
-                };
-
-                // We don't want the path just the FilesContainer XOR-URL and version
-                the_xor.set_path("");
-                let safe_data = SafeData::FilesContainer {
-                    xorurl: the_xor.to_xorurl_string(),
-                    xorname: the_xor.xorname(),
-                    type_tag: the_xor.type_tag(),
-                    version,
-                    files_map,
-                    data_type: the_xor.data_type(),
-                    resolved_from: url,
-                };
-
-                Ok((safe_data, next))
+                self.resolve_file_container(input_url, resolve_path).await
             }
             ContentType::NrsMapContainer => {
-                let (version, nrs_map) = self
-                    .nrs_map_container_get(&xorurl)
-                    .await
-                    .map_err(|_| Error::ContentNotFound(format!("Content not found at {}", url)))?;
-
-                debug!(
-                    "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
-                    version,
-                    the_xor.data_type(),
-                    nrs_map
-                );
-
-                let target_url = nrs_map.resolve_for_subnames(the_xor.sub_names_vec())?;
-                debug!("Resolved target: {}", target_url);
-
-                let mut target_safe_url = Safe::parse_url(&target_url)?;
-                // Let's concatenate the path corresponding to the URL we are processing
-                // to the URL we resolved from NRS Map
-                let url_path = the_xor.path_decoded()?;
-                if target_safe_url.path().is_empty() {
-                    target_safe_url.set_path(&url_path);
-                } else if !the_xor.path().is_empty() {
-                    target_safe_url.set_path(&format!(
-                        "{}{}",
-                        target_safe_url.path_decoded()?,
-                        url_path
-                    ));
-                }
-
-                debug!("Resolving target from resolvable map: {}", target_safe_url);
-
-                // We don't want the path or subnames, just the FilesContainer XOR-URL and version
-                the_xor.set_path("");
-                the_xor.set_sub_names("")?;
-                let nrs_map_container = SafeData::NrsMapContainer {
-                    public_name: if the_xor.is_xorurl() {
-                        None
-                    } else {
-                        Some(the_xor.top_name().to_string())
-                    },
-                    xorurl: the_xor.to_xorurl_string(),
-                    xorname: the_xor.xorname(),
-                    type_tag: the_xor.type_tag(),
-                    version,
-                    nrs_map,
-                    data_type: the_xor.data_type(),
-                    resolved_from: url,
-                };
-
-                Ok((nrs_map_container, Some((target_safe_url, None))))
+                self.resolve_nrs_map_container(input_url, !fetch_mode).await
             }
-            ContentType::Multimap => {
-                let data = if retrieve_data {
-                    // TODO: pass the hash of the URL to grab a single element
-                    self.fetch_multimap_values(&the_xor).await?
-                } else {
-                    MultimapKeyValues::new()
-                };
-
-                let safe_data = SafeData::Multimap {
-                    xorurl,
-                    xorname: the_xor.xorname(),
-                    type_tag: the_xor.type_tag(),
-                    data,
-                    resolved_from: url.to_string(),
-                };
-
-                Ok((safe_data, None))
-            }
+            ContentType::Multimap => self.resolve_multimap(input_url, fetch_mode).await,
             ContentType::Raw => {
-                if !the_xor.sub_names_vec().is_empty() {
-                    let msg = format!(
-                        "Cannot resolve URL targetting raw content as it contains subnames: {}",
-                        xorurl
-                    );
-                    debug!("{}", msg);
-                    return Err(Error::InvalidXorUrl(msg));
-                }
-
-                match the_xor.data_type() {
-                    DataType::SafeKey => {
-                        let safe_data = SafeData::SafeKey {
-                            xorurl,
-                            xorname: the_xor.xorname(),
-                            resolved_from: url,
-                        };
-                        Ok((safe_data, None))
-                    }
-                    DataType::Bytes => {
-                        self.retrieve_data(&the_xor, retrieve_data, None, &metadata, range)
-                            .await
-                    }
-                    DataType::Register => {
-                        let data = if retrieve_data {
-                            // TODO: use the content hash in the URL to grab a single element if it exists
-                            self.fetch_register_entries(&the_xor).await?
-                        } else {
-                            BTreeSet::new()
-                        };
-
-                        let safe_data = SafeData::PublicRegister {
-                            xorurl,
-                            xorname: the_xor.xorname(),
-                            type_tag: the_xor.type_tag(),
-                            data,
-                            resolved_from: url.to_string(),
-                        };
-
-                        Ok((safe_data, None))
-                    }
-                }
+                self.resolve_raw(input_url, attached_metadata, fetch_mode, range)
+                    .await
             }
             ContentType::MediaType(media_type_str) => {
-                if !the_xor.sub_names_vec().is_empty() {
-                    let msg = format!(
-                        "Cannot resolve URL targetting raw content as it contains subnames: {}",
-                        xorurl
-                    );
-                    debug!("{}", msg);
-                    return Err(Error::InvalidXorUrl(msg));
-                }
-
-                match the_xor.data_type() {
-                    DataType::Bytes => {
-                        self.retrieve_data(
-                            &the_xor,
-                            retrieve_data,
-                            Some(media_type_str),
-                            &metadata,
-                            range,
-                        )
-                        .await
-                    }
-                    other => Err(Error::ContentError(format!(
-                        "Data type '{:?}' not supported yet",
-                        other
-                    ))),
-                }
+                self.resolve_mediatype(
+                    input_url,
+                    attached_metadata,
+                    fetch_mode,
+                    range,
+                    media_type_str,
+                )
+                .await
             }
             ContentType::Wallet { .. } => Err(Error::EmptyContent(
                 "Temporarily disabled feature".to_string(),
             )),
         }
     }
-
-    async fn retrieve_data(
-        &self,
-        the_xor: &Url,
-        retrieve_data: bool,
-        media_type: Option<String>,
-        metadata: &Option<FileItem>,
-        range: Range,
-    ) -> Result<(SafeData, Option<NextStepInfo>)> {
-        if !the_xor.path().is_empty() {
-            return Err(Error::ContentError(format!(
-                "Cannot get relative path of Immutable Data {:?}",
-                the_xor.path_decoded()?
-            )));
-        };
-
-        let data = if retrieve_data {
-            self.safe_client
-                .get_bytes(BytesAddress::Public(the_xor.xorname()), range)
-                .await?
-        } else {
-            Bytes::new()
-        };
-
-        let safe_data = SafeData::PublicBlob {
-            xorurl: the_xor.to_xorurl_string(),
-            xorname: the_xor.xorname(),
-            data,
-            media_type,
-            metadata: metadata.clone(),
-            resolved_from: the_xor.to_string(),
-        };
-
-        Ok((safe_data, None))
-    }
 }
-
-fn gen_filtered_filesmap(urlpath: &str, files_map: &FilesMap, xorurl: &str) -> Result<FilesMap> {
-    let mut filtered_filesmap = FilesMap::default();
-    let folder_path = if !urlpath.ends_with('/') {
-        format!("{}/", urlpath)
-    } else {
-        urlpath.to_string()
-    };
-    files_map.iter().for_each(|(filepath, fileitem)| {
-        if filepath.starts_with(&folder_path) {
-            let mut new_path = filepath.clone();
-            new_path.replace_range(..folder_path.len(), "");
-            filtered_filesmap.insert(new_path, fileitem.clone());
-        }
-    });
-
-    if filtered_filesmap.is_empty() {
-        Err(Error::ContentError(format!(
-            "No data found for path \"{}\" on the FilesContainer at \"{}\"",
-            folder_path, xorurl
-        )))
-    } else {
-        Ok(filtered_filesmap)
-    }
-}
-// // This contains information for the next step to be made
-// // in each iteration of the resolution process
-type NextStepInfo = (Url, Option<FileItem>);
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{app::test_helpers::new_safe_instance, retry_loop, Scope, Url};
+    use crate::{app::files, app::test_helpers::new_safe_instance, retry_loop, Scope, Url};
     use anyhow::{anyhow, bail, Context, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use safe_network::types::DataAddress;
@@ -556,26 +397,38 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_files_container() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = safe
+        let (fc_xorurl, _, original_files_map) = safe
             .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
 
-        let safe_url = Url::from_url(&xorurl)?;
-        let content = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let safe_url = Url::from_url(&fc_xorurl)?;
+        let content = retry_loop!(safe.fetch(&fc_xorurl, None));
+        let (version0, _) = retry_loop!(safe.files_container_get(&fc_xorurl));
 
-        assert!(
-            content
-                == SafeData::FilesContainer {
-                    xorurl: xorurl.clone(),
-                    xorname: safe_url.xorname(),
-                    type_tag: 1_100,
-                    version: version0,
-                    files_map,
-                    data_type: DataType::Register,
-                    resolved_from: xorurl.clone(),
-                }
-        );
+        match content.clone() {
+            SafeData::FilesContainer {
+                xorurl,
+                xorname,
+                type_tag,
+                version,
+                files_map,
+                data_type,
+                metadata,
+                resolves_into,
+                resolved_from,
+            } => {
+                assert_eq!(xorurl, fc_xorurl.clone());
+                assert_eq!(xorname, safe_url.xorname());
+                assert_eq!(type_tag, files::FILES_CONTAINER_TYPE_TAG);
+                assert_eq!(version, version0);
+                assert_eq!(files_map, original_files_map);
+                assert_eq!(data_type, DataType::Register);
+                assert!(metadata.is_none()); // no path so no metadata
+                assert!(resolves_into.is_none()); // no path so no next resolution
+                assert_eq!(resolved_from, fc_xorurl.clone());
+            }
+            _ => bail!("Invalid SafeData type! Expected SafeData::FileContainer!"),
+        }
 
         let mut safe_url_with_path = safe_url.clone();
         safe_url_with_path.set_path("/subfolder/subexists.md");
@@ -585,7 +438,7 @@ mod tests {
         assert_eq!(safe_url_with_path.content_type(), safe_url.content_type());
 
         // let's also compare it with the result from inspecting the URL
-        let inspected_content = safe.inspect(&xorurl).await?;
+        let inspected_content = safe.inspect(&fc_xorurl).await?;
         assert_eq!(inspected_content.len(), 1);
         assert_eq!(content, inspected_content[0]);
         Ok(())
@@ -593,24 +446,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_resolvable_container() -> Result<()> {
-        let random_str: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let site_name = format!("subname.{}", random_str);
-
         let mut safe = new_safe_instance().await?;
 
+        // create file container
         let (xorurl, _, the_files_map) = safe
             .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
+        // link to an nrs map
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let (_nrs_map_xorurl, _, _nrs_map) = safe
-            .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
-            .await?;
-
+        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let _nrs_map_url = safe.nrs_create(&site_name, &safe_url, false).await?;
         let nrs_url = format!("safe://{}", site_name);
+
         let content = retry_loop!(safe.fetch(&nrs_url, None));
 
         safe_url.set_sub_names("")?;
@@ -625,7 +476,9 @@ mod tests {
                 version,
                 files_map,
                 data_type,
-                ..
+                metadata,
+                resolves_into,
+                resolved_from,
             } => {
                 assert_eq!(*xorurl, xorurl_without_subname);
                 assert_eq!(*xorname, safe_url.xorname());
@@ -633,56 +486,87 @@ mod tests {
                 assert_eq!(*version, version0);
                 assert_eq!(*data_type, DataType::Register);
                 assert_eq!(*files_map, the_files_map);
-
-                // let's also compare it with the result from inspecting the URL
-                let inspected_content = safe.inspect(&nrs_url).await?;
-                assert_eq!(inspected_content.len(), 2);
-                assert_eq!(content, inspected_content[1]);
-                Ok(())
+                assert!(metadata.is_none());
+                assert!(resolves_into.is_none());
+                assert_eq!(resolved_from, &safe_url.to_string());
             }
-            _ => Err(anyhow!("NRS map container was not returned".to_string(),)),
+            _ => {
+                bail!("FilesContainer was not returned".to_string())
+            }
         }
+
+        // let's also compare it with the result from inspecting the URL
+        let inspected_content = safe.inspect(&nrs_url).await?;
+        assert_eq!(inspected_content.len(), 2);
+        assert_eq!(content, inspected_content[1]);
+
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_fetch_resolvable_map_data() -> Result<()> {
-        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-
         let mut safe = new_safe_instance().await?;
+
+        // create file container
         let (xorurl, _, _the_files_map) = safe
             .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
+        // link to an nrs map
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let files_container_url = safe_url.to_string();
-        let _ = safe
-            .nrs_map_container_create(&site_name, &files_container_url, true, true, false)
+        let files_container_url = safe_url;
+        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let nrs_resolution_url = safe
+            .nrs_create(&site_name, &files_container_url, false)
             .await?;
-
         let nrs_url = format!("safe://{}", site_name);
-        let content = retry_loop!(safe.fetch(&nrs_url, None));
 
         // this should resolve to a FilesContainer
+        let content = retry_loop!(safe.fetch(&nrs_url, None));
         match &content {
             SafeData::FilesContainer {
                 xorurl,
                 resolved_from,
+                resolves_into,
                 ..
             } => {
-                assert_eq!(*resolved_from, files_container_url);
-                assert_eq!(*xorurl, files_container_url);
-
-                // let's also compare it with the result from inspecting the URL
-                let inspected_content = safe.inspect(&nrs_url).await?;
-                assert_eq!(inspected_content.len(), 2);
-                assert_eq!(content, inspected_content[1]);
-                Ok(())
+                assert_eq!(*xorurl, files_container_url.to_string());
+                assert_eq!(*resolved_from, files_container_url.to_string());
+                assert!(resolves_into.is_none());
             }
-            _ => Err(anyhow!("Nrs map container was not returned".to_string(),)),
+            _ => {
+                bail!("FilesContainer was not returned".to_string());
+            }
         }
+
+        // let's also compare it with the result from inspecting the URL
+        let inspected_content = safe.inspect(&nrs_url).await?;
+        assert_eq!(inspected_content.len(), 2);
+        assert_eq!(&content, &inspected_content[1]);
+
+        // check NRS map container step
+        match &inspected_content[0] {
+            SafeData::NrsMapContainer {
+                xorurl,
+                resolved_from,
+                resolves_into,
+                ..
+            } => {
+                let mut unversionned_nrs_res_url = nrs_resolution_url.clone();
+                unversionned_nrs_res_url.set_content_version(None);
+                assert_eq!(*xorurl, unversionned_nrs_res_url.to_xorurl_string());
+                assert_eq!(*resolved_from, unversionned_nrs_res_url.to_string());
+                assert_eq!(*resolves_into, Some(files_container_url));
+            }
+            _ => {
+                bail!("Nrs map container was not returned".to_string());
+            }
+        }
+
+        Ok(())
     }
 
     #[tokio::test]
@@ -761,22 +645,22 @@ mod tests {
     async fn test_fetch_range_from_files_container() -> Result<()> {
         use std::fs::File;
         let mut safe = new_safe_instance().await?;
-        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
+        // create file container
         let (xorurl, _, _files_map) = safe
             .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
+        // map to nrs name
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let (_nrs_map_xorurl, _, _nrs_map) = safe
-            .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
-            .await?;
-
+        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let _ = safe.nrs_create(&site_name, &safe_url, false).await?;
         let nrs_url = format!("safe://{}/test.md", site_name);
 
+        // read a local file content (for comparison)
         let mut file = File::open("./testdata/test.md")
             .context("Failed to open local file: ./testdata/test.md".to_string())?;
         let mut file_data = Vec::new();
@@ -784,7 +668,7 @@ mod tests {
             .context("Failed to read local file: ./testdata/test.md".to_string())?;
         let file_size = file_data.len();
 
-        // Fetch full file and match
+        // fetch full file and compare
         let content = retry_loop!(safe.fetch(&nrs_url, None));
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), file_data.clone());
@@ -792,29 +676,25 @@ mod tests {
             bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
 
-        // Fetch first half and match
-        let fetch_first_half = Some((None, Some(file_size as u64 / 2)));
+        // fetch first half and match
+        let fetch_first_half = Some((Some(0), Some(file_size as u64 / 2)));
         let content = safe.fetch(&nrs_url, fetch_first_half).await?;
-
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), file_data[0..file_size / 2].to_vec());
         } else {
             bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
 
-        // Fetch second half and match
+        // fetch second half and match
         let fetch_second_half = Some((Some(file_size as u64 / 2), Some(file_size as u64)));
         let content = safe.fetch(&nrs_url, fetch_second_half).await?;
-
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), file_data[file_size / 2..file_size].to_vec());
-            Ok(())
         } else {
-            Err(anyhow!(
-                "Content fetched is not a PublicBlob: {:?}",
-                content
-            ))
+            bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
+
+        Ok(())
     }
 
     #[tokio::test]

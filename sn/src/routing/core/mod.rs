@@ -40,27 +40,39 @@ use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
+    log_markers::LogMarker,
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
     section::{SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
+use backoff::ExponentialBackoff;
 use capacity::Capacity;
 use itertools::Itertools;
 use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
 };
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::{mpsc, RwLock};
+use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
+
+const BACKOFF_CACHE_LIMIT: usize = 100;
 const KEY_CACHE_SIZE: u8 = 5;
+
+// store up to 100 in use backoffs
+pub(crate) type AeBackoffCache =
+    Arc<RwLock<LRUCache<(XorName, SocketAddr, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
 
 // State + logic of a routing node.
 pub(crate) struct Core {
@@ -76,7 +88,8 @@ pub(crate) struct Core {
     dkg_voter: DkgVoter,
     relocate_state: Option<RelocateState>,
     pub(super) event_tx: mpsc::Sender<Event>,
-    joins_allowed: bool,
+    joins_allowed: Arc<RwLock<bool>>,
+    is_genesis_node: bool,
     resource_proof: ResourceProof,
     used_space: UsedSpace,
     pub(super) register_storage: RegisterStorage,
@@ -84,10 +97,12 @@ pub(crate) struct Core {
     root_storage_dir: PathBuf,
     capacity: Capacity,
     liveness: Liveness,
+    ae_backoff_cache: AeBackoffCache,
 }
 
 impl Core {
     // Creates `Core` for a regular node.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn new(
         comm: Comm,
         mut node: Node,
@@ -96,6 +111,7 @@ impl Core {
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
+        is_genesis_node: bool,
     ) -> Result<Self> {
         let section_keys_provider =
             SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share).await;
@@ -122,7 +138,8 @@ impl Core {
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
             event_tx,
-            joins_allowed: true,
+            joins_allowed: Arc::new(RwLock::new(true)),
+            is_genesis_node,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage,
             chunk_storage,
@@ -130,6 +147,7 @@ impl Core {
             liveness: adult_liveness,
             root_storage_dir,
             used_space,
+            ae_backoff_cache: AeBackoffCache::default(),
         })
     }
 
@@ -137,21 +155,21 @@ impl Core {
     // Miscellaneous
     ////////////////////////////////////////////////////////////////////////////
 
-    pub(crate) fn state_snapshot(&self) -> StateSnapshot {
+    pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
-            is_elder: self.is_elder(),
-            last_key: *self.section.chain().last_key(),
-            prefix: *self.section.prefix(),
-            elders: self.section().authority_provider().names(),
+            is_elder: self.is_elder().await,
+            last_key: *self.section.chain().await.last_key(),
+            prefix: self.section.prefix().await,
+            elders: self.section().authority_provider().await.names(),
         }
     }
 
-    pub(crate) fn generate_probe_message(&self) -> Result<Command> {
+    pub(crate) async fn generate_probe_message(&self) -> Result<Command> {
         // Generate a random address not belonging to our Prefix
         let mut dst = XorName::random();
 
         // We don't probe ourselves
-        while self.section.prefix().matches(&dst) {
+        while self.section.prefix().await.matches(&dst) {
             dst = XorName::random();
         }
 
@@ -168,23 +186,53 @@ impl Core {
         );
 
         self.send_direct_message_to_nodes(recipients, message, dst_name, section_key)
+            .await
+    }
+
+    pub(crate) async fn write_prefix_map(&self) {
+        info!("Writing our latest PrefixMap to disk");
+
+        // TODO: Make this serialization human readable
+        match rmp_serde::to_vec(&self.network) {
+            Ok(serialized) => {
+                if let Ok(mut node_dir_file) =
+                    File::create(&self.root_storage_dir.join("prefix_map")).await
+                {
+                    if let Err(e) = node_dir_file.write_all(&serialized).await {
+                        error!("Error writing PrefixMap in our node dir: {:?}", e);
+                    }
+                }
+                if self.is_genesis_node {
+                    if let Some(mut safe_dir) = dirs_next::home_dir() {
+                        safe_dir.push(".safe");
+                        safe_dir.push("prefix_map");
+                        if let Ok(mut safe_dir_file) = File::create(safe_dir).await {
+                            if let Err(e) = safe_dir_file.write_all(&serialized).await {
+                                error!("Error writing PrefixMap at `~/.safe`: {:?}", e);
+                            }
+                        }
+                    } else {
+                        error!("Could not write PrefixMap in SAFE dir: Home directory not found");
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Error serializing PrefixMap {:?}", e);
+            }
+        }
     }
 
     /// Generate commands and fire events based upon any node state changes.
-    pub(crate) async fn update_for_new_node_state_and_fire_events(
+    pub(crate) async fn update_self_for_new_node_state_and_fire_events(
         &mut self,
         old: StateSnapshot,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
-        let new = self.state_snapshot();
+        let new = self.state_snapshot().await;
 
         self.section_keys_provider
-            .finalise_dkg(self.section.chain().last_key())
+            .finalise_dkg(self.section.chain().await.last_key())
             .await;
-
-        if new.prefix != old.prefix {
-            info!("Split");
-        }
 
         if new.last_key != old.last_key {
             if new.is_elder {
@@ -192,7 +240,12 @@ impl Core {
                     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
                     new.prefix,
                     new.last_key,
-                    self.section.authority_provider().peers().format(", ")
+                    self.section
+                        .authority_provider()
+                        .await
+                        .peers()
+                        .iter()
+                        .format(", ")
                 );
 
                 if self.section_keys_provider.has_key_share().await {
@@ -201,19 +254,19 @@ impl Core {
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
                     commands.extend(
-                        self.propose(Proposal::JoinsAllowed(self.joins_allowed))
+                        self.propose(Proposal::JoinsAllowed(*self.joins_allowed.read().await))
                             .await?,
                     );
                 }
 
-                self.print_network_stats();
+                self.print_network_stats().await;
             }
 
             if new.is_elder || old.is_elder {
-                commands.extend(self.send_ae_update_to_our_section(&self.section)?);
+                commands.extend(self.send_ae_update_to_our_section(&self.section).await?);
             }
 
-            let current: BTreeSet<_> = self.section.authority_provider().names();
+            let current: BTreeSet<_> = self.section.authority_provider().await.names();
             let added = current.difference(&old.elders).copied().collect();
             let removed = old.elders.difference(&current).copied().collect();
             let remaining = old.elders.intersection(&current).copied().collect();
@@ -227,9 +280,10 @@ impl Core {
             };
 
             let self_status_change = if !old.is_elder && new.is_elder {
-                info!("Promoted to elder");
+                trace!("{}", LogMarker::PromotedToElder);
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
+                trace!("{}", LogMarker::DemotedFromElder);
                 info!("Demoted");
                 self.network = NetworkPrefixMap::new(*self.section.genesis_key());
                 self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None).await;
@@ -239,6 +293,8 @@ impl Core {
             };
 
             let sibling_elders = if new.prefix != old.prefix {
+                info!("{}", LogMarker::NewPrefix);
+
                 self.network.get(&new.prefix.sibling()).map(|sec_auth| {
                     let current: BTreeSet<_> = sec_auth.names();
                     let added = current.difference(&old.elders).copied().collect();
@@ -257,6 +313,10 @@ impl Core {
             };
 
             let event = if let Some(sibling_elders) = sibling_elders {
+                info!("{}", LogMarker::Split);
+                // In case of split, send AEUpdate to sibling new elder nodes.
+                commands.extend(self.send_ae_update_to_sibling_section(&old).await?);
+
                 Event::SectionSplit {
                     elders,
                     sibling_elders,
@@ -273,32 +333,32 @@ impl Core {
         }
 
         if !new.is_elder {
-            commands.extend(self.return_relocate_promise());
+            commands.extend(self.return_relocate_promise().await);
         }
 
         Ok(commands)
     }
 
-    pub(crate) fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
-        if self.section.prefix().matches(name) {
-            *self.section.chain().last_key()
+    pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
+        if self.section.prefix().await.matches(name) {
+            *self.section.chain().await.last_key()
         } else if let Ok(sap) = self.network.section_by_name(name) {
             sap.section_key()
-        } else if self.section.prefix().sibling().matches(name) {
+        } else if self.section.prefix().await.sibling().matches(name) {
             // For sibling with unknown key, use the previous key in our chain under the assumption
             // that it's the last key before the split and therefore the last key of theirs we know.
             // In case this assumption is not correct (because we already progressed more than one
             // key since the split) then this key would be unknown to them and they would send
             // us back their whole section chain. However, this situation should be rare.
-            *self.section.chain().prev_key()
+            *self.section.chain().await.prev_key()
         } else {
-            *self.section.chain().root_key()
+            *self.section.chain().await.root_key()
         }
     }
 
-    pub(crate) fn print_network_stats(&self) {
+    pub(crate) async fn print_network_stats(&self) {
         self.network
-            .network_stats(self.section.authority_provider())
+            .network_stats(&self.section.authority_provider().await)
             .print();
         self.comm.print_stats();
     }

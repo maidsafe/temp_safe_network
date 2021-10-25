@@ -40,6 +40,8 @@ pub struct Config {
     pub qp2p: QuicP2pConfig,
     /// The amount of time to wait for responses to queries before giving up and returning an error.
     pub query_timeout: Duration,
+    /// The amount of time to wait after a command is sent for AE flows to complete.
+    pub standard_wait: Duration,
 }
 
 impl Config {
@@ -59,6 +61,7 @@ impl Config {
         genesis_key: bls::PublicKey,
         config_file_path: Option<&Path>,
         query_timeout: Option<Duration>,
+        standard_wait: Option<Duration>,
     ) -> Self {
         let root_dir = root_dir
             .map(|p| p.to_path_buf())
@@ -70,6 +73,8 @@ impl Config {
             Some(path) => read_config_file(path).await.unwrap_or_default(),
         };
 
+        let query_timeout = query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
+
         qp2p.idle_timeout = Some(Duration::from_secs(5));
         qp2p.keep_alive_interval = Some(Duration::from_secs(1));
 
@@ -78,7 +83,8 @@ impl Config {
             root_dir: root_dir.clone(),
             genesis_key,
             qp2p,
-            query_timeout: query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT),
+            query_timeout,
+            standard_wait: standard_wait.unwrap_or(query_timeout / 10),
         }
     }
 }
@@ -88,7 +94,7 @@ async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
     let mut file = File::open(filepath).await?;
 
     let mut contents = vec![];
-    let _ = file.read_to_end(&mut contents).await?;
+    let _size = file.read_to_end(&mut contents).await?;
 
     serde_json::from_slice(&contents).map_err(|err| {
         warn!(
@@ -154,6 +160,7 @@ mod tests {
             genesis_key,
             Some(&config_filepath),
             None,
+            None,
         )
         .await;
         // convert to string for assert
@@ -163,27 +170,33 @@ mod tests {
             .to_string();
         // normalise for mac
         if str_path.ends_with('/') {
-            let _ = str_path.pop();
+            let _some_last_char = str_path.pop();
         }
 
         let expected_config = Config {
             local_addr: (Ipv4Addr::UNSPECIFIED, 0).into(),
             root_dir: root_dir.clone(),
             genesis_key,
-            qp2p: QuicP2pConfig::default(),
+            qp2p: QuicP2pConfig {
+                idle_timeout: Some(Duration::from_secs(5)),
+                keep_alive_interval: Some(Duration::from_secs(1)),
+                ..Default::default()
+            },
             query_timeout: DEFAULT_QUERY_TIMEOUT,
+            standard_wait: DEFAULT_QUERY_TIMEOUT / 10,
         };
+        assert_eq!(format!("{:?}", config), format!("{:?}", expected_config));
         assert_eq!(serialize(&config)?, serialize(&expected_config)?);
 
         create_dir_all(&root_dir).await?;
         let mut file = File::create(&config_filepath)?;
 
         let config_on_disk =
-            Config::new(None, None, genesis_key, Some(&config_filepath), None).await;
+            Config::new(None, None, genesis_key, Some(&config_filepath), None, None).await;
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = Config::new(None, None, genesis_key, None, None).await;
+        let read_cfg = Config::new(None, None, genesis_key, None, None, None).await;
         assert_eq!(serialize(&config_on_disk)?, serialize(&read_cfg)?);
 
         Ok(())

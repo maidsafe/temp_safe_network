@@ -43,13 +43,3 @@ impl AsRef<[u8; MESSAGE_ID_LEN]> for MessageId {
         &self.0
     }
 }
-
-impl fmt::Display for MessageId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:02x}{:02x}{:02x}{:02x}..",
-            self.0[0], self.0[1], self.0[2], self.0[3]
-        )
-    }
-}

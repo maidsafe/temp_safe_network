@@ -194,7 +194,6 @@ impl QueryResponse {
 
     /// Retrieves the operation identifier for this response, use in tracking node liveness
     /// and responses at clients.
-    /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
     pub fn operation_id(&self) -> Result<OperationId> {
         use QueryResponse::*;
 
@@ -202,22 +201,21 @@ impl QueryResponse {
         match self {
             GetChunk(result) => match result {
                 Ok(chunk) => operation_id(chunk.address()),
-                Err(error) => match error {
-                    ErrorMessage::DataNotFound(address) => match address {
-                        DataAddress::Bytes(address) => operation_id(&ChunkAddress(*address.name())),
-                        another_address => {
-                            error!(
-                                "{:?} address returned when we were expecting a ChunkAddress",
-                                another_address
-                            );
-                            Err(Error::NoOperationId)
-                        }
-                    },
-                    another_error => {
-                        error!("Could not form operation id: {:?}", another_error);
-                        Err(Error::InvalidQueryResponseErrorForOperationId)
-                    }
-                },
+                Err(ErrorMessage::ChunkNotFound(name)) => operation_id(&ChunkAddress(*name)),
+                Err(ErrorMessage::DataNotFound(DataAddress::Bytes(address))) => {
+                    operation_id(&ChunkAddress(*address.name()))
+                }
+                Err(ErrorMessage::DataNotFound(another_address)) => {
+                    error!(
+                        "{:?} address returned when we were expecting a ChunkAddress",
+                        another_address
+                    );
+                    Err(Error::NoOperationId)
+                }
+                Err(another_error) => {
+                    error!("Could not form operation id: {:?}", another_error);
+                    Err(Error::InvalidQueryResponseErrorForOperationId)
+                }
             },
 
             GetRegister((_, operation_id))

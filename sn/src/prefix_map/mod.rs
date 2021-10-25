@@ -23,12 +23,13 @@ use crate::routing::{Error, Result, SectionAuthUtils, SectionAuthorityProviderUt
 use bls::PublicKey as BlsPublicKey;
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use secured_linked_list::SecuredLinkedList;
+use serde::{Deserialize, Serialize};
 use std::iter::{self, Iterator};
 use std::sync::Arc;
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NetworkPrefixMap {
     /// Map of sections prefixes to their latest signed section authority providers.
     sections: Arc<DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>>,
@@ -43,6 +44,11 @@ impl NetworkPrefixMap {
             sections: Arc::new(DashMap::new()),
             genesis_pk,
         }
+    }
+
+    /// Returns the genesis key of the Network
+    pub(crate) fn genesis_key(&self) -> BlsPublicKey {
+        self.genesis_pk
     }
 
     /// Inserts new entry into the map. Replaces previous entry at the same prefix.
@@ -61,7 +67,7 @@ impl NetworkPrefixMap {
             return false;
         }
 
-        let _ = self.sections.insert(prefix, sap);
+        let _prev = self.sections.insert(prefix, sap);
 
         let parent_prefix = prefix.popped();
         self.prune(parent_prefix);
@@ -107,6 +113,14 @@ impl NetworkPrefixMap {
             .map(|entry| entry.value().value.clone())
     }
 
+    /// Get signed `SectionAuthorityProvider` of a known section with the given prefix.
+    pub(crate) fn get_signed(
+        &self,
+        prefix: &Prefix,
+    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
+        self.sections.get(prefix).map(|entry| entry.value().clone())
+    }
+
     /// Update our knowledge of a remote section's SAP only
     /// if it's verifiable with the provided proof chain and the
     /// currently known SAP we are aware of for the Prefix.
@@ -130,6 +144,7 @@ impl NetworkPrefixMap {
 
     /// Update our knowledge of a remote section's SAP only
     /// if it's verifiable with the provided proof chain and section chain.
+    /// Returns true if an udpate was made
     pub(crate) fn verify_with_chain_and_update(
         &self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
@@ -215,7 +230,7 @@ impl NetworkPrefixMap {
         // We can now update our knowledge of the remote section's SAP.
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
-        let _ = self.insert(signed_section_auth);
+        let _changed = self.insert(signed_section_auth);
 
         Ok(true)
     }
@@ -243,6 +258,11 @@ impl NetworkPrefixMap {
     /// one with the longest prefix.
     pub(crate) fn section_by_prefix(&self, prefix: &Prefix) -> Result<SectionAuthorityProvider> {
         self.section_by_name(&prefix.name())
+    }
+
+    /// Get total number of known sections
+    pub(crate) fn known_sections_count(&self) -> usize {
+        self.sections.len()
     }
 
     /// Returns network statistics.
@@ -300,7 +320,7 @@ impl NetworkPrefixMap {
                 prefix.is_covered_by(descendant_prefixes)
             };
             if is_covered {
-                let _ = self.sections.remove(&prefix);
+                let _prev = self.sections.remove(&prefix);
             }
 
             if prefix.is_empty() {
@@ -374,7 +394,7 @@ mod tests {
 
         let sap0 = gen_section_auth(p0)?;
 
-        let _ = map.insert(sap0.clone());
+        let _changed = map.insert(sap0.clone());
 
         // There are no matching prefixes, so return Err.
         assert!(map.section_by_name(&p1.substituted_in(rng.gen())).is_err(),);
@@ -386,7 +406,7 @@ mod tests {
             sap0
         );
 
-        let _ = map.insert(sap0.clone());
+        let _changed = map.insert(sap0.clone());
         assert_eq!(
             map.closest_or_opposite(&p1.substituted_in(rng.gen()))
                 .ok_or(Error::NoMatchingSection)?,
@@ -445,7 +465,7 @@ mod tests {
 
         let sap0 = gen_section_auth(p0)?;
         let sap00 = gen_section_auth(p00)?;
-        let _ = map.insert(sap00.clone());
+        let _changed = map.insert(sap00.clone());
 
         assert!(!map.insert(sap0));
         assert_eq!(map.get(&p0), None);
@@ -467,9 +487,9 @@ mod tests {
         let sap1 = gen_section_auth(p1)?;
         let sap10 = gen_section_auth(p10)?;
 
-        let _ = map.insert(sap0.clone());
-        let _ = map.insert(sap1.clone());
-        let _ = map.insert(sap10.clone());
+        let _changed = map.insert(sap0.clone());
+        let _changed = map.insert(sap1.clone());
+        let _changed = map.insert(sap10.clone());
 
         assert_eq!(
             map.section_by_name(&p0.substituted_in(rng.gen()))?,
@@ -500,9 +520,9 @@ mod tests {
         let sap1 = gen_section_auth(p1)?;
         let sap10 = gen_section_auth(p10)?;
 
-        let _ = map.insert(sap0.clone());
-        let _ = map.insert(sap1.clone());
-        let _ = map.insert(sap10.clone());
+        let _changed = map.insert(sap0.clone());
+        let _changed = map.insert(sap1.clone());
+        let _changed = map.insert(sap10.clone());
 
         assert_eq!(map.section_by_prefix(&p0)?, sap0.value);
 
@@ -529,14 +549,14 @@ mod tests {
         let pk01 = section_auth_01.value.public_key_set.public_key();
         let sig01 = bincode::serialize(&pk01).map(|bytes| genesis_sk.sign(&bytes))?;
         chain01.insert(&genesis_pk, pk01, sig01)?;
-        let _ = map.verify_with_chain_and_update(section_auth_01, &chain01, &chain);
+        let _updated = map.verify_with_chain_and_update(section_auth_01, &chain01, &chain);
 
         let mut chain10 = chain.clone();
         let section_auth_10 = gen_section_auth(p10)?;
         let pk10 = section_auth_10.value.public_key_set.public_key();
         let sig10 = bincode::serialize(&pk10).map(|bytes| genesis_sk.sign(&bytes))?;
         chain10.insert(&genesis_pk, pk10, sig10)?;
-        let _ = map.verify_with_chain_and_update(section_auth_10, &chain10, &chain);
+        let _updated = map.verify_with_chain_and_update(section_auth_10, &chain10, &chain);
 
         let mut rng = rand::thread_rng();
         let n01 = p01.substituted_in(rng.gen());

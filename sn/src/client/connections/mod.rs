@@ -24,6 +24,7 @@ use tokio::sync::{mpsc::Sender, RwLock};
 use xor_name::XorName;
 type QueryResponseSender = Sender<QueryResponse>;
 type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
+use tokio::time::Duration;
 use uluru::LRUCache;
 
 #[derive(Debug)]
@@ -57,4 +58,6 @@ pub(super) struct Session {
     genesis_key: bls::PublicKey,
     /// Initial network comms messageId
     initial_connection_check_msg_id: Arc<RwLock<Option<MessageId>>>,
+    /// Standard time to await potential AE messages:
+    standard_wait: Duration,
 }

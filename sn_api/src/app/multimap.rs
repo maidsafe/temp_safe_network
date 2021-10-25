@@ -54,7 +54,7 @@ impl Safe {
     /// Return the value of a Multimap on the network corresponding to the key provided
     pub async fn multimap_get_by_key(&self, url: &str, key: &[u8]) -> Result<MultimapKeyValues> {
         debug!("Getting value by key from Multimap at: {}", url);
-        let (safeurl, _) = self.parse_and_resolve_url(url).await?;
+        let safeurl = self.parse_and_resolve_url(url).await?;
 
         self.fetch_multimap_value_by_key(&safeurl, key).await
     }
@@ -66,7 +66,7 @@ impl Safe {
         hash: EntryHash,
     ) -> Result<MultimapKeyValue> {
         debug!("Getting value by hash from Multimap at: {}", url);
-        let (safeurl, _) = self.parse_and_resolve_url(url).await?;
+        let safeurl = self.parse_and_resolve_url(url).await?;
 
         self.fetch_multimap_value_by_hash(&safeurl, hash).await
     }

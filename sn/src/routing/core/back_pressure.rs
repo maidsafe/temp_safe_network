@@ -55,7 +55,7 @@ impl BackPressure {
 
     /// Remove regulation for specific nodes when we don't need them anymore (e.g. they left).
     pub(crate) async fn remove(&self, addr: SocketAddr) {
-        let _ = self.reports.write().await.remove(&addr);
+        let _prev = self.reports.write().await.remove(&addr);
     }
 
     /// Sets reported load for a node, when it errored back saying it was strained.
@@ -91,7 +91,7 @@ impl BackPressure {
             retrying_max_elapsed_time,
         };
 
-        let _ = self
+        let _prev = self
             .reports
             .write()
             .await
@@ -126,7 +126,7 @@ impl BackPressure {
             self.system.write().await.refresh_cpu();
         }
         let current_load = { evaluate(self.system.read().await.load_average()) };
-        let _ = self
+        let _prev = self
             .our_reports
             .write()
             .await
@@ -143,7 +143,7 @@ impl BackPressure {
     }
 
     async fn evict_expired(&self, now: Instant) {
-        let _ = join(self.evict_in_expired(now), self.evict_out_expired(now)).await;
+        let _res = join(self.evict_in_expired(now), self.evict_out_expired(now)).await;
         *self.last_eviction.write().await = now;
     }
 
@@ -187,7 +187,7 @@ impl BackPressure {
         };
 
         for addr in expired {
-            let _ = self.our_reports.write().await.remove(&addr);
+            let _prev = self.our_reports.write().await.remove(&addr);
         }
     }
 }

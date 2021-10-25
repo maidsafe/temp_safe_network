@@ -63,7 +63,7 @@ where
         }
 
         let event = serialise(&event)?;
-        let _ = self.tree.insert(key, event).map_err(Error::Sled)?;
+        let _old_entry = self.tree.insert(key, event).map_err(Error::Sled)?;
 
         Ok(())
     }

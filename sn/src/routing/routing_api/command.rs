@@ -15,6 +15,7 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use custom_debug::Debug;
 use std::{
+    fmt,
     net::SocketAddr,
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
@@ -65,12 +66,12 @@ pub(crate) enum Command {
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
-    /// Handle lost connection to a peer.
-    HandleConnectionLost(SocketAddr),
     /// Handle peer that's been detected as lost.
     HandlePeerLost(SocketAddr),
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
+    /// Handle agree on elders. This blocks node message processing until complete.
+    HandleElderAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
     /// the proposed new elders).
     HandleDkgOutcome {
@@ -121,6 +122,50 @@ pub(crate) enum Command {
     StartConnectivityTest(XorName),
     /// Test Connectivity
     TestConnectivity(XorName),
+}
+
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Command::HandleTimeout(_) => write!(f, "HandlePeerLost"),
+            Command::ScheduleTimeout { .. } => write!(f, "ScheduleTimeout"),
+            Command::HandleSystemMessage { msg_id, .. } => {
+                write!(f, "HandleSystemMessage {:?}", msg_id)
+            }
+            Command::HandleMessage { wire_msg, .. } => {
+                write!(f, "HandleMessage {:?}", wire_msg.msg_id())
+            }
+            Command::HandleBlockingMessage { msg_id, .. } => {
+                write!(f, "HandleBlockingMessage {:?}", msg_id)
+            }
+            Command::HandleNonBlockingMessage { msg_id, .. } => {
+                write!(f, "HandleNonBlockingMessage {:?}", msg_id)
+            }
+            Command::HandlePeerLost(_) => write!(f, "HandlePeerLost"),
+            Command::HandleAgreement { .. } => write!(f, "HandleAgreement"),
+            Command::HandleElderAgreement { .. } => write!(f, "HandleElderAgreement"),
+            Command::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
+            Command::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
+            Command::SendMessage { wire_msg, .. } => {
+                write!(f, "SendMessage {:?}", wire_msg.msg_id())
+            }
+            Command::ParseAndSendWireMsg(wire_msg) => {
+                write!(f, "ParseAndSendWireMsg {:?}", wire_msg.msg_id())
+            }
+            Command::PrepareNodeMsgToSend { .. } => write!(f, "PrepareNodeMsgToSend"),
+            Command::SendMessageDeliveryGroup { wire_msg, .. } => {
+                write!(f, "SendMessageDeliveryGroup {:?}", wire_msg.msg_id())
+            }
+            Command::HandleRelocationComplete { .. } => {
+                write!(f, "HandleRelocationComplete")
+            }
+            Command::SetJoinsAllowed(_) => write!(f, "SetJoinsAllowed"),
+            Command::ProposeOnline { .. } => write!(f, "ProposeOnline"),
+            Command::ProposeOffline(_) => write!(f, "ProposeOffline"),
+            Command::StartConnectivityTest(_) => write!(f, "StartConnectivityTest"),
+            Command::TestConnectivity(_) => write!(f, "TestConnectivity"),
+        }
+    }
 }
 
 /// Generate unique timer token.

@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::fetch::Range;
+use super::resolver::Range;
 use crate::{ipc::NodeConfig, Error, Result};
 use bytes::Bytes;
 use hex::encode;
@@ -74,6 +74,7 @@ impl SafeAppClient {
             None,
             node_config.0,
             self.config_path.as_deref(),
+            None,
             Some(self.timeout),
         )
         .await;

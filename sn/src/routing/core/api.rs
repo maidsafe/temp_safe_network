@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    delivery_group, split_barrier::SplitBarrier, Comm, Core, SignatureAggregator, KEY_CACHE_SIZE,
-    RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+    delivery_group, split_barrier::SplitBarrier, AeBackoffCache, Comm, Core, SignatureAggregator,
+    KEY_CACHE_SIZE, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
 use crate::dbs::UsedSpace;
 use crate::messaging::{
@@ -42,7 +42,7 @@ impl Core {
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
 
-        let (section, section_key_share) = Section::first_node(node.peer())?;
+        let (section, section_key_share) = Section::first_node(node.peer()).await?;
         Self::new(
             comm,
             node,
@@ -51,6 +51,7 @@ impl Core {
             event_tx,
             used_space,
             root_storage_dir,
+            true,
         )
         .await
     }
@@ -80,7 +81,8 @@ impl Core {
             dkg_voter: DkgVoter::default(),
             relocate_state: None,
             event_tx: self.event_tx.clone(),
-            joins_allowed: true,
+            joins_allowed: Arc::new(RwLock::new(true)),
+            is_genesis_node: false,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage: self.register_storage.clone(),
             root_storage_dir: self.root_storage_dir.clone(),
@@ -88,6 +90,7 @@ impl Core {
             capacity: self.capacity.clone(),
             chunk_storage: self.chunk_storage.clone(),
             liveness: self.liveness.clone(),
+            ae_backoff_cache: AeBackoffCache::default(),
         })
     }
 
@@ -99,17 +102,17 @@ impl Core {
         &self.section
     }
 
-    pub(crate) fn section_chain(&self) -> &SecuredLinkedList {
-        self.section.chain()
+    pub(crate) async fn section_chain(&self) -> SecuredLinkedList {
+        self.section.chain().await
     }
 
     /// Is this node an elder?
-    pub(crate) fn is_elder(&self) -> bool {
-        self.section.is_elder(&self.node.name())
+    pub(crate) async fn is_elder(&self) -> bool {
+        self.section.is_elder(&self.node.name()).await
     }
 
-    pub(crate) fn is_not_elder(&self) -> bool {
-        !self.is_elder()
+    pub(crate) async fn is_not_elder(&self) -> bool {
+        !self.is_elder().await
     }
 
     /// Returns connection info of this node.
@@ -132,9 +135,12 @@ impl Core {
     }
 
     /// Returns the info about the section matching the name.
-    pub(crate) fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        if self.section.prefix().matches(name) {
-            Ok(self.section.authority_provider().clone())
+    pub(crate) async fn matching_section(
+        &self,
+        name: &XorName,
+    ) -> Result<SectionAuthorityProvider> {
+        if self.section.prefix().await.matches(name) {
+            Ok(self.section.authority_provider().await)
         } else {
             self.network.section_by_name(name)
         }
@@ -163,20 +169,21 @@ impl Core {
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
 
-    pub(crate) fn handle_timeout(&mut self, token: u64) -> Result<Vec<Command>> {
+    pub(crate) async fn handle_timeout(&self, token: u64) -> Result<Vec<Command>> {
         self.dkg_voter
-            .handle_timeout(&self.node, token, *self.section_chain().last_key())
+            .handle_timeout(&self.node, token, *self.section_chain().await.last_key())
     }
 
     // Send message to peers on the network.
-    pub(crate) fn send_msg_to_peers(&self, mut wire_msg: WireMsg) -> Result<Command> {
+    pub(crate) async fn send_msg_to_peers(&self, mut wire_msg: WireMsg) -> Result<Command> {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
             &self.node.name(),
             &self.section,
             &self.network,
-        )?;
+        )
+        .await?;
 
         trace!(
             "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
@@ -190,10 +197,10 @@ impl Core {
 
         // To avoid loop: if destination is to Node, targets are multiple, self is an elder,
         //     self section prefix matches the destination name, then don't carry out a relay.
-        if self.is_elder()
+        if self.is_elder().await
             && targets.len() > 1
             && dst_location.is_to_node()
-            && self.section.prefix().matches(&target_name)
+            && self.section.prefix().await.matches(&target_name)
         {
             return Ok(Command::SendMessageDeliveryGroup {
                 recipients: Vec::new(),
@@ -202,7 +209,7 @@ impl Core {
             });
         }
 
-        let dst_pk = self.section_key_by_name(&target_name);
+        let dst_pk = self.section_key_by_name(&target_name).await;
         wire_msg.set_dst_section_pk(dst_pk);
 
         let command = Command::SendMessageDeliveryGroup {
@@ -220,7 +227,7 @@ impl Core {
     // Setting the JoinsAllowed triggers a round Proposal::SetJoinsAllowed to update the flag.
     pub(crate) async fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();
-        if self.is_elder() && joins_allowed != self.joins_allowed {
+        if self.is_elder().await && joins_allowed != *self.joins_allowed.read().await {
             commands.extend(self.propose(Proposal::JoinsAllowed(joins_allowed)).await?);
         }
         Ok(commands)
@@ -228,7 +235,7 @@ impl Core {
 
     // Generate a new section info based on the current set of members and if it differs from the
     // current elders, trigger a DKG.
-    pub(crate) async fn promote_and_demote_elders(&mut self) -> Result<Vec<Command>> {
+    pub(crate) async fn promote_and_demote_elders(&self) -> Result<Vec<Command>> {
         self.promote_and_demote_elders_except(&BTreeSet::new())
             .await
     }
@@ -245,6 +252,7 @@ impl Core {
         for elder_candidates in self
             .section
             .promote_and_demote_elders(&self.node.name(), excluded_names)
+            .await
         {
             commands.extend(self.send_dkg_start(elder_candidates).await?);
         }

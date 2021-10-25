@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{BlsShareAuth, NodeAuth, SectionAuth, ServiceAuth, SrcLocation};
+use super::{BlsShareAuth, NodeAuth, ServiceAuth, SrcLocation};
 use serde::{Deserialize, Serialize};
 
 /// Source authority of a message.
@@ -34,17 +34,12 @@ pub enum MsgKind {
     /// Section share authority is needed for messages related to section administration, such as
     /// DKG and relocation.
     NodeBlsShareAuthMsg(BlsShareAuth),
-
-    /// A message from an Elder node with authority of its whole section.
-    // FIXME: find an example.
-    SectionAuthMsg(SectionAuth),
 }
 
 impl MsgKind {
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
         match self {
-            Self::SectionAuthMsg(_) => 2,
             Self::NodeBlsShareAuthMsg(_) => 1,
             Self::NodeAuthMsg(_) => 0,
             Self::ServiceMsg(_) => -2,
@@ -54,10 +49,6 @@ impl MsgKind {
     /// The src location of the msg.
     pub fn src(&self) -> SrcLocation {
         match self {
-            Self::SectionAuthMsg(auth) => SrcLocation::Section {
-                name: auth.src_name,
-                section_pk: auth.sig.public_key,
-            },
             Self::NodeBlsShareAuthMsg(auth) => SrcLocation::Node {
                 name: auth.src_name,
                 section_pk: auth.sig_share.public_key_set.public_key(),

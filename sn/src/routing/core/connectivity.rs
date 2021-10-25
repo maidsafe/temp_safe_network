@@ -9,28 +9,13 @@
 use super::Core;
 use crate::messaging::system::Proposal;
 use crate::routing::{
-    error::Result,
-    peer::PeerUtils,
-    routing_api::command::Command,
-    section::{NodeStateUtils, SectionPeersUtils},
+    error::Result, peer::PeerUtils, routing_api::command::Command, section::NodeStateUtils,
     SectionAuthorityProviderUtils,
 };
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
 impl Core {
-    pub(crate) fn handle_connection_lost(&self, addr: SocketAddr) -> Result<Vec<Command>> {
-        if let Some(peer) = self.section.find_joined_member_by_addr(&addr) {
-            debug!(
-                "Possible connection loss detected with known peer {:?}",
-                peer
-            )
-        } else {
-            debug!("Possible connection loss detected with addr: {:?}", addr);
-        }
-        Ok(vec![])
-    }
-
     pub(crate) async fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Command>> {
         let name = if let Some(peer) = self.section.find_joined_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
@@ -40,7 +25,7 @@ impl Core {
             return Ok(vec![]);
         };
 
-        if self.is_not_elder() {
+        if self.is_not_elder().await {
             // Adults cannot complain about connectivity.
             return Ok(vec![]);
         }
@@ -64,14 +49,20 @@ impl Core {
         let elders: Vec<_> = self
             .section
             .authority_provider()
+            .await
             .peers()
+            .iter()
             .filter(|peer| !names.contains(peer.name()))
+            .cloned()
             .collect();
         let mut result: Vec<Command> = Vec::new();
         for name in names.iter() {
             if let Some(info) = self.section.members().get(name) {
                 let info = info.leave()?;
-                if let Ok(commands) = self.send_proposal(&elders, Proposal::Offline(info)).await {
+                if let Ok(commands) = self
+                    .send_proposal(elders.clone(), Proposal::Offline(info))
+                    .await
+                {
                     result.extend(commands);
                 }
             }

@@ -2,6 +2,146 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.36.4](https://github.com/maidsafe/safe_network/compare/v0.36.3...v0.36.4) (2021-10-22)
+
+
+### Bug Fixes
+
+* **scripts:** change regex in has_split.sh to properly match prefix logs ([046a213](https://github.com/maidsafe/safe_network/commit/046a2133fcfdfd11019e943534788bfae1c301c5))
+
+### [0.36.3](https://github.com/maidsafe/safe_network/compare/v0.36.2...v0.36.3) (2021-10-21)
+
+
+### Features
+
+* readd stats per node ([d8ca562](https://github.com/maidsafe/safe_network/commit/d8ca562e0849aec571a0bd9407d22f388c7a8933))
+* **log inspector:** more heavily use ripgrep and store context from there ([1a96ca7](https://github.com/maidsafe/safe_network/commit/1a96ca76fc66a01beef105a2acda81034cb4eaa8))
+* count how frequent routing commands are ([0d945da](https://github.com/maidsafe/safe_network/commit/0d945dad73b3af7643cb600b2015fa9a6cb4f85d))
+* use grep for searching logfiles ([d795de6](https://github.com/maidsafe/safe_network/commit/d795de65d75a2fcfa0a52b4f021d453278b299f8))
+
+### [0.36.2](https://github.com/maidsafe/safe_network/compare/v0.36.1...v0.36.2) (2021-10-21)
+
+
+### Bug Fixes
+
+* handle the case where we don't know an adult's capacity ([cac3b48](https://github.com/maidsafe/safe_network/commit/cac3b48e1f1b1c50e0aa70600d619bde1654a6ff))
+
+### [0.36.1](https://github.com/maidsafe/safe_network/compare/v0.36.0...v0.36.1) (2021-10-21)
+
+
+### Bug Fixes
+
+* **messaging:** return operation id for Chunk not found responses ([92a5a44](https://github.com/maidsafe/safe_network/commit/92a5a44589143f9147c5613f79e2531eaba84aee))
+
+## [0.36.0](https://github.com/maidsafe/safe_network/compare/v0.35.19...v0.36.0) (2021-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **client:** introduces a new configurable field to client config
+
+### Features
+
+* **client:** add standard_wait time to config ([6583694](https://github.com/maidsafe/safe_network/commit/6583694be04f95658ed6aadfb709d6be8940e72b))
+* **client:** read prefixMap from disk if present ([f21cd64](https://github.com/maidsafe/safe_network/commit/f21cd6449e45b7c6949c80693dd904de5d4f0275))
+* **node:** write PrefixMap to node dir ([5dee36c](https://github.com/maidsafe/safe_network/commit/5dee36c1f1b6af5f8cb8cde6a94fd1321dedb8c9))
+
+
+### Bug Fixes
+
+* update examples to use new client config ([2fd9b49](https://github.com/maidsafe/safe_network/commit/2fd9b497265d1722c22b2db7944733f5be51d217))
+
+### [0.35.19](https://github.com/maidsafe/safe_network/compare/v0.35.18...v0.35.19) (2021-10-20)
+
+### [0.35.18](https://github.com/maidsafe/safe_network/compare/v0.35.17...v0.35.18) (2021-10-20)
+
+
+### Bug Fixes
+
+* notify sibling newly promoted elders during split ([12866e2](https://github.com/maidsafe/safe_network/commit/12866e2f8a5fb6bdc3aaf5f4fa1be5dc143474a1))
+
+### [0.35.17](https://github.com/maidsafe/safe_network/compare/v0.35.16...v0.35.17) (2021-10-20)
+
+### [0.35.16](https://github.com/maidsafe/safe_network/compare/v0.35.15...v0.35.16) (2021-10-19)
+
+
+### Features
+
+* **logs-inspector-tool:** allow to generate commands reports for a provided msg id or cmd id ([3af31d0](https://github.com/maidsafe/safe_network/commit/3af31d08bb48e47ea8d8f42775c0b08d326baf1e))
+* **logs-inspector-tool:** include full log filepath in the reports ([093143d](https://github.com/maidsafe/safe_network/commit/093143dedb8946b6976afc9edbff0a8a38f5626b))
+* **logs-inspector-tool:** match msg ids also to SendMessage commands ([18398ca](https://github.com/maidsafe/safe_network/commit/18398ca199531baa2f4374975308cf56222dc77e))
+
+### [0.35.15](https://github.com/maidsafe/safe_network/compare/v0.35.14...v0.35.15) (2021-10-15)
+
+### [0.35.14](https://github.com/maidsafe/safe_network/compare/v0.35.13...v0.35.14) (2021-10-15)
+
+### [0.35.13](https://github.com/maidsafe/safe_network/compare/v0.35.12...v0.35.13) (2021-10-15)
+
+### [0.35.12](https://github.com/maidsafe/safe_network/compare/v0.35.11...v0.35.12) (2021-10-14)
+
+### [0.35.11](https://github.com/maidsafe/safe_network/compare/v0.35.10...v0.35.11) (2021-10-14)
+
+### [0.35.10](https://github.com/maidsafe/safe_network/compare/v0.35.9...v0.35.10) (2021-10-14)
+
+### [0.35.9](https://github.com/maidsafe/safe_network/compare/v0.35.8...v0.35.9) (2021-10-14)
+
+
+### Features
+
+* **actions:** run Digital Ocean testnet action on PRs with approval ([c18f40f](https://github.com/maidsafe/safe_network/commit/c18f40f34abc874f8d6ce6c66b762fc6a018d1b9))
+
+### [0.35.8](https://github.com/maidsafe/safe_network/compare/v0.35.7...v0.35.8) (2021-10-14)
+
+
+### Bug Fixes
+
+* bootstrap proper dst_location and self prefix ([1cc17ec](https://github.com/maidsafe/safe_network/commit/1cc17ec3423f3594df30c54477706e993a60f8fa))
+
+### [0.35.7](https://github.com/maidsafe/safe_network/compare/v0.35.6...v0.35.7) (2021-10-14)
+
+
+### Bug Fixes
+
+* remove trace_span name field during bootstrap due to outdate ([4dee3d5](https://github.com/maidsafe/safe_network/commit/4dee3d52c2edf96246d5b474540b5e2e969ba49a))
+
+### [0.35.6](https://github.com/maidsafe/safe_network/compare/v0.35.5...v0.35.6) (2021-10-14)
+
+
+### Features
+
+* make joins_allowds in routing core RwLocked ([ba018a9](https://github.com/maidsafe/safe_network/commit/ba018a950ad46fd492c516daeb1011bdaf1a931f))
+
+### [0.35.5](https://github.com/maidsafe/safe_network/compare/v0.35.4...v0.35.5) (2021-10-14)
+
+### [0.35.4](https://github.com/maidsafe/safe_network/compare/v0.35.3...v0.35.4) (2021-10-14)
+
+
+### Features
+
+* add register network assert tests ([4c27b76](https://github.com/maidsafe/safe_network/commit/4c27b7660bfaf74c01cdfabca2ab5ab2d1d61005))
+
+### [0.35.3](https://github.com/maidsafe/safe_network/compare/v0.35.2...v0.35.3) (2021-10-13)
+
+### [0.35.2](https://github.com/maidsafe/safe_network/compare/v0.35.1...v0.35.2) (2021-10-13)
+
+
+### Bug Fixes
+
+* move initial contact ae discard-retry to ae-retry only ([372d68e](https://github.com/maidsafe/safe_network/commit/372d68e9ad6c4f0bc98c8352fb36fd30f6332220))
+
+### [0.35.1](https://github.com/maidsafe/safe_network/compare/v0.35.0...v0.35.1) (2021-10-13)
+
+## [0.35.0](https://github.com/maidsafe/safe_network/compare/v0.34.1...v0.35.0) (2021-10-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messaging:** SystemMsg::Propose::content was renamed to SystemMsg::Propose::proposal.
+* **messaging:** change in messaging protocol.
+
+* **messaging:** removing unused MsgKind::SectionAuthMsg ([c295b3c](https://github.com/maidsafe/safe_network/commit/c295b3c14318823e37f129f81d082275104e101f))
+* **messaging:** rename field in SysmteMsg::Propose msg type ([f01af8b](https://github.com/maidsafe/safe_network/commit/f01af8bf27656c6ea201bd5230b561abc6177e33))
+
 ### [0.34.1](https://github.com/maidsafe/safe_network/compare/v0.34.0...v0.34.1) (2021-10-12)
 
 

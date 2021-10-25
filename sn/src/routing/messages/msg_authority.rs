@@ -67,14 +67,15 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
         }
     }
 
-    // Verify if the section key of the NodeMsgAuthority can be trusted
-    // based on a set of known keys.
+    // Verify if it's a section/bls-share signed authority,
+    // and if can be trusted based on a set of known keys.
     fn verify_src_section_key_is_known(&self, known_keys: &[BlsPublicKey]) -> bool {
         let section_pk = match &self {
             NodeMsgAuthority::Node(_) => return true,
             NodeMsgAuthority::BlsShare(bls_share_auth) => &bls_share_auth.section_pk,
             NodeMsgAuthority::Section(section_auth) => &section_auth.sig.public_key,
         };
+
         known_keys.iter().any(|key| key == section_pk)
     }
 }
