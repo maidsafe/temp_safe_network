@@ -7,9 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{
-        JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, Section, SystemMsg,
-    },
+    system::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SystemMsg},
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
 use crate::routing::{
@@ -21,6 +19,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
     peer::PeerUtils,
+    section::Section,
     SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};

@@ -32,10 +32,7 @@ pub(crate) use register_storage::RegisterStorage;
 use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
 use crate::messaging::system::SystemMsg;
-use crate::messaging::{
-    signature_aggregator::SignatureAggregator,
-    system::{Proposal, Section},
-};
+use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
@@ -44,7 +41,7 @@ use crate::routing::{
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{SectionKeyShare, SectionKeysProvider},
+    section::{Section, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
 use backoff::ExponentialBackoff;

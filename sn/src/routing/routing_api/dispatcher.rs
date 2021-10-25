@@ -9,7 +9,7 @@
 use super::{Command, Event};
 use crate::messaging::{
     data::{ChunkDataExchange, StorageLevel},
-    system::{Proposal, Section, SystemMsg},
+    system::{Proposal, SystemMsg},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
 use crate::routing::{
@@ -20,6 +20,7 @@ use crate::routing::{
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
+    section::Section,
     Error, Prefix, XorName,
 };
 use crate::types::PublicKey;
