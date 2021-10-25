@@ -37,7 +37,7 @@ impl Client {
     pub async fn read_bytes(&self, address: BytesAddress) -> Result<Bytes> {
         let chunk = self.get_chunk(address.name()).await?;
 
-        // first try to serialise a blob, if it works, we go and seek it
+        // first try to deserialize a blob, if it works, we go and seek it
         if let Ok(data_map) = self
             .unpack_head_chunk(HeadChunk {
                 chunk: chunk.clone(),
@@ -82,7 +82,7 @@ impl Client {
 
         let chunk = self.get_chunk(address.name()).await?;
 
-        // first try to serialise a blob, if it works, we go and seek it
+        // first try to deserialize a blob, if it works, we go and seek it
         if let Ok(data_map) = self
             .unpack_head_chunk(HeadChunk {
                 chunk: chunk.clone(),
