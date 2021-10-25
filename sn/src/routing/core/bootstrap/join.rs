@@ -130,8 +130,8 @@ impl<'a> Join<'a> {
         // use some backoff here as we try and join
         let mut our_backoff = ExponentialBackoff {
             initial_interval: Duration::from_millis(50),
-            max_interval: Duration::from_secs(3),
-            max_elapsed_time: Some(Duration::from_secs(180)),
+            max_interval: Duration::from_secs(1),
+            max_elapsed_time: Some(Duration::from_secs(20)),
             ..Default::default()
         };
 
