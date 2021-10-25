@@ -13,8 +13,9 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils, error::Result, peer::PeerUtils, routing_api::command::Command,
-    section::ElderCandidatesUtils, Event, SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker, peer::PeerUtils,
+    routing_api::command::Command, section::ElderCandidatesUtils, Event,
+    SectionAuthorityProviderUtils, MIN_AGE,
 };
 
 use super::Core;
@@ -52,6 +53,7 @@ impl Core {
         new_info: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
+        debug!("{}", LogMarker::AgreementOfOnline);
         let mut commands = vec![];
         if let Some(old_info) = self
             .section

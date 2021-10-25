@@ -225,6 +225,7 @@ impl Core {
         &self,
         old: &StateSnapshot,
     ) -> Result<Vec<Command>> {
+        debug!("{}", LogMarker::AeSendUpdateToSiblings);
         if let Some(sibling_sec_auth) = self
             .network
             .get_signed(&self.section().prefix().await.sibling())

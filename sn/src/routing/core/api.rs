@@ -19,6 +19,7 @@ use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
+    log_markers::LogMarker,
     node::Node,
     routing_api::command::Command,
     section::{NodeStateUtils, Section, SectionKeyShare, SectionKeysProvider},
@@ -249,6 +250,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
+        debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         for elder_candidates in self
             .section
             .promote_and_demote_elders(&self.node.name(), excluded_names)

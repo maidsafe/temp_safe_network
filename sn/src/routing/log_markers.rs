@@ -14,8 +14,11 @@ use strum_macros::{Display as StrumDisplay, EnumIter, EnumString};
 #[allow(missing_docs)]
 pub enum LogMarker {
     // split
-    Split,
+    SplitSuccess,
+    SplitAttempt,
     NewPrefix,
+    AeSendUpdateToSiblings,
+    AgreementOfOnline,
     // messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,
@@ -41,6 +44,11 @@ pub enum LogMarker {
     DemotedFromElder,
     DkgSendFailureObservation,
     DkgBroadcastMsg,
+    DkgMessageHandling,
+    DkgSessionComplete,
+    DkgSessionAlreadyCompleted,
+    HandlingDkgSuccessfulOutcome,
+    TriggeringPromotionAndDemotion,
     // ae
     AeResendAfterRetry,
     AeResendAfterAeRedirect,

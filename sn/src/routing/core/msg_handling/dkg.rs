@@ -14,6 +14,7 @@ use crate::messaging::{
 use crate::routing::{
     dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
+    log_markers::LogMarker,
     routing_api::command::Command,
     section::SectionKeyShare,
     SectionAuthorityProviderUtils,
@@ -45,7 +46,12 @@ impl Core {
         message: DkgMessage,
         sender: XorName,
     ) -> Result<Vec<Command>> {
-        trace!("handle DKG message {:?} from {}", message, sender);
+        trace!(
+            "{} {:?} from {}",
+            LogMarker::DkgMessageHandling,
+            message,
+            sender
+        );
 
         self.dkg_voter
             .process_message(
@@ -128,6 +134,7 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         key_share: SectionKeyShare,
     ) -> Result<Vec<Command>> {
+        trace!("{}", LogMarker::HandlingDkgSuccessfulOutcome);
         let proposal = Proposal::SectionInfo(section_auth);
         let recipients: Vec<_> = self.section.authority_provider().await.peers();
         let result = self
@@ -139,7 +146,7 @@ impl Core {
         self.section_keys_provider.insert_dkg_outcome(key_share);
 
         if self.section.chain().await.has_key(&public_key) {
-            self.section_keys_provider.finalise_dkg(&public_key).await
+            self.section_keys_provider.finalise_dkg(&public_key).await;
         }
 
         result
