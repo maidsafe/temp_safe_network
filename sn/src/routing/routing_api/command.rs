@@ -70,6 +70,8 @@ pub(crate) enum Command {
     HandlePeerLost(SocketAddr),
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
+    /// Handle agree on elders. This blocks node message processing until complete.
+    HandleElderAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
     /// the proposed new elders).
     HandleDkgOutcome {
@@ -141,6 +143,7 @@ impl fmt::Display for Command {
             }
             Command::HandlePeerLost(_) => write!(f, "HandlePeerLost"),
             Command::HandleAgreement { .. } => write!(f, "HandleAgreement"),
+            Command::HandleElderAgreement { .. } => write!(f, "HandleElderAgreement"),
             Command::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Command::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
             Command::SendMessage { wire_msg, .. } => {

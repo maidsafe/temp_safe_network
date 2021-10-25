@@ -277,7 +277,7 @@ mod tests {
         // grant permissions for Write to 'authority2' in both replicas too
         let mut perms = BTreeMap::default();
         let user_perms = PublicPermissions::new(true);
-        let _ = perms.insert(User::Key(authority2), user_perms);
+        let _prev = perms.insert(User::Key(authority2), user_perms);
 
         // Instantiate the same Register on two replicas with the two diff authorities
         let mut replica1 = Register::new_public(
@@ -372,7 +372,7 @@ mod tests {
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
         let owner1 = authority_keypair1.public_key();
         let mut perms1 = BTreeMap::default();
-        let _ = perms1.insert(User::Anyone, PublicPermissions::new(true));
+        let _prev = perms1.insert(User::Anyone, PublicPermissions::new(true));
         let replica1 = create_public_reg_replica_with(
             register_name,
             register_tag,
@@ -387,7 +387,7 @@ mod tests {
         let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
         let authority2 = authority_keypair2.public_key();
         let mut perms2 = BTreeMap::default();
-        let _ = perms2.insert(User::Key(owner1), PublicPermissions::new(true));
+        let _prev = perms2.insert(User::Key(owner1), PublicPermissions::new(true));
         let replica2 = create_public_reg_replica_with(
             register_name,
             register_tag,
@@ -435,13 +435,13 @@ mod tests {
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = PrivatePermissions::new(/*read*/ true, /*write*/ false);
-        let _ = perms1.insert(authority1, user_perms1);
+        let _prev = perms1.insert(authority1, user_perms1);
 
         let mut perms2 = BTreeMap::default();
         let user_perms2 = PrivatePermissions::new(/*read*/ true, /*write*/ true);
-        let _ = perms2.insert(authority2, user_perms2);
+        let _prev = perms2.insert(authority2, user_perms2);
         let user_perms2 = PrivatePermissions::new(/*read*/ false, /*write*/ true);
-        let _ = perms2.insert(authority1, user_perms2);
+        let _prev = perms2.insert(authority1, user_perms2);
 
         let replica1 = create_private_reg_replica_with(
             register_name,
@@ -505,7 +505,7 @@ mod tests {
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
         let owner1 = authority_keypair1.public_key();
         let mut perms1 = BTreeMap::default();
-        let _ = perms1.insert(User::Anyone, PublicPermissions::new(true));
+        let _prev = perms1.insert(User::Anyone, PublicPermissions::new(true));
         let mut replica1 = create_public_reg_replica_with(
             register_name,
             register_tag,
@@ -520,7 +520,7 @@ mod tests {
         let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
         let authority2 = authority_keypair2.public_key();
         let mut perms2 = BTreeMap::default();
-        let _ = perms2.insert(User::Key(owner1), PublicPermissions::new(false));
+        let _prev = perms2.insert(User::Key(owner1), PublicPermissions::new(false));
         let mut replica2 = create_public_reg_replica_with(
             register_name,
             register_tag,
@@ -559,11 +559,11 @@ mod tests {
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = PrivatePermissions::new(/*read*/ false, /*write*/ true);
-        let _ = perms1.insert(authority2, user_perms1);
+        let _prev = perms1.insert(authority2, user_perms1);
 
         let mut perms2 = BTreeMap::default();
         let user_perms2 = PrivatePermissions::new(/*read*/ true, /*write*/ false);
-        let _ = perms2.insert(authority1, user_perms2);
+        let _prev = perms2.insert(authority1, user_perms2);
 
         let mut replica1 = create_private_reg_replica_with(
             register_name,

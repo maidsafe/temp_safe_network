@@ -29,12 +29,13 @@ impl Core {
     ) -> Result<Vec<Command>> {
         debug!("Received {:?} from {}", join_request, peer);
 
-        let section_key_matches = join_request.section_key == *self.section.chain().last_key();
+        let section_key_matches =
+            join_request.section_key == *self.section.chain().await.last_key();
 
         // Ignore `JoinRequest` if we are not elder unless the join request
         // is outdated in which case we reply with `BootstrapResponse::Join`
         // with the up-to-date info (see `handle_join_request`).
-        if self.is_not_elder() && section_key_matches {
+        if self.is_not_elder().await && section_key_matches {
             // Note: We don't bounce this message because the current bounce-resend
             // mechanism wouldn't preserve the original SocketAddr which is needed for
             // properly handling this message.
@@ -63,39 +64,45 @@ impl Core {
             trace!("{}", LogMarker::SendJoinsDisallowed);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                node_msg,
-                *self.section.chain().last_key(),
-            )?]);
+            return Ok(vec![
+                self.send_direct_message(
+                    (*peer.name(), *peer.addr()),
+                    node_msg,
+                    *self.section.chain().await.last_key(),
+                )
+                .await?,
+            ]);
         }
 
-        if !section_key_matches || !self.section.prefix().matches(peer.name()) {
+        if !section_key_matches || !self.section.prefix().await.matches(peer.name()) {
             if section_key_matches {
                 debug!(
                     "JoinRequest from {} - name doesn't match our prefix {:?}.",
                     peer,
-                    self.section.prefix()
+                    self.section.prefix().await
                 );
             } else {
                 debug!(
                     "JoinRequest from {} - doesn't have our latest section_key {:?}, presented {:?}.",
                     peer,
-                    self.section.chain().last_key(),
+                    self.section.chain().await.last_key(),
                     join_request.section_key
                 );
             }
 
-            let retry_sap = self.matching_section(peer.name())?;
+            let retry_sap = self.matching_section(peer.name()).await?;
 
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(retry_sap)));
             trace!("Sending {:?} to {}", node_msg, peer);
-            trace!("{}", LogMarker::SendJoinRetry);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                node_msg,
-                *self.section.chain().last_key(),
-            )?]);
+            trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
+            return Ok(vec![
+                self.send_direct_message(
+                    (*peer.name(), *peer.addr()),
+                    node_msg,
+                    *self.section.chain().await.last_key(),
+                )
+                .await?,
+            ]);
         }
 
         // Start as Adult as long as passed resource signed.
@@ -104,35 +111,41 @@ impl Core {
         // During the first section, node shall use ranged age to avoid too many nodes got
         // relocated at the same time. After the first section got split, nodes shall only
         // start with age of MIN_ADULT_AGE
-        if self.section.prefix().is_empty() {
+        if self.section.prefix().await.is_empty() {
             if peer.age() < FIRST_SECTION_MIN_AGE || peer.age() > FIRST_SECTION_MAX_AGE {
                 let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                    self.section.authority_provider().clone(),
+                    self.section.authority_provider().await,
                 )));
-                trace!("{}", LogMarker::SendJoinRetry);
+                trace!("{}", LogMarker::SendJoinRetryFirstSectionAgeIssue);
                 trace!("New node in first section should join with age greater than MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
-                return Ok(vec![self.send_direct_message(
-                    (*peer.name(), *peer.addr()),
-                    node_msg,
-                    *self.section.chain().last_key(),
-                )?]);
+                return Ok(vec![
+                    self.send_direct_message(
+                        (*peer.name(), *peer.addr()),
+                        node_msg,
+                        *self.section.chain().await.last_key(),
+                    )
+                    .await?,
+                ]);
             } else {
                 age = peer.age();
             }
         } else if peer.age() != MIN_ADULT_AGE {
             // After section split, new node has to join with age of MIN_ADULT_AGE.
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                self.section.authority_provider().clone(),
+                self.section.authority_provider().await,
             )));
 
-            trace!("{}", LogMarker::SendJoinRetry);
+            trace!("{}", LogMarker::SendJoinRetryNotAdult);
 
             trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                node_msg,
-                *self.section.chain().last_key(),
-            )?]);
+            return Ok(vec![
+                self.send_direct_message(
+                    (*peer.name(), *peer.addr()),
+                    node_msg,
+                    *self.section.chain().await.last_key(),
+                )
+                .await?,
+            ]);
         }
 
         // Requires the node name matches the age.
@@ -166,11 +179,12 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    *self.section.chain().last_key(),
-                )?
+                    *self.section.chain().await.last_key(),
+                )
+                .await?
             } else {
                 // It's reachable, let's then send the proof challenge
-                self.send_resource_proof_challenge(&peer)?
+                self.send_resource_proof_challenge(&peer).await?
             };
 
             return Ok(vec![cmd]);
@@ -200,40 +214,46 @@ impl Core {
                 ))
             } else {
                 SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                    self.section.authority_provider().clone(),
+                    self.section.authority_provider().await,
                 )))
             };
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                node_msg,
-                *self.section.chain().last_key(),
-            )?]);
+            return Ok(vec![
+                self.send_direct_message(
+                    (*peer.name(), *peer.addr()),
+                    node_msg,
+                    *self.section.chain().await.last_key(),
+                )
+                .await?,
+            ]);
         };
 
-        if !self.section.prefix().matches(peer.name())
-            || join_request.section_key != *self.section.chain().last_key()
+        if !self.section.prefix().await.matches(peer.name())
+            || join_request.section_key != *self.section.chain().await.last_key()
         {
             debug!(
                 "JoinAsRelocatedRequest from {} - name doesn't match our prefix {:?}.",
                 peer,
-                self.section.prefix()
+                self.section.prefix().await
             );
 
             let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
+                JoinAsRelocatedResponse::Retry(self.section.authority_provider().await),
             ));
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                node_msg,
-                *self.section.chain().last_key(),
-            )?]);
+            return Ok(vec![
+                self.send_direct_message(
+                    (*peer.name(), *peer.addr()),
+                    node_msg,
+                    *self.section.chain().await.last_key(),
+                )
+                .await?,
+            ]);
         }
 
         if self.section.members().is_joined(peer.name()) {
@@ -254,13 +274,13 @@ impl Core {
 
         let details = relocate_payload.relocate_details()?;
 
-        if !self.section.prefix().matches(&details.dst) {
+        if !self.section.prefix().await.matches(&details.dst) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - destination {} doesn't match \
                          our prefix {:?}.",
                 peer,
                 details.dst,
-                self.section.prefix()
+                self.section.prefix().await
             );
             return Ok(vec![]);
         }

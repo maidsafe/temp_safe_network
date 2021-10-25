@@ -9,7 +9,7 @@
 use super::{Command, Event};
 use crate::messaging::{
     data::{ChunkDataExchange, StorageLevel},
-    system::{Section, SystemMsg},
+    system::{Proposal, Section, SystemMsg},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
 use crate::routing::{
@@ -46,7 +46,7 @@ pub(super) struct Dispatcher {
 impl Drop for Dispatcher {
     fn drop(&mut self) {
         // Cancel all scheduled timers including any future ones.
-        let _ = self.cancel_timer_tx.send(true);
+        let _res = self.cancel_timer_tx.send(true);
     }
 }
 
@@ -123,18 +123,18 @@ impl Dispatcher {
 
     pub(super) async fn start_network_probing(self: Arc<Self>) {
         info!("Starting to probe network");
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(PROBE_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
-                let _ = interval.tick().await;
+                let _instant = interval.tick().await;
 
                 // Send a probe message if we are an elder
                 let core = dispatcher.core.read().await;
-                if core.is_elder() && !core.section().prefix().is_empty() {
-                    match core.generate_probe_message() {
+                if core.is_elder().await && !core.section().prefix().await.is_empty() {
+                    match core.generate_probe_message().await {
                         Ok(command) => {
                             drop(core);
                             info!("Sending ProbeMessage");
@@ -166,12 +166,15 @@ impl Dispatcher {
         // from integration tests.
         let span = {
             let core = self.core.read().await;
+
+            let prefix = core.section().prefix().await;
+            let is_elder = core.is_elder().await;
             trace_span!(
                 "handle_command",
                 name = %core.node().name(),
-                prefix = format_args!("({:b})", core.section().prefix()),
+                prefix = format_args!("({:b})", prefix),
                 age = core.node().age(),
-                elder = core.is_elder(),
+                elder = is_elder,
                 cmd_id = %cmd_id,
             )
         };
@@ -263,7 +266,7 @@ impl Dispatcher {
                     .await
             }
             Command::PrepareNodeMsgToSend { msg, dst } => {
-                self.core.read().await.prepare_node_msg(msg, dst)
+                self.core.read().await.prepare_node_msg(msg, dst).await
             }
             Command::HandleMessage {
                 sender,
@@ -276,30 +279,44 @@ impl Dispatcher {
                     .handle_message(sender, wire_msg, original_bytes)
                     .await
             }
-            Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
+            Command::HandleTimeout(token) => self.core.read().await.handle_timeout(token).await,
             Command::HandleAgreement { proposal, sig } => {
                 self.core
-                    .write()
+                    .read()
                     .await
-                    .handle_agreement(proposal, sig)
+                    .handle_non_elder_agreement(proposal, sig)
                     .await
             }
+            Command::HandleElderAgreement { proposal, sig } => match proposal {
+                Proposal::OurElders(section_auth) => {
+                    self.core
+                        .write()
+                        .await
+                        .handle_our_elders_agreement(section_auth, sig)
+                        .await
+                }
+                _ => {
+                    error!("Other agreement messages should be handled in `HandleAgreement`, which is non-blocking ");
+                    Ok(vec![])
+                }
+            },
             Command::HandlePeerLost(addr) => self.core.read().await.handle_peer_lost(&addr).await,
             Command::HandleDkgOutcome {
                 section_auth,
                 outcome,
             } => {
                 self.core
-                    .write()
+                    .read()
                     .await
                     .handle_dkg_outcome(section_auth, outcome)
                     .await
             }
             Command::HandleDkgFailure(signeds) => self
                 .core
-                .write()
+                .read()
                 .await
                 .handle_dkg_failure(signeds)
+                .await
                 .map(|command| vec![command]),
             Command::SendMessage {
                 recipients,
@@ -351,7 +368,7 @@ impl Dispatcher {
                 let msg = {
                     let core = self.core.read().await;
                     let node = core.node();
-                    let section_pk = *core.section().chain.last_key();
+                    let section_pk = *core.section().chain.read().await.last_key();
                     WireMsg::single_src(
                         node,
                         DstLocation::Section {
@@ -369,11 +386,12 @@ impl Dispatcher {
                     .await
                     .section()
                     .active_members()
+                    .await
                     .iter()
                     .filter(|peer| peer.name() != &name && peer.name() != &our_name)
                     .cloned()
                     .collect_vec();
-                Ok(self.core.read().await.send_or_handle(msg, peers))
+                Ok(self.core.read().await.send_or_handle(msg, peers).await)
             }
             Command::TestConnectivity(name) => {
                 let mut commands = vec![];
@@ -415,7 +433,7 @@ impl Dispatcher {
                     .await?
             }
             MsgKind::ServiceMsg(_) => {
-                let _ = self
+                let _res = self
                     .core
                     .read()
                     .await
@@ -474,7 +492,7 @@ impl Dispatcher {
 
                 let recipients = vec![(*name, socket_addr)];
                 wire_msg
-                    .set_dst_section_pk(*self.core.read().await.section_chain().clone().last_key());
+                    .set_dst_section_pk(*self.core.read().await.section_chain().await.last_key());
 
                 let command = Command::SendMessage {
                     recipients,
@@ -491,7 +509,7 @@ impl Dispatcher {
             }
         } else {
             // This message is not for an end user, then send it to peer/s over the network
-            let cmd = self.core.read().await.send_msg_to_peers(wire_msg)?;
+            let cmd = self.core.read().await.send_msg_to_peers(wire_msg).await?;
             Ok(vec![cmd])
         }
     }

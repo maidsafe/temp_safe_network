@@ -11,19 +11,21 @@ use crate::routing::{error::Result, peer::PeerUtils, Event};
 use std::collections::BTreeSet;
 
 impl Core {
-    pub(crate) async fn fire_node_event_for_any_new_adults(&mut self) -> Result<()> {
+    pub(crate) async fn fire_node_event_for_any_new_adults(&self) -> Result<()> {
         let old_adults: BTreeSet<_> = self
             .section
             .live_adults()
+            .await
             .iter()
             .map(|p| p.name())
             .copied()
             .collect();
 
-        if self.is_not_elder() {
+        if self.is_not_elder().await {
             let current_adults: BTreeSet<_> = self
                 .section
                 .live_adults()
+                .await
                 .iter()
                 .map(|p| p.name())
                 .copied()

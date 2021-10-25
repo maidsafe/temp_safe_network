@@ -47,23 +47,32 @@ use crate::routing::{
     section::{SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
+use backoff::ExponentialBackoff;
 use capacity::Capacity;
 use itertools::Itertools;
 use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
 };
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{mpsc, RwLock};
+use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
+
+const BACKOFF_CACHE_LIMIT: usize = 100;
 const KEY_CACHE_SIZE: u8 = 5;
+
+// store up to 100 in use backoffs
+pub(crate) type AeBackoffCache =
+    Arc<RwLock<LRUCache<(XorName, SocketAddr, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
 
 // State + logic of a routing node.
 pub(crate) struct Core {
@@ -88,6 +97,7 @@ pub(crate) struct Core {
     root_storage_dir: PathBuf,
     capacity: Capacity,
     liveness: Liveness,
+    ae_backoff_cache: AeBackoffCache,
 }
 
 impl Core {
@@ -137,6 +147,7 @@ impl Core {
             liveness: adult_liveness,
             root_storage_dir,
             used_space,
+            ae_backoff_cache: AeBackoffCache::default(),
         })
     }
 
@@ -144,21 +155,21 @@ impl Core {
     // Miscellaneous
     ////////////////////////////////////////////////////////////////////////////
 
-    pub(crate) fn state_snapshot(&self) -> StateSnapshot {
+    pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
-            is_elder: self.is_elder(),
-            last_key: *self.section.chain().last_key(),
-            prefix: *self.section.prefix(),
-            elders: self.section().authority_provider().names(),
+            is_elder: self.is_elder().await,
+            last_key: *self.section.chain().await.last_key(),
+            prefix: self.section.prefix().await,
+            elders: self.section().authority_provider().await.names(),
         }
     }
 
-    pub(crate) fn generate_probe_message(&self) -> Result<Command> {
+    pub(crate) async fn generate_probe_message(&self) -> Result<Command> {
         // Generate a random address not belonging to our Prefix
         let mut dst = XorName::random();
 
         // We don't probe ourselves
-        while self.section.prefix().matches(&dst) {
+        while self.section.prefix().await.matches(&dst) {
             dst = XorName::random();
         }
 
@@ -175,6 +186,7 @@ impl Core {
         );
 
         self.send_direct_message_to_nodes(recipients, message, dst_name, section_key)
+            .await
     }
 
     pub(crate) async fn write_prefix_map(&self) {
@@ -211,15 +223,15 @@ impl Core {
     }
 
     /// Generate commands and fire events based upon any node state changes.
-    pub(crate) async fn update_for_new_node_state_and_fire_events(
+    pub(crate) async fn update_self_for_new_node_state_and_fire_events(
         &mut self,
         old: StateSnapshot,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
-        let new = self.state_snapshot();
+        let new = self.state_snapshot().await;
 
         self.section_keys_provider
-            .finalise_dkg(self.section.chain().last_key())
+            .finalise_dkg(self.section.chain().await.last_key())
             .await;
 
         if new.last_key != old.last_key {
@@ -228,7 +240,12 @@ impl Core {
                     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
                     new.prefix,
                     new.last_key,
-                    self.section.authority_provider().peers().format(", ")
+                    self.section
+                        .authority_provider()
+                        .await
+                        .peers()
+                        .iter()
+                        .format(", ")
                 );
 
                 if self.section_keys_provider.has_key_share().await {
@@ -242,14 +259,14 @@ impl Core {
                     );
                 }
 
-                self.print_network_stats();
+                self.print_network_stats().await;
             }
 
             if new.is_elder || old.is_elder {
-                commands.extend(self.send_ae_update_to_our_section(&self.section)?);
+                commands.extend(self.send_ae_update_to_our_section(&self.section).await?);
             }
 
-            let current: BTreeSet<_> = self.section.authority_provider().names();
+            let current: BTreeSet<_> = self.section.authority_provider().await.names();
             let added = current.difference(&old.elders).copied().collect();
             let removed = old.elders.difference(&current).copied().collect();
             let remaining = old.elders.intersection(&current).copied().collect();
@@ -276,6 +293,8 @@ impl Core {
             };
 
             let sibling_elders = if new.prefix != old.prefix {
+                info!("{}", LogMarker::NewPrefix);
+
                 self.network.get(&new.prefix.sibling()).map(|sec_auth| {
                     let current: BTreeSet<_> = sec_auth.names();
                     let added = current.difference(&old.elders).copied().collect();
@@ -294,9 +313,9 @@ impl Core {
             };
 
             let event = if let Some(sibling_elders) = sibling_elders {
-                info!("Split");
+                info!("{}", LogMarker::Split);
                 // In case of split, send AEUpdate to sibling new elder nodes.
-                commands.extend(self.send_ae_update_to_sibling_section(&old)?);
+                commands.extend(self.send_ae_update_to_sibling_section(&old).await?);
 
                 Event::SectionSplit {
                     elders,
@@ -314,32 +333,32 @@ impl Core {
         }
 
         if !new.is_elder {
-            commands.extend(self.return_relocate_promise());
+            commands.extend(self.return_relocate_promise().await);
         }
 
         Ok(commands)
     }
 
-    pub(crate) fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
-        if self.section.prefix().matches(name) {
-            *self.section.chain().last_key()
+    pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
+        if self.section.prefix().await.matches(name) {
+            *self.section.chain().await.last_key()
         } else if let Ok(sap) = self.network.section_by_name(name) {
             sap.section_key()
-        } else if self.section.prefix().sibling().matches(name) {
+        } else if self.section.prefix().await.sibling().matches(name) {
             // For sibling with unknown key, use the previous key in our chain under the assumption
             // that it's the last key before the split and therefore the last key of theirs we know.
             // In case this assumption is not correct (because we already progressed more than one
             // key since the split) then this key would be unknown to them and they would send
             // us back their whole section chain. However, this situation should be rare.
-            *self.section.chain().prev_key()
+            *self.section.chain().await.prev_key()
         } else {
-            *self.section.chain().root_key()
+            *self.section.chain().await.root_key()
         }
     }
 
-    pub(crate) fn print_network_stats(&self) {
+    pub(crate) async fn print_network_stats(&self) {
         self.network
-            .network_stats(self.section.authority_provider())
+            .network_stats(&self.section.authority_provider().await)
             .print();
         self.comm.print_stats();
     }

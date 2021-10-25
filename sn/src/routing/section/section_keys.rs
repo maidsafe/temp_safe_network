@@ -71,7 +71,7 @@ impl SectionKeysProvider {
 
     pub(crate) fn insert_dkg_outcome(&self, share: SectionKeyShare) {
         let public_key = share.public_key_set.public_key();
-        let _ = self.pending.insert(public_key, share);
+        let _prev = self.pending.insert(public_key, share);
     }
 
     pub(crate) async fn finalise_dkg(&self, public_key: &bls::PublicKey) {

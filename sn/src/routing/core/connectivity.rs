@@ -25,7 +25,7 @@ impl Core {
             return Ok(vec![]);
         };
 
-        if self.is_not_elder() {
+        if self.is_not_elder().await {
             // Adults cannot complain about connectivity.
             return Ok(vec![]);
         }
@@ -49,8 +49,11 @@ impl Core {
         let elders: Vec<_> = self
             .section
             .authority_provider()
+            .await
             .peers()
+            .iter()
             .filter(|peer| !names.contains(peer.name()))
+            .cloned()
             .collect();
         let mut result: Vec<Command> = Vec::new();
         for name in names.iter() {

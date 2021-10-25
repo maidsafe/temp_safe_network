@@ -83,7 +83,7 @@ impl Core {
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
                 let mut known_keys: Vec<BlsPublicKey> =
-                    self.section.chain().keys().copied().collect();
+                    self.section.chain().await.keys().copied().collect();
                 known_keys.extend(self.network.section_keys());
                 known_keys.push(*self.section.genesis_key());
 
@@ -105,7 +105,7 @@ impl Core {
                 // Let's check for entropy before we proceed further
                 // Adult nodes don't need to carry out entropy checking,
                 // however the message shall always be handled.
-                if self.is_elder() {
+                if self.is_elder().await {
                     // For the case of receiving a join request not matching our prefix,
                     // we just let the join request handler to deal with it later on.
                     // We also skip AE check on Anti-Entropy messages
@@ -192,9 +192,9 @@ impl Core {
 
                 let src_location = SrcLocation::EndUser(user);
 
-                if self.is_not_elder() {
+                if self.is_not_elder().await {
                     trace!("Redirecting from adult to section elders");
-                    cmds.push(self.ae_redirect(sender, &src_location, &wire_msg)?);
+                    cmds.push(self.ae_redirect(sender, &src_location, &wire_msg).await?);
                     return Ok(cmds);
                 }
 
@@ -255,6 +255,10 @@ impl Core {
         {
             Ok(false) => match msg {
                 SystemMsg::NodeCmd(_)
+                | SystemMsg::AntiEntropyProbe(_)
+                | SystemMsg::AntiEntropyRedirect { .. }
+                | SystemMsg::AntiEntropyRetry { .. }
+                | SystemMsg::BackPressure(_)
                 | SystemMsg::JoinResponse(_)
                 | SystemMsg::JoinRequest(_)
                 | SystemMsg::JoinAsRelocatedRequest(_)
@@ -307,41 +311,8 @@ impl Core {
         msg_authority: NodeMsgAuthority,
         node_msg: SystemMsg,
     ) -> Result<Vec<Command>> {
-        let src_name = msg_authority.name();
-
         trace!("Handling blocking system message");
         match node_msg {
-            SystemMsg::AntiEntropyRetry {
-                section_auth,
-                section_signed,
-                proof_chain,
-                bounced_msg,
-            } => {
-                trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
-                self.handle_anti_entropy_retry_msg(
-                    section_auth,
-                    section_signed,
-                    proof_chain,
-                    bounced_msg,
-                    sender,
-                    src_name,
-                )
-                .await
-            }
-            SystemMsg::AntiEntropyRedirect {
-                section_auth,
-                section_signed,
-                bounced_msg,
-            } => {
-                trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
-                self.handle_anti_entropy_redirect_msg(
-                    section_auth,
-                    section_signed,
-                    bounced_msg,
-                    sender,
-                )
-                .await
-            }
             SystemMsg::AntiEntropyUpdate {
                 section_auth,
                 section_signed,
@@ -357,16 +328,6 @@ impl Core {
                     sender,
                 )
                 .await
-            }
-            SystemMsg::AntiEntropyProbe(_dst) => {
-                trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                Ok(vec![])
-            }
-            SystemMsg::BackPressure(load_report) => {
-                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
-                // #TODO: Factor in med/long term backpressure into general node liveness calculations
-                self.comm.regulate(sender, load_report).await;
-                Ok(vec![])
             }
             SystemMsg::Relocate(ref details) => {
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
@@ -394,7 +355,7 @@ impl Core {
                     sender,
                     msg_id
                 );
-                if self.is_not_elder() {
+                if self.is_not_elder().await {
                     return Ok(vec![]);
                 }
 
@@ -452,6 +413,47 @@ impl Core {
         let src_name = msg_authority.name();
         trace!("Handling non blocking message");
         match node_msg {
+            SystemMsg::AntiEntropyRetry {
+                section_auth,
+                section_signed,
+                proof_chain,
+                bounced_msg,
+            } => {
+                trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
+                self.handle_anti_entropy_retry_msg(
+                    section_auth,
+                    section_signed,
+                    proof_chain,
+                    bounced_msg,
+                    sender,
+                    src_name,
+                )
+                .await
+            }
+            SystemMsg::AntiEntropyRedirect {
+                section_auth,
+                section_signed,
+                bounced_msg,
+            } => {
+                trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
+                self.handle_anti_entropy_redirect_msg(
+                    section_auth,
+                    section_signed,
+                    bounced_msg,
+                    sender,
+                )
+                .await
+            }
+            SystemMsg::AntiEntropyProbe(_dst) => {
+                trace!("Received Probe message from {}: {:?}", sender, msg_id);
+                Ok(vec![])
+            }
+            SystemMsg::BackPressure(load_report) => {
+                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
+                // #TODO: Factor in med/long term backpressure into general node liveness calculations
+                self.comm.regulate(sender, load_report).await;
+                Ok(vec![])
+            }
             SystemMsg::JoinResponse(join_response) => {
                 debug!(
                     "Ignoring unexpected join response message: {:?}",
@@ -470,8 +472,8 @@ impl Core {
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                if self.is_not_elder()
-                    && join_request.section_key == *self.section.chain().last_key()
+                if self.is_not_elder().await
+                    && join_request.section_key == *self.section.chain().await.last_key()
                 {
                     return Ok(vec![]);
                 }
@@ -487,7 +489,7 @@ impl Core {
                 proposal,
                 sig_share,
             } => {
-                if self.is_not_elder() {
+                if self.is_not_elder().await {
                     trace!("Dropping Propose msg from {}: {:?}", sender, msg_id);
                     return Ok(vec![]);
                 }
@@ -544,7 +546,7 @@ impl Core {
                             msg_id
                         );
 
-                        return if self.is_elder() {
+                        return if self.is_elder().await {
                             self.republish_chunk(chunk).await
                         } else {
                             // We are an adult here, so just store away!
@@ -660,7 +662,7 @@ impl Core {
 
             let dst = DstLocation::Section {
                 name: node_xorname,
-                section_pk: self.section.section_auth.value.section_key(),
+                section_pk: self.section.section_auth.read().await.value.section_key(),
             };
 
             cmds.push(Command::PrepareNodeMsgToSend { msg, dst });
@@ -670,7 +672,7 @@ impl Core {
 
     // Locate ideal chunk holders for this chunk, line up wiremsgs for those to instruct them to store the chunk
     async fn republish_chunk(&self, chunk: Chunk) -> Result<Vec<Command>> {
-        if self.is_elder() {
+        if self.is_elder().await {
             let target_holders = self.get_chunk_holder_adults(chunk.name()).await;
             info!(
                 "Republishing chunk {:?} to holders {:?}",
@@ -703,7 +705,7 @@ impl Core {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         // let name = network.our_name().await;
-        let section_pk = *self.section_chain().last_key();
+        let section_pk = *self.section_chain().await.last_key();
 
         let dummy_dst_location = DstLocation::Node {
             name: our_name,
@@ -732,7 +734,7 @@ impl Core {
         for target in targets {
             debug!("sending {:?} to {:?}", wire_msg, target);
             let mut wire_msg = wire_msg.clone();
-            let dst_section_pk = self.section_key_by_name(&target);
+            let dst_section_pk = self.section_key_by_name(&target).await;
             wire_msg.set_dst_section_pk(dst_section_pk);
             wire_msg.set_dst_xorname(target);
 

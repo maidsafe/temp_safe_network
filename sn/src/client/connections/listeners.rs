@@ -33,7 +33,7 @@ impl Session {
         mut incoming_messages: ConnectionIncoming<XorName>,
     ) {
         debug!("Listening for incoming messages");
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             loop {
                 match Self::listen_for_incoming_message(src, &mut incoming_messages).await {
                     Ok(msg) => match Self::handle_msg(msg, src, session.clone()).await {
@@ -144,7 +144,7 @@ impl Session {
         let queries = session.pending_queries.clone();
         let error_sender = session.incoming_err_sender;
 
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             match msg {
                 ServiceMsg::QueryResponse { response, .. } => {
                     // Note that this doesn't remove the sender from here since multiple
@@ -183,7 +183,7 @@ impl Session {
                         correlation_id
                     );
                     warn!("CmdError received is: {:?}", error);
-                    let _ = error_sender.send(error.clone()).await;
+                    let _error_from_sender = error_sender.send(error.clone()).await;
 
                     match error {
                         CmdError::Data(_error) => {

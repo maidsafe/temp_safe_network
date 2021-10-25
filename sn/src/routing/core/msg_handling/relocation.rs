@@ -32,20 +32,20 @@ impl Core {
         let mut commands = vec![];
 
         // Do not carry out relocation when there is not enough elder nodes.
-        if self.section.authority_provider().elder_count() < ELDER_SIZE {
+        if self.section.authority_provider().await.elder_count() < ELDER_SIZE {
             return Ok(commands);
         }
 
         // Consider: Set <= 4, as to not carry out relocations in first 16 sections.
         // TEMP: Do not carry out relocations in the first section
-        if self.section.prefix().bit_count() < 1 {
+        if self.section.prefix().await.bit_count() < 1 {
             return Ok(commands);
         }
 
         let relocations =
             relocation::actions(&self.section, &self.network, churn_name, churn_signature);
 
-        for (info, action) in relocations {
+        for (info, action) in relocations.await {
             let peer = info.peer;
 
             // The newly joined node is not being relocated immediately.
@@ -84,7 +84,7 @@ impl Core {
         age: u8,
     ) -> Result<Vec<Command>> {
         let details =
-            RelocateDetails::with_age(&self.section, &self.network, peer, *peer.name(), age);
+            RelocateDetails::with_age(&self.section, &self.network, peer, *peer.name(), age).await;
 
         trace!(
             "Relocating {:?} to {} with age {} due to rejoin",
@@ -130,7 +130,7 @@ impl Core {
         // Create a new instance of JoiningAsRelocated to start the relocation
         // flow. This same instance will handle responses till relocation is complete.
         let genesis_key = *self.section.genesis_key();
-        let bootstrap_addrs = self.section.authority_provider().addresses();
+        let bootstrap_addrs = self.section.authority_provider().await.addresses();
         let mut joining_as_relocated = JoiningAsRelocated::new(
             self.node.clone(),
             genesis_key,
@@ -161,7 +161,7 @@ impl Core {
         } else {
             // Promise returned from a node to be relocated, to be exchanged for the actual
             // `Relocate` message.
-            if self.is_not_elder() || self.section.is_elder(&promise.name) {
+            if self.is_not_elder().await || self.section.is_elder(&promise.name).await {
                 // If we are not elder, maybe we just haven't processed our promotion yet.
                 // If otherwise they are still elder, maybe we just haven't processed their demotion yet.
                 return Ok(vec![]);
@@ -191,14 +191,14 @@ impl Core {
             }
 
             // We are no longer elder. Send the promise back already.
-            if self.is_not_elder() {
-                commands.push(self.send_message_to_our_elders(msg)?);
+            if self.is_not_elder().await {
+                commands.push(self.send_message_to_our_elders(msg).await?);
             }
 
             return Ok(commands);
         }
 
-        if self.section.is_elder(&promise.name) {
+        if self.section.is_elder(&promise.name).await {
             error!(
                 "ignore returned RelocatePromise from {} - node is still elder",
                 promise.name
@@ -208,7 +208,7 @@ impl Core {
 
         if let Some(info) = self.section.members().get(&promise.name) {
             let details =
-                RelocateDetails::new(&self.section, &self.network, &info.peer, promise.dst);
+                RelocateDetails::new(&self.section, &self.network, &info.peer, promise.dst).await;
             commands.extend(self.send_relocate(info.peer, details).await?);
         } else {
             error!(

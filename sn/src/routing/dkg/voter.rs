@@ -127,7 +127,7 @@ impl DkgVoter {
                     commands.extend(session.process_message(node, &dkg_key, message, section_pk)?);
                 }
 
-                let _ = self.sessions.insert(dkg_key, session);
+                let _prev = self.sessions.insert(dkg_key, session);
 
                 // Remove uneeded old sessions.
                 self.sessions.retain(|existing_dkg_key, _| {

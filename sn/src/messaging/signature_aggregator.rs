@@ -227,7 +227,7 @@ mod tests {
         // First insert less than threshold + 1 valid shares.
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            let _ = aggregator.add(payload, sig_share).await;
+            let _keyed_sig = aggregator.add(payload, sig_share).await;
         }
 
         // Then try to insert invalid share.
@@ -259,7 +259,7 @@ mod tests {
 
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            let _ = aggregator.add(payload, sig_share).await;
+            let _keyed_sig = aggregator.add(payload, sig_share).await;
         }
 
         sleep(Duration::from_secs(1));
