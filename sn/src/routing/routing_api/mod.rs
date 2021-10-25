@@ -313,7 +313,7 @@ impl Routing {
 
     /// Returns the Section Chain's genesis key
     pub async fn genesis_key(&self) -> bls::PublicKey {
-        self.dispatcher.core.read().await.section().genesis_key
+        *self.dispatcher.core.read().await.section().genesis_key()
     }
 
     /// Prefix of our section

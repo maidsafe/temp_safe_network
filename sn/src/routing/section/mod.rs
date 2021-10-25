@@ -17,7 +17,7 @@ pub(crate) use self::section_authority_provider::test_utils;
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 use crate::messaging::{
-    system::{ElderCandidates, KeyedSig, NodeState, Peer, Section, SectionAuth, SectionPeers},
+    system::{ElderCandidates, KeyedSig, NodeState, Peer, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -26,15 +26,29 @@ use crate::routing::{
     peer::PeerUtils,
     ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
 };
+use bls::PublicKey as BlsPublicKey;
 pub(crate) use node_state::NodeStateUtils;
 pub(crate) use section_authority_provider::ElderCandidatesUtils;
 use section_authority_provider::SectionAuthorityProviderUtils;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use std::sync::Arc;
-use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr};
+use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
+
+/// Container for storing information about a section.
+#[derive(Clone, Debug)]
+/// All information about a section
+pub(crate) struct Section {
+    /// Network genesis key
+    genesis_key: BlsPublicKey,
+    /// The secured linked list of previous section keys, starting from genesis key
+    pub(crate) chain: Arc<RwLock<SecuredLinkedList>>,
+    /// Signed section authority
+    pub(crate) section_auth: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
+    /// Members of the section
+    section_peers: SectionPeers,
+}
 
 impl Section {
     /// Creates a minimal `Section` initially containing only info about our elders

@@ -477,16 +477,17 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{
-        system::Section, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
-    };
+    use crate::messaging::{DstLocation, MessageId, MessageType, MsgKind, NodeAuth};
     use crate::routing::{
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
         node::Node,
         routing_api::tests::create_comm,
-        section::test_utils::{gen_addr, gen_section_authority_provider},
+        section::{
+            test_utils::{gen_addr, gen_section_authority_provider},
+            Section,
+        },
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;

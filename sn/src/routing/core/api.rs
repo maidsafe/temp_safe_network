@@ -12,7 +12,7 @@ use super::{
 };
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    system::{NodeState, Peer, Proposal, Section},
+    system::{NodeState, Peer, Proposal},
     SectionAuthorityProvider, WireMsg,
 };
 use crate::prefix_map::NetworkPrefixMap;
@@ -21,7 +21,7 @@ use crate::routing::{
     error::Result,
     node::Node,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionKeyShare, SectionKeysProvider},
+    section::{NodeStateUtils, Section, SectionKeyShare, SectionKeysProvider},
     Event,
 };
 use resource_proof::ResourceProof;
