@@ -67,6 +67,7 @@ struct Join<'a> {
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
     prefix: Prefix,
+    backoff: ExponentialBackoff,
 }
 
 impl<'a> Join<'a> {
@@ -80,6 +81,12 @@ impl<'a> Join<'a> {
             recv_rx,
             node,
             prefix: Prefix::default(),
+            backoff: ExponentialBackoff {
+                initial_interval: Duration::from_millis(50),
+                max_interval: Duration::from_secs(1),
+                max_elapsed_time: Some(Duration::from_secs(20)),
+                ..Default::default()
+            },
         }
     }
 
@@ -120,34 +127,14 @@ impl<'a> Join<'a> {
             resource_proof_response: None,
         };
 
-        self.send_join_requests(join_request, &recipients, section_key)
+        self.send_join_requests(join_request, &recipients, section_key, false)
             .await?;
 
         // Avoid sending more than one request to the same peer.
         let mut used_recipient = HashSet::<SocketAddr>::new();
 
-        // use some backoff here as we try and join
-        let mut our_backoff = ExponentialBackoff {
-            initial_interval: Duration::from_millis(100),
-            max_interval: Duration::from_secs(3),
-            max_elapsed_time: Some(Duration::from_secs(20)),
-            ..Default::default()
-        };
-
-        let mut has_started = false;
         loop {
             used_recipient.extend(recipients.iter().map(|(_, addr)| addr));
-
-            if has_started {
-                // use exponential backoff here to delay our responses and avoid any intensive join reqs
-                let next_wait = our_backoff.next_backoff();
-
-                if let Some(wait) = next_wait {
-                    tokio::time::sleep(wait).await;
-                }
-            } else {
-                has_started = true;
-            }
 
             let (response, sender, src_name) = self.receive_join_response().await?;
 
@@ -245,7 +232,7 @@ impl<'a> Join<'a> {
                         };
 
                         recipients = new_recipients;
-                        self.send_join_requests(join_request, &recipients, section_key)
+                        self.send_join_requests(join_request, &recipients, section_key, true)
                             .await?;
                     } else {
                         warn!(
@@ -296,7 +283,7 @@ impl<'a> Join<'a> {
 
                         recipients = new_recipients;
 
-                        self.send_join_requests(join_request, &recipients, section_key)
+                        self.send_join_requests(join_request, &recipients, section_key, true)
                             .await?;
                     } else {
                         warn!(
@@ -328,7 +315,7 @@ impl<'a> Join<'a> {
                         }),
                     };
                     let recipients = &[(src_name, sender)];
-                    self.send_join_requests(join_request, recipients, section_key)
+                    self.send_join_requests(join_request, recipients, section_key, false)
                         .await?;
                 }
             }
@@ -340,7 +327,17 @@ impl<'a> Join<'a> {
         join_request: JoinRequest,
         recipients: &[(XorName, SocketAddr)],
         section_key: BlsPublicKey,
+        should_backoff: bool,
     ) -> Result<()> {
+        if should_backoff {
+            // use exponential backoff here to delay our responses and avoid any intensive join reqs
+            let next_wait = self.backoff.next_backoff();
+
+            if let Some(wait) = next_wait {
+                tokio::time::sleep(wait).await;
+            }
+        }
+
         info!("Sending {:?} to {:?}", join_request, recipients);
 
         let node_msg = SystemMsg::JoinRequest(Box::new(join_request));
