@@ -46,7 +46,7 @@ pub(crate) struct Section {
     /// The secured linked list of previous section keys, starting from genesis key
     pub(crate) chain: Arc<RwLock<SecuredLinkedList>>,
     /// Signed section authority
-    pub(crate) section_auth: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
+    section_auth: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
     /// Members of the section
     section_peers: SectionPeers,
 }
@@ -61,18 +61,18 @@ impl Section {
         chain: SecuredLinkedList,
         section_auth: SectionAuth<SectionAuthorityProvider>,
     ) -> Result<Self, Error> {
+        if genesis_key != *chain.root_key() {
+            return Err(Error::UntrustedProofChain(format!(
+                "genesis key doesn't match first key in proof chain: {:?}",
+                chain.root_key()
+            )));
+        }
+
         if section_auth.sig.public_key != *chain.last_key() {
             error!("can't create section: section_auth signed with incorrect key");
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key doesn't match last key in proof chain: {:?}",
                 section_auth.value
-            )));
-        }
-
-        if genesis_key != *chain.root_key() {
-            return Err(Error::UntrustedProofChain(format!(
-                "genesis key doesn't match first key in proof chain: {:?}",
-                chain.root_key()
             )));
         }
 
@@ -147,12 +147,10 @@ impl Section {
     }
 
     /// Try to merge this `Section` members with `other`. .
-    pub(super) async fn merge_members(&self, members: Option<SectionPeers>) -> Result<()> {
-        if let Some(peers) = members {
-            for refmulti in peers.members.iter() {
-                let info = refmulti.value().clone();
-                let _changed = self.update_member(info).await;
-            }
+    pub(super) async fn merge_members(&self, peers: SectionPeers) -> Result<()> {
+        for refmulti in peers.members.iter() {
+            let info = refmulti.value().clone();
+            let _changed = self.update_member(info).await;
         }
 
         self.section_peers
@@ -160,6 +158,7 @@ impl Section {
 
         Ok(())
     }
+
     /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or
     /// its chain is not compatible with the chain of `self`.
     pub(super) async fn merge_chain(
@@ -182,11 +181,13 @@ impl Section {
         new_section_auth: SectionAuth<SectionAuthorityProvider>,
         new_key_sig: KeyedSig,
     ) -> bool {
-        if new_section_auth.value.prefix() != self.prefix().await
-            && !new_section_auth
-                .value
-                .prefix()
-                .is_extension_of(&self.prefix().await)
+        let (our_prefix, section_key) = {
+            let signed_sap = self.section_auth.read().await;
+            (signed_sap.value.prefix, signed_sap.value.section_key())
+        };
+
+        if new_section_auth.value.prefix() != our_prefix
+            && !new_section_auth.value.prefix().is_extension_of(&our_prefix)
         {
             return false;
         }
@@ -195,25 +196,33 @@ impl Section {
             return false;
         }
 
-        // TODO: dont chain insert here
-        if let Err(error) = self.chain.write().await.insert(
-            &new_key_sig.public_key,
-            new_section_auth.sig.public_key,
-            new_key_sig.signature,
-        ) {
+        let new_section_key = new_section_auth.sig.public_key;
+        let signed_by_key = new_key_sig.public_key;
+
+        // Check if it's a SAP signed by current section key
+        // TODO: this shall be checked by SecuredLinkedList automatically
+        if section_key != signed_by_key {
+            return false;
+        }
+
+        if let Err(error) =
+            self.chain
+                .write()
+                .await
+                .insert(&signed_by_key, new_section_key, new_key_sig.signature)
+        {
             error!(
                 "failed to insert key {:?} (signed with {:?}) into the section chain: {:?}",
-                new_section_auth.sig.public_key, new_key_sig.public_key, error,
+                new_section_key, signed_by_key, error,
             );
             return false;
         }
 
-        if &new_section_auth.sig.public_key == self.chain.read().await.last_key() {
-            *self.section_auth.write().await = new_section_auth;
-        }
+        // Update our section's SAP
+        let new_prefix = new_section_auth.value.prefix();
+        *self.section_auth.write().await = new_section_auth;
 
-        self.section_peers
-            .retain(&self.section_auth.read().await.value.prefix());
+        self.section_peers.retain(&new_prefix);
 
         true
     }
@@ -228,23 +237,42 @@ impl Section {
         self.section_peers.update(node_state)
     }
 
+    /// Return a copy of the section chain
     pub(super) async fn chain(&self) -> SecuredLinkedList {
         self.chain.read().await.clone()
     }
 
+    /// Return current section key
+    pub(super) async fn section_key(&self) -> bls::PublicKey {
+        *self.chain.read().await.last_key()
+    }
+
+    /// Return current section chain length
+    pub(crate) async fn main_chain_branch_len(&self) -> u64 {
+        self.chain.read().await.main_branch_len() as u64
+    }
+
+    /// Return weather current section chain has the provided key
+    pub(crate) async fn has_chain_key(&self, key: &bls::PublicKey) -> bool {
+        self.chain.read().await.has_key(key)
+    }
+
+    /// Return a copy of current SAP
     pub(super) async fn authority_provider(&self) -> SectionAuthorityProvider {
         self.section_auth.read().await.value.clone()
     }
 
+    /// Return a copy of current SAP with corresponding section authority
     pub(super) async fn section_signed_authority_provider(
         &self,
     ) -> SectionAuth<SectionAuthorityProvider> {
-        let auth = self.section_auth.read().await.clone();
-        auth
+        self.section_auth.read().await.clone()
     }
 
+    /// Return weather we are an Elder, by checking if we are one of
+    /// the current section's SAP member,
     pub(super) async fn is_elder(&self, name: &XorName) -> bool {
-        self.authority_provider().await.contains_elder(name)
+        self.section_auth.read().await.value.contains_elder(name)
     }
 
     /// Generate a new section info(s) based on the current set of members,
@@ -263,14 +291,13 @@ impl Section {
 
         // Candidates for elders out of all the nodes in the section, even out of the
         // relocating nodes if there would not be enough instead.
-        let expected_peers = self.section_peers.elder_candidates(
-            ELDER_SIZE,
-            &self.authority_provider().await,
-            excluded_names,
-        );
+        let sap = self.authority_provider().await;
+        let expected_peers = self
+            .section_peers
+            .elder_candidates(ELDER_SIZE, &sap, excluded_names);
 
         let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).cloned().collect();
-        let current_names: BTreeSet<_> = self.authority_provider().await.names();
+        let current_names: BTreeSet<_> = sap.names();
 
         if expected_names == current_names {
             vec![]
@@ -278,17 +305,17 @@ impl Section {
             warn!("ignore attempt to reduce the number of elders too much");
             vec![]
         } else {
-            let elder_candidates =
-                ElderCandidates::new(expected_peers, self.authority_provider().await.prefix());
+            let elder_candidates = ElderCandidates::new(expected_peers, sap.prefix());
             vec![elder_candidates]
         }
     }
 
-    // Prefix of our section.
+    /// Prefix of our section.
     pub(super) async fn prefix(&self) -> Prefix {
-        self.authority_provider().await.prefix
+        self.section_auth.read().await.value.prefix
     }
 
+    /// Return the list of our section's members
     pub(super) fn members(&self) -> &SectionPeers {
         &self.section_peers
     }

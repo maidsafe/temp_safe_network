@@ -170,6 +170,7 @@ impl Dispatcher {
 
             let prefix = core.section().prefix().await;
             let is_elder = core.is_elder().await;
+            let section_key = core.section().section_key().await;
             trace_span!(
                 "handle_command",
                 name = %core.node().name(),
@@ -177,6 +178,7 @@ impl Dispatcher {
                 age = core.node().age(),
                 elder = is_elder,
                 cmd_id = %cmd_id,
+                section_key = ?section_key,
             )
         };
 
@@ -369,7 +371,7 @@ impl Dispatcher {
                 let msg = {
                     let core = self.core.read().await;
                     let node = core.node();
-                    let section_pk = *core.section().chain.read().await.last_key();
+                    let section_pk = core.section().section_key().await;
                     WireMsg::single_src(
                         node,
                         DstLocation::Section {

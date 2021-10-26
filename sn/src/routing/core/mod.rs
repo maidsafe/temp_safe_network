@@ -160,7 +160,7 @@ impl Core {
     pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
             is_elder: self.is_elder().await,
-            last_key: *self.section.chain().await.last_key(),
+            last_key: self.section.section_key().await,
             prefix: self.section.prefix().await,
             elders: self.section().authority_provider().await.names(),
         }
@@ -233,7 +233,7 @@ impl Core {
         let new = self.state_snapshot().await;
 
         self.section_keys_provider
-            .finalise_dkg(self.section.chain().await.last_key())
+            .finalise_dkg(&self.section.section_key().await)
             .await;
 
         if new.last_key != old.last_key {
@@ -343,7 +343,7 @@ impl Core {
 
     pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
         if self.section.prefix().await.matches(name) {
-            *self.section.chain().await.last_key()
+            self.section.section_key().await
         } else if let Ok(sap) = self.network.section_by_name(name) {
             sap.section_key()
         } else if self.section.prefix().await.sibling().matches(name) {
@@ -354,7 +354,7 @@ impl Core {
             // us back their whole section chain. However, this situation should be rare.
             *self.section.chain().await.prev_key()
         } else {
-            *self.section.chain().await.root_key()
+            *self.section.genesis_key()
         }
     }
 

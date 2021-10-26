@@ -52,8 +52,7 @@ impl Core {
             .await
             .map_err(|_| Error::PermitAcquisitionFailed)?;
 
-        let section_key_matches =
-            join_request.section_key == *self.section.chain().await.last_key();
+        let section_key_matches = join_request.section_key == self.section.section_key().await;
 
         // Ignore `JoinRequest` if we are not elder unless the join request
         // is outdated in which case we reply with `BootstrapResponse::Join`
@@ -87,7 +86,7 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    *self.section.chain().await.last_key(),
+                    self.section.section_key().await,
                 )
                 .await?,
             ]);
@@ -104,7 +103,7 @@ impl Core {
                 debug!(
                     "JoinRequest from {} - doesn't have our latest section_key {:?}, presented {:?}.",
                     peer,
-                    self.section.chain().await.last_key(),
+                    self.section.section_key().await,
                     join_request.section_key
                 );
             }
@@ -118,7 +117,7 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    *self.section.chain().await.last_key(),
+                    self.section.section_key().await,
                 )
                 .await?,
             ]);
@@ -142,7 +141,7 @@ impl Core {
                     self.send_direct_message(
                         (*peer.name(), *peer.addr()),
                         node_msg,
-                        *self.section.chain().await.last_key(),
+                        self.section.section_key().await,
                     )
                     .await?,
                 ]);
@@ -162,7 +161,7 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    *self.section.chain().await.last_key(),
+                    self.section.section_key().await,
                 )
                 .await?,
             ]);
@@ -199,7 +198,7 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    *self.section.chain().await.last_key(),
+                    self.section.section_key().await,
                 )
                 .await?
             } else {
@@ -244,14 +243,14 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    *self.section.chain().await.last_key(),
+                    self.section.section_key().await,
                 )
                 .await?,
             ]);
         };
 
         if !self.section.prefix().await.matches(peer.name())
-            || join_request.section_key != *self.section.chain().await.last_key()
+            || join_request.section_key != self.section.section_key().await
         {
             debug!(
                 "JoinAsRelocatedRequest from {} - name doesn't match our prefix {:?}.",
@@ -270,7 +269,7 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    *self.section.chain().await.last_key(),
+                    self.section.section_key().await,
                 )
                 .await?,
             ]);

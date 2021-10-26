@@ -19,8 +19,9 @@ use crate::routing::{
     section::SectionKeyShare,
     SectionAuthorityProviderUtils,
 };
+use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 
 impl Core {
@@ -87,7 +88,7 @@ impl Core {
             return Err(Error::InvalidSrcLocation);
         }
 
-        let generation = self.section.chain().await.main_branch_len() as u64;
+        let generation = self.section.main_chain_branch_len().await;
 
         let elder_candidates = if let Some(elder_candidates) = self
             .section
@@ -145,7 +146,7 @@ impl Core {
 
         self.section_keys_provider.insert_dkg_outcome(key_share);
 
-        if self.section.chain().await.has_key(&public_key) {
+        if self.section.has_chain_key(&public_key).await {
             self.section_keys_provider.finalise_dkg(&public_key).await;
         }
 
@@ -158,5 +159,23 @@ impl Core {
     ) -> Result<Command> {
         let node_msg = SystemMsg::DkgFailureAgreement(failure_set);
         self.send_message_to_our_elders(node_msg).await
+    }
+
+    pub(crate) async fn check_lagging(
+        &self,
+        peer: (XorName, SocketAddr),
+        public_key: &BlsPublicKey,
+    ) -> Result<Option<Command>> {
+        if self.section.has_chain_key(public_key).await
+            && public_key != &self.section.section_key().await
+        {
+            let msg = self.generate_ae_update(*public_key, true).await?;
+            trace!("{}", LogMarker::SendingAeUpdateAfterLagCheck);
+
+            let cmd = self.send_direct_message(peer, msg, *public_key).await?;
+            Ok(Some(cmd))
+        } else {
+            Ok(None)
+        }
     }
 }

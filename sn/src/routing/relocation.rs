@@ -89,7 +89,7 @@ impl RelocateDetailsUtils for RelocateDetails {
         dst: XorName,
         age: u8,
     ) -> RelocateDetails {
-        let root_key = *section.chain().await.root_key();
+        let root_key = *section.genesis_key();
 
         let dst_key = network
             .section_by_name(&dst)
