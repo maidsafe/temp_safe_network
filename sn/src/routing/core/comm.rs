@@ -137,7 +137,7 @@ impl Comm {
             wire_msg.set_dst_xorname(*name);
 
             let bytes = wire_msg.serialize()?;
-            let priority = wire_msg.msg_kind().priority();
+            let priority = wire_msg.clone().into_message()?.priority();
             let retries = self.back_pressure.get(addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
             self.endpoint
@@ -230,7 +230,7 @@ impl Comm {
         }
 
         let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
-        let priority = wire_msg.msg_kind().priority();
+        let priority = wire_msg.clone().into_message()?.priority();
 
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends

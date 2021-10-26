@@ -49,6 +49,107 @@ pub enum MessageType {
     },
 }
 
+impl MessageType {
+    /// The priority of the message, when handled by lower level comms.
+    pub fn priority(&self) -> i32 {
+        match self {
+            // DKG messages
+            MessageType::System {
+                msg: SystemMsg::DkgStart { .. },
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::DkgMessage { .. },
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::DkgFailureObservation { .. },
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::DkgFailureAgreement(_),
+                ..
+            } => 3,
+
+            // Node messages for AE updates
+            MessageType::System {
+                msg: SystemMsg::AntiEntropyRetry { .. },
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::AntiEntropyRedirect { .. },
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::AntiEntropyUpdate { .. },
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::AntiEntropyProbe(_),
+                ..
+            } => 2,
+
+            MessageType::System {
+                msg: SystemMsg::BackPressure(_),
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::Relocate(_),
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::RelocatePromise(_),
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::JoinRequest(_),
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::JoinResponse(_),
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::JoinAsRelocatedRequest(_),
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::JoinAsRelocatedResponse(_),
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::Propose { .. },
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::StartConnectivityTest(_),
+                ..
+            } => 1,
+
+            // Node messages related to processing client queries
+            MessageType::System {
+                msg: SystemMsg::NodeCmd(_),
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::NodeQuery(_),
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::NodeQueryResponse { .. },
+                ..
+            }
+            | MessageType::System {
+                msg: SystemMsg::NodeMsgError { .. },
+                ..
+            } => 0,
+
+            // Service messages for client queries
+            MessageType::Service { .. } => -2,
+        }
+    }
+}
+
 /// Authority of a NodeMsg.
 /// Src of message and authority to send it. Authority is validated by the signature.
 #[derive(PartialEq, Debug, Clone)]
