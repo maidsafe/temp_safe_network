@@ -7,27 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::RegisterCmd;
-use crate::types::{Error, PublicKey, Result};
+use crate::types::{Error, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use xor_name::XorName;
-
-/// Information about a chunk.
-#[derive(Default, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct ChunkMetadata {
-    /// `XorName`s of the holders of the chunk.
-    pub holders: BTreeSet<XorName>,
-
-    /// Chunk owner.
-    pub owner: Option<PublicKey>,
-}
-
-/// Information about a holder.
-#[derive(Default, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct HolderMetadata {
-    /// Held chunks.
-    pub chunks: BTreeSet<XorName>,
-}
 
 /// Metadata (register and chunk holders) replication.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
