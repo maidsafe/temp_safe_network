@@ -417,7 +417,11 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        let initial_contacts = elders_or_adults[0..NODES_TO_CONTACT_PER_STARTUP_BATCH].to_vec();
+        let initial_contacts = elders_or_adults
+            .iter()
+            .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
+            .copied()
+            .collect();
         send_message(
             self.clone(),
             initial_contacts,
