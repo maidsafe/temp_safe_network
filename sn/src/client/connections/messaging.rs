@@ -364,13 +364,6 @@ impl Session {
         }
     }
 
-    // /// This tells us if we've seen at least _one_ AE-Retry msg (and attempted to resend it + cached that)
-    // /// This can be useful to know if we're still working with _only_ genesis key knowledge
-    // #[instrument(skip_all, level = "debug")]
-    // pub(crate) async fn has_seen_ae_retry(&self) -> bool {
-
-    // }
-
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn make_contact_with_nodes(
         &self,
