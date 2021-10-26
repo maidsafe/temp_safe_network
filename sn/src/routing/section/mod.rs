@@ -114,13 +114,14 @@ impl Section {
         let secret_key_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
         let public_key_set = secret_key_set.public_keys();
         let secret_key_share = secret_key_set.secret_key_share(0);
+        let genesis_key = public_key_set.public_key();
 
         let section_auth =
             create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
 
         let section = Section::new(
-            section_auth.sig.public_key,
-            SecuredLinkedList::new(section_auth.sig.public_key),
+            genesis_key,
+            SecuredLinkedList::new(genesis_key),
             section_auth,
         )?;
 
@@ -245,6 +246,7 @@ impl Section {
     /// Return current section key
     pub(super) async fn section_key(&self) -> bls::PublicKey {
         *self.chain.read().await.last_key()
+        //self.section_auth.read().await.value.section_key()
     }
 
     /// Return current section chain length

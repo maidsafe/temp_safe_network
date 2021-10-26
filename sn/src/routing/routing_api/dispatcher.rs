@@ -185,6 +185,19 @@ impl Dispatcher {
         async {
             trace!("{:?} {}", LogMarker::CommandHandleStart, command);
             trace!(?command);
+            {
+                let core = self.core.read().await;
+
+                let section_key = core.section().section_key().await;
+                let chain_last_key = *core.section().chain().await.last_key();
+                if section_key != chain_last_key {
+                    trace!(
+                        ">>>>>>>>>>NO>>>>>>> {:?} != {:?}",
+                        section_key,
+                        chain_last_key
+                    );
+                }
+            }
 
             let command_display = command.to_string();
             match self.try_handle_command(command).await {
