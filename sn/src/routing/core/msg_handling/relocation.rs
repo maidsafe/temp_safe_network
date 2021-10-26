@@ -97,12 +97,12 @@ impl Core {
     }
 
     pub(crate) async fn handle_relocate(
-        &mut self,
+        &self,
         relocate_details: RelocateDetails,
         node_msg: SystemMsg,
         section_auth: AuthorityProof<SectionAuth>,
     ) -> Result<Option<Command>> {
-        if relocate_details.pub_id != self.node.name() {
+        if relocate_details.pub_id != self.node.read().await.name() {
             // This `Relocate` message is not for us - it's most likely a duplicate of a previous
             // message that we already handled.
             return Ok(None);
@@ -113,7 +113,7 @@ impl Core {
             relocate_details.dst
         );
 
-        match self.relocate_state {
+        match *self.relocate_state.read().await {
             Some(RelocateState::InProgress(_)) => {
                 trace!("Ignore Relocate - relocation already in progress");
                 return Ok(None);
@@ -121,7 +121,7 @@ impl Core {
             Some(RelocateState::Delayed(_)) => (),
             None => {
                 self.send_event(Event::RelocationStarted {
-                    previous_name: self.node.name(),
+                    previous_name: self.node.read().await.name(),
                 })
                 .await;
             }
@@ -132,7 +132,7 @@ impl Core {
         let genesis_key = *self.section.genesis_key();
         let bootstrap_addrs = self.section.authority_provider().await.addresses();
         let mut joining_as_relocated = JoiningAsRelocated::new(
-            self.node.clone(),
+            self.node.read().await.clone(),
             genesis_key,
             relocate_details,
             node_msg,
@@ -141,20 +141,21 @@ impl Core {
 
         let cmd = joining_as_relocated.start(bootstrap_addrs)?;
 
-        self.relocate_state = Some(RelocateState::InProgress(Box::new(joining_as_relocated)));
+        *self.relocate_state.write().await =
+            Some(RelocateState::InProgress(Box::new(joining_as_relocated)));
 
         Ok(Some(cmd))
     }
 
     pub(crate) async fn handle_relocate_promise(
-        &mut self,
+        &self,
         promise: RelocatePromise,
         msg: SystemMsg,
     ) -> Result<Vec<Command>> {
         // Check if we need to filter out the `RelocatePromise`.
-        if promise.name == self.node.name() {
+        if promise.name == self.node.read().await.name() {
             // Promise to relocate us.
-            if self.relocate_state.is_some() {
+            if self.relocate_state.read().await.is_some() {
                 // Already received a promise or already relocating. discard.
                 return Ok(vec![]);
             }
@@ -170,15 +171,15 @@ impl Core {
 
         let mut commands = vec![];
 
-        if promise.name == self.node.name() {
+        if promise.name == self.node.read().await.name() {
             // Store the `RelocatePromise` message and send it back after we are demoted.
             // Keep it around even if we are not elder anymore, in case we need to resend it.
-            match self.relocate_state {
+            match *self.relocate_state.read().await {
                 None => {
                     trace!("Received RelocatePromise to section at {}", promise.dst);
-                    self.relocate_state = Some(RelocateState::Delayed(msg.clone()));
+                    *self.relocate_state.write().await = Some(RelocateState::Delayed(msg.clone()));
                     self.send_event(Event::RelocationStarted {
-                        previous_name: self.node.name(),
+                        previous_name: self.node.read().await.name(),
                     })
                     .await;
                 }

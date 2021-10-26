@@ -21,7 +21,7 @@ use xor_name::XorName;
 
 // Resource signed
 impl Core {
-    pub(crate) fn validate_resource_proof_response(
+    pub(crate) async fn validate_resource_proof_response(
         &self,
         peer_name: &XorName,
         response: ResourceProofResponse,
@@ -34,6 +34,8 @@ impl Core {
 
         if self
             .node
+            .read()
+            .await
             .keypair
             .public
             .verify(&serialized, &response.nonce_signature)
@@ -54,7 +56,7 @@ impl Core {
             data_size: RESOURCE_PROOF_DATA_SIZE,
             difficulty: RESOURCE_PROOF_DIFFICULTY,
             nonce,
-            nonce_signature: ed25519::sign(&serialized, &self.node.keypair),
+            nonce_signature: ed25519::sign(&serialized, &self.node.read().await.keypair),
         }));
 
         trace!("{}", LogMarker::SendResourceProofChallenge);

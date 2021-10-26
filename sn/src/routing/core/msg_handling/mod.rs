@@ -305,7 +305,7 @@ impl Core {
     // Handler for node messages which have successfully
     // passed all signature checks and msg verifications
     pub(crate) async fn handle_blocking_message(
-        &mut self,
+        &self,
         sender: SocketAddr,
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
@@ -364,7 +364,7 @@ impl Core {
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(RelocateState::InProgress(ref mut joining_as_relocated)) =
-                    self.relocate_state.as_mut()
+                    *self.relocate_state.write().await
                 {
                     if let Some(cmd) = joining_as_relocated
                         .handle_join_response(*join_response, sender)
@@ -503,7 +503,10 @@ impl Core {
                 elder_candidates,
             } => {
                 trace!("Handling msg: Dkg-Start from {}", sender);
-                if !elder_candidates.elders.contains_key(&self.node.name()) {
+                if !elder_candidates
+                    .elders
+                    .contains_key(&self.node.read().await.name())
+                {
                     return Ok(vec![]);
                 }
 
@@ -650,7 +653,7 @@ impl Core {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
-            let node_id = PublicKey::from(self.node().keypair.public);
+            let node_id = PublicKey::from(self.node.read().await.keypair.public);
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached
@@ -700,7 +703,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let msg_id = MessageId::new();
 
-        let our_name = self.node().name();
+        let our_name = self.node.read().await.name();
 
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
@@ -724,7 +727,12 @@ impl Core {
                 section_pk,
             )
         } else {
-            WireMsg::single_src(self.node(), dummy_dst_location, msg, section_pk)
+            WireMsg::single_src(
+                &self.node.read().await.clone(),
+                dummy_dst_location,
+                msg,
+                section_pk,
+            )
         }?;
 
         wire_msg.set_msg_id(msg_id);

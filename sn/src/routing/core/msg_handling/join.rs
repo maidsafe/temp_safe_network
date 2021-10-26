@@ -178,7 +178,10 @@ impl Core {
 
         // Require resource signed if joining as a new node.
         if let Some(response) = join_request.resource_proof_response {
-            if !self.validate_resource_proof_response(peer.name(), response) {
+            if !self
+                .validate_resource_proof_response(peer.name(), response)
+                .await
+            {
                 debug!(
                     "Ignoring JoinRequest from {} - invalid resource signed response",
                     peer

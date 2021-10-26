@@ -109,6 +109,19 @@ impl Section {
         })
     }
 
+    /// update all section info for our new section
+    pub(super) async fn relocated_to(&self, new_section: Self) -> Result<()> {
+        let mut chain = self.chain.write().await;
+        *chain = new_section.chain().await;
+
+        let mut section_auth = self.section_auth.write().await;
+        *section_auth = new_section.section_auth.read().await.clone();
+
+        self.merge_members(new_section.members().clone()).await?;
+
+        Ok(())
+    }
+
     /// Creates `Section` for the first node in the network
     pub(super) async fn first_node(peer: Peer) -> Result<(Section, SectionKeyShare)> {
         let secret_key_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());

@@ -29,7 +29,7 @@ use xor_name::XorName;
 
 impl Core {
     pub(crate) async fn handle_anti_entropy_update_msg(
-        &mut self,
+        &self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
@@ -301,7 +301,7 @@ impl Core {
                         bounced_msg,
                     };
                     let wire_msg = WireMsg::single_src(
-                        &self.node,
+                        &self.node.read().await.clone(),
                         src_location.to_dst(),
                         ae_msg,
                         self.section.section_key().await,
@@ -398,7 +398,7 @@ impl Core {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             src_location.to_dst(),
             ae_msg,
             self.section.section_key().await,
@@ -432,7 +432,7 @@ impl Core {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             src_location.to_dst(),
             ae_msg,
             self.section.section_key().await,
@@ -511,7 +511,7 @@ mod tests {
         let our_prefix = env.core.section().prefix().await;
         let (msg, src_location) =
             env.create_message(&our_prefix, *env.core.section_chain().await.last_key())?;
-        let sender = env.core.node().addr;
+        let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_pk = *env.core.section_chain().await.last_key();
 
@@ -539,7 +539,7 @@ mod tests {
         let other_pk = other_sk.public_key();
 
         let (msg, src_location) = env.create_message(&env.other_sap.value.prefix, other_pk)?;
-        let sender = env.core.node().addr;
+        let sender = env.core.node.read().await.addr;
 
         // since it's not aware of the other prefix, it shall fail with NoMatchingSection
         let dst_section_pk = other_pk;
@@ -601,7 +601,7 @@ mod tests {
 
         let (msg, src_location) =
             env.create_message(&our_prefix, *env.core.section_chain().await.last_key())?;
-        let sender = env.core.node().addr;
+        let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_pk = *env.core.section_chain().await.root_key();
 
@@ -640,7 +640,7 @@ mod tests {
 
         let (msg, src_location) =
             env.create_message(&our_prefix, *env.core.section_chain().await.last_key())?;
-        let sender = env.core.node().addr;
+        let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
 
         let bogus_env = Env::new().await?;
@@ -703,7 +703,7 @@ mod tests {
                 .context("failed to create section")?;
 
             let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
-            let tmp_core = Core::first_node(
+            let core = Core::first_node(
                 create_comm().await?,
                 node.clone(),
                 mpsc::channel(1).0,
@@ -711,7 +711,8 @@ mod tests {
                 root_storage_dir,
             )
             .await?;
-            let core = tmp_core.relocated(node, section).await?;
+            // let core = tmp_core.
+            core.relocate(node, section).await?;
 
             // generate other SAP for prefix1
             let (other_sap, _, secret_key_set) =

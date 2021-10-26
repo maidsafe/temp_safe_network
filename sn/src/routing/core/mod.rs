@@ -68,6 +68,7 @@ pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
 const KEY_CACHE_SIZE: u8 = 5;
+
 pub(crate) const CONCURRENT_JOINS: usize = 5;
 
 // store up to 100 in use backoffs
@@ -77,7 +78,7 @@ pub(crate) type AeBackoffCache =
 // State + logic of a routing node.
 pub(crate) struct Core {
     pub(crate) comm: Comm,
-    node: Node,
+    pub(crate) node: Arc<RwLock<Node>>,
     section: Section,
     network: NetworkPrefixMap,
     section_keys_provider: SectionKeysProvider,
@@ -86,13 +87,12 @@ pub(crate) struct Core {
     split_barrier: Arc<RwLock<SplitBarrier>>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
-    relocate_state: Option<RelocateState>,
+    relocate_state: Arc<RwLock<Option<RelocateState>>>,
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: Arc<RwLock<bool>>,
     current_joins: Arc<Semaphore>,
     is_genesis_node: bool,
     resource_proof: ResourceProof,
-    used_space: UsedSpace,
     pub(super) register_storage: RegisterStorage,
     pub(super) chunk_storage: ChunkStore,
     root_storage_dir: PathBuf,
@@ -129,7 +129,7 @@ impl Core {
 
         Ok(Self {
             comm,
-            node,
+            node: Arc::new(RwLock::new(node)),
             section,
             network: NetworkPrefixMap::new(genesis_pk),
             section_keys_provider,
@@ -137,7 +137,7 @@ impl Core {
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
-            relocate_state: None,
+            relocate_state: Arc::new(RwLock::new(None)),
             event_tx,
             joins_allowed: Arc::new(RwLock::new(true)),
             current_joins: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
@@ -148,7 +148,6 @@ impl Core {
             capacity,
             liveness: adult_liveness,
             root_storage_dir,
-            used_space,
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }
@@ -226,7 +225,7 @@ impl Core {
 
     /// Generate commands and fire events based upon any node state changes.
     pub(crate) async fn update_self_for_new_node_state_and_fire_events(
-        &mut self,
+        &self,
         old: StateSnapshot,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
@@ -287,8 +286,7 @@ impl Core {
             } else if old.is_elder && !new.is_elder {
                 trace!("{}", LogMarker::DemotedFromElder);
                 info!("Demoted");
-                self.network = NetworkPrefixMap::new(*self.section.genesis_key());
-                self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None).await;
+                self.section_keys_provider.wipe().await;
                 NodeElderChange::Demoted
             } else {
                 NodeElderChange::None
