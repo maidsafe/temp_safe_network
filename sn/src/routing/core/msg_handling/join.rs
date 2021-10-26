@@ -19,9 +19,23 @@ use crate::routing::{
     routing_api::command::Command, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
 use bls::PublicKey as BlsPublicKey;
+use rand::Rng;
 
 // Message handling
 impl Core {
+    /// Check if we already have this peer in our section
+    fn peer_is_already_a_member(&self, peer: Peer) -> bool {
+        if self.section.members().is_joined(peer.name()) {
+            debug!(
+                "Ignoring JoinRequest from {} - already member of our section.",
+                peer
+            );
+            return true;
+        }
+
+        false
+    }
+
     pub(crate) async fn handle_join_request(
         &self,
         peer: Peer,
@@ -44,11 +58,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if self.section.members().is_joined(peer.name()) {
-            debug!(
-                "Ignoring JoinRequest from {} - already member of our section.",
-                peer
-            );
+        if self.peer_is_already_a_member(peer) {
             return Ok(vec![]);
         }
 
@@ -74,6 +84,13 @@ impl Core {
             ]);
         }
 
+        let current_active_members = self.section.active_members().await.len();
+
+        let mut rng = rand::rngs::OsRng;
+        let lowest_wait = 100 * current_active_members as u64;
+        let wait_for_this_req =
+            tokio::time::Duration::from_millis(rng.gen_range(lowest_wait, lowest_wait * 5));
+
         if !section_key_matches || !self.section.prefix().await.matches(peer.name()) {
             if section_key_matches {
                 debug!(
@@ -91,6 +108,9 @@ impl Core {
             }
 
             let retry_sap = self.matching_section(peer.name()).await?;
+
+            // lets wait a random amount before responding to not get overwhelmed with various joinreqs
+            tokio::time::sleep(wait_for_this_req).await;
 
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(retry_sap)));
             trace!("Sending {:?} to {}", node_msg, peer);
@@ -118,6 +138,10 @@ impl Core {
                 )));
                 trace!("{}", LogMarker::SendJoinRetryFirstSectionAgeIssue);
                 trace!("New node in first section should join with age greater than MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
+
+                // lets wait a random amount before responding to not get overwhelmed with various joinreqs
+                tokio::time::sleep(wait_for_this_req).await;
+
                 return Ok(vec![
                     self.send_direct_message(
                         (*peer.name(), *peer.addr()),
@@ -136,8 +160,11 @@ impl Core {
             )));
 
             trace!("{}", LogMarker::SendJoinRetryNotAdult);
-
             trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
+
+            // lets wait a random amount before responding to not get overwhelmed with various joinreqs
+            tokio::time::sleep(wait_for_this_req).await;
+
             return Ok(vec![
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
@@ -183,6 +210,9 @@ impl Core {
                 )
                 .await?
             } else {
+                // lets wait a random amount before responding to not get overwhelmed with various joinreqs
+                tokio::time::sleep(wait_for_this_req).await;
+
                 // It's reachable, let's then send the proof challenge
                 self.send_resource_proof_challenge(&peer).await?
             };
