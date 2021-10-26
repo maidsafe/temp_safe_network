@@ -106,7 +106,7 @@ impl Routing {
 
             let elders = Elders {
                 prefix: section.prefix().await,
-                key: *section.chain().await.last_key(),
+                key: section.section_key().await,
                 remaining: BTreeSet::new(),
                 added: section.authority_provider().await.names(),
                 removed: BTreeSet::new(),
@@ -118,10 +118,13 @@ impl Routing {
                 self_status_change: NodeElderChange::Promoted,
             })
             .await;
+
+            let genesis_key = section.genesis_key();
             info!(
-                "{} Genesis node started!. Genesis key: {}",
+                "{} Genesis node started!. Genesis key {:?}, hex: {}",
                 node_name,
-                hex::encode(section.genesis_key().to_bytes())
+                genesis_key,
+                hex::encode(genesis_key.to_bytes())
             );
 
             core

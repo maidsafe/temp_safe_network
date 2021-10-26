@@ -604,7 +604,7 @@ mod tests {
         let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
         assert_eq!(section.authority_provider().await, section_auth);
-        assert_eq!(*section.chain().await.last_key(), pk);
+        assert_eq!(section.section_key().await, pk);
         assert_eq!(node.age(), node_age);
 
         Ok(())

@@ -17,7 +17,6 @@ use crate::routing::{
     log_markers::LogMarker,
     messages::WireMsgUtils,
     routing_api::command::Command,
-    SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -55,6 +54,9 @@ impl Core {
                         "Anti-Entropy: updated remote section SAP updated for {:?}",
                         section_auth.prefix
                     );
+
+                    // FIXME: perhaps we should update our section chain
+                    // only upon successful DKG round we participated on??
                     self.section
                         .merge_chain(&signed_section_auth, proof_chain)
                         .await?;
@@ -64,7 +66,10 @@ impl Core {
                         section_auth.prefix, section_auth
                     );
                 }
-                self.section.merge_members(members).await?;
+
+                if let Some(peers) = members {
+                    self.section.merge_members(peers).await?;
+                }
             }
             Err(err) => {
                 warn!(
@@ -299,7 +304,7 @@ impl Core {
                         &self.node,
                         src_location.to_dst(),
                         ae_msg,
-                        self.section.authority_provider().await.section_key(),
+                        self.section.section_key().await,
                     )?;
                     trace!("{}", LogMarker::AeSendRedirect);
 
@@ -330,10 +335,10 @@ impl Core {
         trace!(
             "Performing AE checks, provided pk was: {:?} ours is: {:?}",
             dst_section_pk,
-            self.section.chain().await.last_key()
+            self.section.section_key().await
         );
 
-        if dst_section_pk == self.section.chain().await.last_key() {
+        if dst_section_pk == &self.section.section_key().await {
             trace!("Provided Section PK matching our latest. All AE checks passed!");
             // Destination section key matches our current section key
             return Ok(None);
@@ -374,7 +379,7 @@ impl Core {
                     sender
                 );
 
-                let proof_chain = self.section.chain().await.clone();
+                let proof_chain = self.section.chain().await;
 
                 let section_signed_auth = self.section.section_signed_authority_provider().await;
                 let section_auth = section_signed_auth.value;
@@ -396,7 +401,7 @@ impl Core {
             &self.node,
             src_location.to_dst(),
             ae_msg,
-            self.section.authority_provider().await.section_key(),
+            self.section.section_key().await,
         )?;
 
         Ok(Some(Command::SendMessage {
@@ -430,7 +435,7 @@ impl Core {
             &self.node,
             src_location.to_dst(),
             ae_msg,
-            self.section.authority_provider().await.section_key(),
+            self.section.section_key().await,
         )?;
 
         trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
@@ -448,25 +453,26 @@ impl Core {
         data_name: Option<XorName>,
     ) -> Option<SectionAuth<SectionAuthorityProvider>> {
         if let Some(data_name) = data_name {
-            let backup_sap = self.section.section_auth.read().await.clone();
-            let our_section = self.section.section_auth.clone();
-            let better_sap = self
-                .network
-                .closest_or_opposite(&data_name)
-                .unwrap_or(backup_sap);
+            let our_sap = self.section.section_signed_authority_provider().await;
+            trace!("Our SAP: {:?}", our_sap);
 
-            trace!("Our SAP: {:?}", our_section);
-            trace!("Better SAP for data {:?}: {:?}", data_name, better_sap);
-
-            if better_sap != *our_section.read().await {
-                // Update the client of the actual destination section
-                trace!(
-                    "We have a better matched section for the data name {:?}",
-                    data_name
-                );
-                Some(better_sap)
-            } else {
-                None
+            match self.network.closest_or_opposite(&data_name) {
+                Some(better_sap) => {
+                    // Update the client of the actual destination section
+                    trace!(
+                        "We have a better matched section for the data name {:?}",
+                        data_name
+                    );
+                    Some(better_sap)
+                }
+                None => {
+                    trace!(
+                        "We don't have a better matching section for data name {:?}m our SAP: {:?}",
+                        data_name,
+                        our_sap
+                    );
+                    None
+                }
             }
         } else {
             None

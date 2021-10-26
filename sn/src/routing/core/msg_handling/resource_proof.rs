@@ -61,7 +61,7 @@ impl Core {
         self.send_direct_message(
             (*peer.name(), *peer.addr()),
             response,
-            *self.section.chain().await.last_key(),
+            self.section.section_key().await,
         )
         .await
     }

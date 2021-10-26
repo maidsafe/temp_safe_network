@@ -258,7 +258,7 @@ impl Core {
         }
 
         let snapshot = self.state_snapshot().await;
-        let old_chain = self.section.chain.read().await.clone();
+        let old_chain = self.section.chain().await;
 
         for (section_auth, key_sig) in updates {
             info!("Updating elders to: {:?}", &section_auth);
@@ -267,6 +267,7 @@ impl Core {
                     .section
                     .update_elders(section_auth.clone(), key_sig)
                     .await;
+
                 if self
                     .network
                     .update(section_auth, &self.section_chain().await)?
@@ -276,6 +277,8 @@ impl Core {
                 }
             } else {
                 // Update the old chain to become the neighbour's chain.
+                // FIXME: we shouldn't be updating our section info since it
+                // doesn't match our prefix???
                 if let Err(e) = self.section.chain.write().await.insert(
                     &key_sig.public_key,
                     section_auth.value.section_key(),

@@ -138,7 +138,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let msg_id = MessageId::new();
 
-        let section_pk = *self.section().chain().await.last_key();
+        let section_pk = self.section().section_key().await;
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
 
@@ -170,7 +170,7 @@ impl Core {
         };
 
         // Setup node authority on this response and send this back to our elders
-        let section_pk = *self.section().chain().await.last_key();
+        let section_pk = self.section().section_key().await;
         let dst = DstLocation::Node {
             name: requesting_elder,
             section_pk,

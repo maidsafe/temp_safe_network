@@ -356,7 +356,7 @@ async fn aggregate_proposals() -> Result<()> {
         dst_key: None,
     };
 
-    let section_pk = *section.chain().await.last_key();
+    let section_pk = section.section_key().await;
     for (index, node) in nodes.iter().enumerate().take(THRESHOLD) {
         let sig_share = proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
 
@@ -395,7 +395,7 @@ async fn aggregate_proposals() -> Result<()> {
         THRESHOLD,
         &sk_set.secret_key_share(THRESHOLD),
     )?;
-    let section_pk = *section.chain().await.last_key();
+    let section_pk = section.section_key().await;
     let wire_msg = WireMsg::single_src(
         &nodes[THRESHOLD],
         DstLocation::Section {
@@ -961,10 +961,10 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     );
     let new_section_elders: BTreeSet<_> = new_section_auth.names();
     let section_signed_new_section_auth = section_signed(sk2, new_section_auth.clone())?;
+    let proof_chain = chain.clone();
     let new_section = Section::new(pk0, chain, section_signed_new_section_auth)?;
 
     // Create the `Sync` message containing the new `Section`.
-    let proof_chain = new_section.chain().await.clone();
     let wire_msg = WireMsg::single_src(
         &old_node,
         DstLocation::Node {
@@ -974,7 +974,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         SystemMsg::AntiEntropyUpdate {
             section_auth: new_section_auth,
             members: Some(new_section.members().clone()),
-            section_signed: new_section.section_auth.read().await.sig.clone(),
+            section_signed: new_section.section_signed_authority_provider().await.sig,
             proof_chain,
         },
         src_section_pk,

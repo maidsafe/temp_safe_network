@@ -82,14 +82,15 @@ impl Core {
         };
         // Name of the section_pk may not matches the section prefix.
         // Carry out a substitution to prevent the dst_location becomes other section.
+        let section_key = self.section.section_key().await;
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
                 name: self.section.prefix().await.name(),
-                section_pk: *self.section.chain().await.last_key(),
+                section_pk: section_key,
             },
             node_msg,
-            self.section.authority_provider().await.section_key(),
+            section_key,
         )?;
 
         Ok(self.send_or_handle(wire_msg, recipients).await)
@@ -140,24 +141,6 @@ impl Core {
         })
     }
 
-    pub(crate) async fn check_lagging(
-        &self,
-        peer: (XorName, SocketAddr),
-        public_key: &BlsPublicKey,
-    ) -> Result<Option<Command>> {
-        if self.section.chain().await.has_key(public_key)
-            && public_key != self.section.chain().await.last_key()
-        {
-            let msg = self.generate_ae_update(*public_key, true).await?;
-            trace!("{}", LogMarker::SendingAeUpdateAfterLagCheck);
-
-            let cmd = self.send_direct_message(peer, msg, *public_key).await?;
-            Ok(Some(cmd))
-        } else {
-            Ok(None)
-        }
-    }
-
     // Send NodeApproval to a joining node which makes them a section member
     pub(crate) async fn send_node_approval(
         &self,
@@ -183,7 +166,7 @@ impl Core {
             section_chain: self.section.chain().await,
         }));
 
-        let dst_section_pk = *self.section.chain().await.last_key();
+        let dst_section_pk = self.section.section_key().await;
         trace!("{}", LogMarker::SendNodeApproval);
         let cmd = self
             .send_direct_message((name, addr), node_msg, dst_section_pk)
@@ -307,7 +290,7 @@ impl Core {
         let src = details.pub_id;
         let dst = DstLocation::Node {
             name: details.pub_id,
-            section_pk: *self.section.chain().await.last_key(),
+            section_pk: self.section.section_key().await,
         };
         let node_msg = SystemMsg::Relocate(details);
 
@@ -326,7 +309,7 @@ impl Core {
         let src = promise.name;
         let dst = DstLocation::Section {
             name: promise.name,
-            section_pk: *self.section.chain().await.last_key(),
+            section_pk: self.section.section_key().await,
         };
         let node_msg = SystemMsg::RelocatePromise(promise);
 
@@ -348,7 +331,7 @@ impl Core {
         elder_candidates: ElderCandidates,
     ) -> Result<Vec<Command>> {
         let src_prefix = elder_candidates.prefix;
-        let generation = self.section.chain().await.main_branch_len() as u64;
+        let generation = self.section.main_chain_branch_len().await;
         let session_id = DkgSessionId::new(&elder_candidates, generation);
 
         // Send DKG start to all candidates
@@ -365,7 +348,7 @@ impl Core {
             session_id,
             elder_candidates,
         };
-        let section_pk = *self.section.chain().await.last_key();
+        let section_pk = self.section.section_key().await;
         self.send_message_for_dst_accumulation(
             src_prefix.name(),
             DstLocation::Section {
@@ -404,7 +387,7 @@ impl Core {
             src,
             dst,
             node_msg,
-            *self.section.chain().await.last_key(),
+            self.section.section_key().await,
         )?;
 
         trace!(

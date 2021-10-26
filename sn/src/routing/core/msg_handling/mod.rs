@@ -29,7 +29,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     relocation::RelocateState,
     routing_api::command::Command,
-    Error, Event, MessageReceived, Result, SectionAuthorityProviderUtils,
+    Error, Event, MessageReceived, Result,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
 use bls::PublicKey as BlsPublicKey;
@@ -473,7 +473,7 @@ impl Core {
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
                 if self.is_not_elder().await
-                    && join_request.section_key == *self.section.chain().await.last_key()
+                    && join_request.section_key == self.section.section_key().await
                 {
                     return Ok(vec![]);
                 }
@@ -662,7 +662,7 @@ impl Core {
 
             let dst = DstLocation::Section {
                 name: node_xorname,
-                section_pk: self.section.section_auth.read().await.value.section_key(),
+                section_pk: self.section.section_key().await,
             };
 
             cmds.push(Command::PrepareNodeMsgToSend { msg, dst });
