@@ -33,7 +33,7 @@ impl Core {
         trace!("Received DkgStart for {:?}", elder_candidates);
         self.dkg_voter
             .start(
-                &self.node,
+                &self.node.read().await.clone(),
                 session_id,
                 elder_candidates,
                 *self.section_chain().await.last_key(),
@@ -56,7 +56,7 @@ impl Core {
 
         self.dkg_voter
             .process_message(
-                &self.node,
+                &self.node.read().await.clone(),
                 &session_id,
                 message,
                 *self.section_chain().await.last_key(),
@@ -92,7 +92,7 @@ impl Core {
 
         let elder_candidates = if let Some(elder_candidates) = self
             .section
-            .promote_and_demote_elders(&self.node.name(), &BTreeSet::new())
+            .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
             .await
             .into_iter()
             .find(|elder_candidates| failure_set.verify(elder_candidates, generation))

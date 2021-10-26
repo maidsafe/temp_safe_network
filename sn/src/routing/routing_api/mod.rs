@@ -186,7 +186,7 @@ impl Routing {
                 false,
             )
             .await?;
-            info!("{} Joined the network!", core.node().name());
+            info!("{} Joined the network!", core.node.read().await.name());
 
             core
         };
@@ -232,12 +232,7 @@ impl Routing {
     }
 
     pub(crate) async fn update_chunks(&self, chunks: ChunkDataExchange) {
-        self.dispatcher
-            .core
-            .read()
-            .await
-            .update_chunks(chunks)
-            .await
+        self.dispatcher.core.update_chunks(chunks).await
     }
 
     /// Sets the JoinsAllowed flag.
@@ -254,22 +249,22 @@ impl Routing {
 
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
-        self.dispatcher.core.read().await.node().age()
+        self.dispatcher.core.node.read().await.age()
     }
 
     /// Returns the ed25519 public key of this node.
     pub async fn public_key(&self) -> PublicKey {
-        self.dispatcher.core.read().await.node().keypair.public
+        self.dispatcher.core.node.read().await.keypair.public
     }
 
     /// Returns the ed25519 keypair of this node, as bytes.
     pub async fn keypair_as_bytes(&self) -> [u8; KEYPAIR_LENGTH] {
-        self.dispatcher.core.read().await.node().keypair.to_bytes()
+        self.dispatcher.core.node.read().await.keypair.to_bytes()
     }
 
     /// Signs `data` with the ed25519 key of this node.
     pub async fn sign_as_node(&self, data: &[u8]) -> Signature {
-        self.dispatcher.core.read().await.node().keypair.sign(data)
+        self.dispatcher.core.node.read().await.keypair.sign(data)
     }
 
     /// Signs `data` with the BLS secret key share of this node, if it has any. Returns
@@ -281,8 +276,6 @@ impl Routing {
     ) -> Result<(usize, bls::SignatureShare)> {
         self.dispatcher
             .core
-            .read()
-            .await
             .sign_with_section_key_share(data, public_key)
             .await
     }
@@ -291,9 +284,9 @@ impl Routing {
     pub async fn verify(&self, data: &[u8], signature: &Signature) -> bool {
         self.dispatcher
             .core
+            .node
             .read()
             .await
-            .node()
             .keypair
             .verify(data, signature)
             .is_ok()
@@ -301,27 +294,27 @@ impl Routing {
 
     /// The name of this node.
     pub async fn name(&self) -> XorName {
-        self.dispatcher.core.read().await.node().name()
+        self.dispatcher.core.node.read().await.name()
     }
 
     /// Returns connection info of this node.
     pub async fn our_connection_info(&self) -> SocketAddr {
-        self.dispatcher.core.read().await.our_connection_info()
+        self.dispatcher.core.our_connection_info()
     }
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
-        self.dispatcher.core.read().await.section_chain().await
+        self.dispatcher.core.section_chain().await
     }
 
     /// Returns the Section Chain's genesis key
     pub async fn genesis_key(&self) -> bls::PublicKey {
-        *self.dispatcher.core.read().await.section().genesis_key()
+        *self.dispatcher.core.section().genesis_key()
     }
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        self.dispatcher.core.read().await.section().prefix().await
+        self.dispatcher.core.section().prefix().await
     }
 
     /// Finds out if the given XorName matches our prefix.
@@ -331,15 +324,13 @@ impl Routing {
 
     /// Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
-        self.dispatcher.core.read().await.is_elder().await
+        self.dispatcher.core.is_elder().await
     }
 
     /// Returns the information of all the current section elders.
     pub async fn our_elders(&self) -> Vec<Peer> {
         self.dispatcher
             .core
-            .read()
-            .await
             .section()
             .authority_provider()
             .await
@@ -357,7 +348,7 @@ impl Routing {
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.dispatcher.core.read().await.section().adults().await
+        self.dispatcher.core.section().adults().await
     }
 
     /// Returns the adults of our section sorted by their distance to `name` (closest first).
@@ -372,23 +363,12 @@ impl Routing {
 
     /// Returns our section's authority provider.
     pub async fn our_section_auth(&self) -> SectionAuthorityProvider {
-        self.dispatcher
-            .core
-            .read()
-            .await
-            .section()
-            .authority_provider()
-            .await
+        self.dispatcher.core.section().authority_provider().await
     }
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.dispatcher
-            .core
-            .read()
-            .await
-            .matching_section(name)
-            .await
+        self.dispatcher.core.matching_section(name).await
     }
 
     /// Builds a WireMsg signed by this Node
@@ -399,7 +379,7 @@ impl Routing {
     ) -> Result<WireMsg> {
         let src_section_pk = *self.section_chain().await.last_key();
         WireMsg::single_src(
-            self.dispatcher.core.read().await.node(),
+            &self.dispatcher.core.node.read().await.clone(),
             dst,
             node_msg,
             src_section_pk,
@@ -416,14 +396,7 @@ impl Routing {
         let src_section_pk = *self.section_chain().await.last_key();
 
         WireMsg::for_dst_accumulation(
-            &self
-                .dispatcher
-                .core
-                .read()
-                .await
-                .key_share()
-                .await
-                .map_err(|err| err)?,
+            &self.dispatcher.core.key_share().await.map_err(|err| err)?,
             src,
             dst,
             node_msg,
@@ -448,13 +421,13 @@ impl Routing {
     /// Returns the current BLS public key set if this node has one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.dispatcher.core.read().await.public_key_set().await
+        self.dispatcher.core.public_key_set().await
     }
 
     /// Returns our index in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn our_index(&self) -> Result<usize> {
-        self.dispatcher.core.read().await.our_index().await
+        self.dispatcher.core.our_index().await
     }
 }
 
@@ -482,8 +455,8 @@ async fn handle_connection_events(
                 };
 
                 let span = {
-                    let core = dispatcher.core.read().await;
-                    trace_span!("handle_message", name = %core.node().name(), %sender, msg_id = ?wire_msg.msg_id())
+                    let core = &dispatcher.core;
+                    trace_span!("handle_message", name = %core.node.read().await.name(), %sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
                 let len = bytes.len();

@@ -142,7 +142,7 @@ impl Core {
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
 
-        let auth = NodeAuth::authorize(section_pk, &self.node().keypair, &payload);
+        let auth = NodeAuth::authorize(section_pk, &self.node.read().await.keypair, &payload);
         let msg_kind = MsgKind::NodeAuthMsg(auth.into_inner());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;

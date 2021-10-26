@@ -181,7 +181,7 @@ impl Core {
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let infos = self
                 .section
-                .promote_and_demote_elders(&self.node.name(), &BTreeSet::new())
+                .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
                 .await;
             if !infos.contains(&signed_section_auth.value.elder_candidates()) {
                 // SectionInfo out of date, ignore.
@@ -244,7 +244,7 @@ impl Core {
 
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_our_elders_agreement(
-        &mut self,
+        &self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
@@ -262,7 +262,11 @@ impl Core {
 
         for (section_auth, key_sig) in updates {
             info!("Updating elders to: {:?}", &section_auth);
-            if section_auth.value.prefix.matches(&self.node.name()) {
+            if section_auth
+                .value
+                .prefix
+                .matches(&self.node.read().await.name())
+            {
                 let _updated = self
                     .section
                     .update_elders(section_auth.clone(), key_sig)

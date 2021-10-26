@@ -168,7 +168,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let nonce: [u8; 32] = rand::random();
     let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-    let nonce_signature = ed25519::sign(&serialized, &dispatcher.core.read().await.node().keypair);
+    let nonce_signature = ed25519::sign(&serialized, &dispatcher.core.node.read().await.keypair);
 
     let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
     let data = rp.create_proof_data(&nonce);
@@ -885,8 +885,6 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     // The removed peer is still our elder because we haven't yet processed the section update.
     assert!(dispatcher
         .core
-        .read()
-        .await
         .section()
         .authority_provider()
         .await
@@ -1229,7 +1227,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
 
     let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir).await?;
-    let node = core.node().clone();
+    let node = core.node.read().await.clone();
     let section_pk = *core.section_chain().await.last_key();
     let dispatcher = Dispatcher::new(core);
 

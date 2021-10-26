@@ -84,7 +84,7 @@ impl Core {
         // Carry out a substitution to prevent the dst_location becomes other section.
         let section_key = self.section.section_key().await;
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             DstLocation::Section {
                 name: self.section.prefix().await.name(),
                 section_pk: section_key,
@@ -179,11 +179,12 @@ impl Core {
         &self,
         section: &Section,
     ) -> Result<Vec<Command>> {
+        let our_name = &self.node.read().await.name();
         let nodes: Vec<_> = section
             .active_members()
             .await
             .iter()
-            .filter(|peer| peer.name() != &self.node.name())
+            .filter(|peer| peer.name() != our_name)
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
 
@@ -319,7 +320,7 @@ impl Core {
 
     pub(crate) async fn return_relocate_promise(&self) -> Option<Command> {
         // TODO: keep sending this periodically until we get relocated.
-        if let Some(RelocateState::Delayed(msg)) = &self.relocate_state {
+        if let Some(RelocateState::Delayed(msg)) = &*self.relocate_state.read().await {
             self.send_message_to_our_elders(msg.clone()).await.ok()
         } else {
             None
@@ -413,7 +414,7 @@ impl Core {
         trace!("Send {:?} to {:?}", wire_msg, recipients);
 
         for recipient in recipients {
-            if recipient.name() == &self.node.name() {
+            if recipient.name() == &self.node.read().await.name() {
                 handle = true;
             } else {
                 others.push((*recipient.name(), *recipient.addr()));
@@ -433,10 +434,10 @@ impl Core {
 
         if handle {
             wire_msg.set_dst_section_pk(*self.section_chain().await.last_key());
-            wire_msg.set_dst_xorname(self.node.name());
+            wire_msg.set_dst_xorname(self.node.read().await.name());
 
             commands.push(Command::HandleMessage {
-                sender: self.node.addr,
+                sender: self.node.read().await.addr,
                 wire_msg,
                 original_bytes: None,
             });
@@ -452,7 +453,7 @@ impl Core {
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             DstLocation::Section {
                 name: recipient.0,
                 section_pk: dst_section_pk,
@@ -477,7 +478,7 @@ impl Core {
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             DstLocation::Section {
                 name: dst_name,
                 section_pk: dst_section_pk,
