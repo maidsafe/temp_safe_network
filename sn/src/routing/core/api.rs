@@ -28,7 +28,7 @@ use crate::routing::{
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{mpsc, RwLock, Semaphore};
 use xor_name::XorName;
 
 impl Core {
@@ -84,6 +84,7 @@ impl Core {
             event_tx: self.event_tx.clone(),
             joins_allowed: Arc::new(RwLock::new(true)),
             is_genesis_node: false,
+            current_joins: Arc::new(Semaphore::new(super::CONCURRENT_JOINS)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage: self.register_storage.clone(),
             root_storage_dir: self.root_storage_dir.clone(),

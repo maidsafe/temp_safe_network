@@ -15,11 +15,14 @@ use crate::messaging::{
     WireMsg,
 };
 use crate::routing::{
-    error::Result, log_markers::LogMarker, peer::PeerUtils, relocation::RelocatePayloadUtils,
-    routing_api::command::Command, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+    error::{Error, Result},
+    log_markers::LogMarker,
+    peer::PeerUtils,
+    relocation::RelocatePayloadUtils,
+    routing_api::command::Command,
+    FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
 use bls::PublicKey as BlsPublicKey;
-use rand::Rng;
 
 // Message handling
 impl Core {
@@ -42,6 +45,12 @@ impl Core {
         join_request: JoinRequest,
     ) -> Result<Vec<Command>> {
         debug!("Received {:?} from {}", join_request, peer);
+
+        let _permit = self
+            .current_joins
+            .acquire()
+            .await
+            .map_err(|_| Error::PermitAcquisitionFailed)?;
 
         let section_key_matches =
             join_request.section_key == *self.section.chain().await.last_key();
@@ -84,13 +93,6 @@ impl Core {
             ]);
         }
 
-        let current_active_members = self.section.active_members().await.len();
-
-        let mut rng = rand::rngs::OsRng;
-        let lowest_wait = 100 * current_active_members as u64;
-        let wait_for_this_req =
-            tokio::time::Duration::from_millis(rng.gen_range(lowest_wait, lowest_wait * 5));
-
         if !section_key_matches || !self.section.prefix().await.matches(peer.name()) {
             if section_key_matches {
                 debug!(
@@ -108,9 +110,6 @@ impl Core {
             }
 
             let retry_sap = self.matching_section(peer.name()).await?;
-
-            // lets wait a random amount before responding to not get overwhelmed with various joinreqs
-            tokio::time::sleep(wait_for_this_req).await;
 
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(retry_sap)));
             trace!("Sending {:?} to {}", node_msg, peer);
@@ -139,9 +138,6 @@ impl Core {
                 trace!("{}", LogMarker::SendJoinRetryFirstSectionAgeIssue);
                 trace!("New node in first section should join with age greater than MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
 
-                // lets wait a random amount before responding to not get overwhelmed with various joinreqs
-                tokio::time::sleep(wait_for_this_req).await;
-
                 return Ok(vec![
                     self.send_direct_message(
                         (*peer.name(), *peer.addr()),
@@ -161,9 +157,6 @@ impl Core {
 
             trace!("{}", LogMarker::SendJoinRetryNotAdult);
             trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", node_msg, peer);
-
-            // lets wait a random amount before responding to not get overwhelmed with various joinreqs
-            tokio::time::sleep(wait_for_this_req).await;
 
             return Ok(vec![
                 self.send_direct_message(
@@ -210,9 +203,6 @@ impl Core {
                 )
                 .await?
             } else {
-                // lets wait a random amount before responding to not get overwhelmed with various joinreqs
-                tokio::time::sleep(wait_for_this_req).await;
-
                 // It's reachable, let's then send the proof challenge
                 self.send_resource_proof_challenge(&peer).await?
             };
