@@ -93,6 +93,7 @@ async fn main() -> Result<()> {
     debug!("Building current sn_node with args: {:?}", args);
     Command::new("cargo")
         .args(args.clone())
+        .current_dir("sn")
         // .env("RUST_LOG", "debug")
         // .env("RUST_BACKTRACE", "1")
         .stdout(Stdio::inherit())
