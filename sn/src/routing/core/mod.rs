@@ -55,9 +55,11 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
-use tokio::sync::{mpsc, RwLock};
+use tokio::{
+    fs::File,
+    io::AsyncWriteExt,
+    sync::{mpsc, RwLock, Semaphore},
+};
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
@@ -66,6 +68,7 @@ pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
 const KEY_CACHE_SIZE: u8 = 5;
+pub(crate) const CONCURRENT_JOINS: usize = 5;
 
 // store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
@@ -86,6 +89,7 @@ pub(crate) struct Core {
     relocate_state: Option<RelocateState>,
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: Arc<RwLock<bool>>,
+    current_joins: Arc<Semaphore>,
     is_genesis_node: bool,
     resource_proof: ResourceProof,
     used_space: UsedSpace,
@@ -136,6 +140,7 @@ impl Core {
             relocate_state: None,
             event_tx,
             joins_allowed: Arc::new(RwLock::new(true)),
+            current_joins: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
             is_genesis_node,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage,

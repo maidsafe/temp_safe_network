@@ -23,6 +23,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    #[error("There was a problem during acquisition of a tokio::sync::semaphore permit.")]
+    PermitAcquisitionFailed,
     #[error("Failed signature check.")]
     FailedSignature,
     #[error("Section authority provider cannot be trusted: {0}")]
