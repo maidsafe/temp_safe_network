@@ -68,7 +68,9 @@ pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
 const KEY_CACHE_SIZE: u8 = 5;
+
 pub(crate) const CONCURRENT_JOINS: usize = 5;
+pub(crate) const CONCURRENT_DKG_PERMITS: usize = 5;
 
 // store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
@@ -90,6 +92,7 @@ pub(crate) struct Core {
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: Arc<RwLock<bool>>,
     current_joins: Arc<Semaphore>,
+    pub(crate) current_dkg_outcomes: Arc<Semaphore>,
     is_genesis_node: bool,
     resource_proof: ResourceProof,
     used_space: UsedSpace,
@@ -141,6 +144,7 @@ impl Core {
             event_tx,
             joins_allowed: Arc::new(RwLock::new(true)),
             current_joins: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
+            current_dkg_outcomes: Arc::new(Semaphore::new(CONCURRENT_DKG_PERMITS)),
             is_genesis_node,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage,

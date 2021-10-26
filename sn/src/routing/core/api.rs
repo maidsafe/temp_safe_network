@@ -85,6 +85,7 @@ impl Core {
             joins_allowed: Arc::new(RwLock::new(true)),
             is_genesis_node: false,
             current_joins: Arc::new(Semaphore::new(super::CONCURRENT_JOINS)),
+            current_dkg_outcomes: Arc::new(Semaphore::new(super::CONCURRENT_DKG_PERMITS)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage: self.register_storage.clone(),
             root_storage_dir: self.root_storage_dir.clone(),

@@ -308,6 +308,13 @@ impl Dispatcher {
                 section_auth,
                 outcome,
             } => {
+                let core = self.core.read().await;
+                let _permit = core
+                    .current_dkg_outcomes
+                    .acquire()
+                    .await
+                    .map_err(|_| Error::PermitAcquisitionFailed)?;
+
                 self.core
                     .read()
                     .await
