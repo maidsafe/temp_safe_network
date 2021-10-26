@@ -75,7 +75,7 @@ default = [ "testing", "authenticator", "authd_client", "app" ]
 [dev-dependencies]
 anyhow = "1.0.38"
 proptest = "~0.10"
-tracing-subscriber = "~0.2"
+tracing-subscriber = "0.3.1"
 
   [dev-dependencies.tokio]
   version = "1.6.0"
