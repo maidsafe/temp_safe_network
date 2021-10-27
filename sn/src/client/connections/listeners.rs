@@ -16,6 +16,7 @@ use crate::messaging::{
     DstLocation, MessageId, MessageType, MsgKind, SectionAuthorityProvider, WireMsg,
 };
 use crate::messaging::{AuthorityProof, ServiceAuth};
+use crate::routing::log_markers::LogMarker;
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::ConnectionIncoming;
@@ -28,10 +29,19 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     pub(crate) fn spawn_message_listener_thread(
         session: Session,
+        connection_id: usize,
         src: SocketAddr,
         mut incoming_messages: ConnectionIncoming,
     ) {
         debug!("Listening for incoming messages");
+
+        trace!(
+            "{} to {} (id: {})",
+            LogMarker::ConnectionOpened,
+            src,
+            connection_id
+        );
+
         let _handle = tokio::spawn(async move {
             loop {
                 match Self::listen_for_incoming_message(src, &mut incoming_messages).await {
@@ -51,6 +61,9 @@ impl Session {
                     }
                 }
             }
+
+            // once the message loop breaks, we know the connection is closed
+            trace!("{} to {} (id: {})", LogMarker::ConnectionClosed, src, connection_id);
         }.instrument(info_span!("Listening for incoming msgs"))).in_current_span();
     }
 

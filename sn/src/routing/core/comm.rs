@@ -8,7 +8,10 @@
 
 use super::{connected_peers::ConnectedPeers, msg_count::MsgCount, BackPressure};
 use crate::messaging::{system::LoadReport, WireMsg};
-use crate::routing::error::{Error, Result};
+use crate::routing::{
+    error::{Error, Result},
+    log_markers::LogMarker,
+};
 use bytes::Bytes;
 use futures::{
     future::{FutureExt, TryFutureExt},
@@ -94,6 +97,7 @@ impl Comm {
         ));
 
         let _ = task::spawn(handle_incoming_messages(
+            bootstrap_peer.id(),
             bootstrap_peer.remote_address(),
             peer_incoming,
             event_tx.clone(),
@@ -257,6 +261,7 @@ impl Comm {
                     self.endpoint.connect_to(&recipient.1).await.map(
                         |(connection, connection_incoming)| {
                             let _ = task::spawn(handle_incoming_messages(
+                                connection.id(),
                                 connection.remote_address(),
                                 connection_incoming,
                                 self.event_tx.clone(),
@@ -371,10 +376,12 @@ async fn handle_incoming_connections(
     connected_peers: ConnectedPeers,
 ) {
     while let Some((connection, connection_incoming)) = incoming_connections.next().await {
+        let connection_id = connection.id();
         let src = connection.remote_address();
         connected_peers.insert(connection).await;
 
         let _ = task::spawn(handle_incoming_messages(
+            connection_id,
             src,
             connection_incoming,
             event_tx.clone(),
@@ -385,12 +392,20 @@ async fn handle_incoming_connections(
 }
 
 async fn handle_incoming_messages(
+    connection_id: usize,
     src: SocketAddr,
     mut incoming_msgs: qp2p::ConnectionIncoming,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
     connected_peers: ConnectedPeers,
 ) {
+    trace!(
+        "{} to {} (id: {})",
+        LogMarker::ConnectionOpened,
+        src,
+        connection_id
+    );
+
     while let Some(result) = incoming_msgs.next().await.transpose() {
         match result {
             Ok(msg) => {
@@ -407,6 +422,13 @@ async fn handle_incoming_messages(
 
     // remove the connection once we notice it end
     connected_peers.remove_by_address(&src).await;
+
+    trace!(
+        "{} to {} (id: {})",
+        LogMarker::ConnectionClosed,
+        src,
+        connection_id
+    );
 }
 
 /// Returns the status of the send operation.
