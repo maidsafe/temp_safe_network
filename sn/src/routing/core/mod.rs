@@ -112,6 +112,7 @@ impl Core {
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
+        prefix_map: Option<NetworkPrefixMap>,
         is_genesis_node: bool,
     ) -> Result<Self> {
         let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
@@ -126,11 +127,13 @@ impl Core {
         let adult_liveness = Liveness::new();
         let genesis_pk = *section.genesis_key();
 
+        let network = prefix_map.unwrap_or_else(|| NetworkPrefixMap::new(genesis_pk));
+
         Ok(Self {
             comm,
             node: Arc::new(RwLock::new(node)),
             section,
-            network: NetworkPrefixMap::new(genesis_pk),
+            network,
             section_keys_provider,
             proposal_aggregator: SignatureAggregator::default(),
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
