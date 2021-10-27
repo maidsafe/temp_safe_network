@@ -72,4 +72,7 @@ pub enum LogMarker {
     SendNodeApproval,
     // approved to join
     ReceivedJoinApproved,
+    // Connections
+    ConnectionOpened,
+    ConnectionClosed,
 }

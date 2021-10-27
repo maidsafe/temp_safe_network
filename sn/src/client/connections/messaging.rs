@@ -240,6 +240,7 @@ impl Session {
                         .and_then(|(connection, connection_incoming)| async move {
                             Self::spawn_message_listener_thread(
                                 session,
+                                connection.id(),
                                 connection.remote_address(),
                                 connection_incoming,
                             );
@@ -509,6 +510,7 @@ pub(super) async fn send_message(
                     .and_then(|(connection, connection_incoming)| async move {
                         Session::spawn_message_listener_thread(
                             session,
+                            connection.id(),
                             connection.remote_address(),
                             connection_incoming,
                         );
