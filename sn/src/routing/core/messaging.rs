@@ -44,14 +44,17 @@ impl Core {
         recipients: Vec<Peer>,
         proposal: Proposal,
     ) -> Result<Vec<Command>> {
+        let section_key = self.section.section_key().await;
+
         let key_share = self
             .section_keys_provider
-            .key_share()
+            .key_share(&section_key)
             .await
             .map_err(|err| {
                 trace!("Can't propose {:?}: {:?}", proposal, err);
                 err
             })?;
+
         self.send_proposal_with(recipients, proposal, &key_share)
             .await
     }
@@ -369,9 +372,11 @@ impl Core {
         node_msg: SystemMsg,
         recipients: Vec<Peer>,
     ) -> Result<Vec<Command>> {
+        let section_key = self.section.section_key().await;
+
         let key_share = self
             .section_keys_provider
-            .key_share()
+            .key_share(&section_key)
             .await
             .map_err(|err| {
                 trace!(
@@ -383,13 +388,7 @@ impl Core {
                 err
             })?;
 
-        let wire_msg = WireMsg::for_dst_accumulation(
-            &key_share,
-            src,
-            dst,
-            node_msg,
-            self.section.section_key().await,
-        )?;
+        let wire_msg = WireMsg::for_dst_accumulation(&key_share, src, dst, node_msg, section_key)?;
 
         trace!(
             "Send {:?} for accumulation at dst to {:?}",

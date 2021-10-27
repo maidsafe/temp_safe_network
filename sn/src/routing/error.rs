@@ -37,11 +37,6 @@ pub enum Error {
     EmptyRecipientList,
     #[error("Could not connect to any bootstrap contact")]
     BootstrapFailed,
-    // #[error("The config is invalid: {err}")]
-    // InvalidQp2pConfig {
-    //     #[source]
-    //     err: InternalConfigError,
-    // },
     #[error("Cannot connect to the endpoint: {err}")]
     CannotConnectEndpoint {
         #[from]
@@ -62,8 +57,8 @@ pub enum Error {
     InvalidMessage,
     #[error("A signature share is invalid.")]
     InvalidSignatureShare,
-    #[error("The secret key share is missing.")]
-    MissingSecretKeyShare,
+    #[error("The secret key share is missing for public key {0:?}")]
+    MissingSecretKeyShare(bls::PublicKey),
     #[error("Failed to send a message to {0}, {1}")]
     FailedSend(SocketAddr, XorName),
     #[error("Connection closed locally")]
@@ -135,12 +130,6 @@ pub enum Error {
     /// No mapping to sn_messages::Error could be found. Either we need a new error there, or we need to handle or convert this error before sending it as a message
     #[error("No mapping to sn_messages error is set up for this NodeError {0}")]
     NoErrorMapping(String),
-    /// Logic error.
-    #[error("Logic error: {0}")]
-    Logic(String),
-    /// Timeout when trying to join the network
-    #[error("Timeout when trying to join the network")]
-    JoinTimeout,
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),

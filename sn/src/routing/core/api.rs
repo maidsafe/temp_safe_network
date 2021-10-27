@@ -99,7 +99,7 @@ impl Core {
 
     /// Returns the current BLS public key set
     pub(crate) async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        Ok(self.section_keys_provider.key_share().await?.public_key_set)
+        Ok(self.key_share().await?.public_key_set)
     }
 
     /// Returns the info about the section matching the name.
@@ -117,13 +117,14 @@ impl Core {
     /// Returns our index in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub(crate) async fn our_index(&self) -> Result<usize> {
-        Ok(self.section_keys_provider.key_share().await?.index)
+        Ok(self.key_share().await?.index)
     }
 
     /// Returns our key share in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub(crate) async fn key_share(&self) -> Result<SectionKeyShare> {
-        self.section_keys_provider.key_share().await
+        let section_key = self.section.section_key().await;
+        self.section_keys_provider.key_share(&section_key).await
     }
 
     pub(crate) async fn send_event(&self, event: Event) {
