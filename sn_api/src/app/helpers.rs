@@ -9,7 +9,7 @@
 
 #[cfg(feature = "app")]
 use crate::{Error, Result};
-use chrono::{DateTime, SecondsFormat, Utc};
+use ::time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use safe_network::types::{Error as SafeNdError, PublicKey, Token};
 use std::{
@@ -53,10 +53,12 @@ pub fn parse_tokens_amount(amount_str: &str) -> Result<Token> {
 }
 
 pub fn systemtime_to_rfc3339(t: time::SystemTime) -> String {
-    let datetime: DateTime<Utc> = t.into();
-    datetime.to_rfc3339_opts(SecondsFormat::Secs, true)
+    let datetime: OffsetDateTime = t.into();
+    datetime
+        .format(&Rfc3339)
+        .expect("formatting OffsetDateTime to RFC 3339 should be infallible")
 }
 
 pub fn gen_timestamp_secs() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
+    OffsetDateTime::now_utc().unix_timestamp().to_string()
 }

@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     system::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocateDetails, RelocatePayload, Section,
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocateDetails, RelocatePayload,
         SystemMsg,
     },
     AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider, WireMsg,
@@ -22,6 +22,7 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
+    section::Section,
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;

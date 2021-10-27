@@ -91,13 +91,16 @@ async fn main() -> Result<()> {
 
     info!("Building current sn_node");
     debug!("Building current sn_node with args: {:?}", args);
-    let _child = Command::new("cargo")
+    Command::new("cargo")
         .args(args.clone())
+        .current_dir("sn")
         // .env("RUST_LOG", "debug")
         // .env("RUST_BACKTRACE", "1")
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .output()
+        .map_err(Into::into)
+        .and_then(|result| result.status.success().then(|| ()).ok_or_else(|| eyre!("Command exited with error")))
         .wrap_err_with(|| format!("Failed to run build command with args: {:?}", args))?;
 
     info!("sn_node built successfully");

@@ -7,13 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::NetworkPrefixMap;
-use crate::messaging::{
-    system::{Peer, Section},
-    DstLocation,
-};
+use crate::messaging::{system::Peer, DstLocation};
 use crate::routing::{
     error::{Error, Result},
     peer::PeerUtils,
+    section::Section,
     supermajority, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use itertools::Itertools;

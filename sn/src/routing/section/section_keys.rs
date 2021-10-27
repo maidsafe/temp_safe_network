@@ -53,6 +53,12 @@ impl SectionKeysProvider {
         provider
     }
 
+    // remove any pending key share and resets the cache
+    pub(crate) async fn wipe(&self) {
+        self.cache.clear().await;
+        self.pending.clear();
+    }
+
     pub(crate) async fn key_share(&self) -> Result<SectionKeyShare> {
         self.cache.get_most_recent().await
     }
@@ -91,6 +97,19 @@ struct MiniKeyCache {
 }
 
 impl MiniKeyCache {
+    /// returns cache capacity
+    async fn capacity(&self) -> usize {
+        self.list.read().await.capacity()
+    }
+
+    /// clears the cache
+    async fn clear(&self) {
+        let mut vecdeq = self.list.write().await;
+        let capacity = self.capacity().await;
+
+        *vecdeq = VecDeque::with_capacity(capacity);
+    }
+
     /// Constructor for capacity based `KeyCache`.
     fn with_capacity(capacity: usize) -> MiniKeyCache {
         MiniKeyCache {

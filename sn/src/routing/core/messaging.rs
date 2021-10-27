@@ -10,7 +10,7 @@ use super::Core;
 use crate::messaging::{
     system::{
         DkgSessionId, ElderCandidates, JoinResponse, NodeState, Peer, Proposal, RelocateDetails,
-        RelocatePromise, Section, SectionAuth, SystemMsg,
+        RelocatePromise, SectionAuth, SystemMsg,
     },
     DstLocation, WireMsg,
 };
@@ -23,7 +23,7 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionKeyShare},
+    section::{ElderCandidatesUtils, Section, SectionKeyShare},
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
@@ -82,14 +82,15 @@ impl Core {
         };
         // Name of the section_pk may not matches the section prefix.
         // Carry out a substitution to prevent the dst_location becomes other section.
+        let section_key = self.section.section_key().await;
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             DstLocation::Section {
                 name: self.section.prefix().await.name(),
-                section_pk: *self.section.chain().await.last_key(),
+                section_pk: section_key,
             },
             node_msg,
-            self.section.authority_provider().await.section_key(),
+            section_key,
         )?;
 
         Ok(self.send_or_handle(wire_msg, recipients).await)
@@ -140,24 +141,6 @@ impl Core {
         })
     }
 
-    pub(crate) async fn check_lagging(
-        &self,
-        peer: (XorName, SocketAddr),
-        public_key: &BlsPublicKey,
-    ) -> Result<Option<Command>> {
-        if self.section.chain().await.has_key(public_key)
-            && public_key != self.section.chain().await.last_key()
-        {
-            let msg = self.generate_ae_update(*public_key, true).await?;
-            trace!("{}", LogMarker::SendingAeUpdateAfterLagCheck);
-
-            let cmd = self.send_direct_message(peer, msg, *public_key).await?;
-            Ok(Some(cmd))
-        } else {
-            Ok(None)
-        }
-    }
-
     // Send NodeApproval to a joining node which makes them a section member
     pub(crate) async fn send_node_approval(
         &self,
@@ -183,7 +166,7 @@ impl Core {
             section_chain: self.section.chain().await,
         }));
 
-        let dst_section_pk = *self.section.chain().await.last_key();
+        let dst_section_pk = self.section.section_key().await;
         trace!("{}", LogMarker::SendNodeApproval);
         let cmd = self
             .send_direct_message((name, addr), node_msg, dst_section_pk)
@@ -196,11 +179,12 @@ impl Core {
         &self,
         section: &Section,
     ) -> Result<Vec<Command>> {
+        let our_name = &self.node.read().await.name();
         let nodes: Vec<_> = section
             .active_members()
             .await
             .iter()
-            .filter(|peer| peer.name() != &self.node.name())
+            .filter(|peer| peer.name() != our_name)
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
 
@@ -225,6 +209,7 @@ impl Core {
         &self,
         old: &StateSnapshot,
     ) -> Result<Vec<Command>> {
+        debug!("{}", LogMarker::AeSendUpdateToSiblings);
         if let Some(sibling_sec_auth) = self
             .network
             .get_signed(&self.section().prefix().await.sibling())
@@ -306,7 +291,7 @@ impl Core {
         let src = details.pub_id;
         let dst = DstLocation::Node {
             name: details.pub_id,
-            section_pk: *self.section.chain().await.last_key(),
+            section_pk: self.section.section_key().await,
         };
         let node_msg = SystemMsg::Relocate(details);
 
@@ -325,7 +310,7 @@ impl Core {
         let src = promise.name;
         let dst = DstLocation::Section {
             name: promise.name,
-            section_pk: *self.section.chain().await.last_key(),
+            section_pk: self.section.section_key().await,
         };
         let node_msg = SystemMsg::RelocatePromise(promise);
 
@@ -335,7 +320,7 @@ impl Core {
 
     pub(crate) async fn return_relocate_promise(&self) -> Option<Command> {
         // TODO: keep sending this periodically until we get relocated.
-        if let Some(RelocateState::Delayed(msg)) = &self.relocate_state {
+        if let Some(RelocateState::Delayed(msg)) = &*self.relocate_state.read().await {
             self.send_message_to_our_elders(msg.clone()).await.ok()
         } else {
             None
@@ -347,7 +332,7 @@ impl Core {
         elder_candidates: ElderCandidates,
     ) -> Result<Vec<Command>> {
         let src_prefix = elder_candidates.prefix;
-        let generation = self.section.chain().await.main_branch_len() as u64;
+        let generation = self.section.main_chain_branch_len().await;
         let session_id = DkgSessionId::new(&elder_candidates, generation);
 
         // Send DKG start to all candidates
@@ -364,7 +349,7 @@ impl Core {
             session_id,
             elder_candidates,
         };
-        let section_pk = *self.section.chain().await.last_key();
+        let section_pk = self.section.section_key().await;
         self.send_message_for_dst_accumulation(
             src_prefix.name(),
             DstLocation::Section {
@@ -403,7 +388,7 @@ impl Core {
             src,
             dst,
             node_msg,
-            *self.section.chain().await.last_key(),
+            self.section.section_key().await,
         )?;
 
         trace!(
@@ -429,7 +414,7 @@ impl Core {
         trace!("Send {:?} to {:?}", wire_msg, recipients);
 
         for recipient in recipients {
-            if recipient.name() == &self.node.name() {
+            if recipient.name() == &self.node.read().await.name() {
                 handle = true;
             } else {
                 others.push((*recipient.name(), *recipient.addr()));
@@ -449,10 +434,10 @@ impl Core {
 
         if handle {
             wire_msg.set_dst_section_pk(*self.section_chain().await.last_key());
-            wire_msg.set_dst_xorname(self.node.name());
+            wire_msg.set_dst_xorname(self.node.read().await.name());
 
             commands.push(Command::HandleMessage {
-                sender: self.node.addr,
+                sender: self.node.read().await.addr,
                 wire_msg,
                 original_bytes: None,
             });
@@ -468,7 +453,7 @@ impl Core {
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             DstLocation::Section {
                 name: recipient.0,
                 section_pk: dst_section_pk,
@@ -493,7 +478,7 @@ impl Core {
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             DstLocation::Section {
                 name: dst_name,
                 section_pk: dst_section_pk,

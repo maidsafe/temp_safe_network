@@ -14,7 +14,9 @@ use std::{sync::Once, time::Duration};
 use tempfile::tempdir;
 use tracing_core::{Event, Subscriber};
 use tracing_subscriber::fmt::time::{FormatTime, SystemTime};
-use tracing_subscriber::fmt::{fmt, FmtContext, FormatEvent, FormatFields, FormattedFields};
+use tracing_subscriber::fmt::{
+    fmt, format::Writer, FmtContext, FormatEvent, FormatFields, FormattedFields,
+};
 use tracing_subscriber::{registry::LookupSpan, EnvFilter};
 
 static INIT: Once = Once::new();
@@ -30,7 +32,7 @@ where
     fn format_event(
         &self,
         ctx: &FmtContext<'_, S, N>,
-        writer: &mut dyn std::fmt::Write,
+        mut writer: Writer,
         event: &Event<'_>,
     ) -> std::fmt::Result {
         // Write level and target
@@ -40,7 +42,7 @@ where
         let time = SystemTime::default();
         write!(writer, " {} ", level)?;
 
-        time.format_time(writer)?;
+        time.format_time(&mut writer)?;
 
         writeln!(
             writer,
@@ -77,7 +79,7 @@ where
         })?;
 
         // Write fields on the event
-        ctx.field_format().format_fields(writer, event)?;
+        ctx.field_format().format_fields(writer.by_ref(), event)?;
 
         writeln!(writer)
     }

@@ -6,28 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    delivery_group, split_barrier::SplitBarrier, AeBackoffCache, Comm, Core, SignatureAggregator,
-    KEY_CACHE_SIZE, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
-};
+use super::{delivery_group, Comm, Core};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    system::{NodeState, Peer, Proposal, Section},
+    system::{NodeState, Peer, Proposal},
     SectionAuthorityProvider, WireMsg,
 };
-use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
-    dkg::{DkgVoter, ProposalAggregator},
     error::Result,
+    log_markers::LogMarker,
     node::Node,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionKeyShare, SectionKeysProvider},
+    section::{NodeStateUtils, Section, SectionKeyShare},
     Event,
 };
-use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
-use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::sync::{mpsc, RwLock};
+use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
+use tokio::sync::mpsc;
 use xor_name::XorName;
 
 impl Core {
@@ -56,46 +51,16 @@ impl Core {
         .await
     }
 
-    pub(crate) async fn relocated(&self, mut new_node: Node, new_section: Section) -> Result<Self> {
-        let section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None).await;
-
+    pub(crate) async fn relocate(&self, mut new_node: Node, new_section: Section) -> Result<()> {
         // make sure the new Node has the correct local addr as Comm
-        let comm = self.comm.clone();
-        new_node.addr = comm.our_connection_info();
+        new_node.addr = self.comm.our_connection_info();
 
-        let network = NetworkPrefixMap::new(*new_section.genesis_key());
-        // TODO: to keep our knowledge of the network and avoid unnecessary AE msgs:
-        // - clone self.network instead,
-        // - remove the SAP of our new section from the cloned network
-        // - and add current section's SAP to the cloned network
+        let mut our_node = self.node.write().await;
 
-        Ok(Self {
-            comm,
-            node: new_node,
-            section: new_section,
-            network,
-            section_keys_provider,
-            proposal_aggregator: ProposalAggregator::default(),
-            split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
-            message_aggregator: SignatureAggregator::default(),
-            dkg_voter: DkgVoter::default(),
-            relocate_state: None,
-            event_tx: self.event_tx.clone(),
-            joins_allowed: Arc::new(RwLock::new(true)),
-            is_genesis_node: false,
-            resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
-            register_storage: self.register_storage.clone(),
-            root_storage_dir: self.root_storage_dir.clone(),
-            used_space: self.used_space.clone(),
-            capacity: self.capacity.clone(),
-            chunk_storage: self.chunk_storage.clone(),
-            liveness: self.liveness.clone(),
-            ae_backoff_cache: AeBackoffCache::default(),
-        })
-    }
+        self.section.relocated_to(new_section).await?;
+        *our_node = new_node;
 
-    pub(crate) fn node(&self) -> &Node {
-        &self.node
+        Ok(())
     }
 
     pub(crate) fn section(&self) -> &Section {
@@ -108,7 +73,7 @@ impl Core {
 
     /// Is this node an elder?
     pub(crate) async fn is_elder(&self) -> bool {
-        self.section.is_elder(&self.node.name()).await
+        self.section.is_elder(&self.node.read().await.name()).await
     }
 
     pub(crate) async fn is_not_elder(&self) -> bool {
@@ -170,8 +135,11 @@ impl Core {
     // ----------------------------------------------------------------------------------------
 
     pub(crate) async fn handle_timeout(&self, token: u64) -> Result<Vec<Command>> {
-        self.dkg_voter
-            .handle_timeout(&self.node, token, *self.section_chain().await.last_key())
+        self.dkg_voter.handle_timeout(
+            &self.node.read().await.clone(),
+            token,
+            *self.section_chain().await.last_key(),
+        )
     }
 
     // Send message to peers on the network.
@@ -179,7 +147,7 @@ impl Core {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
-            &self.node.name(),
+            &self.node.read().await.name(),
             &self.section,
             &self.network,
         )
@@ -249,9 +217,10 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
+        debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         for elder_candidates in self
             .section
-            .promote_and_demote_elders(&self.node.name(), excluded_names)
+            .promote_and_demote_elders(&self.node.read().await.name(), excluded_names)
             .await
         {
             commands.extend(self.send_dkg_start(elder_candidates).await?);

@@ -117,7 +117,7 @@ jobs:
           key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
 
       - name: Build all safe_network targets
-        run: cargo build --all-targets --release --features=always-joinable,test-utils
+        run: cd sn && cargo build --all-targets --release --features=always-joinable,test-utils
 
       - name: Run Data Types tests
         if: steps.data_types_changes.outputs.src == 'true'

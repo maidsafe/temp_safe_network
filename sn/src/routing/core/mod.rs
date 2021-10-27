@@ -32,10 +32,7 @@ pub(crate) use register_storage::RegisterStorage;
 use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
 use crate::messaging::system::SystemMsg;
-use crate::messaging::{
-    signature_aggregator::SignatureAggregator,
-    system::{Proposal, Section},
-};
+use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
@@ -44,7 +41,7 @@ use crate::routing::{
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{SectionKeyShare, SectionKeysProvider},
+    section::{Section, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
 use backoff::ExponentialBackoff;
@@ -58,17 +55,21 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
-use tokio::sync::{mpsc, RwLock};
+use tokio::{
+    fs::File,
+    io::AsyncWriteExt,
+    sync::{mpsc, RwLock, Semaphore},
+};
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
-pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
-pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
+pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
+pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
 const KEY_CACHE_SIZE: u8 = 5;
+
+pub(crate) const CONCURRENT_JOINS: usize = 5;
 
 // store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
@@ -77,7 +78,7 @@ pub(crate) type AeBackoffCache =
 // State + logic of a routing node.
 pub(crate) struct Core {
     pub(crate) comm: Comm,
-    node: Node,
+    pub(crate) node: Arc<RwLock<Node>>,
     section: Section,
     network: NetworkPrefixMap,
     section_keys_provider: SectionKeysProvider,
@@ -86,12 +87,12 @@ pub(crate) struct Core {
     split_barrier: Arc<RwLock<SplitBarrier>>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
-    relocate_state: Option<RelocateState>,
+    relocate_state: Arc<RwLock<Option<RelocateState>>>,
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: Arc<RwLock<bool>>,
+    current_joins_semaphore: Arc<Semaphore>,
     is_genesis_node: bool,
     resource_proof: ResourceProof,
-    used_space: UsedSpace,
     pub(super) register_storage: RegisterStorage,
     pub(super) chunk_storage: ChunkStore,
     root_storage_dir: PathBuf,
@@ -128,7 +129,7 @@ impl Core {
 
         Ok(Self {
             comm,
-            node,
+            node: Arc::new(RwLock::new(node)),
             section,
             network: NetworkPrefixMap::new(genesis_pk),
             section_keys_provider,
@@ -136,9 +137,10 @@ impl Core {
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
-            relocate_state: None,
+            relocate_state: Arc::new(RwLock::new(None)),
             event_tx,
             joins_allowed: Arc::new(RwLock::new(true)),
+            current_joins_semaphore: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
             is_genesis_node,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage,
@@ -146,7 +148,6 @@ impl Core {
             capacity,
             liveness: adult_liveness,
             root_storage_dir,
-            used_space,
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }
@@ -158,7 +159,7 @@ impl Core {
     pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
             is_elder: self.is_elder().await,
-            last_key: *self.section.chain().await.last_key(),
+            last_key: self.section.section_key().await,
             prefix: self.section.prefix().await,
             elders: self.section().authority_provider().await.names(),
         }
@@ -224,14 +225,14 @@ impl Core {
 
     /// Generate commands and fire events based upon any node state changes.
     pub(crate) async fn update_self_for_new_node_state_and_fire_events(
-        &mut self,
+        &self,
         old: StateSnapshot,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
         let new = self.state_snapshot().await;
 
         self.section_keys_provider
-            .finalise_dkg(self.section.chain().await.last_key())
+            .finalise_dkg(&self.section.section_key().await)
             .await;
 
         if new.last_key != old.last_key {
@@ -285,8 +286,7 @@ impl Core {
             } else if old.is_elder && !new.is_elder {
                 trace!("{}", LogMarker::DemotedFromElder);
                 info!("Demoted");
-                self.network = NetworkPrefixMap::new(*self.section.genesis_key());
-                self.section_keys_provider = SectionKeysProvider::new(KEY_CACHE_SIZE, None).await;
+                self.section_keys_provider.wipe().await;
                 NodeElderChange::Demoted
             } else {
                 NodeElderChange::None
@@ -313,7 +313,7 @@ impl Core {
             };
 
             let event = if let Some(sibling_elders) = sibling_elders {
-                info!("{}", LogMarker::Split);
+                info!("{}", LogMarker::SplitSuccess);
                 // In case of split, send AEUpdate to sibling new elder nodes.
                 commands.extend(self.send_ae_update_to_sibling_section(&old).await?);
 
@@ -341,7 +341,7 @@ impl Core {
 
     pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
         if self.section.prefix().await.matches(name) {
-            *self.section.chain().await.last_key()
+            self.section.section_key().await
         } else if let Ok(sap) = self.network.section_by_name(name) {
             sap.section_key()
         } else if self.section.prefix().await.sibling().matches(name) {
@@ -352,7 +352,7 @@ impl Core {
             // us back their whole section chain. However, this situation should be rare.
             *self.section.chain().await.prev_key()
         } else {
-            *self.section.chain().await.root_key()
+            *self.section.genesis_key()
         }
     }
 

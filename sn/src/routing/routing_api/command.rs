@@ -7,10 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{DkgFailureSigSet, KeyedSig, Proposal, Section, SystemMsg},
+    system::{DkgFailureSigSet, KeyedSig, Proposal, SystemMsg},
     DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
 };
-use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
+use crate::routing::{
+    node::Node,
+    routing_api::Peer,
+    section::{Section, SectionKeyShare},
+    XorName,
+};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use custom_debug::Debug;

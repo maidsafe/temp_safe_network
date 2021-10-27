@@ -17,7 +17,6 @@ use crate::routing::{
     log_markers::LogMarker,
     messages::WireMsgUtils,
     routing_api::command::Command,
-    SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -30,7 +29,7 @@ use xor_name::XorName;
 
 impl Core {
     pub(crate) async fn handle_anti_entropy_update_msg(
-        &mut self,
+        &self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
@@ -55,6 +54,9 @@ impl Core {
                         "Anti-Entropy: updated remote section SAP updated for {:?}",
                         section_auth.prefix
                     );
+
+                    // FIXME: perhaps we should update our section chain
+                    // only upon successful DKG round we participated on??
                     self.section
                         .merge_chain(&signed_section_auth, proof_chain)
                         .await?;
@@ -64,7 +66,10 @@ impl Core {
                         section_auth.prefix, section_auth
                     );
                 }
-                self.section.merge_members(members).await?;
+
+                if let Some(peers) = members {
+                    self.section.merge_members(peers).await?;
+                }
             }
             Err(err) => {
                 warn!(
@@ -296,10 +301,10 @@ impl Core {
                         bounced_msg,
                     };
                     let wire_msg = WireMsg::single_src(
-                        &self.node,
+                        &self.node.read().await.clone(),
                         src_location.to_dst(),
                         ae_msg,
-                        self.section.authority_provider().await.section_key(),
+                        self.section.section_key().await,
                     )?;
                     trace!("{}", LogMarker::AeSendRedirect);
 
@@ -330,10 +335,10 @@ impl Core {
         trace!(
             "Performing AE checks, provided pk was: {:?} ours is: {:?}",
             dst_section_pk,
-            self.section.chain().await.last_key()
+            self.section.section_key().await
         );
 
-        if dst_section_pk == self.section.chain().await.last_key() {
+        if dst_section_pk == &self.section.section_key().await {
             trace!("Provided Section PK matching our latest. All AE checks passed!");
             // Destination section key matches our current section key
             return Ok(None);
@@ -374,7 +379,7 @@ impl Core {
                     sender
                 );
 
-                let proof_chain = self.section.chain().await.clone();
+                let proof_chain = self.section.chain().await;
 
                 let section_signed_auth = self.section.section_signed_authority_provider().await;
                 let section_auth = section_signed_auth.value;
@@ -393,10 +398,10 @@ impl Core {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             src_location.to_dst(),
             ae_msg,
-            self.section.authority_provider().await.section_key(),
+            self.section.section_key().await,
         )?;
 
         Ok(Some(Command::SendMessage {
@@ -427,10 +432,10 @@ impl Core {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node.read().await.clone(),
             src_location.to_dst(),
             ae_msg,
-            self.section.authority_provider().await.section_key(),
+            self.section.section_key().await,
         )?;
 
         trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
@@ -448,25 +453,26 @@ impl Core {
         data_name: Option<XorName>,
     ) -> Option<SectionAuth<SectionAuthorityProvider>> {
         if let Some(data_name) = data_name {
-            let backup_sap = self.section.section_auth.read().await.clone();
-            let our_section = self.section.section_auth.clone();
-            let better_sap = self
-                .network
-                .closest_or_opposite(&data_name)
-                .unwrap_or(backup_sap);
+            let our_sap = self.section.section_signed_authority_provider().await;
+            trace!("Our SAP: {:?}", our_sap);
 
-            trace!("Our SAP: {:?}", our_section);
-            trace!("Better SAP for data {:?}: {:?}", data_name, better_sap);
-
-            if better_sap != *our_section.read().await {
-                // Update the client of the actual destination section
-                trace!(
-                    "We have a better matched section for the data name {:?}",
-                    data_name
-                );
-                Some(better_sap)
-            } else {
-                None
+            match self.network.closest_or_opposite(&data_name) {
+                Some(better_sap) => {
+                    // Update the client of the actual destination section
+                    trace!(
+                        "We have a better matched section for the data name {:?}",
+                        data_name
+                    );
+                    Some(better_sap)
+                }
+                None => {
+                    trace!(
+                        "We don't have a better matching section for data name {:?}m our SAP: {:?}",
+                        data_name,
+                        our_sap
+                    );
+                    None
+                }
             }
         } else {
             None
@@ -477,16 +483,17 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{
-        system::Section, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
-    };
+    use crate::messaging::{DstLocation, MessageId, MessageType, MsgKind, NodeAuth};
     use crate::routing::{
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
         node::Node,
         routing_api::tests::create_comm,
-        section::test_utils::{gen_addr, gen_section_authority_provider},
+        section::{
+            test_utils::{gen_addr, gen_section_authority_provider},
+            Section,
+        },
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
@@ -504,7 +511,7 @@ mod tests {
         let our_prefix = env.core.section().prefix().await;
         let (msg, src_location) =
             env.create_message(&our_prefix, *env.core.section_chain().await.last_key())?;
-        let sender = env.core.node().addr;
+        let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_pk = *env.core.section_chain().await.last_key();
 
@@ -532,7 +539,7 @@ mod tests {
         let other_pk = other_sk.public_key();
 
         let (msg, src_location) = env.create_message(&env.other_sap.value.prefix, other_pk)?;
-        let sender = env.core.node().addr;
+        let sender = env.core.node.read().await.addr;
 
         // since it's not aware of the other prefix, it shall fail with NoMatchingSection
         let dst_section_pk = other_pk;
@@ -594,7 +601,7 @@ mod tests {
 
         let (msg, src_location) =
             env.create_message(&our_prefix, *env.core.section_chain().await.last_key())?;
-        let sender = env.core.node().addr;
+        let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_pk = *env.core.section_chain().await.root_key();
 
@@ -633,7 +640,7 @@ mod tests {
 
         let (msg, src_location) =
             env.create_message(&our_prefix, *env.core.section_chain().await.last_key())?;
-        let sender = env.core.node().addr;
+        let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
 
         let bogus_env = Env::new().await?;
@@ -696,7 +703,7 @@ mod tests {
                 .context("failed to create section")?;
 
             let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
-            let tmp_core = Core::first_node(
+            let core = Core::first_node(
                 create_comm().await?,
                 node.clone(),
                 mpsc::channel(1).0,
@@ -704,7 +711,8 @@ mod tests {
                 root_storage_dir,
             )
             .await?;
-            let core = tmp_core.relocated(node, section).await?;
+            // let core = tmp_core.
+            core.relocate(node, section).await?;
 
             // generate other SAP for prefix1
             let (other_sap, _, secret_key_set) =

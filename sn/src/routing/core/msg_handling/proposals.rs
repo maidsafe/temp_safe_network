@@ -64,10 +64,10 @@ impl Core {
 
             // Let's now verify the section key in the msg authority is trusted
             // based on our current knowledge of the network and sections chains.
-            if !self.section.chain().await.has_key(sig_share_pk) {
+            if !self.section.has_chain_key(sig_share_pk).await {
                 warn!(
-                    "Dropped Propose msg with untrusted sig share from {:?}: {:?}",
-                    sender, msg_id
+                    "Dropped Propose msg ({:?}) with untrusted sig share from {}: {:?}",
+                    msg_id, sender, proposal
                 );
                 return Ok(vec![]);
             }
