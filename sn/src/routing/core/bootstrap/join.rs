@@ -83,8 +83,8 @@ impl<'a> Join<'a> {
             prefix: Prefix::default(),
             backoff: ExponentialBackoff {
                 initial_interval: Duration::from_millis(50),
-                max_interval: Duration::from_secs(1),
-                max_elapsed_time: Some(Duration::from_secs(20)),
+                max_interval: Duration::from_secs(3),
+                max_elapsed_time: Some(Duration::from_secs(60)),
                 ..Default::default()
             },
         }
@@ -335,6 +335,11 @@ impl<'a> Join<'a> {
 
             if let Some(wait) = next_wait {
                 tokio::time::sleep(wait).await;
+            } else {
+                error!("Waiting before attempting to join again");
+
+                tokio::time::sleep(2 * self.backoff.max_interval).await;
+                self.backoff.reset();
             }
         }
 
