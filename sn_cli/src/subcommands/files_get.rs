@@ -16,9 +16,9 @@ use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, TickTimeLimit};
 use sn_api::{
-    fetch::Range,
-    fetch::SafeData,
     files::{FilesMap, GetAttr, ProcessedFiles},
+    resolver::Range,
+    resolver::SafeData,
     DataType, Result as ApiResult, Safe, Url, XorUrl,
 };
 use std::{

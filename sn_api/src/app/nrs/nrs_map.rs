@@ -76,6 +76,15 @@ impl NrsMap {
             )),
         }
     }
+
+    /// Prints a summary for the NRS map.
+    ///
+    /// This is used in the CLI for printing out the details of a map.
+    pub fn get_map_summary(&self) -> BTreeMap<String, BTreeMap<String, String>> {
+        let mut nrs_map_summary = BTreeMap::new();
+        //gen_nrs_map_summary(self, "", &mut nrs_map_summary);
+        nrs_map_summary
+    }
 }
 
 /// removes top name from a given name

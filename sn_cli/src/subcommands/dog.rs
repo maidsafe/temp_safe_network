@@ -13,7 +13,7 @@ use super::{
 };
 use color_eyre::Result;
 use sn_api::{
-    fetch::{ContentType, SafeData},
+    resolver::{ContentType, SafeData},
     Safe, Url,
 };
 use structopt::StructOpt;
@@ -46,6 +46,7 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     nrs_map,
                     data_type,
                     resolved_from,
+                    ..
                 } => {
                     println!("Resolved from: {}", resolved_from);
                     println!("= NRS Map Container =");
@@ -61,7 +62,10 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     let mut safeurl = Url::from_url(xorurl)?;
                     safeurl.set_content_type(ContentType::Raw)?;
                     println!("Native data XOR-URL: {}", safeurl.to_string());
-                    print_nrs_map(nrs_map, public_name);
+                    // TODO: Speak to Anselme regarding new scenario for the nrs_map being optional.
+                    if let Some(nrs_map) = nrs_map {
+                        print_nrs_map(nrs_map, public_name);
+                    }
                 }
                 SafeData::FilesContainer {
                     xorurl,

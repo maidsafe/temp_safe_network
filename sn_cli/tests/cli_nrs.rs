@@ -10,7 +10,7 @@
 use assert_cmd::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::{fetch::ContentType, DataAddress, Scope, Url, XorUrlBase};
+use sn_api::{resolver::ContentType, DataAddress, Scope, Url, XorUrlBase};
 use sn_cmd_test_utilities::util::{
     get_random_nrs_string, parse_nrs_create_output, safe_cmd, safe_cmd_stdout, safeurl_from,
     upload_test_folder, CLI, SAFE_PROTOCOL,
@@ -74,7 +74,6 @@ fn calling_safe_nrs_twice_w_name_fails() -> Result<()> {
 }
 
 #[test]
-#[ignore = "investigate after sn_cli merge into workspace"]
 fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
     let (container_xorurl, _map) = upload_test_folder(true)?;
     let container_url = Url::from_url(&container_xorurl)?;
@@ -145,7 +144,6 @@ fn calling_safe_nrs_put_no_top_default_fetch() -> Result<()> {
 }
 
 #[test]
-#[ignore = "investigate after sn_cli merge into workspace"]
 fn calling_safe_nrs_put_folder_and_fetch_from_subname() -> Result<()> {
     let (container_xorurl, _map) = upload_test_folder(true)?;
     let container_xorurl = Url::from_url(&container_xorurl)?;
@@ -230,7 +228,6 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
 }
 
 #[test]
-#[ignore = "investigate after sn_cli merge into workspace"]
 fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Result<()> {
     let (_container_xorurl, file_map) = upload_test_folder(true)?;
 
@@ -284,7 +281,6 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Resul
 }
 
 #[test]
-#[ignore = "investigate after sn_cli merge into workspace"]
 fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result<()> {
     let (_container_xorurl, file_map) = upload_test_folder(true)?;
 
@@ -332,7 +328,6 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result
 }
 
 #[test]
-#[ignore = "investigate after sn_cli merge into workspace"]
 fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve() -> Result<()> {
     let (_container_xorurl, file_map) = upload_test_folder(true)?;
 

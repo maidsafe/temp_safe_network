@@ -13,7 +13,7 @@ pub mod util {
     use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use sn_api::{fetch::SafeData, files::ProcessedFiles, Keypair, Url};
+    use sn_api::{files::ProcessedFiles, resolver::SafeData, Keypair, Url};
     use std::{collections::BTreeMap, env, fs, path::Path, process};
     use tiny_keccak::{Hasher, Sha3};
     use walkdir::WalkDir;
@@ -282,7 +282,7 @@ pub mod util {
         serde_json::from_str(output).expect("Failed to parse output of `safe files put/sync`")
     }
 
-    pub fn parse_nrs_create_output(output: &str) -> (String, ProcessedFiles) {
+    pub fn parse_nrs_create_output(output: &str) -> (String, String) {
         serde_json::from_str(output).expect("Failed to parse output of `safe nrs create`")
     }
 

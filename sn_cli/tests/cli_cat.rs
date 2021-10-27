@@ -11,7 +11,7 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::fetch::{ContentType, DataType, Url};
+use sn_api::resolver::{ContentType, DataType, Url};
 use sn_cmd_test_utilities::util::{
     create_and_get_keys, get_random_nrs_string, parse_files_container_output,
     parse_files_put_or_sync_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout, safeurl_from,

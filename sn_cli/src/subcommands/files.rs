@@ -21,9 +21,9 @@ use color_eyre::{eyre::bail, eyre::eyre, Result};
 use prettytable::{format::FormatBuilder, Table};
 use serde::Serialize;
 use sn_api::{
-    fetch::SafeData,
     files::{FilesMap, ProcessedFiles},
     nrs::VersionHash,
+    resolver::SafeData,
     Safe, Url, XorUrl,
 };
 use std::{

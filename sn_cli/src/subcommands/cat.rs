@@ -13,7 +13,7 @@ use super::{
 };
 use color_eyre::{eyre::WrapErr, Result};
 use prettytable::Table;
-use sn_api::{fetch::SafeData, Safe};
+use sn_api::{resolver::SafeData, Safe};
 use std::io::{self, Write};
 use structopt::StructOpt;
 use tokio::time::{sleep, Duration};
@@ -94,12 +94,14 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
             nrs_map,
             ..
         } => {
-            // Render NRS Map Container
-            if OutputFmt::Pretty == output_fmt {
-                println!("NRS Map Container (version {}) at \"{}\":", version, url);
-                print_nrs_map(nrs_map, public_name);
-            } else {
-                println!("{}", serialise_output(&(url, nrs_map), output_fmt));
+            // TODO: Speak to Anselme regarding new scenario for the nrs_map being optional.
+            if let Some(nrs_map) = nrs_map {
+                if OutputFmt::Pretty == output_fmt {
+                    println!("NRS Map Container (version {}) at \"{}\":", version, url);
+                    print_nrs_map(nrs_map, public_name);
+                } else {
+                    println!("{}", serialise_output(&(url, nrs_map), output_fmt));
+                }
             }
         }
         SafeData::SafeKey { .. } => {

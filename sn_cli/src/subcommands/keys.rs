@@ -12,7 +12,7 @@ use crate::operations::auth_and_connect::{create_credentials_file, read_credenti
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use hex::encode;
 use sn_api::{
-    fetch::{SafeData, Url},
+    resolver::{SafeData, Url},
     sk_to_hex, Keypair, PublicKey, Safe, XorName,
 };
 use std::io::Write;

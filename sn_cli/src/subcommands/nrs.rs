@@ -11,10 +11,9 @@ use super::{
     helpers::{get_from_arg_or_stdin, notice_dry_run, serialise_output},
     OutputFmt,
 };
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Result};
 use prettytable::{format::FormatBuilder, Table};
-use sn_api::{Safe, XorUrl};
-use std::collections::BTreeMap;
+use sn_api::{Safe, Url};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -69,29 +68,21 @@ pub async fn nrs_commander(
             // TODO: Where do we store/reference these? add it to the Root container,
             // sanitize name / spacing etc., validate destination?
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
-
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
 
-            // Set it as default too, so the top level NRS name is resolvable to same link
-            let default = true;
-
-            let (nrs_map_container_xorurl, processed_entries, _nrs_map) = safe
-                .nrs_map_container_create(&name, &link, default, direct_link, dry_run)
-                .await?;
-
-            // Now let's just print out a summary
+            let url = Url::from_url(&link)?;
+            let url = safe.nrs_create(&name, &url, dry_run).await?;
             print_summary(
                 output_fmt,
                 &format!(
                     "New NRS Map for \"safe://{}\" created at",
                     name.replace("safe://", "")
                 ),
-                nrs_map_container_xorurl,
-                processed_entries,
+                url,
+                ("+", &name, &link),
             );
-
             Ok(())
         }
         NrsSubCommands::Add {
@@ -101,23 +92,22 @@ pub async fn nrs_commander(
             direct_link,
         } => {
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
-
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
 
-            let (version, xorurl, processed_entries, _nrs_map) = safe
-                .nrs_map_container_add(&name, &link, default, direct_link, dry_run)
-                .await?;
-
-            // Now let's just print out the summary
+            let url = Url::from_url(&link)?;
+            let url = safe.nrs_associate(&name, &url, dry_run).await?;
+            let version = url
+                .content_version()
+                .ok_or_else(|| eyre!("Content version not set for returned NRS XorUrl"))?
+                .to_string();
             print_summary(
                 output_fmt,
                 &format!("NRS Map updated (version {})", version),
-                xorurl,
-                processed_entries,
+                url,
+                ("+", &name, &link),
             );
-
             Ok(())
         }
         NrsSubCommands::Remove { name } => {
@@ -125,17 +115,17 @@ pub async fn nrs_commander(
                 notice_dry_run();
             }
 
-            let (version, xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_remove(&name, dry_run).await?;
-
-            // Now let's just print out the summary
+            let url = safe.nrs_remove(&name, dry_run).await?;
+            let version = url
+                .content_version()
+                .ok_or_else(|| eyre!("Content version not set for returned NRS XorUrl"))?
+                .to_string();
             print_summary(
                 output_fmt,
                 &format!("NRS Map updated (version {})", version),
-                xorurl,
-                processed_entries,
+                url,
+                ("-", &name, ""),
             );
-
             Ok(())
         }
     }
@@ -144,8 +134,8 @@ pub async fn nrs_commander(
 fn print_summary(
     output_fmt: OutputFmt,
     header_msg: &str,
-    xorurl: XorUrl,
-    processed_entries: BTreeMap<String, (String, String)>,
+    xorurl: Url,
+    processed_entry: (&str, &str, &str),
 ) {
     if OutputFmt::Pretty == output_fmt {
         let mut table = Table::new();
@@ -155,15 +145,14 @@ fn print_summary(
             .build();
         table.set_format(format);
 
-        for (public_name, (change, name_link)) in processed_entries.iter() {
-            table.add_row(row![change, public_name, name_link]);
-        }
+        let (change, top_name, url) = processed_entry;
+        table.add_row(row![change, top_name, url]);
         println!("{}: \"{}\"", header_msg, xorurl);
         table.printstd();
     } else {
         println!(
             "{}",
-            serialise_output(&(xorurl, processed_entries), output_fmt)
+            serialise_output(&(xorurl, processed_entry), output_fmt)
         );
     }
 }
