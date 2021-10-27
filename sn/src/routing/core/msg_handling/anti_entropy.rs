@@ -86,6 +86,7 @@ impl Core {
         self.update_self_for_new_node_state_and_fire_events(snapshot)
             .await
     }
+
     pub(crate) async fn handle_anti_entropy_retry_msg(
         &self,
         section_auth: SectionAuthorityProvider,

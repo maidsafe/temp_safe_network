@@ -8,7 +8,6 @@
 
 use super::Prefix;
 use crate::messaging::data::Error as ErrorMessage;
-pub use crate::routing::dkg::proposal::ProposalError;
 use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};
 use secured_linked_list::error::Error as SecuredLinkedListError;
 use std::io;
@@ -67,8 +66,6 @@ pub enum Error {
     InvalidSectionChain(#[from] SecuredLinkedListError),
     #[error("Messaging protocol error: {0}")]
     Messaging(#[from] crate::messaging::Error),
-    #[error("proposal error: {0}")]
-    ProposalError(#[from] ProposalError),
     #[error("invalid payload")]
     InvalidPayload,
     #[error("Routing is set to not allow taking any new node")]

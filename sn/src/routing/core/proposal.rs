@@ -6,14 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{KeyedSig, SigShare};
-use crate::messaging::{
-    signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-    system::Proposal,
-};
-use crate::routing::error::Result;
+use crate::messaging::system::Proposal;
+use crate::routing::{dkg::SigShare, error::Result};
 use serde::{Serialize, Serializer};
-use thiserror::Error;
 
 pub(crate) trait ProposalUtils {
     fn prove(
@@ -23,7 +18,7 @@ pub(crate) trait ProposalUtils {
         secret_key_share: &bls::SecretKeyShare,
     ) -> Result<SigShare>;
 
-    fn as_signable(&self) -> SignableView;
+    fn as_signable_bytes(&self) -> Result<Vec<u8>>;
 }
 
 impl ProposalUtils for Proposal {
@@ -38,12 +33,12 @@ impl ProposalUtils for Proposal {
             public_key_set,
             index,
             secret_key_share,
-            &bincode::serialize(&self.as_signable()).map_err(|_| ProposalError::Invalid)?,
+            &self.as_signable_bytes()?,
         ))
     }
 
-    fn as_signable(&self) -> SignableView {
-        SignableView(self)
+    fn as_signable_bytes(&self) -> Result<Vec<u8>> {
+        Ok(bincode::serialize(&SignableView(self))?)
     }
 }
 
@@ -60,37 +55,6 @@ impl<'a> Serialize for SignableView<'a> {
             Proposal::JoinsAllowed(joins_allowed) => joins_allowed.serialize(serializer),
         }
     }
-}
-
-// Aggregator of `Proposal`s.
-#[derive(Default, Clone)]
-pub(crate) struct ProposalAggregator(SignatureAggregator);
-
-impl ProposalAggregator {
-    pub(crate) async fn add(
-        &self,
-        proposal: Proposal,
-        sig_share: SigShare,
-    ) -> Result<(Proposal, KeyedSig), ProposalError> {
-        let bytes =
-            bincode::serialize(&SignableView(&proposal)).map_err(|_| ProposalError::Invalid)?;
-        let sig = self.0.add(&bytes, sig_share).await?;
-        Ok((proposal, sig))
-    }
-}
-
-/// Errors that can occur when handling DKG proposals.
-#[derive(Debug, Error)]
-pub enum ProposalError {
-    /// The proposal could not be aggregated due to some semantic error.
-    #[error("failed to aggregate signature shares: {0}")]
-    Aggregation(#[from] AggregatorError),
-
-    /// The proposal could not be serialized.
-    ///
-    /// Note that this would likely represent a bug in the proposal serialization logic.
-    #[error("invalid proposal")]
-    Invalid,
 }
 
 #[cfg(test)]

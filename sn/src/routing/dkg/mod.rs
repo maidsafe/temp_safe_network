@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod dkg_msgs_utils;
-pub(super) mod proposal;
 mod section_signed;
 mod session;
 #[cfg(test)]
@@ -16,7 +15,6 @@ mod voter;
 
 pub(crate) use self::{
     dkg_msgs_utils::{DkgFailureSigSetUtils, DkgSessionIdUtils},
-    proposal::{ProposalAggregator, ProposalError, ProposalUtils},
     voter::DkgVoter,
 };
 pub(crate) use crate::messaging::system::{KeyedSig, SigShare};
