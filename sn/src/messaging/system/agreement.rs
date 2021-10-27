@@ -88,12 +88,10 @@ pub enum Proposal {
     },
     /// Proposal to remove a node from our section
     Offline(NodeState),
-    /// Proposal to update info about a section. This has two purposes:
+    /// Proposal to update info about a section.
     ///
-    /// 1. To signal the completion of a DKG by the elder candidates to the current elders.
-    ///    This proposal is then signed by the newly generated section key.
-    /// 2. To update information about other section in the network. In this case the proposal is
-    ///    signed by an existing key from the chain.
+    /// It signals the completion of a DKG by the elder candidates to the current elders.
+    /// This proposal is then signed by the newly generated section key.
     SectionInfo(SectionAuthorityProvider),
     /// Proposal to change the elders (and possibly the prefix) of our section.
     /// NOTE: the `SectionAuthorityProvider` is already signed with the new key. This proposal is only to signs the

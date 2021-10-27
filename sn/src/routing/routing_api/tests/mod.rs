@@ -1318,6 +1318,7 @@ async fn handle_elders_update() -> Result<()> {
     let demoted_peer = other_elder_peers.remove(0);
 
     let sk_set1 = SecretKeySet::random();
+
     let pk1 = sk_set1.secret_key().public_key();
     // Create `HandleAgreement` command for an `OurElders` proposal. This will demote one of the
     // current elders and promote the oldest peer.
@@ -1353,6 +1354,13 @@ async fn handle_elders_update() -> Result<()> {
         false,
     )
     .await?;
+
+    // Simulate DKG round finished succesfully by adding
+    // the new section key share to our cache
+    core.section_keys_provider
+        .insert(create_section_key_share(&sk_set1, 0))
+        .await;
+
     let dispatcher = Dispatcher::new(core);
 
     let commands = dispatcher
