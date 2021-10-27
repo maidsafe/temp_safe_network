@@ -63,8 +63,8 @@ use tokio::{
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
-pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 64;
-pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 2;
+pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
+pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
 const KEY_CACHE_SIZE: u8 = 5;
