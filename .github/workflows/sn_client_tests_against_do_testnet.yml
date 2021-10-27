@@ -1,4 +1,4 @@
-name: Deploy testnet on Digital Ocean
+name: 'sn: Run Client Tests against DO Testnet'
 
 on: 
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
           build-node: true
           node-count: ${{ github.event.inputs.node-count || 50 }}
-  
+
   run-client-tests:
     environment: approved_action
     name: Run Client tests
@@ -46,7 +46,6 @@ jobs:
         shell: bash
         run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
 
-      # Install Rust and required components
       - uses: actions-rs/toolchain@v1
         id: toolchain
         with:
@@ -54,7 +53,6 @@ jobs:
           toolchain: stable
           override: true
 
-      # Cache.
       - name: Cargo cache registry, index and build
         uses: actions/cache@v2.1.4
         with:
@@ -76,12 +74,10 @@ jobs:
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
         run: cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob --skip client_api::transfer && sleep 5
 
-      # register api
       - name: Client reg tests
         shell: bash
         run: cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
-      
-      # blob api
+
       - name: Client blob tests
         shell: bash
         run: cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 && sleep 5
