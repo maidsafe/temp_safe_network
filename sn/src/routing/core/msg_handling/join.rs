@@ -47,7 +47,7 @@ impl Core {
         debug!("Received {:?} from {}", join_request, peer);
 
         let _permit = self
-            .current_joins
+            .current_joins_semaphore
             .acquire()
             .await
             .map_err(|_| Error::PermitAcquisitionFailed)?;
