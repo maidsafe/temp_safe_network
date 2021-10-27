@@ -19,6 +19,7 @@ mod liveness_tracking;
 mod messaging;
 mod msg_count;
 mod msg_handling;
+mod proposal;
 mod register_storage;
 mod split_barrier;
 
@@ -27,6 +28,7 @@ pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL};
 pub(crate) use chunk_store::ChunkStore;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
+pub(crate) use proposal::ProposalUtils;
 pub(crate) use register_storage::RegisterStorage;
 
 use self::split_barrier::SplitBarrier;
@@ -35,7 +37,7 @@ use crate::messaging::system::SystemMsg;
 use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
-    dkg::{DkgVoter, ProposalAggregator},
+    dkg::DkgVoter,
     error::Result,
     log_markers::LogMarker,
     node::Node,
@@ -81,7 +83,7 @@ pub(crate) struct Core {
     network: NetworkPrefixMap,
     pub(crate) section_keys_provider: SectionKeysProvider,
     message_aggregator: SignatureAggregator,
-    proposal_aggregator: ProposalAggregator,
+    proposal_aggregator: SignatureAggregator,
     split_barrier: Arc<RwLock<SplitBarrier>>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
@@ -130,7 +132,7 @@ impl Core {
             section,
             network: NetworkPrefixMap::new(genesis_pk),
             section_keys_provider,
-            proposal_aggregator: ProposalAggregator::default(),
+            proposal_aggregator: SignatureAggregator::default(),
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),

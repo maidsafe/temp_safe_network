@@ -20,12 +20,9 @@ use crate::messaging::{
     SectionAuth as MsgKindSectionAuth, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
-    core::{ConnectionEvent, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
+    core::{ConnectionEvent, ProposalUtils, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     create_test_used_space_and_root_storage,
-    dkg::{
-        test_utils::{prove, section_signed},
-        ProposalUtils,
-    },
+    dkg::test_utils::{prove, section_signed},
     ed25519,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
@@ -531,7 +528,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         node_state,
         dst_key: Some(sk_set.secret_key().public_key()),
     };
-    let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
+    let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let commands = dispatcher
         .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
@@ -590,7 +587,7 @@ async fn handle_online_command(
         node_state,
         dst_key: None,
     };
-    let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
+    let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let commands = dispatcher
         .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
@@ -762,7 +759,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         previous_name: None,
     };
     let proposal = Proposal::Offline(node_state);
-    let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
+    let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let _commands = dispatcher
         .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
@@ -790,11 +787,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     // Pick the elder to remove.
     let auth_peers = section_auth.peers();
     let remove_peer = auth_peers.last().expect("section_auth is empty");
-    println!(
-        "remove peeer????? {:?} and authpeers {:?}",
-        remove_peer, auth_peers
-    );
-    println!("and members: {:?}", section.members());
+
     let remove_node_state = section
         .members()
         .get(remove_peer.name())
@@ -819,11 +812,9 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     .await?;
     let dispatcher = Dispatcher::new(core);
 
-    println!("11111?????????");
-
     // Handle agreement on the Offline proposal
     let proposal = Proposal::Offline(remove_node_state);
-    let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
+    let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let commands = dispatcher
         .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
@@ -867,14 +858,10 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
 
-        println!("22222????????");
-
         assert_eq!(recipients, expected_dkg_start_recipients);
 
         dkg_start_sent = true;
     }
-
-    println!("?????????");
 
     assert!(dkg_start_sent);
 
@@ -934,11 +921,9 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     )
     .await?;
 
-    let dispatcher = Dispatcher::new(core);
-
     // Create new `Section` as a successor to the previous one.
-    let sk2_set = SecretKeySet::random();
-    let sk2 = sk2_set.secret_key();
+    let sk_set2 = SecretKeySet::random();
+    let sk2 = sk_set2.secret_key();
     let pk2 = sk2.public_key();
     let pk2_signature = sk_set1.secret_key().sign(bincode::serialize(&pk2)?);
     chain.insert(&pk1, pk2, pk2_signature)?;
@@ -955,7 +940,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             .take(old_section_auth.elder_count() - 1)
             .chain(vec![new_peer]),
         old_section_auth.prefix,
-        sk2_set.public_keys(),
+        sk_set2.public_keys(),
     );
     let new_section_elders: BTreeSet<_> = new_section_auth.names();
     let section_signed_new_section_auth = section_signed(sk2, new_section_auth.clone())?;
@@ -977,6 +962,14 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         },
         src_section_pk,
     )?;
+
+    // Simulate DKG round finished succesfully by adding
+    // the new section key share to our cache
+    core.section_keys_provider
+        .insert(create_section_key_share(&sk_set2, 0))
+        .await;
+
+    let dispatcher = Dispatcher::new(core);
 
     let _commands = get_internal_commands(
         Command::HandleMessage {
@@ -1333,9 +1326,7 @@ async fn handle_elders_update() -> Result<()> {
 
     let section_signed_section_auth1 = section_signed(sk_set1.secret_key(), section_auth1)?;
     let proposal = Proposal::OurElders(section_signed_section_auth1);
-    let signature = sk_set0
-        .secret_key()
-        .sign(&bincode::serialize(&proposal.as_signable())?);
+    let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
     let sig = KeyedSig {
         signature,
         public_key: pk0,
@@ -1481,9 +1472,7 @@ async fn handle_demote_during_split() -> Result<()> {
     let create_our_elders_command = |sk, section_auth| -> Result<_> {
         let section_signed_section_auth = section_signed(sk, section_auth)?;
         let proposal = Proposal::OurElders(section_signed_section_auth);
-        let signature = sk_set_v0
-            .secret_key()
-            .sign(&bincode::serialize(&proposal.as_signable())?);
+        let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
         let sig = KeyedSig {
             signature,
             public_key: sk_set_v0.secret_key().public_key(),
@@ -1628,7 +1617,7 @@ fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<(Proposal, 
             dst_key: None,
         };
 
-        let signature = sk.sign(&bincode::serialize(&proposal.as_signable())?);
+        let signature = sk.sign(&proposal.as_signable_bytes()?);
 
         if relocation::check(age, &signature) && !relocation::check(age + 1, &signature) {
             let sig = KeyedSig {
@@ -1668,5 +1657,13 @@ impl Deref for SecretKeySet {
 
     fn deref(&self) -> &Self::Target {
         &self.set
+    }
+}
+
+// Create signature for the given bytes using the given secret key.
+fn keyed_signed(secret_key: &bls::SecretKey, bytes: &[u8]) -> KeyedSig {
+    KeyedSig {
+        public_key: secret_key.public_key(),
+        signature: secret_key.sign(bytes),
     }
 }

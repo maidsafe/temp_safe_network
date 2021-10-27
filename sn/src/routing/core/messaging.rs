@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
+use super::ProposalUtils;
 use crate::messaging::{
     system::{
         DkgSessionId, ElderCandidates, JoinResponse, NodeState, Peer, Proposal, RelocateDetails,
@@ -16,7 +17,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     core::StateSnapshot,
-    dkg::{DkgSessionIdUtils, ProposalUtils},
+    dkg::DkgSessionIdUtils,
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
@@ -31,6 +32,7 @@ use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use xor_name::XorName;
+
 impl Core {
     // Send proposal to all our elders.
     pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
