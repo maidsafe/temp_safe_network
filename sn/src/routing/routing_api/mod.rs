@@ -41,11 +41,14 @@ use crate::routing::{
 use crate::{dbs::UsedSpace, messaging::data::ChunkDataExchange};
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 
+use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey as TypesPublicKey;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::path::PathBuf;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::{sync::mpsc, task};
 use xor_name::{Prefix, XorName};
 
@@ -175,6 +178,33 @@ impl Routing {
                 genesis_key,
             )
             .await?;
+
+            let mut prefix_map_dir = dirs_next::home_dir()
+                .ok_or_else(|| Error::Configuration("Error opening home dir".to_string()))?;
+            prefix_map_dir.push(".safe");
+            prefix_map_dir.push("prefix_map");
+
+            // Read NetworkPrefixMap from disk if present else create a new one
+            let prefix_map = if let Ok(mut prefix_map_file) = File::open(prefix_map_dir).await {
+                let mut prefix_map_contents = vec![];
+                let _ = prefix_map_file
+                    .read_to_end(&mut prefix_map_contents)
+                    .await?;
+
+                let prefix_map: NetworkPrefixMap = rmp_serde::from_slice(&prefix_map_contents)
+                    .map_err(|err| {
+                        Error::Configuration(format!(
+                            "Error deserializing PrefixMap from disk: {:?}",
+                            err
+                        ))
+                    })?;
+                info!("Read PrefixMap from disc successfully");
+                prefix_map
+            } else {
+                info!("Could not read PrefixMap from disc. Creating a new one . . .");
+                NetworkPrefixMap::new(genesis_key)
+            };
+
             let core = Core::new(
                 comm,
                 node,
@@ -183,6 +213,7 @@ impl Routing {
                 event_tx,
                 used_space,
                 root_storage_dir.to_path_buf(),
+                Some(prefix_map),
                 false,
             )
             .await?;
