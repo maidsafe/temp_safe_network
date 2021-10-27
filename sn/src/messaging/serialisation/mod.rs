@@ -126,7 +126,7 @@ impl MessageType {
                 ..
             } => 1,
 
-            // Node messages related to processing client queries
+            // Inter-node comms related to processing client requests
             MessageType::System {
                 msg: SystemMsg::NodeCmd(_),
                 ..
@@ -144,7 +144,7 @@ impl MessageType {
                 ..
             } => 0,
 
-            // Service messages for client queries
+            // Client<->node service comms
             MessageType::Service { .. } => -2,
         }
     }

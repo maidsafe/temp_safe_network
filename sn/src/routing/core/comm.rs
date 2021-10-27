@@ -399,8 +399,9 @@ pub(crate) enum SendStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messaging::data::{DataQuery, ServiceMsg};
     use crate::messaging::{DstLocation, MessageId, MsgKind, ServiceAuth};
-    use crate::types::Keypair;
+    use crate::types::{ChunkAddress, Keypair};
     use assert_matches::assert_matches;
     use eyre::Result;
     use futures::future;
@@ -656,7 +657,9 @@ mod tests {
         let mut rng = OsRng;
         let src_keypair = Keypair::new_ed25519(&mut rng);
 
-        let payload = WireMsg::serialize_msg_payload(&"test_string".to_string())?;
+        let payload = WireMsg::serialize_msg_payload(&ServiceMsg::Query(DataQuery::GetChunk(
+            ChunkAddress(XorName::random()),
+        )))?;
         let auth = ServiceAuth {
             public_key: src_keypair.public_key(),
             signature: src_keypair.sign(&payload),
