@@ -47,7 +47,7 @@ pub enum Error {
     Serialisation(String),
     /// Error creating File at given path
     #[error("File Creation error: {0}")]
-    FileCreation(String),
+    FileHandling(String),
     /// Entry already exists. Contains the current entry Key.
     #[error("Entry already exists {0}")]
     EntryExists(u8),

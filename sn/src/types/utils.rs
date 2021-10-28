@@ -9,6 +9,7 @@
 
 use super::errors::convert_bincode_error;
 use super::{Error, Result};
+use crate::prefix_map::NetworkPrefixMap;
 use bytes::Bytes;
 use multibase::{self, Base};
 use rand::rngs::OsRng;
@@ -17,7 +18,7 @@ use rayon::current_num_threads;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Wrapper for raw bincode::serialise.
 pub fn serialise<T: Serialize>(data: &T) -> Result<Vec<u8>> {
@@ -52,23 +53,53 @@ pub(crate) fn decode<I: AsRef<str>, O: DeserializeOwned>(encoded: I) -> Result<O
 }
 
 pub(crate) async fn write_data_to_disk<T: Serialize>(data: &T, path: &Path) -> Result<()> {
-    // TODO: Make this serialization human readable
     let serialized = rmp_serde::to_vec(data).map_err(|e| Error::Serialisation(e.to_string()))?;
 
     let mut file = File::create(path)
         .await
-        .map_err(|e| Error::FileCreation(e.to_string()))?;
+        .map_err(|e| Error::FileHandling(e.to_string()))?;
 
     let _ = file
         .write_all(&serialized)
         .await
-        .map_err(|e| Error::FileCreation(e.to_string()))?;
+        .map_err(|e| Error::FileHandling(e.to_string()))?;
 
     file.sync_all()
         .await
-        .map_err(|e| Error::FileCreation(e.to_string()))?;
+        .map_err(|e| Error::FileHandling(e.to_string()))?;
 
     Ok(())
+}
+
+pub(crate) async fn read_prefix_map_from_disk(path: &Path) -> Result<NetworkPrefixMap> {
+    // Read NetworkPrefixMap from disk if present else create a new one
+    match File::open(path).await {
+        Ok(mut prefix_map_file) => {
+            let mut prefix_map_contents = vec![];
+            let _ = prefix_map_file
+                .read_to_end(&mut prefix_map_contents)
+                .await
+                .map_err(|err| {
+                    Error::FileHandling(format!(
+                        "Error reading PrefixMap from {:?}: {:?}",
+                        path, err
+                    ))
+                })?;
+
+            let prefix_map: NetworkPrefixMap = rmp_serde::from_slice(&prefix_map_contents)
+                .map_err(|err| {
+                    Error::FileHandling(format!(
+                        "Error deserializing PrefixMap from disk: {:?}",
+                        err
+                    ))
+                })?;
+            Ok(prefix_map)
+        }
+        Err(e) => {
+            error!("Error reading PrefixMap from {:?}: {:?}", path, e);
+            Err(Error::FailedToParse(e.to_string()))
+        }
+    }
 }
 
 /// Easily create a `BTreeSet`.

@@ -24,6 +24,8 @@ use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
+use serde::Serialize;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{
@@ -59,23 +61,11 @@ impl Session {
 
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
 
-        let mut root_dir = dirs_next::home_dir()
-            .ok_or_else(|| Error::Generic("Error opening home dir".to_string()))?;
-        root_dir.push(SAFE_CLIENT_DIR);
-        root_dir.push(format!("sn_client-{}", client_pk));
+        // Create client's root dir
+        let root_dir = create_client_root_dir(client_pk).await?;
 
-        // Create `.safe/client` dir if not present
-        tokio::fs::create_dir_all(root_dir.clone())
-            .await
-            .map_err(|e| Error::Generic(format!("Error creating client root dir: {:?}", e)))?;
-
-        // Write our PrefixMap to disk
-        if let Err(e) = write_data_to_disk(&prefix_map, &root_dir.join("prefix_map")).await {
-            error!(
-                "Error writing PrefixMap to Client dir {:?}: {:?}",
-                root_dir, e
-            );
-        }
+        // Write our PrefixMap to disk in our root dir
+        write_data_to_path(&prefix_map, &root_dir.join("prefix_map")).await?;
 
         let session = Session {
             client_pk,
@@ -582,4 +572,29 @@ pub(super) async fn send_message(
     }
 
     Ok(())
+}
+
+#[instrument(skip_all, level = "trace")]
+pub(crate) async fn write_data_to_path<T: Serialize>(data: &T, path: &Path) -> Result<(), Error> {
+    // Write our PrefixMap to root dir
+    if let Err(e) = write_data_to_disk(data, path).await {
+        error!("Error writing data for Client at dir {:?}: {:?}", path, e);
+    }
+
+    Ok(())
+}
+
+#[instrument(skip_all, level = "trace")]
+pub(crate) async fn create_client_root_dir(client_pk: PublicKey) -> Result<PathBuf, Error> {
+    let mut root_dir = dirs_next::home_dir()
+        .ok_or_else(|| Error::Generic("Error opening home dir".to_string()))?;
+    root_dir.push(SAFE_CLIENT_DIR);
+    root_dir.push(format!("sn_client-{}", client_pk));
+
+    // Create `.safe/client` dir if not present
+    tokio::fs::create_dir_all(root_dir.clone())
+        .await
+        .map_err(|e| Error::Generic(format!("Error creating client root dir: {:?}", e)))?;
+
+    Ok(root_dir)
 }
