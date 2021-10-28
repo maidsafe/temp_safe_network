@@ -273,6 +273,16 @@ impl Core {
                     .section
                     .update_elders(section_auth.clone(), key_sig)
                     .await;
+            } else {
+                // FIXME: we shouldn't be updating our section info since it
+                // doesn't match our prefix???
+                if let Err(err) = self.section.chain.write().await.insert(
+                    &key_sig.public_key,
+                    section_auth.value.section_key(),
+                    key_sig.signature,
+                ) {
+                    error!("Error generating neighbouring section's proof_chain for knowledge update on split: {:?}", err);
+                }
             }
 
             // Let's update our network knowledge with new SAP even if it's of our own section
