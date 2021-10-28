@@ -1,5 +1,6 @@
 SHELL := /bin/bash
 SN_NODE_VERSION := $(shell grep "^version" < Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+SN_CLI_VERSION := $(shell grep "^version" < Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 UNAME_S := $(shell uname -s)
 DEPLOY_PATH := deploy
 DEPLOY_PROD_PATH := ${DEPLOY_PATH}/prod
@@ -53,7 +54,7 @@ aarch64-unknown-linux-musl:
 	find target/aarch64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
-build-artifacts-for-deploy:
+sn_node-build-artifacts-for-deploy:
 	# This target is just for debugging the packaging process.
 	# Given the zipped artifacts retrieved from Github, it creates the
 	# directory structure that's expected by the packaging target.
@@ -70,9 +71,27 @@ build-artifacts-for-deploy:
 		unzip sn_node-$$arch-prod.zip -d prod/$$arch/release; \
 		rm sn_node-$$arch-prod.zip
 	done
+.ONESHELL:
+sn_cli-build-artifacts-for-deploy:
+	# This target is just for debugging the packaging process.
+	# Given the zipped artifacts retrieved from Github, it creates the
+	# directory structure that's expected by the packaging target.
+	declare -a architectures=( \
+		"x86_64-unknown-linux-musl" \
+		"x86_64-pc-windows-msvc" \
+		"x86_64-apple-darwin" \
+		"arm-unknown-linux-musleabi" \
+		"armv7-unknown-linux-musleabihf" \
+		"aarch64-unknown-linux-musl")
+	cd artifacts
+	for arch in "$${architectures[@]}" ; do \
+		mkdir -p prod/$$arch/release; \
+		unzip sn_cli-$$arch-prod.zip -d prod/$$arch/release; \
+		rm sn_cli-$$arch-prod.zip
+	done
 
 .ONESHELL:
-package-version-artifacts-for-deploy:
+sn_node-package-version-artifacts-for-deploy:
 	rm -f *.zip *.tar.gz
 	rm -rf ${DEPLOY_PATH}
 	mkdir -p ${DEPLOY_PROD_PATH}
@@ -91,6 +110,31 @@ package-version-artifacts-for-deploy:
 		zip -j sn_node-latest-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
 		tar -C artifacts/prod/$$arch/release -zcvf sn_node-${SN_NODE_VERSION}-$$arch.tar.gz $$bin_name; \
 		tar -C artifacts/prod/$$arch/release -zcvf sn_node-latest-$$arch.tar.gz $$bin_name; \
+	done
+
+	mv *.tar.gz ${DEPLOY_PROD_PATH}
+	mv *.zip ${DEPLOY_PROD_PATH}
+
+.ONESHELL:
+sn_cli-package-version-artifacts-for-deploy:
+	rm -f *.zip *.tar.gz
+	rm -rf ${DEPLOY_PATH}
+	mkdir -p ${DEPLOY_PROD_PATH}
+
+	declare -a architectures=( \
+		"x86_64-unknown-linux-musl" \
+		"x86_64-pc-windows-msvc" \
+		"x86_64-apple-darwin" \
+		"arm-unknown-linux-musleabi" \
+		"armv7-unknown-linux-musleabihf" \
+		"aarch64-unknown-linux-musl")
+
+	for arch in "$${architectures[@]}" ; do \
+		if [[ $$arch == *"windows"* ]]; then bin_name="safe.exe"; else bin_name="safe"; fi; \
+		zip -j sn_cli-${SN_CLI_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
+		zip -j sn_cli-latest-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
+		tar -C artifacts/prod/$$arch/release -zcvf sn_cli-${SN_CLI_VERSION}-$$arch.tar.gz $$bin_name; \
+		tar -C artifacts/prod/$$arch/release -zcvf sn_cli-latest-$$arch.tar.gz $$bin_name; \
 	done
 
 	mv *.tar.gz ${DEPLOY_PROD_PATH}
