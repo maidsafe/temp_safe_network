@@ -11,16 +11,15 @@ use safe_network::types::BytesAddress;
 use std::collections::BTreeSet;
 
 impl Safe {
-    pub(crate) async fn resolve_nrs_map_container(
-        &self,
-        input_url: Url,
-        include_subnames_map: bool,
-    ) -> Result<SafeData> {
+    pub(crate) async fn resolve_nrs_map_container(&self, input_url: Url) -> Result<SafeData> {
         // get NRS resolution
-        let mut target_url = self.nrs_get(input_url.top_name()).await.map_err(|e| {
-            warn!("NRS failed to resolve {}: {}", input_url.to_string(), e);
-            Error::ContentNotFound(format!("Content not found at {}", input_url.to_string()))
-        })?;
+        let (mut target_url, nrs_map) = self
+            .nrs_get(input_url.public_name(), input_url.content_version())
+            .await
+            .map_err(|e| {
+                warn!("NRS failed to resolve {}: {}", input_url.to_string(), e);
+                Error::ContentNotFound(format!("Content not found at {}", input_url.to_string()))
+            })?;
         debug!(
             "NRS Resolved {} => {}",
             input_url.to_string(),
@@ -31,13 +30,6 @@ impl Safe {
         let url_path = input_url.path_decoded()?;
         let target_path = target_url.path_decoded()?;
         target_url.set_path(&format!("{}{}", target_path, url_path));
-
-        // get nrs_map if requested
-        let nrs_map = if include_subnames_map {
-            Some(self.nrs_get_subnames_map(input_url.top_name()).await?)
-        } else {
-            None
-        };
 
         // create safe_data ignoring the input path or subnames
         let version = target_url.content_version().ok_or_else(|| {

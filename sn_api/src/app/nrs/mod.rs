@@ -39,7 +39,7 @@ impl Safe {
         let url_str = validate_nrs_top_name(top_name)?;
         let nrs_xorname = Url::from_nrsurl(&url_str)?.xorname();
         debug!("XorName for \"{:?}\" is \"{:?}\"", &url_str, &nrs_xorname);
-        if self.nrs_get(top_name).await.is_ok() {
+        if self.nrs_get(top_name, None).await.is_ok() {
             return Err(Error::ContentError("NRS name already exists".to_string()));
         }
 
@@ -88,7 +88,7 @@ impl Safe {
         let url_str = validate_nrs_public_name(public_name)?;
 
         // fetch and edit nrs_map
-        let (mut nrs_map, version) = self.fetch_latest_nrs_map(public_name).await?;
+        let (mut nrs_map, version) = self.fetch_nrs_map(public_name, None).await?;
         nrs_map.associate(public_name, link)?;
         debug!("The new NRS Map: {:?}", nrs_map);
 
@@ -131,7 +131,7 @@ impl Safe {
         let url_str = validate_nrs_public_name(public_name)?;
 
         // fetch and edit nrs_map
-        let (mut nrs_map, version) = self.fetch_latest_nrs_map(public_name).await?;
+        let (mut nrs_map, version) = self.fetch_nrs_map(public_name, None).await?;
         nrs_map.remove(public_name)?;
 
         if dry_run {
@@ -152,6 +152,7 @@ impl Safe {
     }
 
     /// # Gets a public name's associated link
+    /// If no version is specified, returns the latest.
     /// The top name of the input public name needs to be registered first with `nrs_create`
     /// ```no_run
     /// safe://<subName>.<topName>/path/to/whatever?var=value
@@ -159,24 +160,46 @@ impl Safe {
     ///            Public Name
     /// ```
     /// Finds the Url associated with the given public name on the network.
-    /// Returns the associated Url for the given public name.
-    pub async fn nrs_get(&self, public_name: &str) -> Result<Url> {
-        info!("Getting link for public name: {}", public_name);
+    /// Returns the associated Url for the given public name for that version along with the NrsMap
+    pub async fn nrs_get(
+        &self,
+        public_name: &str,
+        version: Option<VersionHash>,
+    ) -> Result<(Url, NrsMap)> {
+        info!(
+            "Getting link for public name: {} for version: {:?}",
+            public_name, version
+        );
 
-        let (nrs_map, _version) = self.fetch_latest_nrs_map(public_name).await?;
-        nrs_map.get(public_name)
+        let (nrs_map, _version) = self.fetch_nrs_map(public_name, version).await?;
+        let url = nrs_map.get(public_name)?;
+        Ok((url, nrs_map))
     }
 
     /// Get the mapping of all subNames and their associated Url for the Nrs Map Container at the given public name
-    pub async fn nrs_get_subnames_map(&self, public_name: &str) -> Result<NrsMap> {
-        let (nrs_map, _version) = self.fetch_latest_nrs_map(public_name).await?;
+    pub async fn nrs_get_subnames_map(
+        &self,
+        public_name: &str,
+        version: Option<VersionHash>,
+    ) -> Result<NrsMap> {
+        let (nrs_map, _version) = self.fetch_nrs_map(public_name, version).await?;
         Ok(nrs_map)
     }
 
-    // Private helper function to fetch the latest nrs_map from the network
-    async fn fetch_latest_nrs_map(&self, public_name: &str) -> Result<(NrsMap, VersionHash)> {
-        // fetch latest entries and wrap errors
-        let safe_url = Safe::parse_url(public_name)?;
+    // Private helper function to fetch the nrs_map from the network
+    // If no version is provided, fetches the latest
+    // Always returns the versoin of the fetched content along with the NrsMap
+    async fn fetch_nrs_map(
+        &self,
+        public_name: &str,
+        version: Option<VersionHash>,
+    ) -> Result<(NrsMap, VersionHash)> {
+        // assign version
+        let mut safe_url = Safe::parse_url(public_name)?;
+        safe_url.set_content_version(version);
+        let safe_url = safe_url;
+
+        // fetch entries and wrap errors
         let entries = self
             .fetch_register_entries(&safe_url)
             .await
@@ -295,8 +318,9 @@ mod tests {
 
         let _nrs_map_url = retry_loop!(safe.nrs_create(&site_name, &original_url, false));
 
-        let retrieved_url = retry_loop!(safe.nrs_get(&site_name));
+        let (retrieved_url, nrs_map) = retry_loop!(safe.nrs_get(&site_name, None));
 
+        assert_eq!(nrs_map.map.len(), 1);
         assert_eq!(original_url, retrieved_url);
         Ok(())
     }
@@ -332,7 +356,8 @@ mod tests {
         );
 
         // check that the retrieved url matches the expected
-        let retrieved_url = retry_loop!(safe.nrs_get(&associated_name));
+        let (retrieved_url, nrs_map) = retry_loop!(safe.nrs_get(&associated_name, None));
+        assert_eq!(nrs_map.map.len(), 2);
         assert_eq!(retrieved_url, url_v1);
         Ok(())
     }
@@ -427,9 +452,8 @@ mod tests {
         assert!(versionned_url.content_version().is_some());
 
         // wait for them to be available
-        let _ =
-            retry_loop_for_pattern!(safe.nrs_get(&site_name), Ok(res_url) if res_url == &url_v0)?;
-        let _ = retry_loop_for_pattern!(safe.nrs_get(&associated_name1), Ok(res_url) if res_url == &url_v1)?;
+        let _ = retry_loop_for_pattern!(safe.nrs_get(&site_name, None), Ok((res_url, _)) if res_url == &url_v0)?;
+        let _ = retry_loop_for_pattern!(safe.nrs_get(&associated_name1, None), Ok((res_url, _)) if res_url == &url_v1)?;
 
         // remove the first one
         let versionned_url = retry_loop!(safe.nrs_remove(&site_name, false));
@@ -437,11 +461,11 @@ mod tests {
         assert_ne!(versionned_url.content_version(), Some(version0));
 
         // check one is still present
-        let _ = retry_loop_for_pattern!(safe.nrs_get(&associated_name1), Ok(res_url) if res_url == &url_v1)?;
+        let _ = retry_loop_for_pattern!(safe.nrs_get(&associated_name1, None), Ok((res_url, _)) if res_url == &url_v1)?;
 
         // check the other is gone
         let expected_err_msg = format!("Link not found in NRS Map Container for: {}", "");
-        let _ = retry_loop_for_pattern!(safe.nrs_get(&site_name), Err(e) if e.to_string() == expected_err_msg)?;
+        let _ = retry_loop_for_pattern!(safe.nrs_get(&site_name, None), Err(e) if e.to_string() == expected_err_msg)?;
 
         Ok(())
     }

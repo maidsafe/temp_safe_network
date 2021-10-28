@@ -30,6 +30,8 @@ pub type Range = Option<(Option<u64>, Option<u64>)>;
 const INDIRECTION_LIMIT: usize = 10;
 
 /// SafeData contains the data types fetchable using the Safe Network resolver
+#[allow(clippy::large_enum_variant)]
+// FilesContainer is significantly larger than the other variants
 #[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub enum SafeData {
     SafeKey {
@@ -62,7 +64,7 @@ pub enum SafeData {
         xorname: XorName,
         type_tag: u64,
         version: VersionHash,
-        nrs_map: Option<NrsMap>,
+        nrs_map: NrsMap,
         data_type: DataType,
         resolves_into: Option<Url>,
         resolved_from: String,
@@ -360,9 +362,7 @@ impl Safe {
             ContentType::FilesContainer => {
                 self.resolve_file_container(input_url, resolve_path).await
             }
-            ContentType::NrsMapContainer => {
-                self.resolve_nrs_map_container(input_url, !fetch_mode).await
-            }
+            ContentType::NrsMapContainer => self.resolve_nrs_map_container(input_url).await,
             ContentType::Multimap => self.resolve_multimap(input_url, fetch_mode).await,
             ContentType::Raw => {
                 self.resolve_raw(input_url, attached_metadata, fetch_mode, range)
