@@ -163,8 +163,8 @@ jobs:
         env:
           NODE_COUNT: 11
 
-      # - name: Extra wait on CI for split organisation
-      #   run: sleep 60
+      - name: Extra wait on CI for section formation
+        run: sleep 60
 
       # - name: Was there a section split?
       #   run: ./resources/scripts/has_split.sh
