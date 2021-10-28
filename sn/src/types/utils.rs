@@ -15,6 +15,9 @@ use rand::rngs::OsRng;
 use rand::Rng;
 use rayon::current_num_threads;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::path::Path;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 /// Wrapper for raw bincode::serialise.
 pub fn serialise<T: Serialize>(data: &T) -> Result<Vec<u8>> {
@@ -46,6 +49,26 @@ pub(crate) fn decode<I: AsRef<str>, O: DeserializeOwned>(encoded: I) -> Result<O
         )));
     }
     deserialise(&decoded).map_err(|e| Error::FailedToParse(e.to_string()))
+}
+
+pub(crate) async fn write_data_to_disk<T: Serialize>(data: &T, path: &Path) -> Result<()> {
+    // TODO: Make this serialization human readable
+    let serialized = rmp_serde::to_vec(data).map_err(|e| Error::Serialisation(e.to_string()))?;
+
+    let mut file = File::create(path)
+        .await
+        .map_err(|e| Error::FileCreation(e.to_string()))?;
+
+    let _ = file
+        .write_all(&serialized)
+        .await
+        .map_err(|e| Error::FileCreation(e.to_string()))?;
+
+    file.sync_all()
+        .await
+        .map_err(|e| Error::FileCreation(e.to_string()))?;
+
+    Ok(())
 }
 
 /// Easily create a `BTreeSet`.
