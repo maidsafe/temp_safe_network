@@ -19,6 +19,7 @@ use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use qp2p::Endpoint;
+use std::path::PathBuf;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{mpsc::Sender, RwLock};
 use tokio::time::Duration;
@@ -60,4 +61,6 @@ pub(super) struct Session {
     initial_connection_check_msg_id: Arc<RwLock<Option<MessageId>>>,
     /// Standard time to await potential AE messages:
     standard_wait: Duration,
+    /// Root storage dir for this session
+    root_dir: PathBuf,
 }

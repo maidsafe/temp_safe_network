@@ -16,6 +16,7 @@ use crate::messaging::{
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::prefix_map::NetworkPrefixMap;
+use crate::types::utils::write_data_to_disk;
 use crate::types::PublicKey;
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
@@ -39,6 +40,9 @@ pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
 pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 
+// Root directory for Clients
+pub(crate) const SAFE_CLIENT_DIR: &str = ".safe/client";
+
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip(err_sender), level = "debug")]
@@ -55,6 +59,24 @@ impl Session {
 
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
 
+        let mut root_dir = dirs_next::home_dir()
+            .ok_or_else(|| Error::Generic("Error opening home dir".to_string()))?;
+        root_dir.push(SAFE_CLIENT_DIR);
+        root_dir.push(format!("sn_client-{}", client_pk));
+
+        // Create `.safe/client` dir if not present
+        tokio::fs::create_dir_all(root_dir.clone())
+            .await
+            .map_err(|e| Error::Generic(format!("Error creating client root dir: {:?}", e)))?;
+
+        // Write our PrefixMap to disk
+        if let Err(e) = write_data_to_disk(&prefix_map, &root_dir.join("prefix_map")).await {
+            error!(
+                "Error writing PrefixMap to Client dir {:?}: {:?}",
+                root_dir, e
+            );
+        }
+
         let session = Session {
             client_pk,
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
@@ -67,6 +89,7 @@ impl Session {
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             standard_wait,
+            root_dir,
         };
 
         Ok(session)

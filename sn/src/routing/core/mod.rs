@@ -47,6 +47,7 @@ use crate::routing::{
     section::{Section, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
+use crate::types::utils::write_data_to_disk;
 use backoff::ExponentialBackoff;
 use capacity::Capacity;
 use itertools::Itertools;
@@ -58,11 +59,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use tokio::{
-    fs::File,
-    io::AsyncWriteExt,
-    sync::{mpsc, RwLock, Semaphore},
-};
+use tokio::sync::{mpsc, RwLock, Semaphore};
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
@@ -204,32 +201,23 @@ impl Core {
     pub(crate) async fn write_prefix_map(&self) {
         info!("Writing our latest PrefixMap to disk");
 
-        // TODO: Make this serialization human readable
-        match rmp_serde::to_vec(&self.network) {
-            Ok(serialized) => {
-                if let Ok(mut node_dir_file) =
-                    File::create(&self.root_storage_dir.join("prefix_map")).await
-                {
-                    if let Err(e) = node_dir_file.write_all(&serialized).await {
-                        error!("Error writing PrefixMap in our node dir: {:?}", e);
-                    }
+        // Write to the node's root dir
+        if let Err(e) =
+            write_data_to_disk(&self.network, &self.root_storage_dir.join("prefix_map")).await
+        {
+            error!("Error writing PrefixMap to root dir: {:?}", e);
+        }
+
+        // If we are genesis Node, write to `~/.safe` dir
+        if self.is_genesis_node {
+            if let Some(mut safe_dir) = dirs_next::home_dir() {
+                safe_dir.push(".safe");
+                safe_dir.push("prefix_map");
+                if let Err(e) = write_data_to_disk(&self.network, &safe_dir).await {
+                    error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
                 }
-                if self.is_genesis_node {
-                    if let Some(mut safe_dir) = dirs_next::home_dir() {
-                        safe_dir.push(".safe");
-                        safe_dir.push("prefix_map");
-                        if let Ok(mut safe_dir_file) = File::create(safe_dir).await {
-                            if let Err(e) = safe_dir_file.write_all(&serialized).await {
-                                error!("Error writing PrefixMap at `~/.safe`: {:?}", e);
-                            }
-                        }
-                    } else {
-                        error!("Could not write PrefixMap in SAFE dir: Home directory not found");
-                    }
-                }
-            }
-            Err(e) => {
-                error!("Error serializing PrefixMap {:?}", e);
+            } else {
+                error!("Could not write PrefixMap in SAFE dir: Home directory not found");
             }
         }
     }
