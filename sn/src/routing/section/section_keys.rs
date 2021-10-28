@@ -104,8 +104,9 @@ impl MiniKeyCache {
 
     /// clears the cache
     async fn clear(&self) {
-        let mut vecdeq = self.list.write().await;
+        // get capacity first to avoid deadlock
         let capacity = self.capacity().await;
+        let mut vecdeq = self.list.write().await;
 
         *vecdeq = VecDeque::with_capacity(capacity);
     }
