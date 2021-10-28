@@ -122,34 +122,42 @@ jobs:
       - name: Run Data Types tests
         if: steps.data_types_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- types
+        timeout-minutes: 5
 
       - name: Run DBs tests
         if: steps.dbs_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- dbs
+        timeout-minutes: 5
 
       - name: Run PrefixMap tests
         if: steps.prefix_map_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- prefix_map
+        timeout-minutes: 5
 
       - name: Run URL tests
         if: steps.url_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- url
+        timeout-minutes: 5
 
       - name: Run Messaging tests
         if: steps.messaging_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- messaging
+        timeout-minutes: 5
 
       - name: Run Node tests
         if: steps.node_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- node
+        timeout-minutes: 5
 
       - name: Run Routing tests
         if: steps.routing_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
+        timeout-minutes: 5
 
       - name: Run Doc tests
         if: steps.node_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils client --doc
+        timeout-minutes: 5
 
       - run: ./target/release/testnet
         env:
