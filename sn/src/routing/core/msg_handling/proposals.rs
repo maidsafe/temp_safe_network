@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
+
 use crate::messaging::{
     signature_aggregator::Error as AggregatorError, system::Proposal, MessageId,
 };
 use crate::routing::{
-    dkg::{ProposalError, SigShare},
-    routing_api::command::Command,
-    Result, SectionAuthorityProviderUtils,
+    core::ProposalUtils, dkg::SigShare, routing_api::command::Command, Result,
+    SectionAuthorityProviderUtils,
 };
 use std::net::SocketAddr;
 use xor_name::XorName;
@@ -76,25 +76,37 @@ impl Core {
         let mut commands = vec![];
         commands.extend(self.check_lagging((src_name, sender), sig_share_pk).await?);
 
-        match self.proposal_aggregator.add(proposal, sig_share).await {
-            Ok((proposal, sig)) => match proposal {
-                Proposal::OurElders(_) => {
-                    commands.push(Command::HandleElderAgreement { proposal, sig })
+        match proposal.as_signable_bytes() {
+            Err(error) => error!(
+                "Failed to serialise proposal from {}, {:?}: {:?}",
+                sender, msg_id, error
+            ),
+            Ok(serialised_proposal) => {
+                match self
+                    .proposal_aggregator
+                    .add(&serialised_proposal, sig_share)
+                    .await
+                {
+                    Ok(sig) => match proposal {
+                        Proposal::OurElders(_) => {
+                            commands.push(Command::HandleElderAgreement { proposal, sig })
+                        }
+                        _ => commands.push(Command::HandleAgreement { proposal, sig }),
+                    },
+                    Err(AggregatorError::NotEnoughShares) => {
+                        trace!(
+                            "Proposal from {} inserted in aggregator, not enough sig shares yet: {:?}",
+                            sender,
+                            msg_id
+                        );
+                    }
+                    Err(error) => {
+                        error!(
+                            "Failed to add proposal from {}, {:?}: {:?}",
+                            sender, msg_id, error
+                        );
+                    }
                 }
-                _ => commands.push(Command::HandleAgreement { proposal, sig }),
-            },
-            Err(ProposalError::Aggregation(AggregatorError::NotEnoughShares)) => {
-                trace!(
-                    "Proposal from {} inserted in aggregator, not enough sig shares yet: {:?}",
-                    sender,
-                    msg_id
-                );
-            }
-            Err(error) => {
-                error!(
-                    "Failed to add proposal from {}, {:?}: {:?}",
-                    sender, msg_id, error
-                );
             }
         }
 

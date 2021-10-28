@@ -135,20 +135,21 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         key_share: SectionKeyShare,
     ) -> Result<Vec<Command>> {
-        trace!("{}", LogMarker::HandlingDkgSuccessfulOutcome);
+        trace!(
+            "{} public_key={:?}",
+            LogMarker::HandlingDkgSuccessfulOutcome,
+            key_share.public_key_set.public_key()
+        );
+
+        // Add our new keyshare to our cache, we will then use
+        // it to sign any msg that needs section agreement.
+        self.section_keys_provider.insert(key_share.clone()).await;
+
         let proposal = Proposal::SectionInfo(section_auth);
         let recipients: Vec<_> = self.section.authority_provider().await.peers();
         let result = self
             .send_proposal_with(recipients, proposal, &key_share)
             .await;
-
-        let public_key = key_share.public_key_set.public_key();
-
-        self.section_keys_provider.insert_dkg_outcome(key_share);
-
-        if self.section.has_chain_key(&public_key).await {
-            self.section_keys_provider.finalise_dkg(&public_key).await;
-        }
 
         result
     }

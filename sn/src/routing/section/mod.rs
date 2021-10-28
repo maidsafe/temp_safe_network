@@ -127,17 +127,20 @@ impl Section {
     }
 
     /// Creates `Section` for the first node in the network
-    pub(super) async fn first_node(peer: Peer) -> Result<(Section, SectionKeyShare)> {
-        let secret_key_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-        let public_key_set = secret_key_set.public_keys();
-        let secret_key_share = secret_key_set.secret_key_share(0);
+    pub(super) async fn first_node(
+        peer: Peer,
+        genesis_sk_set: bls::SecretKeySet,
+    ) -> Result<(Section, SectionKeyShare)> {
+        let public_key_set = genesis_sk_set.public_keys();
+        let secret_key_share = genesis_sk_set.secret_key_share(0);
+        let genesis_key = public_key_set.public_key();
 
         let section_auth =
             create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
 
         let section = Section::new(
-            section_auth.sig.public_key,
-            SecuredLinkedList::new(section_auth.sig.public_key),
+            genesis_key,
+            SecuredLinkedList::new(genesis_key),
             section_auth,
         )?;
 
@@ -386,7 +389,7 @@ impl Section {
     // Tries to split our section.
     // If we have enough mature nodes for both subsections, returns the SectionAuthorityProviders
     // of the two subsections. Otherwise returns `None`.
-    pub(super) async fn try_split(
+    async fn try_split(
         &self,
         our_name: &XorName,
         excluded_names: &BTreeSet<XorName>,

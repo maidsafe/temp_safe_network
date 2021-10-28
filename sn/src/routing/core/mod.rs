@@ -19,6 +19,7 @@ mod liveness_tracking;
 mod messaging;
 mod msg_count;
 mod msg_handling;
+mod proposal;
 mod register_storage;
 mod split_barrier;
 
@@ -27,6 +28,7 @@ pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL};
 pub(crate) use chunk_store::ChunkStore;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
+pub(crate) use proposal::ProposalUtils;
 pub(crate) use register_storage::RegisterStorage;
 
 use self::split_barrier::SplitBarrier;
@@ -35,7 +37,7 @@ use crate::messaging::system::SystemMsg;
 use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
-    dkg::{DkgVoter, ProposalAggregator},
+    dkg::DkgVoter,
     error::Result,
     log_markers::LogMarker,
     node::Node,
@@ -67,8 +69,6 @@ pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
-const KEY_CACHE_SIZE: u8 = 5;
-
 pub(crate) const CONCURRENT_JOINS: usize = 5;
 
 // store up to 100 in use backoffs
@@ -81,9 +81,9 @@ pub(crate) struct Core {
     pub(crate) node: Arc<RwLock<Node>>,
     section: Section,
     network: NetworkPrefixMap,
-    section_keys_provider: SectionKeysProvider,
+    pub(crate) section_keys_provider: SectionKeysProvider,
     message_aggregator: SignatureAggregator,
-    proposal_aggregator: ProposalAggregator,
+    proposal_aggregator: SignatureAggregator,
     split_barrier: Arc<RwLock<SplitBarrier>>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
@@ -115,8 +115,7 @@ impl Core {
         prefix_map: Option<NetworkPrefixMap>,
         is_genesis_node: bool,
     ) -> Result<Self> {
-        let section_keys_provider =
-            SectionKeysProvider::new(KEY_CACHE_SIZE, section_key_share).await;
+        let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
 
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
@@ -144,7 +143,7 @@ impl Core {
             section,
             network,
             section_keys_provider,
-            proposal_aggregator: ProposalAggregator::default(),
+            proposal_aggregator: SignatureAggregator::default(),
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
@@ -242,10 +241,6 @@ impl Core {
         let mut commands = vec![];
         let new = self.state_snapshot().await;
 
-        self.section_keys_provider
-            .finalise_dkg(&self.section.section_key().await)
-            .await;
-
         if new.last_key != old.last_key {
             if new.is_elder {
                 info!(
@@ -260,7 +255,7 @@ impl Core {
                         .format(", ")
                 );
 
-                if self.section_keys_provider.has_key_share().await {
+                if !self.section_keys_provider.is_empty().await {
                     commands.extend(self.promote_and_demote_elders().await?);
 
                     // Whenever there is an elders change, casting a round of joins_allowed
