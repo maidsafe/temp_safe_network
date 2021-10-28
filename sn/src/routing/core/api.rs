@@ -57,9 +57,11 @@ impl Core {
         new_node.addr = self.comm.our_connection_info();
 
         let mut our_node = self.node.write().await;
+        *our_node = new_node;
+        // dont hold write lock
+        drop(our_node);
 
         self.section.relocated_to(new_section).await?;
-        *our_node = new_node;
 
         Ok(())
     }

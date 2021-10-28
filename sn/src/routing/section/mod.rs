@@ -113,9 +113,13 @@ impl Section {
     pub(super) async fn relocated_to(&self, new_section: Self) -> Result<()> {
         let mut chain = self.chain.write().await;
         *chain = new_section.chain().await;
+        // don't hold write lock
+        drop(chain);
 
         let mut section_auth = self.section_auth.write().await;
         *section_auth = new_section.section_auth.read().await.clone();
+        // don't hold write lock
+        drop(section_auth);
 
         self.merge_members(new_section.members().clone()).await?;
 
