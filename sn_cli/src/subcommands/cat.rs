@@ -94,14 +94,11 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
             nrs_map,
             ..
         } => {
-            // TODO: Speak to Anselme regarding new scenario for the nrs_map being optional.
-            if let Some(nrs_map) = nrs_map {
-                if OutputFmt::Pretty == output_fmt {
-                    println!("NRS Map Container (version {}) at \"{}\":", version, url);
-                    print_nrs_map(nrs_map, public_name);
-                } else {
-                    println!("{}", serialise_output(&(url, nrs_map), output_fmt));
-                }
+            if OutputFmt::Pretty == output_fmt {
+                println!("NRS Map Container (version {}) at \"{}\":", version, url);
+                print_nrs_map(nrs_map, public_name);
+            } else {
+                println!("{}", serialise_output(&(url, nrs_map), output_fmt));
             }
         }
         SafeData::SafeKey { .. } => {
