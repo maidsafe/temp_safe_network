@@ -87,7 +87,7 @@ impl Section {
         // Check if SAP's section key matches SAP signature's key
         if section_auth.sig.public_key != section_auth.value.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
-                "section key doesn't match signature'ssss key: {:?}",
+                "section key doesn't match signature's key: {:?}",
                 section_auth.value
             )));
         }
