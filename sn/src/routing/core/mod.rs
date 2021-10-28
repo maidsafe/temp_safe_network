@@ -200,6 +200,7 @@ impl Core {
 
     pub(crate) async fn write_prefix_map(&self) {
         info!("Writing our latest PrefixMap to disk");
+        // TODO: Make this serialization human readable
 
         // Write to the node's root dir
         if let Err(e) =

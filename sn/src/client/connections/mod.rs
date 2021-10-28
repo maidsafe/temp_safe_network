@@ -18,6 +18,7 @@ use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
+pub(crate) use messaging::SAFE_CLIENT_DIR;
 use qp2p::Endpoint;
 use std::path::PathBuf;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};

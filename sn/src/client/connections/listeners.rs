@@ -311,7 +311,10 @@ impl Session {
                         section_auth.prefix
                     );
                     // Update the PrefixMap on disk
-                    if let Err(e) = write_data_to_disk(&session.network, &session.root_dir).await {
+                    if let Err(e) =
+                        write_data_to_disk(&session.network, &session.root_dir.join("prefix_map"))
+                            .await
+                    {
                         error!(
                             "Error writing freshly updated PrefixMap to client dir: {:?}",
                             e
