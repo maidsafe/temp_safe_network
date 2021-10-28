@@ -30,7 +30,7 @@ use crate::routing::{
     relocation::{self, RelocatePayloadUtils},
     section::{test_utils::*, ElderCandidatesUtils, NodeStateUtils, Section, SectionKeyShare},
     supermajority, Error, Event, Result as RoutingResult, SectionAuthorityProviderUtils,
-    ELDER_SIZE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
+    ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
@@ -83,7 +83,10 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let new_node_comm = create_comm().await?;
     let new_node = Node::new(
-        ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
+        ed25519::gen_keypair(
+            &Prefix::default().range_inclusive(),
+            FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2,
+        ),
         new_node_comm.our_connection_info(),
     );
 
@@ -161,7 +164,10 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let new_node = Node::new(
-        ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
+        ed25519::gen_keypair(
+            &Prefix::default().range_inclusive(),
+            FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2,
+        ),
         gen_addr(),
     );
 
@@ -212,7 +218,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         {
             assert_eq!(*peer.name(), new_node.name());
             assert_eq!(*peer.addr(), new_node.addr);
-            assert_eq!(peer.age(), FIRST_SECTION_MIN_AGE);
+            assert_eq!(peer.age(), FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2);
             assert_eq!(previous_name, None);
             assert_eq!(dst_key, None);
 
