@@ -33,11 +33,12 @@ impl Core {
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
+        genesis_sk_set: bls::SecretKeySet,
     ) -> Result<Self> {
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
 
-        let (section, section_key_share) = Section::first_node(node.peer()).await?;
+        let (section, section_key_share) = Section::first_node(node.peer(), genesis_sk_set).await?;
         Self::new(
             comm,
             node,
@@ -46,18 +47,20 @@ impl Core {
             event_tx,
             used_space,
             root_storage_dir,
+            None,
             true,
         )
         .await
     }
 
     pub(crate) async fn relocate(&self, mut new_node: Node, new_section: Section) -> Result<()> {
+        // we first try to relocate section info.
+        self.section.relocated_to(new_section).await?;
+
         // make sure the new Node has the correct local addr as Comm
         new_node.addr = self.comm.our_connection_info();
 
         let mut our_node = self.node.write().await;
-
-        self.section.relocated_to(new_section).await?;
         *our_node = new_node;
 
         Ok(())
@@ -96,7 +99,7 @@ impl Core {
 
     /// Returns the current BLS public key set
     pub(crate) async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        Ok(self.section_keys_provider.key_share().await?.public_key_set)
+        Ok(self.key_share().await?.public_key_set)
     }
 
     /// Returns the info about the section matching the name.
@@ -114,13 +117,14 @@ impl Core {
     /// Returns our index in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub(crate) async fn our_index(&self) -> Result<usize> {
-        Ok(self.section_keys_provider.key_share().await?.index)
+        Ok(self.key_share().await?.index)
     }
 
     /// Returns our key share in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub(crate) async fn key_share(&self) -> Result<SectionKeyShare> {
-        self.section_keys_provider.key_share().await
+        let section_key = self.section.section_key().await;
+        self.section_keys_provider.key_share(&section_key).await
     }
 
     pub(crate) async fn send_event(&self, event: Event) {

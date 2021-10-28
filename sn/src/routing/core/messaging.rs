@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
+use super::ProposalUtils;
 use crate::messaging::{
     system::{
         DkgSessionId, ElderCandidates, JoinResponse, NodeState, Peer, Proposal, RelocateDetails,
@@ -16,7 +17,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     core::StateSnapshot,
-    dkg::{DkgSessionIdUtils, ProposalUtils},
+    dkg::DkgSessionIdUtils,
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
@@ -31,6 +32,7 @@ use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use xor_name::XorName;
+
 impl Core {
     // Send proposal to all our elders.
     pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
@@ -44,14 +46,17 @@ impl Core {
         recipients: Vec<Peer>,
         proposal: Proposal,
     ) -> Result<Vec<Command>> {
+        let section_key = self.section.section_key().await;
+
         let key_share = self
             .section_keys_provider
-            .key_share()
+            .key_share(&section_key)
             .await
             .map_err(|err| {
                 trace!("Can't propose {:?}: {:?}", proposal, err);
                 err
             })?;
+
         self.send_proposal_with(recipients, proposal, &key_share)
             .await
     }
@@ -369,9 +374,11 @@ impl Core {
         node_msg: SystemMsg,
         recipients: Vec<Peer>,
     ) -> Result<Vec<Command>> {
+        let section_key = self.section.section_key().await;
+
         let key_share = self
             .section_keys_provider
-            .key_share()
+            .key_share(&section_key)
             .await
             .map_err(|err| {
                 trace!(
@@ -383,13 +390,7 @@ impl Core {
                 err
             })?;
 
-        let wire_msg = WireMsg::for_dst_accumulation(
-            &key_share,
-            src,
-            dst,
-            node_msg,
-            self.section.section_key().await,
-        )?;
+        let wire_msg = WireMsg::for_dst_accumulation(&key_share, src, dst, node_msg, section_key)?;
 
         trace!(
             "Send {:?} for accumulation at dst to {:?}",
