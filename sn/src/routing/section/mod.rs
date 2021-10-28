@@ -388,6 +388,11 @@ impl Section {
         excluded_names: &BTreeSet<XorName>,
     ) -> Option<(ElderCandidates, ElderCandidates)> {
         trace!("{}", LogMarker::SplitAttempt);
+        if self.authority_provider().await.elders().len() < ELDER_SIZE {
+            trace!("No attempt to split as our section does not have enough elders.");
+            return None;
+        }
+
         let next_bit_index = if let Ok(index) = self.prefix().await.bit_count().try_into() {
             index
         } else {
