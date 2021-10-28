@@ -17,13 +17,6 @@ pub const MIN_AGE: u8 = 4;
 /// The minimum age a node becomes an adult node.
 pub const MIN_ADULT_AGE: u8 = MIN_AGE + 1;
 
-/// During the first section, nodes can start at a range of age to avoid too many nodes having the
-/// same time get relocated at the same time.
-/// Defines the lower bound of this range.
-pub const FIRST_SECTION_MIN_AGE: u8 = MIN_ADULT_AGE + 1;
-/// Defines the higher bound of this range.
-pub const FIRST_SECTION_MAX_AGE: u8 = 100;
-
 /// Information about a member of our section.
 pub trait MemberInfoUtils {
     // Creates a `MemberInfo` in the `Joined` state.
