@@ -32,15 +32,13 @@ pub mod util {
     }
 
     pub fn get_directory_file_count(directory_path: impl AsRef<Path>) -> Result<usize> {
-        let paths: Vec<walkdir::DirEntry> = WalkDir::new(directory_path)
+        let paths = WalkDir::new(directory_path)
             .follow_links(false)
             .into_iter()
-            .filter_map(|v| v.ok())
-            .into_iter()
-            .collect();
+            .filter_map(|v| v.ok());
         // The `directory_path` itself is returned by walkdir. We're only interested in how many
         // entries are *inside* `directory_path`.
-        Ok(paths.len() - 1)
+        Ok(paths.count() - 1)
     }
 
     pub fn get_directory_len(directory_path: impl AsRef<Path>) -> Result<u64> {

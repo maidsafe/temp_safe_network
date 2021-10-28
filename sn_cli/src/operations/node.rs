@@ -36,7 +36,7 @@ fn run_safe_cmd(
     ignore_errors: bool,
     verbosity: u8,
 ) -> Result<()> {
-    let env: HashMap<String, String> = envs.unwrap_or_else(HashMap::default);
+    let env: HashMap<String, String> = envs.unwrap_or_default();
 
     let msg = format!("Running 'safe' with args {:?} ...", args);
     if verbosity > 1 {

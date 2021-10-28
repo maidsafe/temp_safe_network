@@ -63,7 +63,8 @@ pub async fn nrs_commander(
         NrsSubCommands::Create {
             name,
             link,
-            direct_link,
+            ..
+            // direct_link,
         } => {
             // TODO: Where do we store/reference these? add it to the Root container,
             // sanitize name / spacing etc., validate destination?
@@ -88,8 +89,9 @@ pub async fn nrs_commander(
         NrsSubCommands::Add {
             name,
             link,
-            default,
-            direct_link,
+            ..
+            // default,
+            // direct_link,
         } => {
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
             if dry_run && OutputFmt::Pretty == output_fmt {
