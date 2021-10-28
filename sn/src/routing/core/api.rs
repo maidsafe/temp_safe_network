@@ -53,15 +53,14 @@ impl Core {
     }
 
     pub(crate) async fn relocate(&self, mut new_node: Node, new_section: Section) -> Result<()> {
+        // we first try to relocate section info.
+        self.section.relocated_to(new_section).await?;
+
         // make sure the new Node has the correct local addr as Comm
         new_node.addr = self.comm.our_connection_info();
 
         let mut our_node = self.node.write().await;
         *our_node = new_node;
-        // dont hold write lock
-        drop(our_node);
-
-        self.section.relocated_to(new_section).await?;
 
         Ok(())
     }
