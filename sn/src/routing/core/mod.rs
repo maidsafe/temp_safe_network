@@ -127,7 +127,15 @@ impl Core {
         let adult_liveness = Liveness::new();
         let genesis_pk = *section.genesis_key();
 
-        let network = prefix_map.unwrap_or_else(|| NetworkPrefixMap::new(genesis_pk));
+        // Check if the GenesisKey in the provided prefix_map is the same as our section's.
+        // If not, start afresh.
+        let network = prefix_map.map_or(NetworkPrefixMap::new(genesis_pk), |network| {
+            if network.genesis_key() != genesis_pk {
+                NetworkPrefixMap::new(genesis_pk)
+            } else {
+                network
+            }
+        });
 
         Ok(Self {
             comm,
