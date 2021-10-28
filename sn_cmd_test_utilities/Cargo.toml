@@ -1,0 +1,25 @@
+[package]
+name = "sn_cmd_test_utilities"
+version = "1.1.0"
+description = "Safe CLI Test Utilities"
+authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
+publish = false
+license = "MIT OR BSD-3-Clause"
+repository = "https://github.com/maidsafe/safe_network/sn_cmd_test_utilities"
+edition = "2018"
+
+[dependencies]
+assert_cmd = "~2.0"
+color-eyre = "~0.5"
+ctor = "~0.1"
+rand = "~0.7.3"
+serde = "1.0.123"
+serde_json = "1.0.62"
+sn_api = { path = "../sn_api", version = "~0.38", default-features=false, features = ["app", "authd_client"] }
+duct = "~0.12.0"
+walkdir = "2.3.1"
+multibase = "~0.6.0"
+
+[dependencies.tiny-keccak]
+version = "2.0.2"
+features = [ "sha3" ]
