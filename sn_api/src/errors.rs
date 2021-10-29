@@ -86,6 +86,9 @@ pub enum Error {
     /// NotEnoughBalance
     #[error("NotEnoughBalance: {0}")]
     NotEnoughBalance(String),
+    /// NrsNameAlreadyExists
+    #[error("NrsNameAlreadyExists: {0}")]
+    NrsNameAlreadyExists(String),
     /// Serialisation
     #[error("Serialisation: {0}")]
     Serialisation(String),
