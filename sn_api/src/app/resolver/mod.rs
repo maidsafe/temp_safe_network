@@ -459,7 +459,7 @@ mod tests {
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _nrs_map_url = safe.nrs_create(&site_name, &safe_url, false).await?;
+        let _ = safe.nrs_add(&site_name, &safe_url, false).await?;
         let nrs_url = format!("safe://{}", site_name);
 
         let content = retry_loop!(safe.fetch(&nrs_url, None));
@@ -519,9 +519,10 @@ mod tests {
         safe_url.set_content_version(Some(version0));
         let files_container_url = safe_url;
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let nrs_resolution_url = safe
-            .nrs_create(&site_name, &files_container_url, false)
+        let (nrs_resolution_url, did_create) = safe
+            .nrs_add(&site_name, &files_container_url, false)
             .await?;
+        assert!(did_create);
         let nrs_url = format!("safe://{}", site_name);
 
         // this should resolve to a FilesContainer
@@ -657,7 +658,7 @@ mod tests {
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = safe.nrs_create(&site_name, &safe_url, false).await?;
+        let _ = safe.nrs_add(&site_name, &safe_url, false).await?;
         let nrs_url = format!("safe://{}/test.md", site_name);
 
         // read a local file content (for comparison)
