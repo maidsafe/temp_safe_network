@@ -3094,7 +3094,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
- "tracing-appender 0.2.0",
+ "tracing-appender",
  "tracing-core",
  "tracing-subscriber 0.3.1",
  "uhttp_uri",
@@ -3478,7 +3478,6 @@ dependencies = [
  "structopt",
  "tokio",
  "tracing",
- "tracing-appender 0.1.2",
  "tracing-subscriber 0.2.25",
  "url",
  "walkdir",
@@ -3493,7 +3492,6 @@ dependencies = [
  "assert_cmd",
  "color-eyre",
  "ctor",
- "duct",
  "multibase 0.6.0",
  "rand 0.7.3",
  "serde",
@@ -3925,17 +3923,6 @@ dependencies = [
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
-]
-
-[[package]]
-name = "tracing-appender"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9965507e507f12c8901432a33e31131222abac31edd90cabbcf85cf544b7127a"
-dependencies = [
- "chrono",
- "crossbeam-channel",
- "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
