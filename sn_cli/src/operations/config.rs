@@ -7,20 +7,56 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Result};
+use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use prettytable::Table;
 use serde::{Deserialize, Serialize};
 use sn_api::{NodeConfig, PublicKey};
 use std::{
     collections::{BTreeMap, BTreeSet},
+    default::Default,
     fmt,
     fs::{self, remove_file},
     net::SocketAddr,
     path::{Path, PathBuf},
+    thread,
+    time::Duration,
 };
+use structopt::StructOpt;
 use tracing::debug;
 
 const CONFIG_NETWORKS_DIRNAME: &str = "networks";
+
+/// Provides an interface for calling a launcher tool for launching and joining the network.
+///
+/// There will only be 2 implementations of this: one that uses the `sn_launch_tool` and another
+/// that uses a fake launch tool for use in unit tests.
+///
+/// The only reason the trait exists is for enabling unit testing.
+pub trait NetworkLauncher {
+    fn launch(&mut self, args: Vec<&str>, interval: u64) -> Result<(), Report>;
+}
+
+/// A network launcher based on the `sn_launch_tool`, which provides an implementation of a
+/// `NetworkLauncher`.
+///
+/// This is just a thin wrapper around the launch tool.
+#[derive(Default)]
+pub struct SnLaunchToolNetworkLauncher {}
+impl NetworkLauncher for SnLaunchToolNetworkLauncher {
+    fn launch(&mut self, args: Vec<&str>, interval: u64) -> Result<(), Report> {
+        debug!("Running network launch tool with args: {:?}", args);
+        println!("Starting a node to join a Safe network...");
+        sn_launch_tool::Launch::from_iter_safe(&args)
+            .map_err(|e| eyre!(e))
+            .and_then(|launch| launch.run())
+            .wrap_err("Error launching node")?;
+
+        let interval_duration = Duration::from_secs(interval * 15);
+        thread::sleep(interval_duration);
+
+        Ok(())
+    }
+}
 
 #[derive(Deserialize, Debug, Serialize, Clone)]
 pub enum NetworkInfo {
@@ -62,8 +98,8 @@ pub struct Settings {
 #[derive(Clone, Debug)]
 pub struct Config {
     settings: Settings,
-    cli_config_path: PathBuf,
-    node_config_path: PathBuf,
+    pub cli_config_path: PathBuf,
+    pub node_config_path: PathBuf,
 }
 
 impl Config {

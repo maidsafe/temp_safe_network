@@ -7,14 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::operations::{config::Config, node::*};
+use crate::operations::{config::Config, config::NetworkLauncher, node::*};
 use color_eyre::{eyre::eyre, Result};
 use sn_api::PublicKey;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
 use tracing::debug;
 
-const NODES_DATA_FOLDER: &str = "baby-fleming-nodes";
+const NODES_DATA_DIR_PATH: &str = "baby-fleming-nodes";
 
 const LOCAL_NODE_DIR: &str = "local-node";
 
@@ -65,12 +65,9 @@ pub enum NodeSubCommands {
     #[structopt(name = "run-baby-fleming")]
     /// Run nodes to form a local single-section Safe network
     Run {
-        /// Path where to run sn_node executable from (default ~/.safe/node/). The SN_NODE_PATH env var can also be used to set the path
-        #[structopt(long = "node-path", env = "SN_NODE_PATH")]
-        node_path: Option<PathBuf>,
-        /// Vebosity level for nodes logs (default = INFO, -y = DEBUG, -yy = TRACE)
-        #[structopt(short = "y", parse(from_occurrences))]
-        verbosity: u8,
+        /// Path of the directory where sn_node is located (default is ~/.safe/node/). The SN_NODE_PATH env var can also be used to set the path
+        #[structopt(long = "node-dir-path", env = "SN_NODE_PATH")]
+        node_dir_path: Option<PathBuf>,
         /// Interval in seconds between launching each of the nodes
         #[structopt(short = "i", long, default_value = "1")]
         interval: u64,
@@ -80,9 +77,6 @@ pub enum NodeSubCommands {
         /// IP to be used to launch the local nodes.
         #[structopt(long = "ip")]
         ip: Option<String>,
-        /// Start authd and log in with
-        #[structopt(short = "t", long = "testing")]
-        test: bool,
     },
     /// Shutdown all running nodes processes
     #[structopt(name = "killall")]
@@ -101,7 +95,11 @@ pub enum NodeSubCommands {
     },
 }
 
-pub async fn node_commander(cmd: Option<NodeSubCommands>, config: &mut Config) -> Result<()> {
+pub async fn node_commander(
+    cmd: Option<NodeSubCommands>,
+    config: &mut Config,
+    network_launcher: &mut Box<impl NetworkLauncher>,
+) -> Result<()> {
     match cmd {
         Some(NodeSubCommands::BinVersion { node_path }) => node_version(node_path),
         Some(NodeSubCommands::Install { node_path, version }) => {
@@ -157,23 +155,364 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>, config: &mut Config) -
             )
         }
         Some(NodeSubCommands::Run {
-            node_path,
-            verbosity,
+            node_dir_path,
             interval,
             num_of_nodes,
             ip,
-            test,
-        }) => node_run(
-            node_path,
-            NODES_DATA_FOLDER,
-            verbosity,
-            &interval.to_string(),
-            &num_of_nodes.to_string(),
-            ip,
-            test,
-        ),
+        }) => {
+            let node_directory_path = if let Some(node_path) = node_dir_path {
+                node_path
+            } else {
+                let mut default_node_dir_path = config.node_config_path.clone();
+                default_node_dir_path.pop();
+                default_node_dir_path
+            };
+            node_run(
+                network_launcher,
+                node_directory_path,
+                NODES_DATA_DIR_PATH,
+                interval,
+                &num_of_nodes.to_string(),
+                ip,
+            )
+        }
         Some(NodeSubCommands::Killall { node_path }) => node_shutdown(node_path),
         Some(NodeSubCommands::Update { node_path }) => node_update(node_path),
         None => Err(eyre!("Missing node subcommand")),
+    }
+}
+
+#[cfg(test)]
+mod run_command {
+    use super::{node_commander, NodeSubCommands, NODES_DATA_DIR_PATH};
+    use crate::operations::config::{Config, NetworkLauncher};
+    use crate::operations::node::SN_NODE_EXECUTABLE;
+    use assert_fs::prelude::*;
+    use color_eyre::{Report, Result};
+    use std::path::PathBuf;
+
+    pub struct FakeNetworkLauncher {
+        pub launch_args: Vec<String>,
+    }
+
+    impl NetworkLauncher for FakeNetworkLauncher {
+        fn launch(&mut self, args: Vec<&str>, interval: u64) -> Result<(), Report> {
+            self.launch_args.extend(args.iter().map(|s| s.to_string()));
+            println!("Sleep for {} seconds", interval);
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn should_use_optionally_supplied_node_directory_path() -> Result<()> {
+        let custom_node_dir = assert_fs::TempDir::new()?;
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: Some(PathBuf::from(custom_node_dir.path())),
+            interval: 1,
+            num_of_nodes: 11,
+            ip: None,
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+
+        assert_eq!(launcher.launch_args[1], "--node-path");
+        assert_eq!(
+            launcher.launch_args[2],
+            custom_node_dir
+                .path()
+                .join(SN_NODE_EXECUTABLE)
+                .to_str()
+                .unwrap()
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_use_default_node_directory_path() -> Result<()> {
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let node_dir = tmp_dir.child(".safe/node");
+        node_dir.create_dir_all()?;
+
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let node_config_file = node_dir.child("node_connection_info.config");
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: None,
+            interval: 1,
+            num_of_nodes: 11,
+            ip: None,
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+        assert_eq!(launcher.launch_args[1], "--node-path");
+        assert_eq!(
+            launcher.launch_args[2],
+            node_dir.path().join(SN_NODE_EXECUTABLE).to_str().unwrap()
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_use_default_node_data_directory_path() -> Result<()> {
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let node_dir = tmp_dir.child(".safe/node");
+        node_dir.create_dir_all()?;
+
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let node_config_file = node_dir.child("node_connection_info.config");
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: None,
+            interval: 1,
+            num_of_nodes: 11,
+            ip: None,
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+        assert_eq!(launcher.launch_args[3], "--nodes-dir");
+        assert_eq!(
+            launcher.launch_args[4],
+            node_dir.path().join(NODES_DATA_DIR_PATH).to_str().unwrap()
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_use_custom_node_data_directory_path() -> Result<()> {
+        let custom_node_dir = assert_fs::TempDir::new()?;
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: Some(PathBuf::from(custom_node_dir.path())),
+            interval: 1,
+            num_of_nodes: 11,
+            ip: None,
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+        assert_eq!(launcher.launch_args[3], "--nodes-dir");
+        assert_eq!(
+            launcher.launch_args[4],
+            custom_node_dir
+                .path()
+                .join(NODES_DATA_DIR_PATH)
+                .to_str()
+                .unwrap()
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_create_the_node_data_directory_if_it_does_not_exist() -> Result<()> {
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let node_dir = tmp_dir.child(".safe/node");
+        node_dir.create_dir_all()?;
+        let node_data_dir = node_dir.child(NODES_DATA_DIR_PATH);
+
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let node_config_file = node_dir.child("node_connection_info.config");
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: None,
+            interval: 1,
+            num_of_nodes: 11,
+            ip: None,
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+        node_data_dir.assert(predicates::path::is_dir());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_use_optionally_supplied_interval_value() -> Result<()> {
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let node_dir = tmp_dir.child(".safe/node");
+        node_dir.create_dir_all()?;
+
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let node_config_file = node_dir.child("node_connection_info.config");
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: None,
+            interval: 10,
+            num_of_nodes: 11,
+            ip: None,
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+        assert_eq!(launcher.launch_args[5], "--interval");
+        assert_eq!(launcher.launch_args[6], "10");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_use_optionally_supplied_num_of_nodes_value() -> Result<()> {
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let node_dir = tmp_dir.child(".safe/node");
+        node_dir.create_dir_all()?;
+
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let node_config_file = node_dir.child("node_connection_info.config");
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: None,
+            interval: 1,
+            num_of_nodes: 15,
+            ip: None,
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+        assert_eq!(launcher.launch_args[7], "--num-nodes");
+        assert_eq!(launcher.launch_args[8], "15");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_use_optionally_supplied_ip_address() -> Result<()> {
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let node_dir = tmp_dir.child(".safe/node");
+        node_dir.create_dir_all()?;
+
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let node_config_file = node_dir.child("node_connection_info.config");
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: None,
+            interval: 1,
+            num_of_nodes: 11,
+            ip: Some("10.10.0.1".to_string()),
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+        assert_eq!(launcher.launch_args[9], "--ip");
+        assert_eq!(launcher.launch_args[10], "10.10.0.1");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_use_local_flag_if_no_ip_is_supplied() -> Result<()> {
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let node_dir = tmp_dir.child(".safe/node");
+        node_dir.create_dir_all()?;
+
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let node_config_file = node_dir.child("node_connection_info.config");
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: None,
+            interval: 1,
+            num_of_nodes: 11,
+            ip: None,
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+        assert_eq!(launcher.launch_args[9], "--local");
+
+        Ok(())
     }
 }

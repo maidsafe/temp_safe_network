@@ -8,7 +8,7 @@
 // Software.
 
 use crate::{
-    operations::config::Config,
+    operations::config::{Config, SnLaunchToolNetworkLauncher},
     operations::safe_net::connect,
     shell,
     subcommands::{
@@ -112,7 +112,10 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
             recursive,
             follow_links,
         }) => xorurl_commander(cmd, location, recursive, follow_links, output_fmt, safe).await,
-        Some(SubCommands::Node { cmd }) => node_commander(cmd, &mut get_config()?).await,
+        Some(SubCommands::Node { cmd }) => {
+            let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
+            node_commander(cmd, &mut get_config()?, &mut launcher).await
+        }
         Some(other) => {
             // We treat these commands separatelly since we use the credentials if they are
             // available to connect to the network with them (unless dry-run was set),
