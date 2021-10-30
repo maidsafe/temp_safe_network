@@ -166,6 +166,7 @@ impl Core {
         Ok(commands)
     }
 
+    #[instrument(skip(self), level = "trace")]
     async fn handle_section_info_agreement(
         &self,
         section_auth: SectionAuthorityProvider,
@@ -177,6 +178,10 @@ impl Core {
                 .is_extension_of(&self.section.prefix().await);
 
         if equal_or_extension {
+            debug!(
+                "Updating section info for our prefix: {:?}",
+                section_auth.prefix
+            );
             // Our section or sub-section
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let infos = self
@@ -258,7 +263,6 @@ impl Core {
         }
 
         let snapshot = self.state_snapshot().await;
-        let old_chain = self.section.chain().await;
         let node_name = self.node.read().await.name();
 
         for (section_auth, key_sig) in updates {
@@ -273,27 +277,41 @@ impl Core {
                     .section
                     .update_elders(section_auth.clone(), key_sig)
                     .await;
+
+                let proof_chain = self.section_chain().await;
+
+                let network_updated = self.network.verify_with_chain_and_update(
+                    signed_section_auth.clone(),
+                    &proof_chain,
+                    &proof_chain,
+                )?;
+
+                if !network_updated {
+                    warn!(
+                        "Section Chain updated, but the network was not. w/ {:?}",
+                        section_auth
+                    );
+                }
             } else {
-                // FIXME: we shouldn't be updating our section info since it
-                // doesn't match our prefix???
-                if let Err(err) = self.section.chain.write().await.insert(
+                let mut section_chain_clone = self.section_chain().await.clone();
+
+                if let Err(err) = section_chain_clone.insert(
                     &key_sig.public_key,
                     section_auth.value.section_key(),
                     key_sig.signature,
                 ) {
                     error!("Error generating neighbouring section's proof_chain for knowledge update on split: {:?}", err);
                 }
-            }
 
-            // Let's update our network knowledge with new SAP even if it's of our own section
-            // FIXME: we are not passing the correct proof chain to update the NetworkPrefixMap
-            match self.network.update(section_auth, &old_chain) {
-                Err(e) => error!("Error updating our NetworkPrefixMap: {:?}", e),
-                Ok(true) => {
-                    info!("Updated our NetworkPrefixMap for {:?}", prefix);
-                    self.write_prefix_map().await
+                // Let's update our network knowledge with new SAP even if it's of our own section
+                match self.network.update(section_auth, &section_chain_clone) {
+                    Err(e) => error!("Error updating our NetworkPrefixMap: {:?}", e),
+                    Ok(true) => {
+                        info!("Updated our NetworkPrefixMap for {:?}", prefix);
+                        self.write_prefix_map().await
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
 

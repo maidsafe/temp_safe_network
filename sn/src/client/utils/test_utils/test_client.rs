@@ -116,7 +116,7 @@ pub async fn create_test_client_with(
     let timeout = timeout.map(Duration::from_secs);
     let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
 
-    let standard_wait = if read_prefix_map == true {
+    let standard_wait = if read_prefix_map {
         // there should be No AE needed and commands should work first time
         Some(Duration::from_secs(0))
     } else {
