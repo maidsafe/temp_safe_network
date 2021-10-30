@@ -41,11 +41,14 @@ use crate::routing::{
 use crate::{dbs::UsedSpace, messaging::data::ChunkDataExchange};
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 
+use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey as TypesPublicKey;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::path::PathBuf;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::{sync::mpsc, task};
 use xor_name::{Prefix, XorName};
 
@@ -99,8 +102,17 @@ impl Routing {
             )
             .await?;
             let node = Node::new(keypair, comm.our_connection_info());
-            let core = Core::first_node(comm, node, event_tx, used_space, root_storage_dir.clone())
-                .await?;
+
+            let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
+            let core = Core::first_node(
+                comm,
+                node,
+                event_tx,
+                used_space,
+                root_storage_dir.clone(),
+                genesis_sk_set,
+            )
+            .await?;
 
             let section = core.section();
 
@@ -175,6 +187,7 @@ impl Routing {
                 genesis_key,
             )
             .await?;
+
             let core = Core::new(
                 comm,
                 node,
@@ -183,6 +196,7 @@ impl Routing {
                 event_tx,
                 used_space,
                 root_storage_dir.to_path_buf(),
+                read_prefix_map_from_disk().await,
                 false,
             )
             .await?;
@@ -429,6 +443,33 @@ impl Routing {
     pub async fn our_index(&self) -> Result<usize> {
         self.dispatcher.core.our_index().await
     }
+}
+
+// Reads PrefixMap from '~/.safe/prefix_map' if present.
+async fn read_prefix_map_from_disk() -> Option<NetworkPrefixMap> {
+    let mut prefix_map_dir = dirs_next::home_dir()?;
+    prefix_map_dir.push(".safe");
+    prefix_map_dir.push("prefix_map");
+
+    // Read NetworkPrefixMap from disk if present
+    let prefix_map: Option<NetworkPrefixMap> =
+        if let Ok(mut prefix_map_file) = File::open(prefix_map_dir).await {
+            let mut prefix_map_contents = vec![];
+            let _ = prefix_map_file
+                .read_to_end(&mut prefix_map_contents)
+                .await
+                .ok()?;
+
+            rmp_serde::from_slice(&prefix_map_contents).ok()
+        } else {
+            None
+        };
+
+    if prefix_map.is_some() {
+        info!("Read PrefixMap from disc successfully");
+    }
+
+    prefix_map
 }
 
 // Listen for incoming connection events and handle them.

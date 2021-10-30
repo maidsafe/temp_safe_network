@@ -133,19 +133,3 @@ jobs:
       
       - shell: bash
         run: ./resources/test-scripts/api-tests
-
-  test-publish:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test Publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - name: Cargo publish dry run
-        run: cd sn_api && cargo publish --dry-run

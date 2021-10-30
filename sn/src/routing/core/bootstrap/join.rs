@@ -20,12 +20,11 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     section::Section,
-    SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+    SectionAuthorityProviderUtils,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
-use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
 use std::{collections::HashSet, net::SocketAddr};
 use tokio::sync::mpsc;
@@ -171,7 +170,10 @@ impl<'a> Join<'a> {
                         Section::new(genesis_key, section_chain, section_auth)?,
                     ));
                 }
-                JoinResponse::Retry(section_auth) => {
+                JoinResponse::Retry {
+                    section_auth,
+                    expected_age,
+                } => {
                     let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
                         .elders
                         .iter()
@@ -180,7 +182,7 @@ impl<'a> Join<'a> {
 
                     let prefix = section_auth.prefix;
 
-                    // For the first section, using age random among 6 to 100 to avoid
+                    // For the first section, using a stepoped age decreased from 100 to avoid
                     // relocating too many nodes at the same time.
                     // To avoid recursive due to received outdated SAP, self prefix shall be default
                     // as well when re-generate for a new age.
@@ -191,28 +193,16 @@ impl<'a> Join<'a> {
                         self.node.age(),
                         section_auth
                     );
-                    if prefix.is_empty()
-                        && self.prefix.is_empty()
-                        && self.node.age() < FIRST_SECTION_MIN_AGE
-                    {
-                        let age: u8 = (FIRST_SECTION_MIN_AGE..FIRST_SECTION_MAX_AGE)
-                            .choose(&mut rand::thread_rng())
-                            .unwrap_or(FIRST_SECTION_MAX_AGE);
-
-                        let new_keypair =
-                            ed25519::gen_keypair(&Prefix::default().range_inclusive(), age);
-                        let new_name = ed25519::name(&new_keypair.public);
-
-                        info!("Setting Node name to {}", new_name);
-                        self.node = Node::new(new_keypair, self.node.addr);
-                    }
 
                     if prefix.matches(&self.node.name()) {
                         self.prefix = prefix;
-                        // After section split, new node must join with the age of MIN_ADULT_AGE.
-                        if !prefix.is_empty() && self.node.age() != MIN_ADULT_AGE {
-                            let new_keypair =
-                                ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE);
+
+                        // make sure our joining age is the expected by the network
+                        if self.node.age() != expected_age {
+                            let new_keypair = ed25519::gen_keypair(
+                                &Prefix::default().range_inclusive(),
+                                expected_age,
+                            );
                             let new_name = ed25519::name(&new_keypair.public);
 
                             info!("Setting Node name to {}", new_name);
@@ -414,7 +404,9 @@ impl<'a> Join<'a> {
                 | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
                     return Ok((join_response, sender, src_name));
                 }
-                JoinResponse::Retry(ref section_auth)
+                JoinResponse::Retry {
+                    ref section_auth, ..
+                }
                 | JoinResponse::Redirect(ref section_auth) => {
                     if section_auth.elders.is_empty() {
                         error!(
@@ -499,7 +491,7 @@ mod tests {
     use crate::routing::{
         dkg::test_utils::*, error::Error as RoutingError, messages::WireMsgUtils,
         section::test_utils::*, section::NodeStateUtils, SectionAuthorityProviderUtils, ELDER_SIZE,
-        MIN_ADULT_AGE, MIN_AGE,
+        MIN_ADULT_AGE,
     };
     use crate::types::PublicKey;
     use assert_matches::assert_matches;
@@ -525,9 +517,9 @@ mod tests {
         let sk = sk_set.secret_key();
         let pk = sk.public_key();
 
-        // Node in first section has to have an age higher than MIN_ADULT_AGE
+        // Node in first section has to have a stepped age,
         // Otherwise during the bootstrap process, node will change its id and age.
-        let node_age = MIN_AGE + 2;
+        let node_age = MIN_ADULT_AGE;
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), node_age),
             gen_addr(),
@@ -560,7 +552,10 @@ mod tests {
             // Send JoinResponse::Retry with section auth provider info
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(section_auth.clone()))),
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+                    section_auth: section_auth.clone(),
+                    expected_age: MIN_ADULT_AGE,
+                })),
                 &bootstrap_node,
                 section_auth.section_key(),
             )?;
@@ -890,9 +885,10 @@ mod tests {
             // Send `Retry` with bad prefix
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                    gen_section_authority_provider(bad_prefix, ELDER_SIZE).0,
-                ))),
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+                    section_auth: gen_section_authority_provider(bad_prefix, ELDER_SIZE).0,
+                    expected_age: MIN_ADULT_AGE,
+                })),
                 &bootstrap_node,
                 section_key,
             )?;
@@ -901,9 +897,10 @@ mod tests {
             // Send `Retry` with good prefix
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                    gen_section_authority_provider(good_prefix, ELDER_SIZE).0,
-                ))),
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+                    section_auth: gen_section_authority_provider(good_prefix, ELDER_SIZE).0,
+                    expected_age: MIN_ADULT_AGE,
+                })),
                 &bootstrap_node,
                 section_key,
             )?;

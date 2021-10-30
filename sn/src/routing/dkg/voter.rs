@@ -67,11 +67,11 @@ impl DkgVoter {
     pub(crate) async fn start(
         &self,
         node: &Node,
-        dkg_key: DkgSessionId,
+        session_id: DkgSessionId,
         elder_candidates: ElderCandidates,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
-        if self.sessions.contains_key(&dkg_key) {
+        if self.sessions.contains_key(&session_id) {
             trace!("DKG already in progress for {:?}", elder_candidates);
             return Ok(vec![]);
         }
@@ -121,19 +121,24 @@ impl DkgVoter {
                 };
 
                 let mut commands = vec![];
-                commands.extend(session.broadcast(node, &dkg_key, message, section_pk)?);
+                commands.extend(session.broadcast(node, &session_id, message, section_pk)?);
 
-                for message in self.backlog.write().await.take(&dkg_key).into_iter() {
-                    commands.extend(session.process_message(node, &dkg_key, message, section_pk)?);
+                for message in self.backlog.write().await.take(&session_id).into_iter() {
+                    commands.extend(session.process_message(
+                        node,
+                        &session_id,
+                        message,
+                        section_pk,
+                    )?);
                 }
 
-                let _prev = self.sessions.insert(dkg_key, session);
+                let _prev = self.sessions.insert(session_id, session);
 
                 // Remove uneeded old sessions.
-                self.sessions.retain(|existing_dkg_key, _| {
-                    existing_dkg_key.generation >= dkg_key.generation
+                self.sessions.retain(|existing_session_id, _| {
+                    existing_session_id.generation >= session_id.generation
                 });
-                self.backlog.write().await.prune(&dkg_key);
+                self.backlog.write().await.prune(&session_id);
 
                 Ok(commands)
             }
@@ -156,8 +161,8 @@ impl DkgVoter {
             let session = ref_mut_multi.value();
             session.timer_token() == timer_token
         }) {
-            let (dkg_key, session) = ref_mut_multi.pair_mut();
-            session.handle_timeout(node, dkg_key, section_pk)
+            let (session_id, session) = ref_mut_multi.pair_mut();
+            session.handle_timeout(node, session_id, section_pk)
         } else {
             Ok(vec![])
         }
@@ -167,26 +172,26 @@ impl DkgVoter {
     pub(crate) async fn process_message(
         &self,
         node: &Node,
-        dkg_key: &DkgSessionId,
+        session_id: &DkgSessionId,
         message: DkgMessage,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
-        if let Some(mut session) = self.sessions.get_mut(dkg_key) {
-            session.process_message(node, dkg_key, message, section_pk)
+        if let Some(mut session) = self.sessions.get_mut(session_id) {
+            session.process_message(node, session_id, message, section_pk)
         } else {
-            self.backlog.write().await.push(*dkg_key, message);
+            self.backlog.write().await.push(*session_id, message);
             Ok(vec![])
         }
     }
 
     pub(crate) fn process_failure(
         &self,
-        dkg_key: &DkgSessionId,
+        session_id: &DkgSessionId,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
     ) -> Option<Command> {
         self.sessions
-            .get_mut(dkg_key)?
-            .process_failure(dkg_key, failed_participants, signed)
+            .get_mut(session_id)?
+            .process_failure(session_id, failed_participants, signed)
     }
 }

@@ -55,7 +55,12 @@ pub enum JoinResponse {
         nonce_signature: Signature,
     },
     /// Up to date section information for a joining peer to retry its join request with
-    Retry(SectionAuthorityProvider),
+    Retry {
+        /// The SectionAuthorityProvider of the section.
+        section_auth: SectionAuthorityProvider,
+        /// The age of the node as expected by the section.
+        expected_age: u8,
+    },
     /// Response redirecting a joining peer to join a different section,
     /// containing addresses of nodes that are closer (than the recipient) to the
     /// requested name. The `JoinRequest` should be re-sent to these addresses.
