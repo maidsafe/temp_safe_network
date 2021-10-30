@@ -20,8 +20,7 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     section::Section,
-    SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
-    RECOMMENDED_SECTION_SIZE,
+    SectionAuthorityProviderUtils,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -173,7 +172,7 @@ impl<'a> Join<'a> {
                 }
                 JoinResponse::Retry {
                     section_auth,
-                    section_members,
+                    expected_age,
                 } => {
                     let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
                         .elders
@@ -194,30 +193,16 @@ impl<'a> Join<'a> {
                         self.node.age(),
                         section_auth
                     );
-                    if prefix.is_empty()
-                        && self.prefix.is_empty()
-                        && self.node.age() < FIRST_SECTION_MIN_AGE
-                    {
-                        let age: u8 = if section_members < RECOMMENDED_SECTION_SIZE as u8 * 3 {
-                            FIRST_SECTION_MAX_AGE - section_members * 2
-                        } else {
-                            FIRST_SECTION_MIN_AGE
-                        };
-
-                        let new_keypair =
-                            ed25519::gen_keypair(&Prefix::default().range_inclusive(), age);
-                        let new_name = ed25519::name(&new_keypair.public);
-
-                        info!("Setting Node name to {}", new_name);
-                        self.node = Node::new(new_keypair, self.node.addr);
-                    }
 
                     if prefix.matches(&self.node.name()) {
                         self.prefix = prefix;
-                        // After section split, new node must join with the age of MIN_ADULT_AGE.
-                        if !prefix.is_empty() && self.node.age() != MIN_ADULT_AGE {
-                            let new_keypair =
-                                ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE);
+
+                        // make sure our joining age is the expected by the network
+                        if self.node.age() != expected_age {
+                            let new_keypair = ed25519::gen_keypair(
+                                &Prefix::default().range_inclusive(),
+                                expected_age,
+                            );
                             let new_name = ed25519::name(&new_keypair.public);
 
                             info!("Setting Node name to {}", new_name);
@@ -534,7 +519,7 @@ mod tests {
 
         // Node in first section has to have a stepped age,
         // Otherwise during the bootstrap process, node will change its id and age.
-        let node_age = FIRST_SECTION_MAX_AGE;
+        let node_age = MIN_ADULT_AGE;
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), node_age),
             gen_addr(),
@@ -569,7 +554,7 @@ mod tests {
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
                     section_auth: section_auth.clone(),
-                    section_members: 0,
+                    expected_age: MIN_ADULT_AGE,
                 })),
                 &bootstrap_node,
                 section_auth.section_key(),
@@ -902,7 +887,7 @@ mod tests {
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
                     section_auth: gen_section_authority_provider(bad_prefix, ELDER_SIZE).0,
-                    section_members: ELDER_SIZE as u8,
+                    expected_age: MIN_ADULT_AGE,
                 })),
                 &bootstrap_node,
                 section_key,
@@ -914,7 +899,7 @@ mod tests {
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
                     section_auth: gen_section_authority_provider(good_prefix, ELDER_SIZE).0,
-                    section_members: ELDER_SIZE as u8,
+                    expected_age: MIN_ADULT_AGE,
                 })),
                 &bootstrap_node,
                 section_key,

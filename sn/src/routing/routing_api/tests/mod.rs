@@ -30,7 +30,7 @@ use crate::routing::{
     relocation::{self, RelocatePayloadUtils},
     section::{test_utils::*, ElderCandidatesUtils, NodeStateUtils, Section, SectionKeyShare},
     supermajority, Error, Event, Result as RoutingResult, SectionAuthorityProviderUtils,
-    ELDER_SIZE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
+    ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
@@ -83,7 +83,10 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let new_node_comm = create_comm().await?;
     let new_node = Node::new(
-        ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
+        ed25519::gen_keypair(
+            &Prefix::default().range_inclusive(),
+            FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2,
+        ),
         new_node_comm.our_connection_info(),
     );
 
@@ -161,7 +164,10 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let new_node = Node::new(
-        ed25519::gen_keypair(&Prefix::default().range_inclusive(), FIRST_SECTION_MIN_AGE),
+        ed25519::gen_keypair(
+            &Prefix::default().range_inclusive(),
+            FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2,
+        ),
         gen_addr(),
     );
 
@@ -212,7 +218,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         {
             assert_eq!(*peer.name(), new_node.name());
             assert_eq!(*peer.addr(), new_node.addr);
-            assert_eq!(peer.age(), FIRST_SECTION_MIN_AGE);
+            assert_eq!(peer.age(), FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2);
             assert_eq!(previous_name, None);
             assert_eq!(dst_key, None);
 
@@ -487,9 +493,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         Prefix::default(),
         sk_set.public_keys(),
     );
-    let section_signed_section_auth = section_signed(sk_set.secret_key(), section_auth.clone())?;
+    let section_signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section = Section::new(*chain.root_key(), chain, section_signed_section_auth)?;
+    let section = Section::new(*chain.root_key(), chain, section_signed_sap)?;
     let mut expected_new_elders = BTreeSet::new();
 
     for peer in section_auth.peers() {
@@ -620,11 +626,11 @@ async fn handle_online_command(
                 ..
             }) => {
                 if let JoinResponse::Approval {
-                    section_auth: section_signed_section_auth,
+                    section_auth: section_signed_sap,
                     ..
                 } = *response
                 {
-                    assert_eq!(section_signed_section_auth.value, *section_auth);
+                    assert_eq!(section_signed_sap.value, *section_auth);
                     assert_eq!(recipients, [(*peer.name(), *peer.addr())]);
                     status.node_approval_sent = true;
                 }
@@ -1483,13 +1489,12 @@ async fn handle_demote_during_split() -> Result<()> {
     let sk_set_v1_p1 = SecretKeySet::random();
 
     // Create agreement on `OurElder` for both sub-sections
-    let create_our_elders_command = |sk, section_auth| -> Result<_> {
-        let section_signed_section_auth = section_signed(sk, section_auth)?;
-        let proposal = Proposal::OurElders(section_signed_section_auth);
+    let create_our_elders_command = |section_signed_sap| -> Result<_> {
+        let proposal = Proposal::OurElders(section_signed_sap);
         let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
         let sig = KeyedSig {
             signature,
-            public_key: sk_set_v0.secret_key().public_key(),
+            public_key: sk_set_v0.public_keys().public_key(),
         };
 
         Ok(Command::HandleElderAgreement { proposal, sig })
@@ -1501,18 +1506,21 @@ async fn handle_demote_during_split() -> Result<()> {
         prefix0,
         sk_set_v1_p0.public_keys(),
     );
-    let command = create_our_elders_command(sk_set_v1_p0.secret_key(), section_auth)?;
-    let commands = dispatcher.handle_command(command, "cmd-id").await?;
+
+    let section_signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
+    let command = create_our_elders_command(section_signed_sap)?;
+    let commands = dispatcher.handle_command(command, "cmd-id-1").await?;
     assert_matches!(&commands[..], &[]);
 
     // Handle agreement on `OurElders` for prefix-1.
     let section_auth =
         SectionAuthorityProvider::new(peers_b.iter().copied(), prefix1, sk_set_v1_p1.public_keys());
-    let command = create_our_elders_command(sk_set_v1_p1.secret_key(), section_auth)?;
-    let commands = dispatcher.handle_command(command, "cmd-id").await?;
+
+    let section_signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
+    let command = create_our_elders_command(section_signed_sap)?;
+    let commands = dispatcher.handle_command(command, "cmd-id-2").await?;
 
     let mut update_recipients = HashSet::new();
-
     for command in commands {
         let (recipients, wire_msg) = match command {
             Command::SendMessage {
@@ -1597,14 +1605,10 @@ async fn create_section(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(Section, SectionKeyShare)> {
-    let section_chain = SecuredLinkedList::new(sk_set.secret_key().public_key());
-    let section_signed_section_auth = section_signed(sk_set.secret_key(), section_auth.clone())?;
+    let section_chain = SecuredLinkedList::new(sk_set.public_keys().public_key());
+    let section_signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section = Section::new(
-        *section_chain.root_key(),
-        section_chain,
-        section_signed_section_auth,
-    )?;
+    let section = Section::new(*section_chain.root_key(), section_chain, section_signed_sap)?;
 
     for peer in section_auth.peers() {
         let mut peer = peer;
