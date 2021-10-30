@@ -41,7 +41,7 @@ pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
-    #[instrument(skip_all, level = "debug")]
+    #[instrument(skip(err_sender), level = "debug")]
     pub(crate) async fn new(
         client_pk: PublicKey,
         genesis_key: bls::PublicKey,
@@ -51,11 +51,7 @@ impl Session {
         standard_wait: Duration,
         prefix_map: NetworkPrefixMap,
     ) -> Result<Session, Error> {
-        trace!(
-            "Trying to bootstrap to the network with public_key: {:?}",
-            client_pk
-        );
-        debug!("QP2p config: {:?}", qp2p_config);
+        trace!("Trying to bootstrap to the network");
 
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
 
@@ -472,6 +468,10 @@ impl Session {
                     )
                     .await?;
 
+                    trace!(
+                        "Awaiting a duration of {:?} before trying new nodes",
+                        self.standard_wait
+                    );
                     tokio::time::sleep(self.standard_wait).await;
                 }
             }
