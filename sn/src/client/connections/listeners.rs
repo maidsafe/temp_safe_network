@@ -306,9 +306,13 @@ impl Session {
             }
             Err(err) => {
                 warn!(
-                        "Anti-Entropy: failed to update remote section SAP, bounced msg dropped. Failed section auth was {:?}, {:?}",
-                        err, section_auth
-                    );
+                    "Anti-Entropy: failed to update remote section SAP w/ err: {:?}",
+                    err
+                );
+                warn!(
+                    "Anti-Entropy: bounced msg dropped. Failed section auth was {:?}",
+                    section_auth.public_key_set.public_key()
+                );
                 return Ok(());
             }
         }

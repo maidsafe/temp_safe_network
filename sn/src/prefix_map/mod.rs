@@ -129,10 +129,14 @@ impl NetworkPrefixMap {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
     ) -> Result<bool> {
-        trace!("Attempting to update prefixmap");
-        let section_key = match self.section_by_prefix(&signed_section_auth.value.prefix()) {
+        let prefix = signed_section_auth.value.prefix();
+        trace!("Attempting to update prefixmap for {:?}", prefix);
+        let section_key = match self.section_by_prefix(&prefix) {
             Ok(sap) => sap.section_key(),
-            Err(_) => self.genesis_pk,
+            Err(_) => {
+                trace!("No key found for prefix: {:?}", prefix);
+                self.genesis_pk
+            }
         };
 
         self.verify_with_chain_and_update(
@@ -219,9 +223,10 @@ impl NetworkPrefixMap {
         }
 
         // Check the SAP's key is the last key of the proof chain
+        // if !proof_chain.has_key(&signed_section_auth.value.public_key_set.public_key()) {
         if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
-                "section key ({:?}, {:?}) doesn't match proof chain last key ({:?})",
+                "section key ({:?}, from prefix {:?}) isn't in the proof chain ending with last key ({:?})",
                 signed_section_auth.value.public_key_set.public_key(),
                 signed_section_auth.value.prefix,
                 proof_chain.last_key()

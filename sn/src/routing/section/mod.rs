@@ -111,6 +111,7 @@ impl Section {
 
     /// update all section info for our new section
     pub(super) async fn relocated_to(&self, new_section: Self) -> Result<()> {
+        debug!(">>>>. node was relocated");
         let mut chain = self.chain.write().await;
         *chain = new_section.chain().await;
         // don't hold write lock
@@ -186,12 +187,14 @@ impl Section {
         other: &SectionAuth<SectionAuthorityProvider>,
         proof_chain: SecuredLinkedList,
     ) -> Result<()> {
+        trace!("Attempting to merge chain");
         // We've been AE validated here.
         self.chain.write().await.merge(proof_chain)?;
 
         if &other.sig.public_key == self.chain.read().await.last_key() {
             *self.section_auth.write().await = other.clone();
         }
+
         Ok(())
     }
 
@@ -209,6 +212,7 @@ impl Section {
         if new_section_auth.value.prefix() != our_prefix
             && !new_section_auth.value.prefix().is_extension_of(&our_prefix)
         {
+            warn!("Did not update elders, this SAP prefix is not an extension of ours");
             return false;
         }
 
@@ -232,7 +236,7 @@ impl Section {
                 .insert(&signed_by_key, new_section_key, new_key_sig.signature)
         {
             error!(
-                "failed to insert key {:?} (signed with {:?}) into the section chain: {:?}",
+                "Failed to insert key {:?} (signed with {:?}) into the section chain: {:?}",
                 new_section_key, signed_by_key, error,
             );
             return false;

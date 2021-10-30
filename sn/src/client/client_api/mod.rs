@@ -128,7 +128,11 @@ impl Client {
         // Bootstrap to the network, connecting to a section based
         // on a public key of our choice.
         debug!(
-            "Creating new session with genesis key: {} ...",
+            "Creating new session with genesis key: {:?} ",
+            config.genesis_key
+        );
+        debug!(
+            "Creating new session with genesis key (in hex format): {} ",
             hex::encode(config.genesis_key.to_bytes())
         );
 

@@ -43,6 +43,12 @@ impl Core {
             sig: section_signed,
         };
 
+        // FIXME: perhaps we should update our section chain
+        // only upon successful DKG round we participated on??
+        self.section
+            .merge_chain(&signed_section_auth, proof_chain.clone())
+            .await?;
+
         match self.network.verify_with_chain_and_update(
             signed_section_auth.clone(),
             &proof_chain,
@@ -54,12 +60,6 @@ impl Core {
                         "Anti-Entropy: updated remote section SAP updated for {:?}",
                         section_auth.prefix
                     );
-
-                    // FIXME: perhaps we should update our section chain
-                    // only upon successful DKG round we participated on??
-                    self.section
-                        .merge_chain(&signed_section_auth, proof_chain)
-                        .await?;
                 } else {
                     debug!(
                         "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
@@ -109,11 +109,21 @@ impl Core {
             src_name, sender
         );
 
+        let signed_section_auth = SectionAuth {
+            value: section_auth.clone(),
+            sig: section_signed,
+        };
+
+        // If it's out section, update our section details.
+        if self.section.prefix().await == section_auth.prefix {
+            debug!("AE-Retry received from our section, chain was updated so updating our section info");
+            self.section
+                .merge_chain(&signed_section_auth, proof_chain.clone())
+                .await?;
+        }
+
         match self.network.verify_with_chain_and_update(
-            SectionAuth {
-                value: section_auth.clone(),
-                sig: section_signed,
-            },
+            signed_section_auth.clone(),
             &proof_chain,
             &self.section.chain().await,
         ) {
@@ -124,12 +134,13 @@ impl Core {
                         "Anti-Entropy: updated remote section SAP updated for {:?}",
                         section_auth.prefix
                     );
+
                     self.write_prefix_map().await;
                     info!("PrefixMap written to disk");
                 } else {
                     debug!(
                         "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                        section_auth.prefix, section_auth
+                        section_auth.prefix, section_auth.public_key_set.public_key()
                     );
                 }
 
@@ -151,7 +162,14 @@ impl Core {
                 Ok(vec![cmd])
             }
             Err(err) => {
-                warn!("Anti-Entropy: failed to update remote section SAP, bounced msg from {:?} dropped: {:?}, {:?}", sender, bounced_msg, err);
+                warn!(
+                    "Anti-Entropy: failed to update remote section {:?} SAP because {:?}",
+                    section_auth.prefix, err
+                );
+                warn!(
+                    "Anti-Entropy: bounced msg from {:?} dropped: {:?}",
+                    sender, bounced_msg
+                );
                 Ok(vec![])
             }
         }
@@ -288,12 +306,20 @@ impl Core {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
 
+        let our_prefix = self.section.prefix().await;
+
         // Let's try to find a section closer to the destination, if it's not for us.
         if !self.section.prefix().await.matches(&dst_name) {
-            debug!("AE: prefix not matching");
+            debug!(
+                "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
+                our_prefix, dst_name
+            );
             match self.network.closest_or_opposite(&dst_name) {
                 Some(section_auth) => {
-                    info!("Found a better matching section {:?}", section_auth);
+                    info!(
+                        "Found a better matching prefix {:?}",
+                        section_auth.value.prefix
+                    );
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropyRedirect {
@@ -364,6 +390,11 @@ impl Core {
                 let section_signed = section_signed_auth.sig;
                 let bounced_msg = original_bytes;
 
+                trace!(
+                    "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
+                    proof_chain.last_key(),
+                    &section_auth.public_key_set.public_key()
+                );
                 trace!("{}", LogMarker::AeSendRetryAsOutdated);
 
                 SystemMsg::AntiEntropyRetry {
