@@ -160,13 +160,11 @@ pub async fn node_commander(
             num_of_nodes,
             ip,
         }) => {
-            let node_directory_path = if let Some(node_path) = node_dir_path {
-                node_path
-            } else {
+            let node_directory_path = node_dir_path.unwrap_or_else(|| {
                 let mut default_node_dir_path = config.node_config_path.clone();
                 default_node_dir_path.pop();
                 default_node_dir_path
-            };
+            });
             node_run(
                 network_launcher,
                 node_directory_path,
@@ -174,7 +172,9 @@ pub async fn node_commander(
                 interval,
                 &num_of_nodes.to_string(),
                 ip,
-            )
+            )?;
+            config.add_network("baby-fleming", None)?;
+            Ok(())
         }
         Some(NodeSubCommands::Killall { node_path }) => node_shutdown(node_path),
         Some(NodeSubCommands::Update { node_path }) => node_update(node_path),
@@ -185,11 +185,32 @@ pub async fn node_commander(
 #[cfg(test)]
 mod run_command {
     use super::{node_commander, NodeSubCommands, NODES_DATA_DIR_PATH};
-    use crate::operations::config::{Config, NetworkLauncher};
+    use crate::operations::config::{Config, NetworkInfo, NetworkLauncher};
     use crate::operations::node::SN_NODE_EXECUTABLE;
     use assert_fs::prelude::*;
-    use color_eyre::{Report, Result};
+    use color_eyre::{eyre::eyre, Report, Result};
     use std::path::PathBuf;
+
+    // Each of these tests will assume the launch tool runs successfully and a node config is
+    // written out as a result of the running network. This dummy config will be read when the
+    // baby-fleming network is added to the networks list.
+    const SERIALIZED_NODE_CONFIG: &str = r#"
+    [
+        "89505bbfcac9335a7639a1dca9ed027b98be46b03953e946e53695f678c827f18f6fc22dc888de2bce9078f3fce55095",
+        [
+            "127.0.0.1:33314",
+            "127.0.0.1:38932",
+            "127.0.0.1:39132",
+            "127.0.0.1:47795",
+            "127.0.0.1:49976",
+            "127.0.0.1:53018",
+            "127.0.0.1:53421",
+            "127.0.0.1:54002",
+            "127.0.0.1:54386",
+            "127.0.0.1:55890",
+            "127.0.0.1:57956"
+        ]
+    ]"#;
 
     pub struct FakeNetworkLauncher {
         pub launch_args: Vec<String>,
@@ -209,6 +230,7 @@ mod run_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
@@ -250,6 +272,7 @@ mod run_command {
 
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = node_dir.child("node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
@@ -286,6 +309,7 @@ mod run_command {
 
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = node_dir.child("node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
@@ -320,6 +344,7 @@ mod run_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
@@ -361,6 +386,7 @@ mod run_command {
 
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = node_dir.child("node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
@@ -393,6 +419,7 @@ mod run_command {
 
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = node_dir.child("node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
@@ -426,6 +453,7 @@ mod run_command {
 
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = node_dir.child("node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
@@ -459,6 +487,7 @@ mod run_command {
 
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = node_dir.child("node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
@@ -492,6 +521,7 @@ mod run_command {
 
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = node_dir.child("node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
@@ -512,6 +542,56 @@ mod run_command {
 
         assert!(result.is_ok());
         assert_eq!(launcher.launch_args[9], "--local");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_add_baby_fleming_to_networks_list() -> Result<()> {
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let node_dir = tmp_dir.child(".safe/node");
+        node_dir.create_dir_all()?;
+
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let baby_fleming_config_file =
+            tmp_dir.child(".safe/cli/networks/baby-fleming_node_connection_info.config");
+        let node_config_file = node_dir.child("node_connection_info.config");
+        node_config_file.write_str(SERIALIZED_NODE_CONFIG)?;
+        let mut config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )?;
+
+        let mut launcher = Box::new(FakeNetworkLauncher {
+            launch_args: Vec::new(),
+        });
+
+        let cmd = NodeSubCommands::Run {
+            node_dir_path: None,
+            interval: 1,
+            num_of_nodes: 11,
+            ip: None,
+        };
+
+        let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
+
+        assert!(result.is_ok());
+        assert_eq!(config.networks_iter().count(), 1);
+        baby_fleming_config_file.assert(predicates::path::is_file());
+
+        let (network_name, network_info) = config.networks_iter().next().unwrap();
+        assert_eq!(network_name, "baby-fleming");
+        match network_info {
+            NetworkInfo::NodeConfig(_) => {
+                return Err(eyre!("node config doesn't apply to this test"));
+            }
+            NetworkInfo::ConnInfoLocation(path) => {
+                assert_eq!(
+                    *path,
+                    String::from(baby_fleming_config_file.path().to_str().unwrap())
+                );
+            }
+        }
 
         Ok(())
     }
