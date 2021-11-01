@@ -55,7 +55,8 @@ impl Core {
             // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
             if !self.section.prefix().await.matches(&src_name) {
                 trace!(
-                    "Ignore proposal from other section, src_name {:?}: {:?}",
+                    "Ignore proposal {:?} from other section, src_name {:?}: {:?}",
+                    proposal,
                     src_name,
                     msg_id
                 );

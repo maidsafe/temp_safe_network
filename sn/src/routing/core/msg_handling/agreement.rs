@@ -294,6 +294,8 @@ impl Core {
                     );
                 }
             } else {
+                info!("Updating my neighbour's SAP to: {:?}", &section_auth);
+
                 // Let's update our network knowledge with new SAP even if it's of our own section.
                 // We need to generate the proof chain to connect our current chain to new SAP.
                 let mut proof_chain = old_chain.clone();

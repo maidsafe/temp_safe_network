@@ -139,18 +139,11 @@ impl NetworkPrefixMap {
             }
         };
 
-        let res = self.verify_with_chain_and_update(
+        self.verify_with_chain_and_update(
             signed_section_auth,
             proof_chain,
             &SecuredLinkedList::new(section_key),
-        );
-
-        for section in self.sections.iter() {
-            let prefix = section.key();
-            trace!("Known prefix: {:?}", prefix);
-        }
-
-        res
+        )
     }
 
     /// Update our knowledge of a remote section's SAP only
@@ -244,6 +237,11 @@ impl NetworkPrefixMap {
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
         let _changed = self.insert(signed_section_auth);
+
+        for section in self.sections.iter() {
+            let prefix = section.key();
+            trace!("Known prefix: {:?}", prefix);
+        }
 
         Ok(true)
     }
