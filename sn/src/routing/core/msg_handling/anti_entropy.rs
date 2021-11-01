@@ -44,46 +44,10 @@ impl Core {
             sig: section_signed,
         };
 
-        let our_prefix = self.section().prefix().await;
-
-        // FIXME: perhaps we should update our section chain
-        // only upon successful DKG round we participated on??
-        if section_auth.prefix.is_compatible(&our_prefix) {
-            self.network_knowledge
-                .merge_chain(&signed_section_auth, proof_chain.clone())
-                .await?;
-        }
-
-        match self.network.verify_with_chain_and_update(
-            signed_section_auth.clone(),
-            &proof_chain,
-            &self.network_knowledge.chain().await,
-        ) {
-            Ok(updated) => {
-                if updated {
-                    info!(
-                        "Anti-Entropy: updated remote section SAP updated for {:?}",
-                        section_auth.prefix
-                    );
-                } else {
-                    debug!(
-                        "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                        section_auth.prefix, section_auth
-                    );
-                }
-
-                if let Some(peers) = members {
-                    self.network_knowledge.merge_members(peers).await?;
-                }
-            }
-            Err(err) => {
-                warn!(
-                    "Anti-Entropy: Did not update remote section SAP provided by {:?}: {:?}",
-                    sender, err
-                );
-                return Err(err);
-            }
-        }
+        let _updated = self
+            .network_knowledge
+            .update_knowledge_if_valid(signed_section_auth, proof_chain, members)
+            .await?;
 
         self.fire_node_event_for_any_new_adults().await?;
 
@@ -130,57 +94,105 @@ impl Core {
                 .await?;
         }
 
-        match self.network.verify_with_chain_and_update(
-            signed_section_auth.clone(),
-            &proof_chain,
-            &self.network_knowledge.chain().await,
-        ) {
-            Ok(updated) => {
-                if updated {
-                    // Update the Prefixmap written on our disk
-                    info!(
-                        "Anti-Entropy: updated remote section SAP updated for {:?}",
-                        section_auth.prefix
-                    );
+        let updated = res?;
 
-                    self.write_prefix_map().await;
-                    info!("PrefixMap written to disk");
-                } else {
-                    debug!(
-                        "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                        section_auth.prefix, section_auth.public_key_set.public_key()
-                    );
-                }
+        if updated {
+            // Update the Prefixmap written on our disk
+            info!(
+                "Anti-Entropy: updated remote section SAP updated for {:?}",
+                section_auth.prefix
+            );
 
-                // Regardless if the SAP already existed, as long as it was valid
-                // (it may have been just updated by a concurrent handler of another bounced msg),
-                //we still resend this message.
-                //
-                // TODO: we may need to check if 'bounced_msg' dest section pk is different
-                // from the received new SAP key, to prevent from endlessly resending a msg
-                // if a sybil/corrupt peer keeps sending us the same AE msg.
-                let dst_section_pk = section_auth.public_key_set.public_key();
-                trace!("{}", LogMarker::AeResendAfterRetry);
+            self.write_prefix_map().await;
+            info!("PrefixMap written to disk");
 
-                self.create_or_wait_for_backoff(&src_name, &sender).await;
+             // Regardless if the SAP already existed, as long as it was valid
+            // (it may have been just updated by a concurrent handler of another bounced msg),
+            //we still resend this message.
+            //
+            // TODO: we may need to check if 'bounced_msg' dest section pk is different
+            // from the received new SAP key, to prevent from endlessly resending a msg
+            // if a sybil/corrupt peer keeps sending us the same AE msg.
+            let dst_section_pk = section_auth.public_key_set.public_key();
+            trace!("{}", LogMarker::AeResendAfterRetry);
 
-                let cmd = self
-                    .send_direct_message((src_name, sender), bounced_msg, dst_section_pk)
-                    .await?;
-                Ok(vec![cmd])
-            }
-            Err(err) => {
-                warn!(
-                    "Anti-Entropy: failed to update remote section {:?} SAP because {:?}",
-                    section_auth.prefix, err
-                );
-                warn!(
-                    "Anti-Entropy: bounced msg from {:?} dropped: {:?}",
-                    sender, bounced_msg
-                );
-                Ok(vec![])
-            }
+            self.create_or_wait_for_backoff(&src_name, &sender).await;
+
+            let cmd = self
+                .send_direct_message((src_name, sender), bounced_msg, dst_section_pk)
+                .await?;
+            Ok(vec![cmd])
+
+        } else {
+            debug!(
+                "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                section_auth.prefix, section_auth.public_key_set.public_key()
+            );
+
+            Ok(vec![])
+
         }
+
+
+        // // If it's our section, update our section details.
+        // if self.network_knowledge.prefix().await == section_auth.prefix {
+        //     debug!("AE-Retry received from our section, updating chain");
+        //     self.network_knowledge
+        //         .merge_chain(&signed_section_auth, proof_chain.clone())
+        //         .await?;
+        // }
+
+        // match self.network.verify_with_chain_and_update(
+        //     signed_section_auth.clone(),
+        //     &proof_chain,
+        //     &self.network_knowledge.chain().await,
+        // ) {
+            // Ok(updated) => {
+            //     if updated {
+            //         // Update the Prefixmap written on our disk
+            //         info!(
+            //             "Anti-Entropy: updated remote section SAP updated for {:?}",
+            //             section_auth.prefix
+            //         );
+
+            //         self.write_prefix_map().await;
+            //         info!("PrefixMap written to disk");
+            //     } else {
+            //         debug!(
+            //             "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+            //             section_auth.prefix, section_auth.public_key_set.public_key()
+            //         );
+            //     }
+
+            //     // Regardless if the SAP already existed, as long as it was valid
+            //     // (it may have been just updated by a concurrent handler of another bounced msg),
+            //     //we still resend this message.
+            //     //
+            //     // TODO: we may need to check if 'bounced_msg' dest section pk is different
+            //     // from the received new SAP key, to prevent from endlessly resending a msg
+            //     // if a sybil/corrupt peer keeps sending us the same AE msg.
+            //     let dst_section_pk = section_auth.public_key_set.public_key();
+            //     trace!("{}", LogMarker::AeResendAfterRetry);
+
+            //     self.create_or_wait_for_backoff(&src_name, &sender).await;
+
+            //     let cmd = self
+            //         .send_direct_message((src_name, sender), bounced_msg, dst_section_pk)
+            //         .await?;
+            //     Ok(vec![cmd])
+            // }
+            // Err(err) => {
+            //     warn!(
+            //         "Anti-Entropy: failed to update remote section {:?} SAP because {:?}",
+            //         section_auth.prefix, err
+            //     );
+            //     warn!(
+            //         "Anti-Entropy: bounced msg from {:?} dropped: {:?}",
+            //         sender, bounced_msg
+            //     );
+            //     Ok(vec![])
+            // }
+        // }
     }
 
     pub(crate) async fn handle_anti_entropy_redirect_msg(
@@ -329,7 +341,10 @@ impl Core {
                 "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
                 our_prefix, dst_name
             );
-            match self.network.closest_or_opposite(&dst_name) {
+            match self
+                .network_knowledge
+                .get_closest_or_opposite_signed_sap(&dst_name)
+            {
                 Some(section_auth) => {
                     info!(
                         "Found a better matching prefix {:?}",
@@ -507,7 +522,10 @@ impl Core {
                 .await;
             trace!("Our SAP: {:?}", our_sap);
 
-            match self.network.closest_or_opposite(&data_name) {
+            match self
+                .network_knowledge
+                .get_closest_or_opposite_signed_sap(&data_name)
+            {
                 Some(better_sap) => {
                     // Update the client of the actual destination section
                     trace!(

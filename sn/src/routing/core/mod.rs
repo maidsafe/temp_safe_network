@@ -107,7 +107,7 @@ impl Core {
     pub(crate) async fn new(
         comm: Comm,
         mut node: Node,
-        section: NetworkKnowledge,
+        network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
@@ -125,10 +125,10 @@ impl Core {
 
         let capacity = Capacity::new(BTreeMap::new());
         let adult_liveness = Liveness::new();
-        let genesis_pk = *section.genesis_key();
+        let genesis_pk = *network_knowledge.genesis_key();
 
         // Check if the GenesisKey in the provided prefix_map is the same as our section's.
-        // If not, start afresh.
+        // // If not, start afresh.
         let network = prefix_map.map_or(NetworkPrefixMap::new(genesis_pk), |network| {
             if network.genesis_key() != genesis_pk {
                 NetworkPrefixMap::new(genesis_pk)
@@ -140,7 +140,7 @@ impl Core {
         Ok(Self {
             comm,
             node: Arc::new(RwLock::new(node)),
-            network_knowledge: section,
+            network_knowledge,
             network,
             section_keys_provider,
             proposal_aggregator: SignatureAggregator::default(),
@@ -184,7 +184,7 @@ impl Core {
             dst = XorName::random();
         }
 
-        let matching_section = self.network.section_by_name(&dst)?;
+        let matching_section = self.network_knowledge.section_by_name(&dst)?;
 
         let message = SystemMsg::AntiEntropyProbe(dst);
         let section_key = matching_section.section_key();
@@ -304,19 +304,21 @@ impl Core {
             let sibling_elders = if new.prefix != old.prefix {
                 info!("{}", LogMarker::NewPrefix);
 
-                self.network.get(&new.prefix.sibling()).map(|sec_auth| {
-                    let current: BTreeSet<_> = sec_auth.names();
-                    let added = current.difference(&old.elders).copied().collect();
-                    let removed = old.elders.difference(&current).copied().collect();
-                    let remaining = old.elders.intersection(&current).copied().collect();
-                    Elders {
-                        prefix: new.prefix.sibling(),
-                        key: sec_auth.section_key(),
-                        remaining,
-                        added,
-                        removed,
-                    }
-                })
+                self.network_knowledge
+                    .get_sap(&new.prefix.sibling())
+                    .map(|sec_auth| {
+                        let current: BTreeSet<_> = sec_auth.names();
+                        let added = current.difference(&old.elders).copied().collect();
+                        let removed = old.elders.difference(&current).copied().collect();
+                        let remaining = old.elders.intersection(&current).copied().collect();
+                        Elders {
+                            prefix: new.prefix.sibling(),
+                            key: sec_auth.section_key(),
+                            remaining,
+                            added,
+                            removed,
+                        }
+                    })
             } else {
                 None
             };
@@ -351,7 +353,7 @@ impl Core {
     pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
         if self.network_knowledge.prefix().await.matches(name) {
             self.network_knowledge.section_key().await
-        } else if let Ok(sap) = self.network.section_by_name(name) {
+        } else if let Ok(sap) = self.network_knowledge.section_by_name(name) {
             sap.section_key()
         } else if self
             .network_knowledge
