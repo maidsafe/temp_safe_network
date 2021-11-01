@@ -28,6 +28,7 @@ use std::net::SocketAddr;
 use xor_name::XorName;
 
 impl Core {
+    #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_update_msg(
         &self,
         section_auth: SectionAuthorityProvider,
