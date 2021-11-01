@@ -139,11 +139,18 @@ impl NetworkPrefixMap {
             }
         };
 
-        self.verify_with_chain_and_update(
+        let res = self.verify_with_chain_and_update(
             signed_section_auth,
             proof_chain,
             &SecuredLinkedList::new(section_key),
-        )
+        );
+
+        for section in self.sections.iter() {
+            let prefix = section.key();
+            trace!("Known prefix: {:?}", prefix);
+        }
+
+        res
     }
 
     /// Update our knowledge of a remote section's SAP only
@@ -223,8 +230,7 @@ impl NetworkPrefixMap {
         }
 
         // Check the SAP's key is the last key of the proof chain
-        // if !proof_chain.has_key(&signed_section_auth.value.public_key_set.public_key()) {
-        if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
+        if !proof_chain.has_key(&signed_section_auth.value.public_key_set.public_key()) {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key ({:?}, from prefix {:?}) isn't in the proof chain ending with last key ({:?})",
                 signed_section_auth.value.public_key_set.public_key(),
@@ -236,14 +242,14 @@ impl NetworkPrefixMap {
         // We can now update our knowledge of the remote section's SAP.
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
-        let _changed = self.insert(signed_section_auth);
+        let changed = self.insert(signed_section_auth);
 
         for section in self.sections.iter() {
             let prefix = section.key();
             trace!("Known prefix: {:?}", prefix);
         }
 
-        Ok(true)
+        Ok(changed)
     }
 
     /// Returns the known section public keys.

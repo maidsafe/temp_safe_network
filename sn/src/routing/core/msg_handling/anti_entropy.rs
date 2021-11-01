@@ -119,9 +119,9 @@ impl Core {
             sig: section_signed,
         };
 
-        // If it's out section, update our section details.
+        // If it's our section, update our section details.
         if self.section.prefix().await == section_auth.prefix {
-            debug!("AE-Retry received from our section, chain was updated so updating our section info");
+            debug!("AE-Retry received from our section, updating chain");
             self.section
                 .merge_chain(&signed_section_auth, proof_chain.clone())
                 .await?;
