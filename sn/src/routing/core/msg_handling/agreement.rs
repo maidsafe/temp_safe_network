@@ -270,10 +270,15 @@ impl Core {
             let prefix = section_auth.value.prefix;
             info!("New SAP agreed for {:?}: {:?}", prefix, section_auth);
 
+            let our_prefix = self.section().prefix().await;
+
             // Let's update our own Section info if the new SAP's prefix
             // matches my name, i.e. it's my section's new SAP
             if prefix.matches(&node_name) {
-                info!("Updating my section's SAP to: {:?}", &section_auth);
+                info!(
+                    "pdating my section's ({:?}) to {:?} SAP to: {:?}",
+                    our_prefix, prefix, &section_auth
+                );
                 let updated = self
                     .section
                     .update_elders(section_auth.clone(), key_sig.clone())
@@ -285,17 +290,7 @@ impl Core {
 
                 let proof_chain = self.section_chain().await;
 
-                self.section
-                    .merge_chain(&section_auth.clone(), proof_chain.clone())
-                    .await?;
-
-                let proof_chain = self.section_chain().await;
-
-                trace!("Section chain merged");
-
-                let network_updated = self
-                    .network
-                    .update(signed_section_auth.clone(), &proof_chain)?;
+                let network_updated = self.network.update(section_auth.clone(), &proof_chain)?;
 
                 if !network_updated {
                     warn!(
@@ -303,6 +298,8 @@ impl Core {
                         section_auth
                     );
                 }
+
+                self.write_prefix_map().await;
             } else {
                 info!("Updating my neighbour's SAP to: {:?}", &section_auth);
 
