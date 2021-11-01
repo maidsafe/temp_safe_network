@@ -43,11 +43,15 @@ impl Core {
             sig: section_signed,
         };
 
+        let our_prefix = self.section().prefix().await;
+
         // FIXME: perhaps we should update our section chain
         // only upon successful DKG round we participated on??
-        self.section
-            .merge_chain(&signed_section_auth, proof_chain.clone())
-            .await?;
+        if section_auth.prefix.is_compatible(&our_prefix) {
+            self.section
+                .merge_chain(&signed_section_auth, proof_chain.clone())
+                .await?;
+        }
 
         match self.network.verify_with_chain_and_update(
             signed_section_auth.clone(),
@@ -378,11 +382,6 @@ impl Core {
             .get_proof_chain_to_current(dst_section_pk)
         {
             Ok(proof_chain) => {
-                debug!(
-                    ">> the proof chain: len: {:?}, chain: {:?}",
-                    proof_chain.len(),
-                    proof_chain
-                );
                 info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
                 let section_signed_auth = self.section.section_signed_authority_provider().await;

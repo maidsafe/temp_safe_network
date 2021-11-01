@@ -139,11 +139,18 @@ impl NetworkPrefixMap {
             }
         };
 
-        self.verify_with_chain_and_update(
+        let res = self.verify_with_chain_and_update(
             signed_section_auth,
             proof_chain,
             &SecuredLinkedList::new(section_key),
-        )
+        );
+
+        for section in self.sections.iter() {
+            let prefix = section.key();
+            trace!("Known prefix: {:?}", prefix);
+        }
+
+        res
     }
 
     /// Update our knowledge of a remote section's SAP only

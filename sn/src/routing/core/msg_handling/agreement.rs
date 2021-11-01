@@ -294,16 +294,6 @@ impl Core {
                     );
                 }
             } else {
-                let mut section_chain_clone = self.section_chain().await.clone();
-
-                if let Err(err) = section_chain_clone.insert(
-                    &key_sig.public_key,
-                    section_auth.value.section_key(),
-                    key_sig.signature.clone(),
-                ) {
-                    error!("Error generating neighbouring section's proof_chain for knowledge update on split: {:?}", err);
-                }
-
                 // Let's update our network knowledge with new SAP even if it's of our own section.
                 // We need to generate the proof chain to connect our current chain to new SAP.
                 let mut proof_chain = old_chain.clone();
