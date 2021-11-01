@@ -186,7 +186,10 @@ impl Dispatcher {
                     Ok(outcome)
                 }
                 Err(error) => {
-                    error!("Error encountered when handling command: {:?}", error);
+                    error!(
+                        "Error encountered when handling command (cmd_id {}): {:?}",
+                        cmd_id, error
+                    );
                     trace!(
                         "{:?} {}: {:?}",
                         LogMarker::CommandHandleError,
