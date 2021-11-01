@@ -28,7 +28,9 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     relocation::{self, RelocatePayloadUtils},
-    section::{test_utils::*, ElderCandidatesUtils, NodeStateUtils, Section, SectionKeyShare},
+    section::{
+        test_utils::*, ElderCandidatesUtils, NetworkKnowledge, NodeStateUtils, SectionKeyShare,
+    },
     supermajority, Error, Event, Result as RoutingResult, SectionAuthorityProviderUtils,
     ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
@@ -495,7 +497,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     );
     let section_signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section = Section::new(*chain.root_key(), chain, section_signed_sap)?;
+    let section = NetworkKnowledge::new(*chain.root_key(), chain, section_signed_sap)?;
     let mut expected_new_elders = BTreeSet::new();
 
     for peer in section_auth.peers() {
@@ -917,7 +919,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     let section_signed_old_section_auth =
         section_signed(sk_set1.secret_key(), old_section_auth.clone())?;
-    let old_section = Section::new(pk0, chain.clone(), section_signed_old_section_auth)?;
+    let old_section = NetworkKnowledge::new(pk0, chain.clone(), section_signed_old_section_auth)?;
 
     // Create our node
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
@@ -961,7 +963,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let new_section_elders: BTreeSet<_> = new_section_auth.names();
     let section_signed_new_section_auth = section_signed(sk2, new_section_auth.clone())?;
     let proof_chain = chain.clone();
-    let new_section = Section::new(pk0, chain, section_signed_new_section_auth)?;
+    let new_section = NetworkKnowledge::new(pk0, chain, section_signed_new_section_auth)?;
 
     // Create the `Sync` message containing the new `Section`.
     let wire_msg = WireMsg::single_src(
@@ -1022,7 +1024,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     let pk0 = sk0.public_key();
 
     let section_signed_our_section_auth = section_signed(sk0, our_section_auth.clone())?;
-    let our_section = Section::new(
+    let our_section = NetworkKnowledge::new(
         pk0,
         SecuredLinkedList::new(pk0),
         section_signed_our_section_auth.clone(),
@@ -1606,11 +1608,12 @@ fn create_section_key_share(sk_set: &bls::SecretKeySet, index: usize) -> Section
 async fn create_section(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
-) -> Result<(Section, SectionKeyShare)> {
+) -> Result<(NetworkKnowledge, SectionKeyShare)> {
     let section_chain = SecuredLinkedList::new(sk_set.public_keys().public_key());
     let section_signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section = Section::new(*section_chain.root_key(), section_chain, section_signed_sap)?;
+    let section =
+        NetworkKnowledge::new(*section_chain.root_key(), section_chain, section_signed_sap)?;
 
     for peer in section_auth.peers() {
         let mut peer = peer;

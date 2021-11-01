@@ -44,7 +44,7 @@ use crate::routing::{
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{Section, SectionKeyShare, SectionKeysProvider},
+    section::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
 use crate::types::utils::write_data_to_disk;
@@ -77,7 +77,7 @@ pub(crate) type AeBackoffCache =
 pub(crate) struct Core {
     pub(crate) comm: Comm,
     pub(crate) node: Arc<RwLock<Node>>,
-    section: Section,
+    network_knowledge: NetworkKnowledge,
     network: NetworkPrefixMap,
     pub(crate) section_keys_provider: SectionKeysProvider,
     message_aggregator: SignatureAggregator,
@@ -105,7 +105,7 @@ impl Core {
     pub(crate) async fn new(
         comm: Comm,
         mut node: Node,
-        section: Section,
+        section: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
@@ -138,7 +138,7 @@ impl Core {
         Ok(Self {
             comm,
             node: Arc::new(RwLock::new(node)),
-            section,
+            network_knowledge: section,
             network,
             section_keys_provider,
             proposal_aggregator: SignatureAggregator::default(),
@@ -167,8 +167,8 @@ impl Core {
     pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
             is_elder: self.is_elder().await,
-            last_key: self.section.section_key().await,
-            prefix: self.section.prefix().await,
+            last_key: self.network_knowledge.section_key().await,
+            prefix: self.network_knowledge.prefix().await,
             elders: self.section().authority_provider().await.names(),
         }
     }
@@ -178,7 +178,7 @@ impl Core {
         let mut dst = XorName::random();
 
         // We don't probe ourselves
-        while self.section.prefix().await.matches(&dst) {
+        while self.network_knowledge.prefix().await.matches(&dst) {
             dst = XorName::random();
         }
 
@@ -237,7 +237,7 @@ impl Core {
                     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
                     new.prefix,
                     new.last_key,
-                    self.section
+                    self.network_knowledge
                         .authority_provider()
                         .await
                         .peers()
@@ -260,10 +260,13 @@ impl Core {
             }
 
             if new.is_elder || old.is_elder {
-                commands.extend(self.send_ae_update_to_our_section(&self.section).await?);
+                commands.extend(
+                    self.send_ae_update_to_our_section(&self.network_knowledge)
+                        .await?,
+                );
             }
 
-            let current: BTreeSet<_> = self.section.authority_provider().await.names();
+            let current: BTreeSet<_> = self.network_knowledge.authority_provider().await.names();
             let added = current.difference(&old.elders).copied().collect();
             let removed = old.elders.difference(&current).copied().collect();
             let remaining = old.elders.intersection(&current).copied().collect();
@@ -336,25 +339,31 @@ impl Core {
     }
 
     pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
-        if self.section.prefix().await.matches(name) {
-            self.section.section_key().await
+        if self.network_knowledge.prefix().await.matches(name) {
+            self.network_knowledge.section_key().await
         } else if let Ok(sap) = self.network.section_by_name(name) {
             sap.section_key()
-        } else if self.section.prefix().await.sibling().matches(name) {
+        } else if self
+            .network_knowledge
+            .prefix()
+            .await
+            .sibling()
+            .matches(name)
+        {
             // For sibling with unknown key, use the previous key in our chain under the assumption
             // that it's the last key before the split and therefore the last key of theirs we know.
             // In case this assumption is not correct (because we already progressed more than one
             // key since the split) then this key would be unknown to them and they would send
             // us back their whole section chain. However, this situation should be rare.
-            *self.section.chain().await.prev_key()
+            *self.network_knowledge.chain().await.prev_key()
         } else {
-            *self.section.genesis_key()
+            *self.network_knowledge.genesis_key()
         }
     }
 
     pub(crate) async fn print_network_stats(&self) {
         self.network
-            .network_stats(&self.section.authority_provider().await)
+            .network_stats(&self.network_knowledge.authority_provider().await)
             .print();
         self.comm.print_stats();
     }

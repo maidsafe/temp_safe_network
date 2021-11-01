@@ -28,7 +28,7 @@ use bls::PublicKey as BlsPublicKey;
 impl Core {
     /// Check if we already have this peer in our section
     fn peer_is_already_a_member(&self, peer: Peer) -> bool {
-        if self.section.members().is_joined(peer.name()) {
+        if self.network_knowledge.members().is_joined(peer.name()) {
             debug!(
                 "Ignoring JoinRequest from {} - already member of our section.",
                 peer
@@ -52,7 +52,8 @@ impl Core {
             .await
             .map_err(|_| Error::PermitAcquisitionFailed)?;
 
-        let section_key_matches = join_request.section_key == self.section.section_key().await;
+        let section_key_matches =
+            join_request.section_key == self.network_knowledge.section_key().await;
 
         // Ignore `JoinRequest` if we are not elder unless the join request
         // is outdated in which case we reply with `BootstrapResponse::Join`
@@ -86,7 +87,7 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    self.section.section_key().await,
+                    self.network_knowledge.section_key().await,
                 )
                 .await?,
             ]);
@@ -97,8 +98,8 @@ impl Core {
         // During the first section, node shall use ranged age to avoid too many nodes got
         // relocated at the same time. After the first section got split, nodes shall only
         // start with age of MIN_ADULT_AGE
-        let section_members = self.section.active_members().await.len() as u8;
-        let expected_age: u8 = if self.section.prefix().await.is_empty()
+        let section_members = self.network_knowledge.active_members().await.len() as u8;
+        let expected_age: u8 = if self.network_knowledge.prefix().await.is_empty()
             && section_members < RECOMMENDED_SECTION_SIZE as u8 * 3
         {
             FIRST_SECTION_MAX_AGE - section_members * 2
@@ -106,18 +107,18 @@ impl Core {
             FIRST_SECTION_MIN_AGE
         };
 
-        if !section_key_matches || !self.section.prefix().await.matches(peer.name()) {
+        if !section_key_matches || !self.network_knowledge.prefix().await.matches(peer.name()) {
             if section_key_matches {
                 debug!(
                     "JoinRequest from {} - name doesn't match our prefix {:?}.",
                     peer,
-                    self.section.prefix().await
+                    self.network_knowledge.prefix().await
                 );
             } else {
                 debug!(
                     "JoinRequest from {} - doesn't have our latest section_key {:?}, presented {:?}.",
                     peer,
-                    self.section.section_key().await,
+                    self.network_knowledge.section_key().await,
                     join_request.section_key
                 );
             }
@@ -135,7 +136,7 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    self.section.section_key().await,
+                    self.network_knowledge.section_key().await,
                 )
                 .await?,
             ]);
@@ -143,7 +144,7 @@ impl Core {
 
         if peer.age() != expected_age {
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                section_auth: self.section.authority_provider().await,
+                section_auth: self.network_knowledge.authority_provider().await,
                 expected_age,
             }));
             trace!("{}", LogMarker::SendJoinRetryFirstSectionAgeIssue);
@@ -158,7 +159,7 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    self.section.section_key().await,
+                    self.network_knowledge.section_key().await,
                 )
                 .await?,
             ]);
@@ -189,7 +190,7 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    self.section.section_key().await,
+                    self.network_knowledge.section_key().await,
                 )
                 .await?
             } else {
@@ -224,7 +225,7 @@ impl Core {
                 ))
             } else {
                 SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                    self.section.authority_provider().await,
+                    self.network_knowledge.authority_provider().await,
                 )))
             };
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
@@ -234,23 +235,23 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    self.section.section_key().await,
+                    self.network_knowledge.section_key().await,
                 )
                 .await?,
             ]);
         };
 
-        if !self.section.prefix().await.matches(peer.name())
-            || join_request.section_key != self.section.section_key().await
+        if !self.network_knowledge.prefix().await.matches(peer.name())
+            || join_request.section_key != self.network_knowledge.section_key().await
         {
             debug!(
                 "JoinAsRelocatedRequest from {} - name doesn't match our prefix {:?}.",
                 peer,
-                self.section.prefix().await
+                self.network_knowledge.prefix().await
             );
 
             let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::Retry(self.section.authority_provider().await),
+                JoinAsRelocatedResponse::Retry(self.network_knowledge.authority_provider().await),
             ));
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
@@ -260,13 +261,13 @@ impl Core {
                 self.send_direct_message(
                     (*peer.name(), *peer.addr()),
                     node_msg,
-                    self.section.section_key().await,
+                    self.network_knowledge.section_key().await,
                 )
                 .await?,
             ]);
         }
 
-        if self.section.members().is_joined(peer.name()) {
+        if self.network_knowledge.members().is_joined(peer.name()) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - already member of our section.",
                 peer
@@ -284,13 +285,13 @@ impl Core {
 
         let details = relocate_payload.relocate_details()?;
 
-        if !self.section.prefix().await.matches(&details.dst) {
+        if !self.network_knowledge.prefix().await.matches(&details.dst) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - destination {} doesn't match \
                          our prefix {:?}.",
                 peer,
                 details.dst,
-                self.section.prefix().await
+                self.network_knowledge.prefix().await
             );
             return Ok(vec![]);
         }
@@ -330,7 +331,7 @@ impl Core {
         let dst_key = Some(details.dst_key);
 
         if self
-            .section
+            .network_knowledge
             .members()
             .is_relocated_to_our_section(&details.pub_id)
         {

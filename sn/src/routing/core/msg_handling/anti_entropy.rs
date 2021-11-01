@@ -47,7 +47,7 @@ impl Core {
         // FIXME: perhaps we should update our section chain
         // only upon successful DKG round we participated on??
         if section_auth.prefix.matches(&self.node.read().await.name()) {
-            self.section
+            self.network_knowledge
                 .merge_chain(&signed_section_auth, proof_chain.clone())
                 .await?;
         }
@@ -55,7 +55,7 @@ impl Core {
         match self.network.verify_with_chain_and_update(
             signed_section_auth.clone(),
             &proof_chain,
-            &self.section.chain().await,
+            &self.network_knowledge.chain().await,
         ) {
             Ok(updated) => {
                 if updated {
@@ -71,7 +71,7 @@ impl Core {
                 }
 
                 if let Some(peers) = members {
-                    self.section.merge_members(peers).await?;
+                    self.network_knowledge.merge_members(peers).await?;
                 }
             }
             Err(err) => {
@@ -120,7 +120,7 @@ impl Core {
         // If it's our section, update our section details.
         if section_auth.prefix.matches(&self.node.read().await.name()) {
             debug!("AE-Retry received from our section, updating chain");
-            self.section
+            self.network_knowledge
                 .merge_chain(&signed_section_auth, proof_chain.clone())
                 .await?;
         }
@@ -128,7 +128,7 @@ impl Core {
         match self.network.verify_with_chain_and_update(
             signed_section_auth.clone(),
             &proof_chain,
-            &self.section.chain().await,
+            &self.network_knowledge.chain().await,
         ) {
             Ok(updated) => {
                 if updated {
@@ -221,7 +221,10 @@ impl Core {
                 Err(_) => {
                     // In case we don't have the knowledge of that neighbour locally,
                     // let's take the Elders from the provided SAP and genesis key.
-                    (section_signed.value.elders, *self.section.genesis_key())
+                    (
+                        section_signed.value.elders,
+                        *self.network_knowledge.genesis_key(),
+                    )
                 }
             };
 
@@ -262,7 +265,11 @@ impl Core {
                 trace!("{}", LogMarker::BounceAfterNewElderNotKnownLocally);
 
                 let cmd = self
-                    .send_direct_message((*name, *addr), bounced_msg, *self.section.genesis_key())
+                    .send_direct_message(
+                        (*name, *addr),
+                        bounced_msg,
+                        *self.network_knowledge.genesis_key(),
+                    )
                     .await?;
                 Ok(vec![cmd])
             } else {
@@ -309,10 +316,10 @@ impl Core {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
 
-        let our_prefix = self.section.prefix().await;
+        let our_prefix = self.network_knowledge.prefix().await;
 
         // Let's try to find a section closer to the destination, if it's not for us.
-        if !self.section.prefix().await.matches(&dst_name) {
+        if !self.network_knowledge.prefix().await.matches(&dst_name) {
             debug!(
                 "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
                 our_prefix, dst_name
@@ -334,7 +341,7 @@ impl Core {
                         &self.node.read().await.clone(),
                         src_location.to_dst(),
                         ae_msg,
-                        self.section.section_key().await,
+                        self.network_knowledge.section_key().await,
                     )?;
                     trace!("{}", LogMarker::AeSendRedirect);
 
@@ -365,17 +372,17 @@ impl Core {
         trace!(
             "Performing AE checks, provided pk was: {:?} ours is: {:?}",
             dst_section_pk,
-            self.section.section_key().await
+            self.network_knowledge.section_key().await
         );
 
-        if dst_section_pk == &self.section.section_key().await {
+        if dst_section_pk == &self.network_knowledge.section_key().await {
             trace!("Provided Section PK matching our latest. All AE checks passed!");
             // Destination section key matches our current section key
             return Ok(None);
         }
 
         let ae_msg = match self
-            .section
+            .network_knowledge
             .chain()
             .await
             .get_proof_chain_to_current(dst_section_pk)
@@ -383,7 +390,10 @@ impl Core {
             Ok(proof_chain) => {
                 info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
-                let section_signed_auth = self.section.section_signed_authority_provider().await;
+                let section_signed_auth = self
+                    .network_knowledge
+                    .section_signed_authority_provider()
+                    .await;
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
                 let bounced_msg = original_bytes;
@@ -409,9 +419,12 @@ impl Core {
                     sender
                 );
 
-                let proof_chain = self.section.chain().await;
+                let proof_chain = self.network_knowledge.chain().await;
 
-                let section_signed_auth = self.section.section_signed_authority_provider().await;
+                let section_signed_auth = self
+                    .network_knowledge
+                    .section_signed_authority_provider()
+                    .await;
                 let section_auth = section_signed_auth.value;
                 let section_signed = section_signed_auth.sig;
                 let bounced_msg = original_bytes;
@@ -431,7 +444,7 @@ impl Core {
             &self.node.read().await.clone(),
             src_location.to_dst(),
             ae_msg,
-            self.section.section_key().await,
+            self.network_knowledge.section_key().await,
         )?;
 
         Ok(Some(Command::SendMessage {
@@ -448,7 +461,7 @@ impl Core {
         original_wire_msg: &WireMsg,
     ) -> Result<Command> {
         let section_signed_auth = self
-            .section
+            .network_knowledge
             .section_signed_authority_provider()
             .await
             .clone();
@@ -465,7 +478,7 @@ impl Core {
             &self.node.read().await.clone(),
             src_location.to_dst(),
             ae_msg,
-            self.section.section_key().await,
+            self.network_knowledge.section_key().await,
         )?;
 
         trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
@@ -483,7 +496,10 @@ impl Core {
         data_name: Option<XorName>,
     ) -> Option<SectionAuth<SectionAuthorityProvider>> {
         if let Some(data_name) = data_name {
-            let our_sap = self.section.section_signed_authority_provider().await;
+            let our_sap = self
+                .network_knowledge
+                .section_signed_authority_provider()
+                .await;
             trace!("Our SAP: {:?}", our_sap);
 
             match self.network.closest_or_opposite(&data_name) {
@@ -522,7 +538,7 @@ mod tests {
         routing_api::tests::create_comm,
         section::{
             test_utils::{gen_addr, gen_section_authority_provider},
-            Section,
+            NetworkKnowledge,
         },
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
@@ -729,7 +745,7 @@ mod tests {
             let genesis_pk = genesis_sk_set.public_keys().public_key();
             assert_eq!(genesis_pk, *chain.root_key());
 
-            let section = Section::new(genesis_pk, chain, signed_section_auth)
+            let section = NetworkKnowledge::new(genesis_pk, chain, signed_section_auth)
                 .context("failed to create section")?;
 
             let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;

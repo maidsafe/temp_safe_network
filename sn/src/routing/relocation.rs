@@ -18,14 +18,14 @@ use crate::routing::{
     ed25519::{self, Keypair, Verifier},
     error::Error,
     peer::PeerUtils,
-    section::{section_authority_provider::SectionAuthorityProviderUtils, Section},
+    section::{section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge},
 };
 use async_trait::async_trait;
 use xor_name::XorName;
 
 /// Find all nodes to relocate after a churn event and create the relocate actions for them.
 pub(crate) async fn actions(
-    section: &Section,
+    section: &NetworkKnowledge,
     network: &NetworkPrefixMap,
     churn_name: &XorName,
     churn_signature: &bls::Signature,
@@ -65,10 +65,15 @@ pub(crate) async fn actions(
 /// get once relocated.
 #[async_trait]
 pub(super) trait RelocateDetailsUtils {
-    async fn new(section: &Section, network: &NetworkPrefixMap, peer: &Peer, dst: XorName) -> Self;
+    async fn new(
+        section: &NetworkKnowledge,
+        network: &NetworkPrefixMap,
+        peer: &Peer,
+        dst: XorName,
+    ) -> Self;
 
     async fn with_age(
-        section: &Section,
+        section: &NetworkKnowledge,
         network: &NetworkPrefixMap,
         peer: &Peer,
         dst: XorName,
@@ -78,12 +83,17 @@ pub(super) trait RelocateDetailsUtils {
 
 #[async_trait]
 impl RelocateDetailsUtils for RelocateDetails {
-    async fn new(section: &Section, network: &NetworkPrefixMap, peer: &Peer, dst: XorName) -> Self {
+    async fn new(
+        section: &NetworkKnowledge,
+        network: &NetworkPrefixMap,
+        peer: &Peer,
+        dst: XorName,
+    ) -> Self {
         Self::with_age(section, network, peer, dst, peer.age().saturating_add(1)).await
     }
 
     async fn with_age(
-        section: &Section,
+        section: &NetworkKnowledge,
         network: &NetworkPrefixMap,
         peer: &Peer,
         dst: XorName,
@@ -182,7 +192,7 @@ pub(crate) enum RelocateAction {
 
 impl RelocateAction {
     pub(crate) async fn new(
-        section: &Section,
+        section: &NetworkKnowledge,
         network: &NetworkPrefixMap,
         peer: &Peer,
         churn_name: &XorName,
@@ -312,7 +322,8 @@ mod tests {
         );
         let section_auth = section_signed(sk, section_auth)?;
 
-        let section = Section::new(genesis_pk, SecuredLinkedList::new(genesis_pk), section_auth)?;
+        let section =
+            NetworkKnowledge::new(genesis_pk, SecuredLinkedList::new(genesis_pk), section_auth)?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);
