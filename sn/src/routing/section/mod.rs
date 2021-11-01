@@ -40,7 +40,7 @@ use xor_name::{Prefix, XorName};
 /// Container for storing information about a section.
 #[derive(Clone, Debug)]
 /// All information about a section
-pub(crate) struct Section {
+pub(crate) struct NetworkKnowledge {
     /// Network genesis key
     genesis_key: BlsPublicKey,
     /// The secured linked list of previous section keys, starting from genesis key
@@ -51,7 +51,7 @@ pub(crate) struct Section {
     section_peers: SectionPeers,
 }
 
-impl Section {
+impl NetworkKnowledge {
     /// Creates a minimal `Section` initially containing only info about our elders
     /// (`section_auth`).
     ///
@@ -131,7 +131,7 @@ impl Section {
     pub(super) async fn first_node(
         peer: Peer,
         genesis_sk_set: bls::SecretKeySet,
-    ) -> Result<(Section, SectionKeyShare)> {
+    ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
         let public_key_set = genesis_sk_set.public_keys();
         let secret_key_share = genesis_sk_set.secret_key_share(0);
         let genesis_key = public_key_set.public_key();
@@ -139,7 +139,7 @@ impl Section {
         let section_auth =
             create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
 
-        let section = Section::new(
+        let section = NetworkKnowledge::new(
             genesis_key,
             SecuredLinkedList::new(genesis_key),
             section_auth,

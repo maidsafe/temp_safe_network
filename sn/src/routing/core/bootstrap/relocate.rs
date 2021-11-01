@@ -22,7 +22,7 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    section::Section,
+    section::NetworkKnowledge,
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
@@ -125,7 +125,7 @@ impl JoiningAsRelocated {
 
                 Ok(Some(Command::HandleRelocationComplete {
                     node: self.node.clone(),
-                    section: Section::new(self.genesis_key, section_chain, section_auth)?,
+                    section: NetworkKnowledge::new(self.genesis_key, section_chain, section_auth)?,
                 }))
             }
             JoinAsRelocatedResponse::Retry(section_auth) => {

@@ -13,7 +13,7 @@ use std::collections::BTreeSet;
 impl Core {
     pub(crate) async fn fire_node_event_for_any_new_adults(&self) -> Result<()> {
         let old_adults: BTreeSet<_> = self
-            .section
+            .network_knowledge
             .live_adults()
             .await
             .iter()
@@ -23,7 +23,7 @@ impl Core {
 
         if self.is_not_elder().await {
             let current_adults: BTreeSet<_> = self
-                .section
+                .network_knowledge
                 .live_adults()
                 .await
                 .iter()

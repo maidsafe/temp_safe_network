@@ -19,7 +19,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
     peer::PeerUtils,
-    section::Section,
+    section::NetworkKnowledge,
     SectionAuthorityProviderUtils,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -43,7 +43,7 @@ pub(crate) async fn join_network(
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
     bootstrap_addr: SocketAddr,
     genesis_key: BlsPublicKey,
-) -> Result<(Node, Section)> {
+) -> Result<(Node, NetworkKnowledge)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap");
@@ -99,7 +99,7 @@ impl<'a> Join<'a> {
         self,
         bootstrap_addr: SocketAddr,
         genesis_key: BlsPublicKey,
-    ) -> Result<(Node, Section)> {
+    ) -> Result<(Node, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
         let dst_xorname = self.node.name();
         let recipients = vec![(dst_xorname, bootstrap_addr)];
@@ -111,7 +111,7 @@ impl<'a> Join<'a> {
         mut self,
         network_genesis_key: BlsPublicKey,
         mut recipients: Vec<(XorName, SocketAddr)>,
-    ) -> Result<(Node, Section)> {
+    ) -> Result<(Node, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
         // Once we are approved to join, we will make sure the SAP we receive can
@@ -167,7 +167,7 @@ impl<'a> Join<'a> {
 
                     return Ok((
                         self.node,
-                        Section::new(genesis_key, section_chain, section_auth)?,
+                        NetworkKnowledge::new(genesis_key, section_chain, section_auth)?,
                     ));
                 }
                 JoinResponse::Retry {

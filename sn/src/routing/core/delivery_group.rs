@@ -11,7 +11,7 @@ use crate::messaging::{system::Peer, DstLocation};
 use crate::routing::{
     error::{Error, Result},
     peer::PeerUtils,
-    section::Section,
+    section::NetworkKnowledge,
     supermajority, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use itertools::Itertools;
@@ -35,7 +35,7 @@ use xor_name::XorName;
 pub(crate) async fn delivery_targets(
     dst: &DstLocation,
     our_name: &XorName,
-    section: &Section,
+    section: &NetworkKnowledge,
     network: &NetworkPrefixMap,
 ) -> Result<(Vec<Peer>, usize)> {
     // Adult now having the knowledge of other adults within the own section.
@@ -70,7 +70,7 @@ pub(crate) async fn delivery_targets(
 async fn section_candidates(
     target_name: &XorName,
     our_name: &XorName,
-    section: &Section,
+    section: &NetworkKnowledge,
     network: &NetworkPrefixMap,
 ) -> Result<(Vec<Peer>, usize)> {
     let default_sap = section.authority_provider().await;
@@ -100,7 +100,7 @@ async fn section_candidates(
 async fn candidates(
     target_name: &XorName,
     our_name: &XorName,
-    section: &Section,
+    section: &NetworkKnowledge,
     network: &NetworkPrefixMap,
 ) -> Result<(Vec<Peer>, usize)> {
     // All sections we know (including our own), sorted by distance to `target_name`.
@@ -165,7 +165,11 @@ async fn candidates(
 }
 
 // Returns a `Peer` for a known node.
-fn get_peer(name: &XorName, section: &Section, network: &NetworkPrefixMap) -> Option<Peer> {
+fn get_peer(
+    name: &XorName,
+    section: &NetworkKnowledge,
+    network: &NetworkPrefixMap,
+) -> Option<Peer> {
     match section.members().get(name) {
         Some(info) => Some(info.peer),
         None => network
@@ -526,7 +530,8 @@ mod tests {
         Ok(())
     }
 
-    async fn setup_elder() -> Result<(XorName, Section, NetworkPrefixMap, bls::SecretKey)> {
+    async fn setup_elder() -> Result<(XorName, NetworkKnowledge, NetworkPrefixMap, bls::SecretKey)>
+    {
         let prefix0 = Prefix::default().pushed(false);
         let prefix1 = Prefix::default().pushed(true);
 
@@ -540,7 +545,7 @@ mod tests {
 
         let chain = SecuredLinkedList::new(genesis_pk);
 
-        let section = Section::new(genesis_pk, chain, section_auth0)?;
+        let section = NetworkKnowledge::new(genesis_pk, chain, section_auth0)?;
 
         for peer in elders0 {
             let node_state = NodeState::joined(peer, None);
@@ -577,7 +582,7 @@ mod tests {
         Ok((our_name, section, network, genesis_sk.clone()))
     }
 
-    async fn setup_adult() -> Result<(XorName, Section, NetworkPrefixMap)> {
+    async fn setup_adult() -> Result<(XorName, NetworkKnowledge, NetworkPrefixMap)> {
         let prefix0 = Prefix::default().pushed(false);
 
         let (section_auth, _, secret_key_set) = gen_section_authority_provider(prefix0, ELDER_SIZE);
@@ -585,7 +590,7 @@ mod tests {
         let genesis_pk = genesis_sk.public_key();
         let section_auth = section_signed(genesis_sk, section_auth)?;
         let chain = SecuredLinkedList::new(genesis_pk);
-        let section = Section::new(genesis_pk, chain, section_auth)?;
+        let section = NetworkKnowledge::new(genesis_pk, chain, section_auth)?;
 
         let network = NetworkPrefixMap::new(genesis_pk);
         let our_name = section.prefix().await.substituted_in(rand::random());
