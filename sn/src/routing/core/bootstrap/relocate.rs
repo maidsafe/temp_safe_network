@@ -125,7 +125,13 @@ impl JoiningAsRelocated {
 
                 Ok(Some(Command::HandleRelocationComplete {
                     node: self.node.clone(),
-                    section: NetworkKnowledge::new(self.genesis_key, section_chain, section_auth)?,
+                    // TODO: pass our existing prefixmap here?
+                    section: NetworkKnowledge::new(
+                        self.genesis_key,
+                        section_chain,
+                        section_auth,
+                        None,
+                    )?,
                 }))
             }
             JoinAsRelocatedResponse::Retry(section_auth) => {

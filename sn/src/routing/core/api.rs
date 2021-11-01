@@ -117,7 +117,7 @@ impl Core {
         if self.network_knowledge.prefix().await.matches(name) {
             Ok(self.network_knowledge.authority_provider().await)
         } else {
-            self.network.section_by_name(name)
+            self.network_knowledge.section_by_name(name)
         }
     }
 
