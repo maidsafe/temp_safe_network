@@ -198,6 +198,7 @@ impl Core {
         // the previous PK which is likely what adults know
         let previous_pk = *self.section_chain().await.prev_key();
         let node_msg = self.generate_ae_update(previous_pk, true).await?;
+
         let cmd = self
             .send_direct_message_to_nodes(
                 nodes,
@@ -210,6 +211,7 @@ impl Core {
         Ok(vec![cmd])
     }
 
+    #[instrument(skip_all)]
     pub(crate) async fn send_ae_update_to_sibling_section(
         &self,
         old: &StateSnapshot,
