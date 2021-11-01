@@ -1014,6 +1014,9 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 // Checking when we send AE info to a section from untrusted section, we do not handle it and error out
 async fn untrusted_ae_message_msg_errors() -> Result<()> {
+    crate::init_test_logger();
+    let _span = tracing::info_span!("untrusted_ae_message_msg_errors").entered();
+
     let (our_section_auth, _, sk_set0) = create_section_auth();
     let sk0 = sk_set0.secret_key();
     let pk0 = sk0.public_key();
@@ -1075,12 +1078,12 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     .await;
 
     match commands {
-        Err(Error::UntrustedProofChain(_)) => Ok(()),
+        Err(Error::InvalidSectionChain(_)) => Ok(()),
         Err(other_err) => bail!(
             "AE update handling produced unexpected error with bad AE update: {:?}",
             other_err
         ),
-        Ok(_) => bail!("AE update handling should error due to bad signing."),
+        Ok(_) => bail!("AE update handling should error due to bad proof chain."),
     }
 }
 
