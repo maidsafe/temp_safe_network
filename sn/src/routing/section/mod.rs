@@ -20,6 +20,7 @@ use crate::messaging::{
     system::{ElderCandidates, KeyedSig, NodeState, Peer, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
+use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
@@ -49,6 +50,8 @@ pub(crate) struct NetworkKnowledge {
     section_auth: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
     /// Members of the section
     section_peers: SectionPeers,
+    /// the network prefix map
+    prefix_map: NetworkPrefixMap,
 }
 
 impl NetworkKnowledge {
@@ -60,6 +63,7 @@ impl NetworkKnowledge {
         genesis_key: bls::PublicKey,
         chain: SecuredLinkedList,
         section_auth: SectionAuth<SectionAuthorityProvider>,
+        passed_prefix_map: Option<NetworkPrefixMap>,
     ) -> Result<Self, Error> {
         if genesis_key != *chain.root_key() {
             return Err(Error::UntrustedProofChain(format!(
@@ -101,12 +105,101 @@ impl NetworkKnowledge {
             )));
         }
 
+        let prefix_map =
+            passed_prefix_map.map_or(NetworkPrefixMap::new(genesis_key), |prefix_map| {
+                if prefix_map.genesis_key() != genesis_key {
+                    NetworkPrefixMap::new(genesis_key)
+                } else {
+                    prefix_map
+                }
+            });
+
         Ok(Self {
             genesis_key,
             chain: Arc::new(RwLock::new(chain)),
             section_auth: Arc::new(RwLock::new(section_auth)),
             section_peers: SectionPeers::default(),
+            prefix_map,
         })
+    }
+
+    pub(super) async fn update_knowledge_if_valid(
+        &self,
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        provided_poof_chain: SecuredLinkedList,
+        updated_members: Option<SectionPeers>,
+    ) -> Result<bool> {
+        let our_prefix = self.prefix().await;
+
+        let section_auth = signed_sap.clone().value;
+        let their_prefix = section_auth.prefix;
+
+        let mut there_was_an_update = false;
+
+        // 1. handle updates to our section
+        if their_prefix.is_compatible(&our_prefix) {
+            self.merge_chain(&signed_sap, provided_poof_chain.clone())
+                .await?;
+        }
+
+        // 2. update the network graph
+
+        let updated_prefix_map = self.prefix_map.verify_with_chain_and_update(
+            signed_sap.clone(),
+            &provided_poof_chain,
+            &self.chain().await,
+        )?;
+
+        // {
+        //     Ok(updated) => {
+        if updated_prefix_map {
+            there_was_an_update = true;
+            info!(
+                "Anti-Entropy: updated remote section SAP updated for {:?}",
+                section_auth.prefix
+            );
+        } else {
+            debug!(
+                        "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                        section_auth.prefix, section_auth
+                    );
+        }
+
+        if let Some(peers) = updated_members {
+            let changed = self.merge_members(peers).await?;
+            if changed {
+                there_was_an_update = true;
+            }
+        }
+        // }
+        // Err(err) => {
+        //     warn!(
+        //         "Anti-Entropy: Did not update remote section SAP provided by {:?}: {:?}",
+        //         sender, err
+        //     );
+        //     return Err(err);
+        // }
+        // }
+
+        Ok(there_was_an_update)
+    }
+
+    // Returns the section authority provider for the prefix that matches name, excluding self section.
+    pub(super) fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
+        self.prefix_map.section_by_name(name)
+    }
+
+    // Get SectionAuthorityProvider of a known section with the given prefix.
+    pub(super) fn get_sap(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
+        self.prefix_map.get(prefix)
+    }
+
+    // Get SectionAuthorityProvider of a known section with the given prefix.
+    pub(super) fn get_closest_or_opposite_signed_sap(
+        &self,
+        name: &XorName,
+    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
+        self.prefix_map.closest_or_opposite(name)
     }
 
     /// update all section info for our new section
@@ -143,6 +236,7 @@ impl NetworkKnowledge {
             genesis_key,
             SecuredLinkedList::new(genesis_key),
             section_auth,
+            None,
         )?;
 
         for peer in section.section_auth.read().await.value.peers() {
@@ -168,16 +262,22 @@ impl NetworkKnowledge {
     }
 
     /// Try to merge this `Section` members with `other`. .
-    pub(super) async fn merge_members(&self, peers: SectionPeers) -> Result<()> {
+    pub(super) async fn merge_members(&self, peers: SectionPeers) -> Result<bool> {
+        let mut there_was_an_update = false;
+
         for refmulti in peers.members.iter() {
             let info = refmulti.value().clone();
-            let _changed = self.update_member(info).await;
+            let changed = self.update_member(info).await;
+
+            if changed {
+                there_was_an_update = true
+            }
         }
 
         self.section_peers
             .retain(&self.section_auth.read().await.value.prefix());
 
-        Ok(())
+        Ok(there_was_an_update)
     }
 
     /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or

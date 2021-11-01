@@ -167,7 +167,7 @@ impl<'a> Join<'a> {
 
                     return Ok((
                         self.node,
-                        NetworkKnowledge::new(genesis_key, section_chain, section_auth)?,
+                        NetworkKnowledge::new(genesis_key, section_chain, section_auth, None)?,
                     ));
                 }
                 JoinResponse::Retry {
