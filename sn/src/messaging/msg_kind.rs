@@ -37,15 +37,6 @@ pub enum MsgKind {
 }
 
 impl MsgKind {
-    /// The priority of the message, when handled by lower level comms.
-    pub fn priority(&self) -> i32 {
-        match self {
-            Self::NodeBlsShareAuthMsg(_) => 1,
-            Self::NodeAuthMsg(_) => 0,
-            Self::ServiceMsg(_) => -2,
-        }
-    }
-
     /// The src location of the msg.
     pub fn src(&self) -> SrcLocation {
         match self {

@@ -137,7 +137,7 @@ impl Comm {
             wire_msg.set_dst_xorname(*name);
 
             let bytes = wire_msg.serialize()?;
-            let priority = wire_msg.msg_kind().priority();
+            let priority = wire_msg.clone().into_message()?.priority();
             let retries = self.back_pressure.get(addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
             self.endpoint
@@ -230,7 +230,7 @@ impl Comm {
         }
 
         let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
-        let priority = wire_msg.msg_kind().priority();
+        let priority = wire_msg.clone().into_message()?.priority();
 
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
@@ -399,8 +399,9 @@ pub(crate) enum SendStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messaging::data::{DataQuery, ServiceMsg};
     use crate::messaging::{DstLocation, MessageId, MsgKind, ServiceAuth};
-    use crate::types::Keypair;
+    use crate::types::{ChunkAddress, Keypair};
     use assert_matches::assert_matches;
     use eyre::Result;
     use futures::future;
@@ -656,7 +657,9 @@ mod tests {
         let mut rng = OsRng;
         let src_keypair = Keypair::new_ed25519(&mut rng);
 
-        let payload = WireMsg::serialize_msg_payload(&"test_string".to_string())?;
+        let payload = WireMsg::serialize_msg_payload(&ServiceMsg::Query(DataQuery::GetChunk(
+            ChunkAddress(XorName::random()),
+        )))?;
         let auth = ServiceAuth {
             public_key: src_keypair.public_key(),
             signature: src_keypair.sign(&payload),
