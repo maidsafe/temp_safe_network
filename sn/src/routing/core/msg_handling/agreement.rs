@@ -13,8 +13,9 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils, error::Result, peer::PeerUtils, routing_api::command::Command,
-    section::ElderCandidatesUtils, Event, SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker, peer::PeerUtils,
+    routing_api::command::Command, section::ElderCandidatesUtils, Event,
+    SectionAuthorityProviderUtils, MIN_AGE,
 };
 
 use super::Core;
@@ -52,6 +53,7 @@ impl Core {
         new_info: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
+        debug!("{}", LogMarker::AgreementOfOnline);
         let mut commands = vec![];
         if let Some(old_info) = self
             .section
@@ -179,7 +181,7 @@ impl Core {
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let infos = self
                 .section
-                .promote_and_demote_elders(&self.node.name(), &BTreeSet::new())
+                .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
                 .await;
             if !infos.contains(&signed_section_auth.value.elder_candidates()) {
                 // SectionInfo out of date, ignore.
@@ -242,7 +244,7 @@ impl Core {
 
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_our_elders_agreement(
-        &mut self,
+        &self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
@@ -256,38 +258,42 @@ impl Core {
         }
 
         let snapshot = self.state_snapshot().await;
-        let old_chain = self.section.chain.read().await.clone();
+        let old_chain = self.section.chain().await;
+        let node_name = self.node.read().await.name();
 
         for (section_auth, key_sig) in updates {
-            info!("Updating elders to: {:?}", &section_auth);
-            if section_auth.value.prefix.matches(&self.node.name()) {
+            let prefix = section_auth.value.prefix;
+            info!("New SAP agreed for {:?}: {:?}", prefix, section_auth);
+
+            // Let's update our own Section info if the new SAP's prefix
+            // matches my name, i.e. it's my section's new SAP
+            if prefix.matches(&node_name) {
+                info!("Updating my section's SAP to: {:?}", &section_auth);
                 let _updated = self
                     .section
                     .update_elders(section_auth.clone(), key_sig)
                     .await;
-                if self
-                    .network
-                    .update(section_auth, &self.section_chain().await)?
-                {
-                    info!("Updated our section's state in network's NetworkPrefixMap");
-                    self.write_prefix_map().await;
-                }
             } else {
-                // Update the old chain to become the neighbour's chain.
-                if let Err(e) = self.section.chain.write().await.insert(
+                // FIXME: we shouldn't be updating our section info since it
+                // doesn't match our prefix???
+                if let Err(err) = self.section.chain.write().await.insert(
                     &key_sig.public_key,
                     section_auth.value.section_key(),
                     key_sig.signature,
                 ) {
-                    error!("Error generating neighbouring section's proof_chain for knowledge update on split: {:?}", e);
+                    error!("Error generating neighbouring section's proof_chain for knowledge update on split: {:?}", err);
                 }
+            }
 
-                info!("Updating neighbouring section's SAP");
-                if let Err(e) = self.network.update(section_auth, &old_chain) {
-                    error!("Error updating neighbouring section's details on our NetworkPrefixMap: {:?}", e);
-                } else {
-                    self.write_prefix_map().await;
+            // Let's update our network knowledge with new SAP even if it's of our own section
+            // FIXME: we are not passing the correct proof chain to update the NetworkPrefixMap
+            match self.network.update(section_auth, &old_chain) {
+                Err(e) => error!("Error updating our NetworkPrefixMap: {:?}", e),
+                Ok(true) => {
+                    info!("Updated our NetworkPrefixMap for {:?}", prefix);
+                    self.write_prefix_map().await
                 }
+                _ => {}
             }
         }
 

@@ -14,12 +14,14 @@ use crate::messaging::{
 use crate::routing::{
     dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
+    log_markers::LogMarker,
     routing_api::command::Command,
     section::SectionKeyShare,
     SectionAuthorityProviderUtils,
 };
+use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 
 impl Core {
@@ -31,7 +33,7 @@ impl Core {
         trace!("Received DkgStart for {:?}", elder_candidates);
         self.dkg_voter
             .start(
-                &self.node,
+                &self.node.read().await.clone(),
                 session_id,
                 elder_candidates,
                 *self.section_chain().await.last_key(),
@@ -45,11 +47,16 @@ impl Core {
         message: DkgMessage,
         sender: XorName,
     ) -> Result<Vec<Command>> {
-        trace!("handle DKG message {:?} from {}", message, sender);
+        trace!(
+            "{} {:?} from {}",
+            LogMarker::DkgMessageHandling,
+            message,
+            sender
+        );
 
         self.dkg_voter
             .process_message(
-                &self.node,
+                &self.node.read().await.clone(),
                 &session_id,
                 message,
                 *self.section_chain().await.last_key(),
@@ -81,11 +88,11 @@ impl Core {
             return Err(Error::InvalidSrcLocation);
         }
 
-        let generation = self.section.chain().await.main_branch_len() as u64;
+        let generation = self.section.main_chain_branch_len().await;
 
         let elder_candidates = if let Some(elder_candidates) = self
             .section
-            .promote_and_demote_elders(&self.node.name(), &BTreeSet::new())
+            .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
             .await
             .into_iter()
             .find(|elder_candidates| failure_set.verify(elder_candidates, generation))
@@ -128,19 +135,21 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         key_share: SectionKeyShare,
     ) -> Result<Vec<Command>> {
+        trace!(
+            "{} public_key={:?}",
+            LogMarker::HandlingDkgSuccessfulOutcome,
+            key_share.public_key_set.public_key()
+        );
+
+        // Add our new keyshare to our cache, we will then use
+        // it to sign any msg that needs section agreement.
+        self.section_keys_provider.insert(key_share.clone()).await;
+
         let proposal = Proposal::SectionInfo(section_auth);
         let recipients: Vec<_> = self.section.authority_provider().await.peers();
         let result = self
             .send_proposal_with(recipients, proposal, &key_share)
             .await;
-
-        let public_key = key_share.public_key_set.public_key();
-
-        self.section_keys_provider.insert_dkg_outcome(key_share);
-
-        if self.section.chain().await.has_key(&public_key) {
-            self.section_keys_provider.finalise_dkg(&public_key).await
-        }
 
         result
     }
@@ -151,5 +160,23 @@ impl Core {
     ) -> Result<Command> {
         let node_msg = SystemMsg::DkgFailureAgreement(failure_set);
         self.send_message_to_our_elders(node_msg).await
+    }
+
+    pub(crate) async fn check_lagging(
+        &self,
+        peer: (XorName, SocketAddr),
+        public_key: &BlsPublicKey,
+    ) -> Result<Option<Command>> {
+        if self.section.has_chain_key(public_key).await
+            && public_key != &self.section.section_key().await
+        {
+            let msg = self.generate_ae_update(*public_key, true).await?;
+            trace!("{}", LogMarker::SendingAeUpdateAfterLagCheck);
+
+            let cmd = self.send_direct_message(peer, msg, *public_key).await?;
+            Ok(Some(cmd))
+        } else {
+            Ok(None)
+        }
     }
 }

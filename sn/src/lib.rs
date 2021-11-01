@@ -59,6 +59,7 @@ pub mod url;
 use tracing_core::{Event, Subscriber};
 use tracing_subscriber::{
     fmt::{
+        format::Writer,
         time::{FormatTime, SystemTime},
         FmtContext, FormatEvent, FormatFields, FormattedFields,
     },
@@ -89,7 +90,7 @@ where
     fn format_event(
         &self,
         ctx: &FmtContext<'_, S, N>,
-        writer: &mut dyn std::fmt::Write,
+        mut writer: Writer,
         event: &Event<'_>,
     ) -> std::fmt::Result {
         // Write level and target
@@ -99,7 +100,7 @@ where
         let time = SystemTime::default();
         write!(writer, " {} ", level)?;
 
-        time.format_time(writer)?;
+        time.format_time(&mut writer)?;
 
         writeln!(
             writer,
@@ -136,7 +137,7 @@ where
         })?;
 
         // Write fields on the event
-        ctx.field_format().format_fields(writer, event)?;
+        ctx.field_format().format_fields(writer.by_ref(), event)?;
 
         writeln!(writer)
     }
@@ -172,7 +173,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn split_network_assert_expected_elder_counts() -> Result<()> {
-        let split_count = search_testnet(&LogMarker::Split)?.len();
+        let split_count = search_testnet(&LogMarker::SplitSuccess)?.len();
         assert_eq!(split_count, 7);
 
         let promoted_count = search_testnet(&LogMarker::PromotedToElder)?.len();

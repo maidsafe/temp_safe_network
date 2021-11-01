@@ -16,10 +16,7 @@ mod register;
 
 pub use self::{
     cmd::DataCmd,
-    data_exchange::{
-        ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, RegisterDataExchange,
-        StorageLevel,
-    },
+    data_exchange::{ChunkDataExchange, DataExchange, RegisterDataExchange, StorageLevel},
     errors::{Error, Result},
     query::DataQuery,
     register::{RegisterCmd, RegisterRead, RegisterWrite},

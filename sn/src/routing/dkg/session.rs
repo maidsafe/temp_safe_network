@@ -174,7 +174,7 @@ impl Session {
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         if self.complete {
-            trace!("DKG check: complete");
+            trace!("{} {:?}", LogMarker::DkgSessionAlreadyCompleted, session_id);
             return Ok(vec![]);
         }
 
@@ -230,7 +230,8 @@ impl Session {
         }
 
         trace!(
-            "DKG complete for {:?}: {:?}",
+            "{} {:?}: {:?}",
+            LogMarker::DkgSessionComplete,
             self.elder_candidates,
             outcome.public_key_set.public_key()
         );

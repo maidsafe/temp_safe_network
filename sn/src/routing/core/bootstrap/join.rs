@@ -7,9 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{
-        JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, Section, SystemMsg,
-    },
+    system::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SystemMsg},
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
 use crate::routing::{
@@ -21,12 +19,12 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     node::Node,
     peer::PeerUtils,
-    SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+    section::Section,
+    SectionAuthorityProviderUtils,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
-use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
 use std::{collections::HashSet, net::SocketAddr};
 use tokio::sync::mpsc;
@@ -68,6 +66,7 @@ struct Join<'a> {
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
     prefix: Prefix,
+    backoff: ExponentialBackoff,
 }
 
 impl<'a> Join<'a> {
@@ -81,6 +80,12 @@ impl<'a> Join<'a> {
             recv_rx,
             node,
             prefix: Prefix::default(),
+            backoff: ExponentialBackoff {
+                initial_interval: Duration::from_millis(50),
+                max_interval: Duration::from_secs(3),
+                max_elapsed_time: Some(Duration::from_secs(60)),
+                ..Default::default()
+            },
         }
     }
 
@@ -121,34 +126,14 @@ impl<'a> Join<'a> {
             resource_proof_response: None,
         };
 
-        self.send_join_requests(join_request, &recipients, section_key)
+        self.send_join_requests(join_request, &recipients, section_key, false)
             .await?;
 
         // Avoid sending more than one request to the same peer.
         let mut used_recipient = HashSet::<SocketAddr>::new();
 
-        // use some backoff here as we try and join
-        let mut our_backoff = ExponentialBackoff {
-            initial_interval: Duration::from_millis(50),
-            max_interval: Duration::from_secs(1),
-            max_elapsed_time: Some(Duration::from_secs(20)),
-            ..Default::default()
-        };
-
-        let mut has_started = false;
         loop {
             used_recipient.extend(recipients.iter().map(|(_, addr)| addr));
-
-            if has_started {
-                // use exponential backoff here to delay our responses and avoid any intensive join reqs
-                let next_wait = our_backoff.next_backoff();
-
-                if let Some(wait) = next_wait {
-                    tokio::time::sleep(wait).await;
-                }
-            } else {
-                has_started = true;
-            }
 
             let (response, sender, src_name) = self.receive_join_response().await?;
 
@@ -185,7 +170,10 @@ impl<'a> Join<'a> {
                         Section::new(genesis_key, section_chain, section_auth)?,
                     ));
                 }
-                JoinResponse::Retry(section_auth) => {
+                JoinResponse::Retry {
+                    section_auth,
+                    expected_age,
+                } => {
                     let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
                         .elders
                         .iter()
@@ -194,7 +182,7 @@ impl<'a> Join<'a> {
 
                     let prefix = section_auth.prefix;
 
-                    // For the first section, using age random among 6 to 100 to avoid
+                    // For the first section, using a stepoped age decreased from 100 to avoid
                     // relocating too many nodes at the same time.
                     // To avoid recursive due to received outdated SAP, self prefix shall be default
                     // as well when re-generate for a new age.
@@ -205,28 +193,16 @@ impl<'a> Join<'a> {
                         self.node.age(),
                         section_auth
                     );
-                    if prefix.is_empty()
-                        && self.prefix.is_empty()
-                        && self.node.age() < FIRST_SECTION_MIN_AGE
-                    {
-                        let age: u8 = (FIRST_SECTION_MIN_AGE..FIRST_SECTION_MAX_AGE)
-                            .choose(&mut rand::thread_rng())
-                            .unwrap_or(FIRST_SECTION_MAX_AGE);
-
-                        let new_keypair =
-                            ed25519::gen_keypair(&Prefix::default().range_inclusive(), age);
-                        let new_name = ed25519::name(&new_keypair.public);
-
-                        info!("Setting Node name to {}", new_name);
-                        self.node = Node::new(new_keypair, self.node.addr);
-                    }
 
                     if prefix.matches(&self.node.name()) {
                         self.prefix = prefix;
-                        // After section split, new node must join with the age of MIN_ADULT_AGE.
-                        if !prefix.is_empty() && self.node.age() != MIN_ADULT_AGE {
-                            let new_keypair =
-                                ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE);
+
+                        // make sure our joining age is the expected by the network
+                        if self.node.age() != expected_age {
+                            let new_keypair = ed25519::gen_keypair(
+                                &Prefix::default().range_inclusive(),
+                                expected_age,
+                            );
                             let new_name = ed25519::name(&new_keypair.public);
 
                             info!("Setting Node name to {}", new_name);
@@ -246,7 +222,7 @@ impl<'a> Join<'a> {
                         };
 
                         recipients = new_recipients;
-                        self.send_join_requests(join_request, &recipients, section_key)
+                        self.send_join_requests(join_request, &recipients, section_key, true)
                             .await?;
                     } else {
                         warn!(
@@ -297,7 +273,7 @@ impl<'a> Join<'a> {
 
                         recipients = new_recipients;
 
-                        self.send_join_requests(join_request, &recipients, section_key)
+                        self.send_join_requests(join_request, &recipients, section_key, true)
                             .await?;
                     } else {
                         warn!(
@@ -329,7 +305,7 @@ impl<'a> Join<'a> {
                         }),
                     };
                     let recipients = &[(src_name, sender)];
-                    self.send_join_requests(join_request, recipients, section_key)
+                    self.send_join_requests(join_request, recipients, section_key, false)
                         .await?;
                 }
             }
@@ -341,7 +317,22 @@ impl<'a> Join<'a> {
         join_request: JoinRequest,
         recipients: &[(XorName, SocketAddr)],
         section_key: BlsPublicKey,
+        should_backoff: bool,
     ) -> Result<()> {
+        if should_backoff {
+            // use exponential backoff here to delay our responses and avoid any intensive join reqs
+            let next_wait = self.backoff.next_backoff();
+
+            if let Some(wait) = next_wait {
+                tokio::time::sleep(wait).await;
+            } else {
+                error!("Waiting before attempting to join again");
+
+                tokio::time::sleep(2 * self.backoff.max_interval).await;
+                self.backoff.reset();
+            }
+        }
+
         info!("Sending {:?} to {:?}", join_request, recipients);
 
         let node_msg = SystemMsg::JoinRequest(Box::new(join_request));
@@ -413,7 +404,9 @@ impl<'a> Join<'a> {
                 | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
                     return Ok((join_response, sender, src_name));
                 }
-                JoinResponse::Retry(ref section_auth)
+                JoinResponse::Retry {
+                    ref section_auth, ..
+                }
                 | JoinResponse::Redirect(ref section_auth) => {
                     if section_auth.elders.is_empty() {
                         error!(
@@ -498,7 +491,7 @@ mod tests {
     use crate::routing::{
         dkg::test_utils::*, error::Error as RoutingError, messages::WireMsgUtils,
         section::test_utils::*, section::NodeStateUtils, SectionAuthorityProviderUtils, ELDER_SIZE,
-        MIN_ADULT_AGE, MIN_AGE,
+        MIN_ADULT_AGE,
     };
     use crate::types::PublicKey;
     use assert_matches::assert_matches;
@@ -524,9 +517,9 @@ mod tests {
         let sk = sk_set.secret_key();
         let pk = sk.public_key();
 
-        // Node in first section has to have an age higher than MIN_ADULT_AGE
+        // Node in first section has to have a stepped age,
         // Otherwise during the bootstrap process, node will change its id and age.
-        let node_age = MIN_AGE + 2;
+        let node_age = MIN_ADULT_AGE;
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), node_age),
             gen_addr(),
@@ -559,7 +552,10 @@ mod tests {
             // Send JoinResponse::Retry with section auth provider info
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(section_auth.clone()))),
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+                    section_auth: section_auth.clone(),
+                    expected_age: MIN_ADULT_AGE,
+                })),
                 &bootstrap_node,
                 section_auth.section_key(),
             )?;
@@ -608,7 +604,7 @@ mod tests {
         let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
         assert_eq!(section.authority_provider().await, section_auth);
-        assert_eq!(*section.chain().await.last_key(), pk);
+        assert_eq!(section.section_key().await, pk);
         assert_eq!(node.age(), node_age);
 
         Ok(())
@@ -889,9 +885,10 @@ mod tests {
             // Send `Retry` with bad prefix
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                    gen_section_authority_provider(bad_prefix, ELDER_SIZE).0,
-                ))),
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+                    section_auth: gen_section_authority_provider(bad_prefix, ELDER_SIZE).0,
+                    expected_age: MIN_ADULT_AGE,
+                })),
                 &bootstrap_node,
                 section_key,
             )?;
@@ -900,9 +897,10 @@ mod tests {
             // Send `Retry` with good prefix
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry(
-                    gen_section_authority_provider(good_prefix, ELDER_SIZE).0,
-                ))),
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+                    section_auth: gen_section_authority_provider(good_prefix, ELDER_SIZE).0,
+                    expected_age: MIN_ADULT_AGE,
+                })),
                 &bootstrap_node,
                 section_key,
             )?;

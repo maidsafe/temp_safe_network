@@ -1,0 +1,1 @@
+File now requires some text because self encryption rejects 0 bytes files.

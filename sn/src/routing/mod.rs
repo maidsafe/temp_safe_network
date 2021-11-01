@@ -23,7 +23,6 @@
 // ############################################################################
 // Public API
 // ############################################################################
-pub use self::error::ProposalError;
 pub(crate) use self::{
     core::ChunkStore,
     core::RegisterStorage,

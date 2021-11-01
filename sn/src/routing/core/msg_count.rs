@@ -77,6 +77,6 @@ impl MsgCount {
     }
 
     pub(super) fn increase_outgoing(&self, recipient: SocketAddr) {
-        *self.incoming.entry(recipient).or_insert(0) += 1;
+        *self.outgoing.entry(recipient).or_insert(0) += 1;
     }
 }

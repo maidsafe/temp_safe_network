@@ -138,11 +138,11 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let msg_id = MessageId::new();
 
-        let section_pk = *self.section().chain().await.last_key();
+        let section_pk = self.section().section_key().await;
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
 
-        let auth = NodeAuth::authorize(section_pk, &self.node().keypair, &payload);
+        let auth = NodeAuth::authorize(section_pk, &self.node.read().await.keypair, &payload);
         let msg_kind = MsgKind::NodeAuthMsg(auth.into_inner());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
@@ -170,7 +170,7 @@ impl Core {
         };
 
         // Setup node authority on this response and send this back to our elders
-        let section_pk = *self.section().chain().await.last_key();
+        let section_pk = self.section().section_key().await;
         let dst = DstLocation::Node {
             name: requesting_elder,
             section_pk,

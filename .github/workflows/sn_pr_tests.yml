@@ -117,77 +117,85 @@ jobs:
           key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
 
       - name: Build all safe_network targets
-        run: cargo build --all-targets --release --features=always-joinable,test-utils
+        run: cd sn && cargo build --all-targets --release --features=always-joinable,test-utils
 
       - name: Run Data Types tests
         if: steps.data_types_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- types
+        timeout-minutes: 5
 
       - name: Run DBs tests
         if: steps.dbs_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- dbs
+        timeout-minutes: 5
 
       - name: Run PrefixMap tests
         if: steps.prefix_map_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- prefix_map
+        timeout-minutes: 5
 
       - name: Run URL tests
         if: steps.url_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- url
+        timeout-minutes: 5
 
       - name: Run Messaging tests
         if: steps.messaging_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- messaging
+        timeout-minutes: 5
 
       - name: Run Node tests
         if: steps.node_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- node
+        timeout-minutes: 5
 
       - name: Run Routing tests
         if: steps.routing_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
+        timeout-minutes: 5
 
       - name: Run Doc tests
         if: steps.node_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils client --doc
+        timeout-minutes: 5
 
       - run: ./target/release/testnet
         env:
-          NODE_COUNT: 43
+          NODE_COUNT: 11
 
-      - name: Extra wait on CI for split organisation
-        run: sleep 60
+      # - name: Extra wait on CI for split organisation
+      #   run: sleep 60
 
-      - name: Was there a section split?
-        run: ./resources/scripts/has_split.sh
-        id: split-check-1
-        continue-on-error: true
+      # - name: Was there a section split?
+      #   run: ./resources/scripts/has_split.sh
+      #   id: split-check-1
+      #   continue-on-error: true
 
-      - name: Kill Section if no split (unix)
-        if: matrix.os != 'windows-latest' && steps.split-check-1.outcome == 'failure'
-        run: |
-          killall sn_node
-          rm -rf ~/.safe/node
+      # - name: Kill Section if no split (unix)
+      #   if: matrix.os != 'windows-latest' && steps.split-check-1.outcome == 'failure'
+      #   run: |
+      #     killall sn_node
+      #     rm -rf ~/.safe/node
 
-      - name: Kill section if no split (win)
-        if: matrix.os == 'windows-latest' && steps.split-check-1.outcome == 'failure'
-        shell: cmd
-        run: |
-          taskkill /IM sn_node.exe /F
-          rd /s /q %USERPROFILE%\.safe\node
+      # - name: Kill section if no split (win)
+      #   if: matrix.os == 'windows-latest' && steps.split-check-1.outcome == 'failure'
+      #   shell: cmd
+      #   run: |
+      #     taskkill /IM sn_node.exe /F
+      #     rd /s /q %USERPROFILE%\.safe\node
 
-      - name: Restart Section if no split
-        if: steps.split-check-1.outcome == 'failure'
-        run: ./target/release/testnet
-        env:
-          NODE_COUNT: 43
+      # - name: Restart Section if no split
+      #   if: steps.split-check-1.outcome == 'failure'
+      #   run: ./target/release/testnet
+      #   env:
+      #     NODE_COUNT: 43
 
-      - name: Was there a section split?
-        run: ./resources/scripts/has_split.sh
-        id: split-check-2
+      # - name: Was there a section split?
+      #   run: ./resources/scripts/has_split.sh
+      #   id: split-check-2
 
-      - name: Extra wait on CI for split organisation
-        run: sleep 60
+      # - name: Extra wait on CI for split organisation
+      #   run: sleep 60
 
       - name: Run network asserts one by one
         shell: bash
@@ -225,19 +233,19 @@ jobs:
         run: cd sn && cargo run --release  --features=always-joinable,test-utils --example client_blob
 
 
-      - name: Kill the current network (not needed for next test)
-        if: matrix.os != 'windows-latest'
-        run: |
-          killall sn_node
-          rm -rf ~/.safe/node
-        shell: bash
+      # - name: Kill the current network (not needed for next test)
+      #   if: matrix.os != 'windows-latest'
+      #   run: |
+      #     killall sn_node
+      #     rm -rf ~/.safe/node
+      #   shell: bash
 
-      - name: Kill the current network (not needed for next test)
-        if: matrix.os == 'windows-latest'
-        run: |
-          taskkill /IM sn_node.exe /F
-          rd /s /q %USERPROFILE%\.safe\node
-        shell: cmd
+      # - name: Kill the current network (not needed for next test)
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     taskkill /IM sn_node.exe /F
+      #     rd /s /q %USERPROFILE%\.safe\node
+      #   shell: cmd
 
       # - name: Remove node dir and logs for next test
       #   if: matrix.os == 'windows-latest'

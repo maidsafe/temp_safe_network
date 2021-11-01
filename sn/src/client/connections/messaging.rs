@@ -225,7 +225,8 @@ impl Session {
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
-        let priority = wire_msg.msg_kind().priority();
+        // TODO: prevent this clone
+        let priority = wire_msg.clone().into_message()?.priority();
         let msg_bytes = wire_msg.serialize()?;
 
         // Set up response listeners
@@ -364,13 +365,6 @@ impl Session {
         }
     }
 
-    // /// This tells us if we've seen at least _one_ AE-Retry msg (and attempted to resend it + cached that)
-    // /// This can be useful to know if we're still working with _only_ genesis key knowledge
-    // #[instrument(skip_all, level = "debug")]
-    // pub(crate) async fn has_seen_ae_retry(&self) -> bool {
-
-    // }
-
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn make_contact_with_nodes(
         &self,
@@ -417,7 +411,11 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        let initial_contacts = elders_or_adults[0..NODES_TO_CONTACT_PER_STARTUP_BATCH].to_vec();
+        let initial_contacts = elders_or_adults
+            .iter()
+            .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
+            .copied()
+            .collect();
         send_message(
             self.clone(),
             initial_contacts,
@@ -499,7 +497,7 @@ pub(super) async fn send_message(
     endpoint: Endpoint<XorName>,
     msg_id: MessageId,
 ) -> Result<(), Error> {
-    let priority = wire_msg.msg_kind().priority();
+    let priority = wire_msg.clone().into_message()?.priority();
     let msg_bytes = wire_msg.serialize()?;
 
     // Send message to all Elders concurrently
