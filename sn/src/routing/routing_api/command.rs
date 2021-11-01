@@ -13,7 +13,7 @@ use crate::messaging::{
 use crate::routing::{
     node::Node,
     routing_api::Peer,
-    section::{Section, SectionKeyShare},
+    section::{NetworkKnowledge, SectionKeyShare},
     XorName,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -108,7 +108,7 @@ pub(crate) enum Command {
         /// New Node state and information
         node: Node,
         /// New section where we relocated
-        section: Section,
+        section: NetworkKnowledge,
     },
     /// Attempt to set JoinsAllowed flag.
     SetJoinsAllowed(bool),

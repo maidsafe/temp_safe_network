@@ -20,7 +20,7 @@ use crate::routing::{
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
-    section::Section,
+    section::NetworkKnowledge,
     Error, Prefix, XorName,
 };
 use crate::types::PublicKey;
@@ -476,7 +476,11 @@ impl Dispatcher {
         }
     }
 
-    async fn handle_relocation_complete(&self, new_node: Node, new_section: Section) -> Result<()> {
+    async fn handle_relocation_complete(
+        &self,
+        new_node: Node,
+        new_section: NetworkKnowledge,
+    ) -> Result<()> {
         let previous_name = self.core.node.read().await.name();
         let new_keypair = new_node.keypair.clone();
 

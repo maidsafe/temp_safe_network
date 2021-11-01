@@ -17,7 +17,7 @@ use xor_name::XorName;
 
 impl Core {
     pub(crate) async fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Command>> {
-        let name = if let Some(peer) = self.section.find_joined_member_by_addr(addr) {
+        let name = if let Some(peer) = self.network_knowledge.find_joined_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
             *peer.name()
         } else {
@@ -47,7 +47,7 @@ impl Core {
         // Don't send the `Offline` proposal to the peer being lost as that send would fail,
         // triggering a chain of further `Offline` proposals.
         let elders: Vec<_> = self
-            .section
+            .network_knowledge
             .authority_provider()
             .await
             .peers()
@@ -57,7 +57,7 @@ impl Core {
             .collect();
         let mut result: Vec<Command> = Vec::new();
         for name in names.iter() {
-            if let Some(info) = self.section.members().get(name) {
+            if let Some(info) = self.network_knowledge.members().get(name) {
                 let info = info.leave()?;
                 if let Ok(commands) = self
                     .send_proposal(elders.clone(), Proposal::Offline(info))

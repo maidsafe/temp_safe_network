@@ -33,10 +33,10 @@ impl Core {
 
         // Any other proposal than SectionInfo needs to be signed by a known section key.
         if let Proposal::SectionInfo(ref section_auth) = proposal {
-            if section_auth.prefix == self.section.prefix().await
+            if section_auth.prefix == self.network_knowledge.prefix().await
                 || section_auth
                     .prefix
-                    .is_extension_of(&self.section.prefix().await)
+                    .is_extension_of(&self.network_knowledge.prefix().await)
             {
                 // This `SectionInfo` is proposed by the DKG participants and
                 // it's signed by the new key created by the DKG so we don't
@@ -53,7 +53,7 @@ impl Core {
         } else {
             // Proposal from other section shall be ignored.
             // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
-            if !self.section.prefix().await.matches(&src_name) {
+            if !self.network_knowledge.prefix().await.matches(&src_name) {
                 trace!(
                     "Ignore proposal {:?} from other section, src_name {:?}: {:?}",
                     proposal,
@@ -65,7 +65,7 @@ impl Core {
 
             // Let's now verify the section key in the msg authority is trusted
             // based on our current knowledge of the network and sections chains.
-            if !self.section.has_chain_key(sig_share_pk).await {
+            if !self.network_knowledge.has_chain_key(sig_share_pk).await {
                 warn!(
                     "Dropped Propose msg ({:?}) with untrusted sig share from {}: {:?}",
                     msg_id, sender, proposal

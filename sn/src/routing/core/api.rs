@@ -17,7 +17,7 @@ use crate::routing::{
     log_markers::LogMarker,
     node::Node,
     routing_api::command::Command,
-    section::{NodeStateUtils, Section, SectionKeyShare},
+    section::{NetworkKnowledge, NodeStateUtils, SectionKeyShare},
     Event,
 };
 use secured_linked_list::SecuredLinkedList;
@@ -38,7 +38,8 @@ impl Core {
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
 
-        let (section, section_key_share) = Section::first_node(node.peer(), genesis_sk_set).await?;
+        let (section, section_key_share) =
+            NetworkKnowledge::first_node(node.peer(), genesis_sk_set).await?;
         Self::new(
             comm,
             node,
@@ -53,9 +54,13 @@ impl Core {
         .await
     }
 
-    pub(crate) async fn relocate(&self, mut new_node: Node, new_section: Section) -> Result<()> {
+    pub(crate) async fn relocate(
+        &self,
+        mut new_node: Node,
+        new_section: NetworkKnowledge,
+    ) -> Result<()> {
         // we first try to relocate section info.
-        self.section.relocated_to(new_section).await?;
+        self.network_knowledge.relocated_to(new_section).await?;
 
         // make sure the new Node has the correct local addr as Comm
         new_node.addr = self.comm.our_connection_info();
@@ -66,17 +71,19 @@ impl Core {
         Ok(())
     }
 
-    pub(crate) fn section(&self) -> &Section {
-        &self.section
+    pub(crate) fn section(&self) -> &NetworkKnowledge {
+        &self.network_knowledge
     }
 
     pub(crate) async fn section_chain(&self) -> SecuredLinkedList {
-        self.section.chain().await
+        self.network_knowledge.chain().await
     }
 
     /// Is this node an elder?
     pub(crate) async fn is_elder(&self) -> bool {
-        self.section.is_elder(&self.node.read().await.name()).await
+        self.network_knowledge
+            .is_elder(&self.node.read().await.name())
+            .await
     }
 
     pub(crate) async fn is_not_elder(&self) -> bool {
@@ -107,8 +114,8 @@ impl Core {
         &self,
         name: &XorName,
     ) -> Result<SectionAuthorityProvider> {
-        if self.section.prefix().await.matches(name) {
-            Ok(self.section.authority_provider().await)
+        if self.network_knowledge.prefix().await.matches(name) {
+            Ok(self.network_knowledge.authority_provider().await)
         } else {
             self.network.section_by_name(name)
         }
@@ -123,7 +130,7 @@ impl Core {
     /// Returns our key share in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub(crate) async fn key_share(&self) -> Result<SectionKeyShare> {
-        let section_key = self.section.section_key().await;
+        let section_key = self.network_knowledge.section_key().await;
         self.section_keys_provider.key_share(&section_key).await
     }
 
@@ -152,7 +159,7 @@ impl Core {
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
             &self.node.read().await.name(),
-            &self.section,
+            &self.network_knowledge,
             &self.network,
         )
         .await?;
@@ -172,7 +179,7 @@ impl Core {
         if self.is_elder().await
             && targets.len() > 1
             && dst_location.is_to_node()
-            && self.section.prefix().await.matches(&target_name)
+            && self.network_knowledge.prefix().await.matches(&target_name)
         {
             return Ok(Command::SendMessageDeliveryGroup {
                 recipients: Vec::new(),
@@ -223,7 +230,7 @@ impl Core {
 
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         for elder_candidates in self
-            .section
+            .network_knowledge
             .promote_and_demote_elders(&self.node.read().await.name(), excluded_names)
             .await
         {

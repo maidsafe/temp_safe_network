@@ -56,7 +56,7 @@ impl Core {
         debug!("{}", LogMarker::AgreementOfOnline);
         let mut commands = vec![];
         if let Some(old_info) = self
-            .section
+            .network_knowledge
             .members()
             .get_section_signed(new_info.peer.name())
         {
@@ -92,7 +92,7 @@ impl Core {
             sig,
         };
 
-        if !self.section.update_member(new_info.clone()).await {
+        if !self.network_knowledge.update_member(new_info.clone()).await {
             info!("ignore Online: {:?}", new_info.value.peer);
             return Ok(vec![]);
         }
@@ -135,7 +135,7 @@ impl Core {
         let signature = sig.signature.clone();
 
         if !self
-            .section
+            .network_knowledge
             .update_member(SectionAuth {
                 value: node_state,
                 sig,
@@ -172,10 +172,10 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let equal_or_extension = section_auth.prefix() == self.section.prefix().await
+        let equal_or_extension = section_auth.prefix() == self.network_knowledge.prefix().await
             || section_auth
                 .prefix()
-                .is_extension_of(&self.section.prefix().await);
+                .is_extension_of(&self.network_knowledge.prefix().await);
 
         if equal_or_extension {
             debug!(
@@ -185,7 +185,7 @@ impl Core {
             // Our section or sub-section
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let infos = self
-                .section
+                .network_knowledge
                 .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
                 .await;
             if !infos.contains(&signed_section_auth.value.elder_candidates()) {
@@ -204,7 +204,7 @@ impl Core {
             }
 
             for peer in peers {
-                if !self.section.is_elder(peer.name()).await {
+                if !self.network_knowledge.is_elder(peer.name()).await {
                     ae_update_recipients.push((*peer.name(), *peer.addr()));
                 }
             }
@@ -216,7 +216,7 @@ impl Core {
                     .send_direct_message_to_nodes(
                         ae_update_recipients,
                         node_msg,
-                        self.section.prefix().await.name(),
+                        self.network_knowledge.prefix().await.name(),
                         sig.public_key,
                     )
                     .await?;
@@ -254,7 +254,7 @@ impl Core {
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let updates = self.split_barrier.write().await.process(
-            &self.section.prefix().await,
+            &self.network_knowledge.prefix().await,
             signed_section_auth.clone(),
             key_sig,
         );
@@ -280,7 +280,7 @@ impl Core {
                     our_prefix, prefix, &section_auth
                 );
                 let updated = self
-                    .section
+                    .network_knowledge
                     .update_elders(section_auth.clone(), key_sig.clone())
                     .await;
 
@@ -290,7 +290,7 @@ impl Core {
 
                 let proof_chain = self.section_chain().await;
 
-                let network_updated = self.network.update(section_auth.clone(), &proof_chain)?;
+                let network_updated = self.network_knowledge.update(section_auth.clone(), &proof_chain)?;
 
                 if !network_updated {
                     warn!(
