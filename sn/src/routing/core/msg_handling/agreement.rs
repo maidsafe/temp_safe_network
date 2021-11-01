@@ -271,7 +271,7 @@ impl Core {
                 info!("Updating my section's SAP to: {:?}", &section_auth);
                 let _updated = self
                     .section
-                    .update_elders(section_auth.clone(), key_sig)
+                    .update_elders(section_auth.clone(), key_sig.clone())
                     .await;
             } else {
                 // FIXME: we shouldn't be updating our section info since it
@@ -279,21 +279,32 @@ impl Core {
                 if let Err(err) = self.section.chain.write().await.insert(
                     &key_sig.public_key,
                     section_auth.value.section_key(),
-                    key_sig.signature,
+                    key_sig.signature.clone(),
                 ) {
                     error!("Error generating neighbouring section's proof_chain for knowledge update on split: {:?}", err);
                 }
             }
 
-            // Let's update our network knowledge with new SAP even if it's of our own section
-            // FIXME: we are not passing the correct proof chain to update the NetworkPrefixMap
-            match self.network.update(section_auth, &old_chain) {
-                Err(e) => error!("Error updating our NetworkPrefixMap: {:?}", e),
-                Ok(true) => {
-                    info!("Updated our NetworkPrefixMap for {:?}", prefix);
-                    self.write_prefix_map().await
-                }
-                _ => {}
+            // Let's update our network knowledge with new SAP even if it's of our own section.
+            // We need to generate the proof chain to connect our current chain to new SAP.
+            let mut proof_chain = old_chain.clone();
+            match proof_chain.insert(
+                old_chain.last_key(),
+                section_auth.value.section_key(),
+                key_sig.signature,
+            ) {
+                Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
+                Ok(()) => match self.network.update(section_auth, &proof_chain) {
+                    Err(err) => error!(
+                        "Error updating our NetworkPrefixMap for {:?}: {:?}",
+                        prefix, err
+                    ),
+                    Ok(true) => {
+                        info!("Updated our NetworkPrefixMap for {:?}", prefix);
+                        self.write_prefix_map().await
+                    }
+                    _ => {}
+                },
             }
         }
 
