@@ -274,10 +274,14 @@ impl Core {
             // matches my name, i.e. it's my section's new SAP
             if prefix.matches(&node_name) {
                 info!("Updating my section's SAP to: {:?}", &section_auth);
-                let _updated = self
+                let updated = self
                     .section
                     .update_elders(section_auth.clone(), key_sig.clone())
                     .await;
+
+                if !updated {
+                    warn!("No elder updated happened");
+                }
 
                 let proof_chain = self.section_chain().await;
 
@@ -286,6 +290,7 @@ impl Core {
                     .await?;
 
                 let proof_chain = self.section_chain().await;
+
                 trace!("Section chain merged");
 
                 let network_updated = self

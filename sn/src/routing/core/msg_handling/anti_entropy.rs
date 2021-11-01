@@ -120,7 +120,10 @@ impl Core {
         };
 
         // If it's our section, update our section details.
-        if self.section.prefix().await == section_auth.prefix {
+        if section_auth
+            .prefix
+            .is_compatible(&self.section.prefix().await)
+        {
             debug!("AE-Retry received from our section, updating chain");
             self.section
                 .merge_chain(&signed_section_auth, proof_chain.clone())
