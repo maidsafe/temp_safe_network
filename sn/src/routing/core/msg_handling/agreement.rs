@@ -281,11 +281,16 @@ impl Core {
 
                 let proof_chain = self.section_chain().await;
 
-                let network_updated = self.network.verify_with_chain_and_update(
-                    signed_section_auth.clone(),
-                    &proof_chain,
-                    &proof_chain,
-                )?;
+                self.section
+                    .merge_chain(&section_auth.clone(), proof_chain.clone())
+                    .await?;
+
+                let proof_chain = self.section_chain().await;
+                trace!("Section chain merged");
+
+                let network_updated = self
+                    .network
+                    .update(signed_section_auth.clone(), &proof_chain)?;
 
                 if !network_updated {
                     warn!(
