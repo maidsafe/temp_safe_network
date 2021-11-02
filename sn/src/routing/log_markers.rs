@@ -13,6 +13,8 @@ use strum_macros::{Display as StrumDisplay, EnumIter, EnumString};
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, EnumIter, StrumDisplay, EnumString)]
 #[allow(missing_docs)]
 pub enum LogMarker {
+    // stats
+    TotalNetworkElders,
     // split
     SplitSuccess,
     SplitAttempt,

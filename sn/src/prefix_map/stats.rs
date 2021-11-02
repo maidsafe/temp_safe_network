@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::routing::log_markers::LogMarker;
 pub(crate) struct NetworkStats {
     pub(super) known_elders: u64,
     pub(super) total_elders: u64,
@@ -15,7 +16,11 @@ pub(crate) struct NetworkStats {
 impl NetworkStats {
     pub(crate) fn print(&self) {
         if self.total_elders_exact {
-            info!("*** Exact total network elders: {} ***", self.known_elders)
+            info!(
+                "*** Exact {}: {} ***",
+                LogMarker::TotalNetworkElders,
+                self.known_elders
+            )
         } else {
             info!(
                 "*** Known network elders: {}, Estimated total network elders: {} ***",
