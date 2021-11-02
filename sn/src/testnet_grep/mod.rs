@@ -8,14 +8,12 @@
 
 use crate::routing::log_markers::LogMarker;
 
-#[cfg(test)]
 use grep::matcher::Matcher;
 use grep::regex::RegexMatcher;
 use grep::searcher::sinks::UTF8;
 use grep::searcher::Searcher;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-#[cfg(test)]
 use std::collections::BTreeMap;
 use walkdir::WalkDir;
 
@@ -23,21 +21,15 @@ use std::string::ToString;
 
 use eyre::{bail, Error, Result};
 
-#[cfg(test)]
 use eyre::eyre;
 
-#[cfg(test)]
 use dirs_next::home_dir;
 
-#[cfg(test)]
 use strum::IntoEnumIterator;
 
 // line number and the match
-#[cfg(test)]
 pub(crate) type Matches = Vec<(u64, String)>;
-pub(crate) type MatchesWithPath = Vec<(u64, String, PathBuf)>;
 
-#[cfg(test)]
 fn get_testnet_path() -> Result<PathBuf> {
     let mut home_dirs = home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
 
@@ -47,13 +39,11 @@ fn get_testnet_path() -> Result<PathBuf> {
     Ok(home_dirs)
 }
 
-#[cfg(test)]
 // Handler for searching log state
 pub(crate) struct NetworkLogState {
     initial_logs: BTreeMap<LogMarker, usize>,
 }
 
-#[cfg(test)]
 impl NetworkLogState {
     /// Set the baseline for the log state, return a
     pub(crate) fn new() -> Result<Self> {
@@ -115,7 +105,6 @@ impl NetworkLogState {
 }
 
 /// Search the local-test-network dir for matches.
-#[cfg(test)]
 pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches, Error> {
     let the_path = get_testnet_path()?;
     let paths = [the_path];
@@ -150,14 +139,15 @@ pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches, Error> {
 
     Ok(matches)
 }
+
 /// Search the local-test-network dir for matches.
-pub fn search_logfile_get_whole_line(
-    logfile: &Path,
+pub(crate) fn search_testnet_results_per_node(
     pattern: &LogMarker,
-) -> Result<MatchesWithPath, Error> {
-    let paths = [logfile];
+) -> Result<BTreeMap<String, Matches>, Error> {
+    let the_path = get_testnet_path()?;
+    let paths = [the_path];
     let matcher = RegexMatcher::new_line_matcher(&pattern.to_string())?;
-    let mut matches: MatchesWithPath = vec![];
+    let mut matches: BTreeMap<String, Matches> = BTreeMap::default();
 
     for path in paths {
         for result in WalkDir::new(path) {
@@ -176,7 +166,26 @@ pub fn search_logfile_get_whole_line(
                 &matcher,
                 dent.path(),
                 UTF8(|lnum, line| {
-                    matches.push((lnum, line.to_string(), dent.path().to_path_buf()));
+                    // Now per node
+                    let mut node_file_path = dent.path().to_path_buf();
+
+                    // get the containing dir
+                    let _result = node_file_path.pop();
+                    let node_name = node_file_path
+                        .file_name()
+                        .expect("node dir name can be parsed")
+                        .to_str()
+                        .expect("node dir name can be parsed to str")
+                        .to_string();
+
+                    // We are guaranteed to find a match, so the unwrap is OK.
+                    let mymatch = matcher.find(line.as_bytes())?.unwrap();
+
+                    let file_matches = matches.entry(node_name).or_insert_with(Vec::new);
+
+                    // let file_matches = matches.remove(node_name).ok_or_else(vec![])?;
+                    file_matches.push((lnum, line[mymatch].to_string()));
+
                     Ok(true)
                 }),
             )?;
@@ -184,37 +193,4 @@ pub fn search_logfile_get_whole_line(
     }
 
     Ok(matches)
-}
-
-/// Search the local-test-network log file and return count
-pub fn get_count_in_logfile(logfile: &Path, pattern: &str) -> Result<usize, Error> {
-    let paths = [logfile];
-    let matcher = RegexMatcher::new_line_matcher(pattern)?;
-    let mut count: usize = 0;
-
-    for path in paths {
-        for result in WalkDir::new(path) {
-            let dent = match result {
-                Ok(dent) => dent,
-                Err(err) => {
-                    bail!(err)
-                }
-            };
-
-            if !dent.file_type().is_file() {
-                continue;
-            }
-
-            Searcher::new().search_path(
-                &matcher,
-                dent.path(),
-                UTF8(|_lnum, _line| {
-                    count += 1;
-                    Ok(true)
-                }),
-            )?;
-        }
-    }
-
-    Ok(count)
 }

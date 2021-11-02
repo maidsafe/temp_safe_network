@@ -44,8 +44,9 @@ extern crate tracing;
 pub mod client;
 mod dbs;
 
+#[cfg(test)]
 /// Helpers for analysis of testnet logs
-pub mod testnet_grep;
+mod testnet_grep;
 
 pub use dbs::UsedSpace;
 
@@ -165,22 +166,22 @@ pub fn init_test_logger() {
 #[cfg(test)]
 mod tests {
     use crate::routing::log_markers::LogMarker;
-    use crate::testnet_grep::search_testnet;
+    use crate::testnet_grep::search_testnet_results_per_node;
     use eyre::Result;
 
     // Check that with one split we have 14 elders.
     // This is intended to be run, just after split, in order to confirm splits are functioning correctly
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
-    async fn split_network_assert_expected_elder_counts() -> Result<()> {
-        let split_count = search_testnet(&LogMarker::SplitSuccess)?.len();
-        assert_eq!(split_count, 7);
-
-        let promoted_count = search_testnet(&LogMarker::PromotedToElder)?.len();
-        let demoted_count = search_testnet(&LogMarker::DemotedFromElder)?.len();
+    async fn split_network_assert_health_check() -> Result<()> {
+        let promoted_count = search_testnet_results_per_node(&LogMarker::PromotedToElder)?.len();
+        let demoted_count = search_testnet_results_per_node(&LogMarker::DemotedFromElder)?.len();
 
         let total_elders = promoted_count - demoted_count;
         assert_eq!(total_elders, 14);
+
+        let split_count = search_testnet_results_per_node(&LogMarker::SplitSuccess)?.len();
+        assert!(split_count > 7);
 
         Ok(())
     }
