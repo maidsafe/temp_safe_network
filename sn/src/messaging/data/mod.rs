@@ -164,7 +164,7 @@ impl QueryResponse {
         match self {
             GetChunk(result) => match result {
                 Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+                Err(error) => matches!(*error, ErrorMessage::ChunkNotFound(_)),
             },
             GetRegister((result, _op_id)) => match result {
                 Ok(_) => false,
