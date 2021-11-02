@@ -11,12 +11,6 @@ mod wire_msg_header;
 
 use xor_name::XorName;
 
-const DKG_MSG_PRIORITY: i32 = 3;
-const AE_MSG_PRIORITY: i32 = 2;
-const INFRASTRUCTURE_MSG_PRIORITY: i32 = 1;
-const NODE_DATA_MSG_PRIORITY: i32 = 0;
-const SERVICE_MSG_PRIORITY: i32 = -2;
-
 use crate::types::PublicKey;
 
 pub use self::wire_msg::WireMsg;
@@ -75,7 +69,7 @@ impl MessageType {
             | MessageType::System {
                 msg: SystemMsg::DkgFailureAgreement(_),
                 ..
-            } => DKG_MSG_PRIORITY,
+            } => 3,
 
             // Node messages for AE updates
             MessageType::System {
@@ -93,7 +87,7 @@ impl MessageType {
             | MessageType::System {
                 msg: SystemMsg::AntiEntropyProbe(_),
                 ..
-            } => AE_MSG_PRIORITY,
+            } => 2,
 
             MessageType::System {
                 msg: SystemMsg::BackPressure(_),
@@ -130,7 +124,7 @@ impl MessageType {
             | MessageType::System {
                 msg: SystemMsg::StartConnectivityTest(_),
                 ..
-            } => INFRASTRUCTURE_MSG_PRIORITY,
+            } => 1,
 
             // Inter-node comms related to processing client requests
             MessageType::System {
@@ -148,10 +142,10 @@ impl MessageType {
             | MessageType::System {
                 msg: SystemMsg::NodeMsgError { .. },
                 ..
-            } => NODE_DATA_MSG_PRIORITY,
+            } => 0,
 
             // Client<->node service comms
-            MessageType::Service { .. } => SERVICE_MSG_PRIORITY,
+            MessageType::Service { .. } => -2,
         }
     }
 }
