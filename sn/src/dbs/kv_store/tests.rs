@@ -33,7 +33,7 @@ struct Id(u64);
 impl ToDbKey for Id {}
 impl Key for Id {}
 
-impl Subdir for KvStore<Id, TestData> {
+impl Subdir for KvStore<TestData> {
     fn subdir() -> &'static Path {
         Path::new("test")
     }
@@ -84,7 +84,7 @@ async fn used_space_increases() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::<Id, TestData>::new(root.path(), used_space)?;
+    let db = KvStore::<TestData>::new(root.path(), used_space)?;
 
     let used_space_before = db.total_used_space().await;
 
@@ -119,7 +119,7 @@ async fn used_space_decreases() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::<Id, TestData>::new(root.path(), used_space)?;
+    let db = KvStore::<TestData>::new(root.path(), used_space)?;
 
     for (index, (data, _size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &TestData {
@@ -155,7 +155,7 @@ async fn successful_put() -> Result<()> {
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db = KvStore::<Id, TestData>::new(root.path(), used_space)?;
+    let db = KvStore::<TestData>::new(root.path(), used_space)?;
 
     for (index, (data, _size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &TestData {
@@ -301,7 +301,7 @@ async fn overwrite_value() -> Result<()> {
 async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
-    let db: KvStore<Id, TestData> = KvStore::new(root.path(), used_space)?;
+    let db: KvStore<TestData> = KvStore::new(root.path(), used_space)?;
 
     let id = Id(new_rng().gen());
     match db.get(&id) {
