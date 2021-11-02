@@ -18,7 +18,7 @@ use std::{
 use tokio::sync::RwLock;
 use tracing::info;
 
-type Db = KvStore<ChunkAddress, Chunk>;
+type Db = KvStore<Chunk>;
 
 impl Subdir for Db {
     fn subdir() -> &'static Path {

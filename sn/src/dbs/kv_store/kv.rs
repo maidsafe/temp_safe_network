@@ -11,6 +11,9 @@ use serde::{de::DeserializeOwned, Serialize};
 
 pub(crate) trait Key: ToDbKey + PartialEq + Eq + DeserializeOwned {}
 
+/// A value in a key-value store.
+///
+/// The KV-store is paramaterised by the value type, from which a key can be derived.
 pub(crate) trait Value: Serialize + DeserializeOwned {
     type Key: Key;
     fn key(&self) -> &Self::Key;

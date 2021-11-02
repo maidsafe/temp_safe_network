@@ -33,15 +33,14 @@ const DB_DIR: &str = "db";
 /// `KvStore` is a store of keys and values into a Sled db, while maintaining a maximum disk
 /// usage to restrict storage.
 #[derive(Clone, Debug)]
-pub(crate) struct KvStore<K, V> {
+pub(crate) struct KvStore<V> {
     // tracks space used.
     used_space: UsedSpace,
     db: Db,
-    _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
 
-impl<K: Key, V: Value> KvStore<K, V>
+impl<V: Value> KvStore<V>
 where
     Self: Subdir,
 {
@@ -65,13 +64,12 @@ where
         Ok(KvStore {
             used_space,
             db,
-            _k: PhantomData,
             _v: PhantomData,
         })
     }
 }
 
-impl<K: Key, V: Value + Send + Sync> KvStore<K, V> {
+impl<V: Value + Send + Sync> KvStore<V> {
     ///
     pub(crate) async fn total_used_space(&self) -> u64 {
         self.used_space.total().await
