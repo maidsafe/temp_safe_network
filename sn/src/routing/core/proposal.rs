@@ -48,7 +48,6 @@ pub(crate) struct SignableView<'a>(pub(crate) &'a Proposal);
 impl<'a> Serialize for SignableView<'a> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self.0 {
-            Proposal::Online { node_state, .. } => node_state.serialize(serializer),
             Proposal::Offline(node_state) => node_state.serialize(serializer),
             Proposal::SectionInfo(info) => info.serialize(serializer),
             Proposal::OurElders(info) => info.sig.public_key.serialize(serializer),

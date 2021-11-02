@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{read_prefix_map_from_disk, UsedRecipientSaps};
+use crate::messaging::signature_aggregator::{Error as AggregatorError, SignatureAggregator};
 use crate::messaging::{
     system::{
         JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SectionAuth,
@@ -70,6 +71,8 @@ struct Join<'a> {
     node: Node,
     prefix: Prefix,
     prefix_map: NetworkPrefixMap,
+    signature_aggregator: SignatureAggregator,
+    node_state_serialized: Option<Vec<u8>>,
     backoff: ExponentialBackoff,
 }
 
@@ -86,6 +89,8 @@ impl<'a> Join<'a> {
             node,
             prefix: Prefix::default(),
             prefix_map,
+            signature_aggregator: SignatureAggregator::new(),
+            node_state_serialized: None,
             backoff: ExponentialBackoff {
                 initial_interval: Duration::from_millis(50),
                 max_interval: Duration::from_millis(750),
@@ -134,6 +139,7 @@ impl<'a> Join<'a> {
         let join_request = JoinRequest {
             section_key,
             resource_proof_response: None,
+            aggregated: None,
         };
 
         self.send_join_requests(join_request, &recipients, section_key, false)
@@ -144,7 +150,6 @@ impl<'a> Join<'a> {
 
         loop {
             let (response, sender) = self.receive_join_response().await?;
-
             match response {
                 JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
                     error!(
@@ -191,6 +196,46 @@ impl<'a> Join<'a> {
                     )?;
 
                     return Ok((self.node, network_knowledge));
+                }
+                JoinResponse::ApprovalShare {
+                    node_state,
+                    sig_share,
+                } => {
+                    let serialized_details =
+                        if let Some(node_state_serialized) = &self.node_state_serialized {
+                            node_state_serialized.clone()
+                        } else {
+                            let node_state_serialized = bincode::serialize(&node_state)?;
+                            self.node_state_serialized = Some(node_state_serialized.clone());
+                            node_state_serialized
+                        };
+
+                    info!("Aggregating received ApprovalShare from {:?}", sender);
+                    match self
+                        .signature_aggregator
+                        .add(&serialized_details, sig_share.clone())
+                        .await
+                    {
+                        Ok(sig) => {
+                            info!("Successfully aggregated ApprovalShares for joining the network");
+
+                            let section_key = sig_share.public_key_set.public_key();
+                            let auth = SectionAuth {
+                                value: node_state,
+                                sig,
+                            };
+                            let join_req = JoinRequest {
+                                section_key,
+                                resource_proof_response: None,
+                                aggregated: Some(auth),
+                            };
+                            self.send_join_requests(join_req, &[sender], section_key, false)
+                                .await?;
+                            continue;
+                        }
+                        Err(AggregatorError::NotEnoughShares) => continue,
+                        _ => return Err(Error::FailedSignature),
+                    }
                 }
                 JoinResponse::Retry {
                     section_auth,
@@ -272,6 +317,7 @@ impl<'a> Join<'a> {
                     let join_request = JoinRequest {
                         section_key,
                         resource_proof_response: None,
+                        aggregated: None,
                     };
 
                     let new_recipients = section_auth.elders_vec();
@@ -327,6 +373,7 @@ impl<'a> Join<'a> {
                     let join_request = JoinRequest {
                         section_key,
                         resource_proof_response: None,
+                        aggregated: None,
                     };
 
                     self.send_join_requests(join_request, &new_recipients, section_key, true)
@@ -352,6 +399,7 @@ impl<'a> Join<'a> {
                             nonce,
                             nonce_signature,
                         }),
+                        aggregated: None,
                     };
                     let recipients = &[sender];
                     self.send_join_requests(join_request, recipients, section_key, false)

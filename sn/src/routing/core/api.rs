@@ -8,11 +8,15 @@
 
 use super::{delivery_group, Comm, Core};
 use crate::dbs::UsedSpace;
-use crate::messaging::{system::Proposal, WireMsg};
+use crate::messaging::system::{JoinResponse, MembershipState, SigShare, SystemMsg};
+use crate::messaging::{
+    system::{NodeState, Proposal},
+    SectionAuthorityProvider, WireMsg,
+};
 use crate::routing::{
     error::Result,
     log_markers::LogMarker,
-    network_knowledge::{NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare},
+    network_knowledge::{NetworkKnowledge, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
     Event, Peer,
@@ -232,16 +236,36 @@ impl Core {
         Ok(commands)
     }
 
-    pub(crate) async fn make_online_proposal(
+    pub(crate) async fn send_accepted_online_share(
         &self,
         peer: Peer,
         previous_name: Option<XorName>,
-        dst_key: Option<bls::PublicKey>,
     ) -> Result<Vec<Command>> {
-        self.propose(Proposal::Online {
-            node_state: NodeState::joined(peer, previous_name).to_msg(),
-            dst_key,
-        })
-        .await
+        let public_key_set = self.public_key_set().await?;
+        let section_key = public_key_set.public_key();
+
+        let node_state = NodeState {
+            name: peer.name(),
+            addr: peer.addr(),
+            state: MembershipState::Joined,
+            previous_name,
+        };
+        let serialized_details = bincode::serialize(&node_state)?;
+        let (index, signature_share) = self
+            .sign_with_section_key_share(&serialized_details, &section_key)
+            .await?;
+        let sig_share = SigShare {
+            public_key_set,
+            index,
+            signature_share,
+        };
+        let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::ApprovalShare {
+            node_state,
+            sig_share,
+        }));
+        Ok(vec![
+            self.send_direct_message(peer, node_msg, section_key)
+                .await?,
+        ])
     }
 }

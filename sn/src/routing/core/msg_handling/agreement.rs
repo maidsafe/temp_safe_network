@@ -30,10 +30,6 @@ impl Core {
     ) -> Result<Vec<Command>> {
         debug!("handle agreement on {:?}", proposal);
         match proposal {
-            Proposal::Online { node_state, .. } => {
-                self.handle_online_agreement(node_state.into_state(), sig)
-                    .await
-            }
             Proposal::Offline(node_state) => {
                 self.handle_offline_agreement(node_state.into_state(), sig)
                     .await
@@ -53,7 +49,7 @@ impl Core {
         }
     }
 
-    async fn handle_online_agreement(
+    pub(crate) async fn handle_online_agreement(
         &self,
         new_info: NodeState,
         sig: KeyedSig,
