@@ -512,7 +512,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_nrs_remove_default_soft_link() -> Result<()> {
+    async fn test_nrs_remove_default() -> Result<()> {
         let site_name = random_nrs_name();
         let mut safe = new_safe_instance().await?;
 
@@ -523,43 +523,20 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
         let mut url_v0 = Url::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
-
         let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0, false,));
         assert!(did_create);
 
+        // check it's there
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
+        let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
+        assert!(nrs_map.map.len() == 1);
 
         // remove subname
         let versionned_url = retry_loop!(safe.nrs_remove(&site_name, false));
         assert!(versionned_url.content_version().is_some());
 
-        // try to get it again
-        let (version, _) = retry_loop!(safe.files_container_get(&link));
-        assert_eq!(version, version0);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_nrs_remove_default_hard_link() -> Result<()> {
-        let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
-
-        // let's create an empty files container so we have a valid to link
-        let (link, _, _) = safe
-            .files_container_create(None, None, true, true, false)
-            .await?;
-        let (version0, _) = retry_loop!(safe.files_container_get(&link));
-        let mut url_v0 = Url::from_url(&link)?;
-        url_v0.set_content_version(Some(version0));
-
-        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0, false,));
-        assert!(did_create);
-
-        let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
-
-        // remove subname
-        let versionned_url = retry_loop!(safe.nrs_remove(&site_name, false));
-        assert!(versionned_url.content_version().is_some());
+        // check it's gone
+        let _ = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.is_empty());
 
         Ok(())
     }
