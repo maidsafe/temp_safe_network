@@ -1437,13 +1437,12 @@ async fn handle_elders_update() -> Result<()> {
 
 // Test that demoted node still sends `Sync` messages on split.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Re add the AE update checks, that messages go to the correct nodes"]
 async fn handle_demote_during_split() -> Result<()> {
     crate::init_test_logger();
     let _span = tracing::info_span!("handle_demote_during_split").entered();
 
     let node = create_node(MIN_ADULT_AGE, None);
-
+    let node_name = node.name();
     let prefix0 = Prefix::default().pushed(false);
     let prefix1 = Prefix::default().pushed(true);
 
@@ -1552,10 +1551,13 @@ async fn handle_demote_during_split() -> Result<()> {
         }
     }
 
-    // at least our whole section should get updates
-    assert!(update_recipients.len() > 7);
-
-    // TODO: ascertain why we dont get consistent recipients w/r/t sections here....
+    if prefix0.matches(&node_name) {
+        // everyone
+        assert_eq!(update_recipients.len(), 14);
+    } else {
+        // our node's whole section plus peer c
+        assert_eq!(update_recipients.len(), 8);
+    }
 
     Ok(())
 }
