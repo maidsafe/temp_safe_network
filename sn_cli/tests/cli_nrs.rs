@@ -54,7 +54,7 @@ fn calling_safe_nrs_create_pretty() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_nrs_add_with_create_y() -> Result<()> {
+fn calling_safe_nrs_add_with_y_but_name_already_exists() -> Result<()> {
     let test_name = get_random_nrs_string();
     let fake_target = gen_fake_target()?;
 
@@ -67,7 +67,7 @@ fn calling_safe_nrs_add_with_create_y() -> Result<()> {
         &test_name,
         "-l",
         &fake_target,
-        "--create-top-name",
+        "--create-top-name", // long for "-y"
         "--json",
     ])
     .assert()
@@ -81,7 +81,7 @@ fn calling_safe_nrs_add_with_create_y() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_nrs_add_without_create_y() -> Result<()> {
+fn calling_safe_nrs_with_y_but_name_doesnt_exist() -> Result<()> {
     let test_name = get_random_nrs_string();
     let fake_target = gen_fake_target()?;
 
@@ -92,7 +92,7 @@ fn calling_safe_nrs_add_without_create_y() -> Result<()> {
         &test_name,
         "-l",
         &fake_target,
-        "--create-top-name",
+        "--create-top-name", // long for "-y"
         "--json",
     ])
     .assert()
