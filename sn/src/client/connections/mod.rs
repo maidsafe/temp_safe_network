@@ -21,11 +21,11 @@ use bytes::Bytes;
 use qp2p::Endpoint;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{mpsc::Sender, RwLock};
-use xor_name::XorName;
-type QueryResponseSender = Sender<QueryResponse>;
-type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
 use tokio::time::Duration;
 use uluru::LRUCache;
+
+type QueryResponseSender = Sender<QueryResponse>;
+type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
 
 #[derive(Debug)]
 pub(crate) struct QueryResult {
@@ -41,7 +41,7 @@ pub(super) struct Session {
     // PublicKey of the client
     client_pk: PublicKey,
     // Session endpoint.
-    endpoint: Endpoint<XorName>,
+    endpoint: Endpoint,
     // Channels for sending responses to upper layers
     pending_queries: PendingQueryResponses,
     // Channels for sending errors to upper layer
