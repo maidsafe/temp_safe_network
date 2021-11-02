@@ -19,13 +19,16 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub enum NrsSubCommands {
     #[structopt(name = "add")]
-    /// Add a subname to an existing NRS name, or updates its link if it already exists
+    /// Add a subname to an existing NRS name, or update its link if it already exists
     Add {
         /// The name to add (or update if it already exists)
         name: String,
         /// The safe:// URL to map this to. Usually a FilesContainer for a website. This should be wrapped in double quotes on bash based systems.
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
+        /// Registers the topname for you if you didn't already register it with nrs create
+        #[structopt(short = "y", long = "create-top-name")]
+        create_top_name: bool,
         /// Set the link as default for the top level NRS name as well
         #[structopt(long = "default")]
         default: bool,
@@ -34,7 +37,7 @@ pub enum NrsSubCommands {
         direct_link: bool,
     },
     #[structopt(name = "create")]
-    /// Create a new public name
+    /// Create/Register a new top name
     Create {
         /// The name to give site, eg 'safenetwork'
         name: String,
@@ -68,27 +71,41 @@ pub async fn nrs_commander(
         } => {
             // TODO: Where do we store/reference these? add it to the Root container,
             // sanitize name / spacing etc., validate destination?
-            let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
+
+            // register nrs topname
+            let url = safe.nrs_create(&name, dry_run).await?;
+
+            // associate if a link is provided
+            let (new_url, link_str) = match link {
+                Some(l) => {
+                    let link_url = Url::from_url(&l)?;
+                    let new_url = safe.nrs_associate(&name, &link_url, dry_run).await?;
+                    (new_url, l)
+                },
+                None => {
+                    (url, "".to_string())
+                },
+            };
+
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
 
-            let url = Url::from_url(&link)?;
-            let url = safe.nrs_create(&name, &url, dry_run).await?;
             print_summary(
                 output_fmt,
                 &format!(
-                    "New NRS Map for \"safe://{}\" created at",
+                    "New NRS Map for \"safe://{}\" created:",
                     name.replace("safe://", "")
                 ),
-                url,
-                ("+", &name, &link),
+                new_url,
+                ("+", &name, &link_str),
             );
             Ok(())
         }
         NrsSubCommands::Add {
             name,
             link,
+            create_top_name,
             ..
             // default,
             // direct_link,
@@ -99,14 +116,22 @@ pub async fn nrs_commander(
             }
 
             let url = Url::from_url(&link)?;
-            let url = safe.nrs_associate(&name, &url, dry_run).await?;
+            let (url, did_register_topname) = match create_top_name {
+                true => safe.nrs_add(&name, &url, dry_run).await?,
+                false => (safe.nrs_associate(&name, &url, dry_run).await?, false),
+            };
             let version = url
                 .content_version()
-                .ok_or_else(|| eyre!("Content version not set for returned NRS XorUrl"))?
+                .ok_or_else(|| eyre!("Content version not set for returned NRS Url"))?
                 .to_string();
+            let msg = if did_register_topname {
+                format!("New NRS Map created (version {})", version)
+            } else {
+                format!("Existing NRS Map updated (version {})", version)
+            };
             print_summary(
                 output_fmt,
-                &format!("NRS Map updated (version {})", version),
+                &msg,
                 url,
                 ("+", &name, &link),
             );
@@ -120,7 +145,7 @@ pub async fn nrs_commander(
             let url = safe.nrs_remove(&name, dry_run).await?;
             let version = url
                 .content_version()
-                .ok_or_else(|| eyre!("Content version not set for returned NRS XorUrl"))?
+                .ok_or_else(|| eyre!("Content version not set for returned NRS Url"))?
                 .to_string();
             print_summary(
                 output_fmt,

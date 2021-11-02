@@ -54,6 +54,58 @@ fn calling_safe_nrs_create_pretty() -> Result<()> {
 }
 
 #[test]
+fn calling_safe_nrs_add_with_y_but_name_already_exists() -> Result<()> {
+    let test_name = get_random_nrs_string();
+    let fake_target = gen_fake_target()?;
+
+    safe_cmd(["nrs", "create", &test_name], Some(0))?;
+
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
+    cmd.args(&vec![
+        "nrs",
+        "add",
+        &test_name,
+        "-l",
+        &fake_target,
+        "--create-top-name", // long for "-y"
+        "--json",
+    ])
+    .assert()
+    .stdout(predicate::str::contains("Existing NRS Map updated"))
+    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(3))
+    .stdout(predicate::str::contains(fake_target).count(1))
+    .stdout(predicate::str::contains("+").count(1))
+    .success();
+
+    Ok(())
+}
+
+#[test]
+fn calling_safe_nrs_with_y_but_name_doesnt_exist() -> Result<()> {
+    let test_name = get_random_nrs_string();
+    let fake_target = gen_fake_target()?;
+
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
+    cmd.args(&vec![
+        "nrs",
+        "add",
+        &test_name,
+        "-l",
+        &fake_target,
+        "--create-top-name", // long for "-y"
+        "--json",
+    ])
+    .assert()
+    .stdout(predicate::str::contains("New NRS Map created"))
+    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(3))
+    .stdout(predicate::str::contains(fake_target).count(1))
+    .stdout(predicate::str::contains("+").count(1))
+    .success();
+
+    Ok(())
+}
+
+#[test]
 fn calling_safe_nrs_twice_w_name_fails() -> Result<()> {
     let test_name = get_random_nrs_string();
     let fake_target = gen_fake_target()?;

@@ -1877,7 +1877,7 @@ mod tests {
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(None);
         let unversioned_link = safe_url;
-        match safe.nrs_create(&nrsurl, &unversioned_link, false).await {
+        match safe.nrs_add(&nrsurl, &unversioned_link, false).await {
             Ok(_) => Err(anyhow!(
                 "NRS create was unexpectedly successful".to_string(),
             )),
@@ -1948,8 +1948,8 @@ mod tests {
         let nrsurl = random_nrs_name();
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let nrs_xorurl = retry_loop!(safe.nrs_create(&nrsurl, &safe_url, false));
-
+        let (nrs_xorurl, did_create) = retry_loop!(safe.nrs_add(&nrsurl, &safe_url, false));
+        assert!(did_create);
         let _ = retry_loop!(safe.fetch(&nrs_xorurl.to_string(), None));
 
         let (version1, _, _) = retry_loop!(safe.files_container_sync(
@@ -2272,7 +2272,8 @@ mod tests {
         let nrsurl = random_nrs_name();
         let mut safe_url = Url::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let nrs_xorurl = retry_loop!(safe.nrs_create(&nrsurl, &safe_url, false));
+        let (nrs_xorurl, did_create) = retry_loop!(safe.nrs_add(&nrsurl, &safe_url, false));
+        assert!(did_create);
         let _ = retry_loop!(safe.fetch(&nrs_xorurl.to_string(), None));
 
         let _ = retry_loop!(safe.files_container_sync(
