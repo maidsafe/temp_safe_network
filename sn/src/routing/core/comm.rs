@@ -209,7 +209,8 @@ impl Comm {
     ) -> Result<SendStatus> {
         let msg_id = wire_msg.msg_id();
         trace!(
-            "Sending message (msg_id: {:?}) to {} of {:?}",
+            "Sending message >>> {:?} <<<< (msg_id: {:?}) to {} of {:?}",
+            wire_msg,
             msg_id,
             delivery_group_size,
             recipients

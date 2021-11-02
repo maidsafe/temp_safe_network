@@ -108,8 +108,21 @@ impl Core {
         name: &XorName,
     ) -> Result<SectionAuthorityProvider> {
         if self.section.prefix().await.matches(name) {
+            info!(
+                ">>>> AAA LASTKET {:?} ==?? {:?}",
+                self.section.section_key().await,
+                self.section
+                    .authority_provider()
+                    .await
+                    .public_key_set
+                    .public_key()
+            );
             Ok(self.section.authority_provider().await)
         } else {
+            info!(
+                ">>>> AAA MMMMMMMMMMMM {:?}",
+                self.network.section_by_name(name)
+            );
             self.network.section_by_name(name)
         }
     }

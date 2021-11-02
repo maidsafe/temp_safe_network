@@ -337,7 +337,7 @@ impl Core {
         elder_candidates: ElderCandidates,
     ) -> Result<Vec<Command>> {
         let src_prefix = elder_candidates.prefix;
-        let generation = self.section.main_chain_branch_len().await;
+        let generation = self.section.chain_len().await;
         let session_id = DkgSessionId::new(&elder_candidates, generation);
 
         // Send DKG start to all candidates

@@ -257,8 +257,8 @@ impl Core {
             return Ok(vec![]);
         }
 
+        let old_chain = self.section_chain().await.clone();
         let snapshot = self.state_snapshot().await;
-        let old_chain = self.section.chain().await;
         let node_name = self.node.read().await.name();
 
         for (section_auth, key_sig) in updates {
@@ -268,32 +268,41 @@ impl Core {
             // Let's update our own Section info if the new SAP's prefix
             // matches my name, i.e. it's my section's new SAP
             if prefix.matches(&node_name) {
-                info!("Updating my section's SAP to: {:?}", &section_auth);
-                let _updated = self
+                info!(
+                    "Updating my section's ({:?}) to {:?} SAP to: {:?}",
+                    snapshot.prefix, prefix, &section_auth
+                );
+
+                let elders_updated = self
                     .section
-                    .update_elders(section_auth.clone(), key_sig)
+                    .update_elders(section_auth.clone(), key_sig.clone())
                     .await;
-            } else {
-                // FIXME: we shouldn't be updating our section info since it
-                // doesn't match our prefix???
-                if let Err(err) = self.section.chain.write().await.insert(
-                    &key_sig.public_key,
-                    section_auth.value.section_key(),
-                    key_sig.signature,
-                ) {
-                    error!("Error generating neighbouring section's proof_chain for knowledge update on split: {:?}", err);
+
+                if !elders_updated {
+                    error!("ELDERS NOT UPDATED! {:?}", section_auth);
                 }
             }
 
-            // Let's update our network knowledge with new SAP even if it's of our own section
-            // FIXME: we are not passing the correct proof chain to update the NetworkPrefixMap
-            match self.network.update(section_auth, &old_chain) {
-                Err(e) => error!("Error updating our NetworkPrefixMap: {:?}", e),
-                Ok(true) => {
-                    info!("Updated our NetworkPrefixMap for {:?}", prefix);
-                    self.write_prefix_map().await
-                }
-                _ => {}
+            // Let's update our network knowledge with new SAP even if it's of our own section.
+            // We need to generate the proof chain to connect our current chain to new SAP.
+            let mut proof_chain = old_chain.clone();
+            match proof_chain.insert(
+                old_chain.last_key(),
+                section_auth.value.section_key(),
+                key_sig.signature,
+            ) {
+                Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
+                Ok(()) => match self.network.update(section_auth, &proof_chain) {
+                    Err(err) => error!(
+                        "Error updating our NetworkPrefixMap for {:?}: {:?}",
+                        prefix, err
+                    ),
+                    Ok(true) => {
+                        info!("Updated our NetworkPrefixMap for {:?}", prefix);
+                        self.write_prefix_map().await
+                    }
+                    _ => {}
+                },
             }
         }
 

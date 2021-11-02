@@ -88,7 +88,7 @@ impl Core {
             return Err(Error::InvalidSrcLocation);
         }
 
-        let generation = self.section.main_chain_branch_len().await;
+        let generation = self.section.chain_len().await;
 
         let elder_candidates = if let Some(elder_candidates) = self
             .section

@@ -168,13 +168,15 @@ impl Section {
 
     /// Try to merge this `Section` members with `other`. .
     pub(super) async fn merge_members(&self, peers: SectionPeers) -> Result<()> {
+        let our_prefix = self.section_auth.read().await.value.prefix();
         for refmulti in peers.members.iter() {
-            let info = refmulti.value().clone();
-            let _changed = self.update_member(info).await;
+            let info = refmulti.value();
+            if our_prefix.matches(&info.value.peer.name) {
+                let _changed = self.update_member(info.clone()).await;
+            }
         }
 
-        self.section_peers
-            .retain(&self.section_auth.read().await.value.prefix());
+        self.section_peers.retain(&our_prefix);
 
         Ok(())
     }
@@ -195,24 +197,30 @@ impl Section {
         Ok(())
     }
 
-    /// Update the `SectionAuthorityProvider` of our section.
+    /// Update the `SectionAuthorityProvider` of our section,
+    /// appending the corresponding new block to our section chain.
     pub(super) async fn update_elders(
         &self,
         new_section_auth: SectionAuth<SectionAuthorityProvider>,
         new_key_sig: KeyedSig,
     ) -> bool {
+        info!("UPDATING ELDERS: {:?}", new_section_auth.value);
         let (our_prefix, section_key) = {
             let signed_sap = self.section_auth.read().await;
             (signed_sap.value.prefix, signed_sap.value.section_key())
         };
 
-        if new_section_auth.value.prefix() != our_prefix
-            && !new_section_auth.value.prefix().is_extension_of(&our_prefix)
-        {
+        let new_prefix = new_section_auth.value.prefix();
+        if new_prefix != our_prefix && !new_prefix.is_extension_of(&our_prefix) {
+            warn!(
+                "Did not update elders, this SAP prefix {:?} is not an extension of ours {:?}",
+                new_prefix, our_prefix
+            );
             return false;
         }
 
         if !new_section_auth.self_verify() {
+            error!("Invalid section authority of new SAP",);
             return false;
         }
 
@@ -222,9 +230,14 @@ impl Section {
         // Check if it's a SAP signed by current section key
         // TODO: this shall be checked by SecuredLinkedList automatically
         if section_key != signed_by_key {
+            error!(
+                "Invalid signature for key of new SAP, expected to be signed by current section key: {:?}",
+                section_key
+            );
             return false;
         }
 
+        // Append the corresponding new block into our section chain
         if let Err(error) =
             self.chain
                 .write()
@@ -239,9 +252,9 @@ impl Section {
         }
 
         // Update our section's SAP
-        let new_prefix = new_section_auth.value.prefix();
         *self.section_auth.write().await = new_section_auth;
 
+        // Remove any peer which doesn't belong to our section's prefix
         self.section_peers.retain(&new_prefix);
 
         true
@@ -268,7 +281,7 @@ impl Section {
     }
 
     /// Return current section chain length
-    pub(crate) async fn main_chain_branch_len(&self) -> u64 {
+    pub(crate) async fn chain_len(&self) -> u64 {
         self.chain.read().await.main_branch_len() as u64
     }
 
@@ -289,8 +302,8 @@ impl Section {
         self.section_auth.read().await.clone()
     }
 
-    /// Return weather we are an Elder, by checking if we are one of
-    /// the current section's SAP member,
+    /// Return weather the name provided is of an Elder, by checking if
+    /// it is one of the current section's SAP member,
     pub(super) async fn is_elder(&self, name: &XorName) -> bool {
         self.section_auth.read().await.value.contains_elder(name)
     }

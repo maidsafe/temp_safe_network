@@ -135,7 +135,7 @@ impl<'a> Join<'a> {
         loop {
             used_recipient.extend(recipients.iter().map(|(_, addr)| addr));
 
-            let (response, sender, src_name) = self.receive_join_response().await?;
+            let (response, sender, src_name, msg_id) = self.receive_join_response().await?;
 
             match response {
                 JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
@@ -187,10 +187,11 @@ impl<'a> Join<'a> {
                     // To avoid recursive due to received outdated SAP, self prefix shall be default
                     // as well when re-generate for a new age.
                     trace!(
-                        "Joining node {:?} - {:?}/{:?} received a Retry with SAP {:?}",
+                        "Joining node {:?} - {:?}/{:?} received a Retry {:?} with SAP {:?}",
                         self.prefix,
                         self.node.name(),
                         self.node.age(),
+                        msg_id,
                         section_auth
                     );
 
@@ -226,7 +227,8 @@ impl<'a> Join<'a> {
                             .await?;
                     } else {
                         warn!(
-                            "Newer Join response not for us {:?}, SAP {:?} from {:?}",
+                            "Newer Join response {:?} not for us {:?}, SAP {:?} from {:?}",
+                            msg_id,
                             self.node.name(),
                             section_auth,
                             sender,
@@ -333,7 +335,7 @@ impl<'a> Join<'a> {
             }
         }
 
-        info!("Sending {:?} to {:?}", join_request, recipients);
+        info!(">>>>>>> Sending {:?} to {:?}", join_request, recipients);
 
         let node_msg = SystemMsg::JoinRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
@@ -345,6 +347,7 @@ impl<'a> Join<'a> {
             node_msg,
             section_key,
         )?;
+        info!(">>*****>>>>> Sending {:?}", wire_msg);
 
         let _res = self.send_tx.send((wire_msg, recipients.to_vec())).await;
 
@@ -353,10 +356,17 @@ impl<'a> Join<'a> {
 
     // TODO: receive JoinResponse from the JoinResponse handler directly,
     // analogous to the JoinAsRelocated flow.
-    async fn receive_join_response(&mut self) -> Result<(JoinResponse, SocketAddr, XorName)> {
+    async fn receive_join_response(
+        &mut self,
+    ) -> Result<(
+        JoinResponse,
+        SocketAddr,
+        XorName,
+        crate::messaging::MessageId,
+    )> {
         while let Some(event) = self.recv_rx.recv().await {
             // we are interested only in `JoinResponse` type of messages
-            let (join_response, sender, src_name) = match event {
+            let (join_response, sender, src_name, msg_id) = match event {
                 ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) => continue,
@@ -372,8 +382,9 @@ impl<'a> Join<'a> {
                             Ok(MessageType::System {
                                 msg: SystemMsg::JoinResponse(resp),
                                 msg_authority,
+                                msg_id,
                                 ..
-                            }) => (*resp, sender, msg_authority.src_location().name()),
+                            }) => (*resp, sender, msg_authority.src_location().name(), msg_id),
                             Ok(
                                 MessageType::Service { msg_id, .. }
                                 | MessageType::System { msg_id, .. },
@@ -402,7 +413,7 @@ impl<'a> Join<'a> {
                 JoinResponse::ResourceChallenge { .. }
                 | JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(_))
                 | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
-                    return Ok((join_response, sender, src_name));
+                    return Ok((join_response, sender, src_name, msg_id));
                 }
                 JoinResponse::Retry {
                     ref section_auth, ..
@@ -417,7 +428,7 @@ impl<'a> Join<'a> {
                     }
                     trace!("Received a redirect/retry JoinResponse. Sending request to the latest contacts");
 
-                    return Ok((join_response, sender, src_name));
+                    return Ok((join_response, sender, src_name, msg_id));
                 }
                 JoinResponse::Approval {
                     ref section_auth,
@@ -448,7 +459,7 @@ impl<'a> Join<'a> {
                         section_auth.value.prefix,
                     );
 
-                    return Ok((join_response, sender, src_name));
+                    return Ok((join_response, sender, src_name, msg_id));
                 }
             }
         }
@@ -465,6 +476,7 @@ async fn send_messages(
     comm: &Comm,
 ) -> Result<()> {
     while let Some((wire_msg, recipients)) = rx.recv().await {
+        info!("|||||||||||||| {:?}", wire_msg);
         match comm
             .send(&recipients, recipients.len(), wire_msg.clone())
             .await
