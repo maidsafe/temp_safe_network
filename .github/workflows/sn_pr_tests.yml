@@ -221,11 +221,21 @@ jobs:
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
         timeout-minutes: 15
 
-      # blob api
-      - name: Client blob tests against local network
+      # blob api unix
+      - name: Unix client blob tests against local network
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
+        timeout-minutes: 15
+
+      # blob api win (longer timeout for now)
+      - name: Win client blob tests against local network
+        if: matrix.os == 'windows-latest'
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
         timeout-minutes: 15
+        env:
+          SN_CLIENT_QUERY_TIMEOUT: 180
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 5

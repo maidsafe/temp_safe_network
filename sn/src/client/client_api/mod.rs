@@ -15,7 +15,7 @@ mod register_apis;
 use crate::client::{
     connections::{Session, SAFE_CLIENT_DIR},
     errors::Error,
-    Config,
+    ClientConfig,
 };
 use crate::messaging::data::{CmdError, DataQuery, ServiceMsg};
 use crate::types::{ChunkAddress, Keypair, PublicKey};
@@ -61,7 +61,7 @@ impl Client {
     ///
     #[instrument(skip_all, level = "debug", name = "New client")]
     pub async fn new(
-        config: Config,
+        config: ClientConfig,
         bootstrap_nodes: BTreeSet<SocketAddr>,
         optional_keypair: Option<Keypair>,
     ) -> Result<Self, Error> {
@@ -69,7 +69,7 @@ impl Client {
     }
 
     pub(crate) async fn create_with(
-        config: Config,
+        config: ClientConfig,
         bootstrap_nodes: BTreeSet<SocketAddr>,
         optional_keypair: Option<Keypair>,
         read_prefixmap: bool,
