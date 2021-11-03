@@ -205,37 +205,6 @@ impl Dispatcher {
 
     async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
-            // Data node msg that requires no locking
-            Command::HandleNonBlockingMessage {
-                msg_id,
-                msg_authority,
-                dst_location,
-                msg,
-                sender,
-                known_keys,
-            } => {
-                self.core
-                    .handle_non_blocking_message(
-                        msg_id,
-                        msg_authority,
-                        dst_location,
-                        msg,
-                        sender,
-                        known_keys,
-                    )
-                    .await
-            }
-            // Non-data node msg that requires locking
-            Command::HandleBlockingMessage {
-                sender,
-                msg_id,
-                msg_authority,
-                msg,
-            } => {
-                self.core
-                    .handle_blocking_message(sender, msg_id, msg_authority, msg)
-                    .await
-            }
             Command::HandleSystemMessage {
                 sender,
                 msg_id,
