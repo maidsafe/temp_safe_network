@@ -60,6 +60,10 @@ struct Cmd {
     /// Interval in milliseconds between launching each of the nodes.
     #[structopt(long = "interval", default_value = DEFAULT_INTERVAL)]
     interval: u64,
+
+    /// Format logs as JSON.
+    #[structopt(long)]
+    json_logs: bool,
 }
 
 #[tokio::main]
@@ -172,6 +176,10 @@ pub async fn run_network() -> Result<()> {
 
     if adding_nodes {
         sn_launch_tool_args.push("--add")
+    }
+
+    if args.json_logs {
+        sn_launch_tool_args.push("--json-logs");
     }
 
     // If RUST_LOG was set we pass it down to the launch tool
