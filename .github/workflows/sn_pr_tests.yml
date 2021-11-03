@@ -163,9 +163,22 @@ jobs:
         env:
           NODE_COUNT: 45
 
+<<<<<<< HEAD
       - name: Wait for a healthy network
         shell: bash
         run: ./resources/scripts/network_is_ready.sh
+=======
+      - name: Extra wait on CI for section formation
+        run: sleep 120
+
+      - name: Run split health check
+        shell: bash
+        # FIXME: windows has an issue w/ locking of log files
+        if: matrix.os != 'windows-latest'
+        # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- --ignored split_network_assert_health_check && sleep 5
+        timeout-minutes: 5
+>>>>>>> 5e74c93a7a68 (chore: update health check to test for Prefix(1/0), use this in CI)
         id: split-check-1
         timeout-minutes: 5
         continue-on-error: true
@@ -189,6 +202,7 @@ jobs:
         env:
           NODE_COUNT: 45
 
+<<<<<<< HEAD
       - name: Wait for a healthy network
         shell: bash
         run: ./resources/scripts/network_is_ready.sh
@@ -196,6 +210,16 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
 
+=======
+      - name: Run split health check
+        shell: bash
+        # FIXME: windows has an issue w/ locking of log files
+        if: matrix.os != 'windows-latest'
+        # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- --ignored split_network_assert_health_check && sleep 5
+        timeout-minutes: 5
+        id: split-check-2
+>>>>>>> 5e74c93a7a68 (chore: update health check to test for Prefix(1/0), use this in CI)
 
       - name: Run network asserts one by one
         shell: bash
