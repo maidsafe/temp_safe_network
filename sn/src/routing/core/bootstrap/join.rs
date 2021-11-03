@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::read_prefix_map_from_disk;
 use crate::messaging::{
     system::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SystemMsg},
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
-use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     core::{Comm, ConnectionEvent, SendStatus},
     dkg::SectionAuthUtils,
@@ -28,7 +28,7 @@ use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof;
 use std::{collections::HashSet, net::SocketAddr};
-use tokio::{fs::File, io::AsyncReadExt, sync::mpsc, time::Duration};
+use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::{Prefix, XorName};
 
@@ -487,33 +487,6 @@ async fn send_messages(
         }
     }
     Ok(())
-}
-
-// Reads PrefixMap from '~/.safe/prefix_map' if present.
-async fn read_prefix_map_from_disk() -> Option<NetworkPrefixMap> {
-    let mut prefix_map_dir = dirs_next::home_dir()?;
-    prefix_map_dir.push(".safe");
-    prefix_map_dir.push("prefix_map");
-
-    // Read NetworkPrefixMap from disk if present
-    let prefix_map: Option<NetworkPrefixMap> =
-        if let Ok(mut prefix_map_file) = File::open(prefix_map_dir).await {
-            let mut prefix_map_contents = vec![];
-            let _ = prefix_map_file
-                .read_to_end(&mut prefix_map_contents)
-                .await
-                .ok()?;
-
-            rmp_serde::from_slice(&prefix_map_contents).ok()
-        } else {
-            None
-        };
-
-    if prefix_map.is_some() {
-        info!("Read PrefixMap from disc successfully");
-    }
-
-    prefix_map
 }
 
 #[cfg(test)]

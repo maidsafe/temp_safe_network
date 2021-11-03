@@ -29,7 +29,7 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-use secured_linked_list::SecuredLinkedList;
+//use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use xor_name::XorName;
 
@@ -108,7 +108,7 @@ impl Core {
     /// and members_info if required.
     pub(crate) async fn generate_ae_update(
         &self,
-        dst_section_key: BlsPublicKey,
+        _dst_section_key: BlsPublicKey,
         add_peer_info_to_update: bool,
     ) -> Result<SystemMsg> {
         let section_signed_auth = self
@@ -119,6 +119,8 @@ impl Core {
         let section_auth = section_signed_auth.value;
         let section_signed = section_signed_auth.sig;
 
+        let proof_chain = self.network_knowledge.chain().await;
+        /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
         let proof_chain = match self
             .network_knowledge
             .chain()
@@ -131,6 +133,7 @@ impl Core {
                 self.network_knowledge.chain().await
             }
         };
+        */
 
         let members = if add_peer_info_to_update {
             Some(self.network_knowledge.members().clone())
@@ -194,7 +197,7 @@ impl Core {
             .collect();
 
         // the PK is that of our section (as we know it; and we're ahead of our adults here)
-        let dst_section_pk = *self.section_chain().await.last_key();
+        let dst_section_pk = self.section().section_key().await;
         // the previous PK which is likely what adults know
         let previous_pk = *self.section_chain().await.prev_key();
         let node_msg = self.generate_ae_update(previous_pk, true).await?;
@@ -235,7 +238,12 @@ impl Core {
             let previous_pk = sibling_sec_auth.sig.public_key;
 
             // Compose a min sibling proof_chain.
+
+            /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
             let mut proof_chain = SecuredLinkedList::new(previous_pk);
+            */
+            let mut proof_chain = self.section().chain().await;
+
             let _ = proof_chain.insert(
                 &previous_pk,
                 sibling_sec_auth.value.section_key(),
@@ -276,7 +284,7 @@ impl Core {
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
 
-        let dst_section_pk = *self.section_chain().await.last_key();
+        let dst_section_pk = self.section().section_key().await;
         let node_msg = self.generate_ae_update(dst_section_pk, true).await?;
 
         let cmd = self
@@ -437,7 +445,7 @@ impl Core {
         }
 
         if handle {
-            wire_msg.set_dst_section_pk(*self.section_chain().await.last_key());
+            wire_msg.set_dst_section_pk(self.section().section_key().await);
             wire_msg.set_dst_xorname(self.node.read().await.name());
 
             commands.push(Command::HandleMessage {
@@ -517,7 +525,7 @@ impl Core {
             .map(|(name, address)| (*name, *address))
             .collect();
 
-        let dst_section_pk = *self.section_chain().await.last_key();
+        let dst_section_pk = self.section().section_key().await;
         let cmd = self
             .send_direct_message_to_nodes(
                 targets,

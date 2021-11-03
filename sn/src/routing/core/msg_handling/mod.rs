@@ -712,7 +712,7 @@ impl Core {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         // let name = network.our_name().await;
-        let section_pk = *self.section_chain().await.last_key();
+        let section_pk = self.section().section_key().await;
 
         let dummy_dst_location = DstLocation::Node {
             name: our_name,
