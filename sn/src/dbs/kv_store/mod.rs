@@ -95,37 +95,39 @@ impl<V: Value + Send + Sync> KvStore<V> {
     /// If there is not enough storage space available, returns `Error::NotEnoughSpace`.  In case of
     /// an IO error, it returns `Error::Io`.
     ///
-    /// If a value with the same id already exists, it will be overwritten.
+    /// If a value with the same id already exists, it will not be overwritten.
     pub(crate) async fn store(&self, value: &V) -> Result<()> {
         debug!("Writing value to KV store");
 
         let key = value.key().to_db_key()?;
-        let exists = self.db.contains_key(key.clone()).map_err(Error::from)?;
-
-        trace!(">> Does this entry exist; {:?}: {:?}", key, exists);
-
         let serialised_value = serialise(value)?.to_vec();
-        // FIXME: We're not considering overwriting here. So the space isn't necessarily all 'consumed'
-        // if we overwrite same value eg, or it's only 5 bytes longer/shorter etc
-        let consumed_space = serialised_value.len() as u64;
 
-        info!("consumed space: {:?}", consumed_space);
-        if !self.used_space.can_consume(consumed_space).await {
+        let exists = self.db.contains_key(key.clone()).map_err(Error::from)?;
+        if !exists
+            && !self
+                .used_space
+                .can_consume(serialised_value.len() as u64)
+                .await
+        {
             return Err(Error::NotEnoughSpace);
         }
 
-        let res = self.db.insert(key, serialised_value);
-
-        match res {
-            Ok(_) => {
-                info!("Writing value succeeded!");
-                Ok(())
-            }
-            Err(e) => {
-                info!("Writing value failed!");
-                Err(Error::Sled(e))
+        // Atomically write the value if it's new - this prevents multiple concurrent writes from
+        // consuming extra space (since sled is backed by a log).
+        match self
+            .db
+            .compare_and_swap::<_, &[u8], _>(key, None, Some(serialised_value))?
+        {
+            Ok(()) => debug!("Successfully wrote new value"),
+            Err(sled::CompareAndSwapError { .. }) => {
+                // We throw away the value if the compare_and_swap failed since current use-cases do
+                // not require updates. In future we may want to return the preexisting value, or
+                // have a separate API for overwriting stores.
+                debug!("Value already existed, so we didn't have to write")
             }
         }
+
+        Ok(())
     }
 
     /// Stores a batch of values.
@@ -164,6 +166,9 @@ impl<V: Value + Send + Sync> KvStore<V> {
             .flatten()
             .map(|(key, value)| {
                 let consumed_space = value.len() as u64;
+                // FIXME: this will write value redundantly if it is already set, upsetting used
+                // space calculation and wasting resources. This is quite likely to occur in
+                // practice since many operations are applied redundantly from multiple nodes.
                 batch.insert(key.as_bytes(), value);
                 consumed_space
             })
