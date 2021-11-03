@@ -259,39 +259,39 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn overwrite_value() -> Result<()> {
+async fn no_overwrite_value() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng)?;
+    let (first_chunk, remaining_chunks) = chunks
+        .data_and_sizes
+        .split_first()
+        .expect("generated empty chunks");
 
     let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
     let db = KvStore::new(root.path(), used_space)?;
 
-    let key = &Id(0);
-    let mut total_used_space = db.total_used_space().await;
+    let total_used_space = db.total_used_space().await;
 
-    for (data, size) in chunks.data_and_sizes {
+    let key = &Id(0);
+    db.store(&TestData {
+        id: *key,
+        value: first_chunk.0.clone(),
+    })
+    .await?;
+
+    while db.total_used_space().await < total_used_space + first_chunk.1 {}
+    let total_used_space = db.total_used_space().await;
+
+    for (data, _) in remaining_chunks {
         db.store(&TestData {
             id: *key,
             value: data.clone(),
         })
         .await?;
 
-        while !db.has(key)? {
-            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        }
-
-        loop {
-            let used_space = db.total_used_space().await;
-            if used_space >= size + total_used_space {
-                total_used_space += size;
-                break;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        }
-
-        let retrieved_data = db.get(key)?;
-        assert_eq!(data, retrieved_data.value);
+        assert_eq!(db.total_used_space().await, total_used_space);
+        assert_eq!(db.get(key)?.value, first_chunk.0);
     }
 
     Ok(())
