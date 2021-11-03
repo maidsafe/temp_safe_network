@@ -163,7 +163,6 @@ impl<V: Value + Send + Sync> KvStore<V> {
     }
 
     /// Lists all keys of currently stored data.
-    #[cfg_attr(not(test), allow(unused))]
     pub(crate) fn keys(&self) -> Result<Vec<V::Key>> {
         let keys = self
             .db
