@@ -99,13 +99,8 @@ async fn used_space_increases() -> Result<()> {
         assert!(db.has(&the_data.id)?);
     }
 
-    let mut used_space_after = db.total_used_space().await;
-
-    while used_space_before >= used_space_after {
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        used_space_after = db.total_used_space().await;
-    }
-
+    db.flush().await?;
+    let used_space_after = db.total_used_space().await;
     assert!(used_space_after > used_space_before);
 
     Ok(())
@@ -138,12 +133,9 @@ async fn used_space_decreases() -> Result<()> {
         db.delete(&key)?;
     }
 
-    let mut used_space_after = db.total_used_space().await;
-
-    while used_space_after >= used_space_before {
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        used_space_after = db.total_used_space().await;
-    }
+    db.flush().await?;
+    let used_space_after = db.total_used_space().await;
+    assert!(used_space_after < used_space_before);
 
     Ok(())
 }
@@ -271,7 +263,7 @@ async fn no_overwrite_value() -> Result<()> {
     let used_space = UsedSpace::new(u64::MAX);
     let db = KvStore::new(root.path(), used_space)?;
 
-    let total_used_space = db.total_used_space().await;
+    let initial_used_space = db.total_used_space().await;
 
     let key = &Id(0);
     db.store(&TestData {
@@ -279,9 +271,10 @@ async fn no_overwrite_value() -> Result<()> {
         value: first_chunk.0.clone(),
     })
     .await?;
+    db.flush().await?;
 
-    while db.total_used_space().await < total_used_space + first_chunk.1 {}
     let total_used_space = db.total_used_space().await;
+    assert!(total_used_space >= initial_used_space + first_chunk.1);
 
     for (data, _) in remaining_chunks {
         db.store(&TestData {

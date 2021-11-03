@@ -174,6 +174,14 @@ impl<V: Value + Send + Sync> KvStore<V> {
             .collect();
         Ok(keys)
     }
+
+    // We should avoid manually flushing in real code, since it can take a lot of time - tuning
+    // `flush_every_ms` would be preferrable. This is useful in tests, however.
+    #[cfg(test)]
+    pub(crate) async fn flush(&self) -> Result<()> {
+        let _bytes_flushed = self.db.flush_async().await?;
+        Ok(())
+    }
 }
 
 pub(crate) fn convert<T: DeserializeOwned>(key: sled::IVec) -> Result<T> {
