@@ -77,7 +77,6 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -159,7 +158,6 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -252,7 +250,6 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -352,7 +349,6 @@ async fn aggregate_proposals() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -463,7 +459,6 @@ async fn handle_agreement_on_online() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -497,7 +492,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     );
     let section_signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section = NetworkKnowledge::new(*chain.root_key(), chain, section_signed_sap)?;
+    let section = NetworkKnowledge::new(*chain.root_key(), chain, section_signed_sap, None)?;
     let mut expected_new_elders = BTreeSet::new();
 
     for peer in section_auth.peers() {
@@ -528,7 +523,6 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -696,7 +690,6 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         event_tx,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -763,7 +756,6 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -823,7 +815,6 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -919,7 +910,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     let section_signed_old_section_auth =
         section_signed(sk_set1.secret_key(), old_section_auth.clone())?;
-    let old_section = NetworkKnowledge::new(pk0, chain.clone(), section_signed_old_section_auth)?;
+    let old_section =
+        NetworkKnowledge::new(pk0, chain.clone(), section_signed_old_section_auth, None)?;
 
     // Create our node
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
@@ -934,7 +926,6 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -963,7 +954,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let new_section_elders: BTreeSet<_> = new_section_auth.names();
     let section_signed_new_section_auth = section_signed(sk2, new_section_auth.clone())?;
     let proof_chain = chain.clone();
-    let new_section = NetworkKnowledge::new(pk0, chain, section_signed_new_section_auth)?;
+    let new_section = NetworkKnowledge::new(pk0, chain, section_signed_new_section_auth, None)?;
 
     // Create the `Sync` message containing the new `Section`.
     let wire_msg = WireMsg::single_src(
@@ -1028,6 +1019,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
         pk0,
         SecuredLinkedList::new(pk0),
         section_signed_our_section_auth.clone(),
+        None,
     )?;
 
     // a valid AE msg but with a non-verifiable SAP...
@@ -1050,7 +1042,6 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -1146,7 +1137,6 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -1365,7 +1355,6 @@ async fn handle_elders_update() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -1486,7 +1475,6 @@ async fn handle_demote_during_split() -> Result<()> {
         event_tx,
         used_space,
         root_storage_dir,
-        None,
         false,
     )
     .await?;
@@ -1612,8 +1600,12 @@ async fn create_section(
     let section_chain = SecuredLinkedList::new(sk_set.public_keys().public_key());
     let section_signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section =
-        NetworkKnowledge::new(*section_chain.root_key(), section_chain, section_signed_sap)?;
+    let section = NetworkKnowledge::new(
+        *section_chain.root_key(),
+        section_chain,
+        section_signed_sap,
+        None,
+    )?;
 
     for peer in section_auth.peers() {
         let mut peer = peer;

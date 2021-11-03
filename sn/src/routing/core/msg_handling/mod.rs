@@ -89,7 +89,7 @@ impl Core {
                     .keys()
                     .copied()
                     .collect();
-                known_keys.extend(self.network.section_keys());
+                known_keys.extend(self.network_knowledge.prefix_map().section_keys());
                 known_keys.push(*self.network_knowledge.genesis_key());
 
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
@@ -330,7 +330,6 @@ impl Core {
                     section_signed,
                     proof_chain,
                     members,
-                    sender,
                 )
                 .await
             }

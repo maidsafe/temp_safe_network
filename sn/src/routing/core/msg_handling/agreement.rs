@@ -263,71 +263,44 @@ impl Core {
         }
 
         let snapshot = self.state_snapshot().await;
-        let node_name = self.node.read().await.name();
         let old_chain = self.section_chain().await.clone();
 
-        for (section_auth, key_sig) in updates {
-            let prefix = section_auth.value.prefix;
-            info!("New SAP agreed for {:?}: {:?}", prefix, section_auth);
+        for (signed_sap, key_sig) in updates {
+            let prefix = signed_sap.value.prefix;
+            info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
-            let our_prefix = self.section().prefix().await;
-
-            // Let's update our own Section info if the new SAP's prefix
-            // matches my name, i.e. it's my section's new SAP
-            if prefix.matches(&node_name) {
-                info!(
-                    "pdating my section's ({:?}) to {:?} SAP to: {:?}",
-                    our_prefix, prefix, &section_auth
-                );
-                let updated = self
+            // Let's update our network knowledge, including our
+            // section SAP and chain if the new SAP's prefix matches our name
+            // We need to generate the proof chain to connect our current chain to new SAP.
+            let mut proof_chain = old_chain.clone();
+            match proof_chain.insert(
+                old_chain.last_key(),
+                signed_sap.value.section_key(),
+                key_sig.signature,
+            ) {
+                Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
+                Ok(()) => match self
                     .network_knowledge
-                    .update_elders(section_auth.clone(), key_sig.clone())
-                    .await;
-
-                if !updated {
-                    warn!("No elder updated happened");
-                }
-
-                let proof_chain = self.section_chain().await;
-
-                let network_updated = self.network_knowledge.update(section_auth.clone(), &proof_chain)?;
-
-                if !network_updated {
-                    warn!(
-                        "Section Chain updated, but the network was not. w/ {:?}",
-                        section_auth
-                    );
-                }
-
-                self.write_prefix_map().await;
-            } else {
-                info!("Updating my neighbour's SAP to: {:?}", &section_auth);
-
-                // Let's update our network knowledge with new SAP even if it's of our own section.
-                // We need to generate the proof chain to connect our current chain to new SAP.
-                let mut proof_chain = old_chain.clone();
-                match proof_chain.insert(
-                    old_chain.last_key(),
-                    section_auth.value.section_key(),
-                    key_sig.signature,
-                ) {
-                    Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
-                    Ok(()) => match self.network.update(section_auth, &proof_chain) {
-                        Err(err) => error!(
-                            "Error updating our NetworkPrefixMap for {:?}: {:?}",
-                            prefix, err
-                        ),
-                        Ok(true) => {
-                            info!("Updated our NetworkPrefixMap for {:?}", prefix);
-                            self.write_prefix_map().await
-                        }
-                        _ => {}
-                    },
-                }
+                    .update_knowledge_if_valid(signed_sap, &proof_chain, None)
+                    .await
+                {
+                    Err(err) => error!(
+                        "Error updating our network knowledge for {:?}: {:?}",
+                        prefix, err
+                    ),
+                    Ok(true) => {
+                        info!("Updated our network knowledge for {:?}", prefix);
+                        self.write_prefix_map().await
+                    }
+                    _ => {}
+                },
             }
         }
 
-        info!("Prefixes we know about: {:?}", self.network);
+        info!(
+            "Prefixes we know about: {:?}",
+            self.network_knowledge.prefix_map()
+        );
 
         self.update_self_for_new_node_state_and_fire_events(snapshot)
             .await

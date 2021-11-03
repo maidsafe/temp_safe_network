@@ -48,7 +48,6 @@ impl Core {
             event_tx,
             used_space,
             root_storage_dir,
-            None,
             true,
         )
         .await
@@ -160,7 +159,6 @@ impl Core {
             dst_location,
             &self.node.read().await.name(),
             &self.network_knowledge,
-            &self.network,
         )
         .await?;
 
