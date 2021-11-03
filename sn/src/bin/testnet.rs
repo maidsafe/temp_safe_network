@@ -56,6 +56,10 @@ struct Cmd {
     /// All nodes will be joining existing testnet, none will be started as a genesis node.
     #[structopt(long = "add")]
     add_nodes_to_existing_network: bool,
+
+    /// Format logs as JSON.
+    #[structopt(long)]
+    json_logs: bool,
 }
 
 #[tokio::main]
@@ -167,6 +171,10 @@ pub async fn run_network() -> Result<()> {
 
     if adding_nodes {
         sn_launch_tool_args.push("--add")
+    }
+
+    if args.json_logs {
+        sn_launch_tool_args.push("--json-logs");
     }
 
     // If RUST_LOG was set we pass it down to the launch tool
