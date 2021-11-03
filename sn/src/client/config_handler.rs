@@ -26,10 +26,11 @@ const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(90);
 
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
+const SN_CLIENT_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
 
 /// Configuration for sn_client.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Config {
+pub struct ClientConfig {
     /// The local address to bind to.
     pub local_addr: SocketAddr,
     /// Path to local storage.
@@ -44,7 +45,7 @@ pub struct Config {
     pub standard_wait: Duration,
 }
 
-impl Config {
+impl ClientConfig {
     /// Returns a new `Config` instance.
     ///
     /// This will try to read QuicP2P configuration from `config_file_path`, or else use the default
@@ -74,6 +75,22 @@ impl Config {
         };
 
         let query_timeout = query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
+
+        // if we have an env var for this, lets override
+        let env_timeout = std::env::var(SN_CLIENT_QUERY_TIMEOUT).unwrap_or_else(|_| "".to_string());
+        let query_timeout = match env_timeout.parse() {
+            Ok(time) => {
+                warn!(
+                    "Query timeout set from env var {:?}",
+                    SN_CLIENT_QUERY_TIMEOUT
+                );
+                Duration::from_secs(time)
+            }
+            Err(error) => {
+                warn!("There was an error parsing {:?} env var. Default or client configured query timeout will be used: {:?}", SN_CLIENT_QUERY_TIMEOUT, error);
+                query_timeout
+            }
+        };
 
         Self {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
@@ -151,7 +168,7 @@ mod tests {
 
         // In the absence of a config file, the config handler
         // should initialize bootstrap_cache_dir only
-        let config = Config::new(
+        let config = ClientConfig::new(
             Some(&root_dir),
             None,
             genesis_key,
@@ -170,7 +187,7 @@ mod tests {
             let _some_last_char = str_path.pop();
         }
 
-        let expected_config = Config {
+        let expected_config = ClientConfig {
             local_addr: (Ipv4Addr::UNSPECIFIED, 0).into(),
             root_dir: root_dir.clone(),
             genesis_key,
@@ -189,11 +206,11 @@ mod tests {
         let mut file = File::create(&config_filepath)?;
 
         let config_on_disk =
-            Config::new(None, None, genesis_key, Some(&config_filepath), None, None).await;
+            ClientConfig::new(None, None, genesis_key, Some(&config_filepath), None, None).await;
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = Config::new(None, None, genesis_key, None, None, None).await;
+        let read_cfg = ClientConfig::new(None, None, genesis_key, None, None, None).await;
         assert_eq!(serialize(&config_on_disk)?, serialize(&read_cfg)?);
 
         Ok(())

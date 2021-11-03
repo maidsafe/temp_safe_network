@@ -24,7 +24,7 @@ use tiny_keccak::{Hasher, Sha3};
 
 use eyre::{eyre, Context, Result};
 use safe_network::{
-    client::{utils::test_utils::read_network_conn_info, Client, Config},
+    client::{utils::test_utils::read_network_conn_info, Client, ClientConfig},
     types::{utils::random_bytes, BytesAddress},
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
@@ -182,7 +182,7 @@ pub async fn run_split() -> Result<()> {
     let (genesis_key, bootstrap_nodes) =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
-    let config = Config::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT), None).await;
+    let config = ClientConfig::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT), None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     for (address, hash) in all_data_put {
@@ -220,7 +220,7 @@ async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_nodes);
-    let config = Config::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT), None).await;
+    let config = ClientConfig::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT), None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     let bytes = random_bytes(1024 * 1024);

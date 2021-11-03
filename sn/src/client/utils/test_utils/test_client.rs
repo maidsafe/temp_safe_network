@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::read_network_conn_info;
-use crate::client::{Client, Config};
+use crate::client::{Client, ClientConfig};
 use crate::types::Keypair;
 use eyre::Result;
 use std::{sync::Once, time::Duration};
@@ -124,7 +124,7 @@ pub async fn create_test_client_with(
         None
     };
 
-    let config = Config::new(
+    let config = ClientConfig::new(
         Some(root_dir.path()),
         None,
         genesis_key,

@@ -12,7 +12,7 @@ use crate::{ipc::NodeConfig, Error, Result};
 use bytes::Bytes;
 use hex::encode;
 use log::{debug, info};
-use safe_network::client::{Client, Config, Error as ClientError};
+use safe_network::client::{Client, ClientConfig, Error as ClientError};
 use safe_network::types::{
     register::{Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
     BytesAddress, Error as SafeNdError, Keypair, RegisterAddress,
@@ -69,7 +69,7 @@ impl SafeAppClient {
         );
         debug!("Bootstrap contacts list set to: {:?}", node_config);
 
-        let config = Config::new(
+        let config = ClientConfig::new(
             None,
             None,
             node_config.0,
