@@ -130,68 +130,6 @@ impl<V: Value + Send + Sync> KvStore<V> {
         Ok(())
     }
 
-    /// Stores a batch of values.
-    ///
-    /// If there is not enough storage space available, returns `Error::NotEnoughSpace`.  In case of
-    /// an IO error, it returns `Error::Io`.
-    ///
-    /// If a value with the same id already exists, it will be overwritten.
-    #[allow(unused)] // this will soon be used
-    pub(crate) async fn store_batch(&self, values: &[V]) -> Result<()> {
-        info!("Writing batch");
-        use rayon::prelude::*;
-        type KvPair = (String, Vec<u8>);
-        type KvPairResults = Vec<Result<KvPair>>;
-
-        let mut batch = sled::Batch::default();
-        let (ok, err_results): (KvPairResults, KvPairResults) = values
-            .par_iter()
-            .map(|value| {
-                let serialised_value = serialise(value)?.to_vec();
-                let key = value.key().to_db_key()?;
-                Ok((key, serialised_value))
-            })
-            .partition(|r| r.is_ok());
-
-        if !err_results.is_empty() {
-            for e in err_results {
-                error!("{:?}", e);
-            }
-
-            return Err(Error::SledBatching);
-        }
-
-        let consumed_space = ok
-            .into_iter()
-            .flatten()
-            .map(|(key, value)| {
-                let consumed_space = value.len() as u64;
-                // FIXME: this will write value redundantly if it is already set, upsetting used
-                // space calculation and wasting resources. This is quite likely to occur in
-                // practice since many operations are applied redundantly from multiple nodes.
-                batch.insert(key.as_bytes(), value);
-                consumed_space
-            })
-            .sum();
-
-        if !self.used_space.can_consume(consumed_space).await {
-            return Err(Error::NotEnoughSpace);
-        }
-
-        let res = self.db.apply_batch(batch);
-
-        match res {
-            Ok(_) => {
-                info!("Writing batch succeeded!");
-                Ok(())
-            }
-            Err(e) => {
-                warn!("Writing batch failed!");
-                Err(Error::Sled(e))
-            }
-        }
-    }
-
     /// Returns a value previously stored under `key`.
     ///
     /// If the value can't be accessed, it returns `Error::NoSuchData`.
