@@ -15,8 +15,8 @@ use crate::routing::{
     dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
     log_markers::LogMarker,
+    network_knowledge::SectionKeyShare,
     routing_api::command::Command,
-    section::SectionKeyShare,
     SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -36,7 +36,7 @@ impl Core {
                 &self.node.read().await.clone(),
                 session_id,
                 elder_candidates,
-                self.section().section_key().await,
+                self.network_knowledge().section_key().await,
             )
             .await
     }
@@ -59,7 +59,7 @@ impl Core {
                 &self.node.read().await.clone(),
                 &session_id,
                 message,
-                self.section().section_key().await,
+                self.network_knowledge().section_key().await,
             )
             .await
     }

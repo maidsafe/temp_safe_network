@@ -21,10 +21,10 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
+    network_knowledge::{ElderCandidatesUtils, NetworkKnowledge, SectionKeyShare},
     peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, NetworkKnowledge, SectionKeyShare},
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
@@ -197,7 +197,7 @@ impl Core {
             .collect();
 
         // the PK is that of our section (as we know it; and we're ahead of our adults here)
-        let dst_section_pk = self.section().section_key().await;
+        let dst_section_pk = self.network_knowledge().section_key().await;
         // the previous PK which is likely what adults know
         let previous_pk = *self.section_chain().await.prev_key();
         let node_msg = self.generate_ae_update(previous_pk, true).await?;
@@ -206,7 +206,7 @@ impl Core {
             .send_direct_message_to_nodes(
                 nodes,
                 node_msg,
-                self.section().prefix().await.name(),
+                self.network_knowledge().prefix().await.name(),
                 dst_section_pk,
             )
             .await?;
@@ -223,7 +223,7 @@ impl Core {
         if let Some(sibling_sec_auth) = self
             .network_knowledge
             .prefix_map()
-            .get_signed(&self.section().prefix().await.sibling())
+            .get_signed(&self.network_knowledge().prefix().await.sibling())
         {
             let promoted_sibling_elders: Vec<_> = sibling_sec_auth
                 .value
@@ -242,7 +242,7 @@ impl Core {
             /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
             let mut proof_chain = SecuredLinkedList::new(previous_pk);
             */
-            let mut proof_chain = self.section().chain().await;
+            let mut proof_chain = self.network_knowledge().chain().await;
 
             let _ = proof_chain.insert(
                 &previous_pk,
@@ -284,14 +284,14 @@ impl Core {
             .map(|peer| (*peer.name(), *peer.addr()))
             .collect();
 
-        let dst_section_pk = self.section().section_key().await;
+        let dst_section_pk = self.network_knowledge().section_key().await;
         let node_msg = self.generate_ae_update(dst_section_pk, true).await?;
 
         let cmd = self
             .send_direct_message_to_nodes(
                 adults,
                 node_msg,
-                self.section().prefix().await.name(),
+                self.network_knowledge().prefix().await.name(),
                 dst_section_pk,
             )
             .await?;
@@ -445,7 +445,7 @@ impl Core {
         }
 
         if handle {
-            wire_msg.set_dst_section_pk(self.section().section_key().await);
+            wire_msg.set_dst_section_pk(self.network_knowledge().section_key().await);
             wire_msg.set_dst_xorname(self.node.read().await.name());
 
             commands.push(Command::HandleMessage {
@@ -525,7 +525,7 @@ impl Core {
             .map(|(name, address)| (*name, *address))
             .collect();
 
-        let dst_section_pk = self.section().section_key().await;
+        let dst_section_pk = self.network_knowledge().section_key().await;
         let cmd = self
             .send_direct_message_to_nodes(
                 targets,

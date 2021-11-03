@@ -18,9 +18,9 @@ use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    network_knowledge::NetworkKnowledge,
     node::Node,
     peer::PeerUtils,
-    section::NetworkKnowledge,
     SectionAuthorityProviderUtils,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -495,8 +495,8 @@ mod tests {
     use crate::messaging::{system::NodeState, SectionAuthorityProvider};
     use crate::routing::{
         dkg::test_utils::*, error::Error as RoutingError, messages::WireMsgUtils,
-        section::test_utils::*, section::NodeStateUtils, SectionAuthorityProviderUtils, ELDER_SIZE,
-        MIN_ADULT_AGE,
+        network_knowledge::test_utils::*, network_knowledge::NodeStateUtils,
+        SectionAuthorityProviderUtils, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use crate::types::PublicKey;
     use assert_matches::assert_matches;

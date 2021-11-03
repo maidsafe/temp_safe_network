@@ -16,8 +16,10 @@ use crate::routing::{
     core::JoiningAsRelocated,
     ed25519::{self, Keypair, Verifier},
     error::Error,
+    network_knowledge::{
+        section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge,
+    },
     peer::PeerUtils,
-    section::{section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge},
 };
 use async_trait::async_trait;
 use xor_name::XorName;
@@ -245,9 +247,9 @@ mod tests {
     use super::*;
     use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
-        dkg::test_utils::section_signed, peer::test_utils::arbitrary_unique_peers,
-        routing_api::tests::SecretKeySet, section::NodeStateUtils, SectionAuthorityProviderUtils,
-        ELDER_SIZE, MIN_AGE,
+        dkg::test_utils::section_signed, network_knowledge::NodeStateUtils,
+        peer::test_utils::arbitrary_unique_peers, routing_api::tests::SecretKeySet,
+        SectionAuthorityProviderUtils, ELDER_SIZE, MIN_AGE,
     };
     use assert_matches::assert_matches;
     use eyre::Result;

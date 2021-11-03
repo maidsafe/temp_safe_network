@@ -60,7 +60,7 @@ impl<'a> Serialize for SignableView<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::{dkg, section};
+    use crate::routing::{dkg, network_knowledge};
     use eyre::Result;
     use std::fmt::Debug;
     use xor_name::Prefix;
@@ -69,7 +69,7 @@ mod tests {
     fn serialize_for_signing() -> Result<()> {
         // Proposal::SectionInfo
         let (section_auth, _, _) =
-            section::test_utils::gen_section_authority_provider(Prefix::default(), 4);
+            network_knowledge::test_utils::gen_section_authority_provider(Prefix::default(), 4);
         let proposal = Proposal::SectionInfo(section_auth.clone());
         verify_serialize_for_signing(&proposal, &section_auth)?;
 

@@ -111,7 +111,7 @@ impl Routing {
             )
             .await?;
 
-            let section = core.section();
+            let section = core.network_knowledge();
 
             let elders = Elders {
                 prefix: section.prefix().await,
@@ -319,12 +319,12 @@ impl Routing {
 
     /// Returns the Section Chain's genesis key
     pub async fn genesis_key(&self) -> bls::PublicKey {
-        *self.dispatcher.core.section().genesis_key()
+        *self.dispatcher.core.network_knowledge().genesis_key()
     }
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        self.dispatcher.core.section().prefix().await
+        self.dispatcher.core.network_knowledge().prefix().await
     }
 
     /// Finds out if the given XorName matches our prefix.
@@ -341,7 +341,7 @@ impl Routing {
     pub async fn our_elders(&self) -> Vec<Peer> {
         self.dispatcher
             .core
-            .section()
+            .network_knowledge()
             .authority_provider()
             .await
             .peers()
@@ -358,7 +358,7 @@ impl Routing {
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.dispatcher.core.section().adults().await
+        self.dispatcher.core.network_knowledge().adults().await
     }
 
     /// Returns the adults of our section sorted by their distance to `name` (closest first).
@@ -373,7 +373,11 @@ impl Routing {
 
     /// Returns our section's authority provider.
     pub async fn our_section_auth(&self) -> SectionAuthorityProvider {
-        self.dispatcher.core.section().authority_provider().await
+        self.dispatcher
+            .core
+            .network_knowledge()
+            .authority_provider()
+            .await
     }
 
     /// Returns the info about the section matching the name.

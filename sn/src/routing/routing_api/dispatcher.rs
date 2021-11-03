@@ -18,9 +18,9 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
+    network_knowledge::NetworkKnowledge,
     node::Node,
     peer::PeerUtils,
-    section::NetworkKnowledge,
     Error, Prefix, XorName,
 };
 use crate::types::PublicKey;
@@ -127,7 +127,7 @@ impl Dispatcher {
 
                 // Send a probe message if we are an elder
                 let core = &dispatcher.core;
-                if core.is_elder().await && !core.section().prefix().await.is_empty() {
+                if core.is_elder().await && !core.network_knowledge().prefix().await.is_empty() {
                     match core.generate_probe_message().await {
                         Ok(command) => {
                             info!("Sending ProbeMessage");
@@ -160,9 +160,9 @@ impl Dispatcher {
         let span = {
             let core = &self.core;
 
-            let prefix = core.section().prefix().await;
+            let prefix = core.network_knowledge().prefix().await;
             let is_elder = core.is_elder().await;
-            let section_key = core.section().section_key().await;
+            let section_key = core.network_knowledge().section_key().await;
             let age = core.node.read().await.age();
             trace_span!(
                 "handle_command",
@@ -339,7 +339,7 @@ impl Dispatcher {
                 let msg = {
                     let core = &self.core;
                     let node = core.node.read().await.clone();
-                    let section_pk = core.section().section_key().await;
+                    let section_pk = core.network_knowledge().section_key().await;
                     WireMsg::single_src(
                         &node,
                         DstLocation::Section {
@@ -353,7 +353,7 @@ impl Dispatcher {
                 let our_name = self.core.node.read().await.name();
                 let peers = self
                     .core
-                    .section()
+                    .network_knowledge()
                     .active_members()
                     .await
                     .iter()
@@ -366,7 +366,7 @@ impl Dispatcher {
                 let mut commands = vec![];
                 if let Some(peer) = self
                     .core
-                    .section()
+                    .network_knowledge()
                     .members()
                     .get(&name)
                     .map(|member_info| member_info.peer)
@@ -440,7 +440,7 @@ impl Dispatcher {
                 debug!("Sending client msg to {:?}: {:?}", socket_addr, wire_msg);
 
                 let recipients = vec![(*name, socket_addr)];
-                wire_msg.set_dst_section_pk(self.core.section().section_key().await);
+                wire_msg.set_dst_section_pk(self.core.network_knowledge().section_key().await);
 
                 let command = Command::SendMessage {
                     recipients,

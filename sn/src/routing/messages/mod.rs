@@ -14,8 +14,8 @@ use crate::messaging::{
 };
 use crate::routing::{
     error::{Error, Result},
+    network_knowledge::SectionKeyShare,
     node::Node,
-    section::SectionKeyShare,
 };
 use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;

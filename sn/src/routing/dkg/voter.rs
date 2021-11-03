@@ -14,9 +14,9 @@ use crate::routing::{
     dkg::session::{Backlog, Session},
     ed25519,
     error::Result,
+    network_knowledge::{ElderCandidatesUtils, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionKeyShare},
     supermajority, SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;

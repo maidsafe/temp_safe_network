@@ -16,9 +16,9 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
+    network_knowledge::SectionKeyShare,
     node::Node,
     routing_api::command::{next_timer_token, Command},
-    section::SectionKeyShare,
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
@@ -384,9 +384,9 @@ mod tests {
     use crate::messaging::MessageType;
     use crate::routing::{
         dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
-        node::test_utils::arbitrary_unique_nodes, node::Node,
-        section::section_authority_provider::ElderCandidatesUtils, section::test_utils::gen_addr,
-        ELDER_SIZE, MIN_ADULT_AGE,
+        network_knowledge::section_authority_provider::ElderCandidatesUtils,
+        network_knowledge::test_utils::gen_addr, node::test_utils::arbitrary_unique_nodes,
+        node::Node, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};
