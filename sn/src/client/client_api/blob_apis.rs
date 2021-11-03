@@ -466,16 +466,15 @@ mod tests {
 
         let _outer_span = tracing::info_span!("blob_network_assert").entered();
 
-        let mut the_logs = crate::testnet_grep::NetworkLogState::new()?;
-
         let network_assert_delay: u64 = std::env::var("NETWORK_ASSERT_DELAY")
-            .unwrap_or_else(|_| "3".to_string())
+            .unwrap_or_else(|_| "0".to_string())
             .parse()?;
 
         let bytes = random_bytes(MIN_BLOB_SIZE / 3);
         let client = create_test_client().await?;
 
-        // TODO: Await for all things to have happened here!!!!!
+        let mut the_logs = crate::testnet_grep::NetworkLogState::new()?;
+
         let address = client.upload(bytes.clone(), Scope::Public).await?;
 
         let delay = tokio::time::Duration::from_secs(network_assert_delay);
