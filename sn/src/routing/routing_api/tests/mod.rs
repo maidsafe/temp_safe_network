@@ -1243,7 +1243,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     )
     .await?;
     let node = core.node.read().await.clone();
-    let section_pk = *core.section_chain().await.last_key();
+    let section_pk = core.section().section_key().await;
     let dispatcher = Dispatcher::new(core);
 
     let dst_location = match dst {

@@ -38,6 +38,14 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let snapshot = self.state_snapshot().await;
 
+        // If we have the key share for new SAP key we can switch to this new SAP
+        let switch_to_new_sap = self.is_not_elder().await
+            || self
+                .section_keys_provider
+                .key_share(&section_signed.public_key)
+                .await
+                .is_ok();
+
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
             sig: section_signed,
@@ -45,7 +53,13 @@ impl Core {
 
         let _updated = self
             .network_knowledge
-            .update_knowledge_if_valid(signed_sap, &proof_chain, members)
+            .update_knowledge_if_valid(
+                signed_sap,
+                &proof_chain,
+                members,
+                &self.node.read().await.name(),
+                switch_to_new_sap,
+            )
             .await?;
 
         self.fire_node_event_for_any_new_adults().await?;
@@ -77,6 +91,14 @@ impl Core {
             src_name, sender
         );
 
+        // If we have the key share for new SAP key we can switch to this new SAP
+        let switch_to_new_sap = self.is_not_elder().await
+            || self
+                .section_keys_provider
+                .key_share(&section_signed.public_key)
+                .await
+                .is_ok();
+
         // update our netowkr knowledge.
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
@@ -85,7 +107,13 @@ impl Core {
 
         let updated = self
             .network_knowledge
-            .update_knowledge_if_valid(signed_sap, &proof_chain, None)
+            .update_knowledge_if_valid(
+                signed_sap,
+                &proof_chain,
+                None,
+                &self.node.read().await.name(),
+                switch_to_new_sap,
+            )
             .await?;
 
         if updated {
@@ -322,6 +350,7 @@ impl Core {
             return Ok(None);
         }
 
+        /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
         let ae_msg = match self
             .network_knowledge
             .chain()
@@ -329,30 +358,34 @@ impl Core {
             .get_proof_chain_to_current(dst_section_pk)
         {
             Ok(proof_chain) => {
-                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
+        */
+        let proof_chain = self.network_knowledge.chain().await;
 
-                let section_signed_auth = self
-                    .network_knowledge
-                    .section_signed_authority_provider()
-                    .await;
-                let section_auth = section_signed_auth.value;
-                let section_signed = section_signed_auth.sig;
-                let bounced_msg = original_bytes;
+        info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
-                trace!(
-                    "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
-                    proof_chain.last_key(),
-                    &section_auth.public_key_set.public_key()
-                );
-                trace!("{}", LogMarker::AeSendRetryAsOutdated);
+        let section_signed_auth = self
+            .network_knowledge
+            .section_signed_authority_provider()
+            .await;
+        let section_auth = section_signed_auth.value;
+        let section_signed = section_signed_auth.sig;
+        let bounced_msg = original_bytes;
 
-                SystemMsg::AntiEntropyRetry {
-                    section_auth,
-                    section_signed,
-                    proof_chain,
-                    bounced_msg,
-                }
-            }
+        trace!(
+            "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
+            proof_chain.last_key(),
+            &section_auth.public_key_set.public_key()
+        );
+        trace!("{}", LogMarker::AeSendRetryAsOutdated);
+
+        let ae_msg = SystemMsg::AntiEntropyRetry {
+            section_auth,
+            section_signed,
+            proof_chain,
+            bounced_msg,
+        };
+        /*
+        }
             Err(_) => {
                 trace!(
                     "Anti-Entropy: cannot find dst_section_pk {:?} sent by {} in our chain",
@@ -380,6 +413,7 @@ impl Core {
                 }
             }
         };
+        */
 
         let wire_msg = WireMsg::single_src(
             &self.node.read().await.clone(),
@@ -500,10 +534,10 @@ mod tests {
         let env = Env::new().await?;
         let our_prefix = env.core.section().prefix().await;
         let (msg, src_location) =
-            env.create_message(&our_prefix, *env.core.section_chain().await.last_key())?;
+            env.create_message(&our_prefix, env.core.section().section_key().await)?;
         let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
-        let dst_section_pk = *env.core.section_chain().await.last_key();
+        let dst_section_pk = env.core.section().section_key().await;
 
         let command = env
             .core
@@ -591,17 +625,17 @@ mod tests {
         let our_prefix = env.core.section().prefix().await;
 
         let (msg, src_location) =
-            env.create_message(&our_prefix, *env.core.section_chain().await.last_key())?;
+            env.create_message(&our_prefix, env.core.section().section_key().await)?;
         let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
-        let dst_section_pk = *env.core.section_chain().await.root_key();
+        let dst_section_pk = env.core.section().genesis_key();
 
         let command = env
             .core
             .check_for_entropy(
                 msg.serialize()?,
                 &src_location,
-                &dst_section_pk,
+                dst_section_pk,
                 dst_name,
                 sender,
             )
@@ -630,19 +664,19 @@ mod tests {
         let our_prefix = env.core.section().prefix().await;
 
         let (msg, src_location) =
-            env.create_message(&our_prefix, *env.core.section_chain().await.last_key())?;
+            env.create_message(&our_prefix, env.core.section().section_key().await)?;
         let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
 
         let bogus_env = Env::new().await?;
-        let dst_section_pk = *bogus_env.core.section_chain().await.root_key();
+        let dst_section_pk = bogus_env.core.section().genesis_key();
 
         let command = env
             .core
             .check_for_entropy(
                 msg.serialize()?,
                 &src_location,
-                &dst_section_pk,
+                dst_section_pk,
                 dst_name,
                 sender,
             )

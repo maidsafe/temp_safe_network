@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::read_prefix_map_from_disk;
 use crate::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocateDetails, RelocatePayload,
@@ -130,7 +131,7 @@ impl JoiningAsRelocated {
                         self.genesis_key,
                         section_chain,
                         section_auth,
-                        None,
+                        read_prefix_map_from_disk().await,
                     )?,
                 }))
             }

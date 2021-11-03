@@ -36,7 +36,7 @@ impl Core {
                 &self.node.read().await.clone(),
                 session_id,
                 elder_candidates,
-                *self.section_chain().await.last_key(),
+                self.section().section_key().await,
             )
             .await
     }
@@ -59,7 +59,7 @@ impl Core {
                 &self.node.read().await.clone(),
                 &session_id,
                 message,
-                *self.section_chain().await.last_key(),
+                self.section().section_key().await,
             )
             .await
     }

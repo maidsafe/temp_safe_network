@@ -148,7 +148,7 @@ impl Core {
         self.dkg_voter.handle_timeout(
             &self.node.read().await.clone(),
             token,
-            *self.section_chain().await.last_key(),
+            self.section().section_key().await,
         )
     }
 
