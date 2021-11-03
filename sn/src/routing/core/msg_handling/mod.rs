@@ -264,44 +264,10 @@ impl Core {
             .aggregate_message_and_stop(&mut msg_authority, payload)
             .await
         {
-            Ok(false) => match msg {
-                SystemMsg::NodeCmd(_)
-                | SystemMsg::AntiEntropyProbe(_)
-                | SystemMsg::AntiEntropyRedirect { .. }
-                | SystemMsg::AntiEntropyRetry { .. }
-                | SystemMsg::BackPressure(_)
-                | SystemMsg::JoinResponse(_)
-                | SystemMsg::JoinRequest(_)
-                | SystemMsg::JoinAsRelocatedRequest(_)
-                | SystemMsg::DkgStart { .. }
-                | SystemMsg::DkgFailureAgreement(_)
-                | SystemMsg::DkgMessage { .. }
-                | SystemMsg::DkgFailureObservation { .. }
-                | SystemMsg::Propose { .. }
-                | SystemMsg::NodeQuery(_)
-                | SystemMsg::NodeQueryResponse { .. } => {
-                    let cmd = Command::HandleNonBlockingMessage {
-                        msg_id,
-                        msg,
-                        msg_authority,
-                        dst_location,
-                        sender,
-                        known_keys,
-                    };
-
-                    Ok(vec![cmd])
-                }
-                _ => {
-                    let cmd = Command::HandleBlockingMessage {
-                        sender,
-                        msg_id,
-                        msg,
-                        msg_authority,
-                    };
-
-                    Ok(vec![cmd])
-                }
-            },
+            Ok(false) => {
+                self.handle_valid_msg(msg_id, msg_authority, dst_location, msg, sender, known_keys)
+                    .await
+            }
             Err(Error::InvalidSignatureShare) => {
                 warn!(
                     "Invalid signature on received system message, dropping the message: {:?}",
@@ -313,16 +279,19 @@ impl Core {
         }
     }
 
-    // Handler for node messages which have successfully
+    // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_blocking_message(
+    pub(crate) async fn handle_valid_msg(
         &self,
-        sender: Peer,
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
+        dst_location: DstLocation,
         node_msg: SystemMsg,
+        sender: Peer,
+        known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
-        trace!("Handling blocking system message");
+        let src_name = msg_authority.name();
+        trace!("Handling non blocking message");
         match node_msg {
             SystemMsg::AntiEntropyUpdate {
                 section_auth,
@@ -399,30 +368,6 @@ impl Core {
                 );
                 Ok(vec![])
             }
-            _ => {
-                warn!(
-                    "!!! Unexpected SystemMsg handled at verified non thread safe nodemsg handling: {:?}",
-                    node_msg
-                );
-                Ok(vec![])
-            }
-        }
-    }
-
-    // Handler for data messages which have successfully
-    // passed all signature checks and msg verifications
-    pub(crate) async fn handle_non_blocking_message(
-        &self,
-        msg_id: MessageId,
-        msg_authority: NodeMsgAuthority,
-        dst_location: DstLocation,
-        node_msg: SystemMsg,
-        sender: Peer,
-        known_keys: Vec<BlsPublicKey>,
-    ) -> Result<Vec<Command>> {
-        let src_name = msg_authority.name();
-        trace!("Handling non blocking message");
-        match node_msg {
             SystemMsg::AntiEntropyRetry {
                 section_auth,
                 section_signed,
@@ -628,28 +573,6 @@ impl Core {
                     sending_nodes_pk,
                 )
                 .await
-            }
-            SystemMsg::NodeMsgError {
-                error,
-                correlation_id,
-            } => {
-                trace!(
-                    "From {:?}({:?}), received error {:?} correlated to {:?}, targeting {:?}",
-                    msg_authority.src_location(),
-                    msg_id,
-                    error,
-                    correlation_id,
-                    dst_location
-                );
-                Ok(vec![])
-            }
-            _ => {
-                warn!(
-                    "Non data message provided to data message handler {:?}",
-                    node_msg
-                );
-                // do nothing
-                Ok(vec![])
             }
         }
     }

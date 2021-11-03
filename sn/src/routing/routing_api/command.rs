@@ -53,23 +53,6 @@ pub(crate) enum Command {
         #[debug(skip)]
         known_keys: Vec<BlsPublicKey>,
     },
-    /// Handle verified node message after aggregation either directly or notify via event listener
-    HandleBlockingMessage {
-        sender: Peer,
-        msg_id: MessageId,
-        msg: SystemMsg,
-        msg_authority: NodeMsgAuthority,
-    },
-    /// Handle Node data messages directly
-    HandleNonBlockingMessage {
-        msg_id: MessageId,
-        msg: SystemMsg,
-        msg_authority: NodeMsgAuthority,
-        dst_location: DstLocation,
-        sender: Peer,
-        #[debug(skip)]
-        known_keys: Vec<BlsPublicKey>,
-    },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
     /// Handle peer that's been detected as lost.
@@ -140,12 +123,6 @@ impl fmt::Display for Command {
             }
             Command::HandleMessage { wire_msg, .. } => {
                 write!(f, "HandleMessage {:?}", wire_msg.msg_id())
-            }
-            Command::HandleBlockingMessage { msg_id, .. } => {
-                write!(f, "HandleBlockingMessage {:?}", msg_id)
-            }
-            Command::HandleNonBlockingMessage { msg_id, .. } => {
-                write!(f, "HandleNonBlockingMessage {:?}", msg_id)
             }
             Command::HandlePeerLost(_) => write!(f, "HandlePeerLost"),
             Command::HandleAgreement { .. } => write!(f, "HandleAgreement"),
