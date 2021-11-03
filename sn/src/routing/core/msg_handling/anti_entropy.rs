@@ -512,12 +512,12 @@ mod tests {
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
-        node::Node,
-        routing_api::tests::create_comm,
-        section::{
+        network_knowledge::{
             test_utils::{gen_addr, gen_section_authority_provider},
             NetworkKnowledge,
         },
+        node::Node,
+        routing_api::tests::create_comm,
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
@@ -532,12 +532,14 @@ mod tests {
     async fn ae_everything_up_to_date() -> Result<()> {
         let mut rng = rand::thread_rng();
         let env = Env::new().await?;
-        let our_prefix = env.core.section().prefix().await;
-        let (msg, src_location) =
-            env.create_message(&our_prefix, env.core.section().section_key().await)?;
+        let our_prefix = env.core.network_knowledge().prefix().await;
+        let (msg, src_location) = env.create_message(
+            &our_prefix,
+            env.core.network_knowledge().section_key().await,
+        )?;
         let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
-        let dst_section_pk = env.core.section().section_key().await;
+        let dst_section_pk = env.core.network_knowledge().section_key().await;
 
         let command = env
             .core
@@ -622,13 +624,15 @@ mod tests {
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
         let mut rng = rand::thread_rng();
         let env = Env::new().await?;
-        let our_prefix = env.core.section().prefix().await;
+        let our_prefix = env.core.network_knowledge().prefix().await;
 
-        let (msg, src_location) =
-            env.create_message(&our_prefix, env.core.section().section_key().await)?;
+        let (msg, src_location) = env.create_message(
+            &our_prefix,
+            env.core.network_knowledge().section_key().await,
+        )?;
         let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
-        let dst_section_pk = env.core.section().genesis_key();
+        let dst_section_pk = env.core.network_knowledge().genesis_key();
 
         let command = env
             .core
@@ -649,7 +653,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(section_auth, &env.core.section().authority_provider().await);
+                assert_eq!(section_auth, &env.core.network_knowledge().authority_provider().await);
                 assert_eq!(proof_chain, &env.core.section_chain().await);
             });
         });
@@ -661,15 +665,17 @@ mod tests {
     async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
         let mut rng = rand::thread_rng();
         let env = Env::new().await?;
-        let our_prefix = env.core.section().prefix().await;
+        let our_prefix = env.core.network_knowledge().prefix().await;
 
-        let (msg, src_location) =
-            env.create_message(&our_prefix, env.core.section().section_key().await)?;
+        let (msg, src_location) = env.create_message(
+            &our_prefix,
+            env.core.network_knowledge().section_key().await,
+        )?;
         let sender = env.core.node.read().await.addr;
         let dst_name = our_prefix.substituted_in(rng.gen());
 
         let bogus_env = Env::new().await?;
-        let dst_section_pk = bogus_env.core.section().genesis_key();
+        let dst_section_pk = bogus_env.core.network_knowledge().genesis_key();
 
         let command = env
             .core
@@ -690,7 +696,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(*section_auth, env.core.section().authority_provider().await);
+                assert_eq!(*section_auth, env.core.network_knowledge().authority_provider().await);
                 assert_eq!(*proof_chain, env.core.section_chain().await);
             });
         });

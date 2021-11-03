@@ -19,11 +19,11 @@ use crate::routing::{
     ed25519,
     error::{Error, Result},
     messages::WireMsgUtils,
+    network_knowledge::NetworkKnowledge,
     node::Node,
     peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    section::NetworkKnowledge,
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;

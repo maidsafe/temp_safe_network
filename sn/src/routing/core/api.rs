@@ -15,9 +15,9 @@ use crate::messaging::{
 use crate::routing::{
     error::Result,
     log_markers::LogMarker,
+    network_knowledge::{NetworkKnowledge, NodeStateUtils, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
-    section::{NetworkKnowledge, NodeStateUtils, SectionKeyShare},
     Event,
 };
 use secured_linked_list::SecuredLinkedList;
@@ -70,7 +70,7 @@ impl Core {
         Ok(())
     }
 
-    pub(crate) fn section(&self) -> &NetworkKnowledge {
+    pub(crate) fn network_knowledge(&self) -> &NetworkKnowledge {
         &self.network_knowledge
     }
 
@@ -148,7 +148,7 @@ impl Core {
         self.dkg_voter.handle_timeout(
             &self.node.read().await.clone(),
             token,
-            self.section().section_key().await,
+            self.network_knowledge().section_key().await,
         )
     }
 

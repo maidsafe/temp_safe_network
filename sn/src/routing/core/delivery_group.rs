@@ -9,8 +9,8 @@
 use crate::messaging::{system::Peer, DstLocation};
 use crate::routing::{
     error::{Error, Result},
+    network_knowledge::NetworkKnowledge,
     peer::PeerUtils,
-    section::NetworkKnowledge,
     supermajority, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use itertools::Itertools;
@@ -185,7 +185,7 @@ mod tests {
     use crate::routing::{
         dkg::test_utils::section_signed,
         ed25519,
-        section::{
+        network_knowledge::{
             test_utils::{gen_addr, gen_section_authority_provider},
             NodeStateUtils,
         },

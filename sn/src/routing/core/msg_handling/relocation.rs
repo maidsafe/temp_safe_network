@@ -14,10 +14,10 @@ use crate::messaging::{
 use crate::routing::{
     core::bootstrap::JoiningAsRelocated,
     error::Result,
+    network_knowledge::NodeStateUtils,
     peer::PeerUtils,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
-    section::NodeStateUtils,
     Event, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use xor_name::XorName;

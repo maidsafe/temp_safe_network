@@ -13,8 +13,8 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker, peer::PeerUtils,
-    routing_api::command::Command, section::ElderCandidatesUtils, Event,
+    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker,
+    network_knowledge::ElderCandidatesUtils, peer::PeerUtils, routing_api::command::Command, Event,
     SectionAuthorityProviderUtils, MIN_AGE,
 };
 

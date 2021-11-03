@@ -11,9 +11,9 @@ use crate::messaging::{
     DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
+    network_knowledge::{NetworkKnowledge, SectionKeyShare},
     node::Node,
     routing_api::Peer,
-    section::{NetworkKnowledge, SectionKeyShare},
     XorName,
 };
 use bls::PublicKey as BlsPublicKey;

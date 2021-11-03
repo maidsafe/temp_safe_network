@@ -9,8 +9,8 @@
 use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, ElderCandidates};
 use crate::routing::{
     ed25519::{self, Digest256, Keypair, Verifier},
+    network_knowledge::ElderCandidatesUtils,
     peer::PeerUtils,
-    section::ElderCandidatesUtils,
     supermajority,
 };
 use std::collections::BTreeSet;

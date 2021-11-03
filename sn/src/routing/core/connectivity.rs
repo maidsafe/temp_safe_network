@@ -9,8 +9,8 @@
 use super::Core;
 use crate::messaging::system::Proposal;
 use crate::routing::{
-    error::Result, peer::PeerUtils, routing_api::command::Command, section::NodeStateUtils,
-    SectionAuthorityProviderUtils,
+    error::Result, network_knowledge::NodeStateUtils, peer::PeerUtils,
+    routing_api::command::Command, SectionAuthorityProviderUtils,
 };
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;

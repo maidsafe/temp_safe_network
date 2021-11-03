@@ -94,7 +94,7 @@ impl Core {
 
         if self.get_copy_count() > targets.len() {
             let error = CmdError::Data(ErrorMessage::InsufficientAdults(
-                self.section().prefix().await,
+                self.network_knowledge().prefix().await,
             ));
             return self.send_cmd_error_response(error, origin, msg_id);
         }
@@ -133,7 +133,7 @@ impl Core {
         if targets.is_empty() {
             return self
                 .send_error(
-                    Error::NoAdults(self.section().prefix().await),
+                    Error::NoAdults(self.network_knowledge().prefix().await),
                     msg_id,
                     origin,
                 )

@@ -25,12 +25,12 @@ use crate::routing::{
     dkg::test_utils::{prove, section_signed},
     ed25519,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    network_knowledge::{
+        test_utils::*, ElderCandidatesUtils, NetworkKnowledge, NodeStateUtils, SectionKeyShare,
+    },
     node::Node,
     peer::PeerUtils,
     relocation::{self, RelocatePayloadUtils},
-    section::{
-        test_utils::*, ElderCandidatesUtils, NetworkKnowledge, NodeStateUtils, SectionKeyShare,
-    },
     supermajority, Error, Event, Result as RoutingResult, SectionAuthorityProviderUtils,
     ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
@@ -880,7 +880,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     // The removed peer is still our elder because we haven't yet processed the section update.
     assert!(dispatcher
         .core
-        .section()
+        .network_knowledge()
         .authority_provider()
         .await
         .contains_elder(remove_peer.name()));
@@ -1243,7 +1243,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     )
     .await?;
     let node = core.node.read().await.clone();
-    let section_pk = core.section().section_key().await;
+    let section_pk = core.network_knowledge().section_key().await;
     let dispatcher = Dispatcher::new(core);
 
     let dst_location = match dst {

@@ -40,10 +40,10 @@ use crate::routing::{
     dkg::DkgVoter,
     error::Result,
     log_markers::LogMarker,
+    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
 use crate::types::utils::write_data_to_disk;
@@ -154,7 +154,7 @@ impl Core {
             is_elder: self.is_elder().await,
             last_key: self.network_knowledge.section_key().await,
             prefix: self.network_knowledge.prefix().await,
-            elders: self.section().authority_provider().await.names(),
+            elders: self.network_knowledge().authority_provider().await.names(),
         }
     }
 
