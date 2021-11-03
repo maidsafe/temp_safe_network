@@ -36,7 +36,6 @@ use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
 use crate::messaging::system::SystemMsg;
 use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
-use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::DkgVoter,
     error::Result,
@@ -78,7 +77,6 @@ pub(crate) struct Core {
     pub(crate) comm: Comm,
     pub(crate) node: Arc<RwLock<Node>>,
     network_knowledge: NetworkKnowledge,
-    network: NetworkPrefixMap,
     pub(crate) section_keys_provider: SectionKeysProvider,
     message_aggregator: SignatureAggregator,
     proposal_aggregator: SignatureAggregator,
@@ -110,7 +108,6 @@ impl Core {
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
-        prefix_map: Option<NetworkPrefixMap>,
         is_genesis_node: bool,
     ) -> Result<Self> {
         let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
@@ -123,23 +120,11 @@ impl Core {
 
         let capacity = Capacity::new(BTreeMap::new());
         let adult_liveness = Liveness::new();
-        let genesis_pk = *network_knowledge.genesis_key();
-
-        // Check if the GenesisKey in the provided prefix_map is the same as our section's.
-        // // If not, start afresh.
-        let network = prefix_map.map_or(NetworkPrefixMap::new(genesis_pk), |network| {
-            if network.genesis_key() != genesis_pk {
-                NetworkPrefixMap::new(genesis_pk)
-            } else {
-                network
-            }
-        });
 
         Ok(Self {
             comm,
             node: Arc::new(RwLock::new(node)),
             network_knowledge,
-            network,
             section_keys_provider,
             proposal_aggregator: SignatureAggregator::default(),
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
@@ -203,8 +188,11 @@ impl Core {
         // TODO: Make this serialization human readable
 
         // Write to the node's root dir
-        if let Err(e) =
-            write_data_to_disk(&self.network, &self.root_storage_dir.join("prefix_map")).await
+        if let Err(e) = write_data_to_disk(
+            &self.network_knowledge.prefix_map(),
+            &self.root_storage_dir.join("prefix_map"),
+        )
+        .await
         {
             error!("Error writing PrefixMap to root dir: {:?}", e);
         }
@@ -214,7 +202,9 @@ impl Core {
             if let Some(mut safe_dir) = dirs_next::home_dir() {
                 safe_dir.push(".safe");
                 safe_dir.push("prefix_map");
-                if let Err(e) = write_data_to_disk(&self.network, &safe_dir).await {
+                if let Err(e) =
+                    write_data_to_disk(&self.network_knowledge.prefix_map(), &safe_dir).await
+                {
                     error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
                 }
             } else {
@@ -364,7 +354,8 @@ impl Core {
     }
 
     pub(crate) async fn print_network_stats(&self) {
-        self.network
+        self.network_knowledge
+            .prefix_map()
             .network_stats(&self.network_knowledge.authority_provider().await)
             .print();
         self.comm.print_stats();

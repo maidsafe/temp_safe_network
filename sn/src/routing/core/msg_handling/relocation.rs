@@ -48,12 +48,7 @@ impl Core {
             return Ok(commands);
         }
 
-        let relocations = relocation::actions(
-            &self.network_knowledge,
-            &self.network,
-            churn_name,
-            churn_signature,
-        );
+        let relocations = relocation::actions(&self.network_knowledge, churn_name, churn_signature);
 
         for (info, action) in relocations.await {
             let peer = info.peer;
@@ -93,14 +88,8 @@ impl Core {
         peer: &Peer,
         age: u8,
     ) -> Result<Vec<Command>> {
-        let details = RelocateDetails::with_age(
-            &self.network_knowledge,
-            &self.network,
-            peer,
-            *peer.name(),
-            age,
-        )
-        .await;
+        let details =
+            RelocateDetails::with_age(&self.network_knowledge, peer, *peer.name(), age).await;
 
         trace!(
             "Relocating {:?} to {} with age {} due to rejoin",
@@ -228,13 +217,8 @@ impl Core {
         }
 
         if let Some(info) = self.network_knowledge.members().get(&promise.name) {
-            let details = RelocateDetails::new(
-                &self.network_knowledge,
-                &self.network,
-                &info.peer,
-                promise.dst,
-            )
-            .await;
+            let details =
+                RelocateDetails::new(&self.network_knowledge, &info.peer, promise.dst).await;
             commands.extend(self.send_relocate(info.peer, details).await?);
         } else {
             error!(

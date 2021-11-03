@@ -204,7 +204,7 @@ impl NetworkPrefixMap {
                     // avoid potential looping.
                     return Err(Error::UntrustedProofChain(format!(
                         "provided proof_chain doesn't cover the SAP's key we currently know: {:?}",
-                        signed_section_auth.value
+                        entry.value().value
                     )));
                 }
             }

@@ -218,7 +218,8 @@ impl Core {
     ) -> Result<Vec<Command>> {
         debug!("{}", LogMarker::AeSendUpdateToSiblings);
         if let Some(sibling_sec_auth) = self
-            .network
+            .network_knowledge
+            .prefix_map()
             .get_signed(&self.section().prefix().await.sibling())
         {
             let promoted_sibling_elders: Vec<_> = sibling_sec_auth
@@ -339,7 +340,7 @@ impl Core {
         elder_candidates: ElderCandidates,
     ) -> Result<Vec<Command>> {
         let src_prefix = elder_candidates.prefix;
-        let generation = self.network_knowledge.main_chain_branch_len().await;
+        let generation = self.network_knowledge.chain_len().await;
         let session_id = DkgSessionId::new(&elder_candidates, generation);
 
         // Send DKG start to all candidates

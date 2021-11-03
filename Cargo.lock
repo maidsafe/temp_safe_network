@@ -3133,8 +3133,7 @@ dependencies = [
 [[package]]
 name = "secured_linked_list"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ff13e1ff37d93307cf79a60ecaf2644cddde08050261a0c71360acc951fee48"
+source = "git+https://github.com/bochaco/secured_linked_list.git?branch=feat-last-block-api#eef02e1a4b6c75b94b5ef05b21151b8fc30756c8"
 dependencies = [
  "bincode",
  "blsttc",
