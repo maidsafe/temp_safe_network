@@ -8,7 +8,7 @@
 
 use eyre::Result;
 use safe_network::{
-    client::{utils::test_utils::read_network_conn_info, Client, Config},
+    client::{utils::test_utils::read_network_conn_info, Client, ClientConfig},
     types::utils::random_bytes,
     url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
 };
@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
         "Network's genesis key: {}",
         hex::encode(genesis_key.to_bytes())
     );
-    let config = Config::new(None, None, genesis_key, None, None, None).await;
+    let config = ClientConfig::new(None, None, genesis_key, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     let pk = client.public_key();

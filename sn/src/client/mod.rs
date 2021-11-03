@@ -33,7 +33,7 @@ mod errors;
 // Export public API.
 
 pub use client_api::Client;
-pub use config_handler::{Config, DEFAULT_QUERY_TIMEOUT};
+pub use config_handler::{ClientConfig, DEFAULT_QUERY_TIMEOUT};
 pub use errors::ErrorMessage;
 pub use errors::{Error, Result};
 pub use qp2p::Config as QuicP2pConfig;
