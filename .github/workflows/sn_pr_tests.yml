@@ -122,7 +122,7 @@ jobs:
       - name: Run Data Types tests
         if: steps.data_types_changes.outputs.src == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- types
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       - name: Run DBs tests
         if: steps.dbs_changes.outputs.src == 'true'
