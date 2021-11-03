@@ -304,7 +304,7 @@ impl Core {
             };
 
             let event = if let Some(sibling_elders) = sibling_elders {
-                trace!("{}", LogMarker::SplitSuccess);
+                info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
                 // In case of split, send AEUpdate to sibling new elder nodes.
                 commands.extend(self.send_ae_update_to_sibling_section(&old).await?);
 
