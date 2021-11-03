@@ -174,16 +174,32 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn split_network_assert_health_check() -> Result<()> {
-        let promoted_count = search_testnet_results_per_node(&LogMarker::PromotedToElder)?.len();
-        let demoted_count = search_testnet_results_per_node(&LogMarker::DemotedFromElder)?.len();
+        let prefix1_nodes =
+            search_testnet_results_per_node(format!(r"{}: Prefix\(1\)", LogMarker::SplitSuccess))?
+                .len();
+        let prefix0_nodes =
+            search_testnet_results_per_node(format!(r"{}: Prefix\(0\)", LogMarker::SplitSuccess))?
+                .len();
+        let promoted_count =
+            search_testnet_results_per_node(LogMarker::PromotedToElder.to_string())?.len();
+        let demoted_count =
+            search_testnet_results_per_node(LogMarker::DemotedFromElder.to_string())?.len();
 
         let total_elders = promoted_count - demoted_count;
         println!("Found elders: {:?}", total_elders);
+        println!("Found elders: {:?}", total_elders);
+
+        println!("Found prefix_1_elders: {:?}", prefix1_nodes);
+        println!("Found prefix_0_elders: {:?}", prefix0_nodes);
+        assert_eq!(prefix1_nodes, 7);
+        assert_eq!(prefix0_nodes, 7);
+
         assert_eq!(total_elders, 14);
 
-        let split_count = search_testnet_results_per_node(&LogMarker::SplitSuccess)?.len();
+        let split_count =
+            search_testnet_results_per_node(LogMarker::SplitSuccess.to_string())?.len();
         println!("Found splits: {:?}", split_count);
-        assert!(split_count > 5);
+        assert!(split_count > 7);
 
         Ok(())
     }

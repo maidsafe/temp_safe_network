@@ -142,11 +142,11 @@ pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches, Error> {
 
 /// Search the local-test-network dir for matches.
 pub(crate) fn search_testnet_results_per_node(
-    pattern: &LogMarker,
+    pattern: String,
 ) -> Result<BTreeMap<String, Matches>, Error> {
     let the_path = get_testnet_path()?;
     let paths = [the_path];
-    let matcher = RegexMatcher::new_line_matcher(&pattern.to_string())?;
+    let matcher = RegexMatcher::new_line_matcher(&pattern)?;
     let mut matches: BTreeMap<String, Matches> = BTreeMap::default();
 
     for path in paths {
