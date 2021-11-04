@@ -157,11 +157,11 @@ impl Core {
         info!(
             "Our section with {:?} has approved peer {:?}.",
             self.network_knowledge.prefix().await,
-            node_state.value.peer
+            node_state.peer
         );
 
-        let addr = *node_state.value.peer.addr();
-        let name = *node_state.value.peer.name();
+        let addr = *node_state.peer.addr();
+        let name = *node_state.peer.name();
 
         let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
             genesis_key: *self.network_knowledge.genesis_key(),
@@ -226,7 +226,6 @@ impl Core {
             .get_signed(&self.network_knowledge().prefix().await.sibling())
         {
             let promoted_sibling_elders: Vec<_> = sibling_sec_auth
-                .value
                 .peers()
                 .iter()
                 .filter(|peer| !old.elders.contains(peer.name()))
@@ -246,15 +245,17 @@ impl Core {
 
             let _ = proof_chain.insert(
                 &previous_pk,
-                sibling_sec_auth.value.section_key(),
+                sibling_sec_auth.section_key(),
                 sibling_sec_auth.sig.signature.clone(),
             );
+
+            let dst_name = sibling_sec_auth.prefix().name();
 
             // Those promoted elders shall already know about other adult members.
             // TODO: confirm no need to populate the members.
             let node_msg = SystemMsg::AntiEntropyUpdate {
-                section_auth: sibling_sec_auth.value.clone(),
                 section_signed: sibling_sec_auth.sig,
+                section_auth: sibling_sec_auth.value,
                 proof_chain,
                 members: None,
             };
@@ -263,7 +264,7 @@ impl Core {
                 .send_direct_message_to_nodes(
                     promoted_sibling_elders,
                     node_msg,
-                    sibling_sec_auth.value.prefix().name(),
+                    dst_name,
                     previous_pk,
                 )
                 .await?;

@@ -599,7 +599,7 @@ mod tests {
         proof_chain.insert(&genesis_pk, pk1, sig1)?;
 
         // 3rd key is the section key in SAP
-        let pk2 = section_auth1.value.public_key_set.public_key();
+        let pk2 = section_auth1.public_key_set.public_key();
         let sig2 = bincode::serialize(&pk2).map(|bytes| sk1.sign(&bytes))?;
         proof_chain.insert(&pk1, pk2, sig2)?;
 

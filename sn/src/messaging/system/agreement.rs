@@ -12,7 +12,7 @@ use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, collections::BTreeSet, fmt};
+use std::{borrow::Borrow, collections::BTreeSet, fmt, ops::Deref};
 use xor_name::{Prefix, XorName};
 
 /// SHA3-256 hash digest.
@@ -69,6 +69,14 @@ where
 {
     fn borrow(&self) -> &Prefix {
         self.value.borrow()
+    }
+}
+
+impl<T: Serialize> Deref for SectionAuth<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
 }
 
