@@ -98,18 +98,18 @@ impl Session {
         // TODO: Consider other approach: Keep a session per section!
 
         // Get DataSection elders details.
-        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst_address)
-        {
-            let sap_elders = sap.value.elders.values().cloned();
+        let (elders, section_pk) =
+            if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
+                let sap_elders = sap.value.elders.values().cloned();
 
-            trace!("{:?} SAP elders found", sap_elders);
-            (
-                sap_elders.take(targets_count).collect::<Vec<SocketAddr>>(),
-                sap.value.public_key_set.public_key(),
-            )
-        } else {
-            return Err(Error::NoNetworkKnowledge);
-        };
+                trace!("{:?} SAP elders found", sap_elders);
+                (
+                    sap_elders.take(targets_count).collect::<Vec<SocketAddr>>(),
+                    sap.value.public_key_set.public_key(),
+                )
+            } else {
+                return Err(Error::NoNetworkKnowledge);
+            };
 
         let msg_id = MessageId::new();
 
@@ -173,7 +173,7 @@ impl Session {
         let dst = query.dst_name();
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst) {
+        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst, None) {
             (sap.value.elders, sap.value.public_key_set.public_key())
         } else {
             return Err(Error::NoNetworkKnowledge);
@@ -384,7 +384,7 @@ impl Session {
         // Get DataSection elders details.
         // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
         let (elders_or_adults, section_pk) =
-            if let Some(sap) = self.network.closest_or_opposite(&dst_address) {
+            if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
                 let mut nodes = sap
                     .value
                     .elders
@@ -444,7 +444,11 @@ impl Session {
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
             // wait until we have _some_ network knowledge
-            while self.network.closest_or_opposite(&dst_address).is_none() {
+            while self
+                .network
+                .closest_or_opposite(&dst_address, None)
+                .is_none()
+            {
                 let stats = self.network.known_sections_count();
                 debug!("Client still has not received any AE-Retry message... {:?}. Current sections known", stats);
 

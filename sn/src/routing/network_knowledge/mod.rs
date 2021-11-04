@@ -58,7 +58,7 @@ pub(crate) struct NetworkKnowledge {
     /// Network genesis key
     genesis_key: BlsPublicKey,
     /// The secured linked list of previous section keys, starting from genesis key
-    pub(crate) chain: Arc<RwLock<SecuredLinkedList>>,
+    chain: Arc<RwLock<SecuredLinkedList>>,
     /// Signed Section Authority Provider
     signed_sap: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
     /// Members of our section
@@ -155,6 +155,64 @@ impl NetworkKnowledge {
         })
     }
 
+    /// update all section info for our new section
+    pub(super) async fn relocated_to(&self, new_network_nowledge: Self) -> Result<()> {
+        debug!(">>>>. node was relocated");
+
+        let mut chain = self.chain.write().await;
+        *chain = new_network_nowledge.chain().await;
+        // don't hold write lock
+        drop(chain);
+
+        let mut signed_sap = self.signed_sap.write().await;
+        *signed_sap = new_network_nowledge.signed_sap.read().await.clone();
+        // don't hold write lock
+        drop(signed_sap);
+
+        let _updated = self
+            .merge_members(new_network_nowledge.members().clone())
+            .await?;
+
+        Ok(())
+    }
+
+    /// Creates `NetworkKnowledge` for the first node in the network
+    pub(super) async fn first_node(
+        peer: Peer,
+        genesis_sk_set: bls::SecretKeySet,
+    ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
+        let public_key_set = genesis_sk_set.public_keys();
+        let secret_key_share = genesis_sk_set.secret_key_share(0);
+        let genesis_key = public_key_set.public_key();
+
+        let section_auth =
+            create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
+
+        let section = NetworkKnowledge::new(
+            genesis_key,
+            SecuredLinkedList::new(genesis_key),
+            section_auth,
+            None,
+        )?;
+
+        for peer in section.signed_sap.read().await.value.peers() {
+            let node_state = NodeState::joined(peer, None);
+            let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
+            let _changed = section.section_peers.update(SectionAuth {
+                value: node_state,
+                sig,
+            });
+        }
+
+        let section_key_share = SectionKeyShare {
+            public_key_set,
+            index: 0,
+            secret_key_share,
+        };
+
+        Ok((section, section_key_share))
+    }
+
     pub(super) async fn update_knowledge_if_valid(
         &self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
@@ -231,6 +289,9 @@ impl NetworkKnowledge {
         update_sap: bool,
     ) -> bool {
         let provided_sap = &provided_signed_sap.value;
+
+        // TODO: once we have a proper DAG implementation we won't
+        // need proof chains from genesis but from any other key in the chain
         if proof_chain.root_key() != self.genesis_key() {
             info!(
                 ">>> PROOF NOT TO GENESIS {:?} ==== {:?}",
@@ -263,8 +324,11 @@ impl NetworkKnowledge {
             // TODO: this is inneficient and it will be improved once we have a proper DAG in place.
             for ((prefix, elders), (sap, proof)) in self.all_chains.read().await.iter() {
                 let our_sap = self.signed_sap.read().await.value.clone();
+
+                // FIXME: this may overwrite current SAP if an old SAP is received in a lagging msg,
+                // once we have the DAG we can update a SAP for same prefix only if it's newer.
                 if prefix.matches(our_name)
-                    && (elders.len() > our_sap.elders.len()
+                    && (elders != &our_sap.elders
                         || prefix.bit_count() > our_sap.prefix.bit_count())
                 {
                     *self.chain.write().await = proof.clone();
@@ -298,66 +362,12 @@ impl NetworkKnowledge {
     }
 
     // Get SectionAuthorityProvider of a known section with the given prefix.
-    pub(super) fn get_closest_or_opposite_signed_sap(
+    pub(super) async fn get_closest_or_opposite_signed_sap(
         &self,
         name: &XorName,
     ) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        self.prefix_map.closest_or_opposite(name)
-    }
-
-    /// update all section info for our new section
-    pub(super) async fn relocated_to(&self, new_section: Self) -> Result<()> {
-        debug!(">>>>. node was relocated");
-        let mut chain = self.chain.write().await;
-        *chain = new_section.chain().await;
-        // don't hold write lock
-        drop(chain);
-
-        let mut section_auth = self.signed_sap.write().await;
-        *section_auth = new_section.signed_sap.read().await.clone();
-        // don't hold write lock
-        drop(section_auth);
-
-        let _updated = self.merge_members(new_section.members().clone()).await?;
-
-        Ok(())
-    }
-
-    /// Creates `NetworkKnowledge` for the first node in the network
-    pub(super) async fn first_node(
-        peer: Peer,
-        genesis_sk_set: bls::SecretKeySet,
-    ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-        let public_key_set = genesis_sk_set.public_keys();
-        let secret_key_share = genesis_sk_set.secret_key_share(0);
-        let genesis_key = public_key_set.public_key();
-
-        let section_auth =
-            create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
-
-        let section = NetworkKnowledge::new(
-            genesis_key,
-            SecuredLinkedList::new(genesis_key),
-            section_auth,
-            None,
-        )?;
-
-        for peer in section.signed_sap.read().await.value.peers() {
-            let node_state = NodeState::joined(peer, None);
-            let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
-            let _changed = section.section_peers.update(SectionAuth {
-                value: node_state,
-                sig,
-            });
-        }
-
-        let section_key_share = SectionKeyShare {
-            public_key_set,
-            index: 0,
-            secret_key_share,
-        };
-
-        Ok((section, section_key_share))
+        self.prefix_map
+            .closest_or_opposite(name, Some(&self.prefix().await))
     }
 
     pub(super) fn genesis_key(&self) -> &bls::PublicKey {

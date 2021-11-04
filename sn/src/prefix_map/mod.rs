@@ -74,22 +74,37 @@ impl NetworkPrefixMap {
         true
     }
 
-    /// Returns the known section that is closest to the given name, regardless of whether `name`
-    /// belongs in that section or not.
-    fn closest(&self, name: &XorName) -> Option<SectionAuth<SectionAuthorityProvider>> {
+    /// Returns the known section that is closest to the given name,
+    /// regardless of whether `name` belongs in that section or not.
+    /// If provided, it excludes any section matching the passed prefix.
+    fn closest(
+        &self,
+        name: &XorName,
+        exclude: Option<&Prefix>,
+    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
         self.sections
             .iter()
+            .filter(|e| {
+                if let Some(prefix) = exclude {
+                    e.key() != prefix
+                } else {
+                    true
+                }
+            })
             .min_by(|lhs, rhs| lhs.key().cmp_distance(rhs.key(), name))
             .map(|e| e.value().clone())
     }
 
-    /// Returns the known section that is closest to the given name, regardless of whether `name`
-    /// belongs in that section or not. If there are no close matches, return a SAP from an opposite prefix.
+    /// Returns the known section that is closest to the given name,
+    /// regardless of whether `name` belongs in that section or not.
+    /// If there are no close matches in remote sections, return a SAP from an opposite prefix.
+    /// If provided, it excludes any section matching the passed prefix.
     pub(crate) fn closest_or_opposite(
         &self,
         name: &XorName,
+        exclude: Option<&Prefix>,
     ) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        self.closest(name).or_else(|| {
+        self.closest(name, exclude).or_else(|| {
             self.sections
                 .iter()
                 .filter(|e| e.key().matches(&name.with_bit(0, !name.bit(0))))
@@ -147,7 +162,7 @@ impl NetworkPrefixMap {
 
         for section in self.sections.iter() {
             let prefix = section.key();
-            trace!("Known prefix: {:?}", prefix);
+            trace!("Known prefix after update: {:?}", prefix);
         }
 
         res
@@ -418,14 +433,14 @@ mod tests {
 
         // There are no matching prefixes, so return an opposite prefix.
         assert_eq!(
-            map.closest_or_opposite(&p1.substituted_in(rng.gen()))
+            map.closest_or_opposite(&p1.substituted_in(rng.gen()), None)
                 .ok_or(Error::NoMatchingSection)?,
             sap0
         );
 
         let _changed = map.insert(sap0.clone());
         assert_eq!(
-            map.closest_or_opposite(&p1.substituted_in(rng.gen()))
+            map.closest_or_opposite(&p1.substituted_in(rng.gen()), None)
                 .ok_or(Error::NoMatchingSection)?,
             sap0
         );
@@ -580,9 +595,18 @@ mod tests {
         let n10 = p10.substituted_in(rng.gen());
         let n11 = p11.substituted_in(rng.gen());
 
-        assert_eq!(map.closest(&n01).map(|sap| sap.value.prefix), Some(p01));
-        assert_eq!(map.closest(&n10).map(|sap| sap.value.prefix), Some(p10));
-        assert_eq!(map.closest(&n11).map(|sap| sap.value.prefix), Some(p10));
+        assert_eq!(
+            map.closest(&n01, None).map(|sap| sap.value.prefix),
+            Some(p01)
+        );
+        assert_eq!(
+            map.closest(&n10, None).map(|sap| sap.value.prefix),
+            Some(p10)
+        );
+        assert_eq!(
+            map.closest(&n11, None).map(|sap| sap.value.prefix),
+            Some(p10)
+        );
 
         Ok(())
     }

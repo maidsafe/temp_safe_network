@@ -293,6 +293,7 @@ impl Core {
             match self
                 .network_knowledge
                 .get_closest_or_opposite_signed_sap(&dst_name)
+                .await
             {
                 Some(section_auth) => {
                     info!(
@@ -320,7 +321,7 @@ impl Core {
                     }));
                 }
                 None => {
-                    error!("Our PrefixMap is empty");
+                    warn!("Our PrefixMap is empty");
                     // TODO: do we want to reroute some data messages to another seciton here using check_for_better_section_sap_for_data ?
                     // if not we can remove that function.
 
@@ -328,7 +329,7 @@ impl Core {
                     // to get up to date info from other Elders in our section as it may be
                     // a section key we are not aware of yet?
                     // ...and once we acquired new key/s we attempt AE check again?
-                    error!(
+                    warn!(
                             "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section.",
                             dst_name, dst_section_pk
                         );
@@ -480,6 +481,7 @@ impl Core {
             match self
                 .network_knowledge
                 .get_closest_or_opposite_signed_sap(&data_name)
+                .await
             {
                 Some(better_sap) => {
                     // Update the client of the actual destination section
@@ -512,17 +514,14 @@ mod tests {
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
-        network_knowledge::{
-            test_utils::{gen_addr, gen_section_authority_provider},
-            NetworkKnowledge,
-        },
+        network_knowledge::test_utils::{gen_addr, gen_section_authority_provider},
         node::Node,
         routing_api::tests::create_comm,
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use assert_matches::assert_matches;
     use bls::SecretKey;
-    use eyre::{eyre, Context, Result};
+    use eyre::{Context, Result};
     use rand::Rng;
     use secured_linked_list::SecuredLinkedList;
     use tokio::sync::mpsc;
@@ -567,10 +566,10 @@ mod tests {
         let (msg, src_location) = env.create_message(&env.other_sap.value.prefix, other_pk)?;
         let sender = env.core.node.read().await.addr;
 
-        // since it's not aware of the other prefix, it shall fail with NoMatchingSection
+        // since it's not aware of the other prefix, it shall redirect us to genesis section/SAP
         let dst_section_pk = other_pk;
         let dst_name = env.other_sap.value.prefix.name();
-        match env
+        let command = env
             .core
             .check_for_entropy(
                 msg.serialize()?,
@@ -579,13 +578,21 @@ mod tests {
                 dst_name,
                 sender,
             )
-            .await
-        {
-            Err(Error::NoMatchingSection) => {}
-            _ => return Err(eyre!("expected Error::NoMatchingSection")),
-        }
+            .await?;
 
-        // now let's insert a SAP to make it aware of the other prefix
+        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
+            wire_msg
+                .into_message()
+                .context("failed to deserialised anti-entropy message")?
+        });
+
+        assert_matches!(msg_type, MessageType::System{ msg, .. } => {
+            assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
+                assert_eq!(section_auth, env.genesis_sap);
+            });
+        });
+
+        // now let's insert the other SAP to make it aware of the other prefix
         assert!(env
             .core
             .network_knowledge
@@ -708,6 +715,7 @@ mod tests {
         core: Core,
         other_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: SecuredLinkedList,
+        genesis_sap: SectionAuthorityProvider,
     }
 
     impl Env {
@@ -728,9 +736,6 @@ mod tests {
             let genesis_pk = genesis_sk_set.public_keys().public_key();
             assert_eq!(genesis_pk, *chain.root_key());
 
-            let section = NetworkKnowledge::new(genesis_pk, chain, signed_sap, None)
-                .context("failed to create section")?;
-
             let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
             let core = Core::first_node(
                 create_comm().await?,
@@ -742,7 +747,13 @@ mod tests {
             )
             .await?;
 
-            core.relocate(node, section).await?;
+            let genesis_sap = core.network_knowledge().authority_provider().await;
+
+            // get our Core to now be in prefix(0)
+            let _ = core
+                .network_knowledge()
+                .update_knowledge_if_valid(signed_sap, &chain, None, &node.name(), true)
+                .await;
 
             // generate other SAP for prefix1
             let (other_sap, _, secret_key_set) =
@@ -759,6 +770,7 @@ mod tests {
                 core,
                 other_sap,
                 proof_chain,
+                genesis_sap,
             })
         }
 

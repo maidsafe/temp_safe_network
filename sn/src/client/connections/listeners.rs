@@ -463,7 +463,7 @@ impl Session {
 
             if let Some(sap) = session
                 .network
-                .closest_or_opposite(&dst_address_of_bounced_msg)
+                .closest_or_opposite(&dst_address_of_bounced_msg, None)
             {
                 target_public_key = sap.value.public_key_set.public_key();
 

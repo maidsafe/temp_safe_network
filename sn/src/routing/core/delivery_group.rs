@@ -102,12 +102,7 @@ async fn candidates(
     network_knowledge: &NetworkKnowledge,
 ) -> Result<(Vec<Peer>, usize)> {
     // All sections we know (including our own), sorted by distance to `target_name`.
-    let network_sections = network_knowledge.prefix_map().all();
-    let sap = network_knowledge.authority_provider().await;
-
-    let mut sections = vec![sap];
-
-    sections.extend(network_sections);
+    let sections = network_knowledge.prefix_map().all();
 
     let sections = sections
         .iter()
@@ -445,14 +440,14 @@ mod tests {
         };
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
 
-        // Send to all elders
+        // Send to chosen elder
+        assert_eq!(dg_size, 1);
         assert_eq!(
-            dg_size,
-            network_knowledge.authority_provider().await.elder_count()
-        );
-        itertools::assert_equal(
-            recipients,
-            network_knowledge.authority_provider().await.peers(),
+            Some(recipients[0].addr),
+            network_knowledge
+                .authority_provider()
+                .await
+                .get_addr(&dst_name),
         );
 
         Ok(())
@@ -630,11 +625,14 @@ mod tests {
         let genesis_pk = genesis_sk.public_key();
         let section_auth = section_signed(genesis_sk, section_auth)?;
         let chain = SecuredLinkedList::new(genesis_pk);
-        let section = NetworkKnowledge::new(genesis_pk, chain, section_auth, None)?;
+        let network_knowledge = NetworkKnowledge::new(genesis_pk, chain, section_auth, None)?;
 
-        let our_name = section.prefix().await.substituted_in(rand::random());
+        let our_name = network_knowledge
+            .prefix()
+            .await
+            .substituted_in(rand::random());
 
-        Ok((our_name, section))
+        Ok((our_name, network_knowledge))
     }
 
     fn choose_elder_name(section_auth: &SectionAuthorityProvider) -> Result<XorName> {
