@@ -669,7 +669,8 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     // Make a left peer.
     let peer = create_peer(age);
     let node_state = NodeState {
-        peer,
+        name: peer.name,
+        addr: peer.addr,
         state: MembershipState::Left,
         previous_name: None,
     };
@@ -760,7 +761,8 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let node_state = NodeState {
-        peer: existing_peer,
+        name: existing_peer.name,
+        addr: existing_peer.addr,
         state: MembershipState::Left,
         previous_name: None,
     };

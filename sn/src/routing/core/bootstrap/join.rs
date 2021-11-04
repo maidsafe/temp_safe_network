@@ -20,7 +20,6 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    peer::PeerUtils,
     SectionAuthorityProviderUtils,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -430,7 +429,7 @@ impl<'a> Join<'a> {
                     ref section_chain,
                     ..
                 } => {
-                    if node_state.peer.name() != &self.node.name() {
+                    if node_state.name != self.node.name() {
                         trace!("Ignore NodeApproval not for us");
                         continue;
                     }

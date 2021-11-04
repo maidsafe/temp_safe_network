@@ -362,15 +362,15 @@ impl Dispatcher {
             }
             Command::TestConnectivity(name) => {
                 let mut commands = vec![];
-                if let Some(peer) = self
-                    .core
-                    .network_knowledge()
-                    .members()
-                    .get(&name)
-                    .map(|member_info| member_info.peer)
-                {
-                    if self.core.comm.is_reachable(peer.addr()).await.is_err() {
-                        commands.push(Command::ProposeOffline(*peer.name()));
+                if let Some(member_info) = self.core.network_knowledge().members().get(&name) {
+                    if self
+                        .core
+                        .comm
+                        .is_reachable(&member_info.addr)
+                        .await
+                        .is_err()
+                    {
+                        commands.push(Command::ProposeOffline(member_info.name));
                     }
                 }
                 Ok(commands)
