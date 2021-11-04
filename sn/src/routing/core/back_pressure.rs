@@ -15,7 +15,7 @@ use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
 use sysinfo::{RefreshKind, System, SystemExt};
 use tokio::{sync::RwLock, time::Instant};
 
-const MIN_REPORT_INTERVAL: Duration = Duration::from_secs(10);
+const MIN_REPORT_INTERVAL: Duration = Duration::from_secs(60);
 const REPORT_TTL: Duration = Duration::from_secs(300); // 5 minutes
 
 type OutgoingReports = BTreeMap<SocketAddr, (Instant, LoadReport)>;
