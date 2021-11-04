@@ -58,7 +58,7 @@ impl NrsMap {
             None => {
                 debug!("NRS: No link found for subname(s): {}", sub_name);
                 Err(Error::ContentError(format!(
-                    "Link not found in NRS Map Container for: {}",
+                    "Link not found in NRS Map Container for subname(s): \"{}\"",
                     sub_name
                 )))
             }
