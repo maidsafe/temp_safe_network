@@ -74,8 +74,8 @@ impl ClientConfig {
             Some(path) => read_config_file(path).await.unwrap_or_default(),
         };
 
-        qp2p.idle_timeout = Some(Duration::from_secs(5));
-        qp2p.keep_alive_interval = Some(Duration::from_secs(1));
+        qp2p.idle_timeout = Some(DEFAULT_QUERY_TIMEOUT);
+        qp2p.keep_alive_interval = Some(Duration::from_secs(30));
 
         let query_timeout = query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
 
