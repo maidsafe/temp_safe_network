@@ -129,7 +129,7 @@ impl Safe {
             .await
     }
 
-    fn get_register_address(&self, url: &Url) -> Result<RegisterAddress> {
+    pub(crate) fn get_register_address(&self, url: &Url) -> Result<RegisterAddress> {
         let address = match url.address() {
             DataAddress::Register(reg_address) => reg_address,
             other => {
