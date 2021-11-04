@@ -33,7 +33,6 @@ use crate::routing::{
     log_markers::LogMarker,
     messages::WireMsgUtils,
     node::Node,
-    peer::PeerUtils,
     Peer, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
 };
 use crate::{dbs::UsedSpace, messaging::data::ChunkDataExchange};

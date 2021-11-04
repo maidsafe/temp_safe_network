@@ -15,7 +15,6 @@ use crate::routing::{
     core::bootstrap::JoiningAsRelocated,
     error::Result,
     network_knowledge::NodeStateUtils,
-    peer::PeerUtils,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
     Event, Peer, SectionAuthorityProviderUtils, ELDER_SIZE,

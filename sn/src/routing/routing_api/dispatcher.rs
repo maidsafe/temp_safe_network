@@ -20,7 +20,6 @@ use crate::routing::{
     messages::WireMsgUtils,
     network_knowledge::NetworkKnowledge,
     node::Node,
-    peer::PeerUtils,
     Error, Prefix, XorName,
 };
 use crate::types::PublicKey;

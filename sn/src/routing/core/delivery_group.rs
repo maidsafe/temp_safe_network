@@ -10,7 +10,6 @@ use crate::messaging::DstLocation;
 use crate::routing::{
     error::{Error, Result},
     network_knowledge::{NetworkKnowledge, NodeStateUtils},
-    peer::PeerUtils,
     supermajority, Peer, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use itertools::Itertools;

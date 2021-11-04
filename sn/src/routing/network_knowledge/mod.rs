@@ -25,7 +25,6 @@ use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
     log_markers::LogMarker,
-    peer::PeerUtils,
     Peer, ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
 };
 use bls::PublicKey as BlsPublicKey;
