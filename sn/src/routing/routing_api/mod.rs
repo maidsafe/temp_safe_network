@@ -24,9 +24,7 @@ use self::{
     event_stream::EventStream,
 };
 use crate::messaging::{
-    data::StorageLevel,
-    system::{Peer, SystemMsg},
-    DstLocation, SectionAuthorityProvider, WireMsg,
+    data::StorageLevel, system::SystemMsg, DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     core::{join_network, ChunkStore, Comm, ConnectionEvent, Core, RegisterStorage},
@@ -36,7 +34,7 @@ use crate::routing::{
     messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
-    SectionAuthorityProviderUtils, MIN_ADULT_AGE,
+    Peer, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
 };
 use crate::{dbs::UsedSpace, messaging::data::ChunkDataExchange};
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};

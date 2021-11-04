@@ -13,8 +13,7 @@ use crate::dbs::UsedSpace;
 use crate::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, NodeState,
-        Peer, Proposal, RelocateDetails, RelocatePayload, ResourceProofResponse, SectionAuth,
-        SystemMsg,
+        Proposal, RelocateDetails, RelocatePayload, ResourceProofResponse, SectionAuth, SystemMsg,
     },
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
     SectionAuth as MsgKindSectionAuth, SectionAuthorityProvider, WireMsg,
@@ -31,7 +30,7 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     relocation::{self, RelocatePayloadUtils},
-    supermajority, Error, Event, Result as RoutingResult, SectionAuthorityProviderUtils,
+    supermajority, Error, Event, Peer, Result as RoutingResult, SectionAuthorityProviderUtils,
     ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};

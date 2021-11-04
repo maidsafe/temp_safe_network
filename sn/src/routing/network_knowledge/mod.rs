@@ -17,7 +17,7 @@ pub(crate) use self::section_authority_provider::test_utils;
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 use crate::messaging::{
-    system::{ElderCandidates, KeyedSig, NodeState, Peer, SectionAuth, SectionPeers},
+    system::{ElderCandidates, KeyedSig, NodeState, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
 use crate::prefix_map::NetworkPrefixMap;
@@ -26,7 +26,7 @@ use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
     peer::PeerUtils,
-    ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
+    Peer, ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
 };
 use bls::PublicKey as BlsPublicKey;
 pub(crate) use node_state::NodeStateUtils;

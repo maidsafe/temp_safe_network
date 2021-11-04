@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{system::Peer, DstLocation};
+use crate::messaging::DstLocation;
 use crate::routing::{
     error::{Error, Result},
     network_knowledge::{NetworkKnowledge, NodeStateUtils},
     peer::PeerUtils,
-    supermajority, SectionAuthorityProviderUtils, ELDER_SIZE,
+    supermajority, Peer, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use itertools::Itertools;
 use std::{cmp, iter};

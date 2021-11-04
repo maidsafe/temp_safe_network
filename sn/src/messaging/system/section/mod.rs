@@ -8,12 +8,10 @@
 
 mod candidates;
 mod node_state;
-mod peer;
 
 pub use candidates::ElderCandidates;
 pub use node_state::MembershipState;
 pub use node_state::NodeState;
-pub use peer::Peer;
 
 use crate::messaging::system::agreement::SectionAuth;
 use serde::{Deserialize, Serialize};

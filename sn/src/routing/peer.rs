@@ -6,9 +6,29 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::Peer;
-use std::net::SocketAddr;
+use std::{
+    fmt::{self, Display, Formatter},
+    hash::Hash,
+    net::SocketAddr,
+};
 use xor_name::{XorName, XOR_NAME_LEN};
+
+/// Network p2p peer identity.
+/// When a node knows another p2p_node as a `Peer` it's implicitly connected to it. This is separate
+/// from being connected at the network layer, which currently is handled by quic-p2p.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Peer {
+    /// Peer's xorname
+    pub name: XorName,
+    /// Peer's SocketAddr
+    pub addr: SocketAddr,
+}
+
+impl Display for Peer {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{} at {}", self.name, self.addr)
+    }
+}
 
 ///
 pub trait PeerUtils {

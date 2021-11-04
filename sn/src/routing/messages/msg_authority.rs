@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{system::Peer, NodeMsgAuthority, SrcLocation};
+use crate::messaging::{NodeMsgAuthority, SrcLocation};
 use crate::routing::{
     ed25519::{self},
     error::{Error, Result},
-    peer::PeerUtils,
+    Peer, PeerUtils,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;

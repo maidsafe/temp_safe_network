@@ -25,7 +25,6 @@ pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::ElderCandidates;
 pub use section::MembershipState;
 pub use section::NodeState;
-pub use section::Peer;
 pub use section::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
