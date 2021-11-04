@@ -218,7 +218,7 @@ jobs:
       - name: Initial client tests...
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::blob && sleep 5
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::blob && sleep 5
         timeout-minutes: 5
 
       # register api
