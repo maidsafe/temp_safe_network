@@ -94,7 +94,7 @@ impl RelocateDetailsUtils for RelocateDetails {
             .map_or_else(|_| root_key, |section_auth| section_auth.section_key());
 
         RelocateDetails {
-            pub_id: *peer.name(),
+            pub_id: peer.name(),
             dst,
             dst_key,
             age,
@@ -184,11 +184,11 @@ impl RelocateAction {
         peer: &Peer,
         churn_name: &XorName,
     ) -> Self {
-        let dst = dst(peer.name(), churn_name);
+        let dst = dst(&peer.name(), churn_name);
 
-        if network_knowledge.is_elder(peer.name()).await {
+        if network_knowledge.is_elder(&peer.name()).await {
             RelocateAction::Delayed(RelocatePromise {
-                name: *peer.name(),
+                name: peer.name(),
                 dst,
             })
         } else {
@@ -347,7 +347,7 @@ mod tests {
         let expected_relocated_peers: Vec<_> = peers
             .iter()
             .filter(|peer| Some(peer.age()) == expected_relocated_age)
-            .sorted_by_key(|peer| *peer.name())
+            .sorted_by_key(|peer| peer.name())
             .collect();
 
         assert_eq!(expected_relocated_peers.len(), actions.len());
@@ -355,9 +355,9 @@ mod tests {
         // Verify the relocate action is correct depending on whether the peer is elder or not.
         // NOTE: `zip` works here, because both collections are sorted by name.
         for (peer, action) in expected_relocated_peers.into_iter().zip(actions) {
-            assert_eq!(peer.name(), action.name());
+            assert_eq!(&peer.name(), action.name());
 
-            let is_elder = futures::executor::block_on(network_knowledge.is_elder(peer.name()));
+            let is_elder = futures::executor::block_on(network_knowledge.is_elder(&peer.name()));
 
             if is_elder {
                 assert_matches!(action, RelocateAction::Delayed(_));

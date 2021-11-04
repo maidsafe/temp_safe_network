@@ -459,7 +459,7 @@ impl NetworkKnowledge {
             .section_peers
             .elder_candidates(ELDER_SIZE, &sap, excluded_names);
 
-        let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).cloned().collect();
+        let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).collect();
         let current_names: BTreeSet<_> = sap.names();
 
         if expected_names == current_names {
@@ -488,7 +488,7 @@ impl NetworkKnowledge {
         let mut active_members = vec![];
         let nodes = self.section_peers.all_members();
         for peer in nodes {
-            if self.section_peers.is_joined(peer.name()) || self.is_elder(peer.name()).await {
+            if self.section_peers.is_joined(&peer.name()) || self.is_elder(&peer.name()).await {
                 active_members.push(peer);
             }
         }
@@ -501,7 +501,7 @@ impl NetworkKnowledge {
         let mut adults = vec![];
         let nodes = self.section_peers.mature();
         for peer in nodes {
-            if !self.is_elder(peer.name()).await {
+            if !self.is_elder(&peer.name()).await {
                 adults.push(peer);
             }
         }
@@ -557,7 +557,7 @@ impl NetworkKnowledge {
             .section_peers
             .mature()
             .iter()
-            .filter(|peer| !excluded_names.contains(peer.name()))
+            .filter(|peer| !excluded_names.contains(&peer.name()))
             .map(|peer| peer.name().bit(next_bit_index) == next_bit)
             .fold((0, 0), |(ours, siblings), is_our_prefix| {
                 if is_our_prefix {

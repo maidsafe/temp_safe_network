@@ -19,7 +19,7 @@ impl Core {
     pub(crate) async fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Command>> {
         let name = if let Some(peer) = self.network_knowledge.find_joined_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
-            *peer.name()
+            peer.name()
         } else {
             trace!("Lost unknown peer {}", addr);
             return Ok(vec![]);
@@ -52,7 +52,7 @@ impl Core {
             .await
             .peers()
             .iter()
-            .filter(|peer| !names.contains(peer.name()))
+            .filter(|peer| !names.contains(&peer.name()))
             .cloned()
             .collect();
         let mut result: Vec<Command> = Vec::new();

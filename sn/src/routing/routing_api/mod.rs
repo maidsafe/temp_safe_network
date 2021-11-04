@@ -349,7 +349,7 @@ impl Routing {
         self.our_elders()
             .await
             .into_iter()
-            .sorted_by(|lhs, rhs| name.cmp_distance(lhs.name(), rhs.name()))
+            .sorted_by(|lhs, rhs| name.cmp_distance(&lhs.name(), &rhs.name()))
             .collect()
     }
 
@@ -364,7 +364,7 @@ impl Routing {
         self.our_adults()
             .await
             .into_iter()
-            .sorted_by(|lhs, rhs| name.cmp_distance(lhs.name(), rhs.name()))
+            .sorted_by(|lhs, rhs| name.cmp_distance(&lhs.name(), &rhs.name()))
             .collect()
     }
 

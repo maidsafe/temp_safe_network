@@ -27,7 +27,7 @@ use bls::PublicKey as BlsPublicKey;
 impl Core {
     /// Check if we already have this peer in our section
     fn peer_is_already_a_member(&self, peer: Peer) -> bool {
-        if self.network_knowledge.members().is_joined(peer.name()) {
+        if self.network_knowledge.members().is_joined(&peer.name()) {
             debug!(
                 "Ignoring JoinRequest from {} - already member of our section.",
                 peer
@@ -84,7 +84,7 @@ impl Core {
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
                 self.send_direct_message(
-                    (*peer.name(), *peer.addr()),
+                    (peer.name(), peer.addr()),
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -106,7 +106,7 @@ impl Core {
             FIRST_SECTION_MIN_AGE
         };
 
-        if !section_key_matches || !self.network_knowledge.prefix().await.matches(peer.name()) {
+        if !section_key_matches || !self.network_knowledge.prefix().await.matches(&peer.name()) {
             if section_key_matches {
                 debug!(
                     "JoinRequest from {} - name doesn't match our prefix {:?}.",
@@ -122,7 +122,7 @@ impl Core {
                 );
             }
 
-            let retry_sap = self.matching_section(peer.name()).await?;
+            let retry_sap = self.matching_section(&peer.name()).await?;
 
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
                 section_auth: retry_sap,
@@ -133,7 +133,7 @@ impl Core {
             trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
             return Ok(vec![
                 self.send_direct_message(
-                    (*peer.name(), *peer.addr()),
+                    (peer.name(), peer.addr()),
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -156,7 +156,7 @@ impl Core {
 
             return Ok(vec![
                 self.send_direct_message(
-                    (*peer.name(), *peer.addr()),
+                    (peer.name(), peer.addr()),
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -167,7 +167,7 @@ impl Core {
         // Require resource signed if joining as a new node.
         if let Some(response) = join_request.resource_proof_response {
             if !self
-                .validate_resource_proof_response(peer.name(), response)
+                .validate_resource_proof_response(&peer.name(), response)
                 .await
             {
                 debug!(
@@ -178,16 +178,16 @@ impl Core {
             }
         } else {
             // Do reachability check only for the initial join request
-            let cmd = if self.comm.is_reachable(peer.addr()).await.is_err() {
+            let cmd = if self.comm.is_reachable(&peer.addr()).await.is_err() {
                 let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                    JoinRejectionReason::NodeNotReachable(*peer.addr()),
+                    JoinRejectionReason::NodeNotReachable(peer.addr()),
                 )));
 
                 trace!("{}", LogMarker::SendJoinRejected);
 
                 trace!("Sending {:?} to {}", node_msg, peer);
                 self.send_direct_message(
-                    (*peer.name(), *peer.addr()),
+                    (peer.name(), peer.addr()),
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -218,9 +218,9 @@ impl Core {
             relocate_payload
         } else {
             // Do reachability check
-            let node_msg = if self.comm.is_reachable(peer.addr()).await.is_err() {
+            let node_msg = if self.comm.is_reachable(&peer.addr()).await.is_err() {
                 SystemMsg::JoinAsRelocatedResponse(Box::new(
-                    JoinAsRelocatedResponse::NodeNotReachable(*peer.addr()),
+                    JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
                 ))
             } else {
                 SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
@@ -232,7 +232,7 @@ impl Core {
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
                 self.send_direct_message(
-                    (*peer.name(), *peer.addr()),
+                    (peer.name(), peer.addr()),
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -240,7 +240,7 @@ impl Core {
             ]);
         };
 
-        if !self.network_knowledge.prefix().await.matches(peer.name())
+        if !self.network_knowledge.prefix().await.matches(&peer.name())
             || join_request.section_key != self.network_knowledge.section_key().await
         {
             debug!(
@@ -258,7 +258,7 @@ impl Core {
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
                 self.send_direct_message(
-                    (*peer.name(), *peer.addr()),
+                    (peer.name(), peer.addr()),
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -266,7 +266,7 @@ impl Core {
             ]);
         }
 
-        if self.network_knowledge.members().is_joined(peer.name()) {
+        if self.network_knowledge.members().is_joined(&peer.name()) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - already member of our section.",
                 peer
@@ -274,7 +274,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if !relocate_payload.verify_identity(peer.name()) {
+        if !relocate_payload.verify_identity(&peer.name()) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - invalid signature.",
                 peer

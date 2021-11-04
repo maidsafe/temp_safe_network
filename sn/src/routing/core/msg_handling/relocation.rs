@@ -88,7 +88,7 @@ impl Core {
         age: u8,
     ) -> Result<Vec<Command>> {
         let details =
-            RelocateDetails::with_age(&self.network_knowledge, peer, *peer.name(), age).await;
+            RelocateDetails::with_age(&self.network_knowledge, peer, peer.name(), age).await;
 
         trace!(
             "Relocating {:?} to {} with age {} due to rejoin",

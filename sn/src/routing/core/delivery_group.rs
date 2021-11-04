@@ -85,7 +85,7 @@ async fn section_candidates(
             .peers()
             .iter()
             .cloned()
-            .filter(|node| node.name() != our_name)
+            .filter(|node| &node.name() != our_name)
             .collect();
         let dg_size = chosen_section.len();
         return Ok((chosen_section, dg_size));
@@ -138,7 +138,7 @@ async fn candidates(
 
         if *prefix == network_knowledge.prefix().await {
             // Send to all connected targets so they can forward the message
-            candidates.retain(|node| node.name() != our_name);
+            candidates.retain(|node| &node.name() != our_name);
             dg_size = candidates.len();
             break;
         }
@@ -147,7 +147,7 @@ async fn candidates(
             break;
         }
     }
-    candidates.sort_by(|lhs, rhs| target_name.cmp_distance(lhs.name(), rhs.name()));
+    candidates.sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
 
     if dg_size > 0 && candidates.len() >= dg_size {
         Ok((candidates, dg_size))
@@ -208,7 +208,7 @@ mod tests {
 
         // Send only to the dst node.
         assert_eq!(dg_size, 1);
-        assert_eq!(recipients[0].name(), &dst_name);
+        assert_eq!(recipients[0].name(), dst_name);
 
         Ok(())
     }
@@ -233,7 +233,7 @@ mod tests {
 
         // Send only to the dst node.
         assert_eq!(dg_size, 1);
-        assert_eq!(recipients[0].name(), &dst_name);
+        assert_eq!(recipients[0].name(), dst_name);
 
         Ok(())
     }
@@ -259,7 +259,7 @@ mod tests {
             .await
             .peers()
             .into_iter()
-            .filter(|peer| peer.name() != &our_name);
+            .filter(|peer| peer.name() != our_name);
         assert_eq!(dg_size, expected_recipients.count());
 
         let expected_recipients = network_knowledge
@@ -267,7 +267,7 @@ mod tests {
             .await
             .peers()
             .into_iter()
-            .filter(|peer| peer.name() != &our_name);
+            .filter(|peer| peer.name() != our_name);
         itertools::assert_equal(recipients, expected_recipients);
 
         Ok(())
@@ -292,7 +292,7 @@ mod tests {
 
         // Send only to the dst node.
         assert_eq!(dg_size, 1);
-        assert_eq!(recipients[0].name(), &dst_name);
+        assert_eq!(recipients[0].name(), dst_name);
 
         Ok(())
     }
@@ -318,7 +318,7 @@ mod tests {
         let expected_recipients = section_auth1
             .peers()
             .into_iter()
-            .sorted_by(|lhs, rhs| dst_name.cmp_distance(lhs.name(), rhs.name()));
+            .sorted_by(|lhs, rhs| dst_name.cmp_distance(&lhs.name(), &rhs.name()));
         assert_eq!(dg_size, section_auth1.elder_count());
         itertools::assert_equal(recipients, expected_recipients);
 
@@ -350,7 +350,7 @@ mod tests {
         let expected_recipients = elders_info1
             .peers()
             .into_iter()
-            .sorted_by(|lhs, rhs| dst_name.cmp_distance(lhs.name(), rhs.name()));
+            .sorted_by(|lhs, rhs| dst_name.cmp_distance(&lhs.name(), &rhs.name()));
         let min_dg_size =
             1 + elders_info1.elder_count() - supermajority(elders_info1.elder_count());
         assert_eq!(dg_size, min_dg_size);
@@ -380,7 +380,7 @@ mod tests {
         let expected_recipients = section_auth1
             .peers()
             .into_iter()
-            .sorted_by(|lhs, rhs| dst_name.cmp_distance(lhs.name(), rhs.name()));
+            .sorted_by(|lhs, rhs| dst_name.cmp_distance(&lhs.name(), &rhs.name()));
         assert_eq!(dg_size, section_auth1.elder_count());
         itertools::assert_equal(recipients, expected_recipients);
 
@@ -414,7 +414,7 @@ mod tests {
         let expected_recipients = elders_info1
             .peers()
             .into_iter()
-            .sorted_by(|lhs, rhs| dst_name.cmp_distance(lhs.name(), rhs.name()))
+            .sorted_by(|lhs, rhs| dst_name.cmp_distance(&lhs.name(), &rhs.name()))
             .take(min_dg_size);
 
         assert_eq!(dg_size, min_dg_size);
@@ -438,7 +438,7 @@ mod tests {
         // Send to chosen elder
         assert_eq!(dg_size, 1);
         assert_eq!(
-            Some(recipients[0].addr),
+            Some(recipients[0].addr()),
             network_knowledge
                 .authority_provider()
                 .await
