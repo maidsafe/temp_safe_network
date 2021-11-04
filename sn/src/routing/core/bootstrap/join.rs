@@ -110,6 +110,7 @@ impl<'a> Join<'a> {
         self.join(genesis_key, recipients).await
     }
 
+    #[tracing::instrument(skip(self))]
     async fn join(
         mut self,
         network_genesis_key: BlsPublicKey,
@@ -333,6 +334,7 @@ impl<'a> Join<'a> {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     async fn send_join_requests(
         &mut self,
         join_request: JoinRequest,
@@ -374,6 +376,7 @@ impl<'a> Join<'a> {
 
     // TODO: receive JoinResponse from the JoinResponse handler directly,
     // analogous to the JoinAsRelocated flow.
+    #[tracing::instrument(skip(self))]
     async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
         while let Some(event) = self.recv_rx.recv().await {
             // we are interested only in `JoinResponse` type of messages
