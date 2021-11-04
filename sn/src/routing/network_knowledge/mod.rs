@@ -607,9 +607,8 @@ impl NetworkKnowledge {
 fn create_first_section_authority_provider(
     pk_set: &bls::PublicKeySet,
     sk_share: &bls::SecretKeyShare,
-    mut peer: Peer,
+    peer: Peer,
 ) -> Result<SectionAuth<SectionAuthorityProvider>> {
-    peer.set_reachable(true);
     let section_auth =
         SectionAuthorityProvider::new(iter::once(peer), Prefix::default(), pk_set.clone());
     let sig = create_first_sig(pk_set, sk_share, &section_auth)?;

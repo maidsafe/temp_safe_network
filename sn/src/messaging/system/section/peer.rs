@@ -23,10 +23,6 @@ pub struct Peer {
     pub name: XorName,
     /// Peer's SocketAddr
     pub addr: SocketAddr,
-    /// A node's connectivity will be checked when first time join the network or got relocated.
-    /// An adult can only got promoted to elder when this flag is set to `true`.
-    /// Taking a default of `false` to enforce the connectivity check.
-    pub reachable: bool,
 }
 
 impl Display for Peer {

@@ -496,8 +496,6 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let mut expected_new_elders = BTreeSet::new();
 
     for peer in section_auth.peers() {
-        let mut peer = peer;
-        peer.set_reachable(true);
         let node_state = NodeState::joined(peer, None);
         let sig = prove(sk_set.secret_key(), &node_state)?;
         let _updated = section
@@ -1550,16 +1548,12 @@ async fn handle_demote_during_split() -> Result<()> {
 
 fn create_peer(age: u8) -> Peer {
     let name = ed25519::gen_name_with_age(age);
-    let mut peer = Peer::new(name, gen_addr());
-    peer.set_reachable(true);
-    peer
+    Peer::new(name, gen_addr())
 }
 
 fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> Peer {
     let name = ed25519::gen_name_with_age(age);
-    let mut peer = Peer::new(prefix.substituted_in(name), gen_addr());
-    peer.set_reachable(true);
-    peer
+    Peer::new(prefix.substituted_in(name), gen_addr())
 }
 
 fn create_node(age: u8, prefix: Option<Prefix>) -> Node {
@@ -1604,8 +1598,6 @@ async fn create_section(
     )?;
 
     for peer in section_auth.peers() {
-        let mut peer = peer;
-        peer.set_reachable(true);
         let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(sk_set.secret_key(), node_state)?;
         let _updated = section.update_member(node_state).await;
