@@ -104,7 +104,7 @@ impl NetworkKnowledge {
         }
 
         // Check if SAP's section key matches SAP signature's key
-        if signed_sap.sig.public_key != signed_sap.value.public_key_set.public_key() {
+        if signed_sap.sig.public_key != signed_sap.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key doesn't match signature's key: {:?}",
                 signed_sap.value
@@ -141,7 +141,7 @@ impl NetworkKnowledge {
 
         let mut all_chains = ChainsDag::new();
         let _ = all_chains.insert(
-            (signed_sap.value.prefix, signed_sap.value.elders.clone()),
+            (signed_sap.prefix, signed_sap.elders.clone()),
             (signed_sap.clone(), chain.clone()),
         );
 
@@ -195,7 +195,7 @@ impl NetworkKnowledge {
             None,
         )?;
 
-        for peer in section.signed_sap.read().await.value.peers() {
+        for peer in section.signed_sap.read().await.peers() {
             let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
             let _changed = section.section_peers.update(SectionAuth {
@@ -408,7 +408,7 @@ impl NetworkKnowledge {
 
     /// Return current section key
     pub(super) async fn section_key(&self) -> bls::PublicKey {
-        self.signed_sap.read().await.value.section_key()
+        self.signed_sap.read().await.section_key()
     }
 
     /// Return current section chain length
@@ -436,7 +436,7 @@ impl NetworkKnowledge {
     /// Return weather the name provided belongs to an Elder, by checking if
     /// it is one of the current section's SAP member,
     pub(super) async fn is_elder(&self, name: &XorName) -> bool {
-        self.signed_sap.read().await.value.contains_elder(name)
+        self.signed_sap.read().await.contains_elder(name)
     }
 
     /// Generate a new section info(s) based on the current set of members,
@@ -476,7 +476,7 @@ impl NetworkKnowledge {
 
     /// Prefix of our section.
     pub(super) async fn prefix(&self) -> Prefix {
-        self.signed_sap.read().await.value.prefix
+        self.signed_sap.read().await.prefix
     }
 
     /// Return the list of our section's members

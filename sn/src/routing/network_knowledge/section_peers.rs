@@ -29,9 +29,8 @@ impl SectionPeers {
         let members = &*self.members;
         for entry in members.into_iter() {
             let (_, state) = entry.pair();
-            let info = state.value;
-            if info.state == MembershipState::Joined {
-                joined.push(info)
+            if state.state == MembershipState::Joined {
+                joined.push(state.value)
             }
         }
 
@@ -74,8 +73,8 @@ impl SectionPeers {
         for entry in members.into_iter() {
             let (name, info) = entry.pair();
 
-            if is_active(&info.value, current_elders)
-                && info.value.peer.is_reachable()
+            if is_active(info, current_elders)
+                && info.peer.is_reachable()
                 && !excluded_names.contains(name)
             {
                 candidates.push(info.clone())
@@ -99,9 +98,9 @@ impl SectionPeers {
         for entry in members.into_iter() {
             let (name, info) = entry.pair();
 
-            if info.value.state == MembershipState::Joined
+            if info.state == MembershipState::Joined
                 && prefix.matches(name)
-                && info.value.peer.is_reachable()
+                && info.peer.is_reachable()
                 && !excluded_names.contains(name)
             {
                 candidates.push(info.clone())
@@ -115,7 +114,7 @@ impl SectionPeers {
     pub(crate) fn is_joined(&self, name: &XorName) -> bool {
         self.members
             .get(name)
-            .map(|info| info.value.state == MembershipState::Joined)
+            .map(|info| info.state == MembershipState::Joined)
             .unwrap_or(false)
     }
 
@@ -123,7 +122,7 @@ impl SectionPeers {
     pub(crate) fn is_relocated_to_our_section(&self, name: &XorName) -> bool {
         for peer in self.members.iter() {
             let state = peer.value();
-            if state.value.previous_name == Some(*name) {
+            if state.previous_name == Some(*name) {
                 return true;
             }
         }
@@ -134,7 +133,7 @@ impl SectionPeers {
     /// Update a member of our section.
     /// Returns whether anything actually changed.
     pub(crate) fn update(&self, new_info: SectionAuth<NodeState>) -> bool {
-        match self.members.entry(*new_info.value.peer.name()) {
+        match self.members.entry(*new_info.peer.name()) {
             Entry::Vacant(entry) => {
                 let _prev = entry.insert(new_info);
                 true
@@ -145,9 +144,9 @@ impl SectionPeers {
                 // - Joined -> Left
                 // - Joined -> Relocated
                 // - Relocated -> Left (should not happen, but needed for consistency)
-                match (entry.get().value.state, new_info.value.state) {
+                match (entry.get().state, new_info.state) {
                     (MembershipState::Joined, MembershipState::Joined)
-                        if new_info.value.peer.age() > entry.get().value.peer.age() => {}
+                        if new_info.peer.age() > entry.get().peer.age() => {}
                     (MembershipState::Joined, MembershipState::Left)
                     | (MembershipState::Joined, MembershipState::Relocated(_))
                     | (MembershipState::Relocated(_), MembershipState::Left) => {}
@@ -177,7 +176,7 @@ fn elder_candidates(
     members
         .into_iter()
         .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
-        .map(|auth| auth.value.peer)
+        .map(|auth| auth.peer)
         .take(elder_size)
         .collect()
 }
@@ -191,11 +190,11 @@ fn cmp_elder_candidates(
     // Older nodes are preferred. In case of a tie, prefer current elders. If still a tie, break
     // it comparing by the signed signatures because it's impossible for a node to predict its
     // signature and therefore game its chances of promotion.
-    cmp_elder_candidates_by_membership_state(&lhs.value.state, &rhs.value.state)
-        .then_with(|| rhs.value.peer.age().cmp(&lhs.value.peer.age()))
+    cmp_elder_candidates_by_membership_state(&lhs.state, &rhs.state)
+        .then_with(|| rhs.peer.age().cmp(&lhs.peer.age()))
         .then_with(|| {
-            let lhs_is_elder = is_elder(&lhs.value, current_elders);
-            let rhs_is_elder = is_elder(&rhs.value, current_elders);
+            let lhs_is_elder = is_elder(lhs, current_elders);
+            let rhs_is_elder = is_elder(rhs, current_elders);
 
             match (lhs_is_elder, rhs_is_elder) {
                 (true, false) => Ordering::Less,

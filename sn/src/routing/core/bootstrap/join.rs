@@ -430,7 +430,7 @@ impl<'a> Join<'a> {
                     ref section_chain,
                     ..
                 } => {
-                    if node_state.value.peer.name() != &self.node.name() {
+                    if node_state.peer.name() != &self.node.name() {
                         trace!("Ignore NodeApproval not for us");
                         continue;
                     }
@@ -450,7 +450,7 @@ impl<'a> Join<'a> {
 
                     trace!(
                         "This node has been approved to join the network at {:?}!",
-                        section_auth.value.prefix,
+                        section_auth.prefix,
                     );
 
                     return Ok((join_response, sender, src_name));
@@ -599,7 +599,7 @@ mod tests {
                     section_chain: proof_chain,
                 })),
                 &bootstrap_node,
-                section_auth.value.section_key(),
+                section_auth.section_key(),
             )?;
 
             Ok(())

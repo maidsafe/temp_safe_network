@@ -179,17 +179,17 @@ impl Core {
         // provided SAP, or just use the Elders contained in the provided SAP.
         // The chosen dst_section_pk will either be the latest we are aware of
         // if we find a matching prefix in our records, or the genesis_key otherwise.
-        let (dst_elders, dst_section_pk) = match self
+        let (dst_section_pk, dst_elders) = match self
             .network_knowledge
             .section_by_prefix(&section_auth.prefix)
         {
-            Ok(trusted_sap) => (trusted_sap.elders, trusted_sap.public_key_set.public_key()),
+            Ok(trusted_sap) => (trusted_sap.public_key_set.public_key(), trusted_sap.elders),
             Err(_) => {
                 // In case we don't have the knowledge of that neighbour locally,
                 // let's take the Elders from the provided SAP and genesis key.
                 (
-                    section_signed.value.elders,
                     *self.network_knowledge.genesis_key(),
+                    section_signed.value.elders,
                 )
             }
         };
@@ -296,10 +296,7 @@ impl Core {
                 .await
             {
                 Some(section_auth) => {
-                    info!(
-                        "Found a better matching prefix {:?}",
-                        section_auth.value.prefix
-                    );
+                    info!("Found a better matching prefix {:?}", section_auth.prefix);
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropyRedirect {
@@ -563,12 +560,12 @@ mod tests {
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();
 
-        let (msg, src_location) = env.create_message(&env.other_sap.value.prefix, other_pk)?;
+        let (msg, src_location) = env.create_message(&env.other_sap.prefix, other_pk)?;
         let sender = env.core.node.read().await.addr;
 
         // since it's not aware of the other prefix, it shall redirect us to genesis section/SAP
         let dst_section_pk = other_pk;
-        let dst_name = env.other_sap.value.prefix.name();
+        let dst_name = env.other_sap.prefix.name();
         let command = env
             .core
             .check_for_entropy(
@@ -731,7 +728,7 @@ mod tests {
             let signed_sap = section_signed(sap_sk, section_auth)?;
 
             let (chain, genesis_sk_set) =
-                create_chain(sap_sk, signed_sap.value.public_key_set.public_key())
+                create_chain(sap_sk, signed_sap.public_key_set.public_key())
                     .context("failed to create section chain")?;
             let genesis_pk = genesis_sk_set.public_keys().public_key();
             assert_eq!(genesis_pk, *chain.root_key());

@@ -100,12 +100,12 @@ impl Session {
         // Get DataSection elders details.
         let (elders, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let sap_elders = sap.value.elders.values().cloned();
+                let sap_elders = sap.elders.values().cloned();
 
                 trace!("{:?} SAP elders found", sap_elders);
                 (
                     sap_elders.take(targets_count).collect::<Vec<SocketAddr>>(),
-                    sap.value.public_key_set.public_key(),
+                    sap.public_key_set.public_key(),
                 )
             } else {
                 return Err(Error::NoNetworkKnowledge);
@@ -173,8 +173,8 @@ impl Session {
         let dst = query.dst_name();
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let (elders, section_pk) = if let Some(sap) = self.network.closest_or_opposite(&dst, None) {
-            (sap.value.elders, sap.value.public_key_set.public_key())
+        let (section_pk, elders) = if let Some(sap) = self.network.closest_or_opposite(&dst, None) {
+            (sap.public_key_set.public_key(), sap.value.elders)
         } else {
             return Err(Error::NoNetworkKnowledge);
         };
@@ -386,7 +386,6 @@ impl Session {
         let (elders_or_adults, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
                 let mut nodes = sap
-                    .value
                     .elders
                     .values()
                     .cloned()
@@ -395,7 +394,7 @@ impl Session {
 
                 nodes.shuffle(&mut OsRng);
 
-                (nodes, sap.value.public_key_set.public_key())
+                (nodes, sap.public_key_set.public_key())
             } else {
                 // Send message to our bootstrap peer with network's genesis PK.
                 (nodes, self.genesis_key)

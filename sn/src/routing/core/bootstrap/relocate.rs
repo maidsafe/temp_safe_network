@@ -100,7 +100,7 @@ impl JoiningAsRelocated {
                 section_chain,
                 node_state,
             } => {
-                if node_state.value.peer.name() != &self.node.name() {
+                if node_state.peer.name() != &self.node.name() {
                     trace!("Ignore NodeApproval not for us");
                     return Ok(None);
                 }
@@ -121,7 +121,7 @@ impl JoiningAsRelocated {
 
                 trace!(
                     "This node has been approved to join the network at {:?}!",
-                    section_auth.value.prefix,
+                    section_auth.prefix,
                 );
 
                 Ok(Some(Command::HandleRelocationComplete {

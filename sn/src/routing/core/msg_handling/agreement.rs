@@ -62,17 +62,17 @@ impl Core {
         {
             // This node is rejoin with same name.
 
-            if old_info.value.state != MembershipState::Left {
+            if old_info.state != MembershipState::Left {
                 debug!(
                     "Ignoring Online node {} - {:?} not Left.",
                     new_info.peer.name(),
-                    old_info.value.state,
+                    old_info.state,
                 );
 
                 return Ok(commands);
             }
 
-            let new_age = cmp::max(MIN_AGE, old_info.value.peer.age() / 2);
+            let new_age = cmp::max(MIN_AGE, old_info.peer.age() / 2);
 
             if new_age > MIN_AGE {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
@@ -93,21 +93,21 @@ impl Core {
         };
 
         if !self.network_knowledge.update_member(new_info.clone()).await {
-            info!("ignore Online: {:?}", new_info.value.peer);
+            info!("ignore Online: {:?}", new_info.peer);
             return Ok(vec![]);
         }
 
-        info!("handle Online: {:?}", new_info.value.peer);
+        info!("handle Online: {:?}", new_info.peer);
 
         self.send_event(Event::MemberJoined {
-            name: *new_info.value.peer.name(),
-            previous_name: new_info.value.previous_name,
-            age: new_info.value.peer.age(),
+            name: *new_info.peer.name(),
+            previous_name: new_info.previous_name,
+            age: new_info.peer.age(),
         })
         .await;
 
         commands.extend(
-            self.relocate_peers(new_info.value.peer.name(), &new_info.sig.signature)
+            self.relocate_peers(new_info.peer.name(), &new_info.sig.signature)
                 .await?,
         );
 
@@ -188,7 +188,7 @@ impl Core {
                 .network_knowledge
                 .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
                 .await;
-            if !infos.contains(&signed_section_auth.value.elder_candidates()) {
+            if !infos.contains(&signed_section_auth.elder_candidates()) {
                 // SectionInfo out of date, ignore.
                 return Ok(vec![]);
             }
@@ -266,13 +266,13 @@ impl Core {
         let old_chain = self.section_chain().await.clone();
 
         for (signed_sap, key_sig) in updates {
-            let prefix = signed_sap.value.prefix;
+            let prefix = signed_sap.prefix;
             info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
             // If we have the key share for new SAP key we can switch to this new SAP
             let switch_to_new_sap = self
                 .section_keys_provider
-                .key_share(&signed_sap.value.section_key())
+                .key_share(&signed_sap.section_key())
                 .await
                 .is_ok();
 
@@ -282,7 +282,7 @@ impl Core {
             let mut proof_chain = old_chain.clone();
             match proof_chain.insert(
                 old_chain.last_key(),
-                signed_sap.value.section_key(),
+                signed_sap.section_key(),
                 key_sig.signature,
             ) {
                 Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
