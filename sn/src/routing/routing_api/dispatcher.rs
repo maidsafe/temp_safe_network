@@ -324,12 +324,10 @@ impl Dispatcher {
                 self.core.set_joins_allowed(joins_allowed).await
             }
             Command::ProposeOnline {
-                mut peer,
+                peer,
                 previous_name,
                 dst_key,
             } => {
-                // The reachability check was completed during the initial bootstrap phase
-                peer.set_reachable(true);
                 self.core
                     .make_online_proposal(peer, previous_name, dst_key)
                     .await

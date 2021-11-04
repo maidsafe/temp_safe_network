@@ -73,10 +73,7 @@ impl SectionPeers {
         for entry in members.into_iter() {
             let (name, info) = entry.pair();
 
-            if is_active(info, current_elders)
-                && info.peer.is_reachable()
-                && !excluded_names.contains(name)
-            {
+            if is_active(info, current_elders) && !excluded_names.contains(name) {
                 candidates.push(info.clone())
             }
         }
@@ -100,7 +97,6 @@ impl SectionPeers {
 
             if info.state == MembershipState::Joined
                 && prefix.matches(name)
-                && info.peer.is_reachable()
                 && !excluded_names.contains(name)
             {
                 candidates.push(info.clone())

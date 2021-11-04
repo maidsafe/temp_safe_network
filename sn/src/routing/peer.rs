@@ -15,9 +15,6 @@ pub trait PeerUtils {
     /// Creates a new `Peer` given `Name`, `SocketAddr`.
     fn new(name: XorName, addr: SocketAddr) -> Self;
 
-    /// Set the reachable flag.
-    fn set_reachable(&mut self, reachable: bool);
-
     /// Returns the `XorName` of the peer.
     fn name(&self) -> &XorName;
 
@@ -26,24 +23,12 @@ pub trait PeerUtils {
 
     /// Returns the age.
     fn age(&self) -> u8;
-
-    /// Returns the reachable flag.
-    fn is_reachable(&self) -> bool;
 }
 
 impl PeerUtils for Peer {
     /// Creates a new `Peer` given `Name`, `SocketAddr`.
     fn new(name: XorName, addr: SocketAddr) -> Self {
-        Self {
-            name,
-            addr,
-            reachable: false,
-        }
-    }
-
-    /// Set the reachable flag.
-    fn set_reachable(&mut self, reachable: bool) {
-        self.reachable = reachable;
+        Self { name, addr }
     }
 
     /// Returns the `XorName` of the peer.
@@ -59,11 +44,6 @@ impl PeerUtils for Peer {
     /// Returns the age.
     fn age(&self) -> u8 {
         self.name[XOR_NAME_LEN - 1]
-    }
-
-    /// Returns the reachable flag.
-    fn is_reachable(&self) -> bool {
-        self.reachable
     }
 }
 

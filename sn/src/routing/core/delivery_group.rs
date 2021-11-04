@@ -165,11 +165,7 @@ fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer
             .section_by_name(name)
             .ok()?
             .get_addr(name)
-            .map(|addr| {
-                let mut peer = Peer::new(*name, addr);
-                peer.set_reachable(true);
-                peer
-            }),
+            .map(|addr| Peer::new(*name, addr)),
     }
 }
 
