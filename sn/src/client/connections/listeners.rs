@@ -17,6 +17,7 @@ use crate::messaging::{
 };
 use crate::messaging::{AuthorityProof, ServiceAuth};
 use crate::routing::log_markers::LogMarker;
+use crate::types::utils::write_data_to_disk;
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::ConnectionIncoming;
@@ -309,6 +310,16 @@ impl Session {
                         "Anti-Entropy: updated remote section SAP updated for {:?}",
                         section_auth.prefix
                     );
+                    // Update the PrefixMap on disk
+                    if let Err(e) =
+                        write_data_to_disk(&session.network, &session.root_dir.join("prefix_map"))
+                            .await
+                    {
+                        error!(
+                            "Error writing freshly updated PrefixMap to client dir: {:?}",
+                            e
+                        );
+                    }
                 } else {
                     debug!(
                             "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",

@@ -12,19 +12,22 @@ mod data;
 mod queries;
 mod register_apis;
 
-use crate::client::{connections::Session, errors::Error, Config};
+use crate::client::{
+    connections::{Session, SAFE_CLIENT_DIR},
+    errors::Error,
+    Config,
+};
 use crate::messaging::data::{CmdError, DataQuery, ServiceMsg};
 use crate::types::{ChunkAddress, Keypair, PublicKey};
 
 use crate::messaging::{ServiceAuth, WireMsg};
 use crate::prefix_map::NetworkPrefixMap;
+use crate::types::utils::read_prefix_map_from_disk;
 use itertools::Itertools;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 use tokio::{
     sync::{mpsc::Receiver, RwLock},
     time::Duration,
@@ -88,28 +91,31 @@ impl Client {
             }
         };
 
-        let mut prefix_map_dir = dirs_next::home_dir()
+        let home_dir = dirs_next::home_dir()
             .ok_or_else(|| Error::Generic("Error opening home dir".to_string()))?;
-        prefix_map_dir.push(".safe");
-        prefix_map_dir.push("prefix_map");
+        let root_dir = &home_dir
+            .join(SAFE_CLIENT_DIR)
+            .join(format!("sn_client-{}", keypair.public_key()));
 
-        // Read NetworkPrefixMap from disk if present else create a new one
-        let prefix_map = if let (Ok(mut prefix_map_file), true) =
-            (File::open(prefix_map_dir).await, read_prefixmap)
-        {
-            let mut prefix_map_contents = vec![];
-            let _ = prefix_map_file
-                .read_to_end(&mut prefix_map_contents)
-                .await?;
-
-            let prefix_map: NetworkPrefixMap = rmp_serde::from_slice(&prefix_map_contents)
-                .map_err(|err| {
-                    Error::Generic(format!(
-                        "Error deserializing PrefixMap from disk: {:?}",
-                        err
-                    ))
-                })?;
-            prefix_map
+        // Read NetworkPrefixMap from `.safe/prefix_map` if present else check client root dir
+        let prefix_map = if read_prefixmap {
+            match read_prefix_map_from_disk(&home_dir.join(".safe/prefix_map")).await {
+                Ok(prefix_map) => prefix_map,
+                Err(e) => {
+                    warn!("Could not read PrefixMap at '.safe/prefix_map': {:?}", e);
+                    info!("Checking Client's root dir");
+                    // Read NetworkPrefixMap from `.safe/client/sn_client-{ClientPK}` if present
+                    // else create a new one
+                    match read_prefix_map_from_disk(root_dir).await {
+                        Ok(map) => map,
+                        Err(e) => {
+                            warn!("Could not read PrefixMap at Client's root dir: {:?}", e);
+                            info!("Defaulting to a fresh NetworkPrefixMap");
+                            NetworkPrefixMap::new(config.genesis_key)
+                        }
+                    }
+                }
+            }
         } else {
             NetworkPrefixMap::new(config.genesis_key)
         };
