@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{MembershipState, NodeState, Peer};
-use crate::routing::{error::Error, PeerUtils};
+use crate::messaging::system::{MembershipState, NodeState};
+use crate::routing::{error::Error, Peer, PeerUtils};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// The minimum age a node can have. The Infants will start at age 4. This is to prevent frequent

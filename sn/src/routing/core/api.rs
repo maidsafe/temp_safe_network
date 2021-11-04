@@ -9,7 +9,7 @@
 use super::{delivery_group, Comm, Core};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
-    system::{NodeState, Peer, Proposal},
+    system::{NodeState, Proposal},
     SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
@@ -18,7 +18,7 @@ use crate::routing::{
     network_knowledge::{NetworkKnowledge, NodeStateUtils, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
-    Event,
+    Event, Peer,
 };
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};

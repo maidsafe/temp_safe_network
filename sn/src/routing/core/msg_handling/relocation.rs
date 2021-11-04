@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    system::{Peer, Proposal, RelocateDetails, RelocatePromise, SystemMsg},
+    system::{Proposal, RelocateDetails, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
 };
 use crate::routing::{
@@ -18,7 +18,7 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
-    Event, SectionAuthorityProviderUtils, ELDER_SIZE,
+    Event, Peer, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use xor_name::XorName;
 

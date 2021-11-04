@@ -10,7 +10,7 @@ use super::Core;
 use super::ProposalUtils;
 use crate::messaging::{
     system::{
-        DkgSessionId, ElderCandidates, JoinResponse, NodeState, Peer, Proposal, RelocateDetails,
+        DkgSessionId, ElderCandidates, JoinResponse, NodeState, Proposal, RelocateDetails,
         RelocatePromise, SectionAuth, SystemMsg,
     },
     DstLocation, WireMsg,
@@ -25,7 +25,7 @@ use crate::routing::{
     peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
-    SectionAuthorityProviderUtils,
+    Peer, SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;

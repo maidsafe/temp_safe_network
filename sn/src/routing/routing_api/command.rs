@@ -13,8 +13,7 @@ use crate::messaging::{
 use crate::routing::{
     network_knowledge::{NetworkKnowledge, SectionKeyShare},
     node::Node,
-    routing_api::Peer,
-    XorName,
+    Peer, XorName,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;

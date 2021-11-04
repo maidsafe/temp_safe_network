@@ -8,10 +8,10 @@
 
 use super::node_state::NodeStateUtils;
 use crate::messaging::{
-    system::{MembershipState, NodeState, Peer, SectionAuth, SectionPeers},
+    system::{MembershipState, NodeState, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
-use crate::routing::SectionAuthorityProviderUtils;
+use crate::routing::{Peer, SectionAuthorityProviderUtils};
 use dashmap::mapref::entry::Entry;
 use itertools::Itertools;
 use std::{cmp::Ordering, collections::BTreeSet};

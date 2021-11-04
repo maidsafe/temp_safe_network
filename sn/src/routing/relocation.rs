@@ -9,7 +9,7 @@
 //! Relocation related types and utilities.
 
 use crate::messaging::{
-    system::{NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, SystemMsg},
+    system::{NodeState, RelocateDetails, RelocatePayload, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
 };
 use crate::routing::{
@@ -20,6 +20,7 @@ use crate::routing::{
         section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge, NodeStateUtils,
     },
     peer::PeerUtils,
+    Peer,
 };
 use async_trait::async_trait;
 use xor_name::XorName;
