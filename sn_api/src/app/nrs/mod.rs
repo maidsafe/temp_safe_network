@@ -64,6 +64,9 @@ impl Safe {
             .register_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
             .await?;
         let reg_entry = Url::from_xorurl(&nrs_map_xorurl)?;
+        // Note that we can use the higher level register API here
+        // because reg_xorurl is not an NRS url
+        // (high level register API uses resolution that uses NRS!)
         let entry_hash = self
             .write_to_register(&reg_xorurl, reg_entry, BTreeSet::new())
             .await?;
@@ -107,8 +110,11 @@ impl Safe {
         let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
         let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
         let reg_entry = Url::from_xorurl(&nrs_map_xorurl)?;
+        let safe_url = Safe::parse_url(&url_str)?;
+        let address = self.get_register_address(&safe_url)?;
         let entry_hash = self
-            .write_to_register(&url_str, reg_entry, old_values)
+            .safe_client
+            .write_to_register(address, reg_entry, old_values)
             .await?;
 
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
@@ -182,8 +188,11 @@ impl Safe {
         let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
         let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
         let reg_entry = Url::from_xorurl(&nrs_map_xorurl)?;
+        let safe_url = Safe::parse_url(&url_str)?;
+        let address = self.get_register_address(&safe_url)?;
         let entry_hash = self
-            .write_to_register(&url_str, reg_entry, old_values)
+            .safe_client
+            .write_to_register(address, reg_entry, old_values)
             .await?;
 
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
@@ -226,7 +235,7 @@ impl Safe {
 
     // Private helper function to fetch the nrs_map from the network
     // If no version is provided, fetches the latest
-    // Always returns the versoin of the fetched content along with the NrsMap
+    // Always returns the version of the fetched content along with the NrsMap
     async fn fetch_nrs_map(
         &self,
         public_name: &str,
