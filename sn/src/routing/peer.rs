@@ -18,10 +18,8 @@ use xor_name::{XorName, XOR_NAME_LEN};
 /// from being connected at the network layer, which currently is handled by quic-p2p.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Peer {
-    /// Peer's xorname
-    pub name: XorName,
-    /// Peer's SocketAddr
-    pub addr: SocketAddr,
+    name: XorName,
+    addr: SocketAddr,
 }
 
 impl Display for Peer {
@@ -37,13 +35,13 @@ impl Peer {
     }
 
     /// Returns the `XorName` of the peer.
-    pub fn name(&self) -> &XorName {
-        &self.name
+    pub fn name(&self) -> XorName {
+        self.name
     }
 
     /// Returns the `SocketAddr`.
-    pub fn addr(&self) -> &SocketAddr {
-        &self.addr
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
     }
 
     /// Returns the age.

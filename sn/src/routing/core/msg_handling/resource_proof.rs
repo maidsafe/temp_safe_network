@@ -60,7 +60,7 @@ impl Core {
 
         trace!("{}", LogMarker::SendResourceProofChallenge);
         self.send_direct_message(
-            (*peer.name(), *peer.addr()),
+            (peer.name(), peer.addr()),
             response,
             self.network_knowledge.section_key().await,
         )

@@ -165,7 +165,7 @@ impl Network {
             .our_elders()
             .await
             .iter()
-            .map(|p2p_node| *p2p_node.name())
+            .map(|p2p_node| p2p_node.name())
             .collect::<BTreeSet<_>>()
     }
 
@@ -174,7 +174,7 @@ impl Network {
             .our_adults()
             .await
             .into_iter()
-            .map(|p2p_node| *p2p_node.name())
+            .map(|p2p_node| p2p_node.name())
             .collect::<BTreeSet<_>>()
     }
 

@@ -302,7 +302,7 @@ impl Core {
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults().await;
 
-        let adults_names = adults.iter().map(|p2p_node| *p2p_node.name());
+        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
         let mut candidates = adults_names
             .into_iter()

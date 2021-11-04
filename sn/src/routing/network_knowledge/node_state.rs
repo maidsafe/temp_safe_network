@@ -46,8 +46,8 @@ impl NodeStateUtils for NodeState {
     // Creates a `NodeState` in the `Joined` state.
     fn joined(peer: Peer, previous_name: Option<XorName>) -> NodeState {
         NodeState {
-            name: peer.name,
-            addr: peer.addr,
+            name: peer.name(),
+            addr: peer.addr(),
             state: MembershipState::Joined,
             previous_name,
         }

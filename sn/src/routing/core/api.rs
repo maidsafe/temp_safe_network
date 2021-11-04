@@ -192,7 +192,7 @@ impl Core {
         let command = Command::SendMessageDeliveryGroup {
             recipients: targets
                 .into_iter()
-                .map(|peer| (peer.name, peer.addr))
+                .map(|peer| (peer.name(), peer.addr()))
                 .collect(),
             delivery_group_size: dg_size,
             wire_msg,

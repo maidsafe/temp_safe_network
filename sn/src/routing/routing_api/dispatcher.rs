@@ -354,7 +354,7 @@ impl Dispatcher {
                     .active_members()
                     .await
                     .iter()
-                    .filter(|peer| peer.name() != &name && peer.name() != &our_name)
+                    .filter(|peer| peer.name() != name && peer.name() != our_name)
                     .cloned()
                     .collect_vec();
                 Ok(self.core.send_or_handle(msg, peers).await)

@@ -214,8 +214,8 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
             dst_key,
         } = command
         {
-            assert_eq!(*peer.name(), new_node.name());
-            assert_eq!(*peer.addr(), new_node.addr);
+            assert_eq!(peer.name(), new_node.name());
+            assert_eq!(peer.addr(), new_node.addr);
             assert_eq!(peer.age(), FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2);
             assert_eq!(previous_name, None);
             assert_eq!(dst_key, None);
@@ -468,7 +468,7 @@ async fn handle_agreement_on_online() -> Result<()> {
     assert!(status.node_approval_sent);
 
     assert_matches!(event_rx.recv().await, Some(Event::MemberJoined { name, age, .. }) => {
-        assert_eq!(name, *new_peer.name());
+        assert_eq!(name, new_peer.name());
         assert_eq!(age, MIN_AGE);
     });
 
@@ -566,8 +566,8 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
         let expected_dkg_start_recipients: Vec<_> = expected_new_elders
             .iter()
-            .filter(|peer| *peer.name() != node_name)
-            .map(|peer| (*peer.name(), *peer.addr()))
+            .filter(|peer| peer.name() != node_name)
+            .map(|peer| (peer.name(), peer.addr()))
             .collect();
         assert_eq!(recipients, expected_dkg_start_recipients);
 
@@ -623,7 +623,7 @@ async fn handle_online_command(
                 } = *response
                 {
                     assert_eq!(section_signed_sap.value, *section_auth);
-                    assert_eq!(recipients, [(*peer.name(), *peer.addr())]);
+                    assert_eq!(recipients, [(peer.name(), peer.addr())]);
                     status.node_approval_sent = true;
                 }
             }
@@ -631,11 +631,11 @@ async fn handle_online_command(
                 msg: SystemMsg::Relocate(details),
                 ..
             }) => {
-                if details.pub_id != *peer.name() {
+                if details.pub_id != peer.name() {
                     continue;
                 }
 
-                assert_eq!(recipients, [(*peer.name(), *peer.addr())]);
+                assert_eq!(recipients, [(peer.name(), peer.addr())]);
 
                 status.relocate_details = Some(details.clone());
             }
@@ -667,8 +667,8 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     // Make a left peer.
     let peer = create_peer(age);
     let node_state = NodeState {
-        name: peer.name,
-        addr: peer.addr,
+        name: peer.name(),
+        addr: peer.addr(),
         state: MembershipState::Left,
         previous_name: None,
     };
@@ -704,7 +704,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
 
     assert!(status.node_approval_sent);
     assert_matches!(status.relocate_details, Some(details) => {
-        assert_eq!(details.dst, *peer.name());
+        assert_eq!(details.dst, peer.name());
         assert_eq!(details.age, (age / 2).max(MIN_AGE));
     });
 
@@ -759,8 +759,8 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let node_state = NodeState {
-        name: existing_peer.name,
-        addr: existing_peer.addr,
+        name: existing_peer.name(),
+        addr: existing_peer.addr(),
         state: MembershipState::Left,
         previous_name: None,
     };
@@ -772,7 +772,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         .await?;
 
     assert_matches!(event_rx.recv().await, Some(Event::MemberLeft { name, age, }) => {
-        assert_eq!(name, *existing_peer.name());
+        assert_eq!(name, existing_peer.name());
         assert_eq!(age, MIN_AGE);
     });
 
@@ -796,7 +796,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     let remove_node_state = section
         .members()
-        .get(remove_peer.name())
+        .get(&remove_peer.name())
         .expect("member not found")
         .leave()?;
 
@@ -860,8 +860,8 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
         let expected_dkg_start_recipients: Vec<_> = expected_new_elders
             .iter()
-            .filter(|peer| *peer.name() != node_name)
-            .map(|peer| (*peer.name(), *peer.addr()))
+            .filter(|peer| peer.name() != node_name)
+            .map(|peer| (peer.name(), peer.addr()))
             .collect();
 
         assert_eq!(recipients, expected_dkg_start_recipients);
@@ -872,7 +872,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     assert!(dkg_start_sent);
 
     assert_matches!(event_rx.recv().await, Some(Event::MemberLeft { name, .. }) => {
-        assert_eq!(name, *remove_peer.name());
+        assert_eq!(name, remove_peer.name());
     });
 
     // The removed peer is still our elder because we haven't yet processed the section update.
@@ -881,7 +881,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .network_knowledge()
         .authority_provider()
         .await
-        .contains_elder(remove_peer.name()));
+        .contains_elder(&remove_peer.name()));
 
     Ok(())
 }
@@ -1164,7 +1164,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             .into_iter()
             .map(|recp| recp.1)
             .collect::<Vec<_>>()
-            != [*relocated_peer.addr()]
+            != [relocated_peer.addr()]
         {
             continue;
         }
@@ -1175,7 +1175,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                     ..
                 }) = wire_msg.into_message()
                 {
-                    assert_eq!(details.pub_id, *relocated_peer.name());
+                    assert_eq!(details.pub_id, relocated_peer.name());
                     assert_eq!(details.age, relocated_peer.age() + 1);
                 } else {
                     continue;
@@ -1187,7 +1187,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                     ..
                 }) = wire_msg.into_message()
                 {
-                    assert_eq!(promise.name, *relocated_peer.name());
+                    assert_eq!(promise.name, relocated_peer.name());
                 } else {
                     continue;
                 }
@@ -1399,10 +1399,10 @@ async fn handle_elders_update() -> Result<()> {
 
     let update_expected_recipients: HashSet<_> = other_elder_peers
         .into_iter()
-        .map(|peer| (*peer.name(), *peer.addr()))
-        .chain(iter::once((*promoted_peer.name(), *promoted_peer.addr())))
-        .chain(iter::once((*demoted_peer.name(), *demoted_peer.addr())))
-        .chain(iter::once((*adult_peer.name(), *adult_peer.addr())))
+        .map(|peer| (peer.name(), peer.addr()))
+        .chain(iter::once((promoted_peer.name(), promoted_peer.addr())))
+        .chain(iter::once((demoted_peer.name(), demoted_peer.addr())))
+        .chain(iter::once((adult_peer.name(), adult_peer.addr())))
         .collect();
 
     assert_eq!(update_actual_recipients, update_expected_recipients);

@@ -187,13 +187,13 @@ impl Core {
         &self,
         section: &NetworkKnowledge,
     ) -> Result<Vec<Command>> {
-        let our_name = &self.node.read().await.name();
+        let our_name = self.node.read().await.name();
         let nodes: Vec<_> = section
             .active_members()
             .await
             .iter()
             .filter(|peer| peer.name() != our_name)
-            .map(|peer| (*peer.name(), *peer.addr()))
+            .map(|peer| (peer.name(), peer.addr()))
             .collect();
 
         // the PK is that of our section (as we know it; and we're ahead of our adults here)
@@ -228,8 +228,8 @@ impl Core {
             let promoted_sibling_elders: Vec<_> = sibling_sec_auth
                 .peers()
                 .iter()
-                .filter(|peer| !old.elders.contains(peer.name()))
-                .map(|peer| (*peer.name(), *peer.addr()))
+                .filter(|peer| !old.elders.contains(&peer.name()))
+                .map(|peer| (peer.name(), peer.addr()))
                 .collect();
 
             // Using previous_key as dst_section_key as newly promoted sibling elders shall still
@@ -282,7 +282,7 @@ impl Core {
             .live_adults()
             .await
             .iter()
-            .map(|peer| (*peer.name(), *peer.addr()))
+            .map(|peer| (peer.name(), peer.addr()))
             .collect();
 
         let dst_section_pk = self.network_knowledge().section_key().await;
@@ -427,10 +427,10 @@ impl Core {
         trace!("Send {:?} to {:?}", wire_msg, recipients);
 
         for recipient in recipients {
-            if recipient.name() == &self.node.read().await.name() {
+            if recipient.name() == self.node.read().await.name() {
                 handle = true;
             } else {
-                others.push((*recipient.name(), *recipient.addr()));
+                others.push((recipient.name(), recipient.addr()));
             }
         }
 

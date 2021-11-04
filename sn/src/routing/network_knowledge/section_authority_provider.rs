@@ -36,7 +36,7 @@ impl ElderCandidatesUtils for ElderCandidates {
         Self {
             elders: elders
                 .into_iter()
-                .map(|peer| (*peer.name(), *peer.addr()))
+                .map(|peer| (peer.name(), peer.addr()))
                 .collect(),
             prefix,
         }
@@ -109,7 +109,7 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     {
         let elders = elders
             .into_iter()
-            .map(|peer| (*peer.name(), *peer.addr()))
+            .map(|peer| (peer.name(), peer.addr()))
             .collect();
 
         Self {
@@ -243,7 +243,7 @@ pub(crate) mod test_utils {
         let elders = nodes
             .iter()
             .map(Node::peer)
-            .map(|peer| (*peer.name(), *peer.addr()))
+            .map(|peer| (peer.name(), peer.addr()))
             .collect();
 
         let secret_key_set = SecretKeySet::random();

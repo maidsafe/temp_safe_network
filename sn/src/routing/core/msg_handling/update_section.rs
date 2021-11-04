@@ -18,7 +18,6 @@ impl Core {
             .await
             .iter()
             .map(|p| p.name())
-            .copied()
             .collect();
 
         if self.is_not_elder().await {
@@ -28,7 +27,6 @@ impl Core {
                 .await
                 .iter()
                 .map(|p| p.name())
-                .copied()
                 .collect();
             let added: BTreeSet<_> = current_adults.difference(&old_adults).copied().collect();
             let removed: BTreeSet<_> = old_adults.difference(&current_adults).copied().collect();
