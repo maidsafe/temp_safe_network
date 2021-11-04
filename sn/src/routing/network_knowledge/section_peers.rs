@@ -11,7 +11,7 @@ use crate::messaging::{
     system::{MembershipState, NodeState, Peer, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
-use crate::routing::{peer::PeerUtils, SectionAuthorityProviderUtils};
+use crate::routing::SectionAuthorityProviderUtils;
 use dashmap::mapref::entry::Entry;
 use itertools::Itertools;
 use std::{cmp::Ordering, collections::BTreeSet};
@@ -20,7 +20,10 @@ use xor_name::{Prefix, XorName};
 impl SectionPeers {
     /// Returns joined nodes from our section`
     pub(crate) fn all_members(&self) -> Vec<Peer> {
-        self.joined().into_iter().map(|info| info.peer).collect()
+        self.joined()
+            .into_iter()
+            .map(|info| info.to_peer())
+            .collect()
     }
 
     /// Returns members that have state == `Joined`.
@@ -42,7 +45,7 @@ impl SectionPeers {
         self.joined()
             .into_iter()
             .filter(|info| info.is_mature())
-            .map(|info| info.peer)
+            .map(|info| info.to_peer())
             .collect()
     }
 
@@ -129,7 +132,7 @@ impl SectionPeers {
     /// Update a member of our section.
     /// Returns whether anything actually changed.
     pub(crate) fn update(&self, new_info: SectionAuth<NodeState>) -> bool {
-        match self.members.entry(*new_info.peer.name()) {
+        match self.members.entry(new_info.name) {
             Entry::Vacant(entry) => {
                 let _prev = entry.insert(new_info);
                 true
@@ -142,7 +145,7 @@ impl SectionPeers {
                 // - Relocated -> Left (should not happen, but needed for consistency)
                 match (entry.get().state, new_info.state) {
                     (MembershipState::Joined, MembershipState::Joined)
-                        if new_info.peer.age() > entry.get().peer.age() => {}
+                        if new_info.age() > entry.get().age() => {}
                     (MembershipState::Joined, MembershipState::Left)
                     | (MembershipState::Joined, MembershipState::Relocated(_))
                     | (MembershipState::Relocated(_), MembershipState::Left) => {}
@@ -172,7 +175,7 @@ fn elder_candidates(
     members
         .into_iter()
         .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
-        .map(|auth| auth.peer)
+        .map(|auth| auth.to_peer())
         .take(elder_size)
         .collect()
 }
@@ -187,7 +190,7 @@ fn cmp_elder_candidates(
     // it comparing by the signed signatures because it's impossible for a node to predict its
     // signature and therefore game its chances of promotion.
     cmp_elder_candidates_by_membership_state(&lhs.state, &rhs.state)
-        .then_with(|| rhs.peer.age().cmp(&lhs.peer.age()))
+        .then_with(|| rhs.age().cmp(&lhs.age()))
         .then_with(|| {
             let lhs_is_elder = is_elder(lhs, current_elders);
             let rhs_is_elder = is_elder(rhs, current_elders);
@@ -230,5 +233,5 @@ fn is_active(info: &NodeState, current_elders: &SectionAuthorityProvider) -> boo
 }
 
 fn is_elder(info: &NodeState, current_elders: &SectionAuthorityProvider) -> bool {
-    current_elders.contains_elder(info.peer.name())
+    current_elders.contains_elder(&info.name)
 }

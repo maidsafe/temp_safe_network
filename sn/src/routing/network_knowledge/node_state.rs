@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::system::{MembershipState, NodeState, Peer};
-use crate::routing::{error::Error, peer::PeerUtils};
-use xor_name::XorName;
+use crate::routing::{error::Error, PeerUtils};
+use xor_name::{XorName, XOR_NAME_LEN};
 
 /// The minimum age a node can have. The Infants will start at age 4. This is to prevent frequent
 /// relocations during the beginning of a node's lifetime.
@@ -29,6 +29,8 @@ pub(crate) trait NodeStateUtils {
     // Creates a `NodeState` in the `Joined` state.
     fn joined(peer: Peer, previous_name: Option<XorName>) -> NodeState;
 
+    fn age(&self) -> u8;
+
     // Is the age > `MIN_AGE`?
     fn is_mature(&self) -> bool;
 
@@ -36,21 +38,28 @@ pub(crate) trait NodeStateUtils {
 
     // Convert this info into one with the state changed to `Relocated`.
     fn relocate(self, dst: XorName) -> NodeState;
+
+    fn to_peer(&self) -> Peer;
 }
 
 impl NodeStateUtils for NodeState {
     // Creates a `NodeState` in the `Joined` state.
     fn joined(peer: Peer, previous_name: Option<XorName>) -> NodeState {
         NodeState {
-            peer,
+            name: peer.name,
+            addr: peer.addr,
             state: MembershipState::Joined,
             previous_name,
         }
     }
 
+    fn age(&self) -> u8 {
+        self.name[XOR_NAME_LEN - 1]
+    }
+
     // Is the age > `MIN_AGE`?
     fn is_mature(&self) -> bool {
-        self.peer.age() > MIN_AGE
+        self.age() > MIN_AGE
     }
 
     fn leave(self) -> Result<NodeState, Error> {
@@ -71,5 +80,9 @@ impl NodeStateUtils for NodeState {
             state: MembershipState::Relocated(dst),
             ..self
         }
+    }
+
+    fn to_peer(&self) -> Peer {
+        Peer::new(self.name, self.addr)
     }
 }

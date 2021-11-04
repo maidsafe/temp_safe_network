@@ -17,7 +17,7 @@ use crate::routing::{
     ed25519::{self, Keypair, Verifier},
     error::Error,
     network_knowledge::{
-        section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge,
+        section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge, NodeStateUtils,
     },
     peer::PeerUtils,
 };
@@ -37,11 +37,11 @@ pub(crate) async fn actions(
         .members()
         .joined()
         .into_iter()
-        .filter(|info| check(info.peer.age(), churn_signature));
+        .filter(|info| check(info.age(), churn_signature));
 
     let candidates: Vec<_> = filtered.collect();
 
-    let max_age = if let Some(age) = candidates.iter().map(|info| (*info).peer.age()).max() {
+    let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
         age
     } else {
         return vec![];
@@ -50,10 +50,10 @@ pub(crate) async fn actions(
     let mut relocating_nodes = vec![];
 
     for node_state in candidates {
-        if node_state.peer.age() == max_age {
+        if node_state.age() == max_age {
             relocating_nodes.push((
                 node_state,
-                RelocateAction::new(network_knowledge, &node_state.peer, churn_name).await,
+                RelocateAction::new(network_knowledge, &node_state.to_peer(), churn_name).await,
             ))
         }
     }

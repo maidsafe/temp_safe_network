@@ -13,9 +13,13 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker,
-    network_knowledge::ElderCandidatesUtils, peer::PeerUtils, routing_api::command::Command, Event,
-    SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils,
+    error::Result,
+    log_markers::LogMarker,
+    network_knowledge::{ElderCandidatesUtils, NodeStateUtils},
+    peer::PeerUtils,
+    routing_api::command::Command,
+    Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
 
 use super::Core;
@@ -58,30 +62,28 @@ impl Core {
         if let Some(old_info) = self
             .network_knowledge
             .members()
-            .get_section_signed(new_info.peer.name())
+            .get_section_signed(&new_info.name)
         {
             // This node is rejoin with same name.
 
             if old_info.state != MembershipState::Left {
                 debug!(
                     "Ignoring Online node {} - {:?} not Left.",
-                    new_info.peer.name(),
-                    old_info.state,
+                    new_info.name, old_info.state,
                 );
 
                 return Ok(commands);
             }
 
-            let new_age = cmp::max(MIN_AGE, old_info.peer.age() / 2);
+            let new_age = cmp::max(MIN_AGE, old_info.age() / 2);
 
             if new_age > MIN_AGE {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
                 commands.push(self.send_node_approval(old_info.clone()).await?);
-                commands.extend(
-                    self.relocate_rejoining_peer(&new_info.peer, new_age)
-                        .await?,
-                );
+
+                let peer = new_info.to_peer();
+                commands.extend(self.relocate_rejoining_peer(&peer, new_age).await?);
 
                 return Ok(commands);
             }
@@ -93,21 +95,21 @@ impl Core {
         };
 
         if !self.network_knowledge.update_member(new_info.clone()).await {
-            info!("ignore Online: {:?}", new_info.peer);
+            info!("ignore Online: {} at {}", new_info.name, new_info.addr);
             return Ok(vec![]);
         }
 
-        info!("handle Online: {:?}", new_info.peer);
+        info!("handle Online: {} at {}", new_info.name, new_info.addr);
 
         self.send_event(Event::MemberJoined {
-            name: *new_info.peer.name(),
+            name: new_info.name,
             previous_name: new_info.previous_name,
-            age: new_info.peer.age(),
+            age: new_info.age(),
         })
         .await;
 
         commands.extend(
-            self.relocate_peers(new_info.peer.name(), &new_info.sig.signature)
+            self.relocate_peers(&new_info.name, &new_info.sig.signature)
                 .await?,
         );
 
@@ -130,8 +132,7 @@ impl Core {
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
-        let peer = node_state.peer;
-        let age = peer.age();
+        let age = node_state.age();
         let signature = sig.signature.clone();
 
         if !self
@@ -142,13 +143,13 @@ impl Core {
             })
             .await
         {
-            info!("ignore Offline: {:?}", peer);
+            info!("ignore Offline: {} at {}", node_state.name, node_state.addr);
             return Ok(commands);
         }
 
-        info!("handle Offline: {:?}", peer);
+        info!("handle Offline: {} at {}", node_state.name, node_state.addr);
 
-        commands.extend(self.relocate_peers(peer.name(), &signature).await?);
+        commands.extend(self.relocate_peers(&node_state.name, &signature).await?);
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
@@ -158,7 +159,7 @@ impl Core {
         commands.extend(result);
 
         self.send_event(Event::MemberLeft {
-            name: *peer.name(),
+            name: node_state.name,
             age,
         })
         .await;

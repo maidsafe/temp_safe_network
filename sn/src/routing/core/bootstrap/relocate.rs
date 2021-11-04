@@ -21,7 +21,6 @@ use crate::routing::{
     messages::WireMsgUtils,
     network_knowledge::NetworkKnowledge,
     node::Node,
-    peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
     SectionAuthorityProviderUtils,
@@ -100,7 +99,7 @@ impl JoiningAsRelocated {
                 section_chain,
                 node_state,
             } => {
-                if node_state.peer.name() != &self.node.name() {
+                if node_state.name != self.node.name() {
                     trace!("Ignore NodeApproval not for us");
                     return Ok(None);
                 }

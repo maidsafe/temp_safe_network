@@ -155,13 +155,14 @@ impl Core {
         node_state: SectionAuth<NodeState>,
     ) -> Result<Command> {
         info!(
-            "Our section with {:?} has approved peer {:?}.",
+            "Our section with {:?} has approved peer {} at {}.",
             self.network_knowledge.prefix().await,
-            node_state.peer
+            node_state.name,
+            node_state.addr,
         );
 
-        let addr = *node_state.peer.addr();
-        let name = *node_state.peer.name();
+        let addr = node_state.addr;
+        let name = node_state.name;
 
         let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
             genesis_key: *self.network_knowledge.genesis_key(),

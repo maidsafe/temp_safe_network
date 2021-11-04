@@ -9,7 +9,7 @@
 use crate::messaging::{system::Peer, DstLocation};
 use crate::routing::{
     error::{Error, Result},
-    network_knowledge::NetworkKnowledge,
+    network_knowledge::{NetworkKnowledge, NodeStateUtils},
     peer::PeerUtils,
     supermajority, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
@@ -160,7 +160,7 @@ async fn candidates(
 // Returns a `Peer` for a known node.
 fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer> {
     match network_knowledge.members().get(name) {
-        Some(info) => Some(info.peer),
+        Some(info) => Some(info.to_peer()),
         None => network_knowledge
             .section_by_name(name)
             .ok()?

@@ -51,12 +51,12 @@ impl Core {
         let relocations = relocation::actions(&self.network_knowledge, churn_name, churn_signature);
 
         for (info, action) in relocations.await {
-            let peer = info.peer;
-
             // The newly joined node is not being relocated immediately.
-            if peer.name() == churn_name {
+            if &info.name == churn_name {
                 continue;
             }
+
+            let peer = info.to_peer();
 
             debug!(
                 "Relocating {:?} to {} (on churn of {})",
@@ -217,9 +217,9 @@ impl Core {
         }
 
         if let Some(info) = self.network_knowledge.members().get(&promise.name) {
-            let details =
-                RelocateDetails::new(&self.network_knowledge, &info.peer, promise.dst).await;
-            commands.extend(self.send_relocate(info.peer, details).await?);
+            let peer = info.to_peer();
+            let details = RelocateDetails::new(&self.network_knowledge, &peer, promise.dst).await;
+            commands.extend(self.send_relocate(peer, details).await?);
         } else {
             error!(
                 "ignore returned RelocatePromise from {} - unknown node",
