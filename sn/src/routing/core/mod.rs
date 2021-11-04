@@ -152,7 +152,7 @@ impl Core {
     pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
             is_elder: self.is_elder().await,
-            last_key: self.network_knowledge.section_key().await,
+            section_key: self.network_knowledge.section_key().await,
             prefix: self.network_knowledge.prefix().await,
             elders: self.network_knowledge().authority_provider().await.names(),
         }
@@ -221,12 +221,12 @@ impl Core {
         let mut commands = vec![];
         let new = self.state_snapshot().await;
 
-        if new.last_key != old.last_key {
+        if new.section_key != old.section_key {
             if new.is_elder {
                 info!(
                     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
                     new.prefix,
-                    new.last_key,
+                    new.section_key,
                     self.network_knowledge
                         .authority_provider()
                         .await
@@ -263,7 +263,7 @@ impl Core {
 
             let elders = Elders {
                 prefix: new.prefix,
-                key: new.last_key,
+                key: new.section_key,
                 remaining,
                 added,
                 removed,
@@ -282,7 +282,7 @@ impl Core {
             };
 
             let sibling_elders = if new.prefix != old.prefix {
-                info!("{}", LogMarker::NewPrefix);
+                trace!("{}", LogMarker::NewPrefix);
 
                 self.network_knowledge
                     .get_sap(&new.prefix.sibling())
@@ -304,7 +304,7 @@ impl Core {
             };
 
             let event = if let Some(sibling_elders) = sibling_elders {
-                info!("{}", LogMarker::SplitSuccess);
+                trace!("{}", LogMarker::SplitSuccess);
                 // In case of split, send AEUpdate to sibling new elder nodes.
                 commands.extend(self.send_ae_update_to_sibling_section(&old).await?);
 
@@ -364,7 +364,7 @@ impl Core {
 
 pub(crate) struct StateSnapshot {
     is_elder: bool,
-    last_key: bls::PublicKey,
+    section_key: bls::PublicKey,
     prefix: Prefix,
     elders: BTreeSet<XorName>,
 }

@@ -149,10 +149,10 @@ jobs:
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- node
         timeout-minutes: 5
 
-      # - name: Run Routing tests
-      #   if: steps.routing_changes.outputs.src == 'true'
-      #   run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
-      #   timeout-minutes: 5
+      - name: Run Routing tests
+        if: steps.routing_changes.outputs.src == 'true'
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
+        timeout-minutes: 5
 
       - name: Run Doc tests
         if: steps.node_changes.outputs.src == 'true'

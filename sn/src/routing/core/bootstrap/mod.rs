@@ -13,8 +13,10 @@ pub(crate) use join::join_network;
 pub(crate) use relocate::JoiningAsRelocated;
 
 use crate::prefix_map::NetworkPrefixMap;
+#[cfg(not(test))]
 use tokio::{fs::File, io::AsyncReadExt};
 
+#[cfg(not(test))]
 // Reads PrefixMap from '~/.safe/prefix_map' if present.
 async fn read_prefix_map_from_disk() -> Option<NetworkPrefixMap> {
     let mut prefix_map_dir = dirs_next::home_dir()?;
@@ -40,4 +42,9 @@ async fn read_prefix_map_from_disk() -> Option<NetworkPrefixMap> {
     }
 
     prefix_map
+}
+
+#[cfg(test)]
+async fn read_prefix_map_from_disk() -> Option<NetworkPrefixMap> {
+    None
 }
