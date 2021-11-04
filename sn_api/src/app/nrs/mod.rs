@@ -514,8 +514,17 @@ mod tests {
         let _ = retry_loop_for_pattern!(safe.nrs_get(&associated_name1, None), Ok((res_url, _)) if res_url == &url_v1)?;
 
         // check the other is gone
-        let expected_err_msg = format!("Link not found in NRS Map Container for: {}", "");
-        let _ = retry_loop_for_pattern!(safe.nrs_get(&site_name, None), Err(e) if e.to_string() == expected_err_msg)?;
+        let expected_err_msg = "Link not found in NRS Map Container";
+        let result = retry_loop_for_pattern!(safe.nrs_get(&site_name, None), Err(e) if e.to_string().contains(expected_err_msg));
+        if let Err(err) = result {
+            assert!(err.to_string().contains(expected_err_msg));
+        } else {
+            bail!(
+                "Got unexpected result when expecting an error containing \"{}\": The result: {:?}",
+                expected_err_msg,
+                result
+            );
+        }
 
         Ok(())
     }
