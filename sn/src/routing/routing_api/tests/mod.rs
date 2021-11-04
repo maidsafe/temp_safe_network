@@ -28,7 +28,6 @@ use crate::routing::{
         test_utils::*, ElderCandidatesUtils, NetworkKnowledge, NodeStateUtils, SectionKeyShare,
     },
     node::Node,
-    peer::PeerUtils,
     relocation::{self, RelocatePayloadUtils},
     supermajority, Error, Event, Peer, Result as RoutingResult, SectionAuthorityProviderUtils,
     ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,

@@ -14,7 +14,7 @@ use crate::messaging::{
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, NodeAuth, ServiceAuth, WireMsg,
 };
 use crate::routing::{
-    core::capacity::CHUNK_COPY_COUNT, error::Result, log_markers::LogMarker, peer::PeerUtils,
+    core::capacity::CHUNK_COPY_COUNT, error::Result, log_markers::LogMarker,
     routing_api::command::Command,
 };
 use crate::types::{ChunkAddress, PublicKey};

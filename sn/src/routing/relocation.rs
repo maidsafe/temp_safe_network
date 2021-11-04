@@ -19,7 +19,6 @@ use crate::routing::{
     network_knowledge::{
         section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge, NodeStateUtils,
     },
-    peer::PeerUtils,
     Peer,
 };
 use async_trait::async_trait;

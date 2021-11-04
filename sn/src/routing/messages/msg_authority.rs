@@ -10,7 +10,7 @@ use crate::messaging::{NodeMsgAuthority, SrcLocation};
 use crate::routing::{
     ed25519::{self},
     error::{Error, Result},
-    Peer, PeerUtils,
+    Peer,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;

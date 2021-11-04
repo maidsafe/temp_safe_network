@@ -30,39 +30,24 @@ impl Display for Peer {
     }
 }
 
-///
-pub trait PeerUtils {
+impl Peer {
     /// Creates a new `Peer` given `Name`, `SocketAddr`.
-    fn new(name: XorName, addr: SocketAddr) -> Self;
-
-    /// Returns the `XorName` of the peer.
-    fn name(&self) -> &XorName;
-
-    /// Returns the `SocketAddr`.
-    fn addr(&self) -> &SocketAddr;
-
-    /// Returns the age.
-    fn age(&self) -> u8;
-}
-
-impl PeerUtils for Peer {
-    /// Creates a new `Peer` given `Name`, `SocketAddr`.
-    fn new(name: XorName, addr: SocketAddr) -> Self {
+    pub fn new(name: XorName, addr: SocketAddr) -> Self {
         Self { name, addr }
     }
 
     /// Returns the `XorName` of the peer.
-    fn name(&self) -> &XorName {
+    pub fn name(&self) -> &XorName {
         &self.name
     }
 
     /// Returns the `SocketAddr`.
-    fn addr(&self) -> &SocketAddr {
+    pub fn addr(&self) -> &SocketAddr {
         &self.addr
     }
 
     /// Returns the age.
-    fn age(&self) -> u8 {
+    pub fn age(&self) -> u8 {
         self.name[XOR_NAME_LEN - 1]
     }
 }

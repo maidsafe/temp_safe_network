@@ -14,8 +14,8 @@ use crate::messaging::{
 };
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
-    ChunkStore, Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils,
-    RegisterStorage, Routing as RoutingNode, SectionAuthorityProviderUtils,
+    ChunkStore, Config as RoutingConfig, Error as RoutingError, EventStream, RegisterStorage,
+    Routing as RoutingNode, SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::{PublicKey as BlsPublicKey, PublicKeySet};

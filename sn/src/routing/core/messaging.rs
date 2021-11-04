@@ -22,7 +22,6 @@ use crate::routing::{
     log_markers::LogMarker,
     messages::WireMsgUtils,
     network_knowledge::{ElderCandidatesUtils, NetworkKnowledge, SectionKeyShare},
-    peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
     Peer, SectionAuthorityProviderUtils,

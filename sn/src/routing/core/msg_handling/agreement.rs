@@ -17,7 +17,6 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     network_knowledge::{ElderCandidatesUtils, NodeStateUtils},
-    peer::PeerUtils,
     routing_api::command::Command,
     Event, SectionAuthorityProviderUtils, MIN_AGE,
 };

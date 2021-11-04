@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::routing::{peer::PeerUtils, Peer};
+use crate::routing::Peer;
 use crate::types::PublicKey;
 use ed25519_dalek::Keypair;
 use std::{

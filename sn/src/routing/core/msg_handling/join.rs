@@ -17,7 +17,6 @@ use crate::messaging::{
 use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
-    peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
     Peer, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, RECOMMENDED_SECTION_SIZE,
