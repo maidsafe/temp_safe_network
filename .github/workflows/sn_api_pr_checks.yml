@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-        
+
       - uses: dorny/paths-filter@v2
         id: sn_api_changes
         with:
@@ -54,7 +54,7 @@ jobs:
     if: false
     name: Code coverage check
     runs-on: ubuntu-latest
-    env: 
+    env:
       PROPTEST_CASES: 1
     steps:
       - uses: actions/checkout@v2
@@ -105,9 +105,7 @@ jobs:
           parallel-finished: true
 
   test:
-    # Disabled coverage & test stage for now as tests require work
-    # if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    if: false
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -130,6 +128,6 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
-      
+
       - shell: bash
-        run: ./resources/test-scripts/api-tests
+        run: ./resources/scripts/api-tests
