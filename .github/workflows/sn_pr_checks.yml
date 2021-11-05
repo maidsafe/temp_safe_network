@@ -21,6 +21,8 @@ jobs:
           filters: |
             src:
               - 'sn/src/**'
+              - 'sn_api/src/**'
+              - 'sn_cli/src/**'
 
       - uses: actions-rs/toolchain@v1
         if: steps.sn_changes.outputs.src == 'true'
