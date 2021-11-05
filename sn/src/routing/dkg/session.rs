@@ -16,7 +16,7 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::SectionKeyShare,
+    network_knowledge::{ElderCandidatesUtils, SectionKeyShare},
     node::Node,
     routing_api::command::{next_timer_token, Command},
     Peer, SectionAuthorityProviderUtils,
@@ -84,11 +84,9 @@ impl Session {
 
     fn recipients(&self) -> Vec<Peer> {
         self.elder_candidates
-            .elders
-            .iter()
+            .peers()
             .enumerate()
-            .filter(|(index, _)| *index != self.participant_index)
-            .map(|(_, (name, addr))| Peer::new(*name, *addr))
+            .filter_map(|(index, peer)| (index != self.participant_index).then(|| peer))
             .collect()
     }
 

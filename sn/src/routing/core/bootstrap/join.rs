@@ -178,11 +178,7 @@ impl<'a> Join<'a> {
                     section_auth,
                     expected_age,
                 } => {
-                    let new_recipients: Vec<_> = section_auth
-                        .elders
-                        .iter()
-                        .map(|(name, addr)| Peer::new(*name, *addr))
-                        .collect();
+                    let new_recipients = section_auth.peers();
 
                     let prefix = section_auth.prefix;
 
@@ -245,10 +241,9 @@ impl<'a> Join<'a> {
 
                     // Ignore already used recipients
                     let new_recipients: Vec<_> = section_auth
-                        .elders
-                        .iter()
-                        .filter(|(_, addr)| !used_recipient.contains(addr))
-                        .map(|(name, addr)| Peer::new(*name, *addr))
+                        .peers()
+                        .into_iter()
+                        .filter(|peer| !used_recipient.contains(&peer.addr()))
                         .collect();
 
                     if new_recipients.is_empty() {

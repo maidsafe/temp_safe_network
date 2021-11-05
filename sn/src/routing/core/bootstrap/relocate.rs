@@ -143,11 +143,7 @@ impl JoiningAsRelocated {
                     return Ok(None);
                 }
 
-                let new_recipients: Vec<_> = section_auth
-                    .elders
-                    .iter()
-                    .map(|(name, addr)| Peer::new(*name, *addr))
-                    .collect();
+                let new_recipients = section_auth.peers();
 
                 // if we are relocating, and we didn't generate
                 // the relocation payload yet, we do it now
@@ -178,10 +174,9 @@ impl JoiningAsRelocated {
 
                 // Ignore already used recipients
                 let new_recipients: Vec<_> = section_auth
-                    .elders
-                    .iter()
-                    .filter(|(_, addr)| !self.used_recipients.contains(addr))
-                    .map(|(name, addr)| Peer::new(*name, *addr))
+                    .peers()
+                    .into_iter()
+                    .filter(|elder| !self.used_recipients.contains(&elder.addr()))
                     .collect();
 
                 if new_recipients.is_empty() {
