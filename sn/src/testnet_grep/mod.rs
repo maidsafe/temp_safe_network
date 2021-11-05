@@ -120,7 +120,9 @@ pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches, Error> {
                 }
             };
 
-            if !dent.file_type().is_file() {
+            let is_log_file = dent.path().to_path_buf().to_string().contains("log");
+
+            if !is_log_file && !dent.file_type().is_file() {
                 continue;
             }
 
@@ -158,7 +160,9 @@ pub(crate) fn search_testnet_results_per_node(
                 }
             };
 
-            if !dent.file_type().is_file() {
+            let is_log_file = dent.path().to_path_buf().to_string().contains("log");
+
+            if !dent.file_type().is_file() && !is_log_file {
                 continue;
             }
 

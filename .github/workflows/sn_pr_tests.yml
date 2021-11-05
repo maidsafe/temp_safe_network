@@ -163,20 +163,15 @@ jobs:
         env:
           NODE_COUNT: 45
 
-      # windows and logfile locks are problematic for the testnet asserts
-      # - name: Wait for a healthy network
-      #   if: matrix.os != 'windows-latest'
-      #   run: ./resources/scripts/network_is_ready.sh
-      #   id: split-check-1
-      #   timeout-minutes: 5
-      #   continue-on-error: true
+      - name: Healthcheck
+        run: ./resources/scripts/has_split.sh
+        timeout-minutes: 5
+        continue-on-error: true
 
-      # windows and logfile locks are problematic for the testnet asserts
-      # so we use the bash script
+
       - name: Wait for a healthy network (win)
         shell: bash
-        # if: matrix.os == 'windows-latest'
-        run: ./resources/scripts/network_is_ready_cli.sh
+        run: ./resources/scripts/network_is_ready.sh
         id: split-check-1
         timeout-minutes: 15
         continue-on-error: true
@@ -200,26 +195,18 @@ jobs:
         env:
           NODE_COUNT: 45
 
-      # windows and logfile locks are problematic for the testnet asserts
-      # - name: Wait for a healthy network
-      #   if: matrix.os != 'windows-latest'
-      #   run: ./resources/scripts/network_is_ready.sh
-      #   id: split-check-2
-      #   timeout-minutes: 5
+      - name: Healthcheck
+        run: ./resources/scripts/has_split.sh
+        timeout-minutes: 5
+        continue-on-error: true
 
-      # windows and logfile locks are problematic for the testnet asserts
-      # so we use the bash script
       - name: Wait for a healthy network (win)
         shell: bash
-        # if: matrix.os == 'windows-latest'
-        run: ./resources/scripts/network_is_ready_cli.sh
-        id: split-check-2
+        run: ./resources/scripts/network_is_ready.sh
         timeout-minutes: 15
 
       - name: Run network asserts one by one
         shell: bash
-        # FIXME: windows has an issue w/ locking of log files
-        if: matrix.os != 'windows-latest'
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
         timeout-minutes: 5
