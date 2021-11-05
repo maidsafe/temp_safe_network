@@ -568,7 +568,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_invalid_topname() -> Result<()> {
+    async fn test_nrs_invalid_topname() -> Result<()> {
         let safe = new_safe_instance().await?;
 
         // test with invalid top name
