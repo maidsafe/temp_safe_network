@@ -172,11 +172,7 @@ impl Core {
         let message = SystemMsg::AntiEntropyProbe(dst);
         let section_key = matching_section.section_key();
         let dst_name = matching_section.prefix().name();
-        let recipients: Vec<_> = matching_section
-            .elders
-            .into_iter()
-            .map(|(name, addr)| Peer::new(name, addr))
-            .collect();
+        let recipients = matching_section.peers();
 
         info!(
             "ProbeMessage target {:?} w/key {:?}",
