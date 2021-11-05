@@ -157,7 +157,7 @@ impl NetworkKnowledge {
 
     /// update all section info for our new section
     pub(super) async fn relocated_to(&self, new_network_nowledge: Self) -> Result<()> {
-        debug!(">>>>. node was relocated");
+        debug!("Node was relocated to {:?}", new_network_nowledge);
 
         let mut chain = self.chain.write().await;
         *chain = new_network_nowledge.chain().await;
@@ -328,7 +328,7 @@ impl NetworkKnowledge {
                 // FIXME: this may overwrite current SAP if an old SAP is received in a lagging msg,
                 // once we have the DAG we can update a SAP for same prefix only if it's newer.
                 if prefix.matches(our_name)
-                    && (elders != &our_sap.elders
+                    && (elders.len() > our_sap.elders.len() && elders != &our_sap.elders
                         || prefix.bit_count() > our_sap.prefix.bit_count())
                 {
                     *self.chain.write().await = proof.clone();
