@@ -13,9 +13,12 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker, peer::PeerUtils,
-    routing_api::command::Command, section::ElderCandidatesUtils, Event,
-    SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils,
+    error::Result,
+    log_markers::LogMarker,
+    network_knowledge::{ElderCandidatesUtils, NodeStateUtils},
+    routing_api::command::Command,
+    Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
 
 use super::Core;
@@ -56,32 +59,30 @@ impl Core {
         debug!("{}", LogMarker::AgreementOfOnline);
         let mut commands = vec![];
         if let Some(old_info) = self
-            .section
+            .network_knowledge
             .members()
-            .get_section_signed(new_info.peer.name())
+            .get_section_signed(&new_info.name)
         {
             // This node is rejoin with same name.
 
-            if old_info.value.state != MembershipState::Left {
+            if old_info.state != MembershipState::Left {
                 debug!(
                     "Ignoring Online node {} - {:?} not Left.",
-                    new_info.peer.name(),
-                    old_info.value.state,
+                    new_info.name, old_info.state,
                 );
 
                 return Ok(commands);
             }
 
-            let new_age = cmp::max(MIN_AGE, old_info.value.peer.age() / 2);
+            let new_age = cmp::max(MIN_AGE, old_info.age() / 2);
 
             if new_age > MIN_AGE {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
                 commands.push(self.send_node_approval(old_info.clone()).await?);
-                commands.extend(
-                    self.relocate_rejoining_peer(&new_info.peer, new_age)
-                        .await?,
-                );
+
+                let peer = new_info.to_peer();
+                commands.extend(self.relocate_rejoining_peer(&peer, new_age).await?);
 
                 return Ok(commands);
             }
@@ -92,22 +93,22 @@ impl Core {
             sig,
         };
 
-        if !self.section.update_member(new_info.clone()).await {
-            info!("ignore Online: {:?}", new_info.value.peer);
+        if !self.network_knowledge.update_member(new_info.clone()).await {
+            info!("ignore Online: {} at {}", new_info.name, new_info.addr);
             return Ok(vec![]);
         }
 
-        info!("handle Online: {:?}", new_info.value.peer);
+        info!("handle Online: {} at {}", new_info.name, new_info.addr);
 
         self.send_event(Event::MemberJoined {
-            name: *new_info.value.peer.name(),
-            previous_name: new_info.value.previous_name,
-            age: new_info.value.peer.age(),
+            name: new_info.name,
+            previous_name: new_info.previous_name,
+            age: new_info.age(),
         })
         .await;
 
         commands.extend(
-            self.relocate_peers(new_info.value.peer.name(), &new_info.sig.signature)
+            self.relocate_peers(&new_info.name, &new_info.sig.signature)
                 .await?,
         );
 
@@ -130,25 +131,24 @@ impl Core {
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
-        let peer = node_state.peer;
-        let age = peer.age();
+        let age = node_state.age();
         let signature = sig.signature.clone();
 
         if !self
-            .section
+            .network_knowledge
             .update_member(SectionAuth {
                 value: node_state,
                 sig,
             })
             .await
         {
-            info!("ignore Offline: {:?}", peer);
+            info!("ignore Offline: {} at {}", node_state.name, node_state.addr);
             return Ok(commands);
         }
 
-        info!("handle Offline: {:?}", peer);
+        info!("handle Offline: {} at {}", node_state.name, node_state.addr);
 
-        commands.extend(self.relocate_peers(peer.name(), &signature).await?);
+        commands.extend(self.relocate_peers(&node_state.name, &signature).await?);
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
@@ -158,7 +158,7 @@ impl Core {
         commands.extend(result);
 
         self.send_event(Event::MemberLeft {
-            name: *peer.name(),
+            name: node_state.name,
             age,
         })
         .await;
@@ -172,10 +172,10 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        let equal_or_extension = section_auth.prefix() == self.section.prefix().await
+        let equal_or_extension = section_auth.prefix() == self.network_knowledge.prefix().await
             || section_auth
                 .prefix()
-                .is_extension_of(&self.section.prefix().await);
+                .is_extension_of(&self.network_knowledge.prefix().await);
 
         if equal_or_extension {
             debug!(
@@ -185,10 +185,10 @@ impl Core {
             // Our section or sub-section
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let infos = self
-                .section
+                .network_knowledge
                 .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
                 .await;
-            if !infos.contains(&signed_section_auth.value.elder_candidates()) {
+            if !infos.contains(&signed_section_auth.elder_candidates()) {
                 // SectionInfo out of date, ignore.
                 return Ok(vec![]);
             }
@@ -204,8 +204,8 @@ impl Core {
             }
 
             for peer in peers {
-                if !self.section.is_elder(peer.name()).await {
-                    ae_update_recipients.push((*peer.name(), *peer.addr()));
+                if !self.network_knowledge.is_elder(&peer.name()).await {
+                    ae_update_recipients.push((peer.name(), peer.addr()));
                 }
             }
 
@@ -216,7 +216,7 @@ impl Core {
                     .send_direct_message_to_nodes(
                         ae_update_recipients,
                         node_msg,
-                        self.section.prefix().await.name(),
+                        self.network_knowledge.prefix().await.name(),
                         sig.public_key,
                     )
                     .await?;
@@ -254,7 +254,7 @@ impl Core {
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let updates = self.split_barrier.write().await.process(
-            &self.section.prefix().await,
+            &self.network_knowledge.prefix().await,
             signed_section_auth.clone(),
             key_sig,
         );
@@ -263,71 +263,57 @@ impl Core {
         }
 
         let snapshot = self.state_snapshot().await;
-        let node_name = self.node.read().await.name();
         let old_chain = self.section_chain().await.clone();
 
-        for (section_auth, key_sig) in updates {
-            let prefix = section_auth.value.prefix;
-            info!("New SAP agreed for {:?}: {:?}", prefix, section_auth);
+        for (signed_sap, key_sig) in updates {
+            let prefix = signed_sap.prefix;
+            info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
-            let our_prefix = self.section().prefix().await;
+            // If we have the key share for new SAP key we can switch to this new SAP
+            let switch_to_new_sap = self
+                .section_keys_provider
+                .key_share(&signed_sap.section_key())
+                .await
+                .is_ok();
 
-            // Let's update our own Section info if the new SAP's prefix
-            // matches my name, i.e. it's my section's new SAP
-            if prefix.matches(&node_name) {
-                info!(
-                    "pdating my section's ({:?}) to {:?} SAP to: {:?}",
-                    our_prefix, prefix, &section_auth
-                );
-                let updated = self
-                    .section
-                    .update_elders(section_auth.clone(), key_sig.clone())
-                    .await;
-
-                if !updated {
-                    warn!("No elder updated happened");
-                }
-
-                let proof_chain = self.section_chain().await;
-
-                let network_updated = self.network.update(section_auth.clone(), &proof_chain)?;
-
-                if !network_updated {
-                    warn!(
-                        "Section Chain updated, but the network was not. w/ {:?}",
-                        section_auth
-                    );
-                }
-
-                self.write_prefix_map().await;
-            } else {
-                info!("Updating my neighbour's SAP to: {:?}", &section_auth);
-
-                // Let's update our network knowledge with new SAP even if it's of our own section.
-                // We need to generate the proof chain to connect our current chain to new SAP.
-                let mut proof_chain = old_chain.clone();
-                match proof_chain.insert(
-                    old_chain.last_key(),
-                    section_auth.value.section_key(),
-                    key_sig.signature,
-                ) {
-                    Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
-                    Ok(()) => match self.network.update(section_auth, &proof_chain) {
-                        Err(err) => error!(
-                            "Error updating our NetworkPrefixMap for {:?}: {:?}",
-                            prefix, err
-                        ),
-                        Ok(true) => {
-                            info!("Updated our NetworkPrefixMap for {:?}", prefix);
-                            self.write_prefix_map().await
-                        }
-                        _ => {}
-                    },
-                }
+            // Let's update our network knowledge, including our
+            // section SAP and chain if the new SAP's prefix matches our name
+            // We need to generate the proof chain to connect our current chain to new SAP.
+            let mut proof_chain = old_chain.clone();
+            match proof_chain.insert(
+                old_chain.last_key(),
+                signed_sap.section_key(),
+                key_sig.signature,
+            ) {
+                Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
+                Ok(()) => match self
+                    .network_knowledge
+                    .update_knowledge_if_valid(
+                        signed_sap,
+                        &proof_chain,
+                        None,
+                        &self.node.read().await.name(),
+                        switch_to_new_sap,
+                    )
+                    .await
+                {
+                    Err(err) => error!(
+                        "Error updating our network knowledge for {:?}: {:?}",
+                        prefix, err
+                    ),
+                    Ok(true) => {
+                        info!("Updated our network knowledge for {:?}", prefix);
+                        self.write_prefix_map().await
+                    }
+                    _ => {}
+                },
             }
         }
 
-        info!("Prefixes we know about: {:?}", self.network);
+        info!(
+            "Prefixes we know about: {:?}",
+            self.network_knowledge.prefix_map()
+        );
 
         self.update_self_for_new_node_state_and_fire_events(snapshot)
             .await

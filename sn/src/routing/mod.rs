@@ -27,21 +27,21 @@ pub(crate) use self::{
     core::ChunkStore,
     core::RegisterStorage,
     core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
-    section::section_keys::SectionKeyShare,
+    network_knowledge::section_keys::SectionKeyShare,
 };
 pub use self::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
-    peer::PeerUtils,
+    network_knowledge::{
+        node_state::{FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE},
+        section_authority_provider::SectionAuthorityProviderUtils,
+    },
+    peer::Peer,
     routing_api::{
         config::Config,
         event::{Elders, Event, MessageReceived, NodeElderChange},
         event_stream::EventStream,
         Routing,
-    },
-    section::{
-        node_state::{FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE},
-        section_authority_provider::SectionAuthorityProviderUtils,
     },
 };
 pub use qp2p::{Config as NetworkConfig, SendStream};
@@ -53,7 +53,7 @@ pub use test_utils::*;
 #[cfg(test)]
 pub(crate) use dkg::test_utils::section_signed;
 #[cfg(test)]
-pub(crate) use section::test_utils::gen_section_authority_provider;
+pub(crate) use network_knowledge::test_utils::gen_section_authority_provider;
 
 /// Standardised log markers for various events
 pub mod log_markers;
@@ -67,11 +67,11 @@ mod dkg;
 mod ed25519;
 mod error;
 mod messages;
+mod network_knowledge;
 mod node;
 mod peer;
 mod relocation;
 mod routing_api;
-mod section;
 
 /// Recommended section size. sn_routing will keep adding nodes until the section reaches this size.
 /// More nodes might be added if requested by the upper layers.

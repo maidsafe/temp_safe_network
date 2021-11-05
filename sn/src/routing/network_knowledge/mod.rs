@@ -17,15 +17,15 @@ pub(crate) use self::section_authority_provider::test_utils;
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 use crate::messaging::{
-    system::{ElderCandidates, KeyedSig, NodeState, Peer, SectionAuth, SectionPeers},
+    system::{ElderCandidates, KeyedSig, NodeState, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
+use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
     log_markers::LogMarker,
-    peer::PeerUtils,
-    ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
+    Peer, ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
 };
 use bls::PublicKey as BlsPublicKey;
 pub(crate) use node_state::NodeStateUtils;
@@ -33,33 +33,51 @@ pub(crate) use section_authority_provider::ElderCandidatesUtils;
 use section_authority_provider::SectionAuthorityProviderUtils;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    convert::TryInto,
+    iter,
+    net::SocketAddr,
+    sync::Arc,
+};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
-/// Container for storing information about a section.
+/// Elders
+type Elders = BTreeMap<XorName, SocketAddr>;
+
+/// DAG with SAPs
+// TODO: replace the 'all_chain' object with a proper DAG implementation
+type ChainsDag =
+    BTreeMap<(Prefix, Elders), (SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)>;
+
+/// Container for storing information about the network, including our own section.
 #[derive(Clone, Debug)]
-/// All information about a section
-pub(crate) struct Section {
+pub(crate) struct NetworkKnowledge {
     /// Network genesis key
     genesis_key: BlsPublicKey,
     /// The secured linked list of previous section keys, starting from genesis key
-    pub(crate) chain: Arc<RwLock<SecuredLinkedList>>,
-    /// Signed section authority
-    section_auth: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
-    /// Members of the section
+    chain: Arc<RwLock<SecuredLinkedList>>,
+    /// Signed Section Authority Provider
+    signed_sap: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
+    /// Members of our section
     section_peers: SectionPeers,
+    /// The network prefix map, i.e. a map from prefix to SAPs
+    prefix_map: NetworkPrefixMap,
+    /// DAG with SAPs
+    all_chains: Arc<RwLock<ChainsDag>>,
 }
 
-impl Section {
-    /// Creates a minimal `Section` initially containing only info about our elders
-    /// (`section_auth`).
+impl NetworkKnowledge {
+    /// Creates a minimal `NetworkKnowledge` initially containing only info about our elders
+    /// (`SAP`).
     ///
-    /// Returns error if `section_auth` is not verifiable with the `chain`.
+    /// Returns error if the `signed_sap` is not verifiable with the `chain`.
     pub(super) fn new(
         genesis_key: bls::PublicKey,
         chain: SecuredLinkedList,
-        section_auth: SectionAuth<SectionAuthorityProvider>,
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        passed_prefix_map: Option<NetworkPrefixMap>,
     ) -> Result<Self, Error> {
         if genesis_key != *chain.root_key() {
             return Err(Error::UntrustedProofChain(format!(
@@ -68,27 +86,27 @@ impl Section {
             )));
         }
 
-        if section_auth.sig.public_key != *chain.last_key() {
-            error!("can't create section: section_auth signed with incorrect key");
+        if signed_sap.sig.public_key != *chain.last_key() {
+            error!("can't create section: SAP signed with incorrect key");
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key doesn't match last key in proof chain: {:?}",
-                section_auth.value
+                signed_sap.value
             )));
         }
 
         // Check if SAP signature is valid
-        if !section_auth.self_verify() {
+        if !signed_sap.self_verify() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "invalid signature: {:?}",
-                section_auth.value
+                signed_sap.value
             )));
         }
 
         // Check if SAP's section key matches SAP signature's key
-        if section_auth.sig.public_key != section_auth.value.public_key_set.public_key() {
+        if signed_sap.sig.public_key != signed_sap.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key doesn't match signature's key: {:?}",
-                section_auth.value
+                signed_sap.value
             )));
         }
 
@@ -101,37 +119,67 @@ impl Section {
             )));
         }
 
+        // Check if the GenesisKey in the provided prefix_map is the same as our section's.
+        // If not, start afresh.
+        let prefix_map = match passed_prefix_map {
+            Some(prefix_map) => {
+                if prefix_map.genesis_key() != genesis_key {
+                    return Err(Error::InvalidGenesisKey(prefix_map.genesis_key()));
+                } else {
+                    prefix_map
+                }
+            }
+            None => NetworkPrefixMap::new(genesis_key),
+        };
+
+        // At this point we know the prefix map corresponds to the correct genesis key,
+        // let's make sure the prefix map contains also our own pefix and SAP,
+        if let Err(err) = prefix_map.update(signed_sap.clone(), &chain) {
+            debug!("Failed to update NetworkPrefixMap with SAP {:?} and chain {:?} upon creating new NetworkKnowledge intance: {:?}", signed_sap, chain, err);
+        }
+
+        let mut all_chains = ChainsDag::new();
+        let _ = all_chains.insert(
+            (signed_sap.prefix, signed_sap.elders.clone()),
+            (signed_sap.clone(), chain.clone()),
+        );
+
         Ok(Self {
             genesis_key,
             chain: Arc::new(RwLock::new(chain)),
-            section_auth: Arc::new(RwLock::new(section_auth)),
+            signed_sap: Arc::new(RwLock::new(signed_sap)),
             section_peers: SectionPeers::default(),
+            prefix_map,
+            all_chains: Arc::new(RwLock::new(all_chains)),
         })
     }
 
     /// update all section info for our new section
-    pub(super) async fn relocated_to(&self, new_section: Self) -> Result<()> {
-        debug!(">>>>. node was relocated");
+    pub(super) async fn relocated_to(&self, new_network_nowledge: Self) -> Result<()> {
+        debug!("Node was relocated to {:?}", new_network_nowledge);
+
         let mut chain = self.chain.write().await;
-        *chain = new_section.chain().await;
+        *chain = new_network_nowledge.chain().await;
         // don't hold write lock
         drop(chain);
 
-        let mut section_auth = self.section_auth.write().await;
-        *section_auth = new_section.section_auth.read().await.clone();
+        let mut signed_sap = self.signed_sap.write().await;
+        *signed_sap = new_network_nowledge.signed_sap.read().await.clone();
         // don't hold write lock
-        drop(section_auth);
+        drop(signed_sap);
 
-        self.merge_members(new_section.members().clone()).await?;
+        let _updated = self
+            .merge_members(new_network_nowledge.members().clone())
+            .await?;
 
         Ok(())
     }
 
-    /// Creates `Section` for the first node in the network
+    /// Creates `NetworkKnowledge` for the first node in the network
     pub(super) async fn first_node(
         peer: Peer,
         genesis_sk_set: bls::SecretKeySet,
-    ) -> Result<(Section, SectionKeyShare)> {
+    ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
         let public_key_set = genesis_sk_set.public_keys();
         let secret_key_share = genesis_sk_set.secret_key_share(0);
         let genesis_key = public_key_set.public_key();
@@ -139,13 +187,14 @@ impl Section {
         let section_auth =
             create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
 
-        let section = Section::new(
+        let section = NetworkKnowledge::new(
             genesis_key,
             SecuredLinkedList::new(genesis_key),
             section_auth,
+            None,
         )?;
 
-        for peer in section.section_auth.read().await.value.peers() {
+        for peer in section.signed_sap.read().await.peers() {
             let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
             let _changed = section.section_peers.update(SectionAuth {
@@ -163,96 +212,186 @@ impl Section {
         Ok((section, section_key_share))
     }
 
-    pub(super) fn genesis_key(&self) -> &bls::PublicKey {
-        &self.genesis_key
-    }
+    pub(super) async fn update_knowledge_if_valid(
+        &self,
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        proof_chain: &SecuredLinkedList,
+        updated_members: Option<SectionPeers>,
+        our_name: &XorName,
+        update_sap: bool,
+    ) -> Result<bool> {
+        let provided_sap = signed_sap.value.clone();
 
-    /// Try to merge this `Section` members with `other`. .
-    pub(super) async fn merge_members(&self, peers: SectionPeers) -> Result<()> {
-        for refmulti in peers.members.iter() {
-            let info = refmulti.value().clone();
-            let _changed = self.update_member(info).await;
+        // 1. handle updates to our own section chain and SAP
+        let mut there_was_an_update = self
+            .update_chain(&signed_sap, proof_chain, our_name, update_sap)
+            .await;
+
+        let our_new_prefix = self.prefix().await;
+        if there_was_an_update {
+            // Remove any peer which doesn't belong to our new section's prefix
+            self.section_peers.retain(&our_new_prefix);
+
+            info!(
+                "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
+                our_new_prefix, provided_sap.prefix, provided_sap
+            );
         }
 
-        self.section_peers
-            .retain(&self.section_auth.read().await.value.prefix());
-
-        Ok(())
-    }
-
-    /// Try to merge this `Section` with `other`. Returns `InvalidMessage` if `other` is invalid or
-    /// its chain is not compatible with the chain of `self`.
-    pub(super) async fn merge_chain(
-        &self,
-        other: &SectionAuth<SectionAuthorityProvider>,
-        proof_chain: SecuredLinkedList,
-    ) -> Result<()> {
-        trace!("Attempting to merge chain");
-        // We've been AE validated here.
-        self.chain.write().await.merge(proof_chain)?;
-
-        if &other.sig.public_key == self.chain.read().await.last_key() {
-            *self.section_auth.write().await = other.clone();
+        // 2. update the network prefix map
+        match self.prefix_map.verify_with_chain_and_update(
+            signed_sap.clone(),
+            proof_chain,
+            &self.chain().await,
+        ) {
+            Ok(true) => {
+                there_was_an_update = true;
+                info!(
+                    "Anti-Entropy: updated network prefix map with SAP for {:?}",
+                    provided_sap.prefix
+                );
+            }
+            Ok(false) => {
+                debug!(
+                    "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                    provided_sap.prefix, provided_sap
+                );
+            }
+            Err(err) => {
+                debug!(
+                    "Anti-Entropy: discarded SAP for {:?} since we failed to update prefix map with: {:?}",
+                    provided_sap.prefix, err
+                );
+            }
         }
 
-        Ok(())
+        if let Some(peers) = updated_members {
+            if self.merge_members(peers).await? {
+                info!(
+                    "Updated our section's members ({:?}): {:?}",
+                    our_new_prefix,
+                    self.members()
+                );
+                there_was_an_update = true;
+            }
+        }
+
+        Ok(there_was_an_update)
     }
 
-    /// Update the `SectionAuthorityProvider` of our section.
-    pub(super) async fn update_elders(
+    // Update the chains DAG with provided knowledge, and SAP only if flagged by 'update-sap' arg.
+    async fn update_chain(
         &self,
-        new_section_auth: SectionAuth<SectionAuthorityProvider>,
-        new_key_sig: KeyedSig,
+        provided_signed_sap: &SectionAuth<SectionAuthorityProvider>,
+        proof_chain: &SecuredLinkedList,
+        our_name: &XorName,
+        update_sap: bool,
     ) -> bool {
-        let (our_prefix, section_key) = {
-            let signed_sap = self.section_auth.read().await;
-            (signed_sap.value.prefix, signed_sap.value.section_key())
-        };
+        let provided_sap = &provided_signed_sap.value;
 
-        if new_section_auth.value.prefix() != our_prefix
-            && !new_section_auth.value.prefix().is_extension_of(&our_prefix)
-        {
-            warn!("Did not update elders, this SAP prefix is not an extension of ours");
+        // TODO: once we have a proper DAG implementation we won't
+        // need proof chains from genesis but from any other key in the chain
+        if proof_chain.root_key() != self.genesis_key() {
+            info!(
+                ">>> PROOF NOT TO GENESIS {:?} ==== {:?}",
+                proof_chain, provided_sap
+            );
+
             return false;
         }
 
-        if !new_section_auth.self_verify() {
-            return false;
-        }
-
-        let new_section_key = new_section_auth.sig.public_key;
-        let signed_by_key = new_key_sig.public_key;
-
-        // Check if it's a SAP signed by current section key
-        // TODO: this shall be checked by SecuredLinkedList automatically
-        if section_key != signed_by_key {
-            return false;
-        }
-
-        if let Err(error) =
-            self.chain
-                .write()
-                .await
-                .insert(&signed_by_key, new_section_key, new_key_sig.signature)
-        {
+        if !provided_signed_sap.self_verify() {
             error!(
-                "Failed to insert key {:?} (signed with {:?}) into the section chain: {:?}",
-                new_section_key, signed_by_key, error,
+                "Invalid section authority of new SAP: {:?}",
+                provided_signed_sap.value
             );
             return false;
         }
 
-        // Update our section's SAP
-        let new_prefix = new_section_auth.value.prefix();
-        *self.section_auth.write().await = new_section_auth;
+        // TODO: replace the 'all_chain' object with a proper DAG implementation
+        let _old = self.all_chains.write().await.insert(
+            (provided_sap.prefix, provided_sap.elders.clone()),
+            (provided_signed_sap.clone(), proof_chain.clone()),
+        );
 
-        self.section_peers.retain(&new_prefix);
+        let mut there_was_an_update = false;
+        // We try to update our SAP and own chain only if we were flagged to,
+        // othrwise this update could be due to an AE message and we still don't have
+        // the key share for the new SAP, making this node unable to sign section messages
+        // and possibly being kicked out of the group of Elders.
+        if update_sap {
+            // TODO: this is inneficient and it will be improved once we have a proper DAG in place.
+            for ((prefix, elders), (sap, proof)) in self.all_chains.read().await.iter() {
+                let our_sap = self.signed_sap.read().await.value.clone();
 
-        true
+                // FIXME: this may overwrite current SAP if an old SAP is received in a lagging msg,
+                // once we have the DAG we can update a SAP for same prefix only if it's newer.
+                if prefix.matches(our_name)
+                    && (elders.len() > our_sap.elders.len() && elders != &our_sap.elders
+                        || prefix.bit_count() > our_sap.prefix.bit_count())
+                {
+                    *self.chain.write().await = proof.clone();
+                    *self.signed_sap.write().await = sap.clone();
+                    there_was_an_update = true;
+                }
+            }
+        }
+
+        there_was_an_update
     }
 
-    /// Update the member. Returns whether it actually changed anything.
+    // Returns reference to network prefix map
+    pub(crate) fn prefix_map(&self) -> &NetworkPrefixMap {
+        &self.prefix_map
+    }
+
+    // Returns the section authority provider for the prefix that matches name, excluding self section.
+    pub(super) fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
+        self.prefix_map.section_by_name(name)
+    }
+
+    // Returns the section authority provider for the prefix that matches name, excluding self section.
+    pub(super) fn section_by_prefix(&self, prefix: &Prefix) -> Result<SectionAuthorityProvider> {
+        self.prefix_map.section_by_prefix(prefix)
+    }
+
+    // Get SectionAuthorityProvider of a known section with the given prefix.
+    pub(super) fn get_sap(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
+        self.prefix_map.get(prefix)
+    }
+
+    // Get SectionAuthorityProvider of a known section with the given prefix.
+    pub(super) async fn get_closest_or_opposite_signed_sap(
+        &self,
+        name: &XorName,
+    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
+        self.prefix_map
+            .closest_or_opposite(name, Some(&self.prefix().await))
+    }
+
+    pub(super) fn genesis_key(&self) -> &bls::PublicKey {
+        &self.genesis_key
+    }
+
+    /// Try to merge this `NetworkKnowledge` members with `peers`. .
+    pub(super) async fn merge_members(&self, peers: SectionPeers) -> Result<bool> {
+        let mut there_was_an_update = false;
+
+        for member in peers.members.iter() {
+            let info = member.value().clone();
+            if self.update_member(info).await {
+                there_was_an_update = true
+            }
+        }
+
+        self.section_peers.retain(&self.prefix().await);
+
+        Ok(there_was_an_update)
+    }
+
+    /// Update the member. Returns whether it actually updated it.
     pub(super) async fn update_member(&self, node_state: SectionAuth<NodeState>) -> bool {
+        // let's check the node state is properly signed by one of the keys in our chain
         if !node_state.verify(&*self.chain.read().await) {
             error!("can't merge member {:?}", node_state.value);
             return false;
@@ -268,11 +407,11 @@ impl Section {
 
     /// Return current section key
     pub(super) async fn section_key(&self) -> bls::PublicKey {
-        *self.chain.read().await.last_key()
+        self.signed_sap.read().await.section_key()
     }
 
     /// Return current section chain length
-    pub(crate) async fn main_chain_branch_len(&self) -> u64 {
+    pub(crate) async fn chain_len(&self) -> u64 {
         self.chain.read().await.main_branch_len() as u64
     }
 
@@ -283,20 +422,20 @@ impl Section {
 
     /// Return a copy of current SAP
     pub(super) async fn authority_provider(&self) -> SectionAuthorityProvider {
-        self.section_auth.read().await.value.clone()
+        self.signed_sap.read().await.value.clone()
     }
 
     /// Return a copy of current SAP with corresponding section authority
     pub(super) async fn section_signed_authority_provider(
         &self,
     ) -> SectionAuth<SectionAuthorityProvider> {
-        self.section_auth.read().await.clone()
+        self.signed_sap.read().await.clone()
     }
 
-    /// Return weather we are an Elder, by checking if we are one of
-    /// the current section's SAP member,
+    /// Return weather the name provided belongs to an Elder, by checking if
+    /// it is one of the current section's SAP member,
     pub(super) async fn is_elder(&self, name: &XorName) -> bool {
-        self.section_auth.read().await.value.contains_elder(name)
+        self.signed_sap.read().await.contains_elder(name)
     }
 
     /// Generate a new section info(s) based on the current set of members,
@@ -320,7 +459,7 @@ impl Section {
             .section_peers
             .elder_candidates(ELDER_SIZE, &sap, excluded_names);
 
-        let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).cloned().collect();
+        let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).collect();
         let current_names: BTreeSet<_> = sap.names();
 
         if expected_names == current_names {
@@ -336,7 +475,7 @@ impl Section {
 
     /// Prefix of our section.
     pub(super) async fn prefix(&self) -> Prefix {
-        self.section_auth.read().await.value.prefix
+        self.signed_sap.read().await.prefix
     }
 
     /// Return the list of our section's members
@@ -349,7 +488,7 @@ impl Section {
         let mut active_members = vec![];
         let nodes = self.section_peers.all_members();
         for peer in nodes {
-            if self.section_peers.is_joined(peer.name()) || self.is_elder(peer.name()).await {
+            if self.section_peers.is_joined(&peer.name()) || self.is_elder(&peer.name()).await {
                 active_members.push(peer);
             }
         }
@@ -362,7 +501,7 @@ impl Section {
         let mut adults = vec![];
         let nodes = self.section_peers.mature();
         for peer in nodes {
-            if !self.is_elder(peer.name()).await {
+            if !self.is_elder(&peer.name()).await {
                 adults.push(peer);
             }
         }
@@ -375,8 +514,8 @@ impl Section {
         let mut live_adults = vec![];
 
         for node_state in self.section_peers.joined() {
-            if !self.is_elder(node_state.peer.name()).await {
-                live_adults.push(node_state.peer)
+            if !self.is_elder(&node_state.name).await {
+                live_adults.push(node_state.to_peer())
             }
         }
         live_adults
@@ -386,8 +525,8 @@ impl Section {
         self.section_peers
             .joined()
             .into_iter()
-            .find(|info| info.peer.addr() == addr)
-            .map(|info| info.peer)
+            .find(|info| &info.addr == addr)
+            .map(|info| info.to_peer())
     }
 
     // Tries to split our section.
@@ -418,7 +557,7 @@ impl Section {
             .section_peers
             .mature()
             .iter()
-            .filter(|peer| !excluded_names.contains(peer.name()))
+            .filter(|peer| !excluded_names.contains(&peer.name()))
             .map(|peer| peer.name().bit(next_bit_index) == next_bit)
             .fold((0, 0), |(ours, siblings), is_our_prefix| {
                 if is_our_prefix {
@@ -467,9 +606,8 @@ impl Section {
 fn create_first_section_authority_provider(
     pk_set: &bls::PublicKeySet,
     sk_share: &bls::SecretKeyShare,
-    mut peer: Peer,
+    peer: Peer,
 ) -> Result<SectionAuth<SectionAuthorityProvider>> {
-    peer.set_reachable(true);
     let section_auth =
         SectionAuthorityProvider::new(iter::once(peer), Prefix::default(), pk_set.clone());
     let sig = create_first_sig(pk_set, sk_share, &section_auth)?;

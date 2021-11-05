@@ -7,14 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::system::{JoinResponse, Peer, ResourceProofResponse, SystemMsg};
+use crate::messaging::system::{JoinResponse, ResourceProofResponse, SystemMsg};
 use crate::routing::{
     core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     ed25519,
     log_markers::LogMarker,
-    peer::PeerUtils,
     routing_api::command::Command,
-    Error, Result,
+    Error, Peer, Result,
 };
 use ed25519_dalek::Verifier;
 use xor_name::XorName;
@@ -61,9 +60,9 @@ impl Core {
 
         trace!("{}", LogMarker::SendResourceProofChallenge);
         self.send_direct_message(
-            (*peer.name(), *peer.addr()),
+            (peer.name(), peer.addr()),
             response,
-            self.section.section_key().await,
+            self.network_knowledge.section_key().await,
         )
         .await
     }

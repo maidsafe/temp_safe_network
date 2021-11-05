@@ -6,15 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Peer;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use xor_name::XorName;
 
 /// Information about a member of our section.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct NodeState {
-    /// Peer info
-    pub peer: Peer,
+    /// Peer's name.
+    pub name: XorName,
+    /// Peer's address.
+    pub addr: SocketAddr,
     /// Current state of the peer
     pub state: MembershipState,
     /// To avoid sybil attack via relocation, a relocated node's original name will be recorded.

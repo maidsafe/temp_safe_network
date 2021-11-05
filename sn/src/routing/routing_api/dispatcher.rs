@@ -18,9 +18,8 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
+    network_knowledge::NetworkKnowledge,
     node::Node,
-    peer::PeerUtils,
-    section::Section,
     Error, Prefix, XorName,
 };
 use crate::types::PublicKey;
@@ -127,7 +126,7 @@ impl Dispatcher {
 
                 // Send a probe message if we are an elder
                 let core = &dispatcher.core;
-                if core.is_elder().await && !core.section().prefix().await.is_empty() {
+                if core.is_elder().await && !core.network_knowledge().prefix().await.is_empty() {
                     match core.generate_probe_message().await {
                         Ok(command) => {
                             info!("Sending ProbeMessage");
@@ -160,9 +159,9 @@ impl Dispatcher {
         let span = {
             let core = &self.core;
 
-            let prefix = core.section().prefix().await;
+            let prefix = core.network_knowledge().prefix().await;
             let is_elder = core.is_elder().await;
-            let section_key = core.section().section_key().await;
+            let section_key = core.network_knowledge().section_key().await;
             let age = core.node.read().await.age();
             trace_span!(
                 "handle_command",
@@ -324,12 +323,10 @@ impl Dispatcher {
                 self.core.set_joins_allowed(joins_allowed).await
             }
             Command::ProposeOnline {
-                mut peer,
+                peer,
                 previous_name,
                 dst_key,
             } => {
-                // The reachability check was completed during the initial bootstrap phase
-                peer.set_reachable(true);
                 self.core
                     .make_online_proposal(peer, previous_name, dst_key)
                     .await
@@ -339,7 +336,7 @@ impl Dispatcher {
                 let msg = {
                     let core = &self.core;
                     let node = core.node.read().await.clone();
-                    let section_pk = core.section().section_key().await;
+                    let section_pk = core.network_knowledge().section_key().await;
                     WireMsg::single_src(
                         &node,
                         DstLocation::Section {
@@ -353,26 +350,26 @@ impl Dispatcher {
                 let our_name = self.core.node.read().await.name();
                 let peers = self
                     .core
-                    .section()
+                    .network_knowledge()
                     .active_members()
                     .await
                     .iter()
-                    .filter(|peer| peer.name() != &name && peer.name() != &our_name)
+                    .filter(|peer| peer.name() != name && peer.name() != our_name)
                     .cloned()
                     .collect_vec();
                 Ok(self.core.send_or_handle(msg, peers).await)
             }
             Command::TestConnectivity(name) => {
                 let mut commands = vec![];
-                if let Some(peer) = self
-                    .core
-                    .section()
-                    .members()
-                    .get(&name)
-                    .map(|member_info| member_info.peer)
-                {
-                    if self.core.comm.is_reachable(peer.addr()).await.is_err() {
-                        commands.push(Command::ProposeOffline(*peer.name()));
+                if let Some(member_info) = self.core.network_knowledge().members().get(&name) {
+                    if self
+                        .core
+                        .comm
+                        .is_reachable(&member_info.addr)
+                        .await
+                        .is_err()
+                    {
+                        commands.push(Command::ProposeOffline(member_info.name));
                     }
                 }
                 Ok(commands)
@@ -440,7 +437,7 @@ impl Dispatcher {
                 debug!("Sending client msg to {:?}: {:?}", socket_addr, wire_msg);
 
                 let recipients = vec![(*name, socket_addr)];
-                wire_msg.set_dst_section_pk(*self.core.section_chain().await.last_key());
+                wire_msg.set_dst_section_pk(self.core.network_knowledge().section_key().await);
 
                 let command = Command::SendMessage {
                     recipients,
@@ -476,7 +473,11 @@ impl Dispatcher {
         }
     }
 
-    async fn handle_relocation_complete(&self, new_node: Node, new_section: Section) -> Result<()> {
+    async fn handle_relocation_complete(
+        &self,
+        new_node: Node,
+        new_section: NetworkKnowledge,
+    ) -> Result<()> {
         let previous_name = self.core.node.read().await.name();
         let new_keypair = new_node.keypair.clone();
 

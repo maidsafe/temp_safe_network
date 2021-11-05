@@ -14,8 +14,8 @@ use crate::messaging::{
 };
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
-    ChunkStore, Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils,
-    RegisterStorage, Routing as RoutingNode, SectionAuthorityProviderUtils,
+    ChunkStore, Config as RoutingConfig, Error as RoutingError, EventStream, RegisterStorage,
+    Routing as RoutingNode, SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::{PublicKey as BlsPublicKey, PublicKeySet};
@@ -165,7 +165,7 @@ impl Network {
             .our_elders()
             .await
             .iter()
-            .map(|p2p_node| *p2p_node.name())
+            .map(|p2p_node| p2p_node.name())
             .collect::<BTreeSet<_>>()
     }
 
@@ -174,7 +174,7 @@ impl Network {
             .our_adults()
             .await
             .into_iter()
-            .map(|p2p_node| *p2p_node.name())
+            .map(|p2p_node| p2p_node.name())
             .collect::<BTreeSet<_>>()
     }
 

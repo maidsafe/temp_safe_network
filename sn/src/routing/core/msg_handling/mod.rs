@@ -82,10 +82,15 @@ impl Core {
             } => {
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
-                let mut known_keys: Vec<BlsPublicKey> =
-                    self.section.chain().await.keys().copied().collect();
-                known_keys.extend(self.network.section_keys());
-                known_keys.push(*self.section.genesis_key());
+                let mut known_keys: Vec<BlsPublicKey> = self
+                    .network_knowledge
+                    .chain()
+                    .await
+                    .keys()
+                    .copied()
+                    .collect();
+                known_keys.extend(self.network_knowledge.prefix_map().section_keys());
+                known_keys.push(*self.network_knowledge.genesis_key());
 
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
                     warn!(
@@ -325,7 +330,6 @@ impl Core {
                     section_signed,
                     proof_chain,
                     members,
-                    sender,
                 )
                 .await
             }
@@ -473,7 +477,7 @@ impl Core {
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
                 if self.is_not_elder().await
-                    && join_request.section_key == self.section.section_key().await
+                    && join_request.section_key == self.network_knowledge.section_key().await
                 {
                     return Ok(vec![]);
                 }
@@ -665,7 +669,7 @@ impl Core {
 
             let dst = DstLocation::Section {
                 name: node_xorname,
-                section_pk: self.section.section_key().await,
+                section_pk: self.network_knowledge.section_key().await,
             };
 
             cmds.push(Command::PrepareNodeMsgToSend { msg, dst });
@@ -708,7 +712,7 @@ impl Core {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         // let name = network.our_name().await;
-        let section_pk = *self.section_chain().await.last_key();
+        let section_pk = self.network_knowledge().section_key().await;
 
         let dummy_dst_location = DstLocation::Node {
             name: our_name,

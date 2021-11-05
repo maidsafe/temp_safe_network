@@ -7,28 +7,26 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::routing::{error::Result, peer::PeerUtils, Event};
+use crate::routing::{error::Result, Event};
 use std::collections::BTreeSet;
 
 impl Core {
     pub(crate) async fn fire_node_event_for_any_new_adults(&self) -> Result<()> {
         let old_adults: BTreeSet<_> = self
-            .section
+            .network_knowledge
             .live_adults()
             .await
             .iter()
             .map(|p| p.name())
-            .copied()
             .collect();
 
         if self.is_not_elder().await {
             let current_adults: BTreeSet<_> = self
-                .section
+                .network_knowledge
                 .live_adults()
                 .await
                 .iter()
                 .map(|p| p.name())
-                .copied()
                 .collect();
             let added: BTreeSet<_> = current_adults.difference(&old_adults).copied().collect();
             let removed: BTreeSet<_> = old_adults.difference(&current_adults).copied().collect();

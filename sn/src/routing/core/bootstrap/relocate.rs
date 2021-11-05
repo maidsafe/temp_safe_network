@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::read_prefix_map_from_disk;
 use crate::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocateDetails, RelocatePayload,
@@ -18,11 +19,10 @@ use crate::routing::{
     ed25519,
     error::{Error, Result},
     messages::WireMsgUtils,
+    network_knowledge::NetworkKnowledge,
     node::Node,
-    peer::PeerUtils,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    section::Section,
     SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
@@ -99,7 +99,7 @@ impl JoiningAsRelocated {
                 section_chain,
                 node_state,
             } => {
-                if node_state.value.peer.name() != &self.node.name() {
+                if node_state.name != self.node.name() {
                     trace!("Ignore NodeApproval not for us");
                     return Ok(None);
                 }
@@ -120,12 +120,18 @@ impl JoiningAsRelocated {
 
                 trace!(
                     "This node has been approved to join the network at {:?}!",
-                    section_auth.value.prefix,
+                    section_auth.prefix,
                 );
 
                 Ok(Some(Command::HandleRelocationComplete {
                     node: self.node.clone(),
-                    section: Section::new(self.genesis_key, section_chain, section_auth)?,
+                    // TODO: pass our existing prefixmap here?
+                    section: NetworkKnowledge::new(
+                        self.genesis_key,
+                        section_chain,
+                        section_auth,
+                        read_prefix_map_from_disk().await,
+                    )?,
                 }))
             }
             JoinAsRelocatedResponse::Retry(section_auth) => {

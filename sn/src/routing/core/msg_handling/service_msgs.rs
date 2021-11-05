@@ -14,7 +14,7 @@ use crate::messaging::{
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, NodeAuth, ServiceAuth, WireMsg,
 };
 use crate::routing::{
-    core::capacity::CHUNK_COPY_COUNT, error::Result, log_markers::LogMarker, peer::PeerUtils,
+    core::capacity::CHUNK_COPY_COUNT, error::Result, log_markers::LogMarker,
     routing_api::command::Command,
 };
 use crate::types::{ChunkAddress, PublicKey};
@@ -138,7 +138,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let msg_id = MessageId::new();
 
-        let section_pk = self.section().section_key().await;
+        let section_pk = self.network_knowledge().section_key().await;
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
 
@@ -170,7 +170,7 @@ impl Core {
         };
 
         // Setup node authority on this response and send this back to our elders
-        let section_pk = self.section().section_key().await;
+        let section_pk = self.network_knowledge().section_key().await;
         let dst = DstLocation::Node {
             name: requesting_elder,
             section_pk,
@@ -300,9 +300,9 @@ impl Core {
     pub(crate) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = self.section().adults().await;
+        let adults = self.network_knowledge().adults().await;
 
-        let adults_names = adults.iter().map(|p2p_node| *p2p_node.name());
+        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
         let mut candidates = adults_names
             .into_iter()

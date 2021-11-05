@@ -6,11 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    system::{ElderCandidates, Peer},
-    SectionAuthorityProvider,
-};
-use crate::routing::{peer::PeerUtils, Prefix, XorName};
+use crate::messaging::{system::ElderCandidates, SectionAuthorityProvider};
+use crate::routing::{Peer, Prefix, XorName};
 use bls::{PublicKey, PublicKeySet};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -39,21 +36,18 @@ impl ElderCandidatesUtils for ElderCandidates {
         Self {
             elders: elders
                 .into_iter()
-                .map(|peer| (*peer.name(), *peer.addr()))
+                .map(|peer| (peer.name(), peer.addr()))
                 .collect(),
             prefix,
         }
     }
 
     fn peers(&'_ self) -> Box<dyn Iterator<Item = Peer> + '_> {
-        // The `reachable` flag of Peer is defaulted to `false` during the construction.
-        // As the SectionAuthorityProvider only holds the list of alive elders, it shall be safe
-        // to set the flag as true here during the mapping.
-        Box::new(self.elders.iter().map(|(name, addr)| {
-            let mut peer = Peer::new(*name, *addr);
-            peer.set_reachable(true);
-            peer
-        }))
+        Box::new(
+            self.elders
+                .iter()
+                .map(|(name, addr)| Peer::new(*name, *addr)),
+        )
     }
 
     /// Returns the index of the elder with `name` in this set of elders.
@@ -115,7 +109,7 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     {
         let elders = elders
             .into_iter()
-            .map(|peer| (*peer.name(), *peer.addr()))
+            .map(|peer| (peer.name(), peer.addr()))
             .collect();
 
         Self {
@@ -151,16 +145,10 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     }
 
     fn peers(&'_ self) -> Vec<Peer> {
-        // The `reachable` flag of Peer is defaulted to `false` during the construction.
-        // As the SectionAuthorityProvider only holds the list of alive elders, it shall be safe
-        // to set the flag as true here during the mapping.
-        let mut peers = vec![];
-        for (name, addr) in self.elders.iter() {
-            let mut peer = Peer::new(*name, *addr);
-            peer.set_reachable(true);
-            peers.push(peer);
-        }
-        peers
+        self.elders
+            .iter()
+            .map(|(name, addr)| Peer::new(*name, *addr))
+            .collect()
     }
 
     /// Returns the number of elders in the section.
@@ -255,10 +243,7 @@ pub(crate) mod test_utils {
         let elders = nodes
             .iter()
             .map(Node::peer)
-            .map(|mut peer| {
-                peer.set_reachable(true);
-                (*peer.name(), *peer.addr())
-            })
+            .map(|peer| (peer.name(), peer.addr()))
             .collect();
 
         let secret_key_set = SecretKeySet::random();

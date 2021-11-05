@@ -15,8 +15,8 @@ use crate::routing::{
     dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
     log_markers::LogMarker,
+    network_knowledge::SectionKeyShare,
     routing_api::command::Command,
-    section::SectionKeyShare,
     SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -36,7 +36,7 @@ impl Core {
                 &self.node.read().await.clone(),
                 session_id,
                 elder_candidates,
-                *self.section_chain().await.last_key(),
+                self.network_knowledge().section_key().await,
             )
             .await
     }
@@ -59,7 +59,7 @@ impl Core {
                 &self.node.read().await.clone(),
                 &session_id,
                 message,
-                *self.section_chain().await.last_key(),
+                self.network_knowledge().section_key().await,
             )
             .await
     }
@@ -84,14 +84,14 @@ impl Core {
         sender: &XorName,
         failure_set: &DkgFailureSigSet,
     ) -> Result<Vec<Command>> {
-        if self.section.members().get(sender).is_none() {
+        if self.network_knowledge.members().get(sender).is_none() {
             return Err(Error::InvalidSrcLocation);
         }
 
-        let generation = self.section.main_chain_branch_len().await;
+        let generation = self.network_knowledge.chain_len().await;
 
         let elder_candidates = if let Some(elder_candidates) = self
-            .section
+            .network_knowledge
             .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
             .await
             .into_iter()
@@ -146,7 +146,7 @@ impl Core {
         self.section_keys_provider.insert(key_share.clone()).await;
 
         let proposal = Proposal::SectionInfo(section_auth);
-        let recipients: Vec<_> = self.section.authority_provider().await.peers();
+        let recipients: Vec<_> = self.network_knowledge.authority_provider().await.peers();
         let result = self
             .send_proposal_with(recipients, proposal, &key_share)
             .await;
@@ -167,8 +167,8 @@ impl Core {
         peer: (XorName, SocketAddr),
         public_key: &BlsPublicKey,
     ) -> Result<Option<Command>> {
-        if self.section.has_chain_key(public_key).await
-            && public_key != &self.section.section_key().await
+        if self.network_knowledge.has_chain_key(public_key).await
+            && public_key != &self.network_knowledge.section_key().await
         {
             let msg = self.generate_ae_update(*public_key, true).await?;
             trace!("{}", LogMarker::SendingAeUpdateAfterLagCheck);

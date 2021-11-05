@@ -11,10 +11,9 @@ use crate::messaging::{
     DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
+    network_knowledge::{NetworkKnowledge, SectionKeyShare},
     node::Node,
-    routing_api::Peer,
-    section::{Section, SectionKeyShare},
-    XorName,
+    Peer, XorName,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -108,7 +107,7 @@ pub(crate) enum Command {
         /// New Node state and information
         node: Node,
         /// New section where we relocated
-        section: Section,
+        section: NetworkKnowledge,
     },
     /// Attempt to set JoinsAllowed flag.
     SetJoinsAllowed(bool),

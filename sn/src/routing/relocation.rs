@@ -9,39 +9,39 @@
 //! Relocation related types and utilities.
 
 use crate::messaging::{
-    system::{NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, SystemMsg},
+    system::{NodeState, RelocateDetails, RelocatePayload, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
 };
-use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     core::JoiningAsRelocated,
     ed25519::{self, Keypair, Verifier},
     error::Error,
-    peer::PeerUtils,
-    section::{section_authority_provider::SectionAuthorityProviderUtils, Section},
+    network_knowledge::{
+        section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge, NodeStateUtils,
+    },
+    Peer,
 };
 use async_trait::async_trait;
 use xor_name::XorName;
 
 /// Find all nodes to relocate after a churn event and create the relocate actions for them.
 pub(crate) async fn actions(
-    section: &Section,
-    network: &NetworkPrefixMap,
+    network_knowledge: &NetworkKnowledge,
     churn_name: &XorName,
     churn_signature: &bls::Signature,
 ) -> Vec<(NodeState, RelocateAction)> {
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
 
-    let filtered = section
+    let filtered = network_knowledge
         .members()
         .joined()
         .into_iter()
-        .filter(|info| check(info.peer.age(), churn_signature));
+        .filter(|info| check(info.age(), churn_signature));
 
     let candidates: Vec<_> = filtered.collect();
 
-    let max_age = if let Some(age) = candidates.iter().map(|info| (*info).peer.age()).max() {
+    let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
         age
     } else {
         return vec![];
@@ -50,10 +50,10 @@ pub(crate) async fn actions(
     let mut relocating_nodes = vec![];
 
     for node_state in candidates {
-        if node_state.peer.age() == max_age {
+        if node_state.age() == max_age {
             relocating_nodes.push((
                 node_state,
-                RelocateAction::new(section, network, &node_state.peer, churn_name).await,
+                RelocateAction::new(network_knowledge, &node_state.to_peer(), churn_name).await,
             ))
         }
     }
@@ -65,11 +65,10 @@ pub(crate) async fn actions(
 /// get once relocated.
 #[async_trait]
 pub(super) trait RelocateDetailsUtils {
-    async fn new(section: &Section, network: &NetworkPrefixMap, peer: &Peer, dst: XorName) -> Self;
+    async fn new(network_knowledge: &NetworkKnowledge, peer: &Peer, dst: XorName) -> Self;
 
     async fn with_age(
-        section: &Section,
-        network: &NetworkPrefixMap,
+        network_knowledge: &NetworkKnowledge,
         peer: &Peer,
         dst: XorName,
         age: u8,
@@ -78,25 +77,24 @@ pub(super) trait RelocateDetailsUtils {
 
 #[async_trait]
 impl RelocateDetailsUtils for RelocateDetails {
-    async fn new(section: &Section, network: &NetworkPrefixMap, peer: &Peer, dst: XorName) -> Self {
-        Self::with_age(section, network, peer, dst, peer.age().saturating_add(1)).await
+    async fn new(network_knowledge: &NetworkKnowledge, peer: &Peer, dst: XorName) -> Self {
+        Self::with_age(network_knowledge, peer, dst, peer.age().saturating_add(1)).await
     }
 
     async fn with_age(
-        section: &Section,
-        network: &NetworkPrefixMap,
+        network_knowledge: &NetworkKnowledge,
         peer: &Peer,
         dst: XorName,
         age: u8,
     ) -> RelocateDetails {
-        let root_key = *section.genesis_key();
+        let root_key = *network_knowledge.genesis_key();
 
-        let dst_key = network
+        let dst_key = network_knowledge
             .section_by_name(&dst)
             .map_or_else(|_| root_key, |section_auth| section_auth.section_key());
 
         RelocateDetails {
-            pub_id: *peer.name(),
+            pub_id: peer.name(),
             dst,
             dst_key,
             age,
@@ -182,20 +180,19 @@ pub(crate) enum RelocateAction {
 
 impl RelocateAction {
     pub(crate) async fn new(
-        section: &Section,
-        network: &NetworkPrefixMap,
+        network_knowledge: &NetworkKnowledge,
         peer: &Peer,
         churn_name: &XorName,
     ) -> Self {
-        let dst = dst(peer.name(), churn_name);
+        let dst = dst(&peer.name(), churn_name);
 
-        if section.is_elder(peer.name()).await {
+        if network_knowledge.is_elder(&peer.name()).await {
             RelocateAction::Delayed(RelocatePromise {
-                name: *peer.name(),
+                name: peer.name(),
                 dst,
             })
         } else {
-            RelocateAction::Instant(RelocateDetails::new(section, network, peer, dst).await)
+            RelocateAction::Instant(RelocateDetails::new(network_knowledge, peer, dst).await)
         }
     }
 
@@ -250,9 +247,9 @@ mod tests {
     use super::*;
     use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
-        dkg::test_utils::section_signed, peer::test_utils::arbitrary_unique_peers,
-        routing_api::tests::SecretKeySet, section::NodeStateUtils, SectionAuthorityProviderUtils,
-        ELDER_SIZE, MIN_AGE,
+        dkg::test_utils::section_signed, network_knowledge::NodeStateUtils,
+        peer::test_utils::arbitrary_unique_peers, routing_api::tests::SecretKeySet,
+        SectionAuthorityProviderUtils, ELDER_SIZE, MIN_AGE,
     };
     use assert_matches::assert_matches;
     use eyre::Result;
@@ -312,23 +309,26 @@ mod tests {
         );
         let section_auth = section_signed(sk, section_auth)?;
 
-        let section = Section::new(genesis_pk, SecuredLinkedList::new(genesis_pk), section_auth)?;
+        let network_knowledge = NetworkKnowledge::new(
+            genesis_pk,
+            SecuredLinkedList::new(genesis_pk),
+            section_auth,
+            None,
+        )?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);
             let info = section_signed(sk, info)?;
 
-            let res = futures::executor::block_on(section.update_member(info));
+            let res = futures::executor::block_on(network_knowledge.update_member(info));
             assert!(res);
         }
-
-        let network = NetworkPrefixMap::new(genesis_pk);
 
         // Simulate a churn event whose signature has the given number of trailing zeros.
         let churn_name = rng.gen();
         let churn_signature = signature_with_trailing_zeros(signature_trailing_zeros as u32);
 
-        let actions = actions(&section, &network, &churn_name, &churn_signature);
+        let actions = actions(&network_knowledge, &churn_name, &churn_signature);
         let actions = futures::executor::block_on(actions);
 
         let actions: Vec<_> = actions
@@ -347,7 +347,7 @@ mod tests {
         let expected_relocated_peers: Vec<_> = peers
             .iter()
             .filter(|peer| Some(peer.age()) == expected_relocated_age)
-            .sorted_by_key(|peer| *peer.name())
+            .sorted_by_key(|peer| peer.name())
             .collect();
 
         assert_eq!(expected_relocated_peers.len(), actions.len());
@@ -355,9 +355,9 @@ mod tests {
         // Verify the relocate action is correct depending on whether the peer is elder or not.
         // NOTE: `zip` works here, because both collections are sorted by name.
         for (peer, action) in expected_relocated_peers.into_iter().zip(actions) {
-            assert_eq!(peer.name(), action.name());
+            assert_eq!(&peer.name(), action.name());
 
-            let is_elder = futures::executor::block_on(section.is_elder(peer.name()));
+            let is_elder = futures::executor::block_on(network_knowledge.is_elder(&peer.name()));
 
             if is_elder {
                 assert_matches!(action, RelocateAction::Delayed(_));

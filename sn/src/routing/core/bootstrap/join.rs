@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::read_prefix_map_from_disk;
 use crate::messaging::{
     system::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SystemMsg},
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
@@ -17,9 +18,8 @@ use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    network_knowledge::NetworkKnowledge,
     node::Node,
-    peer::PeerUtils,
-    section::Section,
     SectionAuthorityProviderUtils,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -27,8 +27,7 @@ use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof;
 use std::{collections::HashSet, net::SocketAddr};
-use tokio::sync::mpsc;
-use tokio::time::Duration;
+use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::{Prefix, XorName};
 
@@ -43,7 +42,7 @@ pub(crate) async fn join_network(
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
     bootstrap_addr: SocketAddr,
     genesis_key: BlsPublicKey,
-) -> Result<(Node, Section)> {
+) -> Result<(Node, NetworkKnowledge)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap");
@@ -99,7 +98,7 @@ impl<'a> Join<'a> {
         self,
         bootstrap_addr: SocketAddr,
         genesis_key: BlsPublicKey,
-    ) -> Result<(Node, Section)> {
+    ) -> Result<(Node, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
         let dst_xorname = self.node.name();
         let recipients = vec![(dst_xorname, bootstrap_addr)];
@@ -111,7 +110,7 @@ impl<'a> Join<'a> {
         mut self,
         network_genesis_key: BlsPublicKey,
         mut recipients: Vec<(XorName, SocketAddr)>,
-    ) -> Result<(Node, Section)> {
+    ) -> Result<(Node, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
         // Once we are approved to join, we will make sure the SAP we receive can
@@ -167,7 +166,12 @@ impl<'a> Join<'a> {
 
                     return Ok((
                         self.node,
-                        Section::new(genesis_key, section_chain, section_auth)?,
+                        NetworkKnowledge::new(
+                            genesis_key,
+                            section_chain,
+                            section_auth,
+                            read_prefix_map_from_disk().await,
+                        )?,
                     ));
                 }
                 JoinResponse::Retry {
@@ -425,7 +429,7 @@ impl<'a> Join<'a> {
                     ref section_chain,
                     ..
                 } => {
-                    if node_state.value.peer.name() != &self.node.name() {
+                    if node_state.name != self.node.name() {
                         trace!("Ignore NodeApproval not for us");
                         continue;
                     }
@@ -445,7 +449,7 @@ impl<'a> Join<'a> {
 
                     trace!(
                         "This node has been approved to join the network at {:?}!",
-                        section_auth.value.prefix,
+                        section_auth.prefix,
                     );
 
                     return Ok((join_response, sender, src_name));
@@ -490,8 +494,8 @@ mod tests {
     use crate::messaging::{system::NodeState, SectionAuthorityProvider};
     use crate::routing::{
         dkg::test_utils::*, error::Error as RoutingError, messages::WireMsgUtils,
-        section::test_utils::*, section::NodeStateUtils, SectionAuthorityProviderUtils, ELDER_SIZE,
-        MIN_ADULT_AGE,
+        network_knowledge::test_utils::*, network_knowledge::NodeStateUtils,
+        SectionAuthorityProviderUtils, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use crate::types::PublicKey;
     use assert_matches::assert_matches;
@@ -594,7 +598,7 @@ mod tests {
                     section_chain: proof_chain,
                 })),
                 &bootstrap_node,
-                section_auth.value.section_key(),
+                section_auth.section_key(),
             )?;
 
             Ok(())

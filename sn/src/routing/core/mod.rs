@@ -36,15 +36,14 @@ use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
 use crate::messaging::system::SystemMsg;
 use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
-use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::DkgVoter,
     error::Result,
     log_markers::LogMarker,
+    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{Section, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
 };
 use crate::types::utils::write_data_to_disk;
@@ -77,8 +76,7 @@ pub(crate) type AeBackoffCache =
 pub(crate) struct Core {
     pub(crate) comm: Comm,
     pub(crate) node: Arc<RwLock<Node>>,
-    section: Section,
-    network: NetworkPrefixMap,
+    network_knowledge: NetworkKnowledge,
     pub(crate) section_keys_provider: SectionKeysProvider,
     message_aggregator: SignatureAggregator,
     proposal_aggregator: SignatureAggregator,
@@ -105,12 +103,11 @@ impl Core {
     pub(crate) async fn new(
         comm: Comm,
         mut node: Node,
-        section: Section,
+        network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
-        prefix_map: Option<NetworkPrefixMap>,
         is_genesis_node: bool,
     ) -> Result<Self> {
         let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
@@ -123,23 +120,11 @@ impl Core {
 
         let capacity = Capacity::new(BTreeMap::new());
         let adult_liveness = Liveness::new();
-        let genesis_pk = *section.genesis_key();
-
-        // Check if the GenesisKey in the provided prefix_map is the same as our section's.
-        // If not, start afresh.
-        let network = prefix_map.map_or(NetworkPrefixMap::new(genesis_pk), |network| {
-            if network.genesis_key() != genesis_pk {
-                NetworkPrefixMap::new(genesis_pk)
-            } else {
-                network
-            }
-        });
 
         Ok(Self {
             comm,
             node: Arc::new(RwLock::new(node)),
-            section,
-            network,
+            network_knowledge,
             section_keys_provider,
             proposal_aggregator: SignatureAggregator::default(),
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
@@ -167,9 +152,9 @@ impl Core {
     pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
             is_elder: self.is_elder().await,
-            last_key: self.section.section_key().await,
-            prefix: self.section.prefix().await,
-            elders: self.section().authority_provider().await.names(),
+            section_key: self.network_knowledge.section_key().await,
+            prefix: self.network_knowledge.prefix().await,
+            elders: self.network_knowledge().authority_provider().await.names(),
         }
     }
 
@@ -178,11 +163,11 @@ impl Core {
         let mut dst = XorName::random();
 
         // We don't probe ourselves
-        while self.section.prefix().await.matches(&dst) {
+        while self.network_knowledge.prefix().await.matches(&dst) {
             dst = XorName::random();
         }
 
-        let matching_section = self.network.section_by_name(&dst)?;
+        let matching_section = self.network_knowledge.section_by_name(&dst)?;
 
         let message = SystemMsg::AntiEntropyProbe(dst);
         let section_key = matching_section.section_key();
@@ -203,8 +188,11 @@ impl Core {
         // TODO: Make this serialization human readable
 
         // Write to the node's root dir
-        if let Err(e) =
-            write_data_to_disk(&self.network, &self.root_storage_dir.join("prefix_map")).await
+        if let Err(e) = write_data_to_disk(
+            &self.network_knowledge.prefix_map(),
+            &self.root_storage_dir.join("prefix_map"),
+        )
+        .await
         {
             error!("Error writing PrefixMap to root dir: {:?}", e);
         }
@@ -214,7 +202,9 @@ impl Core {
             if let Some(mut safe_dir) = dirs_next::home_dir() {
                 safe_dir.push(".safe");
                 safe_dir.push("prefix_map");
-                if let Err(e) = write_data_to_disk(&self.network, &safe_dir).await {
+                if let Err(e) =
+                    write_data_to_disk(&self.network_knowledge.prefix_map(), &safe_dir).await
+                {
                     error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
                 }
             } else {
@@ -231,13 +221,13 @@ impl Core {
         let mut commands = vec![];
         let new = self.state_snapshot().await;
 
-        if new.last_key != old.last_key {
+        if new.section_key != old.section_key {
             if new.is_elder {
                 info!(
                     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
                     new.prefix,
-                    new.last_key,
-                    self.section
+                    new.section_key,
+                    self.network_knowledge
                         .authority_provider()
                         .await
                         .peers()
@@ -260,17 +250,20 @@ impl Core {
             }
 
             if new.is_elder || old.is_elder {
-                commands.extend(self.send_ae_update_to_our_section(&self.section).await?);
+                commands.extend(
+                    self.send_ae_update_to_our_section(&self.network_knowledge)
+                        .await?,
+                );
             }
 
-            let current: BTreeSet<_> = self.section.authority_provider().await.names();
+            let current: BTreeSet<_> = self.network_knowledge.authority_provider().await.names();
             let added = current.difference(&old.elders).copied().collect();
             let removed = old.elders.difference(&current).copied().collect();
             let remaining = old.elders.intersection(&current).copied().collect();
 
             let elders = Elders {
                 prefix: new.prefix,
-                key: new.last_key,
+                key: new.section_key,
                 remaining,
                 added,
                 removed,
@@ -289,27 +282,29 @@ impl Core {
             };
 
             let sibling_elders = if new.prefix != old.prefix {
-                info!("{}", LogMarker::NewPrefix);
+                trace!("{}", LogMarker::NewPrefix);
 
-                self.network.get(&new.prefix.sibling()).map(|sec_auth| {
-                    let current: BTreeSet<_> = sec_auth.names();
-                    let added = current.difference(&old.elders).copied().collect();
-                    let removed = old.elders.difference(&current).copied().collect();
-                    let remaining = old.elders.intersection(&current).copied().collect();
-                    Elders {
-                        prefix: new.prefix.sibling(),
-                        key: sec_auth.section_key(),
-                        remaining,
-                        added,
-                        removed,
-                    }
-                })
+                self.network_knowledge
+                    .get_sap(&new.prefix.sibling())
+                    .map(|sec_auth| {
+                        let current: BTreeSet<_> = sec_auth.names();
+                        let added = current.difference(&old.elders).copied().collect();
+                        let removed = old.elders.difference(&current).copied().collect();
+                        let remaining = old.elders.intersection(&current).copied().collect();
+                        Elders {
+                            prefix: new.prefix.sibling(),
+                            key: sec_auth.section_key(),
+                            remaining,
+                            added,
+                            removed,
+                        }
+                    })
             } else {
                 None
             };
 
             let event = if let Some(sibling_elders) = sibling_elders {
-                info!("{}", LogMarker::SplitSuccess);
+                trace!("{}", LogMarker::SplitSuccess);
                 // In case of split, send AEUpdate to sibling new elder nodes.
                 commands.extend(self.send_ae_update_to_sibling_section(&old).await?);
 
@@ -336,25 +331,32 @@ impl Core {
     }
 
     pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
-        if self.section.prefix().await.matches(name) {
-            self.section.section_key().await
-        } else if let Ok(sap) = self.network.section_by_name(name) {
+        if self.network_knowledge.prefix().await.matches(name) {
+            self.network_knowledge.section_key().await
+        } else if let Ok(sap) = self.network_knowledge.section_by_name(name) {
             sap.section_key()
-        } else if self.section.prefix().await.sibling().matches(name) {
+        } else if self
+            .network_knowledge
+            .prefix()
+            .await
+            .sibling()
+            .matches(name)
+        {
             // For sibling with unknown key, use the previous key in our chain under the assumption
             // that it's the last key before the split and therefore the last key of theirs we know.
             // In case this assumption is not correct (because we already progressed more than one
             // key since the split) then this key would be unknown to them and they would send
             // us back their whole section chain. However, this situation should be rare.
-            *self.section.chain().await.prev_key()
+            *self.network_knowledge.chain().await.prev_key()
         } else {
-            *self.section.genesis_key()
+            *self.network_knowledge.genesis_key()
         }
     }
 
     pub(crate) async fn print_network_stats(&self) {
-        self.network
-            .network_stats(&self.section.authority_provider().await)
+        self.network_knowledge
+            .prefix_map()
+            .network_stats(&self.network_knowledge.authority_provider().await)
             .print();
         self.comm.print_stats();
     }
@@ -362,7 +364,7 @@ impl Core {
 
 pub(crate) struct StateSnapshot {
     is_elder: bool,
-    last_key: bls::PublicKey,
+    section_key: bls::PublicKey,
     prefix: Prefix,
     elders: BTreeSet<XorName>,
 }

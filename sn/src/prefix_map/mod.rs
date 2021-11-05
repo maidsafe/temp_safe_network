@@ -61,7 +61,7 @@ impl NetworkPrefixMap {
     // TODO: remove this form public API since we shall not allow any insert/update withot a
     // proof chain, users shall have to call either `update` or `verify_with_chain_and_update` API.
     pub(crate) fn insert(&self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
-        let prefix = sap.value.prefix();
+        let prefix = sap.prefix();
         // Don't insert if any descendant is already present in the map.
         if self.descendants(&prefix).next().is_some() {
             return false;
@@ -74,22 +74,37 @@ impl NetworkPrefixMap {
         true
     }
 
-    /// Returns the known section that is closest to the given name, regardless of whether `name`
-    /// belongs in that section or not.
-    fn closest(&self, name: &XorName) -> Option<SectionAuth<SectionAuthorityProvider>> {
+    /// Returns the known section that is closest to the given name,
+    /// regardless of whether `name` belongs in that section or not.
+    /// If provided, it excludes any section matching the passed prefix.
+    fn closest(
+        &self,
+        name: &XorName,
+        exclude: Option<&Prefix>,
+    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
         self.sections
             .iter()
+            .filter(|e| {
+                if let Some(prefix) = exclude {
+                    e.key() != prefix
+                } else {
+                    true
+                }
+            })
             .min_by(|lhs, rhs| lhs.key().cmp_distance(rhs.key(), name))
             .map(|e| e.value().clone())
     }
 
-    /// Returns the known section that is closest to the given name, regardless of whether `name`
-    /// belongs in that section or not. If there are no close matches, return a SAP from an opposite prefix.
+    /// Returns the known section that is closest to the given name,
+    /// regardless of whether `name` belongs in that section or not.
+    /// If there are no close matches in remote sections, return a SAP from an opposite prefix.
+    /// If provided, it excludes any section matching the passed prefix.
     pub(crate) fn closest_or_opposite(
         &self,
         name: &XorName,
+        exclude: Option<&Prefix>,
     ) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        self.closest(name).or_else(|| {
+        self.closest(name, exclude).or_else(|| {
             self.sections
                 .iter()
                 .filter(|e| e.key().matches(&name.with_bit(0, !name.bit(0))))
@@ -129,7 +144,7 @@ impl NetworkPrefixMap {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
     ) -> Result<bool> {
-        let prefix = signed_section_auth.value.prefix();
+        let prefix = signed_section_auth.prefix();
         trace!("Attempting to update prefixmap for {:?}", prefix);
         let section_key = match self.section_by_prefix(&prefix) {
             Ok(sap) => sap.section_key(),
@@ -147,7 +162,7 @@ impl NetworkPrefixMap {
 
         for section in self.sections.iter() {
             let prefix = section.key();
-            trace!("Known prefix: {:?}", prefix);
+            trace!("Known prefix after update: {:?}", prefix);
         }
 
         res
@@ -171,9 +186,7 @@ impl NetworkPrefixMap {
         }
 
         // Check if SAP's section key matches SAP signature's key
-        if signed_section_auth.sig.public_key
-            != signed_section_auth.value.public_key_set.public_key()
-        {
+        if signed_section_auth.sig.public_key != signed_section_auth.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key doesn't match signature's key: {:?}",
                 signed_section_auth.value
@@ -185,7 +198,7 @@ impl NetworkPrefixMap {
         // as trusted before we store them in our local records.
         // Thus, we just need to check our knowledge of the remote section's key
         // is part of the proof chain received.
-        match self.sections.get(&signed_section_auth.value.prefix) {
+        match self.sections.get(&signed_section_auth.prefix) {
             Some(entry) if entry.value() == &signed_section_auth => {
                 // It's the same SAP we are already aware of
                 return Ok(false);
@@ -193,7 +206,7 @@ impl NetworkPrefixMap {
             Some(entry) => {
                 // We are then aware of the prefix, let's just verify the new SAP can
                 // be trusted based on the SAP we aware of and the proof chain provided.
-                if !proof_chain.has_key(&entry.value().value.public_key_set.public_key()) {
+                if !proof_chain.has_key(&entry.value().public_key_set.public_key()) {
                     // This case may happen when both the sender and receiver is about to using
                     // a new SAP. The AE-Update was sent before sender switching to use new SAP,
                     // hence it only contains proof_chain covering the old SAP.
@@ -204,7 +217,7 @@ impl NetworkPrefixMap {
                     // avoid potential looping.
                     return Err(Error::UntrustedProofChain(format!(
                         "provided proof_chain doesn't cover the SAP's key we currently know: {:?}",
-                        signed_section_auth.value
+                        entry.value().value
                     )));
                 }
             }
@@ -230,11 +243,11 @@ impl NetworkPrefixMap {
         }
 
         // Check the SAP's key is the last key of the proof chain
-        if proof_chain.last_key() != &signed_section_auth.value.public_key_set.public_key() {
+        if proof_chain.last_key() != &signed_section_auth.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key ({:?}, from prefix {:?}) isn't in the last key in the proof chain provided. (Which ends with ({:?}))",
-                signed_section_auth.value.public_key_set.public_key(),
-                signed_section_auth.value.prefix,
+                signed_section_auth.public_key_set.public_key(),
+                signed_section_auth.prefix,
                 proof_chain.last_key()
             )));
         }
@@ -256,7 +269,7 @@ impl NetworkPrefixMap {
     pub(crate) fn section_keys(&self) -> Vec<bls::PublicKey> {
         self.sections
             .iter()
-            .map(|e| e.value().value.section_key())
+            .map(|e| e.value().section_key())
             .collect()
     }
 
@@ -297,11 +310,8 @@ impl NetworkPrefixMap {
             .map(|p| 1.0 / (p.bit_count() as f64).exp2())
             .sum();
 
-        let network_elders_count: usize = self
-            .sections
-            .iter()
-            .map(|e| e.value().value.elder_count())
-            .sum();
+        let network_elders_count: usize =
+            self.sections.iter().map(|e| e.value().elder_count()).sum();
         let total = network_elders_count as f64 / network_fraction;
 
         // `total_elders_exact` indicates whether `total_elders` is
@@ -418,14 +428,14 @@ mod tests {
 
         // There are no matching prefixes, so return an opposite prefix.
         assert_eq!(
-            map.closest_or_opposite(&p1.substituted_in(rng.gen()))
+            map.closest_or_opposite(&p1.substituted_in(rng.gen()), None)
                 .ok_or(Error::NoMatchingSection)?,
             sap0
         );
 
         let _changed = map.insert(sap0.clone());
         assert_eq!(
-            map.closest_or_opposite(&p1.substituted_in(rng.gen()))
+            map.closest_or_opposite(&p1.substituted_in(rng.gen()), None)
                 .ok_or(Error::NoMatchingSection)?,
             sap0
         );
@@ -563,14 +573,14 @@ mod tests {
 
         let mut chain01 = chain.clone();
         let section_auth_01 = gen_section_auth(p01)?;
-        let pk01 = section_auth_01.value.public_key_set.public_key();
+        let pk01 = section_auth_01.public_key_set.public_key();
         let sig01 = bincode::serialize(&pk01).map(|bytes| genesis_sk.sign(&bytes))?;
         chain01.insert(&genesis_pk, pk01, sig01)?;
         let _updated = map.verify_with_chain_and_update(section_auth_01, &chain01, &chain);
 
         let mut chain10 = chain.clone();
         let section_auth_10 = gen_section_auth(p10)?;
-        let pk10 = section_auth_10.value.public_key_set.public_key();
+        let pk10 = section_auth_10.public_key_set.public_key();
         let sig10 = bincode::serialize(&pk10).map(|bytes| genesis_sk.sign(&bytes))?;
         chain10.insert(&genesis_pk, pk10, sig10)?;
         let _updated = map.verify_with_chain_and_update(section_auth_10, &chain10, &chain);
@@ -580,9 +590,9 @@ mod tests {
         let n10 = p10.substituted_in(rng.gen());
         let n11 = p11.substituted_in(rng.gen());
 
-        assert_eq!(map.closest(&n01).map(|sap| sap.value.prefix), Some(p01));
-        assert_eq!(map.closest(&n10).map(|sap| sap.value.prefix), Some(p10));
-        assert_eq!(map.closest(&n11).map(|sap| sap.value.prefix), Some(p10));
+        assert_eq!(map.closest(&n01, None).map(|sap| sap.prefix), Some(p01));
+        assert_eq!(map.closest(&n10, None).map(|sap| sap.prefix), Some(p10));
+        assert_eq!(map.closest(&n11, None).map(|sap| sap.prefix), Some(p10));
 
         Ok(())
     }

@@ -6,64 +6,47 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::Peer;
-use std::net::SocketAddr;
+use std::{
+    fmt::{self, Display, Formatter},
+    hash::Hash,
+    net::SocketAddr,
+};
 use xor_name::{XorName, XOR_NAME_LEN};
 
-///
-pub trait PeerUtils {
-    /// Creates a new `Peer` given `Name`, `SocketAddr`.
-    fn new(name: XorName, addr: SocketAddr) -> Self;
-
-    /// Set the reachable flag.
-    fn set_reachable(&mut self, reachable: bool);
-
-    /// Returns the `XorName` of the peer.
-    fn name(&self) -> &XorName;
-
-    /// Returns the `SocketAddr`.
-    fn addr(&self) -> &SocketAddr;
-
-    /// Returns the age.
-    fn age(&self) -> u8;
-
-    /// Returns the reachable flag.
-    fn is_reachable(&self) -> bool;
+/// Network p2p peer identity.
+/// When a node knows another p2p_node as a `Peer` it's implicitly connected to it. This is separate
+/// from being connected at the network layer, which currently is handled by quic-p2p.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Peer {
+    name: XorName,
+    addr: SocketAddr,
 }
 
-impl PeerUtils for Peer {
-    /// Creates a new `Peer` given `Name`, `SocketAddr`.
-    fn new(name: XorName, addr: SocketAddr) -> Self {
-        Self {
-            name,
-            addr,
-            reachable: false,
-        }
+impl Display for Peer {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{} at {}", self.name, self.addr)
     }
+}
 
-    /// Set the reachable flag.
-    fn set_reachable(&mut self, reachable: bool) {
-        self.reachable = reachable;
+impl Peer {
+    /// Creates a new `Peer` given `Name`, `SocketAddr`.
+    pub fn new(name: XorName, addr: SocketAddr) -> Self {
+        Self { name, addr }
     }
 
     /// Returns the `XorName` of the peer.
-    fn name(&self) -> &XorName {
-        &self.name
+    pub fn name(&self) -> XorName {
+        self.name
     }
 
     /// Returns the `SocketAddr`.
-    fn addr(&self) -> &SocketAddr {
-        &self.addr
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
     }
 
     /// Returns the age.
-    fn age(&self) -> u8 {
+    pub fn age(&self) -> u8 {
         self.name[XOR_NAME_LEN - 1]
-    }
-
-    /// Returns the reachable flag.
-    fn is_reachable(&self) -> bool {
-        self.reachable
     }
 }
 

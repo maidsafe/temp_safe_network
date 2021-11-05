@@ -24,9 +24,7 @@ use self::{
     event_stream::EventStream,
 };
 use crate::messaging::{
-    data::StorageLevel,
-    system::{Peer, SystemMsg},
-    DstLocation, SectionAuthorityProvider, WireMsg,
+    data::StorageLevel, system::SystemMsg, DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     core::{join_network, ChunkStore, Comm, ConnectionEvent, Core, RegisterStorage},
@@ -35,20 +33,16 @@ use crate::routing::{
     log_markers::LogMarker,
     messages::WireMsgUtils,
     node::Node,
-    peer::PeerUtils,
-    SectionAuthorityProviderUtils, MIN_ADULT_AGE,
+    Peer, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
 };
 use crate::{dbs::UsedSpace, messaging::data::ChunkDataExchange};
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 
-use crate::prefix_map::NetworkPrefixMap;
 use crate::types::PublicKey as TypesPublicKey;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::path::PathBuf;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 use tokio::{sync::mpsc, task};
 use xor_name::{Prefix, XorName};
 
@@ -114,7 +108,7 @@ impl Routing {
             )
             .await?;
 
-            let section = core.section();
+            let section = core.network_knowledge();
 
             let elders = Elders {
                 prefix: section.prefix().await,
@@ -179,7 +173,7 @@ impl Routing {
                 genesis_key
             );
             let joining_node = Node::new(keypair, comm.our_connection_info());
-            let (node, section) = join_network(
+            let (node, network_knowledge) = join_network(
                 joining_node,
                 &comm,
                 &mut connection_event_rx,
@@ -191,12 +185,11 @@ impl Routing {
             let core = Core::new(
                 comm,
                 node,
-                section,
+                network_knowledge,
                 None,
                 event_tx,
                 used_space,
                 root_storage_dir.to_path_buf(),
-                read_prefix_map_from_disk().await,
                 false,
             )
             .await?;
@@ -323,12 +316,12 @@ impl Routing {
 
     /// Returns the Section Chain's genesis key
     pub async fn genesis_key(&self) -> bls::PublicKey {
-        *self.dispatcher.core.section().genesis_key()
+        *self.dispatcher.core.network_knowledge().genesis_key()
     }
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        self.dispatcher.core.section().prefix().await
+        self.dispatcher.core.network_knowledge().prefix().await
     }
 
     /// Finds out if the given XorName matches our prefix.
@@ -345,7 +338,7 @@ impl Routing {
     pub async fn our_elders(&self) -> Vec<Peer> {
         self.dispatcher
             .core
-            .section()
+            .network_knowledge()
             .authority_provider()
             .await
             .peers()
@@ -356,13 +349,13 @@ impl Routing {
         self.our_elders()
             .await
             .into_iter()
-            .sorted_by(|lhs, rhs| name.cmp_distance(lhs.name(), rhs.name()))
+            .sorted_by(|lhs, rhs| name.cmp_distance(&lhs.name(), &rhs.name()))
             .collect()
     }
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.dispatcher.core.section().adults().await
+        self.dispatcher.core.network_knowledge().adults().await
     }
 
     /// Returns the adults of our section sorted by their distance to `name` (closest first).
@@ -371,13 +364,17 @@ impl Routing {
         self.our_adults()
             .await
             .into_iter()
-            .sorted_by(|lhs, rhs| name.cmp_distance(lhs.name(), rhs.name()))
+            .sorted_by(|lhs, rhs| name.cmp_distance(&lhs.name(), &rhs.name()))
             .collect()
     }
 
     /// Returns our section's authority provider.
     pub async fn our_section_auth(&self) -> SectionAuthorityProvider {
-        self.dispatcher.core.section().authority_provider().await
+        self.dispatcher
+            .core
+            .network_knowledge()
+            .authority_provider()
+            .await
     }
 
     /// Returns the info about the section matching the name.
@@ -443,33 +440,6 @@ impl Routing {
     pub async fn our_index(&self) -> Result<usize> {
         self.dispatcher.core.our_index().await
     }
-}
-
-// Reads PrefixMap from '~/.safe/prefix_map' if present.
-async fn read_prefix_map_from_disk() -> Option<NetworkPrefixMap> {
-    let mut prefix_map_dir = dirs_next::home_dir()?;
-    prefix_map_dir.push(".safe");
-    prefix_map_dir.push("prefix_map");
-
-    // Read NetworkPrefixMap from disk if present
-    let prefix_map: Option<NetworkPrefixMap> =
-        if let Ok(mut prefix_map_file) = File::open(prefix_map_dir).await {
-            let mut prefix_map_contents = vec![];
-            let _ = prefix_map_file
-                .read_to_end(&mut prefix_map_contents)
-                .await
-                .ok()?;
-
-            rmp_serde::from_slice(&prefix_map_contents).ok()
-        } else {
-            None
-        };
-
-    if prefix_map.is_some() {
-        info!("Read PrefixMap from disc successfully");
-    }
-
-    prefix_map
 }
 
 // Listen for incoming connection events and handle them.
