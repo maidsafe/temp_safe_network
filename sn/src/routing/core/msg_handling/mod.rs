@@ -493,10 +493,10 @@ impl Core {
                 proposal,
                 sig_share,
             } => {
-                if self.is_not_elder().await {
-                    trace!("Dropping Propose msg from {}: {:?}", sender, msg_id);
-                    return Ok(vec![]);
-                }
+                // if self.is_not_elder().await {
+                //     trace!("Dropping Propose msg from {}: {:?}", sender, msg_id);
+                //     return Ok(vec![]);
+                // }
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
                 self.handle_proposal(msg_id, proposal, sig_share, src_name, sender)

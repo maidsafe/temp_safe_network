@@ -173,7 +173,7 @@ jobs:
         shell: bash
         run: ./resources/scripts/network_is_ready.sh
         id: split-check-1
-        timeout-minutes: 15
+        timeout-minutes: 10
         continue-on-error: true
 
       - name: Kill Section if no split (unix)
@@ -203,7 +203,7 @@ jobs:
       - name: Wait for a healthy network (win)
         shell: bash
         run: ./resources/scripts/network_is_ready.sh
-        timeout-minutes: 15
+        timeout-minutes: 10
 
       - name: Run network asserts one by one
         shell: bash
