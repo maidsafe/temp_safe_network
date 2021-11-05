@@ -11,6 +11,9 @@ fi
 echo "Checking logfiles to check for split"
 log_dir="$HOME/.safe/node/local-test-network"
 
+echo "Log dir contains:"
+ls -la $log_dir
+
 
 
 # -u needed here to search log dirs

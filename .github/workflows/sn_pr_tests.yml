@@ -164,24 +164,25 @@ jobs:
           NODE_COUNT: 45
 
       # windows and logfile locks are problematic for the testnet asserts
-      - name: Wait for a healthy network
-        if: matrix.os != 'windows-latest'
-        run: ./resources/scripts/network_is_ready.sh
-        id: split-check-1
-        timeout-minutes: 5
-        continue-on-error: true
+      # - name: Wait for a healthy network
+      #   if: matrix.os != 'windows-latest'
+      #   run: ./resources/scripts/network_is_ready.sh
+      #   id: split-check-1
+      #   timeout-minutes: 5
+      #   continue-on-error: true
 
       # windows and logfile locks are problematic for the testnet asserts
       # so we use the bash script
       - name: Wait for a healthy network (win)
-        if: matrix.os == 'windows-latest'
-        run: ./resources/scripts/network_is_ready_win.sh
-        id: split-check-1-win
+        shell: bash
+        # if: matrix.os == 'windows-latest'
+        run: ./resources/scripts/network_is_ready_cli.sh
+        id: split-check-1
         timeout-minutes: 5
         continue-on-error: true
 
       - name: Kill Section if no split (unix)
-        if: matrix.os != 'windows-latest' && steps.split-check-1.outcome == 'failure' || steps.split-check-1-win.outcome == 'failure'
+        if: matrix.os != 'windows-latest' && steps.split-check-1.outcome == 'failure'
         run: |
           killall sn_node
           rm -rf ~/.safe/node
@@ -200,18 +201,19 @@ jobs:
           NODE_COUNT: 45
 
       # windows and logfile locks are problematic for the testnet asserts
-      - name: Wait for a healthy network
-        if: matrix.os != 'windows-latest'
-        run: ./resources/scripts/network_is_ready.sh
-        id: split-check-2
-        timeout-minutes: 5
+      # - name: Wait for a healthy network
+      #   if: matrix.os != 'windows-latest'
+      #   run: ./resources/scripts/network_is_ready.sh
+      #   id: split-check-2
+      #   timeout-minutes: 5
 
       # windows and logfile locks are problematic for the testnet asserts
       # so we use the bash script
       - name: Wait for a healthy network (win)
-        if: matrix.os == 'windows-latest'
-        run: ./resources/scripts/network_is_ready_win.sh
-        id: split-check-2-win
+        shell: bash
+        # if: matrix.os == 'windows-latest'
+        run: ./resources/scripts/network_is_ready_cli.sh
+        id: split-check-2
         timeout-minutes: 5
 
       - name: Run network asserts one by one
