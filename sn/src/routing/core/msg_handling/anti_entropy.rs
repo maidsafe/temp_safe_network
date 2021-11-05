@@ -44,11 +44,9 @@ impl Core {
             sig: section_signed,
         };
 
-        let our_prefix = self.section().prefix().await;
-
         // FIXME: perhaps we should update our section chain
         // only upon successful DKG round we participated on??
-        if section_auth.prefix.is_compatible(&our_prefix) {
+        if section_auth.prefix.matches(&self.node.read().await.name()) {
             self.section
                 .merge_chain(&signed_section_auth, proof_chain.clone())
                 .await?;
@@ -120,10 +118,7 @@ impl Core {
         };
 
         // If it's our section, update our section details.
-        if section_auth
-            .prefix
-            .is_compatible(&self.section.prefix().await)
-        {
+        if section_auth.prefix.matches(&self.node.read().await.name()) {
             debug!("AE-Retry received from our section, updating chain");
             self.section
                 .merge_chain(&signed_section_auth, proof_chain.clone())
