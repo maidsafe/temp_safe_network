@@ -11,11 +11,6 @@ fi
 echo "Checking logfiles to check for split"
 log_dir="$HOME/.safe/node/local-test-network"
 
-echo "Log dir contains:"
-ls -la $log_dir
-
-
-
 # -u needed here to search log dirs
 prefix1_prior_elder_nodes=$(rg "SplitSuccess: Prefix\(1\)" "$log_dir" -u -c | wc -l)
 prefix1_new_elder_nodes=$(rg "PromotedToElder: Prefix\(1\)" "$log_dir" -u -c | wc -l)
@@ -23,10 +18,10 @@ prefix0_prior_elder_nodes=$(rg "SplitSuccess: Prefix\(0\)" "$log_dir" -u -c | wc
 prefix0_new_elder_nodes=$(rg "PromotedToElder: Prefix\(0\)" "$log_dir" -u -c | wc -l)
 
 
-echo "Prefix(1) prior nodes found $prefix1_prior_elder_nodes times."
-echo "Prefix(1) new nodes found $prefix1_new_elder_nodes times."
-echo "Prefix(0) prior nodes found $prefix0_prior_elder_nodes times."
-echo "Prefix(0) new nodes found $prefix0_new_elder_nodes times."
+echo "Prefix(1) prior nodes found: $prefix1_prior_elder_nodes ."
+echo "Prefix(1) new nodes found: $prefix1_new_elder_nodes ."
+echo "Prefix(0) prior nodes found: $prefix0_prior_elder_nodes ."
+echo "Prefix(0) new nodes found: $prefix0_new_elder_nodes ."
 
 total_prefix0_elders=$(($prefix0_new_elder_nodes + $prefix0_prior_elder_nodes))
 total_prefix1_elders=$(($prefix1_new_elder_nodes + $prefix1_prior_elder_nodes))
