@@ -9,10 +9,7 @@
 use crate::messaging::{system::ElderCandidates, SectionAuthorityProvider};
 use crate::routing::{Peer, Prefix, XorName};
 use bls::{PublicKey, PublicKeySet};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-};
+use std::{collections::BTreeSet, net::SocketAddr};
 
 /// The information about elder candidates in a DKG round.
 pub(crate) trait ElderCandidatesUtils {
@@ -88,9 +85,6 @@ pub trait SectionAuthorityProviderUtils {
     /// Returns the set of elder names.
     fn names(&self) -> BTreeSet<XorName>;
 
-    /// Returns a map of name to socket_addr.
-    fn elders(&self) -> BTreeMap<XorName, SocketAddr>;
-
     /// Returns the list of socket addresses.
     fn addresses(&self) -> Vec<SocketAddr>;
 
@@ -139,7 +133,7 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     /// Returns `ElderCandidates`, which doesn't have key related infos.
     fn elder_candidates(&self) -> ElderCandidates {
         ElderCandidates {
-            elders: self.elders(),
+            elders: self.elders.clone(),
             prefix: self.prefix,
         }
     }
@@ -169,14 +163,6 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     /// Returns the set of elder names.
     fn names(&self) -> BTreeSet<XorName> {
         self.elders.keys().copied().collect()
-    }
-
-    /// Returns a map of name to socket_addr.
-    fn elders(&self) -> BTreeMap<XorName, SocketAddr> {
-        self.elders
-            .iter()
-            .map(|(name, addr)| (*name, *addr))
-            .collect()
     }
 
     fn addresses(&self) -> Vec<SocketAddr> {

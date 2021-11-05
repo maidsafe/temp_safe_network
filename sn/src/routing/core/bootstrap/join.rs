@@ -572,14 +572,7 @@ mod tests {
                 (msg, dst_location));
 
             assert_eq!(dst_location.section_pk(), Some(pk));
-            itertools::assert_equal(
-                recipients,
-                section_auth
-                    .elders()
-                    .iter()
-                    .map(|(name, addr)| Peer::new(*name, *addr))
-                    .collect::<Vec<_>>(),
-            );
+            itertools::assert_equal(recipients, section_auth.peers());
             assert_matches!(node_msg, SystemMsg::JoinRequest(request) => {
                 assert_eq!(request.section_key, pk);
             });

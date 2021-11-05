@@ -538,7 +538,7 @@ impl NetworkKnowledge {
         excluded_names: &BTreeSet<XorName>,
     ) -> Option<(ElderCandidates, ElderCandidates)> {
         trace!("{}", LogMarker::SplitAttempt);
-        if self.authority_provider().await.elders().len() < ELDER_SIZE {
+        if self.authority_provider().await.elders.len() < ELDER_SIZE {
             trace!("No attempt to split as our section does not have enough elders.");
             return None;
         }
