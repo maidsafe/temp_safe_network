@@ -504,14 +504,7 @@ impl Core {
     // TODO: consider changing this so it sends only to a subset of the elders
     // (say 1/3 of the ones closest to our name or so)
     pub(crate) async fn send_message_to_our_elders(&self, node_msg: SystemMsg) -> Result<Command> {
-        let targets: Vec<_> = self
-            .network_knowledge
-            .authority_provider()
-            .await
-            .elders()
-            .iter()
-            .map(|(name, address)| Peer::new(*name, *address))
-            .collect();
+        let targets: Vec<_> = self.network_knowledge.authority_provider().await.peers();
 
         let dst_section_pk = self.network_knowledge().section_key().await;
         let cmd = self
