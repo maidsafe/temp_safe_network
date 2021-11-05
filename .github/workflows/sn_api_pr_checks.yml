@@ -130,4 +130,4 @@ jobs:
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
 
       - shell: bash
-        run: ./resources/scripts/api-tests
+        run: ./resources/scripts/api_tests.sh
