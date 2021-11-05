@@ -20,12 +20,12 @@ use crate::routing::{
     messages::WireMsgUtils,
     network_knowledge::NetworkKnowledge,
     node::Node,
-    Error, Prefix, XorName,
+    Error, Peer, Prefix, XorName,
 };
 use crate::types::PublicKey;
 use itertools::Itertools;
 use std::collections::BTreeSet;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
 use tracing::Instrument;
@@ -379,7 +379,7 @@ impl Dispatcher {
 
     async fn send_message(
         &self,
-        recipients: &[(XorName, SocketAddr)],
+        recipients: &[Peer],
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
@@ -404,7 +404,7 @@ impl Dispatcher {
 
     async fn deliver_messages(
         &self,
-        recipients: &[(XorName, SocketAddr)],
+        recipients: &[Peer],
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Command>> {
@@ -436,7 +436,7 @@ impl Dispatcher {
                 // or validated as part of the routing library.
                 debug!("Sending client msg to {:?}: {:?}", socket_addr, wire_msg);
 
-                let recipients = vec![(*name, socket_addr)];
+                let recipients = vec![Peer::new(*name, socket_addr)];
                 wire_msg.set_dst_section_pk(self.core.network_knowledge().section_key().await);
 
                 let command = Command::SendMessage {

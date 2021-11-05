@@ -59,11 +59,7 @@ impl Core {
         }));
 
         trace!("{}", LogMarker::SendResourceProofChallenge);
-        self.send_direct_message(
-            (peer.name(), peer.addr()),
-            response,
-            self.network_knowledge.section_key().await,
-        )
-        .await
+        self.send_direct_message(*peer, response, self.network_knowledge.section_key().await)
+            .await
     }
 }

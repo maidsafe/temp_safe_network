@@ -17,11 +17,11 @@ use crate::routing::{
     log_markers::LogMarker,
     network_knowledge::SectionKeyShare,
     routing_api::command::Command,
-    SectionAuthorityProviderUtils,
+    Peer, SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use std::{collections::BTreeSet, net::SocketAddr};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Core {
@@ -164,7 +164,7 @@ impl Core {
 
     pub(crate) async fn check_lagging(
         &self,
-        peer: (XorName, SocketAddr),
+        peer: Peer,
         public_key: &BlsPublicKey,
     ) -> Result<Option<Command>> {
         if self.network_knowledge.has_chain_key(public_key).await

@@ -20,7 +20,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    SectionAuthorityProviderUtils,
+    Peer, SectionAuthorityProviderUtils,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -60,7 +60,7 @@ pub(crate) async fn join_network(
 
 struct Join<'a> {
     // Sender for outgoing messages.
-    send_tx: mpsc::Sender<(WireMsg, Vec<(XorName, SocketAddr)>)>,
+    send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
@@ -71,7 +71,7 @@ struct Join<'a> {
 impl<'a> Join<'a> {
     fn new(
         node: Node,
-        send_tx: mpsc::Sender<(WireMsg, Vec<(XorName, SocketAddr)>)>,
+        send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     ) -> Self {
         Self {
@@ -101,7 +101,7 @@ impl<'a> Join<'a> {
     ) -> Result<(Node, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
         let dst_xorname = self.node.name();
-        let recipients = vec![(dst_xorname, bootstrap_addr)];
+        let recipients = vec![Peer::new(dst_xorname, bootstrap_addr)];
 
         self.join(genesis_key, recipients).await
     }
@@ -109,7 +109,7 @@ impl<'a> Join<'a> {
     async fn join(
         mut self,
         network_genesis_key: BlsPublicKey,
-        mut recipients: Vec<(XorName, SocketAddr)>,
+        mut recipients: Vec<Peer>,
     ) -> Result<(Node, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
@@ -132,7 +132,7 @@ impl<'a> Join<'a> {
         let mut used_recipient = HashSet::<SocketAddr>::new();
 
         loop {
-            used_recipient.extend(recipients.iter().map(|(_, addr)| addr));
+            used_recipient.extend(recipients.iter().map(|peer| peer.addr()));
 
             let (response, sender, src_name) = self.receive_join_response().await?;
 
@@ -178,10 +178,10 @@ impl<'a> Join<'a> {
                     section_auth,
                     expected_age,
                 } => {
-                    let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
+                    let new_recipients: Vec<_> = section_auth
                         .elders
                         .iter()
-                        .map(|(name, addr)| (*name, *addr))
+                        .map(|(name, addr)| Peer::new(*name, *addr))
                         .collect();
 
                     let prefix = section_auth.prefix;
@@ -244,11 +244,11 @@ impl<'a> Join<'a> {
                     }
 
                     // Ignore already used recipients
-                    let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
+                    let new_recipients: Vec<_> = section_auth
                         .elders
                         .iter()
                         .filter(|(_, addr)| !used_recipient.contains(addr))
-                        .map(|(name, addr)| (*name, *addr))
+                        .map(|(name, addr)| Peer::new(*name, *addr))
                         .collect();
 
                     if new_recipients.is_empty() {
@@ -308,7 +308,7 @@ impl<'a> Join<'a> {
                             nonce_signature,
                         }),
                     };
-                    let recipients = &[(src_name, sender)];
+                    let recipients = &[Peer::new(src_name, sender)];
                     self.send_join_requests(join_request, recipients, section_key, false)
                         .await?;
                 }
@@ -319,7 +319,7 @@ impl<'a> Join<'a> {
     async fn send_join_requests(
         &mut self,
         join_request: JoinRequest,
-        recipients: &[(XorName, SocketAddr)],
+        recipients: &[Peer],
         section_key: BlsPublicKey,
         should_backoff: bool,
     ) -> Result<()> {
@@ -464,10 +464,7 @@ impl<'a> Join<'a> {
 }
 
 // Keep reading messages from `rx` and send them using `comm`.
-async fn send_messages(
-    mut rx: mpsc::Receiver<(WireMsg, Vec<(XorName, SocketAddr)>)>,
-    comm: &Comm,
-) -> Result<()> {
+async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm) -> Result<()> {
     while let Some((wire_msg, recipients)) = rx.recv().await {
         match comm
             .send(&recipients, recipients.len(), wire_msg.clone())
@@ -542,8 +539,10 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
-            let bootstrap_addrs: Vec<SocketAddr> =
-                recipients.iter().map(|(_name, addr)| *addr).collect();
+            let bootstrap_addrs: Vec<SocketAddr> = recipients
+                .iter()
+                .map(|recipient| recipient.addr())
+                .collect();
             assert_eq!(bootstrap_addrs, [bootstrap_addr]);
 
             let node_msg = assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
@@ -578,7 +577,7 @@ mod tests {
                 section_auth
                     .elders()
                     .iter()
-                    .map(|(name, addr)| (*name, *addr))
+                    .map(|(name, addr)| Peer::new(*name, *addr))
                     .collect::<Vec<_>>(),
             );
             assert_matches!(node_msg, SystemMsg::JoinRequest(request) => {
@@ -640,7 +639,7 @@ mod tests {
             assert_eq!(
                 recipients
                     .into_iter()
-                    .map(|peer| peer.1)
+                    .map(|peer| peer.addr())
                     .collect::<Vec<_>>(),
                 vec![bootstrap_node.addr]
             );
@@ -680,7 +679,7 @@ mod tests {
             assert_eq!(
                 recipients
                     .into_iter()
-                    .map(|peer| peer.1)
+                    .map(|peer| peer.addr())
                     .collect::<Vec<_>>(),
                 new_bootstrap_addrs
                     .iter()
@@ -872,7 +871,7 @@ mod tests {
 
         let section_key = bls::SecretKey::random().public_key();
         let elders = (0..ELDER_SIZE)
-            .map(|_| (good_prefix.substituted_in(rand::random()), gen_addr()))
+            .map(|_| Peer::new(good_prefix.substituted_in(rand::random()), gen_addr()))
             .collect();
         let join_task = state.join(section_key, elders);
 

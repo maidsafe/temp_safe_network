@@ -17,6 +17,7 @@ use crate::routing::{
     log_markers::LogMarker,
     messages::WireMsgUtils,
     routing_api::command::Command,
+    Peer,
 };
 use crate::types::PublicKey;
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -133,7 +134,7 @@ impl Core {
             self.create_or_wait_for_backoff(&src_name, &sender).await;
 
             let cmd = self
-                .send_direct_message((src_name, sender), bounced_msg, dst_section_pk)
+                .send_direct_message(Peer::new(src_name, sender), bounced_msg, dst_section_pk)
                 .await?;
 
             return Ok(vec![cmd]);
@@ -215,7 +216,7 @@ impl Core {
                 self.create_or_wait_for_backoff(name, addr).await;
 
                 let cmd = self
-                    .send_direct_message((*name, *addr), bounced_msg, dst_section_pk)
+                    .send_direct_message(Peer::new(*name, *addr), bounced_msg, dst_section_pk)
                     .await?;
                 Ok(vec![cmd])
             }
@@ -232,7 +233,7 @@ impl Core {
 
                 let cmd = self
                     .send_direct_message(
-                        (*name, *addr),
+                        Peer::new(*name, *addr),
                         bounced_msg,
                         *self.network_knowledge.genesis_key(),
                     )
@@ -313,7 +314,7 @@ impl Core {
                     trace!("{}", LogMarker::AeSendRedirect);
 
                     return Ok(Some(Command::SendMessage {
-                        recipients: vec![(src_location.name(), sender)],
+                        recipients: vec![Peer::new(src_location.name(), sender)],
                         wire_msg,
                     }));
                 }
@@ -421,7 +422,7 @@ impl Core {
         )?;
 
         Ok(Some(Command::SendMessage {
-            recipients: vec![(src_location.name(), sender)],
+            recipients: vec![Peer::new(src_location.name(), sender)],
             wire_msg,
         }))
     }
@@ -457,7 +458,7 @@ impl Core {
         trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
 
         Ok(Command::SendMessage {
-            recipients: vec![(src_location.name(), sender)],
+            recipients: vec![Peer::new(src_location.name(), sender)],
             wire_msg,
         })
     }

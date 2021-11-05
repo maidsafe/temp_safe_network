@@ -205,7 +205,7 @@ impl Core {
 
             for peer in peers {
                 if !self.network_knowledge.is_elder(&peer.name()).await {
-                    ae_update_recipients.push((peer.name(), peer.addr()));
+                    ae_update_recipients.push(peer);
                 }
             }
 
