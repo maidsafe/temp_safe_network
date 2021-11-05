@@ -17,7 +17,7 @@ use crate::routing::{
     log_markers::LogMarker,
     messages::WireMsgUtils,
     routing_api::command::Command,
-    Peer,
+    Peer, SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -25,7 +25,6 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use std::net::SocketAddr;
 use xor_name::XorName;
 
 impl Core {
@@ -76,8 +75,7 @@ impl Core {
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         bounced_msg: Bytes,
-        sender: SocketAddr,
-        src_name: XorName,
+        sender: Peer,
     ) -> Result<Vec<Command>> {
         let bounced_msg = match WireMsg::deserialize(bounced_msg)? {
             MessageType::System { msg, .. } => msg,
@@ -87,10 +85,7 @@ impl Core {
             }
         };
 
-        info!(
-            "Anti-Entropy: retry message received from peer: {} ({})",
-            src_name, sender
-        );
+        info!("Anti-Entropy: retry message received from peer: {}", sender);
 
         // If we have the key share for new SAP key we can switch to this new SAP
         let switch_to_new_sap = self.is_not_elder().await
@@ -131,10 +126,10 @@ impl Core {
             let dst_section_pk = section_auth.public_key_set.public_key();
             trace!("{}", LogMarker::AeResendAfterRetry);
 
-            self.create_or_wait_for_backoff(&src_name, &sender).await;
+            self.create_or_wait_for_backoff(&sender).await;
 
             let cmd = self
-                .send_direct_message(Peer::new(src_name, sender), bounced_msg, dst_section_pk)
+                .send_direct_message(sender, bounced_msg, dst_section_pk)
                 .await?;
 
             return Ok(vec![cmd]);
@@ -148,7 +143,7 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         bounced_msg: Bytes,
-        sender: SocketAddr,
+        sender: Peer,
     ) -> Result<Vec<Command>> {
         debug!(
             "Anti-Entropy: redirect message received from peer: {}",
@@ -184,28 +179,28 @@ impl Core {
             .network_knowledge
             .section_by_prefix(&section_auth.prefix)
         {
-            Ok(trusted_sap) => (trusted_sap.public_key_set.public_key(), trusted_sap.elders),
+            Ok(trusted_sap) => (trusted_sap.public_key_set.public_key(), trusted_sap.peers()),
             Err(_) => {
                 // In case we don't have the knowledge of that neighbour locally,
                 // let's take the Elders from the provided SAP and genesis key.
                 (
                     *self.network_knowledge.genesis_key(),
-                    section_signed.value.elders,
+                    section_signed.peers(),
                 )
             }
         };
 
         // We choose the Elder closest to the dest section key,
         // just to pick one of them in a random but deterministic fashion.
-        let name = XorName::from(PublicKey::Bls(dst_section_pk));
+        let target_name = XorName::from(PublicKey::Bls(dst_section_pk));
         let chosen_dst_elder = dst_elders
-            .iter()
-            .filter(|(elder, _)| section_auth.elders.contains_key(elder))
-            .sorted_by(|lhs, rhs| name.cmp_distance(lhs.0, rhs.0))
+            .into_iter()
+            .filter(|elder| section_auth.elders.contains_key(&elder.name()))
+            .sorted_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
             .next();
 
-        if let Some((name, addr)) = chosen_dst_elder {
-            if addr == &sender {
+        if let Some(elder) = chosen_dst_elder {
+            if elder.addr() == sender.addr() {
                 error!(
                     "Failed to find an alternative Elder to resend msg ({:?}) upon AE-Redirect response.",msg_id
                 );
@@ -213,10 +208,10 @@ impl Core {
             } else {
                 trace!("{}", LogMarker::AeResendAfterAeRedirect);
 
-                self.create_or_wait_for_backoff(name, addr).await;
+                self.create_or_wait_for_backoff(&elder).await;
 
                 let cmd = self
-                    .send_direct_message(Peer::new(*name, *addr), bounced_msg, dst_section_pk)
+                    .send_direct_message(elder, bounced_msg, dst_section_pk)
                     .await?;
                 Ok(vec![cmd])
             }
@@ -228,15 +223,11 @@ impl Core {
 
             // For the situation non-elder exists in both incoming and local SAP, send to one of
             // the incoming elder with the geneis key to trigger AE.
-            if let Some((name, addr)) = section_auth.elders.iter().next() {
+            if let Some(elder) = section_auth.peers().into_iter().next() {
                 trace!("{}", LogMarker::BounceAfterNewElderNotKnownLocally);
 
                 let cmd = self
-                    .send_direct_message(
-                        Peer::new(*name, *addr),
-                        bounced_msg,
-                        *self.network_knowledge.genesis_key(),
-                    )
+                    .send_direct_message(elder, bounced_msg, *self.network_knowledge.genesis_key())
                     .await?;
                 Ok(vec![cmd])
             } else {
@@ -251,12 +242,12 @@ impl Core {
 
     /// Checks AeBackoffCache for backoff, or creates a new instance
     /// waits for any required backoff duration
-    async fn create_or_wait_for_backoff(&self, name: &XorName, addr: &SocketAddr) {
+    async fn create_or_wait_for_backoff(&self, peer: &Peer) {
         let mut ae_backoff_guard = self.ae_backoff_cache.write().await;
 
         if let Some(backoff) = ae_backoff_guard
-            .find(|(node_name, socket, _)| node_name == name && socket == addr)
-            .map(|(_, _, backoff)| backoff)
+            .find(|(node, _)| node == peer)
+            .map(|(_, backoff)| backoff)
         {
             if let Some(next_wait) = backoff.next_backoff() {
                 tokio::time::sleep(next_wait).await;
@@ -265,7 +256,7 @@ impl Core {
                 // we should probably penalise the node here.
             }
         } else {
-            let _res = ae_backoff_guard.insert((*name, *addr, ExponentialBackoff::default()));
+            let _res = ae_backoff_guard.insert((*peer, ExponentialBackoff::default()));
         }
     }
 
@@ -277,7 +268,7 @@ impl Core {
         src_location: &SrcLocation,
         dst_section_pk: &BlsPublicKey,
         dst_name: XorName,
-        sender: SocketAddr,
+        sender: Peer,
     ) -> Result<Option<Command>> {
         trace!("Checking for entropy");
         // Check if the message has reached the correct section,
@@ -314,7 +305,7 @@ impl Core {
                     trace!("{}", LogMarker::AeSendRedirect);
 
                     return Ok(Some(Command::SendMessage {
-                        recipients: vec![Peer::new(src_location.name(), sender)],
+                        recipients: vec![sender],
                         wire_msg,
                     }));
                 }
@@ -422,7 +413,7 @@ impl Core {
         )?;
 
         Ok(Some(Command::SendMessage {
-            recipients: vec![Peer::new(src_location.name(), sender)],
+            recipients: vec![sender],
             wire_msg,
         }))
     }
@@ -430,7 +421,7 @@ impl Core {
     // generate an AE redirect command for the given message
     pub(crate) async fn ae_redirect(
         &self,
-        sender: SocketAddr,
+        sender: Peer,
         src_location: &SrcLocation,
         original_wire_msg: &WireMsg,
     ) -> Result<Command> {
@@ -458,7 +449,7 @@ impl Core {
         trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
 
         Ok(Command::SendMessage {
-            recipients: vec![Peer::new(src_location.name(), sender)],
+            recipients: vec![sender],
             wire_msg,
         })
     }
@@ -534,7 +525,7 @@ mod tests {
             &our_prefix,
             env.core.network_knowledge().section_key().await,
         )?;
-        let sender = env.core.node.read().await.addr;
+        let sender = env.core.node.read().await.peer();
         let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_pk = env.core.network_knowledge().section_key().await;
 
@@ -562,7 +553,7 @@ mod tests {
         let other_pk = other_sk.public_key();
 
         let (msg, src_location) = env.create_message(&env.other_sap.prefix, other_pk)?;
-        let sender = env.core.node.read().await.addr;
+        let sender = env.core.node.read().await.peer();
 
         // since it's not aware of the other prefix, it shall redirect us to genesis section/SAP
         let dst_section_pk = other_pk;
@@ -635,7 +626,7 @@ mod tests {
             &our_prefix,
             env.core.network_knowledge().section_key().await,
         )?;
-        let sender = env.core.node.read().await.addr;
+        let sender = env.core.node.read().await.peer();
         let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_pk = env.core.network_knowledge().genesis_key();
 
@@ -676,7 +667,7 @@ mod tests {
             &our_prefix,
             env.core.network_knowledge().section_key().await,
         )?;
-        let sender = env.core.node.read().await.addr;
+        let sender = env.core.node.read().await.peer();
         let dst_name = our_prefix.substituted_in(rng.gen());
 
         let bogus_env = Env::new().await?;

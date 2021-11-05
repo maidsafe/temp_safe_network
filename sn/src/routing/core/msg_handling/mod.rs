@@ -29,7 +29,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     relocation::RelocateState,
     routing_api::command::Command,
-    Error, Event, MessageReceived, Result,
+    Error, Event, MessageReceived, Peer, Result,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
 use bls::PublicKey as BlsPublicKey;
@@ -43,14 +43,14 @@ impl Core {
     #[instrument(skip(self, original_bytes))]
     pub(crate) async fn handle_message(
         &self,
-        sender: SocketAddr,
+        sender_addr: SocketAddr,
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
         let mut cmds = vec![];
         trace!("handling msg");
         // Apply backpressure if needed.
-        if let Some(load_report) = self.comm.check_strain(sender).await {
+        if let Some(load_report) = self.comm.check_strain(sender_addr).await {
             let msg_src = wire_msg.msg_kind().src();
             cmds.push(Command::PrepareNodeMsgToSend {
                 msg: SystemMsg::BackPressure(load_report),
@@ -95,7 +95,7 @@ impl Core {
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
                     warn!(
                         "Untrusted message ({:?}) dropped from {:?}: {:?} ",
-                        msg_id, sender, msg
+                        msg_id, sender_addr, msg
                     );
                     return Ok(cmds);
                 }
@@ -103,9 +103,14 @@ impl Core {
                 trace!(
                     "Trusted msg authority in message ({:?}) from {:?}: {:?}",
                     msg_id,
-                    sender,
+                    sender_addr,
                     msg
                 );
+
+                // TODO: msg_authority.peer() exists, but will error if authority is
+                // section/sectionshare. It's not clear if this would actually
+                // represent a valid peer.
+                let sender = Peer::new(msg_authority.name(), sender_addr);
 
                 // Let's check for entropy before we proceed further
                 // Adult nodes don't need to carry out entropy checking,
@@ -179,22 +184,23 @@ impl Core {
                     None => {
                         error!(
                             "Service msg has been dropped since {:?} is not a valid msg to send from a client {}.",
-                            msg, sender
+                            msg, sender_addr
                         );
                         return Ok(vec![]);
                     }
                 };
-                let user = match self.comm.get_peer_connection_id(&sender).await {
+                let user = match self.comm.get_peer_connection_id(&sender_addr).await {
                     Some(name) => EndUser(name),
                     None => {
                         error!(
                             "Service msg has been dropped since client connection id for {} was not found: {:?}",
-                            sender, msg
+                            sender_addr, msg
                         );
                         return Ok(cmds);
                     }
                 };
 
+                let sender = Peer::new(user.0, sender_addr);
                 let src_location = SrcLocation::EndUser(user);
 
                 if self.is_not_elder().await {
@@ -243,7 +249,7 @@ impl Core {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_system_message(
         &self,
-        sender: SocketAddr,
+        sender: Peer,
         msg_id: MessageId,
         mut msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
@@ -311,7 +317,7 @@ impl Core {
     // passed all signature checks and msg verifications
     pub(crate) async fn handle_blocking_message(
         &self,
-        sender: SocketAddr,
+        sender: Peer,
         msg_id: MessageId,
         msg_authority: NodeMsgAuthority,
         node_msg: SystemMsg,
@@ -371,7 +377,7 @@ impl Core {
                     *self.relocate_state.write().await
                 {
                     if let Some(cmd) = joining_as_relocated
-                        .handle_join_response(*join_response, sender)
+                        .handle_join_response(*join_response, sender.addr())
                         .await?
                     {
                         return Ok(vec![cmd]);
@@ -411,7 +417,7 @@ impl Core {
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
         node_msg: SystemMsg,
-        sender: SocketAddr,
+        sender: Peer,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
         let src_name = msg_authority.name();
@@ -430,7 +436,6 @@ impl Core {
                     proof_chain,
                     bounced_msg,
                     sender,
-                    src_name,
                 )
                 .await
             }
@@ -455,7 +460,7 @@ impl Core {
             SystemMsg::BackPressure(load_report) => {
                 trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
                 // #TODO: Factor in med/long term backpressure into general node liveness calculations
-                self.comm.regulate(sender, load_report).await;
+                self.comm.regulate(sender.addr(), load_report).await;
                 Ok(vec![])
             }
             SystemMsg::JoinResponse(join_response) => {
@@ -471,8 +476,7 @@ impl Core {
             }
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
-                self.handle_join_request(msg_authority.peer(sender)?, *join_request)
-                    .await
+                self.handle_join_request(sender, *join_request).await
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
@@ -482,12 +486,8 @@ impl Core {
                     return Ok(vec![]);
                 }
 
-                self.handle_join_as_relocated_request(
-                    msg_authority.peer(sender)?,
-                    *join_request,
-                    known_keys,
-                )
-                .await
+                self.handle_join_as_relocated_request(sender, *join_request, known_keys)
+                    .await
             }
             SystemMsg::Propose {
                 proposal,
@@ -499,7 +499,7 @@ impl Core {
                 }
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
-                self.handle_proposal(msg_id, proposal, sig_share, src_name, sender)
+                self.handle_proposal(msg_id, proposal, sig_share, sender)
                     .await
             }
             SystemMsg::DkgStart {
@@ -526,7 +526,8 @@ impl Core {
                     message,
                     sender
                 );
-                self.handle_dkg_message(session_id, message, src_name).await
+                self.handle_dkg_message(session_id, message, sender.name())
+                    .await
             }
             SystemMsg::DkgFailureObservation {
                 session_id,

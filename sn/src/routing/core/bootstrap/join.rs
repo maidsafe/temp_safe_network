@@ -29,7 +29,7 @@ use resource_proof::ResourceProof;
 use std::{collections::HashSet, net::SocketAddr};
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
-use xor_name::{Prefix, XorName};
+use xor_name::Prefix;
 
 /// Join the network as new node.
 ///
@@ -134,7 +134,7 @@ impl<'a> Join<'a> {
         loop {
             used_recipient.extend(recipients.iter().map(|peer| peer.addr()));
 
-            let (response, sender, src_name) = self.receive_join_response().await?;
+            let (response, sender) = self.receive_join_response().await?;
 
             match response {
                 JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
@@ -303,7 +303,7 @@ impl<'a> Join<'a> {
                             nonce_signature,
                         }),
                     };
-                    let recipients = &[Peer::new(src_name, sender)];
+                    let recipients = &[sender];
                     self.send_join_requests(join_request, recipients, section_key, false)
                         .await?;
                 }
@@ -352,17 +352,17 @@ impl<'a> Join<'a> {
 
     // TODO: receive JoinResponse from the JoinResponse handler directly,
     // analogous to the JoinAsRelocated flow.
-    async fn receive_join_response(&mut self) -> Result<(JoinResponse, SocketAddr, XorName)> {
+    async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
         while let Some(event) = self.recv_rx.recv().await {
             // we are interested only in `JoinResponse` type of messages
-            let (join_response, sender, src_name) = match event {
-                ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
+            let (join_response, sender) = match event {
+                ConnectionEvent::Received((sender_addr, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) => continue,
                         MsgKind::NodeBlsShareAuthMsg(_) => {
                             trace!(
                                 "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
-                                sender,
+                                sender_addr,
                                 wire_msg
                             );
                             continue;
@@ -372,14 +372,17 @@ impl<'a> Join<'a> {
                                 msg: SystemMsg::JoinResponse(resp),
                                 msg_authority,
                                 ..
-                            }) => (*resp, sender, msg_authority.src_location().name()),
+                            }) => (
+                                *resp,
+                                Peer::new(msg_authority.src_location().name(), sender_addr),
+                            ),
                             Ok(
                                 MessageType::Service { msg_id, .. }
                                 | MessageType::System { msg_id, .. },
                             ) => {
                                 trace!(
                                     "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
-                                    sender,
+                                    sender_addr,
                                     msg_id
                                 );
                                 continue;
@@ -401,7 +404,7 @@ impl<'a> Join<'a> {
                 JoinResponse::ResourceChallenge { .. }
                 | JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(_))
                 | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
-                    return Ok((join_response, sender, src_name));
+                    return Ok((join_response, sender));
                 }
                 JoinResponse::Retry {
                     ref section_auth, ..
@@ -416,7 +419,7 @@ impl<'a> Join<'a> {
                     }
                     trace!("Received a redirect/retry JoinResponse. Sending request to the latest contacts");
 
-                    return Ok((join_response, sender, src_name));
+                    return Ok((join_response, sender));
                 }
                 JoinResponse::Approval {
                     ref section_auth,
@@ -447,7 +450,7 @@ impl<'a> Join<'a> {
                         section_auth.prefix,
                     );
 
-                    return Ok((join_response, sender, src_name));
+                    return Ok((join_response, sender));
                 }
             }
         }
@@ -499,6 +502,7 @@ mod tests {
     use secured_linked_list::SecuredLinkedList;
     use std::collections::BTreeMap;
     use tokio::task;
+    use xor_name::XorName;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn join_as_adult() -> Result<()> {

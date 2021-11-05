@@ -261,12 +261,12 @@ impl Dispatcher {
                 self.core.prepare_node_msg(msg, dst).await
             }
             Command::HandleMessage {
-                sender,
+                sender_addr,
                 wire_msg,
                 original_bytes,
             } => {
                 self.core
-                    .handle_message(sender, wire_msg, original_bytes)
+                    .handle_message(sender_addr, wire_msg, original_bytes)
                     .await
             }
             Command::HandleTimeout(token) => self.core.handle_timeout(token).await,
@@ -284,7 +284,7 @@ impl Dispatcher {
                     Ok(vec![])
                 }
             },
-            Command::HandlePeerLost(addr) => self.core.handle_peer_lost(&addr).await,
+            Command::HandlePeerLost(peer) => self.core.handle_peer_lost(&peer.addr()).await,
             Command::HandleDkgOutcome {
                 section_auth,
                 outcome,
