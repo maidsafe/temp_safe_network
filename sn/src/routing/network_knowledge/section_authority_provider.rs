@@ -118,15 +118,10 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
         elder_candidates: ElderCandidates,
         pk_set: PublicKeySet,
     ) -> SectionAuthorityProvider {
-        let elders = elder_candidates
-            .elders
-            .iter()
-            .map(|(name, addr)| (*name, *addr))
-            .collect();
         SectionAuthorityProvider {
             prefix: elder_candidates.prefix,
             public_key_set: pk_set,
-            elders,
+            elders: elder_candidates.elders,
         }
     }
 
@@ -226,11 +221,7 @@ pub(crate) mod test_utils {
         count: usize,
     ) -> (SectionAuthorityProvider, Vec<Node>, SecretKeySet) {
         let nodes = gen_sorted_nodes(&prefix, count, false);
-        let elders = nodes
-            .iter()
-            .map(Node::peer)
-            .map(|peer| (peer.name(), peer.addr()))
-            .collect();
+        let elders = nodes.iter().map(|node| (node.name(), node.addr)).collect();
 
         let secret_key_set = SecretKeySet::random();
         let section_auth = SectionAuthorityProvider::from_elder_candidates(
