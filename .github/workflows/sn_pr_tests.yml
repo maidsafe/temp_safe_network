@@ -279,3 +279,6 @@ jobs:
           name: sn_node_logs
           path: $HOME/.safe/node/local-test-network/**/*.log*
         if: failure()
+
+      - name: Run sn_api tests
+        run: ./resources/scripts/api_tests.sh
