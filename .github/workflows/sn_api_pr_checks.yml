@@ -105,7 +105,9 @@ jobs:
           parallel-finished: true
 
   test:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    # sn_api tests are run in sn_pr_tests.yml because they need a running network
+    # if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: false
     name: Test
     runs-on: ${{ matrix.os }}
     strategy:
