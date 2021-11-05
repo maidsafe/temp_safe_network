@@ -27,7 +27,7 @@ use std::{
 
 /// Command for node.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Command {
     /// Handle `message` from `sender`.
     /// Holding the WireMsg that has been received from the network,

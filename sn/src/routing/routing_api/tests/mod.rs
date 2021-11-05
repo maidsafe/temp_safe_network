@@ -231,6 +231,9 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_from_relocated_node() -> Result<()> {
+    crate::init_test_logger();
+    let _span = tracing::info_span!("receive_join_request_from_relocated_node").entered();
+
     let (section_auth, mut nodes, sk_set) = create_section_auth();
 
     let pk_set = sk_set.public_keys();
@@ -1079,21 +1082,20 @@ async fn get_internal_commands(
     let commands = dispatcher.handle_command(command, "cmd-id").await?;
 
     let mut node_msg_handling = vec![];
-    let mut inner_handling = vec![];
+    // let mut inner_handling = vec![];
 
     for command in commands {
         // first pass gets us into node msg handling
         let commands = dispatcher.handle_command(command, "cmd-id").await?;
         node_msg_handling.extend(commands);
     }
-
-    for command in node_msg_handling {
-        // second pass gets us into non-data handling
+    for command in node_msg_handling.clone() {
+        // first pass gets us into node msg handling
         let commands = dispatcher.handle_command(command, "cmd-id").await?;
-        inner_handling.extend(commands);
+        node_msg_handling.extend(commands);
     }
 
-    Ok(inner_handling)
+    Ok(node_msg_handling)
 }
 
 #[tokio::test(flavor = "multi_thread")]
