@@ -437,7 +437,7 @@ impl Core {
             wire_msg.set_dst_xorname(self.node.read().await.name());
 
             commands.push(Command::HandleMessage {
-                sender: self.node.read().await.addr,
+                sender_addr: self.node.read().await.addr,
                 wire_msg,
                 original_bytes: None,
             });

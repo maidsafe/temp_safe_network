@@ -54,7 +54,6 @@ use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
 };
@@ -70,7 +69,7 @@ pub(crate) const CONCURRENT_JOINS: usize = 5;
 
 // store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
-    Arc<RwLock<LRUCache<(XorName, SocketAddr, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
+    Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
 
 // State + logic of a routing node.
 pub(crate) struct Core {

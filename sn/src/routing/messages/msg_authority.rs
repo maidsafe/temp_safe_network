@@ -7,22 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{NodeMsgAuthority, SrcLocation};
-use crate::routing::{
-    ed25519::{self},
-    error::{Error, Result},
-    Peer,
-};
+use crate::routing::ed25519::{self};
 use bls::PublicKey as BlsPublicKey;
-use std::net::SocketAddr;
 use xor_name::XorName;
 
 pub(crate) trait NodeMsgAuthorityUtils {
     fn src_location(&self) -> SrcLocation;
 
     fn name(&self) -> XorName;
-
-    // If this location is `Node`, returns the corresponding `Peer` with `addr`. Otherwise error.
-    fn peer(&self, addr: SocketAddr) -> Result<Peer>;
 
     // Verify if the section key of the NodeMsgAuthority can be trusted
     // based on a set of known keys.
@@ -52,18 +44,6 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
             NodeMsgAuthority::Node(node_auth) => ed25519::name(&node_auth.public_key),
             NodeMsgAuthority::BlsShare(bls_share_auth) => bls_share_auth.src_name,
             NodeMsgAuthority::Section(section_auth) => section_auth.src_name,
-        }
-    }
-
-    // If this location is `Node`, returns the corresponding `Peer` with `addr`. Otherwise error.
-    fn peer(&self, addr: SocketAddr) -> Result<Peer> {
-        match self {
-            NodeMsgAuthority::Node(node_auth) => {
-                Ok(Peer::new(ed25519::name(&node_auth.public_key), addr))
-            }
-            NodeMsgAuthority::Section(_) | NodeMsgAuthority::BlsShare(_) => {
-                Err(Error::InvalidSrcLocation)
-            }
         }
     }
 

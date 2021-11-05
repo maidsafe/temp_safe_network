@@ -104,7 +104,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let mut commands = get_internal_commands(
         Command::HandleMessage {
-            sender: new_node.addr,
+            sender_addr: new_node.addr,
             wire_msg,
             original_bytes: None,
         },
@@ -198,7 +198,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let commands = get_internal_commands(
         Command::HandleMessage {
-            sender: new_node.addr,
+            sender_addr: new_node.addr,
             wire_msg,
             original_bytes: None,
         },
@@ -304,7 +304,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let inner_commands = get_internal_commands(
         Command::HandleMessage {
-            sender: relocated_node.addr,
+            sender_addr: relocated_node.addr,
             wire_msg,
             original_bytes: None,
         },
@@ -378,7 +378,7 @@ async fn aggregate_proposals() -> Result<()> {
 
         let commands = get_internal_commands(
             Command::HandleMessage {
-                sender: node.addr,
+                sender_addr: node.addr,
                 wire_msg,
                 original_bytes: None,
             },
@@ -414,7 +414,7 @@ async fn aggregate_proposals() -> Result<()> {
 
     let mut commands = get_internal_commands(
         Command::HandleMessage {
-            sender: nodes[THRESHOLD].addr,
+            sender_addr: nodes[THRESHOLD].addr,
             wire_msg,
             original_bytes: None,
         },
@@ -974,7 +974,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     let _commands = get_internal_commands(
         Command::HandleMessage {
-            sender: old_node.addr,
+            sender_addr: old_node.addr,
             wire_msg,
             original_bytes: None,
         },
@@ -1054,7 +1054,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
 
     let _commands = get_internal_commands(
         Command::HandleMessage {
-            sender: sender.addr,
+            sender_addr: sender.addr,
             wire_msg,
             original_bytes: None,
         },

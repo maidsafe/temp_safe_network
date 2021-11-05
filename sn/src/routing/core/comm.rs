@@ -299,7 +299,7 @@ impl Comm {
                     }
                 });
 
-            (result, recipient.addr())
+            (result, recipient)
         };
 
         let mut tasks: FuturesUnordered<_> = recipients[0..delivery_group_size]
@@ -311,12 +311,12 @@ impl Comm {
         let mut successes = 0;
         let mut failed_recipients = vec![];
 
-        while let Some((result, addr)) = tasks.next().await {
+        while let Some((result, recipient)) = tasks.next().await {
             match result {
                 Ok(()) => {
                     successes += 1;
                     // count outgoing msgs..
-                    self.msg_count.increase_outgoing(addr);
+                    self.msg_count.increase_outgoing(recipient.addr());
                 }
                 Err(Error::ConnectionClosed) => {
                     // The connection was closed by us which means
@@ -324,7 +324,7 @@ impl Comm {
                     return Err(Error::ConnectionClosed);
                 }
                 Err(_) => {
-                    failed_recipients.push(addr);
+                    failed_recipients.push(*recipient);
 
                     if next < recipients.len() {
                         tasks.push(send(&recipients[next], msg_bytes.clone()));
@@ -443,8 +443,8 @@ async fn handle_incoming_messages(
 #[derive(Debug, Clone)]
 pub(crate) enum SendStatus {
     AllRecipients,
-    MinDeliveryGroupSizeReached(Vec<SocketAddr>),
-    MinDeliveryGroupSizeFailed(Vec<SocketAddr>),
+    MinDeliveryGroupSizeReached(Vec<Peer>),
+    MinDeliveryGroupSizeFailed(Vec<Peer>),
 }
 
 #[cfg(test)]
@@ -561,7 +561,7 @@ mod tests {
         let message = new_test_message()?;
         let status = comm.send(&[invalid_peer, peer], 1, message.clone()).await?;
         assert_matches!(status, SendStatus::MinDeliveryGroupSizeReached(failed_recipients) => {
-            assert_eq!(&failed_recipients, &[invalid_peer.addr()])
+            assert_eq!(&failed_recipients, &[invalid_peer])
         });
 
         if let Some(bytes) = rx.recv().await {
