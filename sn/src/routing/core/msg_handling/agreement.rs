@@ -270,11 +270,12 @@ impl Core {
             info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
             // If we have the key share for new SAP key we can switch to this new SAP
-            let switch_to_new_sap = self
-                .section_keys_provider
-                .key_share(&signed_sap.section_key())
-                .await
-                .is_ok();
+            let switch_to_new_sap = self.is_not_elder().await
+                || self
+                    .section_keys_provider
+                    .key_share(&signed_sap.section_key())
+                    .await
+                    .is_ok();
 
             // Let's update our network knowledge, including our
             // section SAP and chain if the new SAP's prefix matches our name
