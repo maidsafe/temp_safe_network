@@ -174,32 +174,53 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn split_network_assert_health_check() -> Result<()> {
-        let prefix1_nodes =
+        let prefix1_prior_elder_nodes =
             search_testnet_results_per_node(format!(r"{}: Prefix\(1\)", LogMarker::SplitSuccess))?
                 .len();
-        let prefix0_nodes =
+        let prefix1_new_elder_nodes = search_testnet_results_per_node(format!(
+            r"{}: Prefix\(1\)",
+            LogMarker::PromotedToElder
+        ))?
+        .len();
+        let prefix0_prior_elder_nodes =
             search_testnet_results_per_node(format!(r"{}: Prefix\(0\)", LogMarker::SplitSuccess))?
                 .len();
-        let promoted_count =
-            search_testnet_results_per_node(LogMarker::PromotedToElder.to_string())?.len();
-        let demoted_count =
-            search_testnet_results_per_node(LogMarker::DemotedFromElder.to_string())?.len();
-
-        let total_elders = promoted_count - demoted_count;
-        println!("Found elders: {:?}", total_elders);
-        println!("Found elders: {:?}", total_elders);
-
-        println!("Found prefix_1_elders: {:?}", prefix1_nodes);
-        println!("Found prefix_0_elders: {:?}", prefix0_nodes);
-        assert_eq!(prefix1_nodes, 7);
-        assert_eq!(prefix0_nodes, 7);
-
-        assert_eq!(total_elders, 14);
+        let prefix0_new_elder_nodes = search_testnet_results_per_node(format!(
+            r"{}: Prefix\(0\)",
+            LogMarker::PromotedToElder
+        ))?
+        .len();
 
         let split_count =
             search_testnet_results_per_node(LogMarker::SplitSuccess.to_string())?.len();
+
         println!("Found splits: {:?}", split_count);
-        assert!(split_count > 7);
+
+        let total_elders = prefix0_prior_elder_nodes
+            + prefix0_new_elder_nodes
+            + prefix1_new_elder_nodes
+            + prefix1_prior_elder_nodes;
+        println!("Found elders: {:?}", total_elders);
+
+        println!(
+            "Found prefix_0_prior_elders: {:?}",
+            prefix0_prior_elder_nodes
+        );
+        println!("Found prefix_0_new_elders: {:?}", prefix0_new_elder_nodes);
+
+        println!(
+            "Found prefix_1_prior_elders: {:?}",
+            prefix1_prior_elder_nodes
+        );
+        println!("Found prefix_1_new_elders: {:?}", prefix1_new_elder_nodes);
+
+        // all our prev elders were relocated to new sections
+        assert_eq!(prefix1_prior_elder_nodes + prefix0_prior_elder_nodes, 7);
+        assert_eq!(prefix0_new_elder_nodes + prefix1_new_elder_nodes, 7);
+
+        assert_eq!(total_elders, 14);
+
+        assert!(split_count >= 7);
 
         Ok(())
     }
