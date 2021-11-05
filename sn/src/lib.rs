@@ -215,10 +215,10 @@ mod tests {
         println!("Found prefix_1_new_elders: {:?}", prefix1_new_elder_nodes);
 
         // all our prev elders were relocated to new sections
-        assert_eq!(prefix1_prior_elder_nodes + prefix0_prior_elder_nodes, 7);
-        assert_eq!(prefix0_new_elder_nodes + prefix1_new_elder_nodes, 7);
-
-        assert_eq!(total_elders, 14);
+        assert!(prefix1_prior_elder_nodes + prefix0_prior_elder_nodes >= 7);
+        assert!(prefix0_new_elder_nodes + prefix1_new_elder_nodes >= 7);
+        // we're not discounting demotions at the moment, so just more than 14 is fine
+        assert!(total_elders >= 14);
 
         assert!(split_count >= 7);
 

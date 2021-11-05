@@ -28,8 +28,8 @@ total_prefix1_elders=$(($prefix1_new_elder_nodes + $prefix1_prior_elder_nodes))
 total_elders=$(($total_prefix1_elders + $total_prefix0_elders))
 
 
-
-if ! [[ $total_elders -eq 14 ]]
+# 14 elders or more (we're not discounting demotions here...)
+if ! [[ $total_elders -gt 13 ]]
     then
         echo "No split, retry or perhaps change NODE_COUNT!"
         exit 100
