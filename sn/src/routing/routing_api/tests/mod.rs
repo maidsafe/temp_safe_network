@@ -567,7 +567,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         let expected_dkg_start_recipients: Vec<_> = expected_new_elders
             .iter()
             .filter(|peer| peer.name() != node_name)
-            .map(|peer| (peer.name(), peer.addr()))
+            .copied()
             .collect();
         assert_eq!(recipients, expected_dkg_start_recipients);
 
@@ -623,7 +623,7 @@ async fn handle_online_command(
                 } = *response
                 {
                     assert_eq!(section_signed_sap.value, *section_auth);
-                    assert_eq!(recipients, [(peer.name(), peer.addr())]);
+                    assert_eq!(recipients, [*peer]);
                     status.node_approval_sent = true;
                 }
             }
@@ -635,7 +635,7 @@ async fn handle_online_command(
                     continue;
                 }
 
-                assert_eq!(recipients, [(peer.name(), peer.addr())]);
+                assert_eq!(recipients, [*peer]);
 
                 status.relocate_details = Some(details.clone());
             }
@@ -859,9 +859,8 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         itertools::assert_equal(actual_elder_candidates.peers(), expected_new_elders.clone());
 
         let expected_dkg_start_recipients: Vec<_> = expected_new_elders
-            .iter()
+            .into_iter()
             .filter(|peer| peer.name() != node_name)
-            .map(|peer| (peer.name(), peer.addr()))
             .collect();
 
         assert_eq!(recipients, expected_dkg_start_recipients);
@@ -1162,7 +1161,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
         if recipients
             .into_iter()
-            .map(|recp| recp.1)
+            .map(|recp| recp.addr())
             .collect::<Vec<_>>()
             != [relocated_peer.addr()]
         {
@@ -1258,7 +1257,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let commands = dispatcher
         .handle_command(
             Command::SendMessage {
-                recipients: vec![(node.name(), node.addr)],
+                recipients: vec![node.peer()],
                 wire_msg,
             },
             "cmd-id",
@@ -1399,10 +1398,9 @@ async fn handle_elders_update() -> Result<()> {
 
     let update_expected_recipients: HashSet<_> = other_elder_peers
         .into_iter()
-        .map(|peer| (peer.name(), peer.addr()))
-        .chain(iter::once((promoted_peer.name(), promoted_peer.addr())))
-        .chain(iter::once((demoted_peer.name(), demoted_peer.addr())))
-        .chain(iter::once((adult_peer.name(), adult_peer.addr())))
+        .chain(iter::once(promoted_peer))
+        .chain(iter::once(demoted_peer))
+        .chain(iter::once(adult_peer))
         .collect();
 
     assert_eq!(update_actual_recipients, update_expected_recipients);
@@ -1529,8 +1527,8 @@ async fn handle_demote_during_split() -> Result<()> {
                 ..
             })
         ) {
-            for (name, socket) in recipients {
-                let _old = update_recipients.insert(name, socket);
+            for recipient in recipients {
+                let _old = update_recipients.insert(recipient.name(), recipient.addr());
             }
         }
     }

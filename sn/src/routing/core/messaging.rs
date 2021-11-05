@@ -21,15 +21,13 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidatesUtils, NetworkKnowledge, SectionKeyShare},
+    network_knowledge::{ElderCandidatesUtils, NetworkKnowledge, NodeStateUtils, SectionKeyShare},
     relocation::RelocateState,
     routing_api::command::Command,
     Peer, SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-//use secured_linked_list::SecuredLinkedList;
-use std::net::SocketAddr;
 use xor_name::XorName;
 
 impl Core {
@@ -153,15 +151,12 @@ impl Core {
         &self,
         node_state: SectionAuth<NodeState>,
     ) -> Result<Command> {
+        let peer = node_state.to_peer();
         info!(
-            "Our section with {:?} has approved peer {} at {}.",
+            "Our section with {:?} has approved peer {}.",
             self.network_knowledge.prefix().await,
-            node_state.name,
-            node_state.addr,
+            peer,
         );
-
-        let addr = node_state.addr;
-        let name = node_state.name;
 
         let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
             genesis_key: *self.network_knowledge.genesis_key(),
@@ -177,7 +172,7 @@ impl Core {
         let dst_section_pk = self.network_knowledge.section_key().await;
         trace!("{}", LogMarker::SendNodeApproval);
         let cmd = self
-            .send_direct_message((name, addr), node_msg, dst_section_pk)
+            .send_direct_message(peer, node_msg, dst_section_pk)
             .await?;
 
         Ok(cmd)
@@ -191,9 +186,8 @@ impl Core {
         let nodes: Vec<_> = section
             .active_members()
             .await
-            .iter()
+            .into_iter()
             .filter(|peer| peer.name() != our_name)
-            .map(|peer| (peer.name(), peer.addr()))
             .collect();
 
         // the PK is that of our section (as we know it; and we're ahead of our adults here)
@@ -227,9 +221,8 @@ impl Core {
         {
             let promoted_sibling_elders: Vec<_> = sibling_sec_auth
                 .peers()
-                .iter()
+                .into_iter()
                 .filter(|peer| !old.elders.contains(&peer.name()))
-                .map(|peer| (peer.name(), peer.addr()))
                 .collect();
 
             // Using previous_key as dst_section_key as newly promoted sibling elders shall still
@@ -277,13 +270,7 @@ impl Core {
     }
 
     pub(crate) async fn send_ae_update_to_adults(&self) -> Result<Vec<Command>> {
-        let adults: Vec<_> = self
-            .network_knowledge
-            .live_adults()
-            .await
-            .iter()
-            .map(|peer| (peer.name(), peer.addr()))
-            .collect();
+        let adults = self.network_knowledge.live_adults().await;
 
         let dst_section_pk = self.network_knowledge().section_key().await;
         let node_msg = self.generate_ae_update(dst_section_pk, true).await?;
@@ -430,12 +417,12 @@ impl Core {
             if recipient.name() == self.node.read().await.name() {
                 handle = true;
             } else {
-                others.push((recipient.name(), recipient.addr()));
+                others.push(recipient);
             }
         }
 
         if !others.is_empty() {
-            let dst_section_pk = self.section_key_by_name(&others[0].0).await;
+            let dst_section_pk = self.section_key_by_name(&others[0].name()).await;
             wire_msg.set_dst_section_pk(dst_section_pk);
 
             trace!("{}", LogMarker::SendOrHandle);
@@ -461,14 +448,14 @@ impl Core {
 
     pub(crate) async fn send_direct_message(
         &self,
-        recipient: (XorName, SocketAddr),
+        recipient: Peer,
         node_msg: SystemMsg,
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
             &self.node.read().await.clone(),
             DstLocation::Section {
-                name: recipient.0,
+                name: recipient.name(),
                 section_pk: dst_section_pk,
             },
             node_msg,
@@ -488,7 +475,7 @@ impl Core {
 
     pub(crate) async fn send_direct_message_to_nodes(
         &self,
-        recipients: Vec<(XorName, SocketAddr)>,
+        recipients: Vec<Peer>,
         node_msg: SystemMsg,
         dst_name: XorName,
         dst_section_pk: BlsPublicKey,
@@ -523,7 +510,7 @@ impl Core {
             .await
             .elders()
             .iter()
-            .map(|(name, address)| (*name, *address))
+            .map(|(name, address)| Peer::new(*name, *address))
             .collect();
 
         let dst_section_pk = self.network_knowledge().section_key().await;

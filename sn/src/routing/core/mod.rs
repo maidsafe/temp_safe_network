@@ -44,7 +44,7 @@ use crate::routing::{
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
+    Elders, Event, NodeElderChange, Peer, SectionAuthorityProviderUtils,
 };
 use crate::types::utils::write_data_to_disk;
 use backoff::ExponentialBackoff;
@@ -172,7 +172,11 @@ impl Core {
         let message = SystemMsg::AntiEntropyProbe(dst);
         let section_key = matching_section.section_key();
         let dst_name = matching_section.prefix().name();
-        let recipients = matching_section.elders.into_iter().collect::<Vec<_>>();
+        let recipients: Vec<_> = matching_section
+            .elders
+            .into_iter()
+            .map(|(name, addr)| Peer::new(name, addr))
+            .collect();
 
         info!(
             "ProbeMessage target {:?} w/key {:?}",

@@ -19,7 +19,7 @@ use crate::routing::{
     network_knowledge::SectionKeyShare,
     node::Node,
     routing_api::command::{next_timer_token, Command},
-    SectionAuthorityProviderUtils,
+    Peer, SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
@@ -28,7 +28,6 @@ use itertools::Itertools;
 use std::{
     collections::{BTreeSet, VecDeque},
     iter, mem,
-    net::SocketAddr,
     time::Duration,
 };
 use xor_name::XorName;
@@ -83,13 +82,13 @@ impl Session {
         Ok(commands)
     }
 
-    fn recipients(&self) -> Vec<(XorName, SocketAddr)> {
+    fn recipients(&self) -> Vec<Peer> {
         self.elder_candidates
             .elders
             .iter()
             .enumerate()
             .filter(|(index, _)| *index != self.participant_index)
-            .map(|(_, (name, addr))| (*name, *addr))
+            .map(|(_, (name, addr))| Peer::new(*name, *addr))
             .collect()
     }
 
@@ -392,7 +391,7 @@ mod tests {
     use eyre::{bail, ContextCompat, Result};
     use proptest::prelude::*;
     use rand::{rngs::SmallRng, SeedableRng};
-    use std::{collections::HashMap, iter};
+    use std::{collections::HashMap, iter, net::SocketAddr};
     use xor_name::Prefix;
 
     #[tokio::test]
@@ -523,7 +522,7 @@ mod tests {
                         assert_eq!(session_id, *expected_dkg_key);
                         Ok(recipients
                             .into_iter()
-                            .map(|addr| (addr.1, message.clone()))
+                            .map(|peer| (peer.addr(), message.clone()))
                             .collect())
                     }
                     other_message => bail!("Unexpected message: {:?}", other_message),

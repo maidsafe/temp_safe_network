@@ -12,7 +12,7 @@ use crate::messaging::{
     signature_aggregator::Error as AggregatorError, system::Proposal, MessageId,
 };
 use crate::routing::{
-    core::ProposalUtils, dkg::SigShare, routing_api::command::Command, Result,
+    core::ProposalUtils, dkg::SigShare, routing_api::command::Command, Peer, Result,
     SectionAuthorityProviderUtils,
 };
 use std::net::SocketAddr;
@@ -75,7 +75,10 @@ impl Core {
         }
 
         let mut commands = vec![];
-        commands.extend(self.check_lagging((src_name, sender), sig_share_pk).await?);
+        commands.extend(
+            self.check_lagging(Peer::new(src_name, sender), sig_share_pk)
+                .await?,
+        );
 
         match proposal.as_signable_bytes() {
             Err(error) => error!(

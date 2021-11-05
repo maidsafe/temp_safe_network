@@ -86,7 +86,7 @@ pub(crate) enum Command {
     HandleDkgFailure(DkgFailureSigSet),
     /// Send a message to the given `recipients`.
     SendMessage {
-        recipients: Vec<(XorName, SocketAddr)>,
+        recipients: Vec<Peer>,
         wire_msg: WireMsg,
     },
     /// Parses WireMsg to send to the correct location
@@ -95,7 +95,7 @@ pub(crate) enum Command {
     PrepareNodeMsgToSend { msg: SystemMsg, dst: DstLocation },
     /// Send a message to `delivery_group_size` peers out of the given `recipients`.
     SendMessageDeliveryGroup {
-        recipients: Vec<(XorName, SocketAddr)>,
+        recipients: Vec<Peer>,
         delivery_group_size: usize,
         wire_msg: WireMsg,
     },

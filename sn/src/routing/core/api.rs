@@ -190,10 +190,7 @@ impl Core {
         wire_msg.set_dst_section_pk(dst_pk);
 
         let command = Command::SendMessageDeliveryGroup {
-            recipients: targets
-                .into_iter()
-                .map(|peer| (peer.name(), peer.addr()))
-                .collect(),
+            recipients: targets.into_iter().collect(),
             delivery_group_size: dg_size,
             wire_msg,
         };

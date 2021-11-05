@@ -23,7 +23,7 @@ use crate::routing::{
     node::Node,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    SectionAuthorityProviderUtils,
+    Peer, SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
@@ -69,9 +69,9 @@ impl JoiningAsRelocated {
     // shall be fed back with `handle_join_response` function.
     pub(crate) fn start(&mut self, bootstrap_addrs: Vec<SocketAddr>) -> Result<Command> {
         let dst_xorname = self.relocate_details.dst;
-        let recipients: Vec<(XorName, SocketAddr)> = bootstrap_addrs
+        let recipients: Vec<_> = bootstrap_addrs
             .iter()
-            .map(|addr| (dst_xorname, *addr))
+            .map(|addr| Peer::new(dst_xorname, *addr))
             .collect();
 
         self.used_recipients.extend(bootstrap_addrs);
@@ -143,10 +143,10 @@ impl JoiningAsRelocated {
                     return Ok(None);
                 }
 
-                let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
+                let new_recipients: Vec<_> = section_auth
                     .elders
                     .iter()
-                    .map(|(name, addr)| (*name, *addr))
+                    .map(|(name, addr)| Peer::new(*name, *addr))
                     .collect();
 
                 // if we are relocating, and we didn't generate
@@ -163,7 +163,7 @@ impl JoiningAsRelocated {
 
                 let cmd = self.build_join_request_cmd(&new_recipients)?;
                 self.used_recipients
-                    .extend(new_recipients.iter().map(|(_, addr)| addr));
+                    .extend(new_recipients.iter().map(|recipient| recipient.addr()));
 
                 Ok(Some(cmd))
             }
@@ -177,11 +177,11 @@ impl JoiningAsRelocated {
                 }
 
                 // Ignore already used recipients
-                let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
+                let new_recipients: Vec<_> = section_auth
                     .elders
                     .iter()
                     .filter(|(_, addr)| !self.used_recipients.contains(addr))
-                    .map(|(name, addr)| (*name, *addr))
+                    .map(|(name, addr)| Peer::new(*name, *addr))
                     .collect();
 
                 if new_recipients.is_empty() {
@@ -208,7 +208,7 @@ impl JoiningAsRelocated {
 
                 let cmd = self.build_join_request_cmd(&new_recipients)?;
                 self.used_recipients
-                    .extend(new_recipients.iter().map(|(_, addr)| addr));
+                    .extend(new_recipients.iter().map(|recipient| recipient.addr()));
 
                 Ok(Some(cmd))
             }
@@ -248,7 +248,7 @@ impl JoiningAsRelocated {
         Ok(())
     }
 
-    fn build_join_request_cmd(&self, recipients: &[(XorName, SocketAddr)]) -> Result<Command> {
+    fn build_join_request_cmd(&self, recipients: &[Peer]) -> Result<Command> {
         let join_request = JoinAsRelocatedRequest {
             section_key: self.dst_section_key,
             relocate_payload: self.relocate_payload.clone(),
