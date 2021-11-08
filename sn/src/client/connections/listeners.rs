@@ -131,10 +131,11 @@ impl Session {
                     section_signed,
                     bounced_msg,
                     proof_chain,
+                    src
                 )
                 .await;
                 if result.is_err() {
-                    warn!("Failed to handle AE-Retry msg");
+                    warn!("Failed to handle AE-Retry msg from {:?}", src);
                 }
                 result
             }
@@ -294,6 +295,7 @@ impl Session {
         section_signed: KeyedSig,
         bounced_msg: Bytes,
         proof_chain: SecuredLinkedList,
+        src: SocketAddr
     ) -> Result<(), Error> {
         // Update our network knowledge making sure proof chain
         // validates the new SAP based on currently known remote section SAP.
@@ -333,8 +335,8 @@ impl Session {
                     err
                 );
                 warn!(
-                    "Anti-Entropy: bounced msg dropped. Failed section auth was {:?}",
-                    section_auth.public_key_set.public_key()
+                    "Anti-Entropy: bounced msg dropped. Failed section auth was {:?} sent by: {:?}",
+                    section_auth.public_key_set.public_key(), src
                 );
                 return Ok(());
             }
