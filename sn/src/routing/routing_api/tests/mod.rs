@@ -898,7 +898,6 @@ enum UntrustedMessageSource {
 
 #[tokio::test(flavor = "multi_thread")]
 // Checking when we get AE info that is ahead of us we should handle it.
-#[ignore = "FIXME: once we have a DAG to manage all sections chains, this test can be re-enabled"]
 async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     // Create first `Section` with a chain of length 2
     let sk0 = bls::SecretKey::random();
@@ -1287,7 +1286,6 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "FIXME: once we have a DAG to manage all sections chains, this test can be re-enabled"]
 async fn handle_elders_update() -> Result<()> {
     crate::init_test_logger();
     let _span = tracing::info_span!("handle_elders_update").entered();
