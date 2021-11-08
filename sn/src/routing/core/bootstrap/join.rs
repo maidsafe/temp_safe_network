@@ -20,7 +20,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    SectionAuthorityProviderUtils,
+    Peer, SectionAuthorityProviderUtils,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -29,7 +29,7 @@ use resource_proof::ResourceProof;
 use std::{collections::HashSet, net::SocketAddr};
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
-use xor_name::{Prefix, XorName};
+use xor_name::Prefix;
 
 /// Join the network as new node.
 ///
@@ -60,7 +60,7 @@ pub(crate) async fn join_network(
 
 struct Join<'a> {
     // Sender for outgoing messages.
-    send_tx: mpsc::Sender<(WireMsg, Vec<(XorName, SocketAddr)>)>,
+    send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
@@ -71,7 +71,7 @@ struct Join<'a> {
 impl<'a> Join<'a> {
     fn new(
         node: Node,
-        send_tx: mpsc::Sender<(WireMsg, Vec<(XorName, SocketAddr)>)>,
+        send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     ) -> Self {
         Self {
@@ -101,7 +101,7 @@ impl<'a> Join<'a> {
     ) -> Result<(Node, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
         let dst_xorname = self.node.name();
-        let recipients = vec![(dst_xorname, bootstrap_addr)];
+        let recipients = vec![Peer::new(dst_xorname, bootstrap_addr)];
 
         self.join(genesis_key, recipients).await
     }
@@ -109,7 +109,7 @@ impl<'a> Join<'a> {
     async fn join(
         mut self,
         network_genesis_key: BlsPublicKey,
-        mut recipients: Vec<(XorName, SocketAddr)>,
+        mut recipients: Vec<Peer>,
     ) -> Result<(Node, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
@@ -132,9 +132,9 @@ impl<'a> Join<'a> {
         let mut used_recipient = HashSet::<SocketAddr>::new();
 
         loop {
-            used_recipient.extend(recipients.iter().map(|(_, addr)| addr));
+            used_recipient.extend(recipients.iter().map(|peer| peer.addr()));
 
-            let (response, sender, src_name) = self.receive_join_response().await?;
+            let (response, sender) = self.receive_join_response().await?;
 
             match response {
                 JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
@@ -178,11 +178,7 @@ impl<'a> Join<'a> {
                     section_auth,
                     expected_age,
                 } => {
-                    let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
-                        .elders
-                        .iter()
-                        .map(|(name, addr)| (*name, *addr))
-                        .collect();
+                    let new_recipients = section_auth.peers();
 
                     let prefix = section_auth.prefix;
 
@@ -244,11 +240,10 @@ impl<'a> Join<'a> {
                     }
 
                     // Ignore already used recipients
-                    let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
-                        .elders
-                        .iter()
-                        .filter(|(_, addr)| !used_recipient.contains(addr))
-                        .map(|(name, addr)| (*name, *addr))
+                    let new_recipients: Vec<_> = section_auth
+                        .peers()
+                        .into_iter()
+                        .filter(|peer| !used_recipient.contains(&peer.addr()))
                         .collect();
 
                     if new_recipients.is_empty() {
@@ -308,7 +303,7 @@ impl<'a> Join<'a> {
                             nonce_signature,
                         }),
                     };
-                    let recipients = &[(src_name, sender)];
+                    let recipients = &[sender];
                     self.send_join_requests(join_request, recipients, section_key, false)
                         .await?;
                 }
@@ -319,7 +314,7 @@ impl<'a> Join<'a> {
     async fn send_join_requests(
         &mut self,
         join_request: JoinRequest,
-        recipients: &[(XorName, SocketAddr)],
+        recipients: &[Peer],
         section_key: BlsPublicKey,
         should_backoff: bool,
     ) -> Result<()> {
@@ -357,17 +352,17 @@ impl<'a> Join<'a> {
 
     // TODO: receive JoinResponse from the JoinResponse handler directly,
     // analogous to the JoinAsRelocated flow.
-    async fn receive_join_response(&mut self) -> Result<(JoinResponse, SocketAddr, XorName)> {
+    async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
         while let Some(event) = self.recv_rx.recv().await {
             // we are interested only in `JoinResponse` type of messages
-            let (join_response, sender, src_name) = match event {
-                ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
+            let (join_response, sender) = match event {
+                ConnectionEvent::Received((sender_addr, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) => continue,
                         MsgKind::NodeBlsShareAuthMsg(_) => {
                             trace!(
                                 "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
-                                sender,
+                                sender_addr,
                                 wire_msg
                             );
                             continue;
@@ -377,14 +372,17 @@ impl<'a> Join<'a> {
                                 msg: SystemMsg::JoinResponse(resp),
                                 msg_authority,
                                 ..
-                            }) => (*resp, sender, msg_authority.src_location().name()),
+                            }) => (
+                                *resp,
+                                Peer::new(msg_authority.src_location().name(), sender_addr),
+                            ),
                             Ok(
                                 MessageType::Service { msg_id, .. }
                                 | MessageType::System { msg_id, .. },
                             ) => {
                                 trace!(
                                     "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
-                                    sender,
+                                    sender_addr,
                                     msg_id
                                 );
                                 continue;
@@ -406,7 +404,7 @@ impl<'a> Join<'a> {
                 JoinResponse::ResourceChallenge { .. }
                 | JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(_))
                 | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
-                    return Ok((join_response, sender, src_name));
+                    return Ok((join_response, sender));
                 }
                 JoinResponse::Retry {
                     ref section_auth, ..
@@ -421,7 +419,7 @@ impl<'a> Join<'a> {
                     }
                     trace!("Received a redirect/retry JoinResponse. Sending request to the latest contacts");
 
-                    return Ok((join_response, sender, src_name));
+                    return Ok((join_response, sender));
                 }
                 JoinResponse::Approval {
                     ref section_auth,
@@ -452,7 +450,7 @@ impl<'a> Join<'a> {
                         section_auth.prefix,
                     );
 
-                    return Ok((join_response, sender, src_name));
+                    return Ok((join_response, sender));
                 }
             }
         }
@@ -464,10 +462,7 @@ impl<'a> Join<'a> {
 }
 
 // Keep reading messages from `rx` and send them using `comm`.
-async fn send_messages(
-    mut rx: mpsc::Receiver<(WireMsg, Vec<(XorName, SocketAddr)>)>,
-    comm: &Comm,
-) -> Result<()> {
+async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm) -> Result<()> {
     while let Some((wire_msg, recipients)) = rx.recv().await {
         match comm
             .send(&recipients, recipients.len(), wire_msg.clone())
@@ -507,6 +502,7 @@ mod tests {
     use secured_linked_list::SecuredLinkedList;
     use std::collections::BTreeMap;
     use tokio::task;
+    use xor_name::XorName;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn join_as_adult() -> Result<()> {
@@ -542,8 +538,10 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
-            let bootstrap_addrs: Vec<SocketAddr> =
-                recipients.iter().map(|(_name, addr)| *addr).collect();
+            let bootstrap_addrs: Vec<SocketAddr> = recipients
+                .iter()
+                .map(|recipient| recipient.addr())
+                .collect();
             assert_eq!(bootstrap_addrs, [bootstrap_addr]);
 
             let node_msg = assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
@@ -573,14 +571,7 @@ mod tests {
                 (msg, dst_location));
 
             assert_eq!(dst_location.section_pk(), Some(pk));
-            itertools::assert_equal(
-                recipients,
-                section_auth
-                    .elders()
-                    .iter()
-                    .map(|(name, addr)| (*name, *addr))
-                    .collect::<Vec<_>>(),
-            );
+            itertools::assert_equal(recipients, section_auth.peers());
             assert_matches!(node_msg, SystemMsg::JoinRequest(request) => {
                 assert_eq!(request.section_key, pk);
             });
@@ -640,7 +631,7 @@ mod tests {
             assert_eq!(
                 recipients
                     .into_iter()
-                    .map(|peer| peer.1)
+                    .map(|peer| peer.addr())
                     .collect::<Vec<_>>(),
                 vec![bootstrap_node.addr]
             );
@@ -680,7 +671,7 @@ mod tests {
             assert_eq!(
                 recipients
                     .into_iter()
-                    .map(|peer| peer.1)
+                    .map(|peer| peer.addr())
                     .collect::<Vec<_>>(),
                 new_bootstrap_addrs
                     .iter()
@@ -872,7 +863,7 @@ mod tests {
 
         let section_key = bls::SecretKey::random().public_key();
         let elders = (0..ELDER_SIZE)
-            .map(|_| (good_prefix.substituted_in(rand::random()), gen_addr()))
+            .map(|_| Peer::new(good_prefix.substituted_in(rand::random()), gen_addr()))
             .collect();
         let join_task = state.join(section_key, elders);
 

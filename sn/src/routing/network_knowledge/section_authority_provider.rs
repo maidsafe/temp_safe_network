@@ -9,10 +9,7 @@
 use crate::messaging::{system::ElderCandidates, SectionAuthorityProvider};
 use crate::routing::{Peer, Prefix, XorName};
 use bls::{PublicKey, PublicKeySet};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-};
+use std::{collections::BTreeSet, net::SocketAddr};
 
 /// The information about elder candidates in a DKG round.
 pub(crate) trait ElderCandidatesUtils {
@@ -88,9 +85,6 @@ pub trait SectionAuthorityProviderUtils {
     /// Returns the set of elder names.
     fn names(&self) -> BTreeSet<XorName>;
 
-    /// Returns a map of name to socket_addr.
-    fn elders(&self) -> BTreeMap<XorName, SocketAddr>;
-
     /// Returns the list of socket addresses.
     fn addresses(&self) -> Vec<SocketAddr>;
 
@@ -124,22 +118,17 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
         elder_candidates: ElderCandidates,
         pk_set: PublicKeySet,
     ) -> SectionAuthorityProvider {
-        let elders = elder_candidates
-            .elders
-            .iter()
-            .map(|(name, addr)| (*name, *addr))
-            .collect();
         SectionAuthorityProvider {
             prefix: elder_candidates.prefix,
             public_key_set: pk_set,
-            elders,
+            elders: elder_candidates.elders,
         }
     }
 
     /// Returns `ElderCandidates`, which doesn't have key related infos.
     fn elder_candidates(&self) -> ElderCandidates {
         ElderCandidates {
-            elders: self.elders(),
+            elders: self.elders.clone(),
             prefix: self.prefix,
         }
     }
@@ -169,14 +158,6 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     /// Returns the set of elder names.
     fn names(&self) -> BTreeSet<XorName> {
         self.elders.keys().copied().collect()
-    }
-
-    /// Returns a map of name to socket_addr.
-    fn elders(&self) -> BTreeMap<XorName, SocketAddr> {
-        self.elders
-            .iter()
-            .map(|(name, addr)| (*name, *addr))
-            .collect()
     }
 
     fn addresses(&self) -> Vec<SocketAddr> {
@@ -240,11 +221,7 @@ pub(crate) mod test_utils {
         count: usize,
     ) -> (SectionAuthorityProvider, Vec<Node>, SecretKeySet) {
         let nodes = gen_sorted_nodes(&prefix, count, false);
-        let elders = nodes
-            .iter()
-            .map(Node::peer)
-            .map(|peer| (peer.name(), peer.addr()))
-            .collect();
+        let elders = nodes.iter().map(|node| (node.name(), node.addr)).collect();
 
         let secret_key_set = SecretKeySet::random();
         let section_auth = SectionAuthorityProvider::from_elder_candidates(

@@ -44,7 +44,7 @@ use crate::routing::{
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    Elders, Event, NodeElderChange, SectionAuthorityProviderUtils,
+    Elders, Event, NodeElderChange, Peer, SectionAuthorityProviderUtils,
 };
 use crate::types::utils::write_data_to_disk;
 use backoff::ExponentialBackoff;
@@ -54,7 +54,6 @@ use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
 };
@@ -70,7 +69,7 @@ pub(crate) const CONCURRENT_JOINS: usize = 5;
 
 // store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
-    Arc<RwLock<LRUCache<(XorName, SocketAddr, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
+    Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
 
 // State + logic of a routing node.
 pub(crate) struct Core {
@@ -172,7 +171,7 @@ impl Core {
         let message = SystemMsg::AntiEntropyProbe(dst);
         let section_key = matching_section.section_key();
         let dst_name = matching_section.prefix().name();
-        let recipients = matching_section.elders.into_iter().collect::<Vec<_>>();
+        let recipients = matching_section.peers();
 
         info!(
             "ProbeMessage target {:?} w/key {:?}",

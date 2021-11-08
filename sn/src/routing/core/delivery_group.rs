@@ -632,10 +632,9 @@ mod tests {
 
     fn choose_elder_name(section_auth: &SectionAuthorityProvider) -> Result<XorName> {
         section_auth
-            .elders()
-            .keys()
+            .names()
+            .into_iter()
             .choose(&mut rand::thread_rng())
-            .copied()
             .context("no elders")
     }
 }

@@ -32,7 +32,9 @@ pub(crate) enum Command {
     /// Handle `message` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     HandleMessage {
-        sender: SocketAddr,
+        // This is the only command that uses `SocketAddr` instead of `Peer`, because we haven't
+        // deserialized/verified the src at this stage.
+        sender_addr: SocketAddr,
         wire_msg: WireMsg,
         #[debug(skip)]
         // original bytes to avoid reserializing for entropy checks
@@ -41,7 +43,7 @@ pub(crate) enum Command {
     // TODO: rename this as/when this is all node for clarity
     /// Handle Node, either directly or notify via event listener
     HandleSystemMessage {
-        sender: SocketAddr,
+        sender: Peer,
         msg_id: MessageId,
         msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
@@ -53,7 +55,7 @@ pub(crate) enum Command {
     },
     /// Handle verified node message after aggregation either directly or notify via event listener
     HandleBlockingMessage {
-        sender: SocketAddr,
+        sender: Peer,
         msg_id: MessageId,
         msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
@@ -64,14 +66,14 @@ pub(crate) enum Command {
         msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
-        sender: SocketAddr,
+        sender: Peer,
         #[debug(skip)]
         known_keys: Vec<BlsPublicKey>,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
     /// Handle peer that's been detected as lost.
-    HandlePeerLost(SocketAddr),
+    HandlePeerLost(Peer),
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle agree on elders. This blocks node message processing until complete.
@@ -86,7 +88,7 @@ pub(crate) enum Command {
     HandleDkgFailure(DkgFailureSigSet),
     /// Send a message to the given `recipients`.
     SendMessage {
-        recipients: Vec<(XorName, SocketAddr)>,
+        recipients: Vec<Peer>,
         wire_msg: WireMsg,
     },
     /// Parses WireMsg to send to the correct location
@@ -95,7 +97,7 @@ pub(crate) enum Command {
     PrepareNodeMsgToSend { msg: SystemMsg, dst: DstLocation },
     /// Send a message to `delivery_group_size` peers out of the given `recipients`.
     SendMessageDeliveryGroup {
-        recipients: Vec<(XorName, SocketAddr)>,
+        recipients: Vec<Peer>,
         delivery_group_size: usize,
         wire_msg: WireMsg,
     },

@@ -449,11 +449,11 @@ async fn handle_connection_events(
 ) {
     while let Some(event) = incoming_conns.recv().await {
         match event {
-            ConnectionEvent::Received((sender, bytes)) => {
+            ConnectionEvent::Received((sender_addr, bytes)) => {
                 trace!(
                     "New message ({} bytes) received from: {}",
                     bytes.len(),
-                    sender
+                    sender_addr
                 );
 
                 // bytes.clone is cheap
@@ -467,19 +467,19 @@ async fn handle_connection_events(
 
                 let span = {
                     let core = &dispatcher.core;
-                    trace_span!("handle_message", name = %core.node.read().await.name(), %sender, msg_id = ?wire_msg.msg_id())
+                    trace_span!("handle_message", name = %core.node.read().await.name(), %sender_addr, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
                 let len = bytes.len();
                 let command = Command::HandleMessage {
-                    sender,
+                    sender_addr,
                     wire_msg,
                     original_bytes: Some(bytes),
                 };
                 trace!(
                     "{:?} from {} length {}",
                     LogMarker::DispatchHandleMsgCmd,
-                    sender,
+                    sender_addr,
                     len,
                 );
 

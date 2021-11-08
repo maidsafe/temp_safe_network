@@ -11,6 +11,7 @@ use crate::messaging::{system::LoadReport, WireMsg};
 use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
+    Peer,
 };
 use bytes::Bytes;
 use futures::{
@@ -136,19 +137,22 @@ impl Comm {
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
     pub(crate) async fn send_on_existing_connection(
         &self,
-        recipients: &[(XorName, SocketAddr)],
+        recipients: &[Peer],
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
         trace!("Sending msg on existing connection to {:?}", recipients);
-        for (name, addr) in recipients {
-            wire_msg.set_dst_xorname(*name);
+        for recipient in recipients {
+            let name = recipient.name();
+            let addr = recipient.addr();
+
+            wire_msg.set_dst_xorname(name);
 
             let bytes = wire_msg.serialize()?;
             let priority = wire_msg.msg_kind().priority();
-            let retries = self.back_pressure.get(addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
+            let retries = self.back_pressure.get(&addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
             self.connected_peers
-                .get_by_address(addr)
+                .get_by_address(&addr)
                 .map(|res| res.ok_or(None))
                 .and_then(|client| async move {
                     client
@@ -166,11 +170,11 @@ impl Comm {
                         name,
                         err
                     );
-                    Error::FailedSend(*addr, *name)
+                    Error::FailedSend(addr, name)
                 })?;
 
             // count outgoing msgs..
-            self.msg_count.increase_outgoing(*addr);
+            self.msg_count.increase_outgoing(addr);
         }
 
         Ok(())
@@ -209,9 +213,12 @@ impl Comm {
     /// `SendStatus::MinDeliveryGroupSizeReached` or `SendStatus::MinDeliveryGroupSizeFailed` depending
     /// on if the minimum delivery group size is met or not. The failed recipients are sent along
     /// with the status. It returns a `SendStatus::AllRecipients` if message is sent to all the recipients.
-    pub(crate) async fn send(
+    #[allow(clippy::needless_lifetimes)] // this is firing a false positive here
+                                         // we need an explicit lifetime for the compiler to see
+                                         // that `recipient` lives long enough in the closure
+    pub(crate) async fn send<'r>(
         &self,
-        recipients: &[(XorName, SocketAddr)],
+        recipients: &'r [Peer],
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<SendStatus> {
@@ -243,35 +250,36 @@ impl Comm {
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
         // succeeds or if there are no more recipients to pick.
-        let send = |recipient: (XorName, SocketAddr), msg_bytes: Bytes| async move {
+        let send = |recipient: &'r Peer, msg_bytes: Bytes| async move {
             trace!(
                 "Sending message ({} bytes, msg_id: {:?}) to {} of delivery group size {}",
                 msg_bytes.len(),
                 msg_id,
-                recipient.1,
+                recipient,
                 delivery_group_size,
             );
 
-            let retries = self.back_pressure.get(&recipient.1).await; // TODO: more laid back retries with lower priority, more aggressive with higher
+            let retries = self.back_pressure.get(&recipient.addr()).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-            let connection =
-                if let Some(connection) = self.connected_peers.get_by_address(&recipient.1).await {
-                    Ok(connection.connection().clone())
-                } else {
-                    self.endpoint.connect_to(&recipient.1).await.map(
-                        |(connection, connection_incoming)| {
-                            let _ = task::spawn(handle_incoming_messages(
-                                connection.id(),
-                                connection.remote_address(),
-                                connection_incoming,
-                                self.event_tx.clone(),
-                                self.msg_count.clone(),
-                                self.connected_peers.clone(),
-                            ));
-                            connection
-                        },
-                    )
-                };
+            let connection = if let Some(connection) =
+                self.connected_peers.get_by_address(&recipient.addr()).await
+            {
+                Ok(connection.connection().clone())
+            } else {
+                self.endpoint.connect_to(&recipient.addr()).await.map(
+                    |(connection, connection_incoming)| {
+                        let _ = task::spawn(handle_incoming_messages(
+                            connection.id(),
+                            connection.remote_address(),
+                            connection_incoming,
+                            self.event_tx.clone(),
+                            self.msg_count.clone(),
+                            self.connected_peers.clone(),
+                        ));
+                        connection
+                    },
+                )
+            };
 
             let result = future::ready(connection)
                 .err_into()
@@ -291,24 +299,24 @@ impl Comm {
                     }
                 });
 
-            (result, recipient.1)
+            (result, recipient)
         };
 
         let mut tasks: FuturesUnordered<_> = recipients[0..delivery_group_size]
             .iter()
-            .map(|(name, recipient)| send((*name, *recipient), msg_bytes.clone()))
+            .map(|recipient| send(recipient, msg_bytes.clone()))
             .collect();
 
         let mut next = delivery_group_size;
         let mut successes = 0;
         let mut failed_recipients = vec![];
 
-        while let Some((result, addr)) = tasks.next().await {
+        while let Some((result, recipient)) = tasks.next().await {
             match result {
                 Ok(()) => {
                     successes += 1;
                     // count outgoing msgs..
-                    self.msg_count.increase_outgoing(addr);
+                    self.msg_count.increase_outgoing(recipient.addr());
                 }
                 Err(Error::ConnectionClosed) => {
                     // The connection was closed by us which means
@@ -316,10 +324,10 @@ impl Comm {
                     return Err(Error::ConnectionClosed);
                 }
                 Err(_) => {
-                    failed_recipients.push(addr);
+                    failed_recipients.push(*recipient);
 
                     if next < recipients.len() {
-                        tasks.push(send(recipients[next], msg_bytes.clone()));
+                        tasks.push(send(&recipients[next], msg_bytes.clone()));
                         next += 1;
                     }
                 }
@@ -435,8 +443,8 @@ async fn handle_incoming_messages(
 #[derive(Debug, Clone)]
 pub(crate) enum SendStatus {
     AllRecipients,
-    MinDeliveryGroupSizeReached(Vec<SocketAddr>),
-    MinDeliveryGroupSizeFailed(Vec<SocketAddr>),
+    MinDeliveryGroupSizeReached(Vec<Peer>),
+    MinDeliveryGroupSizeFailed(Vec<Peer>),
 }
 
 #[cfg(test)]
@@ -444,6 +452,7 @@ mod tests {
     use super::*;
     use crate::messaging::data::{DataQuery, ServiceMsg};
     use crate::messaging::{DstLocation, MessageId, MsgKind, ServiceAuth};
+    use crate::routing::Peer;
     use crate::types::{ChunkAddress, Keypair};
     use assert_matches::assert_matches;
     use eyre::Result;
@@ -460,26 +469,22 @@ mod tests {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::new(local_addr(), Config::default(), tx).await?;
 
-        let mut peer0 = Peer::new().await?;
-        let mut peer1 = Peer::new().await?;
+        let (peer0, mut rx0) = new_peer().await?;
+        let (peer1, mut rx1) = new_peer().await?;
 
         let original_message = new_test_message()?;
 
         let status = comm
-            .send(
-                &[(peer0.name, peer0.addr), (peer1.name, peer1.addr)],
-                2,
-                original_message.clone(),
-            )
+            .send(&[peer0, peer1], 2, original_message.clone())
             .await?;
 
         assert_matches!(status, SendStatus::AllRecipients);
 
-        if let Some(bytes) = peer0.rx.recv().await {
+        if let Some(bytes) = rx0.recv().await {
             assert_eq!(WireMsg::from(bytes)?, original_message.clone());
         }
 
-        if let Some(bytes) = peer1.rx.recv().await {
+        if let Some(bytes) = rx1.recv().await {
             assert_eq!(WireMsg::from(bytes)?, original_message);
         }
 
@@ -491,25 +496,21 @@ mod tests {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::new(local_addr(), Config::default(), tx).await?;
 
-        let mut peer0 = Peer::new().await?;
-        let mut peer1 = Peer::new().await?;
+        let (peer0, mut rx0) = new_peer().await?;
+        let (peer1, mut rx1) = new_peer().await?;
 
         let original_message = new_test_message()?;
         let status = comm
-            .send(
-                &[(peer0.name, peer0.addr), (peer1.name, peer1.addr)],
-                1,
-                original_message.clone(),
-            )
+            .send(&[peer0, peer1], 1, original_message.clone())
             .await?;
 
         assert_matches!(status, SendStatus::AllRecipients);
 
-        if let Some(bytes) = peer0.rx.recv().await {
+        if let Some(bytes) = rx0.recv().await {
             assert_eq!(WireMsg::from(bytes)?, original_message);
         }
 
-        assert!(time::timeout(TIMEOUT, peer1.rx.recv())
+        assert!(time::timeout(TIMEOUT, rx1.recv())
             .await
             .unwrap_or_default()
             .is_none());
@@ -530,15 +531,13 @@ mod tests {
             tx,
         )
         .await?;
-        let invalid_addr = get_invalid_addr().await?;
+        let invalid_peer = get_invalid_peer().await?;
 
-        let status = comm
-            .send(&[(XorName::random(), invalid_addr)], 1, new_test_message()?)
-            .await?;
+        let status = comm.send(&[invalid_peer], 1, new_test_message()?).await?;
 
         assert_matches!(
             &status,
-            &SendStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_addr]
+            &SendStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_peer.addr()]
         );
 
         Ok(())
@@ -556,23 +555,16 @@ mod tests {
             tx,
         )
         .await?;
-        let mut peer = Peer::new().await?;
-        let invalid_addr = get_invalid_addr().await?;
-        let name = XorName::random();
+        let (peer, mut rx) = new_peer().await?;
+        let invalid_peer = get_invalid_peer().await?;
 
         let message = new_test_message()?;
-        let status = comm
-            .send(
-                &[(name, invalid_addr), (peer.name, peer.addr)],
-                1,
-                message.clone(),
-            )
-            .await?;
+        let status = comm.send(&[invalid_peer, peer], 1, message.clone()).await?;
         assert_matches!(status, SendStatus::MinDeliveryGroupSizeReached(failed_recipients) => {
-            assert_eq!(&failed_recipients, &[invalid_addr])
+            assert_eq!(&failed_recipients, &[invalid_peer])
         });
 
-        if let Some(bytes) = peer.rx.recv().await {
+        if let Some(bytes) = rx.recv().await {
             assert_eq!(WireMsg::from(bytes)?, message);
         }
         Ok(())
@@ -590,25 +582,18 @@ mod tests {
             tx,
         )
         .await?;
-        let mut peer = Peer::new().await?;
-        let invalid_addr = get_invalid_addr().await?;
-        let name = XorName::random();
+        let (peer, mut rx) = new_peer().await?;
+        let invalid_peer = get_invalid_peer().await?;
 
         let message = new_test_message()?;
-        let status = comm
-            .send(
-                &[(name, invalid_addr), (peer.name, peer.addr)],
-                2,
-                message.clone(),
-            )
-            .await?;
+        let status = comm.send(&[invalid_peer, peer], 2, message.clone()).await?;
 
         assert_matches!(
             status,
-            SendStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_addr]
+            SendStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_peer]
         );
 
-        if let Some(bytes) = peer.rx.recv().await {
+        if let Some(bytes) = rx.recv().await {
             assert_eq!(WireMsg::from(bytes)?, message);
         }
         Ok(())
@@ -626,7 +611,7 @@ mod tests {
 
         let msg0 = new_test_message()?;
         let status = send_comm
-            .send(&[(name, recv_addr)], 1, msg0.clone())
+            .send(&[Peer::new(name, recv_addr)], 1, msg0.clone())
             .await?;
         assert_matches!(status, SendStatus::AllRecipients);
 
@@ -647,7 +632,7 @@ mod tests {
 
         let msg1 = new_test_message()?;
         let status = send_comm
-            .send(&[(name, recv_addr)], 1, msg1.clone())
+            .send(&[Peer::new(name, recv_addr)], 1, msg1.clone())
             .await?;
         assert_matches!(status, SendStatus::AllRecipients);
 
@@ -676,7 +661,11 @@ mod tests {
 
         // Send a message to establish the connection
         let status = comm1
-            .send(&[(XorName::random(), addr0)], 1, new_test_message()?)
+            .send(
+                &[Peer::new(XorName::random(), addr0)],
+                1,
+                new_test_message()?,
+            )
             .await?;
         assert_matches!(status, SendStatus::AllRecipients);
 
@@ -701,7 +690,11 @@ mod tests {
 
         // Establish a connection by sending a message
         let status = client_comm
-            .send(&[(XorName::random(), node_addr)], 1, new_test_message()?)
+            .send(
+                &[Peer::new(XorName::random(), node_addr)],
+                1,
+                new_test_message()?,
+            )
             .await?;
         assert_matches!(status, SendStatus::AllRecipients);
 
@@ -717,7 +710,10 @@ mod tests {
 
         // We can reply to the client over the existing connection
         node_comm
-            .send_on_existing_connection(&[(XorName::random(), client_addr)], new_test_message()?)
+            .send_on_existing_connection(
+                &[Peer::new(XorName::random(), client_addr)],
+                new_test_message()?,
+            )
             .await?;
 
         assert_matches!(client_rx.recv().await, Some(ConnectionEvent::Received(_)));
@@ -752,37 +748,25 @@ mod tests {
         Ok(wire_msg)
     }
 
-    struct Peer {
-        addr: SocketAddr,
-        name: XorName,
-        rx: mpsc::Receiver<Bytes>,
-    }
+    async fn new_peer() -> Result<(Peer, mpsc::Receiver<Bytes>)> {
+        let (endpoint, mut incoming_connections, _) =
+            Endpoint::new(local_addr(), &[], Config::default()).await?;
+        let addr = endpoint.public_addr();
 
-    impl Peer {
-        async fn new() -> Result<Self> {
-            let (endpoint, mut incoming_connections, _) =
-                Endpoint::new(local_addr(), &[], Config::default()).await?;
-            let addr = endpoint.public_addr();
+        let (tx, rx) = mpsc::channel(1);
 
-            let (tx, rx) = mpsc::channel(1);
-
-            let _handle = tokio::spawn(async move {
-                while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
-                    while let Ok(Some(msg)) = incoming_messages.next().await {
-                        let _ = tx.send(msg).await;
-                    }
+        let _handle = tokio::spawn(async move {
+            while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
+                while let Ok(Some(msg)) = incoming_messages.next().await {
+                    let _ = tx.send(msg).await;
                 }
-            });
+            }
+        });
 
-            Ok(Self {
-                addr,
-                rx,
-                name: XorName::random(),
-            })
-        }
+        Ok((Peer::new(XorName::random(), addr), rx))
     }
 
-    async fn get_invalid_addr() -> Result<SocketAddr> {
+    async fn get_invalid_peer() -> Result<Peer> {
         let socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).await?;
         let addr = socket.local_addr()?;
 
@@ -793,7 +777,7 @@ mod tests {
             let _ = socket;
         });
 
-        Ok(addr)
+        Ok(Peer::new(XorName::random(), addr))
     }
 
     fn local_addr() -> SocketAddr {

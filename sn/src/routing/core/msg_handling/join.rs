@@ -84,7 +84,7 @@ impl Core {
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
                 self.send_direct_message(
-                    (peer.name(), peer.addr()),
+                    peer,
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -133,7 +133,7 @@ impl Core {
             trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
             return Ok(vec![
                 self.send_direct_message(
-                    (peer.name(), peer.addr()),
+                    peer,
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -156,7 +156,7 @@ impl Core {
 
             return Ok(vec![
                 self.send_direct_message(
-                    (peer.name(), peer.addr()),
+                    peer,
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -186,12 +186,8 @@ impl Core {
                 trace!("{}", LogMarker::SendJoinRejected);
 
                 trace!("Sending {:?} to {}", node_msg, peer);
-                self.send_direct_message(
-                    (peer.name(), peer.addr()),
-                    node_msg,
-                    self.network_knowledge.section_key().await,
-                )
-                .await?
+                self.send_direct_message(peer, node_msg, self.network_knowledge.section_key().await)
+                    .await?
             } else {
                 // It's reachable, let's then send the proof challenge
                 self.send_resource_proof_challenge(&peer).await?
@@ -232,7 +228,7 @@ impl Core {
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
                 self.send_direct_message(
-                    (peer.name(), peer.addr()),
+                    peer,
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )
@@ -258,7 +254,7 @@ impl Core {
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
                 self.send_direct_message(
-                    (peer.name(), peer.addr()),
+                    peer,
                     node_msg,
                     self.network_knowledge.section_key().await,
                 )

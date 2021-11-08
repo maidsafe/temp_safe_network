@@ -12,11 +12,9 @@ use crate::messaging::{
     signature_aggregator::Error as AggregatorError, system::Proposal, MessageId,
 };
 use crate::routing::{
-    core::ProposalUtils, dkg::SigShare, routing_api::command::Command, Result,
+    core::ProposalUtils, dkg::SigShare, routing_api::command::Command, Peer, Result,
     SectionAuthorityProviderUtils,
 };
-use std::net::SocketAddr;
-use xor_name::XorName;
 
 // Decisions
 impl Core {
@@ -26,8 +24,7 @@ impl Core {
         msg_id: MessageId,
         proposal: Proposal,
         sig_share: SigShare,
-        src_name: XorName,
-        sender: SocketAddr,
+        sender: Peer,
     ) -> Result<Vec<Command>> {
         let sig_share_pk = &sig_share.public_key_set.public_key();
 
@@ -42,7 +39,7 @@ impl Core {
                 // it's signed by the new key created by the DKG so we don't
                 // know it yet. We only require the src_name of the
                 // proposal to be one of the DKG participants.
-                if !section_auth.contains_elder(&src_name) {
+                if !section_auth.contains_elder(&sender.name()) {
                     trace!(
                         "Ignoring proposal from src not being a DKG participant: {:?}",
                         proposal
@@ -53,11 +50,16 @@ impl Core {
         } else {
             // Proposal from other section shall be ignored.
             // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
-            if !self.network_knowledge.prefix().await.matches(&src_name) {
+            if !self
+                .network_knowledge
+                .prefix()
+                .await
+                .matches(&sender.name())
+            {
                 trace!(
-                    "Ignore proposal {:?} from other section, src_name {:?}: {:?}",
+                    "Ignore proposal {:?} from other section, src {}: {:?}",
                     proposal,
-                    src_name,
+                    sender,
                     msg_id
                 );
                 return Ok(vec![]);
@@ -75,7 +77,7 @@ impl Core {
         }
 
         let mut commands = vec![];
-        commands.extend(self.check_lagging((src_name, sender), sig_share_pk).await?);
+        commands.extend(self.check_lagging(sender, sig_share_pk).await?);
 
         match proposal.as_signable_bytes() {
             Err(error) => error!(
