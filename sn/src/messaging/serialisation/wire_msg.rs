@@ -98,8 +98,8 @@ impl WireMsg {
     }
 
     /// Deserialize the payload from this WireMsg returning a MessageType instance.
-    pub fn into_message(self) -> Result<MessageType> {
-        match self.header.msg_envelope.msg_kind {
+    pub fn into_message(&self) -> Result<MessageType> {
+        match self.header.msg_envelope.msg_kind.clone() {
             MsgKind::ServiceMsg(auth) => {
                 let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))

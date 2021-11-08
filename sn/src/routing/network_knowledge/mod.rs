@@ -375,18 +375,27 @@ impl NetworkKnowledge {
 
     /// Try to merge this `NetworkKnowledge` members with `peers`. .
     pub(super) async fn merge_members(&self, peers: SectionPeers) -> Result<bool> {
-        let mut there_was_an_update = false;
-
-        for member in peers.members.iter() {
-            let info = member.value().clone();
-            if self.update_member(info).await {
-                there_was_an_update = true
-            }
-        }
+        let there_was_an_update = self.update_members(peers).await;
 
         self.section_peers.retain(&self.prefix().await);
 
         Ok(there_was_an_update)
+    }
+
+    async fn update_members(&self, peers: SectionPeers) -> bool {
+        let chain = self.chain.read().await.clone();
+        let mut there_was_an_update = false;
+
+        for refmulti in peers.members.iter() {
+            let node_state = refmulti.value().clone();
+            if !node_state.verify(&chain) {
+                error!("can't merge member {:?}", node_state.value);
+            } else if self.section_peers.update(node_state) {
+                there_was_an_update = true;
+            }
+        }
+
+        there_was_an_update
     }
 
     /// Update the member. Returns whether it actually updated it.
