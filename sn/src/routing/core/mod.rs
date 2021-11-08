@@ -285,14 +285,14 @@ impl Core {
 
                 self.network_knowledge
                     .get_sap(&new.prefix.sibling())
-                    .map(|sec_auth| {
-                        let current: BTreeSet<_> = sec_auth.names();
+                    .map(|sap| {
+                        let current: BTreeSet<_> = sap.names();
                         let added = current.difference(&old.elders).copied().collect();
                         let removed = old.elders.difference(&current).copied().collect();
                         let remaining = old.elders.intersection(&current).copied().collect();
                         Elders {
                             prefix: new.prefix.sibling(),
-                            key: sec_auth.section_key(),
+                            key: sap.section_key(),
                             remaining,
                             added,
                             removed,

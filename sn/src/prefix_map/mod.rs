@@ -273,8 +273,7 @@ impl NetworkPrefixMap {
             .collect()
     }
 
-    /// Returns the section authority provider for the prefix that matches `name`,
-    /// excluding self section.
+    /// Returns the section authority provider for the prefix that matches `name`.
     pub(crate) fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.sections
             .iter()

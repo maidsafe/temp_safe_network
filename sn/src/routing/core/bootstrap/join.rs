@@ -9,7 +9,7 @@
 use super::read_prefix_map_from_disk;
 use crate::messaging::{
     system::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SystemMsg},
-    DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
+    DstLocation, MessageType, MsgKind, NodeAuth, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     core::{Comm, ConnectionEvent, SendStatus},
@@ -130,6 +130,7 @@ impl<'a> Join<'a> {
 
         // Avoid sending more than one request to the same peer.
         let mut used_recipient = HashSet::<SocketAddr>::new();
+        let mut used_recipient_saps = HashSet::<SectionAuthorityProvider>::new();
 
         loop {
             used_recipient.extend(recipients.iter().map(|peer| peer.addr()));
@@ -178,7 +179,16 @@ impl<'a> Join<'a> {
                     section_auth,
                     expected_age,
                 } => {
-                    let new_recipients = section_auth.peers();
+                    let new_recipients = match used_recipient_saps.get(&section_auth) {
+                        None => {
+                            let _ = used_recipient_saps.insert(section_auth.clone());
+                            section_auth.peers()
+                        }
+                        Some(_) => {
+                            debug!("Ignoring JoinResponse::Retry with same section authority provider as we previously sent to: {:?}", section_auth);
+                            continue;
+                        }
+                    };
 
                     let prefix = section_auth.prefix;
 
@@ -417,7 +427,7 @@ impl<'a> Join<'a> {
                         );
                         continue;
                     }
-                    trace!("Received a redirect/retry JoinResponse. Sending request to the latest contacts");
+                    trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
 
                     return Ok((join_response, sender));
                 }
