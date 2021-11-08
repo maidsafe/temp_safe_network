@@ -1421,7 +1421,6 @@ async fn handle_elders_update() -> Result<()> {
 
 // Test that demoted node still sends `Sync` messages on split.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "FIXME: once we have a DAG to manage all sections chains, this test can be re-enabled"]
 async fn handle_demote_during_split() -> Result<()> {
     crate::init_test_logger();
     let _span = tracing::info_span!("handle_demote_during_split").entered();
@@ -1472,10 +1471,23 @@ async fn handle_demote_during_split() -> Result<()> {
         false,
     )
     .await?;
-    let dispatcher = Dispatcher::new(core);
 
     let sk_set_v1_p0 = SecretKeySet::random();
     let sk_set_v1_p1 = SecretKeySet::random();
+
+    // Simulate DKG round finished succesfully by adding the new section
+    // key share to our cache (according to which split section we'll belong to).
+    if prefix0.matches(&node_name) {
+        core.section_keys_provider
+            .insert(create_section_key_share(&sk_set_v1_p0, 0))
+            .await;
+    } else {
+        core.section_keys_provider
+            .insert(create_section_key_share(&sk_set_v1_p1, 0))
+            .await;
+    }
+
+    let dispatcher = Dispatcher::new(core);
 
     // Create agreement on `OurElder` for both sub-sections
     let create_our_elders_command = |section_signed_sap| -> Result<_> {
@@ -1512,6 +1524,7 @@ async fn handle_demote_during_split() -> Result<()> {
     let commands = dispatcher.handle_command(command, "cmd-id-2").await?;
 
     let mut update_recipients = BTreeMap::new();
+
     for command in commands {
         let (recipients, wire_msg) = match command {
             Command::SendMessage {

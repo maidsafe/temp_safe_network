@@ -166,17 +166,17 @@ impl NetworkKnowledge {
         let section_auth =
             create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
 
-        let section = NetworkKnowledge::new(
+        let network_knowledge = NetworkKnowledge::new(
             genesis_key,
             SecuredLinkedList::new(genesis_key),
             section_auth,
             None,
         )?;
 
-        for peer in section.signed_sap.read().await.peers() {
+        for peer in network_knowledge.signed_sap.read().await.peers() {
             let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
-            let _changed = section.section_peers.update(SectionAuth {
+            let _changed = network_knowledge.section_peers.update(SectionAuth {
                 value: node_state,
                 sig,
             });
@@ -188,7 +188,7 @@ impl NetworkKnowledge {
             secret_key_share,
         };
 
-        Ok((section, section_key_share))
+        Ok((network_knowledge, section_key_share))
     }
 
     pub(super) async fn update_knowledge_if_valid(
@@ -204,7 +204,7 @@ impl NetworkKnowledge {
         // TODO: once we have a proper DAG implementation we won't
         // need proof chains from genesis but from any other key in the chain
         if proof_chain.root_key() != self.genesis_key() {
-            error!(
+            println!(
                 "Proof chain's first key is not the genesis key ({:?}): {:?}",
                 self.genesis_key(),
                 proof_chain.root_key()
@@ -233,8 +233,16 @@ impl NetworkKnowledge {
                 // the key share for the new SAP, making this node unable to sign section messages
                 // and possibly being kicked out of the group of Elders.
                 if update_sap && provided_sap.prefix.matches(our_name) {
+                    let our_prev_prefix = self.prefix().await;
                     *self.signed_sap.write().await = signed_sap.clone();
                     *self.chain.write().await = proof_chain.clone();
+
+                    // Remove any peer which doesn't belong to our new section's prefix
+                    self.section_peers.retain(&provided_sap.prefix);
+                    info!(
+                        "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
+                        our_prev_prefix, provided_sap.prefix, provided_sap
+                    );
                 }
             }
             Ok(false) => {
@@ -251,27 +259,16 @@ impl NetworkKnowledge {
             }
         }
 
-        let our_new_prefix = self.prefix().await;
-        if there_was_an_update {
-            // Remove any peer which doesn't belong to our new section's prefix
-            self.section_peers.retain(&our_new_prefix);
-
-            info!(
-                "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
-                our_new_prefix, provided_sap.prefix, provided_sap
-            );
-        }
-
         // TODO:
         // 2. Update the chains DAG with provided knowledge so we have all sections chains,
-        // inlcuding our own, to be able to provide proof chains when required, e.e. AE responses.
+        // inlcuding our own, to be able to provide proof chains when required, e.g. in AE responses.
 
         // 3. Update members if changes were provided
         if let Some(peers) = updated_members {
             if self.merge_members(peers).await? {
                 info!(
                     "Updated our section's members ({:?}): {:?}",
-                    our_new_prefix,
+                    self.prefix().await,
                     self.members()
                 );
                 there_was_an_update = true;
@@ -314,18 +311,10 @@ impl NetworkKnowledge {
         &self.genesis_key
     }
 
-    /// Try to merge this `NetworkKnowledge` members with `peers`. .
-    pub(super) async fn merge_members(&self, peers: SectionPeers) -> Result<bool> {
-        let there_was_an_update = self.update_members(peers).await;
-
-        self.section_peers.retain(&self.prefix().await);
-
-        Ok(there_was_an_update)
-    }
-
-    async fn update_members(&self, peers: SectionPeers) -> bool {
-        let chain = self.chain.read().await.clone();
+    // Try to merge this `NetworkKnowledge` members with `peers`. .
+    async fn merge_members(&self, peers: SectionPeers) -> Result<bool> {
         let mut there_was_an_update = false;
+        let chain = self.chain.read().await.clone();
 
         for refmulti in peers.members.iter() {
             let node_state = refmulti.value().clone();
@@ -336,7 +325,9 @@ impl NetworkKnowledge {
             }
         }
 
-        there_was_an_update
+        self.section_peers.retain(&self.prefix().await);
+
+        Ok(there_was_an_update)
     }
 
     /// Update the member. Returns whether it actually updated it.
