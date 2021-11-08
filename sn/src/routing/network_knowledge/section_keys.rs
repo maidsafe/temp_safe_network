@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::routing::error::{Error, Result};
+use crate::routing::{
+    error::{Error, Result},
+    log_markers::LogMarker,
+};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uluru::LRUCache;
@@ -89,7 +92,8 @@ impl SectionKeysProvider {
             trace!("evicted old key share from cache: {:?}", evicted);
         }
         trace!(
-            "new key share inserted in cache (total {}): {:?}",
+            "{} in cache (total {}): {:?}",
+            LogMarker::NewKeyShareStored,
             self.cache.read().await.len(),
             public_key
         );
