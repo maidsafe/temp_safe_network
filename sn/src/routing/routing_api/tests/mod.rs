@@ -115,11 +115,12 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let mut next_cmd = commands.next();
 
-    if matches!(next_cmd, Some(Command::SendMessageDeliveryGroup { .. })) {
+    if !matches!(next_cmd, Some(Command::SendMessage { .. })) {
         next_cmd = commands.next();
     }
 
     let response_wire_msg = assert_matches!(
+        // we want to check the command _after_ that
         next_cmd,
         Some(Command::SendMessage {
             wire_msg,
@@ -391,8 +392,8 @@ async fn aggregate_proposals() -> Result<()> {
 
         if !commands.is_empty() {
             // only possible/expected msg if not empty, is a backpressure msg
-            assert_eq!(1, commands.len());
-            assert_matches!(commands[0], Command::SendMessageDeliveryGroup { .. })
+            assert_eq!(2, commands.len());
+            assert_matches!(commands[1], Command::SendMessageDeliveryGroup { .. })
         }
     }
 
@@ -426,9 +427,10 @@ async fn aggregate_proposals() -> Result<()> {
     .await?
     .into_iter();
 
+    println!("Commands we have: {:?}", commands);
     let mut next_cmd = commands.next();
 
-    if matches!(next_cmd, Some(Command::SendMessageDeliveryGroup { .. })) {
+    while !matches!(next_cmd, Some(Command::HandleAgreement { .. })) {
         next_cmd = commands.next();
     }
 
