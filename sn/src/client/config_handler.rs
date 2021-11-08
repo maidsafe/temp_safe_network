@@ -80,26 +80,21 @@ impl ClientConfig {
         let query_timeout = query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
 
         // if we have an env var for this, lets override
-        let query_timeout = match std::env::var(SN_CLIENT_QUERY_TIMEOUT)  {
-            Ok(timeout) => {
-                match timeout.parse() {
-                    Ok(time) => {
-                        warn!(
-                            "Query timeout set from env var {:?}",
-                            SN_CLIENT_QUERY_TIMEOUT
-                        );
-                        Duration::from_secs(time)
-                    }
-                    Err(error) => {
-                        warn!("There was an error parsing {:?} env var. Default or client configured query timeout will be used: {:?}", SN_CLIENT_QUERY_TIMEOUT, error);
-                        query_timeout
-                    }
+        let query_timeout = match std::env::var(SN_CLIENT_QUERY_TIMEOUT) {
+            Ok(timeout) => match timeout.parse() {
+                Ok(time) => {
+                    warn!(
+                        "Query timeout set from env var {:?}",
+                        SN_CLIENT_QUERY_TIMEOUT
+                    );
+                    Duration::from_secs(time)
                 }
-
+                Err(error) => {
+                    warn!("There was an error parsing {:?} env var. Default or client configured query timeout will be used: {:?}", SN_CLIENT_QUERY_TIMEOUT, error);
+                    query_timeout
+                }
             },
-            Err(_) => {
-                query_timeout
-            }
+            Err(_) => query_timeout,
         };
 
         Self {
