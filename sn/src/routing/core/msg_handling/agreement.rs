@@ -253,11 +253,13 @@ impl Core {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
+        trace!("{}", LogMarker::HandlingElderAgreement);
         let updates = self.split_barrier.write().await.process(
             &self.network_knowledge.prefix().await,
             signed_section_auth.clone(),
             key_sig,
         );
+
         if updates.is_empty() {
             return Ok(vec![]);
         }
@@ -267,6 +269,8 @@ impl Core {
 
         for (signed_sap, key_sig) in updates {
             let prefix = signed_sap.prefix;
+            trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
+
             info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
             // If we have the key share for new SAP key we can switch to this new SAP

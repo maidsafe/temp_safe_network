@@ -50,6 +50,9 @@ pub enum LogMarker {
     DkgSessionComplete,
     DkgSessionAlreadyCompleted,
     HandlingDkgSuccessfulOutcome,
+    HandlingElderAgreement,
+    NewSignedSap,
+    NewKeyShareStored,
     TriggeringPromotionAndDemotion,
     // ae
     AeResendAfterRetry,
