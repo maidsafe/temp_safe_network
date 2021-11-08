@@ -249,10 +249,7 @@ impl Core {
             }
 
             if new.is_elder || old.is_elder {
-                commands.extend(
-                    self.send_ae_update_to_our_section(&self.network_knowledge)
-                        .await?,
-                );
+                commands.extend(self.send_ae_update_to_our_section().await);
             }
 
             let current: BTreeSet<_> = self.network_knowledge.authority_provider().await.names();
@@ -304,8 +301,8 @@ impl Core {
 
             let event = if let Some(sibling_elders) = sibling_elders {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
-                // In case of split, send AEUpdate to sibling new elder nodes.
-                commands.extend(self.send_ae_update_to_sibling_section(&old).await?);
+                // In case of split, send AE-Update to sibling new elder nodes.
+                commands.extend(self.send_ae_update_to_sibling_section(&old).await);
 
                 Event::SectionSplit {
                     elders,

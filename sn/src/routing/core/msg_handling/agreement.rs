@@ -79,7 +79,7 @@ impl Core {
             if new_age > MIN_AGE {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
-                commands.push(self.send_node_approval(old_info.clone()).await?);
+                commands.extend(self.send_node_approval(old_info.clone()).await);
 
                 let peer = new_info.to_peer();
                 commands.extend(self.relocate_rejoining_peer(&peer, new_age).await?);
@@ -114,11 +114,11 @@ impl Core {
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            commands.extend(self.send_ae_update_to_adults().await?);
+            commands.extend(self.send_ae_update_to_adults().await);
         }
 
         commands.extend(result);
-        commands.push(self.send_node_approval(new_info).await?);
+        commands.extend(self.send_node_approval(new_info).await);
 
         self.print_network_stats().await;
 
@@ -152,7 +152,7 @@ impl Core {
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            commands.extend(self.send_ae_update_to_adults().await?);
+            commands.extend(self.send_ae_update_to_adults().await);
         }
 
         commands.extend(result);
@@ -274,7 +274,8 @@ impl Core {
             info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
             // If we have the key share for new SAP key we can switch to this new SAP
-            let switch_to_new_sap = self.is_not_elder().await
+            let switch_to_new_sap = (self.is_not_elder().await
+                && !signed_sap.contains_elder(&self.node.read().await.name()))
                 || self
                     .section_keys_provider
                     .key_share(&signed_sap.section_key())
