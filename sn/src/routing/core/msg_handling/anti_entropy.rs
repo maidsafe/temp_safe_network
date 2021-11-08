@@ -38,8 +38,10 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let snapshot = self.state_snapshot().await;
 
-        // If we have the key share for new SAP key we can switch to this new SAP
-        let switch_to_new_sap = self.is_not_elder().await
+        // If we have the key share for new SAP key we can switch to this new SAP.
+        // Otherwise, only update when not being the elder of new SAP.
+        let switch_to_new_sap = (self.is_not_elder().await
+            && !section_auth.contains_elder(&self.node.read().await.name()))
             || self
                 .section_keys_provider
                 .key_share(&section_signed.public_key)
@@ -84,18 +86,21 @@ impl Core {
                 return Ok(vec![]);
             }
         };
+        let snapshot = self.state_snapshot().await;
 
         info!("Anti-Entropy: retry message received from peer: {}", sender);
 
-        // If we have the key share for new SAP key we can switch to this new SAP
-        let switch_to_new_sap = self.is_not_elder().await
+        // If we have the key share for new SAP key we can switch to this new SAP.
+        // Otherwise, only update when not being the elder of new SAP.
+        let switch_to_new_sap = (self.is_not_elder().await
+            && !section_auth.contains_elder(&self.node.read().await.name()))
             || self
                 .section_keys_provider
                 .key_share(&section_signed.public_key)
                 .await
                 .is_ok();
 
-        // update our netowkr knowledge.
+        // update our network knowledge.
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
             sig: section_signed,
@@ -112,6 +117,7 @@ impl Core {
             )
             .await?;
 
+        let mut result = Vec::new();
         if updated {
             self.write_prefix_map().await;
             info!("PrefixMap written to disk");
@@ -128,14 +134,19 @@ impl Core {
 
             self.create_or_wait_for_backoff(&sender).await;
 
-            let cmd = self
-                .send_direct_message(sender, bounced_msg, dst_section_pk)
-                .await?;
-
-            return Ok(vec![cmd]);
+            if let Ok(cmds) = self
+                .update_self_for_new_node_state_and_fire_events(snapshot)
+                .await
+            {
+                result.extend(cmds);
+            }
+            result.push(
+                self.send_direct_message(sender, bounced_msg, dst_section_pk)
+                    .await?,
+            );
         }
 
-        Ok(vec![])
+        Ok(result)
     }
 
     pub(crate) async fn handle_anti_entropy_redirect_msg(
