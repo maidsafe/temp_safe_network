@@ -62,7 +62,7 @@ impl Core {
         let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
 
-        let message_type = match wire_msg.clone().into_message() {
+        let message_type = match wire_msg.into_message() {
             Ok(message_type) => message_type,
             Err(error) => {
                 error!(
