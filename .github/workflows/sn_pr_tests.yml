@@ -169,11 +169,11 @@ jobs:
         continue-on-error: true
 
 
-      - name: Wait for a healthy network (win)
+      - name: Wait for a healthy network
         shell: bash
         run: ./resources/scripts/network_is_ready.sh
         id: split-check-1
-        timeout-minutes: 10
+        timeout-minutes: 20
         continue-on-error: true
 
       - name: Kill Section if no split (unix)
@@ -200,10 +200,10 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
 
-      - name: Wait for a healthy network (win)
+      - name: Wait for a healthy network
         shell: bash
         run: ./resources/scripts/network_is_ready.sh
-        timeout-minutes: 10
+        timeout-minutes: 20
 
       - name: Run network asserts one by one
         shell: bash
