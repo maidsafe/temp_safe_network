@@ -197,8 +197,8 @@ mod tests {
             root_dir: root_dir.clone(),
             genesis_key,
             qp2p: QuicP2pConfig {
-                idle_timeout: Some(Duration::from_secs(5)),
-                keep_alive_interval: Some(Duration::from_secs(1)),
+                idle_timeout: Some(Duration::from_secs(90)),
+                keep_alive_interval: Some(Duration::from_secs(30)),
                 ..Default::default()
             },
             query_timeout: DEFAULT_QUERY_TIMEOUT,
