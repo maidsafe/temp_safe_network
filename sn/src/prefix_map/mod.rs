@@ -58,9 +58,9 @@ impl NetworkPrefixMap {
     /// the map.
     /// Returns a boolean indicating whether anything changed.
     //
-    // TODO: remove this form public API since we shall not allow any insert/update withot a
-    // proof chain, users shall have to call either `update` or `verify_with_chain_and_update` API.
-    pub(crate) fn insert(&self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
+    // This is not a public API since we shall not allow any insert/update without a
+    // proof chain, users shall call either `update` or `verify_with_chain_and_update` API.
+    fn insert(&self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
         let prefix = sap.prefix();
         // Don't insert if any descendant is already present in the map.
         if self.descendants(&prefix).next().is_some() {
@@ -141,10 +141,10 @@ impl NetworkPrefixMap {
     /// currently known SAP we are aware of for the Prefix.
     pub(crate) fn update(
         &self,
-        signed_section_auth: SectionAuth<SectionAuthorityProvider>,
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
     ) -> Result<bool> {
-        let prefix = signed_section_auth.prefix();
+        let prefix = signed_sap.prefix();
         trace!("Attempting to update prefixmap for {:?}", prefix);
         let section_key = match self.section_by_prefix(&prefix) {
             Ok(sap) => sap.section_key(),
@@ -155,7 +155,7 @@ impl NetworkPrefixMap {
         };
 
         let res = self.verify_with_chain_and_update(
-            signed_section_auth,
+            signed_sap,
             proof_chain,
             &SecuredLinkedList::new(section_key),
         );
@@ -173,23 +173,23 @@ impl NetworkPrefixMap {
     /// Returns true if an udpate was made
     pub(crate) fn verify_with_chain_and_update(
         &self,
-        signed_section_auth: SectionAuth<SectionAuthorityProvider>,
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
         section_chain: &SecuredLinkedList,
     ) -> Result<bool> {
         // Check if SAP signature is valid
-        if !signed_section_auth.self_verify() {
+        if !signed_sap.self_verify() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "invalid signature: {:?}",
-                signed_section_auth.value
+                signed_sap.value
             )));
         }
 
         // Check if SAP's section key matches SAP signature's key
-        if signed_section_auth.sig.public_key != signed_section_auth.public_key_set.public_key() {
+        if signed_sap.sig.public_key != signed_sap.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key doesn't match signature's key: {:?}",
-                signed_section_auth.value
+                signed_sap.value
             )));
         }
 
@@ -198,8 +198,8 @@ impl NetworkPrefixMap {
         // as trusted before we store them in our local records.
         // Thus, we just need to check our knowledge of the remote section's key
         // is part of the proof chain received.
-        match self.sections.get(&signed_section_auth.prefix) {
-            Some(entry) if entry.value() == &signed_section_auth => {
+        match self.sections.get(&signed_sap.prefix) {
+            Some(entry) if entry.value() == &signed_sap => {
                 // It's the same SAP we are already aware of
                 return Ok(false);
             }
@@ -227,7 +227,7 @@ impl NetworkPrefixMap {
                 if !proof_chain.check_trust(section_chain.keys()) {
                     return Err(Error::UntrustedProofChain(format!(
                         "none of the keys were found on our section chain: {:?}",
-                        signed_section_auth.value
+                        signed_sap.value
                     )));
                 }
             }
@@ -243,11 +243,11 @@ impl NetworkPrefixMap {
         }
 
         // Check the SAP's key is the last key of the proof chain
-        if proof_chain.last_key() != &signed_section_auth.public_key_set.public_key() {
+        if proof_chain.last_key() != &signed_sap.public_key_set.public_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key ({:?}, from prefix {:?}) isn't in the last key in the proof chain provided. (Which ends with ({:?}))",
-                signed_section_auth.public_key_set.public_key(),
-                signed_section_auth.prefix,
+                signed_sap.public_key_set.public_key(),
+                signed_sap.prefix,
                 proof_chain.last_key()
             )));
         }
@@ -255,7 +255,7 @@ impl NetworkPrefixMap {
         // We can now update our knowledge of the remote section's SAP.
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
-        let changed = self.insert(signed_section_auth);
+        let changed = self.insert(signed_sap);
 
         for section in self.sections.iter() {
             let prefix = section.key();

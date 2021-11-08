@@ -79,6 +79,7 @@ impl NetworkKnowledge {
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         passed_prefix_map: Option<NetworkPrefixMap>,
     ) -> Result<Self, Error> {
+        // Let's check the section chain's genesis key matches ours.
         if genesis_key != *chain.root_key() {
             return Err(Error::UntrustedProofChain(format!(
                 "genesis key doesn't match first key in proof chain: {:?}",
@@ -86,6 +87,7 @@ impl NetworkKnowledge {
             )));
         }
 
+        // Check the SAP's key is the last key of the section chain
         if signed_sap.sig.public_key != *chain.last_key() {
             error!("can't create section: SAP signed with incorrect key");
             return Err(Error::UntrustedSectionAuthProvider(format!(
@@ -110,8 +112,8 @@ impl NetworkKnowledge {
             )));
         }
 
-        // Make sure the proof chain can be trusted,
-        // i.e. check each key is signed by its parent/predecesor key.
+        // Make sure the section chain can be trusted, i.e. check that
+        // each key is signed by its parent/predecesor key.
         if !chain.self_verify() {
             return Err(Error::UntrustedProofChain(format!(
                 "invalid chain: {:?}",
@@ -119,8 +121,8 @@ impl NetworkKnowledge {
             )));
         }
 
-        // Check if the GenesisKey in the provided prefix_map is the same as our section's.
-        // If not, start afresh.
+        // Check if the genesis key in the provided prefix_map matches ours.
+        // If no prefix map was provided, start afresh.
         let prefix_map = match passed_prefix_map {
             Some(prefix_map) => {
                 if prefix_map.genesis_key() != genesis_key {
