@@ -582,7 +582,7 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits",
- "time 0.1.43",
+ "time 0.1.44",
  "winapi",
 ]
 
@@ -1377,7 +1377,7 @@ checksum = "7fcd999463524c52659517fe2cea98493cfe485d10565e7b0fb07dbba7ad2753"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "wasi 0.10.2+wasi-snapshot-preview1",
+ "wasi 0.10.0+wasi-snapshot-preview1",
 ]
 
 [[package]]
@@ -3188,7 +3188,7 @@ dependencies = [
 [[package]]
 name = "self_update"
 version = "0.27.0"
-source = "git+https://github.com/jacderida/self_update.git?branch=github_download_json_parsing#dca30efd757eb35d333f4424a3c33083bdf3796d"
+source = "git+https://github.com/jacderida/self_update.git?branch=github_download_json_parsing#d3dc11142b207c89cc25cc0b099ac3cf54e6493c"
 dependencies = [
  "either",
  "flate2",
@@ -3770,11 +3770,12 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.1.43"
+version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
+checksum = "6db9e6914ab8b1ae1c260a4ae7a49b6c5611b40328a735b21862567685e73255"
 dependencies = [
  "libc",
+ "wasi 0.10.0+wasi-snapshot-preview1",
  "winapi",
 ]
 
@@ -4197,9 +4198,9 @@ checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
 
 [[package]]
 name = "wasi"
-version = "0.10.2+wasi-snapshot-preview1"
+version = "0.10.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd6fbd9a79829dd1ad0cc20627bf1ed606756a7f77edff7b66b7064f9cb327c6"
+checksum = "1a143597ca7c7793eff794def352d41792a93c481eb1042423ff7ff72ba2c31f"
 
 [[package]]
 name = "wasm-bindgen"
@@ -4463,5 +4464,5 @@ dependencies = [
  "crc32fast",
  "flate2",
  "thiserror",
- "time 0.1.43",
+ "time 0.1.44",
 ]
