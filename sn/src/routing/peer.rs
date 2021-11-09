@@ -16,7 +16,7 @@ use xor_name::{XorName, XOR_NAME_LEN};
 /// Network p2p peer identity.
 /// When a node knows another p2p_node as a `Peer` it's implicitly connected to it. This is separate
 /// from being connected at the network layer, which currently is handled by quic-p2p.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Peer {
     name: XorName,
     addr: SocketAddr,
@@ -25,6 +25,12 @@ pub struct Peer {
 impl Display for Peer {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{} at {}", self.name, self.addr)
+    }
+}
+
+impl PartialEq<&Self> for Peer {
+    fn eq(&self, other: &&Self) -> bool {
+        self.name == other.name && self.addr == other.addr
     }
 }
 

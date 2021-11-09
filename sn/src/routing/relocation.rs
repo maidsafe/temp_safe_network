@@ -303,7 +303,7 @@ mod tests {
                 .sorted_by_key(|peer| peer.age())
                 .rev()
                 .take(ELDER_SIZE)
-                .copied(),
+                .cloned(),
             Prefix::default(),
             sk_set.public_keys(),
         );
@@ -317,7 +317,7 @@ mod tests {
         )?;
 
         for peer in &peers {
-            let info = NodeState::joined(*peer, None);
+            let info = NodeState::joined(peer.clone(), None);
             let info = section_signed(sk, info)?;
 
             let res = futures::executor::block_on(network_knowledge.update_member(info));

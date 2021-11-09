@@ -172,7 +172,7 @@ impl Core {
         let dst_section_pk = self.network_knowledge.section_key().await;
         trace!("{}", LogMarker::SendNodeApproval);
         match self
-            .send_direct_message(peer, node_msg, dst_section_pk)
+            .send_direct_message(peer.clone(), node_msg, dst_section_pk)
             .await
         {
             Ok(cmd) => vec![cmd],

@@ -26,7 +26,7 @@ use bls::PublicKey as BlsPublicKey;
 // Message handling
 impl Core {
     /// Check if we already have this peer in our section
-    fn peer_is_already_a_member(&self, peer: Peer) -> bool {
+    fn peer_is_already_a_member(&self, peer: &Peer) -> bool {
         if self.network_knowledge.members().is_joined(&peer.name()) {
             debug!(
                 "Ignoring JoinRequest from {} - already member of our section.",
@@ -66,7 +66,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if self.peer_is_already_a_member(peer) {
+        if self.peer_is_already_a_member(&peer) {
             return Ok(vec![]);
         }
 
@@ -190,7 +190,7 @@ impl Core {
                     .await?
             } else {
                 // It's reachable, let's then send the proof challenge
-                self.send_resource_proof_challenge(&peer).await?
+                self.send_resource_proof_challenge(peer).await?
             };
 
             return Ok(vec![cmd]);
