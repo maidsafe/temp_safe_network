@@ -270,14 +270,8 @@ impl<'a> Join<'a> {
 
                     let new_recipients: Vec<_> = section_auth
                         .peers()
-                        .iter()
-                        .filter_map(|peer| {
-                            if used_recipient_saps.insert((peer.addr(), new_section_key)) {
-                                Some(*peer)
-                            } else {
-                                None
-                            }
-                        })
+                        .into_iter()
+                        .filter(|peer| used_recipient_saps.insert((peer.addr(), new_section_key)))
                         .collect();
 
                     if new_recipients.is_empty() {

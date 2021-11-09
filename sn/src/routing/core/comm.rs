@@ -343,7 +343,7 @@ impl Comm {
                     return Err(Error::ConnectionClosed);
                 }
                 Err(_) => {
-                    failed_recipients.push(*recipient);
+                    failed_recipients.push(recipient.clone());
 
                     if next < recipients.len() {
                         tasks.push(send(&recipients[next], msg_bytes.clone()));
@@ -546,12 +546,13 @@ mod tests {
         )
         .await?;
         let invalid_peer = get_invalid_peer().await?;
+        let invalid_addr = invalid_peer.addr();
 
         let status = comm.send(&[invalid_peer], 1, new_test_message()?).await?;
 
         assert_matches!(
             &status,
-            &SendStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_peer.addr()]
+            &SendStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_addr]
         );
 
         Ok(())
@@ -573,7 +574,9 @@ mod tests {
         let invalid_peer = get_invalid_peer().await?;
 
         let message = new_test_message()?;
-        let status = comm.send(&[invalid_peer, peer], 1, message.clone()).await?;
+        let status = comm
+            .send(&[invalid_peer.clone(), peer], 1, message.clone())
+            .await?;
         assert_matches!(status, SendStatus::MinDeliveryGroupSizeReached(failed_recipients) => {
             assert_eq!(&failed_recipients, &[invalid_peer])
         });
@@ -600,7 +603,9 @@ mod tests {
         let invalid_peer = get_invalid_peer().await?;
 
         let message = new_test_message()?;
-        let status = comm.send(&[invalid_peer, peer], 2, message.clone()).await?;
+        let status = comm
+            .send(&[invalid_peer.clone(), peer], 2, message.clone())
+            .await?;
 
         assert_matches!(
             status,

@@ -146,7 +146,7 @@ impl Core {
                                         &msg_authority.src_location(),
                                         &dst_section_pk,
                                         dst_location.name(),
-                                        sender,
+                                        &sender,
                                     )
                                     .await?
                                 {
@@ -226,7 +226,7 @@ impl Core {
                         &src_location,
                         &received_section_pk,
                         dst_name,
-                        sender,
+                        &sender,
                     )
                     .await?
                 {

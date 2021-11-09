@@ -267,7 +267,7 @@ impl Core {
                 // we should probably penalise the node here.
             }
         } else {
-            let _res = ae_backoff_guard.insert((*peer, ExponentialBackoff::default()));
+            let _res = ae_backoff_guard.insert((peer.clone(), ExponentialBackoff::default()));
         }
     }
 
@@ -279,7 +279,7 @@ impl Core {
         src_location: &SrcLocation,
         dst_section_pk: &BlsPublicKey,
         dst_name: XorName,
-        sender: Peer,
+        sender: &Peer,
     ) -> Result<Option<Command>> {
         trace!("Checking for entropy");
         // Check if the message has reached the correct section,
@@ -316,7 +316,7 @@ impl Core {
                     trace!("{}", LogMarker::AeSendRedirect);
 
                     return Ok(Some(Command::SendMessage {
-                        recipients: vec![sender],
+                        recipients: vec![sender.clone()],
                         wire_msg,
                     }));
                 }
@@ -424,7 +424,7 @@ impl Core {
         )?;
 
         Ok(Some(Command::SendMessage {
-            recipients: vec![sender],
+            recipients: vec![sender.clone()],
             wire_msg,
         }))
     }
@@ -547,7 +547,7 @@ mod tests {
                 &src_location,
                 &dst_section_pk,
                 dst_name,
-                sender,
+                &sender,
             )
             .await?;
 
@@ -576,7 +576,7 @@ mod tests {
                 &src_location,
                 &dst_section_pk,
                 dst_name,
-                sender,
+                &sender,
             )
             .await?;
 
@@ -608,7 +608,7 @@ mod tests {
                 &src_location,
                 &dst_section_pk,
                 dst_name,
-                sender,
+                &sender,
             )
             .await?;
 
@@ -648,7 +648,7 @@ mod tests {
                 &src_location,
                 dst_section_pk,
                 dst_name,
-                sender,
+                &sender,
             )
             .await?;
 
@@ -691,7 +691,7 @@ mod tests {
                 &src_location,
                 dst_section_pk,
                 dst_name,
-                sender,
+                &sender,
             )
             .await?;
 

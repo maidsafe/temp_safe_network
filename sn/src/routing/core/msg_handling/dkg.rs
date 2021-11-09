@@ -164,7 +164,7 @@ impl Core {
 
     pub(crate) async fn check_lagging(
         &self,
-        peer: Peer,
+        peer: &Peer,
         public_key: &BlsPublicKey,
     ) -> Result<Option<Command>> {
         if self.network_knowledge.has_chain_key(public_key).await
@@ -173,7 +173,9 @@ impl Core {
             let msg = self.generate_ae_update(*public_key, true).await?;
             trace!("{}", LogMarker::SendingAeUpdateAfterLagCheck);
 
-            let cmd = self.send_direct_message(peer, msg, *public_key).await?;
+            let cmd = self
+                .send_direct_message(peer.clone(), msg, *public_key)
+                .await?;
             Ok(Some(cmd))
         } else {
             Ok(None)
