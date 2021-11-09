@@ -403,13 +403,13 @@ impl<'a> Join<'a> {
         while let Some(event) = self.recv_rx.recv().await {
             // we are interested only in `JoinResponse` type of messages
             let (join_response, sender) = match event {
-                ConnectionEvent::Received((sender_addr, bytes)) => match WireMsg::from(bytes) {
+                ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) => continue,
                         MsgKind::NodeBlsShareAuthMsg(_) => {
                             trace!(
                                 "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
-                                sender_addr,
+                                sender.addr(),
                                 wire_msg
                             );
                             continue;
@@ -419,17 +419,14 @@ impl<'a> Join<'a> {
                                 msg: SystemMsg::JoinResponse(resp),
                                 msg_authority,
                                 ..
-                            }) => (
-                                *resp,
-                                Peer::new(msg_authority.src_location().name(), sender_addr),
-                            ),
+                            }) => (*resp, sender.identify(msg_authority.src_location().name())),
                             Ok(
                                 MessageType::Service { msg_id, .. }
                                 | MessageType::System { msg_id, .. },
                             ) => {
                                 trace!(
                                     "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
-                                    sender_addr,
+                                    sender.addr(),
                                     msg_id
                                 );
                                 continue;
@@ -537,7 +534,7 @@ mod tests {
     use crate::routing::{
         dkg::test_utils::*, error::Error as RoutingError, messages::WireMsgUtils,
         network_knowledge::test_utils::*, network_knowledge::NodeStateUtils,
-        SectionAuthorityProviderUtils, ELDER_SIZE, MIN_ADULT_AGE,
+        SectionAuthorityProviderUtils, UnknownPeer, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use crate::types::PublicKey;
     use assert_matches::assert_matches;
@@ -997,7 +994,7 @@ mod tests {
         debug!("wire msg built");
 
         recv_tx.try_send(ConnectionEvent::Received((
-            bootstrap_node.addr,
+            UnknownPeer::new(bootstrap_node.addr),
             wire_msg.serialize()?,
         )))?;
 

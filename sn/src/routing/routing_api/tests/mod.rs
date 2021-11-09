@@ -1273,7 +1273,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     assert!(commands.is_empty());
 
     let msg_type = assert_matches!(comm_rx.recv().await, Some(ConnectionEvent::Received((sender, bytes))) => {
-        assert_eq!(sender, node.addr);
+        assert_eq!(sender.addr(), node.addr);
         assert_matches!(WireMsg::deserialize(bytes), Ok(msg_type) => msg_type)
     });
 

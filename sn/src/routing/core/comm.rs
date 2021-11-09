@@ -11,7 +11,7 @@ use crate::messaging::{system::LoadReport, WireMsg};
 use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
-    Peer,
+    Peer, UnknownPeer,
 };
 use bytes::Bytes;
 use futures::{
@@ -108,8 +108,7 @@ impl Comm {
 
         let _ = task::spawn(
             handle_incoming_messages(
-                bootstrap_peer.id(),
-                bootstrap_peer.remote_address(),
+                bootstrap_peer.clone(),
                 peer_incoming,
                 event_tx.clone(),
                 msg_count.clone(),
@@ -293,8 +292,7 @@ impl Comm {
                         |(connection, connection_incoming)| {
                             let _ = task::spawn(
                                 handle_incoming_messages(
-                                    connection.id(),
-                                    connection.remote_address(),
+                                    connection.clone(),
                                     connection_incoming,
                                     self.event_tx.clone(),
                                     self.msg_count.clone(),
@@ -402,7 +400,7 @@ impl Comm {
 
 #[derive(Debug)]
 pub(crate) enum ConnectionEvent {
-    Received((SocketAddr, Bytes)),
+    Received((UnknownPeer, Bytes)),
 }
 
 #[tracing::instrument(skip_all)]
@@ -413,14 +411,11 @@ async fn handle_incoming_connections(
     connected_peers: ConnectedPeers,
 ) {
     while let Some((connection, connection_incoming)) = incoming_connections.next().await {
-        let connection_id = connection.id();
-        let src = connection.remote_address();
-        connected_peers.insert(connection).await;
+        connected_peers.insert(connection.clone()).await;
 
         let _ = task::spawn(
             handle_incoming_messages(
-                connection_id,
-                src,
+                connection,
                 connection_incoming,
                 event_tx.clone(),
                 msg_count.clone(),
@@ -433,19 +428,25 @@ async fn handle_incoming_connections(
 
 #[tracing::instrument(skip(incoming_msgs, event_tx, msg_count, connected_peers))]
 async fn handle_incoming_messages(
-    connection_id: usize,
-    src: SocketAddr,
+    connection: qp2p::Connection,
     mut incoming_msgs: qp2p::ConnectionIncoming,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
     connected_peers: ConnectedPeers,
 ) {
+    let connection_id = connection.id();
+    let src = connection.remote_address();
     trace!(%connection_id, %src, "{}", LogMarker::ConnectionOpened);
 
     while let Some(result) = incoming_msgs.next().await.transpose() {
         match result {
             Ok(msg) => {
-                let _send_res = event_tx.send(ConnectionEvent::Received((src, msg))).await;
+                let _send_res = event_tx
+                    .send(ConnectionEvent::Received((
+                        UnknownPeer::connected(connection.clone()),
+                        msg,
+                    )))
+                    .await;
                 // count incoming msgs..
                 msg_count.increase_incoming(src);
             }

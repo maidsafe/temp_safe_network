@@ -450,7 +450,8 @@ async fn handle_connection_events(
 ) {
     while let Some(event) = incoming_conns.recv().await {
         match event {
-            ConnectionEvent::Received((sender_addr, bytes)) => {
+            ConnectionEvent::Received((sender, bytes)) => {
+                let sender_addr = sender.addr();
                 trace!(
                     "New message ({} bytes) received from: {}",
                     bytes.len(),

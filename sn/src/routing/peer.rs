@@ -108,6 +108,44 @@ impl Peer {
     }
 }
 
+/// A peer whose name we do not yet know.
+///
+/// An [`UnknownPeer`] can be [`identify`]'d to become a [`Peer`].
+#[derive(Debug)]
+pub(crate) struct UnknownPeer {
+    addr: SocketAddr,
+    connection: Option<qp2p::Connection>,
+}
+
+impl UnknownPeer {
+    #[cfg(test)]
+    pub(crate) fn new(addr: SocketAddr) -> Self {
+        Self {
+            addr,
+            connection: None,
+        }
+    }
+
+    pub(crate) fn connected(connection: qp2p::Connection) -> Self {
+        Self {
+            addr: connection.remote_address(),
+            connection: Some(connection),
+        }
+    }
+
+    pub(crate) fn addr(&self) -> SocketAddr {
+        self.addr
+    }
+
+    pub(crate) fn identify(self, name: XorName) -> Peer {
+        Peer {
+            name,
+            addr: self.addr,
+            connection: self.connection,
+        }
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod test_utils {
     use super::*;
