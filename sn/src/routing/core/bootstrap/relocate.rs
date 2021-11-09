@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{read_prefix_map_from_disk, UsedRecipientSaps};
+use super::UsedRecipientSaps;
 use crate::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocateDetails, RelocatePayload,
@@ -128,12 +128,12 @@ impl JoiningAsRelocated {
 
                 Ok(Some(Command::HandleRelocationComplete {
                     node: self.node.clone(),
-                    // TODO: pass our existing prefixmap here?
+                    // FIXME: pass our existing prefixmap here
                     section: NetworkKnowledge::new(
                         self.genesis_key,
                         section_chain,
                         section_auth,
-                        read_prefix_map_from_disk().await,
+                        None,
                     )?,
                 }))
             }
