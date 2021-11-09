@@ -171,8 +171,17 @@ jobs:
 
       - name: Wait for a healthy network
         shell: bash
+        if: matrix.os != 'windows-latest'
         run: ./resources/scripts/network_is_ready.sh
         id: split-check-1
+        timeout-minutes: 20
+        continue-on-error: true
+
+      - name: Wait for a healthy network (win)
+        shell: bash
+        if: matrix.os == 'windows-latest'
+        run: ./resources/scripts/network_is_ready_cli.sh
+        id: split-check-1-win
         timeout-minutes: 20
         continue-on-error: true
 
@@ -183,7 +192,7 @@ jobs:
           rm -rf ~/.safe/node
 
       - name: Kill section if no split (win)
-        if: matrix.os == 'windows-latest' && steps.split-check-1.outcome == 'failure'
+        if: matrix.os == 'windows-latest' && steps.split-check-1-win.outcome == 'failure'
         shell: cmd
         run: |
           taskkill /IM sn_node.exe /F
@@ -195,6 +204,12 @@ jobs:
         env:
           NODE_COUNT: 45
 
+      - name: Restart Section if no split
+        if: steps.split-check-1-win.outcome == 'failure'
+        run: ./target/release/testnet
+        env:
+          NODE_COUNT: 45
+
       - name: Healthcheck
         run: ./resources/scripts/has_split.sh
         timeout-minutes: 5
@@ -202,7 +217,14 @@ jobs:
 
       - name: Wait for a healthy network
         shell: bash
+        if: matrix.os != 'windows-latest'
         run: ./resources/scripts/network_is_ready.sh
+        timeout-minutes: 20
+
+      - name: Wait for a healthy network (win)
+        shell: bash
+        if: matrix.os == 'windows-latest'
+        run: ./resources/scripts/network_is_ready_cli.sh
         timeout-minutes: 20
 
       - name: Run network asserts one by one
