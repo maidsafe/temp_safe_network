@@ -100,7 +100,7 @@ impl<'a> Join<'a> {
     async fn join(
         mut self,
         network_genesis_key: BlsPublicKey,
-        recipients: Vec<Peer>,
+        mut recipients: Vec<Peer>,
     ) -> Result<(Node, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
@@ -203,8 +203,20 @@ impl<'a> Join<'a> {
                         let new_recipients: Vec<_> = section_auth
                             .peers()
                             .into_iter()
-                            .filter(|peer| {
-                                used_recipient_saps.insert((peer.addr(), new_section_key))
+                            .filter_map(|peer| {
+                                if used_recipient_saps.insert((peer.addr(), new_section_key)) {
+                                    if let Some(connection) = recipients
+                                        .iter_mut()
+                                        .find(|p| p.addr() == peer.addr())
+                                        .and_then(|p| p.connection.take())
+                                    {
+                                        Some(Peer::connected(peer.name(), connection))
+                                    } else {
+                                        Some(peer)
+                                    }
+                                } else {
+                                    None
+                                }
                             })
                             .collect();
 
@@ -244,7 +256,8 @@ impl<'a> Join<'a> {
                             resource_proof_response: None,
                         };
 
-                        self.send_join_requests(join_request, &new_recipients, section_key, true)
+                        recipients = new_recipients;
+                        self.send_join_requests(join_request, &recipients, section_key, true)
                             .await?;
                     } else {
                         warn!(
@@ -263,8 +276,20 @@ impl<'a> Join<'a> {
                         let new_recipients: Vec<_> = section_auth
                             .peers()
                             .into_iter()
-                            .filter(|peer| {
-                                used_recipient_saps.insert((peer.addr(), new_section_key))
+                            .filter_map(|peer| {
+                                if used_recipient_saps.insert((peer.addr(), new_section_key)) {
+                                    if let Some(connection) = recipients
+                                        .iter_mut()
+                                        .find(|p| p.addr() == peer.addr())
+                                        .and_then(|p| p.connection.take())
+                                    {
+                                        Some(Peer::connected(peer.name(), connection))
+                                    } else {
+                                        Some(peer)
+                                    }
+                                } else {
+                                    None
+                                }
                             })
                             .collect();
 
@@ -291,7 +316,8 @@ impl<'a> Join<'a> {
                             resource_proof_response: None,
                         };
 
-                        self.send_join_requests(join_request, &new_recipients, section_key, true)
+                        recipients = new_recipients;
+                        self.send_join_requests(join_request, &recipients, section_key, true)
                             .await?;
                     } else {
                         warn!(
