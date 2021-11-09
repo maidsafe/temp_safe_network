@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use std::{
+    cmp::Ordering,
     fmt::{self, Display, Formatter},
-    hash::Hash,
+    hash::{Hash, Hasher},
     net::SocketAddr,
 };
 use xor_name::{XorName, XOR_NAME_LEN};
@@ -16,15 +17,44 @@ use xor_name::{XorName, XOR_NAME_LEN};
 /// Network p2p peer identity.
 /// When a node knows another p2p_node as a `Peer` it's implicitly connected to it. This is separate
 /// from being connected at the network layer, which currently is handled by quic-p2p.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct Peer {
     name: XorName,
     addr: SocketAddr,
+
+    // The connection through which we learned about the `Peer`. This may be set when connecting to
+    // a peer, or when receiving an incoming connection. This provides a means for connection reuse,
+    // but there's no guarantee that the connection will still be valid at call time, so
+    // reconnection may be necessary.
+    pub(crate) connection: Option<qp2p::Connection>,
 }
 
 impl Display for Peer {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{} at {}", self.name, self.addr)
+    }
+}
+
+impl Eq for Peer {}
+
+impl Hash for Peer {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.addr.hash(state);
+    }
+}
+
+impl Ord for Peer {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.name
+            .cmp(&other.name)
+            .then_with(|| self.addr.cmp(&other.addr))
+    }
+}
+
+impl PartialEq for Peer {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.addr == other.addr
     }
 }
 
@@ -34,10 +64,32 @@ impl PartialEq<&Self> for Peer {
     }
 }
 
+impl PartialOrd for Peer {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl Peer {
     /// Creates a new `Peer` given `Name`, `SocketAddr`.
     pub fn new(name: XorName, addr: SocketAddr) -> Self {
-        Self { name, addr }
+        Self {
+            name,
+            addr,
+            connection: None,
+        }
+    }
+
+    /// Crates a new `Peer` given a `name`, and an existing connection to the peer.
+    ///
+    /// Note that the connection doesn't have to be alive (i.e. may be disconnected). This needs to
+    /// be considered when reading `self.connection`.
+    pub(crate) fn connected(name: XorName, connection: qp2p::Connection) -> Self {
+        Self {
+            name,
+            addr: connection.remote_address(),
+            connection: Some(connection),
+        }
     }
 
     /// Returns the `XorName` of the peer.

@@ -26,7 +26,6 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof;
-use std::net::SocketAddr;
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
@@ -40,17 +39,20 @@ pub(crate) async fn join_network(
     node: Node,
     comm: &Comm,
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
-    bootstrap_addr: SocketAddr,
+    bootstrap_peer: qp2p::Connection,
     genesis_key: BlsPublicKey,
 ) -> Result<(Node, NetworkKnowledge)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap");
 
+    // We don't know the peer's name, so just use our own on the assumption that we'll be corrected
+    // by AE.
+    let bootstrap_peer = Peer::connected(node.name(), bootstrap_peer);
     let state = Join::new(node, send_tx, incoming_conns);
 
     future::join(
-        state.run(bootstrap_addr, genesis_key),
+        state.join(genesis_key, vec![bootstrap_peer]),
         send_messages(send_rx, comm),
     )
     .instrument(span)
@@ -94,18 +96,6 @@ impl<'a> Join<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn run(
-        self,
-        bootstrap_addr: SocketAddr,
-        genesis_key: BlsPublicKey,
-    ) -> Result<(Node, NetworkKnowledge)> {
-        // Use our XorName as we do not know their name or section key yet.
-        let dst_xorname = self.node.name();
-        let recipients = vec![Peer::new(dst_xorname, bootstrap_addr)];
-
-        self.join(genesis_key, recipients).await
-    }
-
     #[tracing::instrument(skip(self))]
     async fn join(
         mut self,
@@ -209,6 +199,7 @@ impl<'a> Join<'a> {
                     if prefix.matches(&self.node.name()) {
                         let new_section_key = section_auth.section_key();
 
+                        // FIXME: we lose our connected peers here – maybe that's OK though?
                         let new_recipients: Vec<_> = section_auth
                             .peers()
                             .into_iter()
@@ -268,6 +259,7 @@ impl<'a> Join<'a> {
                     if section_auth.prefix.matches(&self.node.name()) {
                         let new_section_key = section_auth.section_key();
 
+                        // FIXME: we lose our connected peers here – maybe that's OK though?
                         let new_recipients: Vec<_> = section_auth
                             .peers()
                             .into_iter()
@@ -529,7 +521,7 @@ mod tests {
         pin_mut,
     };
     use secured_linked_list::SecuredLinkedList;
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, net::SocketAddr};
     use tokio::task;
     use xor_name::XorName;
 
@@ -541,7 +533,7 @@ mod tests {
         let (section_auth, mut nodes, sk_set) =
             gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
-        let bootstrap_addr = bootstrap_node.addr;
+        let bootstrap_peer = bootstrap_node.peer();
 
         let sk = sk_set.secret_key();
         let pk = sk.public_key();
@@ -557,7 +549,12 @@ mod tests {
         let state = Join::new(node, send_tx, &mut recv_rx);
 
         // Create the bootstrap task, but don't run it yet.
-        let bootstrap = async move { state.run(bootstrap_addr, pk).await.map_err(Error::from) };
+        let bootstrap = async move {
+            state
+                .join(pk, vec![bootstrap_peer])
+                .await
+                .map_err(Error::from)
+        };
 
         // Create the task that executes the body of the test, but don't run it either.
         let others = async {
@@ -571,7 +568,7 @@ mod tests {
                 .iter()
                 .map(|recipient| recipient.addr())
                 .collect();
-            assert_eq!(bootstrap_addrs, [bootstrap_addr]);
+            assert_eq!(bootstrap_addrs, [bootstrap_node.addr]);
 
             let node_msg = assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, .. }) =>
                 msg);
@@ -641,6 +638,7 @@ mod tests {
 
         let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
+        let bootstrap_peer = bootstrap_node.peer();
         let genesis_key = sk_set.secret_key().public_key();
 
         let node = Node::new(
@@ -649,7 +647,7 @@ mod tests {
         );
         let state = Join::new(node, send_tx, &mut recv_rx);
 
-        let bootstrap_task = state.run(bootstrap_node.addr, genesis_key);
+        let bootstrap_task = state.join(genesis_key, vec![bootstrap_peer]);
         let test_task = async move {
             // Receive JoinRequest
             let (wire_msg, recipients) = send_rx
@@ -738,6 +736,7 @@ mod tests {
 
         let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
+        let bootstrap_peer = bootstrap_node.peer();
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -745,7 +744,7 @@ mod tests {
         );
         let state = Join::new(node, send_tx, &mut recv_rx);
 
-        let bootstrap_task = state.run(bootstrap_node.addr, sk_set.secret_key().public_key());
+        let bootstrap_task = state.join(sk_set.secret_key().public_key(), vec![bootstrap_peer]);
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()
@@ -819,6 +818,7 @@ mod tests {
         let (section_auth, mut nodes, sk_set) =
             gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
+        let bootstrap_peer = bootstrap_node.peer();
 
         let node = Node::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -827,7 +827,7 @@ mod tests {
 
         let state = Join::new(node, send_tx, &mut recv_rx);
 
-        let bootstrap_task = state.run(bootstrap_node.addr, sk_set.secret_key().public_key());
+        let bootstrap_task = state.join(sk_set.secret_key().public_key(), vec![bootstrap_peer]);
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()

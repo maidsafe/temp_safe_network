@@ -152,7 +152,7 @@ impl Routing {
             let node_name = ed25519::name(&keypair.public);
             info!("{} Bootstrapping a new node.", node_name);
 
-            let (comm, bootstrap_addr) = Comm::bootstrap(
+            let (comm, bootstrap_peer) = Comm::bootstrap(
                 config.local_addr,
                 config
                     .bootstrap_nodes
@@ -169,7 +169,7 @@ impl Routing {
                 node_name,
                 std::process::id(),
                 comm.our_connection_info(),
-                bootstrap_addr,
+                bootstrap_peer.remote_address(),
                 genesis_key
             );
 
@@ -178,7 +178,7 @@ impl Routing {
                 joining_node,
                 &comm,
                 &mut connection_event_rx,
-                bootstrap_addr,
+                bootstrap_peer,
                 genesis_key,
             )
             .await?;

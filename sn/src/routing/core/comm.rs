@@ -86,7 +86,7 @@ impl Comm {
         bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
-    ) -> Result<(Self, SocketAddr)> {
+    ) -> Result<(Self, qp2p::Connection)> {
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
         let (endpoint, incoming_connections, bootstrap_peer) =
@@ -126,7 +126,7 @@ impl Comm {
                 back_pressure: BackPressure::new(),
                 connected_peers,
             },
-            bootstrap_peer.remote_address(),
+            bootstrap_peer,
         ))
     }
 
@@ -276,9 +276,17 @@ impl Comm {
 
                 let retries = self.back_pressure.get(&recipient.addr()).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-                let connection = if let Some(connection) =
+                let connection = if let Some(connection) = &recipient.connection {
+                    // FIXME: connection may have been lost – we should retry if that's the case
+                    // (retries may already be happening at a higher level though, so this could be
+                    // non-trivial)
+                    Ok(connection.clone())
+                } else if let Some(connection) =
                     self.connected_peers.get_by_address(&recipient.addr()).await
                 {
+                    // FIXME: connection may have been lost – we should retry if that's the case
+                    // (retries may already be happening at a higher level though, so this could be
+                    // non-trivial)
                     Ok(connection.connection().clone())
                 } else {
                     self.endpoint.connect_to(&recipient.addr()).await.map(
