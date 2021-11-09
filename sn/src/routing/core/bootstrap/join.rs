@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::read_prefix_map_from_disk;
+use super::{read_prefix_map_from_disk, UsedRecipientSaps};
 use crate::messaging::{
     system::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SystemMsg},
-    DstLocation, MessageType, MsgKind, NodeAuth, SectionAuthorityProvider, WireMsg,
+    DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
 use crate::routing::{
     core::{Comm, ConnectionEvent, SendStatus},
@@ -26,7 +26,7 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof;
-use std::{collections::HashSet, net::SocketAddr};
+use std::net::SocketAddr;
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
@@ -109,7 +109,7 @@ impl<'a> Join<'a> {
     async fn join(
         mut self,
         network_genesis_key: BlsPublicKey,
-        mut recipients: Vec<Peer>,
+        recipients: Vec<Peer>,
     ) -> Result<(Node, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
@@ -128,13 +128,15 @@ impl<'a> Join<'a> {
         self.send_join_requests(join_request, &recipients, section_key, false)
             .await?;
 
-        // Avoid sending more than one request to the same peer.
-        let mut used_recipient = HashSet::<SocketAddr>::new();
-        let mut used_recipient_saps = HashSet::<SectionAuthorityProvider>::new();
+        // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
+        let mut used_recipient_saps = UsedRecipientSaps::new();
+
+        // To avoid recusive due to outdated SAP, only allowed sending request to SAP
+        // having longer prefix and more elders.
+        // This is mainly only required for tests during genesis section.
+        let mut expected_elders = recipients.len();
 
         loop {
-            used_recipient.extend(recipients.iter().map(|peer| peer.addr()));
-
             let (response, sender) = self.receive_join_response().await?;
 
             match response {
@@ -179,22 +181,11 @@ impl<'a> Join<'a> {
                     section_auth,
                     expected_age,
                 } => {
-                    let new_recipients = match used_recipient_saps.get(&section_auth) {
-                        None => {
-                            let _ = used_recipient_saps.insert(section_auth.clone());
-                            section_auth.peers()
-                        }
-                        Some(_) => {
-                            debug!("Ignoring JoinResponse::Retry with same section authority provider as we previously sent to: {:?}", section_auth);
-                            continue;
-                        }
-                    };
-
                     let prefix = section_auth.prefix;
 
-                    // For the first section, using a stepoped age decreased from 100 to avoid
+                    // For the first section, using a stepped age decreased from 100 to avoid
                     // relocating too many nodes at the same time.
-                    // To avoid recursive due to received outdated SAP, self prefix shall be default
+                    // To avoid using outdated SAP, self prefix shall be default
                     // as well when re-generate for a new age.
                     trace!(
                         "Joining node {:?} - {:?}/{:?} received a Retry with SAP {:?}",
@@ -204,8 +195,42 @@ impl<'a> Join<'a> {
                         section_auth
                     );
 
+                    if prefix.bit_count() < self.prefix.bit_count()
+                        || section_auth.elders.len() < expected_elders
+                    {
+                        debug!(
+                            "Ignore JoinResponse::Retry with outdated SAP: {:?}",
+                            section_auth
+                        );
+                        continue;
+                    }
+
                     if prefix.matches(&self.node.name()) {
-                        self.prefix = prefix;
+                        let new_section_key = section_auth.section_key();
+
+                        let new_recipients: Vec<_> = section_auth
+                            .peers()
+                            .iter()
+                            .filter_map(|peer| {
+                                if used_recipient_saps.insert((peer.addr(), new_section_key)) {
+                                    Some(*peer)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        if new_recipients.is_empty() {
+                            debug!(
+                                "Ignore JoinResponse::Retry with old SAP that has been sent to: {:?}",
+                                section_auth
+                            );
+                            continue;
+                        } else {
+                            section_key = new_section_key;
+                            expected_elders = section_auth.elders.len();
+                            self.prefix = prefix;
+                        }
 
                         // make sure our joining age is the expected by the network
                         if self.node.age() != expected_age {
@@ -225,14 +250,13 @@ impl<'a> Join<'a> {
                             section_auth,
                             sender
                         );
-                        section_key = section_auth.section_key();
+
                         let join_request = JoinRequest {
                             section_key,
                             resource_proof_response: None,
                         };
 
-                        recipients = new_recipients;
-                        self.send_join_requests(join_request, &recipients, section_key, true)
+                        self.send_join_requests(join_request, &new_recipients, section_key, true)
                             .await?;
                     } else {
                         warn!(
@@ -244,45 +268,45 @@ impl<'a> Join<'a> {
                     }
                 }
                 JoinResponse::Redirect(section_auth) => {
-                    if section_auth.section_key() == section_key {
-                        debug!("Ignoring JoinResponse::Redirect with same section authority provider key as we previously sent: {:?}", section_auth);
-                        continue;
-                    }
-
-                    // Ignore already used recipients
-                    let new_recipients: Vec<_> = section_auth
-                        .peers()
-                        .into_iter()
-                        .filter(|peer| !used_recipient.contains(&peer.addr()))
-                        .collect();
-
-                    if new_recipients.is_empty() {
-                        debug!("Joining redirected to the same set of peers we already contacted - ignoring response");
-                        continue;
-                    } else {
-                        info!(
-                            "Joining redirected to another set of peers: {:?}",
-                            new_recipients,
-                        );
-                    }
-
                     if section_auth.prefix.matches(&self.node.name()) {
-                        self.prefix = section_auth.prefix;
+                        let new_section_key = section_auth.section_key();
+
+                        let new_recipients: Vec<_> = section_auth
+                            .peers()
+                            .iter()
+                            .filter_map(|peer| {
+                                if used_recipient_saps.insert((peer.addr(), new_section_key)) {
+                                    Some(*peer)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        if new_recipients.is_empty() {
+                            debug!(
+                                "Ignore JoinResponse::Redirect with old SAP that has been sent to: {:?}",
+                                section_auth
+                            );
+                            continue;
+                        } else {
+                            section_key = new_section_key;
+                            self.prefix = section_auth.prefix;
+                        }
+
                         info!(
-                            "Newer Join response for us {:?}, SAP {:?} from {:?}",
+                            "Newer JoinResponse::Redirect for us {:?}, SAP {:?} from {:?}",
                             self.node.name(),
                             section_auth,
                             sender
                         );
-                        section_key = section_auth.section_key();
+
                         let join_request = JoinRequest {
                             section_key,
                             resource_proof_response: None,
                         };
 
-                        recipients = new_recipients;
-
-                        self.send_join_requests(join_request, &recipients, section_key, true)
+                        self.send_join_requests(join_request, &new_recipients, section_key, true)
                             .await?;
                     } else {
                         warn!(

@@ -13,8 +13,12 @@ pub(crate) use join::join_network;
 pub(crate) use relocate::JoiningAsRelocated;
 
 use crate::prefix_map::NetworkPrefixMap;
+use bls::PublicKey as BlsPublicKey;
+use std::{collections::HashSet, net::SocketAddr};
 #[cfg(not(test))]
 use tokio::{fs::File, io::AsyncReadExt};
+
+type UsedRecipientSaps = HashSet<(SocketAddr, BlsPublicKey)>;
 
 #[cfg(not(test))]
 // Reads PrefixMap from '~/.safe/prefix_map' if present.
