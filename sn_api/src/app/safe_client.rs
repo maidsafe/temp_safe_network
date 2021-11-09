@@ -74,8 +74,8 @@ impl SafeAppClient {
             None,
             node_config.0,
             self.config_path.as_deref(),
-            None,
             Some(self.timeout),
+            None,
         )
         .await;
         let client = Client::new(config, node_config.1, app_keypair)

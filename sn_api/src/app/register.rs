@@ -146,7 +146,7 @@ impl Safe {
 
 #[cfg(test)]
 mod tests {
-    use crate::{app::test_helpers::new_safe_instance, retry_loop, Url};
+    use crate::{app::test_helpers::new_safe_instance, Url};
     use anyhow::Result;
 
     #[tokio::test]
@@ -156,8 +156,8 @@ mod tests {
         let xorurl = safe.register_create(None, 25_000, false).await?;
         let xorurl_priv = safe.register_create(None, 25_000, true).await?;
 
-        let received_data = retry_loop!(safe.register_read(&xorurl));
-        let received_data_priv = retry_loop!(safe.register_read(&xorurl_priv));
+        let received_data = safe.register_read(&xorurl).await?;
+        let received_data_priv = safe.register_read(&xorurl_priv).await?;
 
         assert!(received_data.is_empty());
         assert!(received_data_priv.is_empty());
@@ -170,8 +170,8 @@ mod tests {
             .write_to_register(&xorurl_priv, initial_data.clone(), Default::default())
             .await?;
 
-        let received_entry = retry_loop!(safe.register_read_entry(&xorurl, hash));
-        let received_entry_priv = retry_loop!(safe.register_read_entry(&xorurl_priv, hash_priv));
+        let received_entry = safe.register_read_entry(&xorurl, hash).await?;
+        let received_entry_priv = safe.register_read_entry(&xorurl_priv, hash_priv).await?;
 
         assert_eq!(received_entry, initial_data.clone());
         assert_eq!(received_entry_priv, initial_data);
