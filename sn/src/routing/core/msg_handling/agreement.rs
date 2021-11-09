@@ -82,7 +82,7 @@ impl Core {
                 commands.extend(self.send_node_approval(old_info.clone()).await);
 
                 let peer = new_info.to_peer();
-                commands.extend(self.relocate_rejoining_peer(&peer, new_age).await?);
+                commands.extend(self.relocate_rejoining_peer(peer, new_age).await?);
 
                 return Ok(commands);
             }
