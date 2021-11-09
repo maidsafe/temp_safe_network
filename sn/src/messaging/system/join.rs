@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{agreement::SectionAuth, section::NodeState};
-use crate::messaging::SectionAuthorityProvider;
+use crate::messaging::{system::KeyedSig, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;
@@ -56,8 +56,12 @@ pub enum JoinResponse {
     },
     /// Up to date section information for a joining peer to retry its join request with
     Retry {
-        /// The SectionAuthorityProvider of the section.
+        /// Current `SectionAuthorityProvider` of the section.
         section_auth: SectionAuthorityProvider,
+        /// Section signature over the `SectionAuthorityProvider`.
+        section_signed: KeyedSig,
+        /// Section chain truncated from the section key found in the join request.
+        proof_chain: SecuredLinkedList,
         /// The age of the node as expected by the section.
         expected_age: u8,
     },

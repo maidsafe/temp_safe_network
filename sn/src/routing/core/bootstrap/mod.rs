@@ -13,6 +13,9 @@ pub(crate) use join::join_network;
 pub(crate) use relocate::JoiningAsRelocated;
 
 use crate::prefix_map::NetworkPrefixMap;
+#[cfg(not(test))]
+use crate::routing::Error;
+use crate::routing::Result;
 use bls::PublicKey as BlsPublicKey;
 use std::{collections::HashSet, net::SocketAddr};
 #[cfg(not(test))]
@@ -22,33 +25,45 @@ type UsedRecipientSaps = HashSet<(SocketAddr, BlsPublicKey)>;
 
 #[cfg(not(test))]
 // Reads PrefixMap from '~/.safe/prefix_map' if present.
-async fn read_prefix_map_from_disk() -> Option<NetworkPrefixMap> {
-    let mut prefix_map_dir = dirs_next::home_dir()?;
-    prefix_map_dir.push(".safe");
-    prefix_map_dir.push("prefix_map");
+async fn read_prefix_map_from_disk(genesis_key: BlsPublicKey) -> Result<NetworkPrefixMap> {
+    let read_prefix_map = match dirs_next::home_dir() {
+        None => None,
+        Some(mut prefix_map_dir) => {
+            // Read NetworkPrefixMap from disk if present
+            prefix_map_dir.push(".safe");
+            prefix_map_dir.push("prefix_map");
 
-    // Read NetworkPrefixMap from disk if present
-    let prefix_map: Option<NetworkPrefixMap> =
-        if let Ok(mut prefix_map_file) = File::open(prefix_map_dir).await {
-            let mut prefix_map_contents = vec![];
-            let _ = prefix_map_file
-                .read_to_end(&mut prefix_map_contents)
-                .await
-                .ok()?;
+            if let Ok(mut prefix_map_file) = File::open(prefix_map_dir.clone()).await {
+                let mut prefix_map_contents = vec![];
+                match prefix_map_file.read_to_end(&mut prefix_map_contents).await {
+                    Ok(_) => rmp_serde::from_slice(&prefix_map_contents)
+                        .ok()
+                        .map(|map: NetworkPrefixMap| (map, prefix_map_dir)),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            }
+        }
+    };
 
-            rmp_serde::from_slice(&prefix_map_contents).ok()
-        } else {
-            None
-        };
-
-    if prefix_map.is_some() {
-        info!("Read PrefixMap from disc successfully");
+    match read_prefix_map {
+        Some((prefix_map, dir)) => {
+            info!(
+                "Read PrefixMap from disk successfully from {}",
+                dir.display()
+            );
+            if prefix_map.genesis_key() != genesis_key {
+                Err(Error::InvalidGenesisKey(prefix_map.genesis_key()))
+            } else {
+                Ok(prefix_map)
+            }
+        }
+        None => Ok(NetworkPrefixMap::new(genesis_key)),
     }
-
-    prefix_map
 }
 
 #[cfg(test)]
-async fn read_prefix_map_from_disk() -> Option<NetworkPrefixMap> {
-    None
+async fn read_prefix_map_from_disk(genesis_key: BlsPublicKey) -> Result<NetworkPrefixMap> {
+    Ok(NetworkPrefixMap::new(genesis_key))
 }

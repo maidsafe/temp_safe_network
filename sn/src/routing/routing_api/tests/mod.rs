@@ -59,7 +59,8 @@ static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
-    let (section_auth, mut nodes, sk_set) = create_section_auth();
+    let prefix1 = Prefix::default().pushed(true);
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, ELDER_SIZE);
 
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
@@ -82,10 +83,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let new_node_comm = create_comm().await?;
     let new_node = Node::new(
-        ed25519::gen_keypair(
-            &Prefix::default().range_inclusive(),
-            FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2,
-        ),
+        ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
         new_node_comm.our_connection_info(),
     );
 
@@ -141,7 +139,8 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_with_resource_proof_response() -> Result<()> {
-    let (section_auth, mut nodes, sk_set) = create_section_auth();
+    let prefix1 = Prefix::default().pushed(true);
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, ELDER_SIZE);
 
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
@@ -163,10 +162,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let new_node = Node::new(
-        ed25519::gen_keypair(
-            &Prefix::default().range_inclusive(),
-            FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2,
-        ),
+        ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
         gen_addr(),
     );
 
@@ -217,7 +213,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         {
             assert_eq!(peer.name(), new_node.name());
             assert_eq!(peer.addr(), new_node.addr);
-            assert_eq!(peer.age(), FIRST_SECTION_MAX_AGE - ELDER_SIZE as u8 * 2);
+            assert_eq!(peer.age(), MIN_ADULT_AGE);
             assert_eq!(previous_name, None);
             assert_eq!(dst_key, None);
 

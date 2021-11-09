@@ -8,9 +8,13 @@
 
 use super::{read_prefix_map_from_disk, UsedRecipientSaps};
 use crate::messaging::{
-    system::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SystemMsg},
+    system::{
+        JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SectionAuth,
+        SystemMsg,
+    },
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
+use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     core::{Comm, ConnectionEvent, SendStatus},
     dkg::SectionAuthUtils,
@@ -47,15 +51,15 @@ pub(crate) async fn join_network(
 
     let span = trace_span!("bootstrap");
 
-    let state = Join::new(node, send_tx, incoming_conns);
+    // Read prefix map from cache if available
+    let prefix_map = read_prefix_map_from_disk(genesis_key).await?;
 
-    future::join(
-        state.run(bootstrap_addr, genesis_key),
-        send_messages(send_rx, comm),
-    )
-    .instrument(span)
-    .await
-    .0
+    let state = Join::new(node, send_tx, incoming_conns, prefix_map);
+
+    future::join(state.run(bootstrap_addr), send_messages(send_rx, comm))
+        .instrument(span)
+        .await
+        .0
 }
 
 struct Join<'a> {
@@ -65,6 +69,7 @@ struct Join<'a> {
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
     prefix: Prefix,
+    prefix_map: NetworkPrefixMap,
     backoff: ExponentialBackoff,
 }
 
@@ -73,12 +78,14 @@ impl<'a> Join<'a> {
         node: Node,
         send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
+        prefix_map: NetworkPrefixMap,
     ) -> Self {
         Self {
             send_tx,
             recv_rx,
             node,
             prefix: Prefix::default(),
+            prefix_map,
             backoff: ExponentialBackoff {
                 initial_interval: Duration::from_millis(50),
                 max_interval: Duration::from_millis(750),
@@ -94,14 +101,11 @@ impl<'a> Join<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn run(
-        self,
-        bootstrap_addr: SocketAddr,
-        genesis_key: BlsPublicKey,
-    ) -> Result<(Node, NetworkKnowledge)> {
+    async fn run(self, bootstrap_addr: SocketAddr) -> Result<(Node, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
         let dst_xorname = self.node.name();
         let recipients = vec![Peer::new(dst_xorname, bootstrap_addr)];
+        let genesis_key = self.prefix_map.genesis_key();
 
         self.join(genesis_key, recipients).await
     }
@@ -130,11 +134,6 @@ impl<'a> Join<'a> {
 
         // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
         let mut used_recipient_saps = UsedRecipientSaps::new();
-
-        // To avoid recusive due to outdated SAP, only allowed sending request to SAP
-        // having longer prefix and more elders.
-        // This is mainly only required for tests during genesis section.
-        let mut expected_elders = recipients.len();
 
         loop {
             let (response, sender) = self.receive_join_response().await?;
@@ -173,20 +172,16 @@ impl<'a> Join<'a> {
                             genesis_key,
                             section_chain,
                             section_auth,
-                            read_prefix_map_from_disk().await,
+                            Some(self.prefix_map),
                         )?,
                     ));
                 }
                 JoinResponse::Retry {
                     section_auth,
+                    section_signed,
+                    proof_chain,
                     expected_age,
                 } => {
-                    let prefix = section_auth.prefix;
-
-                    // For the first section, using a stepped age decreased from 100 to avoid
-                    // relocating too many nodes at the same time.
-                    // To avoid using outdated SAP, self prefix shall be default
-                    // as well when re-generate for a new age.
                     trace!(
                         "Joining node {:?} - {:?}/{:?} received a Retry with SAP {:?}",
                         self.prefix,
@@ -195,127 +190,120 @@ impl<'a> Join<'a> {
                         section_auth
                     );
 
-                    if prefix.bit_count() < self.prefix.bit_count()
-                        || section_auth.elders.len() < expected_elders
-                    {
+                    let prefix = section_auth.prefix;
+                    if !prefix.matches(&self.node.name()) {
+                        warn!(
+                            "Ignoring newer JoinResponse::Retry response not for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender,
+                        );
+                        continue;
+                    }
+
+                    let signed_sap = SectionAuth {
+                        value: section_auth.clone(),
+                        sig: section_signed,
+                    };
+
+                    // make sure we received a valid and trusted new SAP
+                    match self.prefix_map.update(signed_sap, &proof_chain) {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            // it's not a new SAP, ignore it unless the expected age is different.
+                            if self.node.age() == expected_age {
+                                debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
+                                continue;
+                            }
+                        }
+                        Err(err) => {
+                            debug!(
+                                "Ignoring JoinResponse::Retry with an invalid SAP: {:?}",
+                                err
+                            );
+                            continue;
+                        }
+                    }
+
+                    // make sure our joining age is the expected by the network
+                    if self.node.age() != expected_age {
+                        let new_keypair = ed25519::gen_keypair(
+                            &Prefix::default().range_inclusive(),
+                            expected_age,
+                        );
+                        let new_name = ed25519::name(&new_keypair.public);
+
+                        info!("Setting Node name to {} (age {})", new_name, expected_age);
+                        self.node = Node::new(new_keypair, self.node.addr);
+                    }
+
+                    info!(
+                        "Newer Join response for us {:?}, SAP {:?} from {:?}",
+                        self.node.name(),
+                        section_auth,
+                        sender
+                    );
+
+                    section_key = section_auth.section_key();
+                    let join_request = JoinRequest {
+                        section_key,
+                        resource_proof_response: None,
+                    };
+
+                    let new_recipients = section_auth.peers();
+                    self.send_join_requests(join_request, &new_recipients, section_key, true)
+                        .await?;
+                }
+                JoinResponse::Redirect(section_auth) => {
+                    if !section_auth.prefix.matches(&self.node.name()) {
+                        warn!(
+                            "Ignoring newer JoinResponse::Redirect response not for us {:?}, SAP {:?} from {:?}",
+                            self.node.name(),
+                            section_auth,
+                            sender,
+                        );
+                        continue;
+                    }
+
+                    let new_section_key = section_auth.section_key();
+
+                    let new_recipients: Vec<_> = section_auth
+                        .peers()
+                        .iter()
+                        .filter_map(|peer| {
+                            if used_recipient_saps.insert((peer.addr(), new_section_key)) {
+                                Some(*peer)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    if new_recipients.is_empty() {
                         debug!(
-                            "Ignore JoinResponse::Retry with outdated SAP: {:?}",
+                            "Ignoring JoinResponse::Redirect with old SAP that has been sent to: {:?}",
                             section_auth
                         );
                         continue;
                     }
 
-                    if prefix.matches(&self.node.name()) {
-                        let new_section_key = section_auth.section_key();
+                    info!(
+                        "Newer JoinResponse::Redirect for us {:?}, SAP {:?} from {:?}",
+                        self.node.name(),
+                        section_auth,
+                        sender
+                    );
 
-                        let new_recipients: Vec<_> = section_auth
-                            .peers()
-                            .iter()
-                            .filter_map(|peer| {
-                                if used_recipient_saps.insert((peer.addr(), new_section_key)) {
-                                    Some(*peer)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
+                    section_key = new_section_key;
+                    self.prefix = section_auth.prefix;
 
-                        if new_recipients.is_empty() {
-                            debug!(
-                                "Ignore JoinResponse::Retry with old SAP that has been sent to: {:?}",
-                                section_auth
-                            );
-                            continue;
-                        } else {
-                            section_key = new_section_key;
-                            expected_elders = section_auth.elders.len();
-                            self.prefix = prefix;
-                        }
+                    let join_request = JoinRequest {
+                        section_key,
+                        resource_proof_response: None,
+                    };
 
-                        // make sure our joining age is the expected by the network
-                        if self.node.age() != expected_age {
-                            let new_keypair = ed25519::gen_keypair(
-                                &Prefix::default().range_inclusive(),
-                                expected_age,
-                            );
-                            let new_name = ed25519::name(&new_keypair.public);
-
-                            info!("Setting Node name to {}", new_name);
-                            self.node = Node::new(new_keypair, self.node.addr);
-                        }
-
-                        info!(
-                            "Newer Join response for us {:?}, SAP {:?} from {:?}",
-                            self.node.name(),
-                            section_auth,
-                            sender
-                        );
-
-                        let join_request = JoinRequest {
-                            section_key,
-                            resource_proof_response: None,
-                        };
-
-                        self.send_join_requests(join_request, &new_recipients, section_key, true)
-                            .await?;
-                    } else {
-                        warn!(
-                            "Newer Join response not for us {:?}, SAP {:?} from {:?}",
-                            self.node.name(),
-                            section_auth,
-                            sender,
-                        );
-                    }
-                }
-                JoinResponse::Redirect(section_auth) => {
-                    if section_auth.prefix.matches(&self.node.name()) {
-                        let new_section_key = section_auth.section_key();
-
-                        let new_recipients: Vec<_> = section_auth
-                            .peers()
-                            .iter()
-                            .filter_map(|peer| {
-                                if used_recipient_saps.insert((peer.addr(), new_section_key)) {
-                                    Some(*peer)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-
-                        if new_recipients.is_empty() {
-                            debug!(
-                                "Ignore JoinResponse::Redirect with old SAP that has been sent to: {:?}",
-                                section_auth
-                            );
-                            continue;
-                        } else {
-                            section_key = new_section_key;
-                            self.prefix = section_auth.prefix;
-                        }
-
-                        info!(
-                            "Newer JoinResponse::Redirect for us {:?}, SAP {:?} from {:?}",
-                            self.node.name(),
-                            section_auth,
-                            sender
-                        );
-
-                        let join_request = JoinRequest {
-                            section_key,
-                            resource_proof_response: None,
-                        };
-
-                        self.send_join_requests(join_request, &new_recipients, section_key, true)
-                            .await?;
-                    } else {
-                        warn!(
-                            "Newer Join response not for us {:?}, SAP {:?} from {:?}",
-                            self.node.name(),
-                            section_auth,
-                            sender,
-                        );
-                    }
+                    self.send_join_requests(join_request, &new_recipients, section_key, true)
+                        .await?;
                 }
                 JoinResponse::ResourceChallenge {
                     data_size,
@@ -547,9 +535,8 @@ mod tests {
             gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
         let bootstrap_node = nodes.remove(0);
         let bootstrap_addr = bootstrap_node.addr;
-
         let sk = sk_set.secret_key();
-        let pk = sk.public_key();
+        let section_key = sk.public_key();
 
         // Node in first section has to have a stepped age,
         // Otherwise during the bootstrap process, node will change its id and age.
@@ -559,10 +546,15 @@ mod tests {
             gen_addr(),
         );
         let peer = node.peer();
-        let state = Join::new(node, send_tx, &mut recv_rx);
+        let state = Join::new(
+            node,
+            send_tx,
+            &mut recv_rx,
+            NetworkPrefixMap::new(section_key),
+        );
 
         // Create the bootstrap task, but don't run it yet.
-        let bootstrap = async move { state.run(bootstrap_addr, pk).await.map_err(Error::from) };
+        let bootstrap = async move { state.run(bootstrap_addr).await.map_err(Error::from) };
 
         // Create the task that executes the body of the test, but don't run it either.
         let others = async {
@@ -586,10 +578,15 @@ mod tests {
             });
 
             // Send JoinResponse::Retry with section auth provider info
+            let section_chain = SecuredLinkedList::new(section_key);
+            let signed_sap = section_signed(sk, section_auth.clone())?;
+
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
                     section_auth: section_auth.clone(),
+                    section_signed: signed_sap.sig,
+                    proof_chain: section_chain,
                     expected_age: MIN_ADULT_AGE,
                 })),
                 &bootstrap_node,
@@ -604,20 +601,20 @@ mod tests {
             let (node_msg, dst_location) = assert_matches!(wire_msg.into_message(), Ok(MessageType::System { msg, dst_location,.. }) =>
                 (msg, dst_location));
 
-            assert_eq!(dst_location.section_pk(), Some(pk));
+            assert_eq!(dst_location.section_pk(), Some(section_key));
             itertools::assert_equal(recipients, section_auth.peers());
             assert_matches!(node_msg, SystemMsg::JoinRequest(request) => {
-                assert_eq!(request.section_key, pk);
+                assert_eq!(request.section_key, section_key);
             });
 
             // Send JoinResponse::Approval
             let section_auth = section_signed(sk, section_auth.clone())?;
             let node_state = section_signed(sk, NodeState::joined(peer, None))?;
-            let proof_chain = SecuredLinkedList::new(pk);
+            let proof_chain = SecuredLinkedList::new(section_key);
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
-                    genesis_key: pk,
+                    genesis_key: section_key,
                     section_auth: section_auth.clone(),
                     node_state,
                     section_chain: proof_chain,
@@ -633,7 +630,7 @@ mod tests {
         let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
         assert_eq!(section.authority_provider().await, section_auth);
-        assert_eq!(section.section_key().await, pk);
+        assert_eq!(section.section_key().await, section_key);
         assert_eq!(node.age(), node_age);
 
         Ok(())
@@ -652,9 +649,14 @@ mod tests {
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let state = Join::new(node, send_tx, &mut recv_rx);
+        let state = Join::new(
+            node,
+            send_tx,
+            &mut recv_rx,
+            NetworkPrefixMap::new(genesis_key),
+        );
 
-        let bootstrap_task = state.run(bootstrap_node.addr, genesis_key);
+        let bootstrap_task = state.run(bootstrap_node.addr);
         let test_task = async move {
             // Receive JoinRequest
             let (wire_msg, recipients) = send_rx
@@ -748,9 +750,15 @@ mod tests {
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let state = Join::new(node, send_tx, &mut recv_rx);
+        let section_key = sk_set.secret_key().public_key();
+        let state = Join::new(
+            node,
+            send_tx,
+            &mut recv_rx,
+            NetworkPrefixMap::new(section_key),
+        );
 
-        let bootstrap_task = state.run(bootstrap_node.addr, sk_set.secret_key().public_key());
+        let bootstrap_task = state.run(bootstrap_node.addr);
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()
@@ -830,9 +838,15 @@ mod tests {
             gen_addr(),
         );
 
-        let state = Join::new(node, send_tx, &mut recv_rx);
+        let section_key = sk_set.secret_key().public_key();
+        let state = Join::new(
+            node,
+            send_tx,
+            &mut recv_rx,
+            NetworkPrefixMap::new(section_key),
+        );
 
-        let bootstrap_task = state.run(bootstrap_node.addr, sk_set.secret_key().public_key());
+        let bootstrap_task = state.run(bootstrap_node.addr);
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()
@@ -893,9 +907,16 @@ mod tests {
             }
         };
 
-        let state = Join::new(node, send_tx, &mut recv_rx);
+        let (section_auth, _, sk_set) = gen_section_authority_provider(good_prefix, ELDER_SIZE);
+        let section_key = sk_set.public_keys().public_key();
 
-        let section_key = bls::SecretKey::random().public_key();
+        let state = Join::new(
+            node,
+            send_tx,
+            &mut recv_rx,
+            NetworkPrefixMap::new(section_key),
+        );
+
         let elders = (0..ELDER_SIZE)
             .map(|_| Peer::new(good_prefix.substituted_in(rand::random()), gen_addr()))
             .collect();
@@ -911,11 +932,16 @@ mod tests {
                 assert_matches!(wire_msg.into_message(), Ok(MessageType::System{ msg, .. }) => msg);
             assert_matches!(node_msg, SystemMsg::JoinRequest(_));
 
+            let section_chain = SecuredLinkedList::new(section_key);
+            let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+
             // Send `Retry` with bad prefix
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
                     section_auth: gen_section_authority_provider(bad_prefix, ELDER_SIZE).0,
+                    section_signed: signed_sap.sig.clone(),
+                    proof_chain: section_chain.clone(),
                     expected_age: MIN_ADULT_AGE,
                 })),
                 &bootstrap_node,
@@ -927,7 +953,9 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                    section_auth: gen_section_authority_provider(good_prefix, ELDER_SIZE).0,
+                    section_auth,
+                    section_signed: signed_sap.sig,
+                    proof_chain: section_chain,
                     expected_age: MIN_ADULT_AGE,
                 })),
                 &bootstrap_node,

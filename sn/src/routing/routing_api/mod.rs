@@ -108,13 +108,13 @@ impl Routing {
             )
             .await?;
 
-            let section = core.network_knowledge();
+            let network_knowledge = core.network_knowledge();
 
             let elders = Elders {
-                prefix: section.prefix().await,
-                key: section.section_key().await,
+                prefix: network_knowledge.prefix().await,
+                key: network_knowledge.section_key().await,
                 remaining: BTreeSet::new(),
-                added: section.authority_provider().await.names(),
+                added: network_knowledge.authority_provider().await.names(),
                 removed: BTreeSet::new(),
             };
 
@@ -125,7 +125,7 @@ impl Routing {
             })
             .await;
 
-            let genesis_key = section.genesis_key();
+            let genesis_key = network_knowledge.genesis_key();
             info!(
                 "{} Genesis node started!. Genesis key {:?}, hex: {}",
                 node_name,
