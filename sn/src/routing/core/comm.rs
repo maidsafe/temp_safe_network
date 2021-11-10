@@ -266,8 +266,10 @@ impl Comm {
             {
                 Ok(connection.connection().clone())
             } else {
-                self.endpoint.connect_to(&recipient.addr()).await.map(
-                    |(connection, connection_incoming)| {
+                self.endpoint
+                    .connect_to(&recipient.addr())
+                    .and_then(|(connection, connection_incoming)| async move {
+                        self.connected_peers.insert(connection.clone()).await;
                         let _ = task::spawn(handle_incoming_messages(
                             connection.id(),
                             connection.remote_address(),
@@ -276,9 +278,9 @@ impl Comm {
                             self.msg_count.clone(),
                             self.connected_peers.clone(),
                         ));
-                        connection
-                    },
-                )
+                        Ok(connection)
+                    })
+                    .await
             };
 
             let result = future::ready(connection)
