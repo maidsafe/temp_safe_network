@@ -47,7 +47,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const BASE_TRACING_DIRECTIVES: &str = "testnet=info,sn_launch_tool=debug";
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: Duration = Duration::from_millis(100);
+const DEFAULT_INTERVAL: &str = "1000";
 const DEFAULT_NODE_COUNT: u32 = 33;
 
 #[derive(Debug, StructOpt)]
@@ -56,6 +56,10 @@ struct Cmd {
     /// All nodes will be joining existing testnet, none will be started as a genesis node.
     #[structopt(long = "add")]
     add_nodes_to_existing_network: bool,
+
+    /// Interval in milliseconds between launching each of the nodes.
+    #[structopt(long = "interval", default_value = DEFAULT_INTERVAL)]
+    interval: u64,
 }
 
 #[tokio::main]
@@ -151,7 +155,8 @@ pub async fn run_network() -> Result<()> {
     let node_count_str = node_count.to_string();
 
     // Let's create an args array to pass to the network launcher tool
-    let interval_str = INTERVAL.as_millis().to_string();
+    let interval_str = args.interval.to_string();
+
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool",
         "--node-path",
@@ -188,7 +193,7 @@ pub async fn run_network() -> Result<()> {
     Launch::from_iter_safe(&sn_launch_tool_args)?.run()?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = INTERVAL * node_count;
+    let interval_duration = Duration::from_millis(args.interval) * node_count / 2;
 
     sleep(interval_duration).await;
 

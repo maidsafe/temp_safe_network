@@ -207,9 +207,15 @@ async fn run_node() -> Result<()> {
                 error!("{}", &message);
             }
             Err(e) => {
-                return Err(e).wrap_err(
-                    "Cannot start node. If this is the first node on the network pass the local \
-                    address to be used using --first",
+                let log_path = if let Some(path) = config.log_dir() {
+                    format!("{}", path.display())
+                } else {
+                    "unknown".to_string()
+                };
+
+                return Err(e).wrap_err(format!(
+                    "Cannot start node (log path: {}). If this is the first node on the network pass the local \
+                    address to be used using --first", log_path)
                 );
             }
         }
