@@ -65,7 +65,7 @@ pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
-pub(crate) const CONCURRENT_JOINS: usize = 5;
+pub(crate) const CONCURRENT_JOINS: usize = 7;
 
 // store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
