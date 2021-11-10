@@ -228,6 +228,8 @@ impl<'a> Join<'a> {
 
                     // make sure our joining age is the expected by the network
                     if self.node.age() != expected_age {
+                        trace!("re-generate name due to mis-matched age, current {:?} vs. expected {:?}",
+                            self.node.age(), expected_age);
                         let new_keypair = ed25519::gen_keypair(
                             &Prefix::default().range_inclusive(),
                             expected_age,
