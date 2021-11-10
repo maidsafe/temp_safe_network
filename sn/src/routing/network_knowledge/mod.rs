@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod elder_candidates;
 pub(super) mod node_state;
 pub(super) mod peer;
 pub(crate) mod section_authority_provider;
@@ -18,7 +19,7 @@ pub(crate) use self::section_authority_provider::test_utils;
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 use crate::messaging::{
-    system::{ElderCandidates, KeyedSig, NodeState, SectionAuth, SectionPeers},
+    system::{KeyedSig, NodeState, SectionAuth, SectionPeers},
     SectionAuthorityProvider,
 };
 use crate::prefix_map::NetworkPrefixMap;
@@ -29,9 +30,9 @@ use crate::routing::{
     ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
 };
 use bls::PublicKey as BlsPublicKey;
+pub(crate) use elder_candidates::ElderCandidates;
 pub(crate) use node_state::NodeStateUtils;
 use peer::Peer;
-pub(crate) use section_authority_provider::ElderCandidatesUtils;
 use section_authority_provider::SectionAuthorityProviderUtils;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
@@ -411,7 +412,7 @@ impl NetworkKnowledge {
             warn!("ignore attempt to reduce the number of elders too much");
             vec![]
         } else {
-            let elder_candidates = ElderCandidates::new(expected_peers, sap.prefix());
+            let elder_candidates = ElderCandidates::new(sap.prefix(), expected_peers);
             vec![elder_candidates]
         }
     }
@@ -537,8 +538,8 @@ impl NetworkKnowledge {
             excluded_names,
         );
 
-        let our_elder_candidates = ElderCandidates::new(our_elders, our_prefix);
-        let other_elder_candidates = ElderCandidates::new(other_elders, other_prefix);
+        let our_elder_candidates = ElderCandidates::new(our_prefix, our_elders);
+        let other_elder_candidates = ElderCandidates::new(other_prefix, other_elders);
 
         debug!(">>>>> end of split attempt");
         Some((our_elder_candidates, other_elder_candidates))

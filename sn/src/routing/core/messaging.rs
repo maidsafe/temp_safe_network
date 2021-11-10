@@ -10,8 +10,8 @@ use super::Core;
 use super::ProposalUtils;
 use crate::messaging::{
     system::{
-        DkgSessionId, ElderCandidates, JoinResponse, NodeState, Proposal, RelocateDetails,
-        RelocatePromise, SectionAuth, SystemMsg,
+        DkgSessionId, JoinResponse, NodeState, Proposal, RelocateDetails, RelocatePromise,
+        SectionAuth, SystemMsg,
     },
     DstLocation, WireMsg,
 };
@@ -21,7 +21,7 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidatesUtils, NodeStateUtils, SectionKeyShare},
+    network_knowledge::{ElderCandidates, NodeStateUtils, SectionKeyShare},
     relocation::RelocateState,
     routing_api::command::Command,
     Peer, SectionAuthorityProviderUtils,
@@ -387,12 +387,12 @@ impl Core {
         &self,
         elder_candidates: ElderCandidates,
     ) -> Result<Vec<Command>> {
-        let src_prefix = elder_candidates.prefix;
+        let src_prefix = elder_candidates.prefix();
         let generation = self.network_knowledge.chain_len().await;
         let session_id = DkgSessionId::new(&elder_candidates, generation);
 
         // Send DKG start to all candidates
-        let recipients: Vec<_> = elder_candidates.peers().collect();
+        let recipients: Vec<_> = elder_candidates.elders().cloned().collect();
 
         trace!(
             "Send DkgStart for {:?} with {:?} to {:?}",
@@ -403,7 +403,11 @@ impl Core {
 
         let node_msg = SystemMsg::DkgStart {
             session_id,
-            elder_candidates,
+            prefix: elder_candidates.prefix(),
+            elders: elder_candidates
+                .elders()
+                .map(|peer| (peer.name(), peer.addr()))
+                .collect(),
         };
         let section_pk = self.network_knowledge.section_key().await;
         self.send_message_for_dst_accumulation(
