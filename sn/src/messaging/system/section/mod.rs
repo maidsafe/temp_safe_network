@@ -31,7 +31,7 @@ pub struct SectionPeers {
 impl Eq for SectionPeers {}
 
 impl PartialEq for SectionPeers {
-    fn eq(&self, _other: &Self) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         // TODO: there must be a better way of doing this...
         let mut us: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
         let mut them: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
@@ -41,7 +41,7 @@ impl PartialEq for SectionPeers {
             let _prev = us.insert(*key, value.clone());
         }
 
-        for refmulti in self.members.iter() {
+        for refmulti in other.members.iter() {
             let (key, value) = refmulti.pair();
             let _prev = them.insert(*key, value.clone());
         }
