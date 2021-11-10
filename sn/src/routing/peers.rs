@@ -112,14 +112,13 @@ impl Peer {
 /// A peer whose name we do not yet know.
 ///
 /// An [`UnknownPeer`] can be [`identify`]'d to become a [`Peer`].
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct UnknownPeer {
     addr: SocketAddr,
     connection: Option<qp2p::Connection>,
 }
 
 impl UnknownPeer {
-    #[cfg(test)]
     pub(crate) fn new(addr: SocketAddr) -> Self {
         Self {
             addr,

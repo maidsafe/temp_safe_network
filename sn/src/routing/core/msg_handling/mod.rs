@@ -29,13 +29,13 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     relocation::RelocateState,
     routing_api::command::Command,
-    ElderCandidates, Error, Event, MessageReceived, Peer, Result,
+    ElderCandidates, Error, Event, MessageReceived, Peer, Result, UnknownPeer,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use rand::rngs::OsRng;
-use std::{collections::BTreeSet, net::SocketAddr};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 // Message handling
@@ -43,14 +43,14 @@ impl Core {
     #[instrument(skip(self, original_bytes))]
     pub(crate) async fn handle_message(
         &self,
-        sender_addr: SocketAddr,
+        sender: UnknownPeer,
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
         let mut cmds = vec![];
         trace!("handling msg");
         // Apply backpressure if needed.
-        if let Some(load_report) = self.comm.check_strain(sender_addr).await {
+        if let Some(load_report) = self.comm.check_strain(sender.addr()).await {
             let msg_src = wire_msg.msg_kind().src();
             cmds.push(Command::PrepareNodeMsgToSend {
                 msg: SystemMsg::BackPressure(load_report),
@@ -95,7 +95,9 @@ impl Core {
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
                     warn!(
                         "Untrusted message ({:?}) dropped from {:?}: {:?} ",
-                        msg_id, sender_addr, msg
+                        msg_id,
+                        sender.addr(),
+                        msg
                     );
                     return Ok(cmds);
                 }
@@ -103,14 +105,10 @@ impl Core {
                 trace!(
                     "Trusted msg authority in message ({:?}) from {:?}: {:?}",
                     msg_id,
-                    sender_addr,
+                    sender.addr(),
                     msg
                 );
-
-                // TODO: msg_authority.peer() exists, but will error if authority is
-                // section/sectionshare. It's not clear if this would actually
-                // represent a valid peer.
-                let sender = Peer::new(msg_authority.name(), sender_addr);
+                let sender = sender.identify(msg_authority.name());
 
                 // Let's check for entropy before we proceed further
                 // Adult nodes don't need to carry out entropy checking,
@@ -184,23 +182,23 @@ impl Core {
                     None => {
                         error!(
                             "Service msg has been dropped since {:?} is not a valid msg to send from a client {}.",
-                            msg, sender_addr
+                            msg, sender.addr()
                         );
                         return Ok(vec![]);
                     }
                 };
-                let user = match self.comm.get_peer_connection_id(&sender_addr).await {
+                let user = match self.comm.get_peer_connection_id(&sender.addr()).await {
                     Some(name) => EndUser(name),
                     None => {
                         error!(
                             "Service msg has been dropped since client connection id for {} was not found: {:?}",
-                            sender_addr, msg
+                            sender.addr(), msg
                         );
                         return Ok(cmds);
                     }
                 };
 
-                let sender = Peer::new(user.0, sender_addr);
+                let sender = Peer::new(user.0, sender.addr());
                 let src_location = SrcLocation::EndUser(user);
 
                 if self.is_not_elder().await {

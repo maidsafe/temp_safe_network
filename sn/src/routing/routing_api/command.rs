@@ -13,14 +13,13 @@ use crate::messaging::{
 use crate::routing::{
     network_knowledge::{NetworkKnowledge, SectionKeyShare},
     node::Node,
-    Peer, XorName,
+    Peer, UnknownPeer, XorName,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use custom_debug::Debug;
 use std::{
     fmt,
-    net::SocketAddr,
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
@@ -32,9 +31,7 @@ pub(crate) enum Command {
     /// Handle `message` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     HandleMessage {
-        // This is the only command that uses `SocketAddr` instead of `Peer`, because we haven't
-        // deserialized/verified the src at this stage.
-        sender_addr: SocketAddr,
+        sender: UnknownPeer,
         wire_msg: WireMsg,
         #[debug(skip)]
         // original bytes to avoid reserializing for entropy checks

@@ -474,7 +474,7 @@ async fn handle_connection_events(
                 let _span_guard = span.enter();
                 let len = bytes.len();
                 let command = Command::HandleMessage {
-                    sender_addr,
+                    sender,
                     wire_msg,
                     original_bytes: Some(bytes),
                 };

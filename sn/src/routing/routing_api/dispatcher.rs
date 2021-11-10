@@ -230,12 +230,12 @@ impl Dispatcher {
                 self.core.prepare_node_msg(msg, dst).await
             }
             Command::HandleMessage {
-                sender_addr,
+                sender,
                 wire_msg,
                 original_bytes,
             } => {
                 self.core
-                    .handle_message(sender_addr, wire_msg, original_bytes)
+                    .handle_message(sender, wire_msg, original_bytes)
                     .await
             }
             Command::HandleTimeout(token) => self.core.handle_timeout(token).await,

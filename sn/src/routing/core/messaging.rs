@@ -24,7 +24,7 @@ use crate::routing::{
     network_knowledge::{NodeStateUtils, SectionKeyShare},
     relocation::RelocateState,
     routing_api::command::Command,
-    ElderCandidates, Peer, SectionAuthorityProviderUtils,
+    ElderCandidates, Peer, SectionAuthorityProviderUtils, UnknownPeer,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
@@ -490,7 +490,7 @@ impl Core {
             wire_msg.set_dst_xorname(self.node.read().await.name());
 
             commands.push(Command::HandleMessage {
-                sender_addr: self.node.read().await.addr,
+                sender: UnknownPeer::new(self.node.read().await.addr),
                 wire_msg,
                 original_bytes: None,
             });

@@ -28,8 +28,8 @@ use crate::routing::{
     node::Node,
     relocation::{self, RelocatePayloadUtils},
     supermajority, ElderCandidates, Error, Event, Peer, Result as RoutingResult,
-    SectionAuthorityProviderUtils, ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
-    MIN_ADULT_AGE, MIN_AGE,
+    SectionAuthorityProviderUtils, UnknownPeer, ELDER_SIZE, FIRST_SECTION_MAX_AGE,
+    FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
@@ -103,7 +103,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let mut commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: new_node.addr,
+            sender: UnknownPeer::new(new_node.addr),
             wire_msg,
             original_bytes: None,
         },
@@ -198,7 +198,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: new_node.addr,
+            sender: UnknownPeer::new(new_node.addr),
             wire_msg,
             original_bytes: None,
         },
@@ -307,7 +307,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let inner_commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: relocated_node.addr,
+            sender: UnknownPeer::new(relocated_node.addr),
             wire_msg,
             original_bytes: None,
         },
@@ -381,7 +381,7 @@ async fn aggregate_proposals() -> Result<()> {
 
         let commands = get_internal_commands(
             Command::HandleMessage {
-                sender_addr: node.addr,
+                sender: UnknownPeer::new(node.addr),
                 wire_msg,
                 original_bytes: None,
             },
@@ -417,7 +417,7 @@ async fn aggregate_proposals() -> Result<()> {
 
     let mut commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: nodes[THRESHOLD].addr,
+            sender: UnknownPeer::new(nodes[THRESHOLD].addr),
             wire_msg,
             original_bytes: None,
         },
@@ -974,7 +974,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     let _commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: old_node.addr,
+            sender: UnknownPeer::new(old_node.addr),
             wire_msg,
             original_bytes: None,
         },
@@ -1054,7 +1054,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
 
     let _commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: sender.addr,
+            sender: UnknownPeer::new(sender.addr),
             wire_msg,
             original_bytes: None,
         },
