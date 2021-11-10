@@ -304,7 +304,7 @@ jobs:
 
       - name: Run sn_api tests
         run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 5
+        timeout-minutes: 15
 
       - name: Are nodes still running...?
         if: failure() && matrix.os != 'windows-latest'
