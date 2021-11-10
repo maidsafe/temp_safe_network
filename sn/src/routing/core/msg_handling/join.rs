@@ -207,6 +207,12 @@ impl Core {
         join_request: JoinAsRelocatedRequest,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
+        let _permit = self
+            .current_joins_semaphore
+            .acquire()
+            .await
+            .map_err(|_| Error::PermitAcquisitionFailed)?;
+
         debug!("Received {:?} from {}", join_request, peer);
         let relocate_payload = if let Some(relocate_payload) = join_request.relocate_payload {
             relocate_payload
