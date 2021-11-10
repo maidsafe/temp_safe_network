@@ -57,7 +57,7 @@ impl ElderCandidatesUtils for ElderCandidates {
 
 /// A new `SectionAuthorityProvider` is created whenever the elders change,
 /// due to an elder being added or removed, or the section splitting or merging.
-pub trait SectionAuthorityProviderUtils {
+pub(crate) trait SectionAuthorityProviderUtils {
     /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.
     fn new<I: IntoIterator<Item = Peer>>(elders: I, prefix: Prefix, pk_set: PublicKeySet) -> Self;
 

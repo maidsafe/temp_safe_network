@@ -27,7 +27,9 @@ pub(crate) use self::{
     core::ChunkStore,
     core::RegisterStorage,
     core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
-    network_knowledge::section_keys::SectionKeyShare,
+    network_knowledge::{
+        section_authority_provider::SectionAuthorityProviderUtils, section_keys::SectionKeyShare,
+    },
 };
 pub use self::{
     dkg::SectionAuthUtils,
@@ -35,7 +37,6 @@ pub use self::{
     network_knowledge::{
         node_state::{FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE},
         peer::Peer,
-        section_authority_provider::SectionAuthorityProviderUtils,
     },
     routing_api::{
         config::Config,
