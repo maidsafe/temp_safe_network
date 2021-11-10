@@ -24,13 +24,12 @@ use crate::routing::{
     dkg::test_utils::{prove, section_signed},
     ed25519,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::{
-        test_utils::*, ElderCandidatesUtils, NetworkKnowledge, NodeStateUtils, SectionKeyShare,
-    },
+    network_knowledge::{test_utils::*, NetworkKnowledge, NodeStateUtils, SectionKeyShare},
     node::Node,
     relocation::{self, RelocatePayloadUtils},
-    supermajority, Error, Event, Peer, Result as RoutingResult, SectionAuthorityProviderUtils,
-    ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
+    supermajority, ElderCandidates, Error, Event, Peer, Result as RoutingResult,
+    SectionAuthorityProviderUtils, ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
+    MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
@@ -559,12 +558,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
         let actual_elder_candidates = match wire_msg.into_message() {
             Ok(MessageType::System {
-                msg:
-                    SystemMsg::DkgStart {
-                        elder_candidates, ..
-                    },
+                msg: SystemMsg::DkgStart { prefix, elders, .. },
                 ..
-            }) => elder_candidates,
+            }) => ElderCandidates::new(prefix, elders),
             _ => continue,
         };
         itertools::assert_equal(actual_elder_candidates.peers(), expected_new_elders.clone());
@@ -849,12 +845,9 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
         let actual_elder_candidates = match wire_msg.into_message() {
             Ok(MessageType::System {
-                msg:
-                    SystemMsg::DkgStart {
-                        elder_candidates, ..
-                    },
+                msg: SystemMsg::DkgStart { prefix, elders, .. },
                 ..
-            }) => elder_candidates,
+            }) => ElderCandidates::new(prefix, elders),
             _ => continue,
         };
 

@@ -10,8 +10,8 @@ use super::Core;
 use super::ProposalUtils;
 use crate::messaging::{
     system::{
-        DkgSessionId, ElderCandidates, JoinResponse, NodeState, Proposal, RelocateDetails,
-        RelocatePromise, SectionAuth, SystemMsg,
+        DkgSessionId, JoinResponse, NodeState, Proposal, RelocateDetails, RelocatePromise,
+        SectionAuth, SystemMsg,
     },
     DstLocation, WireMsg,
 };
@@ -21,10 +21,10 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidatesUtils, NodeStateUtils, SectionKeyShare},
+    network_knowledge::{NodeStateUtils, SectionKeyShare},
     relocation::RelocateState,
     routing_api::command::Command,
-    Peer, SectionAuthorityProviderUtils,
+    ElderCandidates, Peer, SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
@@ -387,7 +387,7 @@ impl Core {
         &self,
         elder_candidates: ElderCandidates,
     ) -> Result<Vec<Command>> {
-        let src_prefix = elder_candidates.prefix;
+        let prefix = elder_candidates.prefix();
         let generation = self.network_knowledge.chain_len().await;
         let session_id = DkgSessionId::new(&elder_candidates, generation);
 
@@ -403,11 +403,12 @@ impl Core {
 
         let node_msg = SystemMsg::DkgStart {
             session_id,
-            elder_candidates,
+            prefix,
+            elders: elder_candidates.into_elders(),
         };
         let section_pk = self.network_knowledge.section_key().await;
         self.send_message_for_dst_accumulation(
-            src_prefix.name(),
+            prefix.name(),
             DstLocation::Section {
                 name: XorName::from(PublicKey::Bls(section_pk)),
                 section_pk,

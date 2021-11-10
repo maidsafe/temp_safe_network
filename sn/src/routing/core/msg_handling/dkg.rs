@@ -8,7 +8,7 @@
 
 use super::super::Core;
 use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, ElderCandidates, Proposal, SystemMsg},
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SystemMsg},
     SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -17,7 +17,7 @@ use crate::routing::{
     log_markers::LogMarker,
     network_knowledge::SectionKeyShare,
     routing_api::command::Command,
-    Peer, SectionAuthorityProviderUtils,
+    ElderCandidates, Peer, SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;

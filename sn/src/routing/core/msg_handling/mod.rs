@@ -29,7 +29,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     relocation::RelocateState,
     routing_api::command::Command,
-    Error, Event, MessageReceived, Peer, Result,
+    ElderCandidates, Error, Event, MessageReceived, Peer, Result,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
 use bls::PublicKey as BlsPublicKey;
@@ -449,17 +449,16 @@ impl Core {
             }
             SystemMsg::DkgStart {
                 session_id,
-                elder_candidates,
+                prefix,
+                elders,
             } => {
                 trace!("Handling msg: Dkg-Start from {}", sender);
-                if !elder_candidates
-                    .elders
-                    .contains_key(&self.node.read().await.name())
-                {
+                if !elders.contains_key(&self.node.read().await.name()) {
                     return Ok(vec![]);
                 }
 
-                self.handle_dkg_start(session_id, elder_candidates).await
+                self.handle_dkg_start(session_id, ElderCandidates::new(prefix, elders))
+                    .await
             }
             SystemMsg::DkgMessage {
                 session_id,

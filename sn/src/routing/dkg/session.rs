@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, ElderCandidates, SystemMsg},
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     DstLocation, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
@@ -16,10 +16,10 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidatesUtils, SectionKeyShare},
+    network_knowledge::SectionKeyShare,
     node::Node,
     routing_api::command::{next_timer_token, Command},
-    Peer, SectionAuthorityProviderUtils,
+    ElderCandidates, Peer, SectionAuthorityProviderUtils,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
@@ -187,7 +187,10 @@ impl Session {
         };
 
         // Less than 100% participation
-        if !participants.iter().eq(self.elder_candidates.elders.keys()) {
+        if !participants
+            .iter()
+            .eq(self.elder_candidates.elders().keys())
+        {
             trace!(
                 "DKG failed due to unexpected participants for {:?}: {:?}",
                 self.elder_candidates,
@@ -196,7 +199,7 @@ impl Session {
 
             let failed_participants: BTreeSet<_> = self
                 .elder_candidates
-                .elders
+                .elders()
                 .keys()
                 .filter_map(|elder| {
                     if !participants.contains(elder) {
@@ -301,7 +304,7 @@ impl Session {
     ) -> Option<Command> {
         if !self
             .elder_candidates
-            .elders
+            .elders()
             .contains_key(&ed25519::name(&signed.public_key))
         {
             return None;
@@ -381,7 +384,6 @@ mod tests {
     use crate::messaging::MessageType;
     use crate::routing::{
         dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
-        network_knowledge::section_authority_provider::ElderCandidatesUtils,
         network_knowledge::test_utils::gen_addr, node::test_utils::arbitrary_unique_nodes,
         node::Node, ELDER_SIZE, MIN_ADULT_AGE,
     };
@@ -403,7 +405,8 @@ mod tests {
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let elder_candidates = ElderCandidates::new(iter::once(node.peer()), Prefix::default());
+        let elder_candidates =
+            ElderCandidates::from_peers(Prefix::default(), iter::once(node.peer()));
         let session_id = DkgSessionId::new(&elder_candidates, 0);
 
         let commands = voter
@@ -431,7 +434,7 @@ mod tests {
         let mut messages = Vec::new();
 
         let elder_candidates =
-            ElderCandidates::new(nodes.iter().map(Node::peer), Prefix::default());
+            ElderCandidates::from_peers(Prefix::default(), nodes.iter().map(Node::peer));
         let session_id = DkgSessionId::new(&elder_candidates, 0);
 
         let mut actors: HashMap<_, _> = nodes

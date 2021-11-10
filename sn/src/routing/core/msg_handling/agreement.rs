@@ -13,12 +13,9 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils,
-    error::Result,
-    log_markers::LogMarker,
-    network_knowledge::{ElderCandidatesUtils, NodeStateUtils},
-    routing_api::command::Command,
-    Event, SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker,
+    network_knowledge::NodeStateUtils, routing_api::command::Command, Event,
+    SectionAuthorityProviderUtils, MIN_AGE,
 };
 
 use super::Core;

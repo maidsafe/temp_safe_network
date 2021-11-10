@@ -6,11 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, ElderCandidates};
+use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId};
 use crate::routing::{
     ed25519::{self, Digest256, Keypair, Verifier},
-    network_knowledge::ElderCandidatesUtils,
-    supermajority,
+    supermajority, ElderCandidates,
 };
 use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Sha3};
@@ -30,8 +29,9 @@ impl DkgSessionIdUtils for DkgSessionId {
             hasher.update(&peer.name().0);
         }
 
-        hasher.update(&elder_candidates.prefix.name().0);
-        hasher.update(&elder_candidates.prefix.bit_count().to_le_bytes());
+        let prefix = elder_candidates.prefix();
+        hasher.update(&prefix.name().0);
+        hasher.update(&prefix.bit_count().to_le_bytes());
         hasher.finalize(&mut hash);
 
         Self { hash, generation }
@@ -96,7 +96,7 @@ impl DkgFailureSigSetUtils for DkgFailureSigSet {
     // Check whether we have enough signatures to reach agreement on the failure. The contained signatures
     // are assumed valid.
     fn has_agreement(&self, elder_candidates: &ElderCandidates) -> bool {
-        has_failure_agreement(elder_candidates.elders.len(), self.sigs.len())
+        has_failure_agreement(elder_candidates.elders().len(), self.sigs.len())
     }
 
     fn verify(&self, elder_candidates: &ElderCandidates, generation: u64) -> bool {
@@ -109,13 +109,13 @@ impl DkgFailureSigSetUtils for DkgFailureSigSet {
             .iter()
             .filter(|sig| {
                 elder_candidates
-                    .elders
+                    .elders()
                     .contains_key(&ed25519::name(&sig.public_key))
                     && sig.public_key.verify(&hash, &sig.signature).is_ok()
             })
             .count();
 
-        has_failure_agreement(elder_candidates.elders.len(), votes)
+        has_failure_agreement(elder_candidates.elders().len(), votes)
     }
 }
 

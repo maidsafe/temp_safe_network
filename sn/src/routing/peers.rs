@@ -8,11 +8,12 @@
 
 use std::{
     cmp::Ordering,
+    collections::BTreeMap,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
     net::SocketAddr,
 };
-use xor_name::{XorName, XOR_NAME_LEN};
+use xor_name::{Prefix, XorName, XOR_NAME_LEN};
 
 /// Network p2p peer identity.
 /// When a node knows another p2p_node as a `Peer` it's implicitly connected to it. This is separate
@@ -143,6 +144,49 @@ impl UnknownPeer {
             addr: self.addr,
             connection: self.connection,
         }
+    }
+}
+
+/// Information about elder candidates, who will participate in a DKG roung.
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ElderCandidates {
+    /// The section prefix. It matches all the members' names.
+    prefix: Prefix,
+    /// The section's complete set of elders as a map from their name to their socket address.
+    elders: BTreeMap<XorName, SocketAddr>,
+}
+
+impl ElderCandidates {
+    pub(crate) fn new(prefix: Prefix, elders: BTreeMap<XorName, SocketAddr>) -> Self {
+        Self { prefix, elders }
+    }
+
+    pub(crate) fn from_peers(prefix: Prefix, elders: impl IntoIterator<Item = Peer>) -> Self {
+        Self {
+            prefix,
+            elders: elders
+                .into_iter()
+                .map(|peer| (peer.name(), peer.addr()))
+                .collect(),
+        }
+    }
+
+    pub(crate) fn prefix(&self) -> Prefix {
+        self.prefix
+    }
+
+    pub(crate) fn elders(&self) -> &BTreeMap<XorName, SocketAddr> {
+        &self.elders
+    }
+
+    pub(crate) fn into_elders(self) -> BTreeMap<XorName, SocketAddr> {
+        self.elders
+    }
+
+    pub(crate) fn peers(&self) -> impl Iterator<Item = Peer> + '_ {
+        self.elders
+            .iter()
+            .map(|(name, addr)| Peer::new(*name, *addr))
     }
 }
 
