@@ -19,7 +19,7 @@ use crate::routing::{
     log_markers::LogMarker,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    Peer, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+    Peer, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
 };
 use bls::PublicKey as BlsPublicKey;
 
@@ -111,12 +111,13 @@ impl Core {
         // relocated at the same time. After the first section got split, nodes shall only
         // start with age of MIN_ADULT_AGE
         let expected_age: u8 = if our_prefix.is_empty() {
+            let section_members = self.network_knowledge.active_members().await.len();
             // Calculate a deterministic value based on peer's address
             // within the range [FIRST_SECTION_MIN_AGE, FIRST_SECTION_MAX_AGE].
-            let value: u8 = bincode::serialize(&peer.addr())?.iter().sum();
-            let range = FIRST_SECTION_MAX_AGE - FIRST_SECTION_MIN_AGE;
+            // let value: u8 = bincode::serialize(&peer.addr())?.iter().sum();
+            // let range = FIRST_SECTION_MAX_AGE - FIRST_SECTION_MIN_AGE;
 
-            FIRST_SECTION_MAX_AGE - (value % range)
+            FIRST_SECTION_MAX_AGE - section_members as u8 * 2
         } else {
             MIN_ADULT_AGE
         };

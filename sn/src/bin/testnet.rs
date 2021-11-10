@@ -48,7 +48,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 const BASE_TRACING_DIRECTIVES: &str = "testnet=info,sn_launch_tool=debug";
 const NODES_DIR: &str = "local-test-network";
 const DEFAULT_INTERVAL: &str = "1000";
-const DEFAULT_NODE_COUNT: u32 = 33;
+const DEFAULT_NODE_COUNT: u32 = 45;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "testnet")]
@@ -193,7 +193,7 @@ pub async fn run_network() -> Result<()> {
     Launch::from_iter_safe(&sn_launch_tool_args)?.run()?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_millis(args.interval) * node_count / 2;
+    let interval_duration = Duration::from_millis(args.interval);
 
     sleep(interval_duration).await;
 
