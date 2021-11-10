@@ -34,9 +34,9 @@ pub use self::{
     error::{Error, Result},
     network_knowledge::{
         node_state::{FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE},
+        peer::Peer,
         section_authority_provider::SectionAuthorityProviderUtils,
     },
-    peer::Peer,
     routing_api::{
         config::Config,
         event::{Elders, Event, MessageReceived, NodeElderChange},
@@ -69,7 +69,6 @@ mod error;
 mod messages;
 mod network_knowledge;
 mod node;
-mod peer;
 mod relocation;
 mod routing_api;
 

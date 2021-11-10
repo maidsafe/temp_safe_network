@@ -247,8 +247,9 @@ mod tests {
     use super::*;
     use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
-        dkg::test_utils::section_signed, network_knowledge::NodeStateUtils,
-        peer::test_utils::arbitrary_unique_peers, routing_api::tests::SecretKeySet,
+        dkg::test_utils::section_signed,
+        network_knowledge::peer::test_utils::arbitrary_unique_peers,
+        network_knowledge::NodeStateUtils, routing_api::tests::SecretKeySet,
         SectionAuthorityProviderUtils, ELDER_SIZE, MIN_AGE,
     };
     use assert_matches::assert_matches;

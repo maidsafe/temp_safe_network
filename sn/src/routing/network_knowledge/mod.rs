@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 pub(super) mod node_state;
+pub(super) mod peer;
 pub(crate) mod section_authority_provider;
 pub(super) mod section_keys;
 mod section_peers;
@@ -25,10 +26,11 @@ use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
     log_markers::LogMarker,
-    Peer, ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
+    ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
 };
 use bls::PublicKey as BlsPublicKey;
 pub(crate) use node_state::NodeStateUtils;
+use peer::Peer;
 pub(crate) use section_authority_provider::ElderCandidatesUtils;
 use section_authority_provider::SectionAuthorityProviderUtils;
 use secured_linked_list::SecuredLinkedList;
