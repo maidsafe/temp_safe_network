@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::read_prefix_map_from_disk;
+use super::{read_prefix_map_from_disk, UsedRecipientSaps};
 use crate::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocateDetails, RelocatePayload,
@@ -27,7 +27,7 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-use std::{collections::HashSet, net::SocketAddr};
+use std::net::SocketAddr;
 use xor_name::{Prefix, XorName};
 
 /// Re-join as a relocated node.
@@ -38,8 +38,8 @@ pub(crate) struct JoiningAsRelocated {
     relocate_details: RelocateDetails,
     node_msg: SystemMsg,
     node_msg_auth: AuthorityProof<SectionAuth>,
-    // Avoid sending more than one request to the same peer.
-    used_recipients: HashSet<SocketAddr>,
+    // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
+    used_recipient_saps: UsedRecipientSaps,
     relocate_payload: Option<RelocatePayload>,
 }
 
@@ -60,7 +60,7 @@ impl JoiningAsRelocated {
             relocate_details,
             node_msg,
             node_msg_auth: section_auth,
-            used_recipients: HashSet::<SocketAddr>::new(),
+            used_recipient_saps: UsedRecipientSaps::new(),
             relocate_payload: None,
         })
     }
@@ -74,7 +74,10 @@ impl JoiningAsRelocated {
             .map(|addr| Peer::new(dst_xorname, *addr))
             .collect();
 
-        self.used_recipients.extend(bootstrap_addrs);
+        self.used_recipient_saps = bootstrap_addrs
+            .iter()
+            .map(|addr| (*addr, self.dst_section_key))
+            .collect();
 
         // We send a first join request to obtain the section prefix, which
         // we will then use to generate the relocation payload and send the
@@ -143,7 +146,29 @@ impl JoiningAsRelocated {
                     return Ok(None);
                 }
 
-                let new_recipients = section_auth.peers();
+                let new_section_key = section_auth.section_key();
+                let new_recipients: Vec<_> = section_auth
+                    .peers()
+                    .iter()
+                    .filter_map(|peer| {
+                        if self
+                            .used_recipient_saps
+                            .insert((peer.addr(), new_section_key))
+                        {
+                            Some(*peer)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if new_recipients.is_empty() {
+                    debug!(
+                        "Ignore JoinAsRelocatedResponse::Retry with old SAP that has been sent to: {:?}",
+                        section_auth
+                    );
+                    return Ok(None);
+                }
 
                 // if we are relocating, and we didn't generate
                 // the relocation payload yet, we do it now
@@ -158,8 +183,6 @@ impl JoiningAsRelocated {
                 self.dst_section_key = section_auth.section_key();
 
                 let cmd = self.build_join_request_cmd(&new_recipients)?;
-                self.used_recipients
-                    .extend(new_recipients.iter().map(|recipient| recipient.addr()));
 
                 Ok(Some(cmd))
             }
@@ -172,21 +195,28 @@ impl JoiningAsRelocated {
                     return Ok(None);
                 }
 
-                // Ignore already used recipients
+                let new_section_key = section_auth.section_key();
                 let new_recipients: Vec<_> = section_auth
                     .peers()
-                    .into_iter()
-                    .filter(|elder| !self.used_recipients.contains(&elder.addr()))
+                    .iter()
+                    .filter_map(|peer| {
+                        if self
+                            .used_recipient_saps
+                            .insert((peer.addr(), new_section_key))
+                        {
+                            Some(*peer)
+                        } else {
+                            None
+                        }
+                    })
                     .collect();
 
                 if new_recipients.is_empty() {
-                    debug!("Joining redirected to the same set of peers we already contacted - ignoring response");
-                    return Ok(None);
-                } else {
-                    info!(
-                        "Joining redirected to another set of peers: {:?}",
-                        new_recipients,
+                    debug!(
+                        "Ignore JoinAsRelocatedResponse::Redirect with old SAP that has been sent to: {:?}",
+                        section_auth
                     );
+                    return Ok(None);
                 }
 
                 // if we are relocating, and we didn't generate
@@ -202,8 +232,6 @@ impl JoiningAsRelocated {
                 self.dst_section_key = section_auth.section_key();
 
                 let cmd = self.build_join_request_cmd(&new_recipients)?;
-                self.used_recipients
-                    .extend(new_recipients.iter().map(|recipient| recipient.addr()));
 
                 Ok(Some(cmd))
             }

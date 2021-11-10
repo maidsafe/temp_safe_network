@@ -172,6 +172,7 @@ impl Routing {
                 bootstrap_addr,
                 genesis_key
             );
+
             let joining_node = Node::new(keypair, comm.our_connection_info());
             let (node, network_knowledge) = join_network(
                 joining_node,

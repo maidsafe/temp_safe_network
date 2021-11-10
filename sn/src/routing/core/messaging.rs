@@ -21,7 +21,7 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidatesUtils, NetworkKnowledge, NodeStateUtils, SectionKeyShare},
+    network_knowledge::{ElderCandidatesUtils, NodeStateUtils, SectionKeyShare},
     relocation::RelocateState,
     routing_api::command::Command,
     Peer, SectionAuthorityProviderUtils,
@@ -150,7 +150,7 @@ impl Core {
     pub(crate) async fn send_node_approval(
         &self,
         node_state: SectionAuth<NodeState>,
-    ) -> Result<Command> {
+    ) -> Vec<Command> {
         let peer = node_state.to_peer();
         info!(
             "Our section with {:?} has approved peer {}.",
@@ -171,59 +171,86 @@ impl Core {
 
         let dst_section_pk = self.network_knowledge.section_key().await;
         trace!("{}", LogMarker::SendNodeApproval);
-        let cmd = self
+        match self
             .send_direct_message(peer, node_msg, dst_section_pk)
-            .await?;
-
-        Ok(cmd)
+            .await
+        {
+            Ok(cmd) => vec![cmd],
+            Err(err) => {
+                error!("Failed to send join approval to node {}: {:?}", peer, err);
+                vec![]
+            }
+        }
     }
 
-    pub(crate) async fn send_ae_update_to_our_section(
-        &self,
-        section: &NetworkKnowledge,
-    ) -> Result<Vec<Command>> {
+    pub(crate) async fn send_ae_update_to_our_section(&self) -> Vec<Command> {
         let our_name = self.node.read().await.name();
-        let nodes: Vec<_> = section
+        let nodes: Vec<_> = self
+            .network_knowledge
             .active_members()
             .await
             .into_iter()
             .filter(|peer| peer.name() != our_name)
             .collect();
 
+        if nodes.is_empty() {
+            warn!("No peers of our section found in our network knowledge to send AE-Update");
+            return vec![];
+        }
+
         // the PK is that of our section (as we know it; and we're ahead of our adults here)
-        let dst_section_pk = self.network_knowledge().section_key().await;
+        let dst_section_pk = self.network_knowledge.section_key().await;
         // the previous PK which is likely what adults know
         let previous_pk = *self.section_chain().await.prev_key();
-        let node_msg = self.generate_ae_update(previous_pk, true).await?;
+        let node_msg = match self.generate_ae_update(previous_pk, true).await {
+            Ok(node_msg) => node_msg,
+            Err(err) => {
+                warn!(
+                    "Failed to generate AE-Update msg to send to our section's peers: {:?}",
+                    err
+                );
+                return vec![];
+            }
+        };
 
-        let cmd = self
+        match self
             .send_direct_message_to_nodes(
                 nodes,
                 node_msg,
-                self.network_knowledge().prefix().await.name(),
+                self.network_knowledge.prefix().await.name(),
                 dst_section_pk,
             )
-            .await?;
-
-        Ok(vec![cmd])
+            .await
+        {
+            Ok(cmd) => vec![cmd],
+            Err(err) => {
+                error!("Failed to send AE update to our section peers: {:?}", err);
+                vec![]
+            }
+        }
     }
 
     #[instrument(skip_all)]
     pub(crate) async fn send_ae_update_to_sibling_section(
         &self,
         old: &StateSnapshot,
-    ) -> Result<Vec<Command>> {
+    ) -> Vec<Command> {
         debug!("{}", LogMarker::AeSendUpdateToSiblings);
         if let Some(sibling_sec_auth) = self
             .network_knowledge
             .prefix_map()
-            .get_signed(&self.network_knowledge().prefix().await.sibling())
+            .get_signed(&self.network_knowledge.prefix().await.sibling())
         {
             let promoted_sibling_elders: Vec<_> = sibling_sec_auth
                 .peers()
                 .into_iter()
                 .filter(|peer| !old.elders.contains(&peer.name()))
                 .collect();
+
+            if promoted_sibling_elders.is_empty() {
+                debug!("No promoted siblings found in our network knowledge to send AE-Update");
+                return vec![];
+            }
 
             // Using previous_key as dst_section_key as newly promoted sibling elders shall still
             // in the state of pre-split.
@@ -234,7 +261,7 @@ impl Core {
             /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
             let mut proof_chain = SecuredLinkedList::new(previous_pk);
             */
-            let mut proof_chain = self.network_knowledge().chain().await;
+            let mut proof_chain = self.network_knowledge.chain().await;
 
             let _ = proof_chain.insert(
                 &previous_pk,
@@ -253,38 +280,63 @@ impl Core {
                 members: None,
             };
 
-            let cmd = self
+            match self
                 .send_direct_message_to_nodes(
                     promoted_sibling_elders,
                     node_msg,
                     dst_name,
                     previous_pk,
                 )
-                .await?;
-
-            Ok(vec![cmd])
+                .await
+            {
+                Ok(cmd) => vec![cmd],
+                Err(err) => {
+                    error!(
+                        "Failed to send AE update to our promoted sibling elders: {:?}",
+                        err
+                    );
+                    vec![]
+                }
+            }
         } else {
             error!("Failed to get sibling SAP during split.");
-            Ok(vec![])
+            vec![]
         }
     }
 
-    pub(crate) async fn send_ae_update_to_adults(&self) -> Result<Vec<Command>> {
+    pub(crate) async fn send_ae_update_to_adults(&self) -> Vec<Command> {
         let adults = self.network_knowledge.live_adults().await;
 
-        let dst_section_pk = self.network_knowledge().section_key().await;
-        let node_msg = self.generate_ae_update(dst_section_pk, true).await?;
+        let dst_section_pk = self.network_knowledge.section_key().await;
+        let node_msg = match self.generate_ae_update(dst_section_pk, true).await {
+            Ok(node_msg) => node_msg,
+            Err(err) => {
+                warn!(
+                    "Failed to generate AE-Update msg to send to our section's Adults: {:?}",
+                    err
+                );
+                return vec![];
+            }
+        };
 
-        let cmd = self
+        match self
             .send_direct_message_to_nodes(
                 adults,
                 node_msg,
-                self.network_knowledge().prefix().await.name(),
+                self.network_knowledge.prefix().await.name(),
                 dst_section_pk,
             )
-            .await?;
-
-        Ok(vec![cmd])
+            .await
+        {
+            Ok(cmd) => vec![cmd],
+            Err(err) => {
+                error!(
+                    "Failed to send AE update to our promoted sibling elders: {:?}",
+                    err
+                );
+                vec![]
+            }
+        }
     }
 
     pub(crate) async fn send_relocate(
@@ -433,7 +485,7 @@ impl Core {
         }
 
         if handle {
-            wire_msg.set_dst_section_pk(self.network_knowledge().section_key().await);
+            wire_msg.set_dst_section_pk(self.network_knowledge.section_key().await);
             wire_msg.set_dst_xorname(self.node.read().await.name());
 
             commands.push(Command::HandleMessage {
@@ -506,7 +558,7 @@ impl Core {
     pub(crate) async fn send_message_to_our_elders(&self, node_msg: SystemMsg) -> Result<Command> {
         let targets: Vec<_> = self.network_knowledge.authority_provider().await.peers();
 
-        let dst_section_pk = self.network_knowledge().section_key().await;
+        let dst_section_pk = self.network_knowledge.section_key().await;
         let cmd = self
             .send_direct_message_to_nodes(
                 targets,
