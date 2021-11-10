@@ -22,15 +22,17 @@ pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResp
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
-pub use section::ElderCandidates;
 pub use section::MembershipState;
 pub use section::NodeState;
 pub use section::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 pub use signed::{KeyedSig, SigShare};
-use std::collections::BTreeSet;
-use xor_name::XorName;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+};
+use xor_name::{Prefix, XorName};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -100,8 +102,10 @@ pub enum SystemMsg {
     DkgStart {
         /// The identifier of the DKG session to start.
         session_id: DkgSessionId,
-        /// The DKG particpants.
-        elder_candidates: ElderCandidates,
+        /// The section prefix. It matches all the members' names.
+        prefix: Prefix,
+        /// The section's complete set of elders as a map from their name to their socket address.
+        elders: BTreeMap<XorName, SocketAddr>,
     },
     /// Message exchanged for DKG process.
     DkgMessage {

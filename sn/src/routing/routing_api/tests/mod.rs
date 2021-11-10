@@ -24,9 +24,7 @@ use crate::routing::{
     dkg::test_utils::{prove, section_signed},
     ed25519,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::{
-        test_utils::*, ElderCandidatesUtils, NetworkKnowledge, NodeStateUtils, SectionKeyShare,
-    },
+    network_knowledge::{test_utils::*, NetworkKnowledge, NodeStateUtils, SectionKeyShare},
     node::Node,
     relocation::{self, RelocatePayloadUtils},
     supermajority, Error, Event, Peer, Result as RoutingResult, SectionAuthorityProviderUtils,
@@ -555,15 +553,12 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
         let actual_elder_candidates = match wire_msg.into_message() {
             Ok(MessageType::System {
-                msg:
-                    SystemMsg::DkgStart {
-                        elder_candidates, ..
-                    },
+                msg: SystemMsg::DkgStart { elders, .. },
                 ..
-            }) => elder_candidates,
+            }) => elders.into_iter().map(|(name, addr)| Peer::new(name, addr)),
             _ => continue,
         };
-        itertools::assert_equal(actual_elder_candidates.peers(), expected_new_elders.clone());
+        itertools::assert_equal(actual_elder_candidates, expected_new_elders.clone());
 
         let expected_dkg_start_recipients: Vec<_> = expected_new_elders
             .iter()
@@ -845,12 +840,9 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
         let actual_elder_candidates = match wire_msg.into_message() {
             Ok(MessageType::System {
-                msg:
-                    SystemMsg::DkgStart {
-                        elder_candidates, ..
-                    },
+                msg: SystemMsg::DkgStart { elders, .. },
                 ..
-            }) => elder_candidates,
+            }) => elders.into_iter().map(|(name, addr)| Peer::new(name, addr)),
             _ => continue,
         };
 
@@ -860,7 +852,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             .filter(|peer| peer != remove_peer)
             .chain(iter::once(existing_peer.clone()))
             .collect();
-        itertools::assert_equal(actual_elder_candidates.peers(), expected_new_elders.clone());
+        itertools::assert_equal(actual_elder_candidates, expected_new_elders.clone());
 
         let expected_dkg_start_recipients: Vec<_> = expected_new_elders
             .into_iter()

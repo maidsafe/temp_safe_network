@@ -6,54 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{system::ElderCandidates, SectionAuthorityProvider};
+use super::ElderCandidates;
+use crate::messaging::SectionAuthorityProvider;
 use crate::routing::{Peer, Prefix, XorName};
 use bls::{PublicKey, PublicKeySet};
 use std::{collections::BTreeSet, net::SocketAddr};
-
-/// The information about elder candidates in a DKG round.
-pub(crate) trait ElderCandidatesUtils {
-    /// Creates a new `ElderCandidates` with the given members and prefix.
-    fn new<I: IntoIterator<Item = Peer>>(elders: I, prefix: Prefix) -> Self;
-
-    fn peers(&'_ self) -> Box<dyn Iterator<Item = Peer> + '_>;
-
-    /// Returns the index of the elder with `name` in this set of elders.
-    /// This is useful for BLS signatures where the signature share needs to be mapped to a
-    /// "field element" which is typically a numeric index.
-    fn position(&self, name: &XorName) -> Option<usize>;
-}
-
-impl ElderCandidatesUtils for ElderCandidates {
-    /// Creates a new `ElderCandidates` with the given members and prefix.
-    fn new<I>(elders: I, prefix: Prefix) -> Self
-    where
-        I: IntoIterator<Item = Peer>,
-    {
-        Self {
-            elders: elders
-                .into_iter()
-                .map(|peer| (peer.name(), peer.addr()))
-                .collect(),
-            prefix,
-        }
-    }
-
-    fn peers(&'_ self) -> Box<dyn Iterator<Item = Peer> + '_> {
-        Box::new(
-            self.elders
-                .iter()
-                .map(|(name, addr)| Peer::new(*name, *addr)),
-        )
-    }
-
-    /// Returns the index of the elder with `name` in this set of elders.
-    /// This is useful for BLS signatures where the signature share needs to be mapped to a
-    /// "field element" which is typically a numeric index.
-    fn position(&self, name: &XorName) -> Option<usize> {
-        self.elders.keys().position(|other_name| other_name == name)
-    }
-}
 
 /// A new `SectionAuthorityProvider` is created whenever the elders change,
 /// due to an elder being added or removed, or the section splitting or merging.
@@ -119,18 +76,18 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
         pk_set: PublicKeySet,
     ) -> SectionAuthorityProvider {
         SectionAuthorityProvider {
-            prefix: elder_candidates.prefix,
+            prefix: elder_candidates.prefix(),
             public_key_set: pk_set,
-            elders: elder_candidates.elders,
+            elders: elder_candidates
+                .elders()
+                .map(|peer| (peer.name(), peer.addr()))
+                .collect(),
         }
     }
 
     /// Returns `ElderCandidates`, which doesn't have key related infos.
     fn elder_candidates(&self) -> ElderCandidates {
-        ElderCandidates {
-            elders: self.elders.clone(),
-            prefix: self.prefix,
-        }
+        ElderCandidates::new(self.prefix, self.peers())
     }
 
     fn peers(&'_ self) -> Vec<Peer> {
@@ -221,11 +178,11 @@ pub(crate) mod test_utils {
         count: usize,
     ) -> (SectionAuthorityProvider, Vec<Node>, SecretKeySet) {
         let nodes = gen_sorted_nodes(&prefix, count, false);
-        let elders = nodes.iter().map(|node| (node.name(), node.addr)).collect();
+        let elders = nodes.iter().map(Node::peer);
 
         let secret_key_set = SecretKeySet::random();
         let section_auth = SectionAuthorityProvider::from_elder_candidates(
-            ElderCandidates { elders, prefix },
+            ElderCandidates::new(prefix, elders),
             secret_key_set.public_keys(),
         );
 
