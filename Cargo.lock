@@ -430,9 +430,9 @@ dependencies = [
 
 [[package]]
 name = "bls_dkg"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "407fd8382b94b11327e66a8cb2f5a2dae5ea5b4cf8af735de6bccc065c9a25de"
+checksum = "f173ff0f6f9e5b3d30532a6fccd990318e5c6a1c98706b7af24e68046c9d23b8"
 dependencies = [
  "aes",
  "bincode",

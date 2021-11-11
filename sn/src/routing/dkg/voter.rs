@@ -188,8 +188,8 @@ impl DkgVoter {
             // during the handling of them there will be new message reached,
             // which be pushed to the backlog.
             trace!("Draining backlog before process message");
-            for message in self.backlog.write().await.take(&session_id).into_iter() {
-                commands.extend(session.process_message(node, &session_id, message, section_pk)?);
+            for message in self.backlog.write().await.take(session_id).into_iter() {
+                commands.extend(session.process_message(node, session_id, message, section_pk)?);
             }
 
             commands.extend(session.process_message(node, session_id, message, section_pk)?)
