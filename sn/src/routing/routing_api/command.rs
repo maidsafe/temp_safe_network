@@ -116,7 +116,7 @@ pub(crate) enum Command {
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Command::HandleTimeout(_) => write!(f, "HandlePeerLost"),
+            Command::HandleTimeout(_) => write!(f, "HandleTimeout"),
             Command::ScheduleTimeout { .. } => write!(f, "ScheduleTimeout"),
             Command::HandleSystemMessage { msg_id, .. } => {
                 write!(f, "HandleSystemMessage {:?}", msg_id)
@@ -124,7 +124,7 @@ impl fmt::Display for Command {
             Command::HandleMessage { wire_msg, .. } => {
                 write!(f, "HandleMessage {:?}", wire_msg.msg_id())
             }
-            Command::HandlePeerLost(_) => write!(f, "HandlePeerLost"),
+            Command::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
             Command::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Command::HandleElderAgreement { .. } => write!(f, "HandleElderAgreement"),
             Command::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),

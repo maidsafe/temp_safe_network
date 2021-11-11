@@ -145,13 +145,21 @@ impl Core {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone()).await;
 
-        let proposal = Proposal::SectionInfo(section_auth);
-        let recipients: Vec<_> = self.network_knowledge.authority_provider().await.peers();
-        let result = self
-            .send_proposal_with(recipients, proposal, &key_share)
-            .await;
-
-        result
+        let snapshot = self.state_snapshot().await;
+        //
+        if self
+            .network_knowledge
+            .forced_switch(key_share.public_key_set.public_key())
+            .await
+        {
+            self.update_self_for_new_node_state_and_fire_events(snapshot)
+                .await
+        } else {
+            let proposal = Proposal::SectionInfo(section_auth);
+            let recipients: Vec<_> = self.network_knowledge.authority_provider().await.peers();
+            self.send_proposal_with(recipients, proposal, &key_share)
+                .await
+        }
     }
 
     pub(crate) async fn handle_dkg_failure(

@@ -33,7 +33,7 @@ use std::{
 use xor_name::XorName;
 
 // Interval to progress DKG timed phase
-const DKG_PROGRESS_INTERVAL: Duration = Duration::from_secs(30);
+const DKG_PROGRESS_INTERVAL: Duration = Duration::from_secs(3);
 
 const BACKLOG_CAPACITY: usize = 100;
 
@@ -347,6 +347,7 @@ impl Backlog {
     pub(crate) fn push(&mut self, session_id: DkgSessionId, message: DkgMessage) {
         if self.0.len() == self.0.capacity() {
             let _prev = self.0.pop_front();
+            trace!("Backlog removed {:?} due to capacity", _prev);
         }
 
         self.0.push_back((session_id, message))

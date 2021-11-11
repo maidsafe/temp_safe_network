@@ -50,6 +50,10 @@ pub(crate) struct NetworkKnowledge {
     section_peers: SectionPeers,
     /// The network prefix map, i.e. a map from prefix to SAPs
     prefix_map: NetworkPrefixMap,
+    ///
+    cache_chain: Arc<RwLock<Option<SecuredLinkedList>>>,
+    ///
+    cache_sap: Arc<RwLock<Option<SectionAuth<SectionAuthorityProvider>>>>,
 }
 
 impl NetworkKnowledge {
@@ -130,6 +134,8 @@ impl NetworkKnowledge {
             signed_sap: Arc::new(RwLock::new(signed_sap)),
             section_peers: SectionPeers::default(),
             prefix_map,
+            cache_chain: Arc::new(RwLock::new(None)),
+            cache_sap: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -191,6 +197,44 @@ impl NetworkKnowledge {
         Ok((network_knowledge, section_key_share))
     }
 
+    ///
+    pub(super) async fn forced_switch(&self, section_key: BlsPublicKey) -> bool {
+        let mut switched = false;
+        if let Some(signed_sap) = self.cache_sap.read().await.clone() {
+            let provided_sap = signed_sap.value.clone();
+            if provided_sap.section_key() == section_key {
+                if let Some(proof_chain) = self.cache_chain.read().await.clone() {
+                    let our_prev_prefix = self.prefix().await;
+                    *self.signed_sap.write().await = signed_sap.clone();
+                    *self.chain.write().await = proof_chain.clone();
+
+                    // Remove any peer which doesn't belong to our new section's prefix
+                    self.section_peers.retain(&provided_sap.prefix);
+                    info!(
+                        "Switched our section's SAP ({:?} to {:?}) with new one: {:?}",
+                        our_prev_prefix, provided_sap.prefix, provided_sap
+                    );
+                    switched = true;
+                } else {
+                    warn!("Doesn't have cached chain for {:?}", section_key);
+                }
+            } else {
+                trace!(
+                    "Cached sap({:?}) doesn't match key_share {:?}",
+                    provided_sap,
+                    section_key
+                );
+            }
+        } else {
+            trace!("Doesn't have cached SAP or chain for {:?}", section_key);
+        }
+        if switched {
+            *self.cache_chain.write().await = None;
+            *self.cache_sap.write().await = None;
+        }
+        switched
+    }
+
     pub(super) async fn update_knowledge_if_valid(
         &self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
@@ -232,17 +276,23 @@ impl NetworkKnowledge {
                 // otherwise this update could be due to an AE message and we still don't have
                 // the key share for the new SAP, making this node unable to sign section messages
                 // and possibly being kicked out of the group of Elders.
-                if update_sap && provided_sap.prefix.matches(our_name) {
-                    let our_prev_prefix = self.prefix().await;
-                    *self.signed_sap.write().await = signed_sap.clone();
-                    *self.chain.write().await = proof_chain.clone();
+                if provided_sap.prefix.matches(our_name) {
+                    if update_sap {
+                        let our_prev_prefix = self.prefix().await;
+                        *self.signed_sap.write().await = signed_sap.clone();
+                        *self.chain.write().await = proof_chain.clone();
 
-                    // Remove any peer which doesn't belong to our new section's prefix
-                    self.section_peers.retain(&provided_sap.prefix);
-                    info!(
-                        "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
-                        our_prev_prefix, provided_sap.prefix, provided_sap
-                    );
+                        // Remove any peer which doesn't belong to our new section's prefix
+                        self.section_peers.retain(&provided_sap.prefix);
+                        info!(
+                            "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
+                            our_prev_prefix, provided_sap.prefix, provided_sap
+                        );
+                    } else {
+                        trace!("Cache the proof_chain to wait for the keyshare");
+                        *self.cache_chain.write().await = Some(proof_chain.clone());
+                        *self.cache_sap.write().await = Some(signed_sap.clone());
+                    }
                 }
             }
             Ok(false) => {
