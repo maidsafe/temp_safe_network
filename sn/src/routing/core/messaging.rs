@@ -133,7 +133,13 @@ impl Core {
         */
 
         let members = if add_peer_info_to_update {
-            Some(self.network_knowledge.members().clone())
+            Some(
+                self.network_knowledge
+                    .members()
+                    .iter()
+                    .map(|state| state.clone())
+                    .collect(),
+            )
         } else {
             None
         };

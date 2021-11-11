@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
+    system::{KeyedSig, SectionAuth, SystemMsg},
     MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
@@ -16,6 +16,7 @@ use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
     messages::WireMsgUtils,
+    network_knowledge::SectionPeers,
     routing_api::command::Command,
     Peer, SectionAuthorityProviderUtils,
 };

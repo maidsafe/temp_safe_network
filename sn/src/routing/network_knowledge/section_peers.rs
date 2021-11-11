@@ -8,16 +8,76 @@
 
 use super::node_state::NodeStateUtils;
 use crate::messaging::{
-    system::{MembershipState, NodeState, SectionAuth, SectionPeers},
+    system::{MembershipState, NodeState, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::routing::{Peer, SectionAuthorityProviderUtils};
-use dashmap::mapref::entry::Entry;
+use dashmap::{mapref::entry::Entry, DashMap};
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::BTreeSet};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet},
+    ops::Deref,
+    sync::Arc,
+};
 use xor_name::{Prefix, XorName};
 
+/// Container for storing information about members of our section.
+#[derive(Clone, Default, Debug)]
+pub(crate) struct SectionPeers {
+    members: Arc<DashMap<XorName, SectionAuth<NodeState>>>,
+}
+
+impl Eq for SectionPeers {}
+
+impl PartialEq for SectionPeers {
+    fn eq(&self, other: &Self) -> bool {
+        // TODO: there must be a better way of doing this...
+        let mut us: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
+        let mut them: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
+
+        for refmulti in self.members.iter() {
+            let (key, value) = refmulti.pair();
+            let _prev = us.insert(*key, value.clone());
+        }
+
+        for refmulti in other.members.iter() {
+            let (key, value) = refmulti.pair();
+            let _prev = them.insert(*key, value.clone());
+        }
+
+        us == them
+    }
+}
+
+impl<'a> IntoIterator for &'a SectionPeers {
+    type Item = dashmap::mapref::multiple::RefMulti<'a, XorName, SectionAuth<NodeState>>;
+
+    type IntoIter = dashmap::iter::Iter<'a, XorName, SectionAuth<NodeState>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.members.iter()
+    }
+}
+
 impl SectionPeers {
+    pub(crate) fn new(members: impl IntoIterator<Item = SectionAuth<NodeState>>) -> Self {
+        Self {
+            members: Arc::new(
+                members
+                    .into_iter()
+                    .map(|state| (state.name, state))
+                    .collect(),
+            ),
+        }
+    }
+
+    pub(crate) fn iter(
+        &self,
+    ) -> impl Iterator<Item = impl Deref<Target = SectionAuth<NodeState>> + '_> + '_ {
+        IntoIterator::into_iter(self)
+    }
+
     /// Returns joined nodes from our section`
     pub(crate) fn all_members(&self) -> Vec<Peer> {
         self.joined()

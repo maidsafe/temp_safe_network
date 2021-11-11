@@ -19,7 +19,7 @@ pub(crate) use self::section_authority_provider::test_utils;
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 use crate::messaging::{
-    system::{KeyedSig, NodeState, SectionAuth, SectionPeers},
+    system::{KeyedSig, NodeState, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::prefix_map::NetworkPrefixMap;
@@ -34,6 +34,7 @@ pub(crate) use elder_candidates::ElderCandidates;
 pub(crate) use node_state::NodeStateUtils;
 use peer::Peer;
 use section_authority_provider::SectionAuthorityProviderUtils;
+pub(crate) use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr, sync::Arc};
@@ -370,11 +371,10 @@ impl NetworkKnowledge {
         let mut there_was_an_update = false;
         let chain = self.chain.read().await.clone();
 
-        for refmulti in peers.members.iter() {
-            let node_state = refmulti.value().clone();
+        for node_state in peers.iter() {
             if !node_state.verify(&chain) {
                 error!("can't merge member {:?}", node_state.value);
-            } else if self.section_peers.update(node_state) {
+            } else if self.section_peers.update(node_state.clone()) {
                 there_was_an_update = true;
             }
         }
