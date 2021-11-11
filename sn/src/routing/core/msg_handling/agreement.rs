@@ -189,67 +189,35 @@ impl Core {
                 .is_extension_of(&self.network_knowledge.prefix().await);
 
         if equal_or_extension {
+            // Our section or sub-section
             debug!(
                 "Updating section info for our prefix: {:?}",
                 section_auth.prefix()
             );
-            // Our section or sub-section
+
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
-            let infos = self
+            let saps_candidates = self
                 .network_knowledge
                 .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
                 .await;
-            if !infos.contains(&signed_section_auth.elder_candidates()) {
+
+            if !saps_candidates.contains(&signed_section_auth.elder_candidates()) {
                 // SectionInfo out of date, ignore.
                 return Ok(vec![]);
             }
 
-            // Send a `AE Update` message to all the to-be-promoted members so they have the full
-            // section and network data.
-            let mut ae_update_recipients = vec![];
-
-            let mut peers = vec![];
-
-            for elder_candidate in infos.clone() {
-                peers.extend(elder_candidate.elders().cloned())
-            }
-
-            for peer in peers {
-                if !self.network_knowledge.is_elder(&peer.name()).await {
-                    ae_update_recipients.push(peer);
-                }
-            }
-
-            let mut commands = vec![];
-            if !ae_update_recipients.is_empty() {
-                let node_msg = self.generate_ae_update(sig.public_key, true).await?;
-                let cmd = self
-                    .send_direct_message_to_nodes(
-                        ae_update_recipients,
-                        node_msg,
-                        self.network_knowledge.prefix().await.name(),
-                        sig.public_key,
-                    )
-                    .await?;
-
-                commands.push(cmd);
-            }
-
-            // Send the `OurElder` proposal to all of the to-be-elders so it's aggregated by them.
-            let our_elders_recipients: Vec<_> = infos
+            // Send the `OurElder` proposal to all of the to-be-Elders so it's aggregated by them.
+            let proposal_recipients = saps_candidates
                 .iter()
                 .flat_map(|info| info.elders())
                 .cloned()
                 .collect();
-            commands.extend(
-                self.send_proposal(
-                    our_elders_recipients,
-                    Proposal::OurElders(signed_section_auth.into_authed_msg()),
-                )
-                .await?,
-            );
 
-            Ok(commands)
+            self.send_proposal(
+                proposal_recipients,
+                Proposal::OurElders(signed_section_auth.into_authed_msg()),
+            )
+            .await
         } else {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
