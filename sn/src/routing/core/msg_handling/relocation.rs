@@ -14,7 +14,6 @@ use crate::messaging::{
 use crate::routing::{
     core::bootstrap::JoiningAsRelocated,
     error::Result,
-    network_knowledge::NodeStateUtils,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
     Event, Peer, SectionAuthorityProviderUtils, ELDER_SIZE,
@@ -51,7 +50,7 @@ impl Core {
 
         for (info, action) in relocations.await {
             // The newly joined node is not being relocated immediately.
-            if &info.name == churn_name {
+            if &info.name() == churn_name {
                 continue;
             }
 
@@ -65,7 +64,7 @@ impl Core {
             );
 
             commands.extend(
-                self.propose(Proposal::Offline(info.relocate(*action.dst())))
+                self.propose(Proposal::Offline(info.relocate(*action.dst()).into_msg()))
                     .await?,
             );
 

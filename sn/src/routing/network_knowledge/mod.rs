@@ -19,7 +19,7 @@ pub(crate) use self::section_authority_provider::test_utils;
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 use crate::messaging::{
-    system::{KeyedSig, NodeState, SectionAuth},
+    system::{KeyedSig, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::prefix_map::NetworkPrefixMap;
@@ -31,7 +31,7 @@ use crate::routing::{
 };
 use bls::PublicKey as BlsPublicKey;
 pub(crate) use elder_candidates::ElderCandidates;
-pub(crate) use node_state::NodeStateUtils;
+pub(crate) use node_state::NodeState;
 use peer::Peer;
 use section_authority_provider::SectionAuthorityProviderUtils;
 pub(crate) use section_peers::SectionPeers;
@@ -184,7 +184,7 @@ impl NetworkKnowledge {
         )?;
 
         for peer in network_knowledge.signed_sap.read().await.peers() {
-            let node_state = NodeState::joined(peer, None);
+            let node_state = NodeState::joined(&peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
             let _changed = network_knowledge.section_peers.update(SectionAuth {
                 value: node_state,
@@ -509,7 +509,7 @@ impl NetworkKnowledge {
         let mut live_adults = vec![];
 
         for node_state in self.section_peers.joined() {
-            if !self.is_elder(&node_state.name).await {
+            if !self.is_elder(&node_state.name()).await {
                 live_adults.push(node_state.to_peer())
             }
         }
@@ -520,7 +520,7 @@ impl NetworkKnowledge {
         self.section_peers
             .joined()
             .into_iter()
-            .find(|info| &info.addr == addr)
+            .find(|info| &info.addr() == addr)
             .map(|info| info.to_peer())
     }
 

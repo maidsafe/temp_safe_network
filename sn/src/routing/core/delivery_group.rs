@@ -9,7 +9,7 @@
 use crate::messaging::DstLocation;
 use crate::routing::{
     error::{Error, Result},
-    network_knowledge::{NetworkKnowledge, NodeStateUtils},
+    network_knowledge::NetworkKnowledge,
     supermajority, Peer, SectionAuthorityProviderUtils, ELDER_SIZE,
 };
 use itertools::Itertools;
@@ -171,13 +171,13 @@ fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{system::NodeState, SectionAuthorityProvider};
+    use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
         dkg::test_utils::section_signed,
         ed25519,
         network_knowledge::{
             test_utils::{gen_addr, gen_section_authority_provider},
-            NodeStateUtils,
+            NodeState,
         },
         SectionAuthorityProviderUtils, MIN_ADULT_AGE,
     };
@@ -220,7 +220,7 @@ mod tests {
         let name = ed25519::gen_name_with_age(MIN_ADULT_AGE);
         let dst_name = network_knowledge.prefix().await.substituted_in(name);
         let peer = Peer::new(dst_name, gen_addr());
-        let node_state = NodeState::joined(peer, None);
+        let node_state = NodeState::joined(&peer, None);
         let node_state = section_signed(&sk, node_state)?;
         assert!(network_knowledge.update_member(node_state).await);
 
@@ -575,7 +575,7 @@ mod tests {
         let network_knowledge = NetworkKnowledge::new(genesis_pk, chain, section_auth0, None)?;
 
         for peer in elders0 {
-            let node_state = NodeState::joined(peer, None);
+            let node_state = NodeState::joined(&peer, None);
             let node_state = section_signed(genesis_sk, node_state)?;
             assert!(network_knowledge.update_member(node_state).await);
         }

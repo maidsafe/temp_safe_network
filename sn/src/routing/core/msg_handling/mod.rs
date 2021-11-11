@@ -305,7 +305,11 @@ impl Core {
                     section_auth,
                     section_signed,
                     proof_chain,
-                    members.map(SectionPeers::new),
+                    members.map(|members| {
+                        SectionPeers::new(
+                            members.into_iter().map(|member| member.into_authed_state()),
+                        )
+                    }),
                 )
                 .await
             }

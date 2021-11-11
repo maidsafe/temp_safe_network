@@ -9,13 +9,12 @@
 use std::{cmp, collections::BTreeSet};
 
 use crate::messaging::{
-    system::{KeyedSig, MembershipState, NodeState, Proposal, SectionAuth},
+    system::{KeyedSig, MembershipState, Proposal, SectionAuth},
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker,
-    network_knowledge::NodeStateUtils, routing_api::command::Command, Event,
-    SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker, network_knowledge::NodeState,
+    routing_api::command::Command, Event, SectionAuthorityProviderUtils, MIN_AGE,
 };
 
 use super::Core;
@@ -31,9 +30,13 @@ impl Core {
         debug!("handle agreement on {:?}", proposal);
         match proposal {
             Proposal::Online { node_state, .. } => {
-                self.handle_online_agreement(node_state, sig).await
+                self.handle_online_agreement(node_state.into_state(), sig)
+                    .await
             }
-            Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
+            Proposal::Offline(node_state) => {
+                self.handle_offline_agreement(node_state.into_state(), sig)
+                    .await
+            }
             Proposal::SectionInfo(section_auth) => {
                 self.handle_section_info_agreement(section_auth, sig).await
             }
@@ -58,14 +61,15 @@ impl Core {
         if let Some(old_info) = self
             .network_knowledge
             .members()
-            .get_section_signed(&new_info.name)
+            .get_section_signed(&new_info.name())
         {
             // This node is rejoin with same name.
 
-            if old_info.state != MembershipState::Left {
+            if old_info.state() != MembershipState::Left {
                 debug!(
                     "Ignoring Online node {} - {:?} not Left.",
-                    new_info.name, old_info.state,
+                    new_info.name(),
+                    old_info.state(),
                 );
 
                 return Ok(commands);
@@ -91,21 +95,21 @@ impl Core {
         };
 
         if !self.network_knowledge.update_member(new_info.clone()).await {
-            info!("ignore Online: {} at {}", new_info.name, new_info.addr);
+            info!("ignore Online: {} at {}", new_info.name(), new_info.addr());
             return Ok(vec![]);
         }
 
-        info!("handle Online: {} at {}", new_info.name, new_info.addr);
+        info!("handle Online: {} at {}", new_info.name(), new_info.addr());
 
         self.send_event(Event::MemberJoined {
-            name: new_info.name,
-            previous_name: new_info.previous_name,
+            name: new_info.name(),
+            previous_name: new_info.previous_name(),
             age: new_info.age(),
         })
         .await;
 
         commands.extend(
-            self.relocate_peers(&new_info.name, &new_info.sig.signature)
+            self.relocate_peers(&new_info.name(), &new_info.sig.signature)
                 .await?,
         );
 
@@ -139,13 +143,21 @@ impl Core {
             })
             .await
         {
-            info!("ignore Offline: {} at {}", node_state.name, node_state.addr);
+            info!(
+                "ignore Offline: {} at {}",
+                node_state.name(),
+                node_state.addr()
+            );
             return Ok(commands);
         }
 
-        info!("handle Offline: {} at {}", node_state.name, node_state.addr);
+        info!(
+            "handle Offline: {} at {}",
+            node_state.name(),
+            node_state.addr()
+        );
 
-        commands.extend(self.relocate_peers(&node_state.name, &signature).await?);
+        commands.extend(self.relocate_peers(&node_state.name(), &signature).await?);
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
@@ -155,7 +167,7 @@ impl Core {
         commands.extend(result);
 
         self.send_event(Event::MemberLeft {
-            name: node_state.name,
+            name: node_state.name(),
             age,
         })
         .await;

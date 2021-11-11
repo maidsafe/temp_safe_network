@@ -9,7 +9,7 @@
 //! Relocation related types and utilities.
 
 use crate::messaging::{
-    system::{NodeState, RelocateDetails, RelocatePayload, RelocatePromise, SystemMsg},
+    system::{RelocateDetails, RelocatePayload, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
 };
 use crate::routing::{
@@ -17,7 +17,7 @@ use crate::routing::{
     ed25519::{self, Keypair, Verifier},
     error::Error,
     network_knowledge::{
-        section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge, NodeStateUtils,
+        section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge, NodeState,
     },
     Peer,
 };
@@ -249,8 +249,7 @@ mod tests {
     use crate::routing::{
         dkg::test_utils::section_signed,
         network_knowledge::peer::test_utils::arbitrary_unique_peers,
-        network_knowledge::NodeStateUtils, routing_api::tests::SecretKeySet,
-        SectionAuthorityProviderUtils, ELDER_SIZE, MIN_AGE,
+        routing_api::tests::SecretKeySet, SectionAuthorityProviderUtils, ELDER_SIZE, MIN_AGE,
     };
     use assert_matches::assert_matches;
     use eyre::Result;
@@ -318,7 +317,7 @@ mod tests {
         )?;
 
         for peer in &peers {
-            let info = NodeState::joined(peer.clone(), None);
+            let info = NodeState::joined(peer, None);
             let info = section_signed(sk, info)?;
 
             let res = futures::executor::block_on(network_knowledge.update_member(info));
