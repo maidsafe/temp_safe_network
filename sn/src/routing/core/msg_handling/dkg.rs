@@ -149,7 +149,7 @@ impl Core {
         //
         if self
             .network_knowledge
-            .forced_switch(key_share.public_key_set.public_key())
+            .skip_section_info_agreement(key_share.public_key_set.public_key())
             .await
         {
             self.update_self_for_new_node_state_and_fire_events(snapshot)

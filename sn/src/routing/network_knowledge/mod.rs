@@ -198,7 +198,7 @@ impl NetworkKnowledge {
     }
 
     ///
-    pub(super) async fn forced_switch(&self, section_key: BlsPublicKey) -> bool {
+    pub(super) async fn skip_section_info_agreement(&self, section_key: BlsPublicKey) -> bool {
         let mut switched = false;
         if let Some(signed_sap) = self.cache_sap.read().await.clone() {
             let provided_sap = signed_sap.value.clone();
@@ -214,6 +214,10 @@ impl NetworkKnowledge {
                         "Switched our section's SAP ({:?} to {:?}) with new one: {:?}",
                         our_prev_prefix, provided_sap.prefix, provided_sap
                     );
+
+                    *self.cache_chain.write().await = None;
+                    *self.cache_sap.write().await = None;
+
                     switched = true;
                 } else {
                     warn!("Doesn't have cached chain for {:?}", section_key);
@@ -228,10 +232,7 @@ impl NetworkKnowledge {
         } else {
             trace!("Doesn't have cached SAP or chain for {:?}", section_key);
         }
-        if switched {
-            *self.cache_chain.write().await = None;
-            *self.cache_sap.write().await = None;
-        }
+
         switched
     }
 
