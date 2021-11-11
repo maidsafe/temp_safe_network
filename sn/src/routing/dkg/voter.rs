@@ -124,6 +124,8 @@ impl DkgVoter {
                 let mut commands = vec![];
                 commands.extend(session.broadcast(node, &session_id, message, section_pk)?);
 
+                trace!("Start draining backlog");
+
                 for message in self.backlog.write().await.take(&session_id).into_iter() {
                     commands.extend(session.process_message(
                         node,
@@ -132,6 +134,8 @@ impl DkgVoter {
                         section_pk,
                     )?);
                 }
+
+                trace!("Draining backlog completed");
 
                 let _prev = self.sessions.insert(session_id, session);
 
@@ -180,6 +184,7 @@ impl DkgVoter {
         if let Some(mut session) = self.sessions.get_mut(session_id) {
             session.process_message(node, session_id, message, section_pk)
         } else {
+            trace!("Pushing to backlog {:?} - {:?}", session_id, message);
             self.backlog.write().await.push(*session_id, message);
             Ok(vec![])
         }
