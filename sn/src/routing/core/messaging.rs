@@ -10,8 +10,8 @@ use super::Core;
 use super::ProposalUtils;
 use crate::messaging::{
     system::{
-        DkgSessionId, JoinResponse, NodeState, Proposal, RelocateDetails, RelocatePromise,
-        SectionAuth, SystemMsg,
+        DkgSessionId, JoinResponse, Proposal, RelocateDetails, RelocatePromise, SectionAuth,
+        SystemMsg,
     },
     DstLocation, WireMsg,
 };
@@ -21,7 +21,7 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, NodeStateUtils, SectionKeyShare},
+    network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
     relocation::RelocateState,
     routing_api::command::Command,
     Peer, SectionAuthorityProviderUtils,
@@ -137,7 +137,7 @@ impl Core {
                 self.network_knowledge
                     .members()
                     .iter()
-                    .map(|state| state.clone())
+                    .map(|state| state.clone().into_authed_msg())
                     .collect(),
             )
         } else {
@@ -171,7 +171,7 @@ impl Core {
                 .section_signed_authority_provider()
                 .await
                 .clone(),
-            node_state,
+            node_state: node_state.into_authed_msg(),
             section_chain: self.network_knowledge.chain().await,
         }));
 

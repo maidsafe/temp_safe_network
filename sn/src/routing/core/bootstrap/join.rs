@@ -507,10 +507,12 @@ async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{system::NodeState, SectionAuthorityProvider};
+    use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
-        dkg::test_utils::*, error::Error as RoutingError, messages::WireMsgUtils,
-        network_knowledge::test_utils::*, network_knowledge::NodeStateUtils,
+        dkg::test_utils::*,
+        error::Error as RoutingError,
+        messages::WireMsgUtils,
+        network_knowledge::{test_utils::*, NodeState},
         SectionAuthorityProviderUtils, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use crate::types::PublicKey;
@@ -608,14 +610,14 @@ mod tests {
 
             // Send JoinResponse::Approval
             let section_auth = section_signed(sk, section_auth.clone())?;
-            let node_state = section_signed(sk, NodeState::joined(peer, None))?;
+            let node_state = section_signed(sk, NodeState::joined(&peer, None))?;
             let proof_chain = SecuredLinkedList::new(section_key);
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
                     genesis_key: section_key,
                     section_auth: section_auth.clone(),
-                    node_state,
+                    node_state: node_state.into_authed_msg(),
                     section_chain: proof_chain,
                 })),
                 &bootstrap_node,

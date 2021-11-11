@@ -8,14 +8,11 @@
 
 use super::{delivery_group, Comm, Core};
 use crate::dbs::UsedSpace;
-use crate::messaging::{
-    system::{NodeState, Proposal},
-    SectionAuthorityProvider, WireMsg,
-};
+use crate::messaging::{system::Proposal, SectionAuthorityProvider, WireMsg};
 use crate::routing::{
     error::Result,
     log_markers::LogMarker,
-    network_knowledge::{NetworkKnowledge, NodeStateUtils, SectionKeyShare},
+    network_knowledge::{NetworkKnowledge, NodeState, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
     Event, Peer,
@@ -237,12 +234,12 @@ impl Core {
 
     pub(crate) async fn make_online_proposal(
         &self,
-        peer: Peer,
+        peer: &Peer,
         previous_name: Option<XorName>,
         dst_key: Option<bls::PublicKey>,
     ) -> Result<Vec<Command>> {
         self.propose(Proposal::Online {
-            node_state: NodeState::joined(peer, previous_name),
+            node_state: NodeState::joined(peer, previous_name).into_msg(),
             dst_key,
         })
         .await
