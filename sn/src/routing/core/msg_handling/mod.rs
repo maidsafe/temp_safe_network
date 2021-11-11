@@ -27,6 +27,7 @@ use crate::messaging::{
 use crate::routing::{
     log_markers::LogMarker,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    network_knowledge::SectionPeers,
     relocation::RelocateState,
     routing_api::command::Command,
     Error, Event, MessageReceived, Peer, Result,
@@ -304,7 +305,7 @@ impl Core {
                     section_auth,
                     section_signed,
                     proof_chain,
-                    members,
+                    members.map(SectionPeers::new),
                 )
                 .await
             }
