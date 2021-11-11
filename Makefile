@@ -1,33 +1,26 @@
 SHELL := /bin/bash
-SN_NODE_VERSION := $(shell grep "^version" < Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
-SN_CLI_VERSION := $(shell grep "^version" < Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+SN_NODE_VERSION := $(shell grep "^version" < sn/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+SN_CLI_VERSION := $(shell grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 UNAME_S := $(shell uname -s)
 DEPLOY_PATH := deploy
 DEPLOY_PROD_PATH := ${DEPLOY_PATH}/prod
 
-build:
-ifeq ($(UNAME_S),Linux)
-	@echo "This target should not be used for Linux - please use the `musl` target."
-	@exit 1
-endif
-	rm -rf artifacts
-	mkdir artifacts
-	cargo build --release
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+gha-build-x86_64-pc-windows-msvc: build
 
-musl:
-ifneq ($(UNAME_S),Linux)
-	@echo "This target only applies to Linux - please use the `build` target."
-	@exit 1
-endif
+gha-build-x86_64-apple-darwin: build
+
+gha-build-x86_64-unknown-linux-musl:
 	rm -rf target
 	rm -rf artifacts
 	mkdir artifacts
 	sudo apt update -y && sudo apt install -y musl-tools
 	rustup target add x86_64-unknown-linux-musl
 	cargo build --release --target x86_64-unknown-linux-musl
-	find target/x86_64-unknown-linux-musl/release \
-		-maxdepth 1 -type f -exec cp '{}' artifacts \;
+	find target/x86_64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+gha-build-arm-unknown-linux-musleabi: arm-unknown-linux-musleabi
+gha-build-armv7-unknown-linux-musleabihf: armv7-unknown-linux-musleabihf
+gha-build-aarch64-unknown-linux-musl: aarch64-unknown-linux-musl
 
 arm-unknown-linux-musleabi:
 	rm -rf target
@@ -53,8 +46,14 @@ aarch64-unknown-linux-musl:
 	cross build --release --target aarch64-unknown-linux-musl
 	find target/aarch64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
+build:
+	rm -rf artifacts
+	mkdir artifacts
+	cargo build --release
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
 .ONESHELL:
-sn_node-build-artifacts-for-deploy:
+safe_network-build-artifacts-for-deploy:
 	# This target is just for debugging the packaging process.
 	# Given the zipped artifacts retrieved from Github, it creates the
 	# directory structure that's expected by the packaging target.
@@ -68,30 +67,12 @@ sn_node-build-artifacts-for-deploy:
 	cd artifacts
 	for arch in "$${architectures[@]}" ; do \
 		mkdir -p prod/$$arch/release; \
-		unzip sn_node-$$arch-prod.zip -d prod/$$arch/release; \
-		rm sn_node-$$arch-prod.zip
-	done
-.ONESHELL:
-sn_cli-build-artifacts-for-deploy:
-	# This target is just for debugging the packaging process.
-	# Given the zipped artifacts retrieved from Github, it creates the
-	# directory structure that's expected by the packaging target.
-	declare -a architectures=( \
-		"x86_64-unknown-linux-musl" \
-		"x86_64-pc-windows-msvc" \
-		"x86_64-apple-darwin" \
-		"arm-unknown-linux-musleabi" \
-		"armv7-unknown-linux-musleabihf" \
-		"aarch64-unknown-linux-musl")
-	cd artifacts
-	for arch in "$${architectures[@]}" ; do \
-		mkdir -p prod/$$arch/release; \
-		unzip sn_cli-$$arch-prod.zip -d prod/$$arch/release; \
-		rm sn_cli-$$arch-prod.zip
+		unzip safe_network-$$arch.zip -d prod/$$arch/release; \
+		rm safe_network-$$arch.zip; \
 	done
 
 .ONESHELL:
-sn_node-package-version-artifacts-for-deploy:
+safe_network-package-version-artifacts-for-release:
 	rm -f *.zip *.tar.gz
 	rm -rf ${DEPLOY_PATH}
 	mkdir -p ${DEPLOY_PROD_PATH}
@@ -107,9 +88,7 @@ sn_node-package-version-artifacts-for-deploy:
 	for arch in "$${architectures[@]}" ; do \
 		if [[ $$arch == *"windows"* ]]; then bin_name="sn_node.exe"; else bin_name="sn_node"; fi; \
 		zip -j sn_node-${SN_NODE_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
-		zip -j sn_node-latest-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
 		tar -C artifacts/prod/$$arch/release -zcvf sn_node-${SN_NODE_VERSION}-$$arch.tar.gz $$bin_name; \
-		tar -C artifacts/prod/$$arch/release -zcvf sn_node-latest-$$arch.tar.gz $$bin_name; \
 	done
 
 	mv *.tar.gz ${DEPLOY_PROD_PATH}
