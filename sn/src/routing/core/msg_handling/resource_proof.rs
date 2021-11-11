@@ -47,7 +47,7 @@ impl Core {
             .validate_all(&response.nonce, &response.data, response.solution)
     }
 
-    pub(crate) async fn send_resource_proof_challenge(&self, peer: &Peer) -> Result<Command> {
+    pub(crate) async fn send_resource_proof_challenge(&self, peer: Peer) -> Result<Command> {
         let nonce: [u8; 32] = rand::random();
         let serialized =
             bincode::serialize(&(peer.name(), &nonce)).map_err(|_| Error::InvalidMessage)?;
@@ -59,7 +59,7 @@ impl Core {
         }));
 
         trace!("{}", LogMarker::SendResourceProofChallenge);
-        self.send_direct_message(*peer, response, self.network_knowledge.section_key().await)
+        self.send_direct_message(peer, response, self.network_knowledge.section_key().await)
             .await
     }
 }

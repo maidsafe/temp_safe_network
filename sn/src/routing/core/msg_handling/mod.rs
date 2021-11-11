@@ -146,7 +146,7 @@ impl Core {
                                         &msg_authority.src_location(),
                                         &dst_section_pk,
                                         dst_location.name(),
-                                        sender,
+                                        &sender,
                                     )
                                     .await?
                                 {
@@ -226,7 +226,7 @@ impl Core {
                         &src_location,
                         &received_section_pk,
                         dst_name,
-                        sender,
+                        &sender,
                     )
                     .await?
                 {
@@ -449,17 +449,15 @@ impl Core {
             }
             SystemMsg::DkgStart {
                 session_id,
-                elder_candidates,
+                prefix,
+                elders,
             } => {
                 trace!("Handling msg: Dkg-Start from {}", sender);
-                if !elder_candidates
-                    .elders
-                    .contains_key(&self.node.read().await.name())
-                {
+                if !elders.contains_key(&self.node.read().await.name()) {
                     return Ok(vec![]);
                 }
 
-                self.handle_dkg_start(session_id, elder_candidates).await
+                self.handle_dkg_start(session_id, prefix, elders).await
             }
             SystemMsg::DkgMessage {
                 session_id,

@@ -84,11 +84,11 @@ impl Core {
 
     pub(crate) async fn relocate_rejoining_peer(
         &self,
-        peer: &Peer,
+        peer: Peer,
         age: u8,
     ) -> Result<Vec<Command>> {
         let details =
-            RelocateDetails::with_age(&self.network_knowledge, peer, peer.name(), age).await;
+            RelocateDetails::with_age(&self.network_knowledge, &peer, peer.name(), age).await;
 
         trace!(
             "Relocating {:?} to {} with age {} due to rejoin",
@@ -97,7 +97,7 @@ impl Core {
             details.age
         );
 
-        self.send_relocate(*peer, details).await
+        self.send_relocate(peer, details).await
     }
 
     pub(crate) async fn handle_relocate(

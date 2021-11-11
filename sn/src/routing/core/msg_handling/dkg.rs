@@ -8,28 +8,36 @@
 
 use super::super::Core;
 use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, ElderCandidates, Proposal, SystemMsg},
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SystemMsg},
     SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
     log_markers::LogMarker,
-    network_knowledge::SectionKeyShare,
+    network_knowledge::{ElderCandidates, SectionKeyShare},
     routing_api::command::Command,
     Peer, SectionAuthorityProviderUtils,
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use std::collections::BTreeSet;
-use xor_name::XorName;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+};
+use xor_name::{Prefix, XorName};
 
 impl Core {
     pub(crate) async fn handle_dkg_start(
         &self,
         session_id: DkgSessionId,
-        elder_candidates: ElderCandidates,
+        prefix: Prefix,
+        elders: BTreeMap<XorName, SocketAddr>,
     ) -> Result<Vec<Command>> {
+        let elder_candidates = ElderCandidates::new(
+            prefix,
+            elders.into_iter().map(|(name, addr)| Peer::new(name, addr)),
+        );
         trace!("Received DkgStart for {:?}", elder_candidates);
         self.dkg_voter
             .start(
@@ -172,7 +180,7 @@ impl Core {
 
     pub(crate) async fn check_lagging(
         &self,
-        peer: Peer,
+        peer: &Peer,
         public_key: &BlsPublicKey,
     ) -> Result<Option<Command>> {
         if self.network_knowledge.has_chain_key(public_key).await
@@ -181,7 +189,9 @@ impl Core {
             let msg = self.generate_ae_update(*public_key, true).await?;
             trace!("{}", LogMarker::SendingAeUpdateAfterLagCheck);
 
-            let cmd = self.send_direct_message(peer, msg, *public_key).await?;
+            let cmd = self
+                .send_direct_message(peer.clone(), msg, *public_key)
+                .await?;
             Ok(Some(cmd))
         } else {
             Ok(None)

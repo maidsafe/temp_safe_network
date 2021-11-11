@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, ElderCandidates},
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId},
     SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::session::{Backlog, Session},
     ed25519,
     error::Result,
-    network_knowledge::{ElderCandidatesUtils, SectionKeyShare},
+    network_knowledge::{ElderCandidates, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
     supermajority, SectionAuthorityProviderUtils,
@@ -77,18 +77,19 @@ impl DkgVoter {
         }
 
         let name = ed25519::name(&node.keypair.public);
-        let participant_index = if let Some(index) = elder_candidates.position(&name) {
-            index
-        } else {
-            error!(
-                "DKG failed to start for {:?}: {} is not a participant",
-                elder_candidates, name
-            );
-            return Ok(vec![]);
-        };
+        let participant_index =
+            if let Some(index) = elder_candidates.names().position(|n| n == name) {
+                index
+            } else {
+                error!(
+                    "DKG failed to start for {:?}: {} is not a participant",
+                    elder_candidates, name
+                );
+                return Ok(vec![]);
+            };
 
         // Special case: only one participant.
-        if elder_candidates.elders.len() == 1 {
+        if elder_candidates.len() == 1 {
             let secret_key_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
             let section_auth = SectionAuthorityProvider::from_elder_candidates(
                 elder_candidates,
@@ -104,8 +105,8 @@ impl DkgVoter {
             }]);
         }
 
-        let threshold = supermajority(elder_candidates.elders.len()) - 1;
-        let participants = elder_candidates.elders.keys().copied().collect();
+        let threshold = supermajority(elder_candidates.len()) - 1;
+        let participants = elder_candidates.names().collect();
 
         match KeyGen::initialize(name, threshold, participants) {
             Ok((key_gen, message)) => {

@@ -27,16 +27,17 @@ pub(crate) use self::{
     core::ChunkStore,
     core::RegisterStorage,
     core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
-    network_knowledge::section_keys::SectionKeyShare,
+    network_knowledge::{
+        section_authority_provider::SectionAuthorityProviderUtils, section_keys::SectionKeyShare,
+    },
 };
 pub use self::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
     network_knowledge::{
         node_state::{FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE},
-        section_authority_provider::SectionAuthorityProviderUtils,
+        peer::Peer,
     },
-    peer::Peer,
     routing_api::{
         config::Config,
         event::{Elders, Event, MessageReceived, NodeElderChange},
@@ -69,7 +70,6 @@ mod error;
 mod messages;
 mod network_knowledge;
 mod node;
-mod peer;
 mod relocation;
 mod routing_api;
 

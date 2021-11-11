@@ -171,12 +171,12 @@ impl Dispatcher {
                 elder = is_elder,
                 cmd_id = %cmd_id,
                 section_key = ?section_key,
+                %command,
             )
         };
 
         async {
-            trace!("{:?} {}", LogMarker::CommandHandleStart, command);
-            trace!(?command);
+            trace!("{:?}", LogMarker::CommandHandleStart);
 
             let command_display = command.to_string();
             match self.try_handle_command(command).await {

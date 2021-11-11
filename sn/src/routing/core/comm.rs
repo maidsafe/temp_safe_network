@@ -21,6 +21,7 @@ use futures::{
 use qp2p::Endpoint;
 use std::{future, net::SocketAddr};
 use tokio::{sync::mpsc, task};
+use tracing::Instrument;
 use xor_name::XorName;
 
 // Communication component of the node to interact with other nodes.
@@ -42,6 +43,7 @@ impl Drop for Comm {
 }
 
 impl Comm {
+    #[tracing::instrument(skip_all)]
     pub(crate) async fn new(
         local_addr: SocketAddr,
         config: qp2p::Config,
@@ -57,12 +59,15 @@ impl Comm {
         let msg_count = MsgCount::new();
         let connected_peers = ConnectedPeers::default();
 
-        let _handle = task::spawn(handle_incoming_connections(
-            incoming_connections,
-            event_tx.clone(),
-            msg_count.clone(),
-            connected_peers.clone(),
-        ));
+        let _handle = task::spawn(
+            handle_incoming_connections(
+                incoming_connections,
+                event_tx.clone(),
+                msg_count.clone(),
+                connected_peers.clone(),
+            )
+            .in_current_span(),
+        );
 
         let back_pressure = BackPressure::new();
 
@@ -75,6 +80,7 @@ impl Comm {
         })
     }
 
+    #[tracing::instrument(skip(local_addr, config, event_tx))]
     pub(crate) async fn bootstrap(
         local_addr: SocketAddr,
         bootstrap_nodes: &[SocketAddr],
@@ -90,21 +96,27 @@ impl Comm {
         let msg_count = MsgCount::new();
         let connected_peers = ConnectedPeers::default();
 
-        let _handle = task::spawn(handle_incoming_connections(
-            incoming_connections,
-            event_tx.clone(),
-            msg_count.clone(),
-            connected_peers.clone(),
-        ));
+        let _handle = task::spawn(
+            handle_incoming_connections(
+                incoming_connections,
+                event_tx.clone(),
+                msg_count.clone(),
+                connected_peers.clone(),
+            )
+            .in_current_span(),
+        );
 
-        let _ = task::spawn(handle_incoming_messages(
-            bootstrap_peer.id(),
-            bootstrap_peer.remote_address(),
-            peer_incoming,
-            event_tx.clone(),
-            msg_count.clone(),
-            connected_peers.clone(),
-        ));
+        let _ = task::spawn(
+            handle_incoming_messages(
+                bootstrap_peer.id(),
+                bootstrap_peer.remote_address(),
+                peer_incoming,
+                event_tx.clone(),
+                msg_count.clone(),
+                connected_peers.clone(),
+            )
+            .in_current_span(),
+        );
 
         Ok((
             Self {
@@ -213,9 +225,11 @@ impl Comm {
     /// `SendStatus::MinDeliveryGroupSizeReached` or `SendStatus::MinDeliveryGroupSizeFailed` depending
     /// on if the minimum delivery group size is met or not. The failed recipients are sent along
     /// with the status. It returns a `SendStatus::AllRecipients` if message is sent to all the recipients.
-    #[allow(clippy::needless_lifetimes)] // this is firing a false positive here
-                                         // we need an explicit lifetime for the compiler to see
-                                         // that `recipient` lives long enough in the closure
+    #[allow(clippy::needless_lifetimes)]
+    // ^ this is firing a false positive here
+    // we need an explicit lifetime for the compiler to see
+    // that `recipient` lives long enough in the closure
+    #[tracing::instrument(skip(self))]
     pub(crate) async fn send<'r>(
         &self,
         recipients: &'r [Peer],
@@ -250,58 +264,61 @@ impl Comm {
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
         // succeeds or if there are no more recipients to pick.
-        let send = |recipient: &'r Peer, msg_bytes: Bytes| async move {
-            trace!(
-                "Sending message ({} bytes, msg_id: {:?}) to {} of delivery group size {}",
-                msg_bytes.len(),
-                msg_id,
-                recipient,
-                delivery_group_size,
-            );
+        let send = |recipient: &'r Peer, msg_bytes: Bytes| {
+            async move {
+                trace!(
+                    "Sending message ({} bytes, msg_id: {:?}) to {} of delivery group size {}",
+                    msg_bytes.len(),
+                    msg_id,
+                    recipient,
+                    delivery_group_size,
+                );
 
-            let retries = self.back_pressure.get(&recipient.addr()).await; // TODO: more laid back retries with lower priority, more aggressive with higher
+                let retries = self.back_pressure.get(&recipient.addr()).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-            let connection = if let Some(connection) =
-                self.connected_peers.get_by_address(&recipient.addr()).await
-            {
-                Ok(connection.connection().clone())
-            } else {
-                self.endpoint
-                    .connect_to(&recipient.addr())
-                    .and_then(|(connection, connection_incoming)| async move {
-                        self.connected_peers.insert(connection.clone()).await;
-                        let _ = task::spawn(handle_incoming_messages(
-                            connection.id(),
-                            connection.remote_address(),
-                            connection_incoming,
-                            self.event_tx.clone(),
-                            self.msg_count.clone(),
-                            self.connected_peers.clone(),
-                        ));
-                        Ok(connection)
+                let connection = if let Some(connection) =
+                    self.connected_peers.get_by_address(&recipient.addr()).await
+                {
+                    Ok(connection.connection().clone())
+                } else {
+                    self.endpoint
+                        .connect_to(&recipient.addr())
+                        .and_then(|(connection, connection_incoming)| async move {
+                            self.connected_peers.insert(connection.clone()).await;
+                            let _ = task::spawn(handle_incoming_messages(
+                                connection.id(),
+                                connection.remote_address(),
+                                connection_incoming,
+                                self.event_tx.clone(),
+                                self.msg_count.clone(),
+                                self.connected_peers.clone(),
+                            ));
+                            Ok(connection)
+                        })
+                        .await
+                };
+
+                let result = future::ready(connection)
+                    .err_into()
+                    .and_then(|connection| async move {
+                        connection
+                            .send_with(msg_bytes, priority, Some(&retries))
+                            .await
                     })
                     .await
-            };
+                    .map_err(|err| match err {
+                        qp2p::SendError::ConnectionLost(qp2p::ConnectionError::Closed(
+                            qp2p::Close::Local,
+                        )) => Error::ConnectionClosed,
+                        _ => {
+                            warn!("during sending, received error {:?}", err);
+                            err.into()
+                        }
+                    });
 
-            let result = future::ready(connection)
-                .err_into()
-                .and_then(|connection| async move {
-                    connection
-                        .send_with(msg_bytes, priority, Some(&retries))
-                        .await
-                })
-                .await
-                .map_err(|err| match err {
-                    qp2p::SendError::ConnectionLost(qp2p::ConnectionError::Closed(
-                        qp2p::Close::Local,
-                    )) => Error::ConnectionClosed,
-                    _ => {
-                        warn!("during sending, received error {:?}", err);
-                        err.into()
-                    }
-                });
-
-            (result, recipient)
+                (result, recipient)
+            }
+            .in_current_span()
         };
 
         let mut tasks: FuturesUnordered<_> = recipients[0..delivery_group_size]
@@ -326,7 +343,7 @@ impl Comm {
                     return Err(Error::ConnectionClosed);
                 }
                 Err(_) => {
-                    failed_recipients.push(*recipient);
+                    failed_recipients.push(recipient.clone());
 
                     if next < recipients.len() {
                         tasks.push(send(&recipients[next], msg_bytes.clone()));
@@ -379,6 +396,7 @@ pub(crate) enum ConnectionEvent {
     Received((SocketAddr, Bytes)),
 }
 
+#[tracing::instrument(skip_all)]
 async fn handle_incoming_connections(
     mut incoming_connections: qp2p::IncomingConnections,
     event_tx: mpsc::Sender<ConnectionEvent>,
@@ -390,17 +408,21 @@ async fn handle_incoming_connections(
         let src = connection.remote_address();
         connected_peers.insert(connection).await;
 
-        let _ = task::spawn(handle_incoming_messages(
-            connection_id,
-            src,
-            connection_incoming,
-            event_tx.clone(),
-            msg_count.clone(),
-            connected_peers.clone(),
-        ));
+        let _ = task::spawn(
+            handle_incoming_messages(
+                connection_id,
+                src,
+                connection_incoming,
+                event_tx.clone(),
+                msg_count.clone(),
+                connected_peers.clone(),
+            )
+            .in_current_span(),
+        );
     }
 }
 
+#[tracing::instrument(skip(incoming_msgs, event_tx, msg_count, connected_peers))]
 async fn handle_incoming_messages(
     connection_id: usize,
     src: SocketAddr,
@@ -409,12 +431,7 @@ async fn handle_incoming_messages(
     msg_count: MsgCount,
     connected_peers: ConnectedPeers,
 ) {
-    trace!(
-        "{} to {} (id: {})",
-        LogMarker::ConnectionOpened,
-        src,
-        connection_id
-    );
+    trace!(%connection_id, %src, "{}", LogMarker::ConnectionOpened);
 
     while let Some(result) = incoming_msgs.next().await.transpose() {
         match result {
@@ -433,12 +450,7 @@ async fn handle_incoming_messages(
     // remove the connection once we notice it end
     connected_peers.remove_by_address(&src).await;
 
-    trace!(
-        "{} to {} (id: {})",
-        LogMarker::ConnectionClosed,
-        src,
-        connection_id
-    );
+    trace!(%connection_id, %src, "{}", LogMarker::ConnectionClosed);
 }
 
 /// Returns the status of the send operation.
@@ -534,12 +546,13 @@ mod tests {
         )
         .await?;
         let invalid_peer = get_invalid_peer().await?;
+        let invalid_addr = invalid_peer.addr();
 
         let status = comm.send(&[invalid_peer], 1, new_test_message()?).await?;
 
         assert_matches!(
             &status,
-            &SendStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_peer.addr()]
+            &SendStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_addr]
         );
 
         Ok(())
@@ -561,7 +574,9 @@ mod tests {
         let invalid_peer = get_invalid_peer().await?;
 
         let message = new_test_message()?;
-        let status = comm.send(&[invalid_peer, peer], 1, message.clone()).await?;
+        let status = comm
+            .send(&[invalid_peer.clone(), peer], 1, message.clone())
+            .await?;
         assert_matches!(status, SendStatus::MinDeliveryGroupSizeReached(failed_recipients) => {
             assert_eq!(&failed_recipients, &[invalid_peer])
         });
@@ -588,7 +603,9 @@ mod tests {
         let invalid_peer = get_invalid_peer().await?;
 
         let message = new_test_message()?;
-        let status = comm.send(&[invalid_peer, peer], 2, message.clone()).await?;
+        let status = comm
+            .send(&[invalid_peer.clone(), peer], 2, message.clone())
+            .await?;
 
         assert_matches!(
             status,

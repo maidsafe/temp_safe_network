@@ -149,16 +149,10 @@ impl JoiningAsRelocated {
                 let new_section_key = section_auth.section_key();
                 let new_recipients: Vec<_> = section_auth
                     .peers()
-                    .iter()
-                    .filter_map(|peer| {
-                        if self
-                            .used_recipient_saps
+                    .into_iter()
+                    .filter(|peer| {
+                        self.used_recipient_saps
                             .insert((peer.addr(), new_section_key))
-                        {
-                            Some(*peer)
-                        } else {
-                            None
-                        }
                     })
                     .collect();
 
@@ -198,16 +192,10 @@ impl JoiningAsRelocated {
                 let new_section_key = section_auth.section_key();
                 let new_recipients: Vec<_> = section_auth
                     .peers()
-                    .iter()
-                    .filter_map(|peer| {
-                        if self
-                            .used_recipient_saps
+                    .into_iter()
+                    .filter(|peer| {
+                        self.used_recipient_saps
                             .insert((peer.addr(), new_section_key))
-                        {
-                            Some(*peer)
-                        } else {
-                            None
-                        }
                     })
                     .collect();
 

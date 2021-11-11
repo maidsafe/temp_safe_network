@@ -13,12 +13,9 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils,
-    error::Result,
-    log_markers::LogMarker,
-    network_knowledge::{ElderCandidatesUtils, NodeStateUtils},
-    routing_api::command::Command,
-    Event, SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker,
+    network_knowledge::NodeStateUtils, routing_api::command::Command, Event,
+    SectionAuthorityProviderUtils, MIN_AGE,
 };
 
 use super::Core;
@@ -82,7 +79,7 @@ impl Core {
                 commands.extend(self.send_node_approval(old_info.clone()).await);
 
                 let peer = new_info.to_peer();
-                commands.extend(self.relocate_rejoining_peer(&peer, new_age).await?);
+                commands.extend(self.relocate_rejoining_peer(peer, new_age).await?);
 
                 return Ok(commands);
             }
@@ -200,7 +197,7 @@ impl Core {
             let mut peers = vec![];
 
             for elder_candidate in infos.clone() {
-                peers.extend(elder_candidate.peers())
+                peers.extend(elder_candidate.elders().cloned())
             }
 
             for peer in peers {
@@ -225,8 +222,11 @@ impl Core {
             }
 
             // Send the `OurElder` proposal to all of the to-be-elders so it's aggregated by them.
-            let our_elders_recipients: Vec<_> =
-                infos.clone().iter().flat_map(|info| info.peers()).collect();
+            let our_elders_recipients: Vec<_> = infos
+                .iter()
+                .flat_map(|info| info.elders())
+                .cloned()
+                .collect();
             commands.extend(
                 self.send_proposal(
                     our_elders_recipients,
