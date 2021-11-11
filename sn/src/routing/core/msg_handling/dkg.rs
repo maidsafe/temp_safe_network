@@ -19,7 +19,6 @@ use crate::routing::{
     routing_api::command::Command,
     Peer, SectionAuthorityProviderUtils,
 };
-use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -176,25 +175,5 @@ impl Core {
     ) -> Result<Command> {
         let node_msg = SystemMsg::DkgFailureAgreement(failure_set);
         self.send_message_to_our_elders(node_msg).await
-    }
-
-    pub(crate) async fn check_lagging(
-        &self,
-        peer: &Peer,
-        public_key: &BlsPublicKey,
-    ) -> Result<Option<Command>> {
-        if self.network_knowledge.has_chain_key(public_key).await
-            && public_key != &self.network_knowledge.section_key().await
-        {
-            let msg = self.generate_ae_update(*public_key, true).await?;
-            trace!("{}", LogMarker::SendingAeUpdateAfterLagCheck);
-
-            let cmd = self
-                .send_direct_message(peer.clone(), msg, *public_key)
-                .await?;
-            Ok(Some(cmd))
-        } else {
-            Ok(None)
-        }
     }
 }
