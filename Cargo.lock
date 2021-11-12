@@ -3131,7 +3131,7 @@ dependencies = [
 [[package]]
 name = "secured_linked_list"
 version = "0.4.0"
-source = "git+https://github.com/bochaco/secured_linked_list.git?branch=fix-get-proof-chain#7d6eb1de60bde38057215578d15952b3aefdda5e"
+source = "git+https://github.com/bochaco/secured_linked_list.git?branch=fix-get-proof-chain#8c533fb271202be1dfc888fc09a7c3bcad4763fc"
 dependencies = [
  "bincode",
  "blsttc",

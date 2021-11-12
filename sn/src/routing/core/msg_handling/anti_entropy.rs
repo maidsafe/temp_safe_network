@@ -154,6 +154,7 @@ impl Core {
         &self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
+        _section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
     ) -> Result<Vec<Command>> {
@@ -285,9 +286,9 @@ impl Core {
         dst_name: XorName,
         sender: &Peer,
     ) -> Result<Option<Command>> {
-        trace!("Checking for entropy");
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
+        trace!("Checking for entropy");
 
         let our_prefix = self.network_knowledge.prefix().await;
 
@@ -302,13 +303,14 @@ impl Core {
                 .get_closest_or_opposite_signed_sap(&dst_name)
                 .await
             {
-                Some(section_auth) => {
-                    info!("Found a better matching prefix {:?}", section_auth.prefix());
+                Some((signed_sap, section_chain)) => {
+                    info!("Found a better matching prefix {:?}", signed_sap.prefix());
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropyRedirect {
-                        section_auth: section_auth.value.into_msg(),
-                        section_signed: section_auth.sig,
+                        section_auth: signed_sap.value.into_msg(),
+                        section_signed: signed_sap.sig,
+                        section_chain,
                         bounced_msg,
                     };
                     let wire_msg = WireMsg::single_src(
@@ -326,17 +328,14 @@ impl Core {
                 }
                 None => {
                     warn!("Our PrefixMap is empty");
-                    // TODO: do we want to reroute some data messages to another seciton here using check_for_better_section_sap_for_data ?
-                    // if not we can remove that function.
-
                     // TODO: instead of just dropping the message, don't we actually need
                     // to get up to date info from other Elders in our section as it may be
                     // a section key we are not aware of yet?
                     // ...and once we acquired new key/s we attempt AE check again?
                     warn!(
-                            "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section.",
-                            dst_name, dst_section_pk
-                        );
+                        "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section.",
+                        dst_name, dst_section_pk
+                    );
 
                     return Err(Error::NoMatchingSection);
                 }
@@ -355,42 +354,33 @@ impl Core {
             return Ok(None);
         }
 
-        /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
         let ae_msg = match self
             .network_knowledge
-            .chain()
-            .await
             .get_proof_chain_to_current(dst_section_pk)
+            .await
         {
             Ok(proof_chain) => {
-        */
-        let proof_chain = self.network_knowledge.chain().await;
+                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
-        info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
+                let signed_sap = self
+                    .network_knowledge
+                    .section_signed_authority_provider()
+                    .await;
 
-        let section_signed_auth = self
-            .network_knowledge
-            .section_signed_authority_provider()
-            .await;
-        let section_auth = section_signed_auth.value;
-        let section_signed = section_signed_auth.sig;
-        let bounced_msg = original_bytes;
+                trace!(
+                    "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
+                    proof_chain.last_key(),
+                    &signed_sap.value.section_key()
+                );
+                trace!("{}", LogMarker::AeSendRetryAsOutdated);
 
-        trace!(
-            "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
-            proof_chain.last_key(),
-            &section_auth.section_key()
-        );
-        trace!("{}", LogMarker::AeSendRetryAsOutdated);
-
-        let ae_msg = SystemMsg::AntiEntropyRetry {
-            section_auth: section_auth.into_msg(),
-            section_signed,
-            proof_chain,
-            bounced_msg,
-        };
-        /*
-        }
+                SystemMsg::AntiEntropyRetry {
+                    section_auth: signed_sap.value.into_msg(),
+                    section_signed: signed_sap.sig,
+                    proof_chain,
+                    bounced_msg: original_bytes,
+                }
+            }
             Err(_) => {
                 trace!(
                     "Anti-Entropy: cannot find dst_section_pk {:?} sent by {} in our chain",
@@ -398,27 +388,23 @@ impl Core {
                     sender
                 );
 
-                let proof_chain = self.network_knowledge.chain().await;
+                let proof_chain = self.network_knowledge.section_chain().await;
 
-                let section_signed_auth = self
+                let signed_sap = self
                     .network_knowledge
                     .section_signed_authority_provider()
                     .await;
-                let section_auth = section_signed_auth.value;
-                let section_signed = section_signed_auth.sig;
-                let bounced_msg = original_bytes;
 
                 trace!("{}", LogMarker::AeSendRetryDstPkFail);
 
                 SystemMsg::AntiEntropyRetry {
-                    section_auth,
-                    section_signed,
+                    section_auth: signed_sap.value.into_msg(),
+                    section_signed: signed_sap.sig,
                     proof_chain,
-                    bounced_msg,
+                    bounced_msg: original_bytes,
                 }
             }
         };
-        */
 
         let wire_msg = WireMsg::single_src(
             &self.node.read().await.clone(),
@@ -434,23 +420,21 @@ impl Core {
     }
 
     // generate an AE redirect command for the given message
-    pub(crate) async fn ae_redirect(
+    pub(crate) async fn ae_redirect_to_our_elders(
         &self,
         sender: Peer,
         src_location: &SrcLocation,
         original_wire_msg: &WireMsg,
     ) -> Result<Command> {
-        let section_signed_auth = self
+        let signed_sap = self
             .network_knowledge
             .section_signed_authority_provider()
-            .await
-            .clone();
-        let section_auth = section_signed_auth.value;
-        let section_signed = section_signed_auth.sig;
+            .await;
 
         let ae_msg = SystemMsg::AntiEntropyRedirect {
-            section_auth: section_auth.into_msg(),
-            section_signed,
+            section_auth: signed_sap.value.into_msg(),
+            section_signed: signed_sap.sig,
+            section_chain: self.network_knowledge.section_chain().await,
             bounced_msg: original_wire_msg.serialize()?,
         };
 
@@ -467,46 +451,6 @@ impl Core {
             recipients: vec![sender],
             wire_msg,
         })
-    }
-
-    // checks to see if we're actually in the ideal section for this data
-    #[allow(dead_code)]
-    pub(crate) async fn check_for_better_section_sap_for_data(
-        &self,
-        data_name: Option<XorName>,
-    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        if let Some(data_name) = data_name {
-            let our_sap = self
-                .network_knowledge
-                .section_signed_authority_provider()
-                .await;
-            trace!("Our SAP: {:?}", our_sap);
-
-            match self
-                .network_knowledge
-                .get_closest_or_opposite_signed_sap(&data_name)
-                .await
-            {
-                Some(better_sap) => {
-                    // Update the client of the actual destination section
-                    trace!(
-                        "We have a better matched section for the data name {:?}",
-                        data_name
-                    );
-                    Some(better_sap)
-                }
-                None => {
-                    trace!(
-                        "We don't have a better matching section for data name {:?}m our SAP: {:?}",
-                        data_name,
-                        our_sap
-                    );
-                    None
-                }
-            }
-        } else {
-            None
-        }
     }
 }
 
@@ -582,9 +526,9 @@ mod tests {
                 dst_name,
                 &sender,
             )
-            .await?;
+            .await;
 
-        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
+        let msg_type = assert_matches!(command, Ok(Some(Command::SendMessage { wire_msg, .. })) => {
             wire_msg
                 .into_message()
                 .context("failed to deserialised anti-entropy message")?
@@ -597,11 +541,18 @@ mod tests {
         });
 
         // now let's insert the other SAP to make it aware of the other prefix
-        assert!(env
-            .core
-            .network_knowledge
-            .prefix_map()
-            .update(env.other_sap.clone(), &env.proof_chain)?);
+        assert!(
+            env.core
+                .network_knowledge()
+                .update_knowledge_if_valid(
+                    env.other_sap.clone(),
+                    &env.proof_chain,
+                    None,
+                    &env.core.node.read().await.name(),
+                    false,
+                )
+                .await?
+        );
 
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
@@ -614,9 +565,9 @@ mod tests {
                 dst_name,
                 &sender,
             )
-            .await?;
+            .await;
 
-        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
+        let msg_type = assert_matches!(command, Ok(Some(Command::SendMessage { wire_msg, .. })) => {
             wire_msg
                 .into_message()
                 .context("failed to deserialised anti-entropy message")?

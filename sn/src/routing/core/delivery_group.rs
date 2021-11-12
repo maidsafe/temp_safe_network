@@ -602,7 +602,7 @@ mod tests {
             .verify_with_chain_and_update(
                 section_auth1,
                 &proof_chain,
-                &network_knowledge.chain().await
+                &network_knowledge.section_chain().await
             )
             .is_ok(),);
 

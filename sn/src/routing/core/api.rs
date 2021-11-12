@@ -72,7 +72,7 @@ impl Core {
     }
 
     pub(crate) async fn section_chain(&self) -> SecuredLinkedList {
-        self.network_knowledge.chain().await
+        self.network_knowledge.section_chain().await
     }
 
     /// Is this node an elder?

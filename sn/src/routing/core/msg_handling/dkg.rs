@@ -154,12 +154,12 @@ impl Core {
 
         let snapshot = self.state_snapshot().await;
 
-        // If we are lagging, we may already be approved as new Elder and
-        // an AE update provided us with this same SAP but signed by previous Elders,
-        // thus we can skip the SectionInfo agreement proposal phase.
+        // If we are lagging, we may have been already approved as new Elder, and
+        // an AE update provided us with this same SAP but already signed by previous Elders,
+        // if so we can skip the SectionInfo agreement proposal phase.
         if self
             .network_knowledge
-            .skip_section_info_agreement(key_share_pk, &sap.prefix())
+            .set_current_sap(key_share_pk, &sap.prefix())
             .await
         {
             self.update_self_for_new_node_state_and_fire_events(snapshot)
