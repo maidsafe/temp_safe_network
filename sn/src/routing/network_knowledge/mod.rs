@@ -43,7 +43,7 @@ use xor_name::{Prefix, XorName};
 pub(crate) struct NetworkKnowledge {
     /// Network genesis key
     genesis_key: BlsPublicKey,
-    /// The secured linked list of previous section keys, starting from genesis key
+    /// Current section chain of our own section, starting from genesis key
     chain: Arc<RwLock<SecuredLinkedList>>,
     /// Signed Section Authority Provider
     signed_sap: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
@@ -51,10 +51,8 @@ pub(crate) struct NetworkKnowledge {
     section_peers: SectionPeers,
     /// The network prefix map, i.e. a map from prefix to SAPs
     prefix_map: NetworkPrefixMap,
-    ///
-    cache_chain: Arc<RwLock<Option<SecuredLinkedList>>>,
-    ///
-    cache_sap: Arc<RwLock<Option<SectionAuth<SectionAuthorityProvider>>>>,
+    /// A DAG containing all section chains of the whole netwrk that we are aware of
+    all_sections_chains: Arc<RwLock<SecuredLinkedList>>,
 }
 
 impl NetworkKnowledge {
@@ -131,12 +129,11 @@ impl NetworkKnowledge {
 
         Ok(Self {
             genesis_key,
-            chain: Arc::new(RwLock::new(chain)),
+            chain: Arc::new(RwLock::new(chain.clone())),
             signed_sap: Arc::new(RwLock::new(signed_sap)),
             section_peers: SectionPeers::default(),
             prefix_map,
-            cache_chain: Arc::new(RwLock::new(None)),
-            cache_sap: Arc::new(RwLock::new(None)),
+            all_sections_chains: Arc::new(RwLock::new(chain)),
         })
     }
 
@@ -199,44 +196,57 @@ impl NetworkKnowledge {
     }
 
     ///
-    pub(super) async fn skip_section_info_agreement(&self, section_key: BlsPublicKey) -> bool {
-        let mut switched = false;
-        if let Some(signed_sap) = self.cache_sap.read().await.clone() {
-            let provided_sap = signed_sap.value.clone();
-            if provided_sap.section_key() == section_key {
-                if let Some(proof_chain) = self.cache_chain.read().await.clone() {
-                    let our_prev_prefix = self.prefix().await;
-                    *self.signed_sap.write().await = signed_sap.clone();
-                    *self.chain.write().await = proof_chain.clone();
+    pub(super) async fn skip_section_info_agreement(
+        &self,
+        section_key: BlsPublicKey,
+        prefix: &Prefix,
+    ) -> bool {
+        // Let's try to find the signed SAP corresponding to the provided prefix and section key
+        match self.prefix_map.get_signed(prefix) {
+            Some(signed_sap) if signed_sap.value.section_key() == section_key => {
+                // We have the signed SAP for the provided prefix and section key,
+                // we should be able to update our current SAP and section chain
+                match self
+                    .all_sections_chains
+                    .read()
+                    .await
+                    .get_proof_chain(&self.genesis_key, &section_key)
+                {
+                    Ok(section_chain) => {
+                        // Let's then update our current SAP and section chain
+                        let our_prev_prefix = self.prefix().await;
+                        *self.signed_sap.write().await = signed_sap.clone();
+                        *self.chain.write().await = section_chain;
 
-                    // Remove any peer which doesn't belong to our new section's prefix
-                    self.section_peers.retain(&provided_sap.prefix());
-                    info!(
-                        "Switched our section's SAP ({:?} to {:?}) with new one: {:?}",
-                        our_prev_prefix,
-                        provided_sap.prefix(),
-                        provided_sap
-                    );
+                        // Remove any peer which doesn't belong to our new section's prefix
+                        self.section_peers.retain(prefix);
+                        info!(
+                            "Switched our section's SAP ({:?} to {:?}) with new one: {:?}",
+                            our_prev_prefix, prefix, signed_sap
+                        );
 
-                    *self.cache_chain.write().await = None;
-                    *self.cache_sap.write().await = None;
-
-                    switched = true;
-                } else {
-                    warn!("Doesn't have cached chain for {:?}", section_key);
+                        true
+                    }
+                    Err(err) => {
+                        trace!(
+                            "We couldn't find section chain for {:?} and section key {:?}: {:?}",
+                            prefix,
+                            section_key,
+                            err
+                        );
+                        false
+                    }
                 }
-            } else {
+            }
+            Some(_) | None => {
                 trace!(
-                    "Cached sap({:?}) doesn't match key_share {:?}",
-                    provided_sap,
+                    "We yet don't have the signed SAP for {:?} and section key {:?}",
+                    prefix,
                     section_key
                 );
+                false
             }
-        } else {
-            trace!("Doesn't have cached SAP or chain for {:?}", section_key);
         }
-
-        switched
     }
 
     pub(super) async fn update_knowledge_if_valid(
@@ -263,7 +273,7 @@ impl NetworkKnowledge {
 
         let mut there_was_an_update = false;
 
-        // 1. Update the network prefix map
+        // Update the network prefix map
         match self.prefix_map.verify_with_chain_and_update(
             signed_sap.clone(),
             proof_chain,
@@ -276,29 +286,30 @@ impl NetworkKnowledge {
                     provided_sap.prefix()
                 );
 
+                // Join the proof chain to our DAG since it's a new SAP
+                // thus it shall extend some branch/chain.
+                self.all_sections_chains
+                    .write()
+                    .await
+                    .join(proof_chain.clone())?;
+
                 // We try to update our SAP and own chain only if we were flagged to,
                 // otherwise this update could be due to an AE message and we still don't have
                 // the key share for the new SAP, making this node unable to sign section messages
                 // and possibly being kicked out of the group of Elders.
-                if provided_sap.prefix().matches(our_name) {
-                    if update_sap {
-                        let our_prev_prefix = self.prefix().await;
-                        *self.signed_sap.write().await = signed_sap.clone();
-                        *self.chain.write().await = proof_chain.clone();
+                if update_sap && provided_sap.prefix().matches(our_name) {
+                    let our_prev_prefix = self.prefix().await;
+                    *self.signed_sap.write().await = signed_sap.clone();
+                    *self.chain.write().await = proof_chain.clone();
 
-                        // Remove any peer which doesn't belong to our new section's prefix
-                        self.section_peers.retain(&provided_sap.prefix());
-                        info!(
-                            "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
-                            our_prev_prefix,
-                            provided_sap.prefix(),
-                            provided_sap
-                        );
-                    } else {
-                        trace!("Cache the proof_chain to wait for the keyshare");
-                        *self.cache_chain.write().await = Some(proof_chain.clone());
-                        *self.cache_sap.write().await = Some(signed_sap.clone());
-                    }
+                    // Remove any peer which doesn't belong to our new section's prefix
+                    self.section_peers.retain(&provided_sap.prefix());
+                    info!(
+                        "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
+                        our_prev_prefix,
+                        provided_sap.prefix(),
+                        provided_sap
+                    );
                 }
             }
             Ok(false) => {
@@ -315,11 +326,7 @@ impl NetworkKnowledge {
             }
         }
 
-        // TODO:
-        // 2. Update the chains DAG with provided knowledge so we have all sections chains,
-        // inlcuding our own, to be able to provide proof chains when required, e.g. in AE responses.
-
-        // 3. Update members if changes were provided
+        // Update members if changes were provided
         if let Some(peers) = updated_members {
             if self.merge_members(peers).await? {
                 info!(
