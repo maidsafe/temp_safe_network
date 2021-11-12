@@ -140,7 +140,7 @@ impl Core {
         if !self
             .network_knowledge
             .update_member(SectionAuth {
-                value: node_state,
+                value: node_state.clone(),
                 sig,
             })
             .await

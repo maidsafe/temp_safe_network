@@ -49,9 +49,10 @@ pub(crate) async fn actions(
 
     for node_state in candidates {
         if node_state.age() == max_age {
+            let peer = node_state.to_peer();
             relocating_nodes.push((
                 node_state,
-                RelocateAction::new(network_knowledge, &node_state.to_peer(), churn_name).await,
+                RelocateAction::new(network_knowledge, &peer, churn_name).await,
             ))
         }
     }
