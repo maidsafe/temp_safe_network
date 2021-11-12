@@ -10,7 +10,7 @@ use crate::messaging::DstLocation;
 use crate::routing::{
     error::{Error, Result},
     network_knowledge::NetworkKnowledge,
-    supermajority, Peer, SectionAuthorityProviderUtils, ELDER_SIZE,
+    supermajority, Peer, ELDER_SIZE,
 };
 use itertools::Itertools;
 use std::{cmp, iter};
@@ -76,10 +76,10 @@ async fn section_candidates(
     let network_sections = network_knowledge.prefix_map().all();
     let info = iter::once(default_sap.clone())
         .chain(network_sections)
-        .min_by(|lhs, rhs| lhs.prefix.cmp_distance(&rhs.prefix, target_name))
+        .min_by(|lhs, rhs| lhs.prefix().cmp_distance(&rhs.prefix(), target_name))
         .unwrap_or(default_sap);
 
-    if info.prefix == network_knowledge.prefix().await {
+    if info.prefix() == network_knowledge.prefix().await {
         // Exclude our name since we don't need to send to ourself
         let chosen_section: Vec<_> = info
             .peers()
@@ -105,8 +105,8 @@ async fn candidates(
 
     let sections = sections
         .iter()
-        .sorted_by(|lhs, rhs| lhs.prefix.cmp_distance(&rhs.prefix, target_name))
-        .map(|info| (info.prefix, info.elder_count(), info.peers()))
+        .sorted_by(|lhs, rhs| lhs.prefix().cmp_distance(&rhs.prefix(), target_name))
+        .map(|info| (info.prefix(), info.elder_count(), info.peers()))
         .collect_vec();
 
     // let sections = iter::once(&sap)
@@ -171,15 +171,14 @@ fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
         dkg::test_utils::section_signed,
         ed25519,
         network_knowledge::{
             test_utils::{gen_addr, gen_section_authority_provider},
-            NodeState,
+            NodeState, SectionAuthorityProvider,
         },
-        SectionAuthorityProviderUtils, MIN_ADULT_AGE,
+        MIN_ADULT_AGE,
     };
     use eyre::{ContextCompat, Result};
     use rand::seq::IteratorRandom;
@@ -306,7 +305,7 @@ mod tests {
             .get(&Prefix::default().pushed(true))
             .context("unknown section")?;
 
-        let dst_name = section_auth1.prefix.substituted_in(rand::random());
+        let dst_name = section_auth1.prefix().substituted_in(rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Node {
             name: dst_name,
@@ -336,7 +335,7 @@ mod tests {
             .context("unknown section")?;
 
         let dst_name = elders_info1
-            .prefix
+            .prefix()
             .pushed(false)
             .substituted_in(rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
@@ -368,7 +367,7 @@ mod tests {
             .get(&Prefix::default().pushed(true))
             .context("unknown section")?;
 
-        let dst_name = section_auth1.prefix.substituted_in(rand::random());
+        let dst_name = section_auth1.prefix().substituted_in(rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Section {
             name: dst_name,
@@ -398,7 +397,7 @@ mod tests {
             .context("unknown section")?;
 
         let dst_name = elders_info1
-            .prefix
+            .prefix()
             .pushed(false)
             .substituted_in(rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
@@ -594,7 +593,7 @@ mod tests {
         proof_chain.insert(&genesis_pk, pk1, sig1)?;
 
         // 3rd key is the section key in SAP
-        let pk2 = section_auth1.public_key_set.public_key();
+        let pk2 = section_auth1.section_key();
         let sig2 = bincode::serialize(&pk2).map(|bytes| sk1.sign(&bytes))?;
         proof_chain.insert(&pk1, pk2, sig2)?;
 

@@ -8,8 +8,8 @@
 
 use std::mem;
 
-use crate::messaging::{system::SectionAuth, SectionAuthorityProvider};
-use crate::routing::dkg::KeyedSig;
+use crate::messaging::system::SectionAuth;
+use crate::routing::{dkg::KeyedSig, network_knowledge::SectionAuthorityProvider};
 use xor_name::Prefix;
 
 type Entry = (SectionAuth<SectionAuthorityProvider>, KeyedSig);
@@ -36,7 +36,7 @@ impl SplitBarrier {
         section_auth: SectionAuth<SectionAuthorityProvider>,
         keyed_sig: KeyedSig,
     ) -> Vec<Entry> {
-        if !section_auth.prefix.is_extension_of(our_prefix) {
+        if !section_auth.prefix().is_extension_of(our_prefix) {
             // Not a split, no need to cache.
             return vec![(section_auth, keyed_sig)];
         }
@@ -46,7 +46,7 @@ impl SplitBarrier {
             mem::take(&mut self.0)
                 .into_iter()
                 .partition(|(cached_section_auth, _)| {
-                    cached_section_auth.prefix == section_auth.prefix.sibling()
+                    cached_section_auth.prefix() == section_auth.prefix().sibling()
                 });
         self.0 = keep;
 

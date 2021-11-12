@@ -8,13 +8,14 @@
 
 use std::{cmp, collections::BTreeSet};
 
-use crate::messaging::{
-    system::{KeyedSig, MembershipState, Proposal, SectionAuth},
-    SectionAuthorityProvider,
-};
+use crate::messaging::system::{KeyedSig, MembershipState, Proposal, SectionAuth};
 use crate::routing::{
-    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker, network_knowledge::NodeState,
-    routing_api::command::Command, Event, SectionAuthorityProviderUtils, MIN_AGE,
+    dkg::SectionAuthUtils,
+    error::Result,
+    log_markers::LogMarker,
+    network_knowledge::{NodeState, SectionAuthorityProvider},
+    routing_api::command::Command,
+    Event, MIN_AGE,
 };
 
 use super::Core;
@@ -38,7 +39,8 @@ impl Core {
                     .await
             }
             Proposal::SectionInfo(section_auth) => {
-                self.handle_section_info_agreement(section_auth, sig).await
+                self.handle_section_info_agreement(section_auth.into_state(), sig)
+                    .await
             }
             Proposal::OurElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
@@ -189,7 +191,7 @@ impl Core {
         if equal_or_extension {
             debug!(
                 "Updating section info for our prefix: {:?}",
-                section_auth.prefix
+                section_auth.prefix()
             );
             // Our section or sub-section
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
@@ -242,7 +244,7 @@ impl Core {
             commands.extend(
                 self.send_proposal(
                     our_elders_recipients,
-                    Proposal::OurElders(signed_section_auth),
+                    Proposal::OurElders(signed_section_auth.into_authed_msg()),
                 )
                 .await?,
             );
@@ -280,7 +282,7 @@ impl Core {
         let old_chain = self.section_chain().await.clone();
 
         for (signed_sap, key_sig) in updates {
-            let prefix = signed_sap.prefix;
+            let prefix = signed_sap.prefix();
             trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
 
             info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);

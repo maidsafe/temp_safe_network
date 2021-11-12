@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    system::{MembershipState, SectionAuth},
-    SectionAuthorityProvider,
+use crate::messaging::system::{MembershipState, SectionAuth};
+use crate::routing::{
+    network_knowledge::{NodeState, SectionAuthorityProvider},
+    Peer,
 };
-use crate::routing::{network_knowledge::NodeState, Peer, SectionAuthorityProviderUtils};
 use dashmap::{mapref::entry::Entry, DashMap};
 use itertools::Itertools;
 use std::{

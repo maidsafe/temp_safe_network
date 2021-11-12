@@ -13,10 +13,10 @@ use crate::messaging::data::DataCmd;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
     system::{KeyedSig, SectionAuth, SystemMsg},
-    DstLocation, MessageId, MessageType, MsgKind, SectionAuthorityProvider, WireMsg,
+    DstLocation, MessageId, MessageType, MsgKind, WireMsg,
 };
 use crate::messaging::{AuthorityProof, ServiceAuth};
-use crate::routing::log_markers::LogMarker;
+use crate::routing::{log_markers::LogMarker, SectionAuthorityProvider};
 use crate::types::utils::write_data_to_disk;
 use bytes::Bytes;
 use itertools::Itertools;
@@ -104,7 +104,7 @@ impl Session {
             } => {
                 let result = Self::handle_ae_redirect_msg(
                     session,
-                    section_auth,
+                    section_auth.into_state(),
                     section_signed,
                     bounced_msg,
                     src,
@@ -127,7 +127,7 @@ impl Session {
             } => {
                 let result = Self::handle_ae_retry_msg(
                     session,
-                    section_auth,
+                    section_auth.into_state(),
                     section_signed,
                     bounced_msg,
                     proof_chain,
@@ -310,7 +310,7 @@ impl Session {
                 if updated {
                     debug!(
                         "Anti-Entropy: updated remote section SAP updated for {:?}",
-                        section_auth.prefix
+                        section_auth.prefix()
                     );
                     // Update the PrefixMap on disk
                     if let Err(e) =
@@ -325,7 +325,7 @@ impl Session {
                 } else {
                     debug!(
                             "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                            section_auth.prefix, section_auth
+                            section_auth.prefix(), section_auth
                         );
                 }
             }
@@ -336,7 +336,7 @@ impl Session {
                 );
                 warn!(
                     "Anti-Entropy: bounced msg dropped. Failed section auth was {:?} sent by: {:?}",
-                    section_auth.public_key_set.public_key(),
+                    section_auth.section_key(),
                     src
                 );
                 return Ok(());
@@ -450,17 +450,17 @@ impl Session {
         let target_public_key;
 
         // We normally have received auth when we're in AE-Redirect (where we could not trust enough to update our prefixmap)
-        let mut target_elders = if let Some(auth) = received_auth {
-            target_public_key = auth.public_key_set.public_key();
-            auth.elders
+        let mut target_elders: Vec<_> = if let Some(auth) = received_auth {
+            target_public_key = auth.section_key();
+            auth.elders()
                 .iter()
                 .sorted_by(|(lhs_name, _), (rhs_name, _)| {
                     dst_address_of_bounced_msg.cmp_distance(lhs_name, rhs_name)
                 })
                 .map(|(_, addr)| addr)
                 .take(target_count)
-                .cloned()
-                .collect::<Vec<SocketAddr>>()
+                .copied()
+                .collect()
         } else {
             // we use whatever is our latest knowledge at this point
 
@@ -468,13 +468,9 @@ impl Session {
                 .network
                 .closest_or_opposite(&dst_address_of_bounced_msg, None)
             {
-                target_public_key = sap.public_key_set.public_key();
+                target_public_key = sap.section_key();
 
-                sap.elders
-                    .values()
-                    .cloned()
-                    .take(target_count)
-                    .collect::<Vec<SocketAddr>>()
+                sap.elders().values().copied().take(target_count).collect()
             } else {
                 error!("Cannot resend {:?}, no 'received auth' provided, and nothing relevant in session network prefixmap", msg_id);
                 return Ok(None);
@@ -487,13 +483,12 @@ impl Session {
             session.ae_redirect_cache.write().await
         };
 
-        let cache_entry = the_cache_guard.find(|x| {
-            x == &(
-                target_elders.clone(),
-                target_public_key,
-                bounced_msg.clone(),
-            )
-        });
+        let cache_entry =
+            the_cache_guard.find(|(candidate_elders, candidate_public_key, candidate_msg)| {
+                candidate_elders == &target_elders
+                    && candidate_public_key == &target_public_key
+                    && candidate_msg == &bounced_msg
+            });
 
         if cache_entry.is_some() {
             // an elder group corresponds to a PK, so as we've sent to this PK, we've sent to these elders...

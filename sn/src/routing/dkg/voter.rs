@@ -6,18 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId},
-    SectionAuthorityProvider,
-};
+use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId};
 use crate::routing::{
     dkg::session::{Backlog, Session},
     ed25519,
     error::Result,
-    network_knowledge::{ElderCandidates, SectionKeyShare},
+    network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
-    supermajority, SectionAuthorityProviderUtils,
+    supermajority,
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};

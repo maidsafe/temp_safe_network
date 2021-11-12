@@ -16,9 +16,7 @@ use crate::routing::{
     core::JoiningAsRelocated,
     ed25519::{self, Keypair, Verifier},
     error::Error,
-    network_knowledge::{
-        section_authority_provider::SectionAuthorityProviderUtils, NetworkKnowledge, NodeState,
-    },
+    network_knowledge::{NetworkKnowledge, NodeState},
     Peer,
 };
 use async_trait::async_trait;
@@ -245,11 +243,11 @@ fn trailing_zeros(bytes: &[u8]) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
         dkg::test_utils::section_signed,
         network_knowledge::peer::test_utils::arbitrary_unique_peers,
-        routing_api::tests::SecretKeySet, SectionAuthorityProviderUtils, ELDER_SIZE, MIN_AGE,
+        network_knowledge::SectionAuthorityProvider, routing_api::tests::SecretKeySet, ELDER_SIZE,
+        MIN_AGE,
     };
     use assert_matches::assert_matches;
     use eyre::Result;

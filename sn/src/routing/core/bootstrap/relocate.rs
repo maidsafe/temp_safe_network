@@ -12,18 +12,18 @@ use crate::messaging::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocateDetails, RelocatePayload,
         SystemMsg,
     },
-    AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider, WireMsg,
+    AuthorityProof, DstLocation, SectionAuth, WireMsg,
 };
 use crate::routing::{
     dkg::SectionAuthUtils,
     ed25519,
     error::{Error, Result},
     messages::WireMsgUtils,
-    network_knowledge::NetworkKnowledge,
+    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider},
     node::Node,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    Peer, SectionAuthorityProviderUtils,
+    Peer,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
@@ -132,12 +132,13 @@ impl JoiningAsRelocated {
                     section: NetworkKnowledge::new(
                         self.genesis_key,
                         section_chain,
-                        section_auth,
+                        section_auth.into_authed_state(),
                         None,
                     )?,
                 }))
             }
             JoinAsRelocatedResponse::Retry(section_auth) => {
+                let section_auth = section_auth.into_state();
                 if !self.check_autority_provider(&section_auth, &self.relocate_details.dst) {
                     return Ok(None);
                 }
@@ -167,7 +168,7 @@ impl JoiningAsRelocated {
                 // if we are relocating, and we didn't generate
                 // the relocation payload yet, we do it now
                 if self.relocate_payload.is_none() {
-                    self.build_relocation_payload(&section_auth.prefix)?;
+                    self.build_relocation_payload(&section_auth.prefix())?;
                 }
 
                 info!(
@@ -181,6 +182,8 @@ impl JoiningAsRelocated {
                 Ok(Some(cmd))
             }
             JoinAsRelocatedResponse::Redirect(section_auth) => {
+                let section_auth = section_auth.into_state();
+
                 if !self.check_autority_provider(&section_auth, &self.relocate_details.dst) {
                     return Ok(None);
                 }
@@ -210,7 +213,7 @@ impl JoiningAsRelocated {
                 // if we are relocating, and we didn't generate
                 // the relocation payload yet, we do it now
                 if self.relocate_payload.is_none() {
-                    self.build_relocation_payload(&section_auth.prefix)?;
+                    self.build_relocation_payload(&section_auth.prefix())?;
                 }
 
                 info!(
@@ -291,10 +294,10 @@ impl JoiningAsRelocated {
         section_auth: &SectionAuthorityProvider,
         dst: &XorName,
     ) -> bool {
-        if !section_auth.prefix.matches(dst) {
+        if !section_auth.prefix().matches(dst) {
             error!("Invalid JoinResponse bad prefix: {:?}", section_auth);
             false
-        } else if section_auth.elders.is_empty() {
+        } else if section_auth.elders().is_empty() {
             error!(
                 "Invalid JoinResponse, empty list of Elders: {:?}",
                 section_auth

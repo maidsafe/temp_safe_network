@@ -7,17 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::super::Core;
-use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SystemMsg},
-    SectionAuthorityProvider,
+use crate::messaging::system::{
+    DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SystemMsg,
 };
 use crate::routing::{
     dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
     log_markers::LogMarker,
-    network_knowledge::{ElderCandidates, SectionKeyShare},
+    network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     routing_api::command::Command,
-    Peer, SectionAuthorityProviderUtils,
+    Peer,
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
@@ -163,7 +162,7 @@ impl Core {
             self.update_self_for_new_node_state_and_fire_events(snapshot)
                 .await
         } else {
-            let proposal = Proposal::SectionInfo(section_auth);
+            let proposal = Proposal::SectionInfo(section_auth.into_msg());
             let recipients: Vec<_> = self.network_knowledge.authority_provider().await.peers();
             self.send_proposal_with(recipients, proposal, &key_share)
                 .await
