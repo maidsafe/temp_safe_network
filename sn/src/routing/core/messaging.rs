@@ -113,7 +113,7 @@ impl Core {
             .section_signed_authority_provider()
             .await
             .clone();
-        let section_auth = section_signed_auth.value;
+        let sap = section_signed_auth.value;
         let section_signed = section_signed_auth.sig;
 
         let proof_chain = match self
@@ -141,7 +141,7 @@ impl Core {
         };
 
         Ok(SystemMsg::AntiEntropyUpdate {
-            section_auth: section_auth.into_msg(),
+            section_auth: sap.into_msg(),
             section_signed,
             proof_chain,
             members,
@@ -238,12 +238,12 @@ impl Core {
         old: &StateSnapshot,
     ) -> Vec<Command> {
         debug!("{}", LogMarker::AeSendUpdateToSiblings);
-        if let Some(sibling_sec_auth) = self
+        if let Some(sibling_sap) = self
             .network_knowledge
             .prefix_map()
             .get_signed(&self.network_knowledge.prefix().await.sibling())
         {
-            let promoted_sibling_elders: Vec<_> = sibling_sec_auth
+            let promoted_sibling_elders: Vec<_> = sibling_sap
                 .peers()
                 .into_iter()
                 .filter(|peer| !old.elders.contains(&peer.name()))
@@ -256,12 +256,12 @@ impl Core {
 
             // Using previous_key as dst_section_key as newly promoted sibling elders shall still
             // in the state of pre-split.
-            let previous_pk = sibling_sec_auth.sig.public_key;
+            let previous_section_key = old.section_key;
 
             // Compose a min sibling proof_chain.
             let mut proof_chain = match self
                 .network_knowledge
-                .get_proof_chain_to_current(&previous_pk)
+                .get_proof_chain_to_current(&previous_section_key)
                 .await
             {
                 Ok(chain) => chain,
@@ -272,18 +272,18 @@ impl Core {
             };
 
             let _ = proof_chain.insert(
-                &previous_pk,
-                sibling_sec_auth.section_key(),
-                sibling_sec_auth.sig.signature.clone(),
+                &previous_section_key,
+                sibling_sap.section_key(),
+                sibling_sap.sig.signature.clone(),
             );
 
-            let dst_name = sibling_sec_auth.prefix().name();
+            let dst_name = sibling_sap.prefix().name();
 
             // Those promoted elders shall already know about other adult members.
             // TODO: confirm no need to populate the members.
             let node_msg = SystemMsg::AntiEntropyUpdate {
-                section_signed: sibling_sec_auth.sig,
-                section_auth: sibling_sec_auth.value.into_msg(),
+                section_signed: sibling_sap.sig,
+                section_auth: sibling_sap.value.into_msg(),
                 proof_chain,
                 members: None,
             };
@@ -293,7 +293,7 @@ impl Core {
                     promoted_sibling_elders,
                     node_msg,
                     dst_name,
-                    previous_pk,
+                    previous_section_key,
                 )
                 .await
             {
