@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-    DstLocation, SectionAuthorityProvider, WireMsg,
+    DstLocation, WireMsg,
 };
 use crate::routing::{
     dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
@@ -16,10 +16,10 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, SectionKeyShare},
+    network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
     routing_api::command::{next_timer_token, Command},
-    Peer, SectionAuthorityProviderUtils,
+    Peer,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;

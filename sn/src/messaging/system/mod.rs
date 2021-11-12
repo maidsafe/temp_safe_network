@@ -24,7 +24,6 @@ pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::MembershipState;
 pub use section::NodeState;
-pub use section::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 pub use signed::{KeyedSig, SigShare};
@@ -76,7 +75,7 @@ pub enum SystemMsg {
         /// Our section chain truncated from the triggering msg's dst section_key (or genesis key for full proof)
         proof_chain: SecuredLinkedList,
         /// Optional section members if we're updating our own section adults
-        members: Option<SectionPeers>,
+        members: Option<BTreeSet<SectionAuth<NodeState>>>,
     },
     /// Probes the network by sending a message to a random dst triggering an AE flow.
     AntiEntropyProbe(XorName),

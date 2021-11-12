@@ -15,7 +15,7 @@ use crate::messaging::{
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
     ChunkStore, Config as RoutingConfig, Error as RoutingError, EventStream, RegisterStorage,
-    Routing as RoutingNode, SectionAuthorityProviderUtils,
+    Routing as RoutingNode,
 };
 use crate::types::PublicKey;
 use bls::{PublicKey as BlsPublicKey, PublicKeySet};
@@ -106,11 +106,7 @@ impl Network {
 
     /// Returns our section's public key.
     pub(crate) async fn our_section_public_key(&self) -> BlsPublicKey {
-        self.routing
-            .our_section_auth()
-            .await
-            .public_key_set
-            .public_key()
+        self.routing.our_section_auth().await.section_key()
     }
 
     pub(crate) async fn our_public_key_set(&self) -> Result<PublicKeySet> {

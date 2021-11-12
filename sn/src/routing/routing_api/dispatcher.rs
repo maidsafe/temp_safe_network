@@ -245,7 +245,7 @@ impl Dispatcher {
             Command::HandleElderAgreement { proposal, sig } => match proposal {
                 Proposal::OurElders(section_auth) => {
                     self.core
-                        .handle_our_elders_agreement(section_auth, sig)
+                        .handle_our_elders_agreement(section_auth.into_authed_state(), sig)
                         .await
                 }
                 _ => {
@@ -297,7 +297,7 @@ impl Dispatcher {
                 dst_key,
             } => {
                 self.core
-                    .make_online_proposal(peer, previous_name, dst_key)
+                    .make_online_proposal(&peer, previous_name, dst_key)
                     .await
             }
             Command::ProposeOffline(name) => self.core.propose_offline(name).await,
@@ -334,11 +334,11 @@ impl Dispatcher {
                     if self
                         .core
                         .comm
-                        .is_reachable(&member_info.addr)
+                        .is_reachable(&member_info.addr())
                         .await
                         .is_err()
                     {
-                        commands.push(Command::ProposeOffline(member_info.name));
+                        commands.push(Command::ProposeOffline(member_info.name()));
                     }
                 }
                 Ok(commands)

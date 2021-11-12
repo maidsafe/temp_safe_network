@@ -7,54 +7,31 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::ElderCandidates;
-use crate::messaging::SectionAuthorityProvider;
+use crate::messaging::{
+    system::SectionAuth, SectionAuthorityProvider as SectionAuthorityProviderMsg,
+};
 use crate::routing::{Peer, Prefix, XorName};
 use bls::{PublicKey, PublicKeySet};
-use std::{collections::BTreeSet, net::SocketAddr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+};
 
-/// A new `SectionAuthorityProvider` is created whenever the elders change,
-/// due to an elder being added or removed, or the section splitting or merging.
-pub(crate) trait SectionAuthorityProviderUtils {
-    /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.
-    fn new<I: IntoIterator<Item = Peer>>(elders: I, prefix: Prefix, pk_set: PublicKeySet) -> Self;
-
-    /// Creates a new `SectionAuthorityProvider` from ElderCandidates and public keyset.
-    fn from_elder_candidates(
-        elder_candidates: ElderCandidates,
-        pk_set: PublicKeySet,
-    ) -> SectionAuthorityProvider;
-
-    /// Returns `ElderCandidates`, which doesn't have key related infos.
-    fn elder_candidates(&self) -> ElderCandidates;
-
-    /// Returns a vec of the list of peers.
-    fn peers(&'_ self) -> Vec<Peer>;
-
-    /// Returns the number of elders in the section.
-    fn elder_count(&self) -> usize;
-
-    /// Returns a map of name to socket_addr.
-    fn contains_elder(&self, name: &XorName) -> bool;
-
-    /// Returns a socket_addr of an elder.
-    fn get_addr(&self, name: &XorName) -> Option<SocketAddr>;
-
-    /// Returns the set of elder names.
-    fn names(&self) -> BTreeSet<XorName>;
-
-    /// Returns the list of socket addresses.
-    fn addresses(&self) -> Vec<SocketAddr>;
-
-    /// Returns its prefix.
-    fn prefix(&self) -> Prefix;
-
-    /// Key of the section.
-    fn section_key(&self) -> PublicKey;
+/// Details of section authority.
+///
+/// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being
+/// added or removed, or the section splitting or merging.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize)]
+// TODO: make pub(crate) - but it's used by routing stress_example atm
+pub struct SectionAuthorityProvider {
+    prefix: Prefix,
+    public_key_set: PublicKeySet,
+    elders: BTreeMap<XorName, SocketAddr>,
 }
 
-impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
+impl SectionAuthorityProvider {
     /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.
-    fn new<I>(elders: I, prefix: Prefix, pk_set: PublicKeySet) -> Self
+    pub(crate) fn new<I>(elders: I, prefix: Prefix, pk_set: PublicKeySet) -> Self
     where
         I: IntoIterator<Item = Peer>,
     {
@@ -71,7 +48,7 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     }
 
     /// Creates a new `SectionAuthorityProvider` from ElderCandidates and public keyset.
-    fn from_elder_candidates(
+    pub(crate) fn from_elder_candidates(
         elder_candidates: ElderCandidates,
         pk_set: PublicKeySet,
     ) -> SectionAuthorityProvider {
@@ -85,12 +62,20 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
         }
     }
 
+    pub(crate) fn prefix(&self) -> Prefix {
+        self.prefix
+    }
+
+    pub(crate) fn elders(&self) -> &BTreeMap<XorName, SocketAddr> {
+        &self.elders
+    }
+
     /// Returns `ElderCandidates`, which doesn't have key related infos.
-    fn elder_candidates(&self) -> ElderCandidates {
+    pub(crate) fn elder_candidates(&self) -> ElderCandidates {
         ElderCandidates::new(self.prefix, self.peers())
     }
 
-    fn peers(&'_ self) -> Vec<Peer> {
+    pub(crate) fn peers(&'_ self) -> Vec<Peer> {
         self.elders
             .iter()
             .map(|(name, addr)| Peer::new(*name, *addr))
@@ -98,36 +83,74 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
     }
 
     /// Returns the number of elders in the section.
-    fn elder_count(&self) -> usize {
+    pub(crate) fn elder_count(&self) -> usize {
         self.elders.len()
     }
 
     /// Returns a map of name to socket_addr.
-    fn contains_elder(&self, name: &XorName) -> bool {
+    pub(crate) fn contains_elder(&self, name: &XorName) -> bool {
         self.elders.contains_key(name)
     }
 
     /// Returns a socket_addr of an elder.
-    fn get_addr(&self, name: &XorName) -> Option<SocketAddr> {
+    pub(crate) fn get_addr(&self, name: &XorName) -> Option<SocketAddr> {
         self.elders.get(name).copied()
     }
 
     /// Returns the set of elder names.
-    fn names(&self) -> BTreeSet<XorName> {
+    pub(crate) fn names(&self) -> BTreeSet<XorName> {
         self.elders.keys().copied().collect()
     }
 
-    fn addresses(&self) -> Vec<SocketAddr> {
+    pub(crate) fn addresses(&self) -> Vec<SocketAddr> {
         self.elders.values().copied().collect()
     }
 
-    fn prefix(&self) -> Prefix {
-        self.prefix
-    }
-
     /// Key of the section.
-    fn section_key(&self) -> PublicKey {
+    // TODO: make pub(crate) - but it's used by routing stress_example atm
+    pub fn section_key(&self) -> PublicKey {
         self.public_key_set.public_key()
+    }
+}
+
+// Add conversion methods to/from `messaging::...::NodeState`
+// We prefer this over `From<...>` to make it easier to read the conversion.
+
+impl SectionAuthorityProvider {
+    pub(crate) fn into_msg(self) -> SectionAuthorityProviderMsg {
+        SectionAuthorityProviderMsg {
+            prefix: self.prefix,
+            public_key_set: self.public_key_set,
+            elders: self.elders,
+        }
+    }
+}
+
+impl SectionAuth<SectionAuthorityProvider> {
+    pub(crate) fn into_authed_msg(self) -> SectionAuth<SectionAuthorityProviderMsg> {
+        SectionAuth {
+            value: self.value.into_msg(),
+            sig: self.sig,
+        }
+    }
+}
+
+impl SectionAuthorityProviderMsg {
+    pub(crate) fn into_state(self) -> SectionAuthorityProvider {
+        SectionAuthorityProvider {
+            prefix: self.prefix,
+            public_key_set: self.public_key_set,
+            elders: self.elders,
+        }
+    }
+}
+
+impl SectionAuth<SectionAuthorityProviderMsg> {
+    pub(crate) fn into_authed_state(self) -> SectionAuth<SectionAuthorityProvider> {
+        SectionAuth {
+            value: self.value.into_state(),
+            sig: self.sig,
+        }
     }
 }
 

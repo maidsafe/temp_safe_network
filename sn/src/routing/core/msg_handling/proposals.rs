@@ -13,7 +13,6 @@ use crate::messaging::{
 };
 use crate::routing::{
     core::ProposalUtils, dkg::SigShare, routing_api::command::Command, Peer, Result,
-    SectionAuthorityProviderUtils,
 };
 
 // Decisions
@@ -29,7 +28,7 @@ impl Core {
         let sig_share_pk = &sig_share.public_key_set.public_key();
 
         // Any other proposal than SectionInfo needs to be signed by a known section key.
-        if let Proposal::SectionInfo(ref section_auth) = proposal {
+        if let Proposal::SectionInfo(section_auth) = &proposal {
             if section_auth.prefix == self.network_knowledge.prefix().await
                 || section_auth
                     .prefix
@@ -39,7 +38,7 @@ impl Core {
                 // it's signed by the new key created by the DKG so we don't
                 // know it yet. We only require the src_name of the
                 // proposal to be one of the DKG participants.
-                if !section_auth.contains_elder(&sender.name()) {
+                if !section_auth.elders.contains_key(&sender.name()) {
                     trace!(
                         "Ignoring proposal from src not being a DKG participant: {:?}",
                         proposal

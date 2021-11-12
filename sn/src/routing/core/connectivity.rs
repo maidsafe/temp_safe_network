@@ -8,10 +8,7 @@
 
 use super::Core;
 use crate::messaging::system::Proposal;
-use crate::routing::{
-    error::Result, network_knowledge::NodeStateUtils, routing_api::command::Command,
-    SectionAuthorityProviderUtils,
-};
+use crate::routing::{error::Result, routing_api::command::Command};
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
@@ -60,7 +57,7 @@ impl Core {
             if let Some(info) = self.network_knowledge.members().get(name) {
                 let info = info.leave()?;
                 if let Ok(commands) = self
-                    .send_proposal(elders.clone(), Proposal::Offline(info))
+                    .send_proposal(elders.clone(), Proposal::Offline(info.into_msg()))
                     .await
                 {
                     result.extend(commands);

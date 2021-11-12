@@ -24,7 +24,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    Peer, SectionAuthorityProviderUtils,
+    Peer,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -172,7 +172,7 @@ impl<'a> Join<'a> {
                         NetworkKnowledge::new(
                             genesis_key,
                             section_chain,
-                            section_auth,
+                            section_auth.into_authed_state(),
                             Some(self.prefix_map),
                         )?,
                     ));
@@ -183,6 +183,8 @@ impl<'a> Join<'a> {
                     proof_chain,
                     expected_age,
                 } => {
+                    let section_auth = section_auth.into_state();
+
                     trace!(
                         "Joining node {:?} - {:?}/{:?} received a Retry with SAP {:?}",
                         self.prefix,
@@ -191,7 +193,7 @@ impl<'a> Join<'a> {
                         section_auth
                     );
 
-                    let prefix = section_auth.prefix;
+                    let prefix = section_auth.prefix();
                     if !prefix.matches(&self.node.name()) {
                         warn!(
                             "Ignoring newer JoinResponse::Retry response not for us {:?}, SAP {:?} from {:?}",
@@ -258,7 +260,9 @@ impl<'a> Join<'a> {
                         .await?;
                 }
                 JoinResponse::Redirect(section_auth) => {
-                    if !section_auth.prefix.matches(&self.node.name()) {
+                    let section_auth = section_auth.into_state();
+
+                    if !section_auth.prefix().matches(&self.node.name()) {
                         warn!(
                             "Ignoring newer JoinResponse::Redirect response not for us {:?}, SAP {:?} from {:?}",
                             self.node.name(),
@@ -292,7 +296,7 @@ impl<'a> Join<'a> {
                     );
 
                     section_key = new_section_key;
-                    self.prefix = section_auth.prefix;
+                    self.prefix = section_auth.prefix();
 
                     let join_request = JoinRequest {
                         section_key,
@@ -507,11 +511,13 @@ async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{system::NodeState, SectionAuthorityProvider};
+    use crate::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
     use crate::routing::{
-        dkg::test_utils::*, error::Error as RoutingError, messages::WireMsgUtils,
-        network_knowledge::test_utils::*, network_knowledge::NodeStateUtils,
-        SectionAuthorityProviderUtils, ELDER_SIZE, MIN_ADULT_AGE,
+        dkg::test_utils::*,
+        error::Error as RoutingError,
+        messages::WireMsgUtils,
+        network_knowledge::{test_utils::*, NodeState},
+        ELDER_SIZE, MIN_ADULT_AGE,
     };
     use crate::types::PublicKey;
     use assert_matches::assert_matches;
@@ -583,7 +589,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                    section_auth: section_auth.clone(),
+                    section_auth: section_auth.clone().into_msg(),
                     section_signed: signed_sap.sig,
                     proof_chain: section_chain,
                     expected_age: MIN_ADULT_AGE,
@@ -608,14 +614,14 @@ mod tests {
 
             // Send JoinResponse::Approval
             let section_auth = section_signed(sk, section_auth.clone())?;
-            let node_state = section_signed(sk, NodeState::joined(peer, None))?;
+            let node_state = section_signed(sk, NodeState::joined(&peer, None))?;
             let proof_chain = SecuredLinkedList::new(section_key);
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
                     genesis_key: section_key,
-                    section_auth: section_auth.clone(),
-                    node_state,
+                    section_auth: section_auth.clone().into_authed_msg(),
+                    node_state: node_state.into_authed_msg(),
                     section_chain: proof_chain,
                 })),
                 &bootstrap_node,
@@ -686,7 +692,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
-                    SectionAuthorityProvider {
+                    SectionAuthorityProviderMsg {
                         prefix: Prefix::default(),
                         public_key_set: new_pk_set.clone(),
                         elders: new_bootstrap_addrs.clone(),
@@ -774,7 +780,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
-                    SectionAuthorityProvider {
+                    SectionAuthorityProviderMsg {
                         prefix: Prefix::default(),
                         public_key_set: new_pk_set.clone(),
                         elders: BTreeMap::new(),
@@ -792,7 +798,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
-                    SectionAuthorityProvider {
+                    SectionAuthorityProviderMsg {
                         prefix: Prefix::default(),
                         public_key_set: new_pk_set.clone(),
                         elders: addrs,
@@ -938,7 +944,9 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                    section_auth: gen_section_authority_provider(bad_prefix, ELDER_SIZE).0,
+                    section_auth: gen_section_authority_provider(bad_prefix, ELDER_SIZE)
+                        .0
+                        .into_msg(),
                     section_signed: signed_sap.sig.clone(),
                     proof_chain: section_chain.clone(),
                     expected_age: MIN_ADULT_AGE,
@@ -952,7 +960,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                    section_auth,
+                    section_auth: section_auth.into_msg(),
                     section_signed: signed_sap.sig,
                     proof_chain: section_chain,
                     expected_age: MIN_ADULT_AGE,

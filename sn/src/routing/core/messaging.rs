@@ -10,8 +10,8 @@ use super::Core;
 use super::ProposalUtils;
 use crate::messaging::{
     system::{
-        DkgSessionId, JoinResponse, NodeState, Proposal, RelocateDetails, RelocatePromise,
-        SectionAuth, SystemMsg,
+        DkgSessionId, JoinResponse, Proposal, RelocateDetails, RelocatePromise, SectionAuth,
+        SystemMsg,
     },
     DstLocation, WireMsg,
 };
@@ -21,10 +21,10 @@ use crate::routing::{
     error::Result,
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, NodeStateUtils, SectionKeyShare},
+    network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
     relocation::RelocateState,
     routing_api::command::Command,
-    Peer, SectionAuthorityProviderUtils,
+    Peer,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
@@ -133,13 +133,19 @@ impl Core {
         */
 
         let members = if add_peer_info_to_update {
-            Some(self.network_knowledge.members().clone())
+            Some(
+                self.network_knowledge
+                    .members()
+                    .iter()
+                    .map(|state| state.clone().into_authed_msg())
+                    .collect(),
+            )
         } else {
             None
         };
 
         Ok(SystemMsg::AntiEntropyUpdate {
-            section_auth,
+            section_auth: section_auth.into_msg(),
             section_signed,
             proof_chain,
             members,
@@ -164,8 +170,8 @@ impl Core {
                 .network_knowledge
                 .section_signed_authority_provider()
                 .await
-                .clone(),
-            node_state,
+                .into_authed_msg(),
+            node_state: node_state.into_authed_msg(),
             section_chain: self.network_knowledge.chain().await,
         }));
 
@@ -275,7 +281,7 @@ impl Core {
             // TODO: confirm no need to populate the members.
             let node_msg = SystemMsg::AntiEntropyUpdate {
                 section_signed: sibling_sec_auth.sig,
-                section_auth: sibling_sec_auth.value,
+                section_auth: sibling_sec_auth.value.into_msg(),
                 proof_chain,
                 members: None,
             };
