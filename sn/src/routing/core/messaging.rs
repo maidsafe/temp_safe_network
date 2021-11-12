@@ -105,7 +105,7 @@ impl Core {
     /// and members_info if required.
     pub(crate) async fn generate_ae_update(
         &self,
-        _dst_section_key: BlsPublicKey,
+        dst_section_key: BlsPublicKey,
         add_peer_info_to_update: bool,
     ) -> Result<SystemMsg> {
         let section_signed_auth = self
@@ -116,21 +116,17 @@ impl Core {
         let section_auth = section_signed_auth.value;
         let section_signed = section_signed_auth.sig;
 
-        let proof_chain = self.network_knowledge.chain().await;
-        /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
         let proof_chain = match self
             .network_knowledge
-            .chain()
-            .await
             .get_proof_chain_to_current(&dst_section_key)
+            .await
         {
             Ok(chain) => chain,
             Err(_) => {
-                // error getting chain from key, so lets send the whole thing
-                self.network_knowledge.chain().await
+                // error getting chain from key, so let's send the whole thing
+                self.network_knowledge.section_chain().await
             }
         };
-        */
 
         let members = if add_peer_info_to_update {
             Some(
@@ -172,7 +168,7 @@ impl Core {
                 .await
                 .into_authed_msg(),
             node_state: node_state.into_authed_msg(),
-            section_chain: self.network_knowledge.chain().await,
+            section_chain: self.network_knowledge.section_chain().await,
         }));
 
         let dst_section_pk = self.network_knowledge.section_key().await;
@@ -263,11 +259,17 @@ impl Core {
             let previous_pk = sibling_sec_auth.sig.public_key;
 
             // Compose a min sibling proof_chain.
-
-            /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
-            let mut proof_chain = SecuredLinkedList::new(previous_pk);
-            */
-            let mut proof_chain = self.network_knowledge.chain().await;
+            let mut proof_chain = match self
+                .network_knowledge
+                .get_proof_chain_to_current(&previous_pk)
+                .await
+            {
+                Ok(chain) => chain,
+                Err(err) => {
+                    error!("Failed to generate proof chain to send AE-Update to promoted siblings: {:?}", err);
+                    return vec![];
+                }
+            };
 
             let _ = proof_chain.insert(
                 &previous_pk,

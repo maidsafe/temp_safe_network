@@ -85,7 +85,7 @@ impl Core {
                 // based on our current knowledge of the network and sections chains.
                 let mut known_keys: Vec<BlsPublicKey> = self
                     .network_knowledge
-                    .chain()
+                    .section_chain()
                     .await
                     .keys()
                     .copied()
@@ -206,7 +206,10 @@ impl Core {
 
                 if self.is_not_elder().await {
                     trace!("Redirecting from adult to section elders");
-                    cmds.push(self.ae_redirect(sender, &src_location, &wire_msg).await?);
+                    cmds.push(
+                        self.ae_redirect_to_our_elders(sender, &src_location, &wire_msg)
+                            .await?,
+                    );
                     return Ok(cmds);
                 }
 
@@ -392,12 +395,14 @@ impl Core {
             SystemMsg::AntiEntropyRedirect {
                 section_auth,
                 section_signed,
+                section_chain,
                 bounced_msg,
             } => {
                 trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
                 self.handle_anti_entropy_redirect_msg(
                     section_auth.into_state(),
                     section_signed,
+                    section_chain,
                     bounced_msg,
                     sender,
                 )
