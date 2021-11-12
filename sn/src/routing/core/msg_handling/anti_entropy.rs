@@ -256,12 +256,15 @@ impl Core {
     /// waits for any required backoff duration
     async fn create_or_wait_for_backoff(&self, peer: &Peer) {
         let mut ae_backoff_guard = self.ae_backoff_cache.write().await;
-
-        if let Some(backoff) = ae_backoff_guard
+        let our_backoff = ae_backoff_guard
             .find(|(node, _)| node == peer)
-            .map(|(_, backoff)| backoff)
-        {
-            if let Some(next_wait) = backoff.next_backoff() {
+            .map(|(_, backoff)| backoff);
+
+        if let Some(backoff) = our_backoff {
+            let next_backoff = backoff.next_backoff();
+            drop(ae_backoff_guard);
+
+            if let Some(next_wait) = next_backoff {
                 tokio::time::sleep(next_wait).await;
             } else {
                 // TODO: we've done all backoffs and are _still_ getting messages?
