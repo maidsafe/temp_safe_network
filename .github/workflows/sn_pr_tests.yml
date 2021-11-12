@@ -374,6 +374,6 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: sn_node_logs
-          path: $HOME/.safe/node/local-test-network/**/*.log*
+          path: $HOME/.safe/node/local-test-network/
         if: failure()
 
