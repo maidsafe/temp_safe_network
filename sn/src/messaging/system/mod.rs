@@ -60,6 +60,8 @@ pub enum SystemMsg {
         /// Section signature over the `SectionAuthorityProvider` of the closest
         /// section the bounced message shall be resent to.
         section_signed: KeyedSig,
+        /// Section chain (from genesis key) for the closest section.
+        section_chain: SecuredLinkedList,
         /// Message bounced that shall be resent by the peer.
         #[debug(skip)]
         bounced_msg: Bytes,

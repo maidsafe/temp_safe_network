@@ -142,9 +142,7 @@ impl Core {
                 );
             }
 
-            // TODO: once we keep a DAG for chains, return only a delta
-            // from provided section key rather than the chain from genesis key.
-            let proof_chain = self.network_knowledge.chain().await;
+            let proof_chain = self.network_knowledge.section_chain().await;
             let signed_sap = self
                 .network_knowledge
                 .section_signed_authority_provider()
