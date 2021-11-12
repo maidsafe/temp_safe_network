@@ -4,28 +4,50 @@
 # put that into the release description. This gets very painful in Bash because the entry
 # contains newline characters.
 
+import getopt
 import sys
 
-def get_changelog_entry(version):
+def get_changelog_entry(changelog_path, version):
     sn_changelog_content = ""
-    with open("sn/CHANGELOG.md", "r") as sn_changelog_file:
+    with open(changelog_path, "r") as sn_changelog_file:
         sn_changelog_content = sn_changelog_file.read()
     start = sn_changelog_content.find("## v{version}".format(version=version))
     end = sn_changelog_content.find("## v", start + 10)
     return sn_changelog_content[start:end].strip()
 
-def insert_changelog_entry(entry):
+def insert_changelog_entry(entry, pattern):
     release_description = ""
     with open("release_description.md", "r") as file:
         release_description = file.read()
-        release_description = release_description.replace("__SN_CHANGELOG_TEXT__", entry)
+        release_description = release_description.replace(pattern, entry)
     with open("release_description.md", "w") as file:
         file.write(release_description)
 
-def main(version):
-    sn_changelog_entry = get_changelog_entry(version)
-    insert_changelog_entry(sn_changelog_entry)
+def main(sn_version, sn_api_version, sn_cli_version):
+    if sn_version:
+        sn_changelog_entry = get_changelog_entry("sn/CHANGELOG.md", sn_version)
+        insert_changelog_entry(sn_changelog_entry, "__SN_CHANGELOG_TEXT__")
+    if sn_api_version:
+        sn_api_changelog_entry = get_changelog_entry("sn_api/CHANGELOG.md", sn_api_version)
+        insert_changelog_entry(sn_api_changelog_entry, "__SN_API_CHANGELOG_TEXT__")
+    if sn_cli_version:
+        sn_cli_changelog_entry = get_changelog_entry("sn_cli/CHANGELOG.md", sn_cli_version)
+        insert_changelog_entry(sn_cli_changelog_entry, "__SN_CLI_CHANGELOG_TEXT__")
 
 if __name__ == "__main__":
-    version = sys.argv[1]
-    main(version)
+    sn_version = ""
+    sn_api_version = ""
+    sn_cli_version = ""
+    opts, args = getopt.getopt(
+        sys.argv[1:],
+        "",
+        ["sn-version=", "sn-api-version=", "sn-cli-version="]
+    )
+    for opt, arg in opts:
+        if opt in "--sn-version":
+            sn_version = arg
+        elif opt in "--sn-api-version":
+            sn_api_version = arg
+        elif opt in "--sn-cli-version":
+            sn_cli_version = arg
+    main(sn_version, sn_api_version, sn_cli_version)
