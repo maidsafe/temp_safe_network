@@ -359,7 +359,7 @@ jobs:
           ls $HOME/.safe/node/local-test-network
 
       - name: Print Network Log Stats
-        run: cargo run --bin log_cmds_inspector --release $HOME/.safe/node/local-test-network
+        run: cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
 
       - name: Upload Node Logs
           # Upload artifacts.
