@@ -26,7 +26,7 @@ pub const FIRST_SECTION_MIN_AGE: u8 = MIN_ADULT_AGE + 1;
 pub const FIRST_SECTION_MAX_AGE: u8 = 100;
 
 /// Information about a member of our section.
-#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize)]
 pub(crate) struct NodeState {
     name: XorName,
     addr: SocketAddr,
@@ -101,7 +101,7 @@ impl NodeState {
         }
     }
 
-    pub(crate) fn to_peer(self) -> Peer {
+    pub(crate) fn to_peer(&self) -> Peer {
         Peer::new(self.name, self.addr)
     }
 }

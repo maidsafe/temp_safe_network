@@ -92,7 +92,7 @@ impl SectionPeers {
         for entry in members.into_iter() {
             let (_, state) = entry.pair();
             if state.state() == MembershipState::Joined {
-                joined.push(state.value)
+                joined.push(state.value.clone())
             }
         }
 
@@ -110,7 +110,7 @@ impl SectionPeers {
 
     /// Get info for the member with the given name.
     pub(crate) fn get(&self, name: &XorName) -> Option<NodeState> {
-        self.members.get(name).map(|info| info.value)
+        self.members.get(name).map(|info| info.value.clone())
     }
 
     /// Get section_signed info for the member with the given name.
