@@ -16,7 +16,7 @@ use crate::routing::{
     error::Result,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
-    Event, Peer, SectionAuthorityProviderUtils, ELDER_SIZE,
+    Event, Peer, ELDER_SIZE,
 };
 use xor_name::XorName;
 

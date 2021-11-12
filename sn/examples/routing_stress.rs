@@ -430,7 +430,7 @@ impl Network {
                 .await
                 .context("No pk found for our node's section")?;
 
-            let nodes_section_pk = nodes_section.public_key_set.public_key();
+            let nodes_section_pk = nodes_section.section_key();
             if self.try_send_probe(node, dst).await? {
                 self.probe_tracker
                     .send(*prefix, dst, nodes_section_pk)

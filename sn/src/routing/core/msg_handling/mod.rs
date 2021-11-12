@@ -302,7 +302,7 @@ impl Core {
             } => {
                 trace!("Handling msg: AE-Update from {}: {:?}", sender, msg_id,);
                 self.handle_anti_entropy_update_msg(
-                    section_auth,
+                    section_auth.into_state(),
                     section_signed,
                     proof_chain,
                     members.map(|members| {
@@ -381,7 +381,7 @@ impl Core {
             } => {
                 trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
                 self.handle_anti_entropy_retry_msg(
-                    section_auth,
+                    section_auth.into_state(),
                     section_signed,
                     proof_chain,
                     bounced_msg,
@@ -396,7 +396,7 @@ impl Core {
             } => {
                 trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
                 self.handle_anti_entropy_redirect_msg(
-                    section_auth,
+                    section_auth.into_state(),
                     section_signed,
                     bounced_msg,
                     sender,

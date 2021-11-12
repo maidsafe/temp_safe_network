@@ -8,11 +8,11 @@
 
 use super::{delivery_group, Comm, Core};
 use crate::dbs::UsedSpace;
-use crate::messaging::{system::Proposal, SectionAuthorityProvider, WireMsg};
+use crate::messaging::{system::Proposal, WireMsg};
 use crate::routing::{
     error::Result,
     log_markers::LogMarker,
-    network_knowledge::{NetworkKnowledge, NodeState, SectionKeyShare},
+    network_knowledge::{NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
     Event, Peer,

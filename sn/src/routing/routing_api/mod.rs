@@ -23,17 +23,16 @@ use self::{
     event::{Elders, Event, NodeElderChange},
     event_stream::EventStream,
 };
-use crate::messaging::{
-    data::StorageLevel, system::SystemMsg, DstLocation, SectionAuthorityProvider, WireMsg,
-};
+use crate::messaging::{data::StorageLevel, system::SystemMsg, DstLocation, WireMsg};
 use crate::routing::{
     core::{join_network, ChunkStore, Comm, ConnectionEvent, Core, RegisterStorage},
     ed25519,
     error::{Error, Result},
     log_markers::LogMarker,
     messages::WireMsgUtils,
+    network_knowledge::SectionAuthorityProvider,
     node::Node,
-    Peer, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
+    Peer, MIN_ADULT_AGE,
 };
 use crate::{dbs::UsedSpace, messaging::data::ChunkDataExchange};
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
@@ -370,7 +369,7 @@ impl Routing {
     }
 
     /// Returns our section's authority provider.
-    pub async fn our_section_auth(&self) -> SectionAuthorityProvider {
+    pub(crate) async fn our_section_auth(&self) -> SectionAuthorityProvider {
         self.dispatcher
             .core
             .network_knowledge()

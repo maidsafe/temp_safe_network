@@ -16,7 +16,7 @@ use crate::messaging::{
         RelocateDetails, RelocatePayload, ResourceProofResponse, SectionAuth, SystemMsg,
     },
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
-    SectionAuth as MsgKindSectionAuth, SectionAuthorityProvider, WireMsg,
+    SectionAuth as MsgKindSectionAuth, WireMsg,
 };
 use crate::routing::{
     core::{ConnectionEvent, ProposalUtils, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
@@ -24,11 +24,13 @@ use crate::routing::{
     dkg::test_utils::{prove, section_signed},
     ed25519,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::{test_utils::*, NetworkKnowledge, NodeState, SectionKeyShare},
+    network_knowledge::{
+        test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
+    },
     node::Node,
     relocation::{self, RelocatePayloadUtils},
-    supermajority, Error, Event, Peer, Result as RoutingResult, SectionAuthorityProviderUtils,
-    ELDER_SIZE, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
+    supermajority, Error, Event, Peer, Result as RoutingResult, ELDER_SIZE, FIRST_SECTION_MAX_AGE,
+    FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
@@ -618,7 +620,7 @@ async fn handle_online_command(
                     ..
                 } = *response
                 {
-                    assert_eq!(section_signed_sap.value, *section_auth);
+                    assert_eq!(section_signed_sap.value, section_auth.clone().into_msg());
                     assert_eq!(recipients, [peer]);
                     status.node_approval_sent = true;
                 }
@@ -927,7 +929,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         .take(old_sap.elder_count() - 1)
         .chain(vec![new_peer]);
 
-    let new_sap = SectionAuthorityProvider::new(new_elders, old_sap.prefix, sk_set2.public_keys());
+    let new_sap =
+        SectionAuthorityProvider::new(new_elders, old_sap.prefix(), sk_set2.public_keys());
     let new_section_elders: BTreeSet<_> = new_sap.names();
     let signed_new_sap = section_signed(sk2, new_sap.clone())?;
 
@@ -939,7 +942,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             section_pk: pk1,
         },
         SystemMsg::AntiEntropyUpdate {
-            section_auth: new_sap,
+            section_auth: new_sap.into_msg(),
             members: None,
             section_signed: signed_new_sap.sig,
             proof_chain: chain,
@@ -1000,7 +1003,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     // a valid AE msg but with a non-verifiable SAP...
     let bogus_section_pk = bls::SecretKey::random().public_key();
     let node_msg = SystemMsg::AntiEntropyUpdate {
-        section_auth: section_signed_our_section_auth.value.clone(),
+        section_auth: section_signed_our_section_auth.value.clone().into_msg(),
         section_signed: section_signed_our_section_auth.sig,
         proof_chain: SecuredLinkedList::new(bogus_section_pk),
         members: None,
@@ -1311,7 +1314,7 @@ async fn handle_elders_update() -> Result<()> {
     let elder_names1: BTreeSet<_> = sap1.names();
 
     let signed_sap1 = section_signed(sk_set1.secret_key(), sap1)?;
-    let proposal = Proposal::OurElders(signed_sap1);
+    let proposal = Proposal::OurElders(signed_sap1.into_authed_msg());
     let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
     let sig = KeyedSig {
         signature,
@@ -1488,7 +1491,7 @@ async fn handle_demote_during_split() -> Result<()> {
     );
 
     let section_signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
-    let command = create_our_elders_command(section_signed_sap)?;
+    let command = create_our_elders_command(section_signed_sap.into_authed_msg())?;
     let commands = dispatcher.handle_command(command, "cmd-id-1").await?;
 
     assert_matches!(&commands[..], &[]);
@@ -1498,7 +1501,7 @@ async fn handle_demote_during_split() -> Result<()> {
         SectionAuthorityProvider::new(peers_b.iter().cloned(), prefix1, sk_set_v1_p1.public_keys());
 
     let section_signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
-    let command = create_our_elders_command(section_signed_sap)?;
+    let command = create_our_elders_command(section_signed_sap.into_authed_msg())?;
 
     let commands = dispatcher.handle_command(command, "cmd-id-2").await?;
 

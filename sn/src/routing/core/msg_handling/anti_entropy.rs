@@ -9,16 +9,16 @@
 use super::Core;
 use crate::messaging::{
     system::{KeyedSig, SectionAuth, SystemMsg},
-    MessageType, SectionAuthorityProvider, SrcLocation, WireMsg,
+    MessageType, SrcLocation, WireMsg,
 };
 use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::SectionPeers,
+    network_knowledge::{SectionAuthorityProvider, SectionPeers},
     routing_api::command::Command,
-    Peer, SectionAuthorityProviderUtils,
+    Peer,
 };
 use crate::types::PublicKey;
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -130,7 +130,7 @@ impl Core {
             // TODO: we may need to check if 'bounced_msg' dest section pk is different
             // from the received new SAP key, to prevent from endlessly resending a msg
             // if a sybil/corrupt peer keeps sending us the same AE msg.
-            let dst_section_pk = section_auth.public_key_set.public_key();
+            let dst_section_pk = section_auth.section_key();
             trace!("{}", LogMarker::AeResendAfterRetry);
 
             self.create_or_wait_for_backoff(&sender).await;
@@ -189,9 +189,9 @@ impl Core {
         // if we find a matching prefix in our records, or the genesis_key otherwise.
         let (dst_section_pk, dst_elders) = match self
             .network_knowledge
-            .section_by_prefix(&section_auth.prefix)
+            .section_by_prefix(&section_auth.prefix())
         {
-            Ok(trusted_sap) => (trusted_sap.public_key_set.public_key(), trusted_sap.peers()),
+            Ok(trusted_sap) => (trusted_sap.section_key(), trusted_sap.peers()),
             Err(_) => {
                 // In case we don't have the knowledge of that neighbour locally,
                 // let's take the Elders from the provided SAP and genesis key.
@@ -207,7 +207,7 @@ impl Core {
         let target_name = XorName::from(PublicKey::Bls(dst_section_pk));
         let chosen_dst_elder = dst_elders
             .into_iter()
-            .filter(|elder| section_auth.elders.contains_key(&elder.name()))
+            .filter(|elder| section_auth.contains_elder(&elder.name()))
             .sorted_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
             .next();
 
@@ -300,11 +300,11 @@ impl Core {
                 .await
             {
                 Some(section_auth) => {
-                    info!("Found a better matching prefix {:?}", section_auth.prefix);
+                    info!("Found a better matching prefix {:?}", section_auth.prefix());
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropyRedirect {
-                        section_auth: section_auth.value.clone(),
+                        section_auth: section_auth.value.into_msg(),
                         section_signed: section_auth.sig,
                         bounced_msg,
                     };
@@ -376,12 +376,12 @@ impl Core {
         trace!(
             "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
             proof_chain.last_key(),
-            &section_auth.public_key_set.public_key()
+            &section_auth.section_key()
         );
         trace!("{}", LogMarker::AeSendRetryAsOutdated);
 
         let ae_msg = SystemMsg::AntiEntropyRetry {
-            section_auth,
+            section_auth: section_auth.into_msg(),
             section_signed,
             proof_chain,
             bounced_msg,
@@ -446,7 +446,7 @@ impl Core {
         let section_signed = section_signed_auth.sig;
 
         let ae_msg = SystemMsg::AntiEntropyRedirect {
-            section_auth,
+            section_auth: section_auth.into_msg(),
             section_signed,
             bounced_msg: original_wire_msg.serialize()?,
         };
@@ -564,12 +564,12 @@ mod tests {
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();
 
-        let (msg, src_location) = env.create_message(&env.other_sap.prefix, other_pk)?;
+        let (msg, src_location) = env.create_message(&env.other_sap.prefix(), other_pk)?;
         let sender = env.core.node.read().await.peer();
 
         // since it's not aware of the other prefix, it shall redirect us to genesis section/SAP
         let dst_section_pk = other_pk;
-        let dst_name = env.other_sap.prefix.name();
+        let dst_name = env.other_sap.prefix().name();
         let command = env
             .core
             .check_for_entropy(
@@ -589,7 +589,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                assert_eq!(section_auth, env.genesis_sap);
+                assert_eq!(section_auth, env.genesis_sap.into_msg());
             });
         });
 
@@ -621,7 +621,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                assert_eq!(section_auth, env.other_sap.value);
+                assert_eq!(section_auth, env.other_sap.value.into_msg());
             });
         });
 
@@ -661,7 +661,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(section_auth, &env.core.network_knowledge().authority_provider().await);
+                assert_eq!(section_auth, &env.core.network_knowledge().authority_provider().await.into_msg());
                 assert_eq!(proof_chain, &env.core.section_chain().await);
             });
         });
@@ -704,7 +704,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(*section_auth, env.core.network_knowledge().authority_provider().await);
+                assert_eq!(*section_auth, env.core.network_knowledge().authority_provider().await.into_msg());
                 assert_eq!(*proof_chain, env.core.section_chain().await);
             });
         });
@@ -731,9 +731,8 @@ mod tests {
             let sap_sk = secret_key_set.secret_key();
             let signed_sap = section_signed(sap_sk, section_auth)?;
 
-            let (chain, genesis_sk_set) =
-                create_chain(sap_sk, signed_sap.public_key_set.public_key())
-                    .context("failed to create section chain")?;
+            let (chain, genesis_sk_set) = create_chain(sap_sk, signed_sap.section_key())
+                .context("failed to create section chain")?;
             let genesis_pk = genesis_sk_set.public_keys().public_key();
             assert_eq!(genesis_pk, *chain.root_key());
 

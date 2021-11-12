@@ -24,7 +24,7 @@ use crate::routing::{
     network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
     relocation::RelocateState,
     routing_api::command::Command,
-    Peer, SectionAuthorityProviderUtils,
+    Peer,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
@@ -145,7 +145,7 @@ impl Core {
         };
 
         Ok(SystemMsg::AntiEntropyUpdate {
-            section_auth,
+            section_auth: section_auth.into_msg(),
             section_signed,
             proof_chain,
             members,
@@ -170,7 +170,7 @@ impl Core {
                 .network_knowledge
                 .section_signed_authority_provider()
                 .await
-                .clone(),
+                .into_authed_msg(),
             node_state: node_state.into_authed_msg(),
             section_chain: self.network_knowledge.chain().await,
         }));
@@ -281,7 +281,7 @@ impl Core {
             // TODO: confirm no need to populate the members.
             let node_msg = SystemMsg::AntiEntropyUpdate {
                 section_signed: sibling_sec_auth.sig,
-                section_auth: sibling_sec_auth.value,
+                section_auth: sibling_sec_auth.value.into_msg(),
                 proof_chain,
                 members: None,
             };

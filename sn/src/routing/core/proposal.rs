@@ -70,14 +70,14 @@ mod tests {
         // Proposal::SectionInfo
         let (section_auth, _, _) =
             network_knowledge::test_utils::gen_section_authority_provider(Prefix::default(), 4);
-        let proposal = Proposal::SectionInfo(section_auth.clone());
+        let proposal = Proposal::SectionInfo(section_auth.clone().into_msg());
         verify_serialize_for_signing(&proposal, &section_auth)?;
 
         // Proposal::OurElders
         let new_sk = bls::SecretKey::random();
         let new_pk = new_sk.public_key();
         let section_signed_auth = dkg::test_utils::section_signed(&new_sk, section_auth)?;
-        let proposal = Proposal::OurElders(section_signed_auth);
+        let proposal = Proposal::OurElders(section_signed_auth.into_authed_msg());
         verify_serialize_for_signing(&proposal, &new_pk)?;
 
         Ok(())

@@ -245,7 +245,7 @@ impl Dispatcher {
             Command::HandleElderAgreement { proposal, sig } => match proposal {
                 Proposal::OurElders(section_auth) => {
                     self.core
-                        .handle_our_elders_agreement(section_auth, sig)
+                        .handle_our_elders_agreement(section_auth.into_authed_state(), sig)
                         .await
                 }
                 _ => {
