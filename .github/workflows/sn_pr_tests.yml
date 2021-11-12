@@ -358,6 +358,13 @@ jobs:
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
+      - name: Are nodes still running...?
+        if: failure() && matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          echo "$(pgrep sn_node.exe | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
+
       - name: Print Network Log Stats
         run: cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
         if: failure()
