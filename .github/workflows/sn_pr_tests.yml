@@ -159,7 +159,7 @@ jobs:
         run: cd sn && cargo test --release --features=always-joinable,test-utils client --doc
         timeout-minutes: 5
 
-      - run: ./target/release/testnet
+      - run: ./target/release/testnet --interval 5000
         env:
           NODE_COUNT: 45
 
@@ -200,7 +200,7 @@ jobs:
 
       - name: Restart Section if no split
         if: steps.split-check-1.outcome == 'failure'
-        run: ./target/release/testnet
+        run: ./target/release/testnet --interval 5000
         env:
           NODE_COUNT: 45
 
