@@ -44,7 +44,7 @@ use crate::routing::{
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    Elders, Event, NodeElderChange, Peer, SectionAuthorityProviderUtils,
+    Elders, Event, NodeElderChange, Peer,
 };
 use crate::types::utils::write_data_to_disk;
 use backoff::ExponentialBackoff;
@@ -175,7 +175,8 @@ impl Core {
 
         info!(
             "ProbeMessage target {:?} w/key {:?}",
-            matching_section.prefix, section_key
+            matching_section.prefix(),
+            section_key
         );
 
         self.send_direct_message_to_nodes(recipients, message, dst_name, section_key)

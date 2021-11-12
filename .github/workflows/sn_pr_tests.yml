@@ -168,13 +168,12 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
 
-
       - name: Wait for a healthy network
         shell: bash
         if: matrix.os != 'windows-latest'
         run: ./resources/scripts/network_is_ready.sh
         id: split-check-1
-        timeout-minutes: 20
+        timeout-minutes: 5
         continue-on-error: true
 
       - name: Wait for a healthy network (win)
@@ -182,7 +181,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: ./resources/scripts/network_is_ready_cli.sh
         id: split-check-1-win
-        timeout-minutes: 20
+        timeout-minutes: 5
         continue-on-error: true
 
       - name: Kill Section if no split (unix)
@@ -210,6 +209,7 @@ jobs:
         env:
           NODE_COUNT: 45
 
+    # second chance at network startup
       - name: Healthcheck
         run: ./resources/scripts/has_split.sh
         timeout-minutes: 5
@@ -219,13 +219,59 @@ jobs:
         shell: bash
         if: matrix.os != 'windows-latest'
         run: ./resources/scripts/network_is_ready.sh
-        timeout-minutes: 20
+        id: split-check-2
+        timeout-minutes: 5
+        continue-on-error: true
 
       - name: Wait for a healthy network (win)
         shell: bash
         if: matrix.os == 'windows-latest'
         run: ./resources/scripts/network_is_ready_cli.sh
-        timeout-minutes: 20
+        id: split-check-2-win
+        timeout-minutes: 5
+        continue-on-error: true
+
+      - name: Kill Section if no split (unix)
+        if: matrix.os != 'windows-latest' && steps.split-check-2.outcome == 'failure'
+        run: |
+          killall sn_node
+          rm -rf ~/.safe/node
+
+      - name: Kill section if no split (win)
+        if: matrix.os == 'windows-latest' && steps.split-check-2-win.outcome == 'failure'
+        shell: cmd
+        run: |
+          taskkill /IM sn_node.exe /F
+          rd /s /q %USERPROFILE%\.safe\node
+
+      - name: Restart Section if no split
+        if: steps.split-check-2.outcome == 'failure'
+        run: ./target/release/testnet
+        env:
+          NODE_COUNT: 45
+
+      - name: Restart Section if no split
+        if: steps.split-check-2-win.outcome == 'failure'
+        run: ./target/release/testnet
+        env:
+          NODE_COUNT: 45
+
+      - name: Healthcheck
+        run: ./resources/scripts/has_split.sh
+        timeout-minutes: 5
+        continue-on-error: true
+
+      - name: Wait for a healthy network
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        run: ./resources/scripts/network_is_ready.sh
+        timeout-minutes: 5
+
+      - name: Wait for a healthy network (win)
+        shell: bash
+        if: matrix.os == 'windows-latest'
+        run: ./resources/scripts/network_is_ready_cli.sh
+        timeout-minutes: 5
 
       - name: Run network asserts one by one
         shell: bash
@@ -312,14 +358,22 @@ jobs:
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
+      - name: Are nodes still running...?
+        if: failure() && matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          echo "$(pgrep sn_node.exe | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
+
       - name: Print Network Log Stats
-        run: cargo run --bin log_cmds_inspector --release $HOME/.safe/node/local-test-network
+        run: cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
+        if: failure()
 
       - name: Upload Node Logs
           # Upload artifacts.
         uses: actions/upload-artifact@v2
         with:
           name: sn_node_logs
-          path: $HOME/.safe/node/local-test-network/**/*.log*
+          path: $HOME/.safe/node/local-test-network/
         if: failure()
 

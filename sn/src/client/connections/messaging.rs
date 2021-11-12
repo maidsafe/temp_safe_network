@@ -100,12 +100,12 @@ impl Session {
         // Get DataSection elders details.
         let (elders, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let sap_elders = sap.elders.values().cloned();
+                let sap_elders = sap.elders().values().copied();
 
                 trace!("{:?} SAP elders found", sap_elders);
                 (
                     sap_elders.take(targets_count).collect::<Vec<SocketAddr>>(),
-                    sap.public_key_set.public_key(),
+                    sap.section_key(),
                 )
             } else {
                 return Err(Error::NoNetworkKnowledge);
@@ -174,18 +174,18 @@ impl Session {
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
         let (section_pk, elders) = if let Some(sap) = self.network.closest_or_opposite(&dst, None) {
-            (sap.public_key_set.public_key(), sap.value.elders)
+            (sap.section_key(), sap.value.elders().clone())
         } else {
             return Err(Error::NoNetworkKnowledge);
         };
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
-        let chosen_elders = elders
+        let chosen_elders: Vec<_> = elders
             .into_iter()
             .sorted_by(|(lhs_name, _), (rhs_name, _)| dst.cmp_distance(lhs_name, rhs_name))
             .map(|(_, addr)| addr)
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-            .collect::<Vec<SocketAddr>>();
+            .collect();
 
         let elders_len = chosen_elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES && elders_len > 1 {
@@ -385,16 +385,16 @@ impl Session {
         // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
         let (elders_or_adults, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let mut nodes = sap
-                    .elders
+                let mut nodes: Vec<_> = sap
+                    .elders()
                     .values()
-                    .cloned()
                     .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-                    .collect::<Vec<SocketAddr>>();
+                    .copied()
+                    .collect();
 
                 nodes.shuffle(&mut OsRng);
 
-                (nodes, sap.public_key_set.public_key())
+                (nodes, sap.section_key())
             } else {
                 // Send message to our bootstrap peer with network's genesis PK.
                 (nodes, self.genesis_key)

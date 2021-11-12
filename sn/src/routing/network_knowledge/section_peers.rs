@@ -6,18 +6,77 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::node_state::NodeStateUtils;
-use crate::messaging::{
-    system::{MembershipState, NodeState, SectionAuth, SectionPeers},
-    SectionAuthorityProvider,
+use crate::messaging::system::{MembershipState, SectionAuth};
+use crate::routing::{
+    network_knowledge::{NodeState, SectionAuthorityProvider},
+    Peer,
 };
-use crate::routing::{Peer, SectionAuthorityProviderUtils};
-use dashmap::mapref::entry::Entry;
+use dashmap::{mapref::entry::Entry, DashMap};
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::BTreeSet};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet},
+    ops::Deref,
+    sync::Arc,
+};
 use xor_name::{Prefix, XorName};
 
+/// Container for storing information about members of our section.
+#[derive(Clone, Default, Debug)]
+pub(crate) struct SectionPeers {
+    members: Arc<DashMap<XorName, SectionAuth<NodeState>>>,
+}
+
+impl Eq for SectionPeers {}
+
+impl PartialEq for SectionPeers {
+    fn eq(&self, other: &Self) -> bool {
+        // TODO: there must be a better way of doing this...
+        let mut us: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
+        let mut them: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
+
+        for refmulti in self.members.iter() {
+            let (key, value) = refmulti.pair();
+            let _prev = us.insert(*key, value.clone());
+        }
+
+        for refmulti in other.members.iter() {
+            let (key, value) = refmulti.pair();
+            let _prev = them.insert(*key, value.clone());
+        }
+
+        us == them
+    }
+}
+
+impl<'a> IntoIterator for &'a SectionPeers {
+    type Item = dashmap::mapref::multiple::RefMulti<'a, XorName, SectionAuth<NodeState>>;
+
+    type IntoIter = dashmap::iter::Iter<'a, XorName, SectionAuth<NodeState>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.members.iter()
+    }
+}
+
 impl SectionPeers {
+    pub(crate) fn new(members: impl IntoIterator<Item = SectionAuth<NodeState>>) -> Self {
+        Self {
+            members: Arc::new(
+                members
+                    .into_iter()
+                    .map(|state| (state.name(), state))
+                    .collect(),
+            ),
+        }
+    }
+
+    pub(crate) fn iter(
+        &self,
+    ) -> impl Iterator<Item = impl Deref<Target = SectionAuth<NodeState>> + '_> + '_ {
+        IntoIterator::into_iter(self)
+    }
+
     /// Returns joined nodes from our section`
     pub(crate) fn all_members(&self) -> Vec<Peer> {
         self.joined()
@@ -32,8 +91,8 @@ impl SectionPeers {
         let members = &*self.members;
         for entry in members.into_iter() {
             let (_, state) = entry.pair();
-            if state.state == MembershipState::Joined {
-                joined.push(state.value)
+            if state.state() == MembershipState::Joined {
+                joined.push(state.value.clone())
             }
         }
 
@@ -51,7 +110,7 @@ impl SectionPeers {
 
     /// Get info for the member with the given name.
     pub(crate) fn get(&self, name: &XorName) -> Option<NodeState> {
-        self.members.get(name).map(|info| info.value)
+        self.members.get(name).map(|info| info.value.clone())
     }
 
     /// Get section_signed info for the member with the given name.
@@ -98,7 +157,7 @@ impl SectionPeers {
         for entry in members.into_iter() {
             let (name, info) = entry.pair();
 
-            if info.state == MembershipState::Joined
+            if info.state() == MembershipState::Joined
                 && prefix.matches(name)
                 && !excluded_names.contains(name)
             {
@@ -113,7 +172,7 @@ impl SectionPeers {
     pub(crate) fn is_joined(&self, name: &XorName) -> bool {
         self.members
             .get(name)
-            .map(|info| info.state == MembershipState::Joined)
+            .map(|info| info.state() == MembershipState::Joined)
             .unwrap_or(false)
     }
 
@@ -121,7 +180,7 @@ impl SectionPeers {
     pub(crate) fn is_relocated_to_our_section(&self, name: &XorName) -> bool {
         for peer in self.members.iter() {
             let state = peer.value();
-            if state.previous_name == Some(*name) {
+            if state.previous_name() == Some(*name) {
                 return true;
             }
         }
@@ -132,7 +191,7 @@ impl SectionPeers {
     /// Update a member of our section.
     /// Returns whether anything actually changed.
     pub(crate) fn update(&self, new_info: SectionAuth<NodeState>) -> bool {
-        match self.members.entry(new_info.name) {
+        match self.members.entry(new_info.name()) {
             Entry::Vacant(entry) => {
                 let _prev = entry.insert(new_info);
                 true
@@ -143,7 +202,7 @@ impl SectionPeers {
                 // - Joined -> Left
                 // - Joined -> Relocated
                 // - Relocated -> Left (should not happen, but needed for consistency)
-                match (entry.get().state, new_info.state) {
+                match (entry.get().state(), new_info.state()) {
                     (MembershipState::Joined, MembershipState::Joined)
                         if new_info.age() > entry.get().age() => {}
                     (MembershipState::Joined, MembershipState::Left)
@@ -189,7 +248,7 @@ fn cmp_elder_candidates(
     // Older nodes are preferred. In case of a tie, prefer current elders. If still a tie, break
     // it comparing by the signed signatures because it's impossible for a node to predict its
     // signature and therefore game its chances of promotion.
-    cmp_elder_candidates_by_membership_state(&lhs.state, &rhs.state)
+    cmp_elder_candidates_by_membership_state(&lhs.state(), &rhs.state())
         .then_with(|| rhs.age().cmp(&lhs.age()))
         .then_with(|| {
             let lhs_is_elder = is_elder(lhs, current_elders);
@@ -225,7 +284,7 @@ fn cmp_elder_candidates_by_membership_state(
 // relocated. This is because such elder still fulfils its duties and only when demoted can it
 // leave.
 fn is_active(info: &NodeState, current_elders: &SectionAuthorityProvider) -> bool {
-    match info.state {
+    match info.state() {
         MembershipState::Joined => true,
         MembershipState::Relocated(_) if is_elder(info, current_elders) => true,
         _ => false,
@@ -233,5 +292,5 @@ fn is_active(info: &NodeState, current_elders: &SectionAuthorityProvider) -> boo
 }
 
 fn is_elder(info: &NodeState, current_elders: &SectionAuthorityProvider) -> bool {
-    current_elders.contains_elder(&info.name)
+    current_elders.contains_elder(&info.name())
 }

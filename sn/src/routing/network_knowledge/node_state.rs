@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{MembershipState, NodeState};
+use crate::messaging::system::{MembershipState, NodeState as NodeStateMsg, SectionAuth};
 use crate::routing::{error::Error, Peer};
+use std::net::SocketAddr;
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// The minimum age a node can have. The Infants will start at age 4. This is to prevent frequent
@@ -25,27 +26,18 @@ pub const FIRST_SECTION_MIN_AGE: u8 = MIN_ADULT_AGE + 1;
 pub const FIRST_SECTION_MAX_AGE: u8 = 100;
 
 /// Information about a member of our section.
-pub(crate) trait NodeStateUtils {
-    // Creates a `NodeState` in the `Joined` state.
-    fn joined(peer: Peer, previous_name: Option<XorName>) -> NodeState;
-
-    fn age(&self) -> u8;
-
-    // Is the age > `MIN_AGE`?
-    fn is_mature(&self) -> bool;
-
-    fn leave(self) -> Result<NodeState, Error>;
-
-    // Convert this info into one with the state changed to `Relocated`.
-    fn relocate(self, dst: XorName) -> NodeState;
-
-    fn to_peer(&self) -> Peer;
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize)]
+pub(crate) struct NodeState {
+    name: XorName,
+    addr: SocketAddr,
+    state: MembershipState,
+    previous_name: Option<XorName>,
 }
 
-impl NodeStateUtils for NodeState {
+impl NodeState {
     // Creates a `NodeState` in the `Joined` state.
-    fn joined(peer: Peer, previous_name: Option<XorName>) -> NodeState {
-        NodeState {
+    pub(crate) fn joined(peer: &Peer, previous_name: Option<XorName>) -> Self {
+        Self {
             name: peer.name(),
             addr: peer.addr(),
             state: MembershipState::Joined,
@@ -53,36 +45,106 @@ impl NodeStateUtils for NodeState {
         }
     }
 
-    fn age(&self) -> u8 {
+    // Creates a `NodeState` in the `Left` state.
+    #[cfg(test)]
+    pub(crate) fn left(peer: &Peer, previous_name: Option<XorName>) -> Self {
+        Self {
+            name: peer.name(),
+            addr: peer.addr(),
+            state: MembershipState::Left,
+            previous_name,
+        }
+    }
+
+    pub(crate) fn name(&self) -> XorName {
+        self.name
+    }
+
+    pub(crate) fn addr(&self) -> SocketAddr {
+        self.addr
+    }
+
+    pub(crate) fn state(&self) -> MembershipState {
+        self.state
+    }
+
+    pub(crate) fn previous_name(&self) -> Option<XorName> {
+        self.previous_name
+    }
+
+    pub(crate) fn age(&self) -> u8 {
         self.name[XOR_NAME_LEN - 1]
     }
 
     // Is the age > `MIN_AGE`?
-    fn is_mature(&self) -> bool {
+    pub(crate) fn is_mature(&self) -> bool {
         self.age() > MIN_AGE
     }
 
-    fn leave(self) -> Result<NodeState, Error> {
+    pub(crate) fn leave(self) -> Result<Self, Error> {
         // Do not allow switching to `Left` when already relocated, to avoid rejoining with the
         // same name.
         if let MembershipState::Relocated(_) = self.state {
             return Err(Error::InvalidState);
         }
-        Ok(NodeState {
+        Ok(Self {
             state: MembershipState::Left,
             ..self
         })
     }
 
     // Convert this info into one with the state changed to `Relocated`.
-    fn relocate(self, dst: XorName) -> NodeState {
-        NodeState {
+    pub(crate) fn relocate(self, dst: XorName) -> Self {
+        Self {
             state: MembershipState::Relocated(dst),
             ..self
         }
     }
 
-    fn to_peer(&self) -> Peer {
+    pub(crate) fn to_peer(&self) -> Peer {
         Peer::new(self.name, self.addr)
+    }
+}
+
+// Add conversion methods to/from `messaging::...::NodeState`
+// We prefer this over `From<...>` to make it easier to read the conversion.
+
+impl NodeState {
+    pub(crate) fn into_msg(self) -> NodeStateMsg {
+        NodeStateMsg {
+            name: self.name,
+            addr: self.addr,
+            state: self.state,
+            previous_name: self.previous_name,
+        }
+    }
+}
+
+impl SectionAuth<NodeState> {
+    pub(crate) fn into_authed_msg(self) -> SectionAuth<NodeStateMsg> {
+        SectionAuth {
+            value: self.value.into_msg(),
+            sig: self.sig,
+        }
+    }
+}
+
+impl NodeStateMsg {
+    pub(crate) fn into_state(self) -> NodeState {
+        NodeState {
+            name: self.name,
+            addr: self.addr,
+            state: self.state,
+            previous_name: self.previous_name,
+        }
+    }
+}
+
+impl SectionAuth<NodeStateMsg> {
+    pub(crate) fn into_authed_state(self) -> SectionAuth<NodeState> {
+        SectionAuth {
+            value: self.value.into_state(),
+            sig: self.sig,
+        }
     }
 }

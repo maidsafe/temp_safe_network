@@ -27,9 +27,7 @@ pub(crate) use self::{
     core::ChunkStore,
     core::RegisterStorage,
     core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
-    network_knowledge::{
-        section_authority_provider::SectionAuthorityProviderUtils, section_keys::SectionKeyShare,
-    },
+    network_knowledge::{section_keys::SectionKeyShare, SectionAuthorityProvider},
 };
 pub use self::{
     dkg::SectionAuthUtils,

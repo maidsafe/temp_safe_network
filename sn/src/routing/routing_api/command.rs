@@ -8,10 +8,10 @@
 
 use crate::messaging::{
     system::{DkgFailureSigSet, KeyedSig, Proposal, SystemMsg},
-    DstLocation, MessageId, NodeMsgAuthority, SectionAuthorityProvider, WireMsg,
+    DstLocation, MessageId, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
-    network_knowledge::{NetworkKnowledge, SectionKeyShare},
+    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
     Peer, XorName,
 };
