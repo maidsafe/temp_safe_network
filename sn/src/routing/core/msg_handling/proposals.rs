@@ -76,7 +76,6 @@ impl Core {
         }
 
         let mut commands = vec![];
-        commands.extend(self.check_lagging(&sender, sig_share_pk).await?);
 
         match proposal.as_signable_bytes() {
             Err(error) => error!(
