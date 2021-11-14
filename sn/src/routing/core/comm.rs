@@ -264,7 +264,7 @@ impl Comm {
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
         // succeeds or if there are no more recipients to pick.
-        let send = |recipient: &'r Peer, msg_bytes: Bytes| {
+        let send = |recipient: &'r Peer, msg_bytes: Bytes, force_reconnection: bool| {
             async move {
                 trace!(
                     "Sending message ({} bytes, msg_id: {:?}) to {} of delivery group size {}",
@@ -276,26 +276,32 @@ impl Comm {
 
                 let retries = self.back_pressure.get(&recipient.addr()).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-                let connection = if let Some(connection) =
-                    self.connected_peers.get_by_address(&recipient.addr()).await
+                let existing_connection =
+                    self.connected_peers.get_by_address(&recipient.addr()).await;
+
+                let (connection, reused) = if let Some(connection) =
+                    (!force_reconnection).then(|| existing_connection).flatten()
                 {
-                    Ok(connection.connection().clone())
+                    (Ok(connection.connection().clone()), true)
                 } else {
-                    self.endpoint
-                        .connect_to(&recipient.addr())
-                        .and_then(|(connection, connection_incoming)| async move {
-                            self.connected_peers.insert(connection.clone()).await;
-                            let _ = task::spawn(handle_incoming_messages(
-                                connection.id(),
-                                connection.remote_address(),
-                                connection_incoming,
-                                self.event_tx.clone(),
-                                self.msg_count.clone(),
-                                self.connected_peers.clone(),
-                            ));
-                            Ok(connection)
-                        })
-                        .await
+                    (
+                        self.endpoint
+                            .connect_to(&recipient.addr())
+                            .and_then(|(connection, connection_incoming)| async move {
+                                self.connected_peers.insert(connection.clone()).await;
+                                let _ = task::spawn(handle_incoming_messages(
+                                    connection.id(),
+                                    connection.remote_address(),
+                                    connection_incoming,
+                                    self.event_tx.clone(),
+                                    self.msg_count.clone(),
+                                    self.connected_peers.clone(),
+                                ));
+                                Ok(connection)
+                            })
+                            .await,
+                        false,
+                    )
                 };
 
                 let result = future::ready(connection)
@@ -316,21 +322,21 @@ impl Comm {
                         }
                     });
 
-                (result, recipient)
+                (result, recipient, reused)
             }
             .in_current_span()
         };
 
         let mut tasks: FuturesUnordered<_> = recipients[0..delivery_group_size]
             .iter()
-            .map(|recipient| send(recipient, msg_bytes.clone()))
+            .map(|recipient| send(recipient, msg_bytes.clone(), false))
             .collect();
 
         let mut next = delivery_group_size;
         let mut successes = 0;
         let mut failed_recipients = vec![];
 
-        while let Some((result, recipient)) = tasks.next().await {
+        while let Some((result, recipient, reused)) = tasks.next().await {
             match result {
                 Ok(()) => {
                     successes += 1;
@@ -342,11 +348,20 @@ impl Comm {
                     // we are terminating so let's cut this short.
                     return Err(Error::ConnectionClosed);
                 }
+                Err(Error::AddressNotReachable {
+                    err: qp2p::RpcError::Send(qp2p::SendError::ConnectionLost(_)),
+                }) if reused => {
+                    // We reused an existing connection, but it was lost when we tried to send. This
+                    // could indicate the connection timed out whilst it was held, or some other
+                    // transient connection issue. We don't treat this as a failed recipient, and
+                    // instead push the same recipient again, but force a reconnection.
+                    tasks.push(send(recipient, msg_bytes.clone(), true));
+                }
                 Err(_) => {
                     failed_recipients.push(recipient.clone());
 
                     if next < recipients.len() {
-                        tasks.push(send(&recipients[next], msg_bytes.clone()));
+                        tasks.push(send(&recipients[next], msg_bytes.clone(), false));
                         next += 1;
                     }
                 }
