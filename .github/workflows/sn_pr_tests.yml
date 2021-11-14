@@ -163,7 +163,13 @@ jobs:
         run: cd sn && cargo test --release --features=always-joinable,test-utils client --doc
         timeout-minutes: 5
 
+      - run: ./target/release/testnet > startup.log
+        if: matrix.os != 'windows-latest'
+        env:
+          NODE_COUNT: 45
+
       - run: ./target/release/testnet
+        if: matrix.os == 'windows-latest'
         env:
           NODE_COUNT: 45
 
@@ -203,13 +209,13 @@ jobs:
 
       - name: Restart Section if no split
         if: steps.split-check-1.outcome == 'failure'
-        run: ./target/release/testnet
+        run: ./target/release/testnet > startup.log
         env:
           NODE_COUNT: 45
 
       - name: Restart Section if no split
         if: steps.split-check-1-win.outcome == 'failure'
-        run: ./target/release/testnet
+        run: ./target/release/testnet > startup.log
         env:
           NODE_COUNT: 45
 
@@ -250,13 +256,13 @@ jobs:
 
       - name: Restart Section if no split
         if: steps.split-check-2.outcome == 'failure'
-        run: ./target/release/testnet
+        run: ./target/release/testnet > startup.log
         env:
           NODE_COUNT: 45
 
       - name: Restart Section if no split
         if: steps.split-check-2-win.outcome == 'failure'
-        run: ./target/release/testnet
+        run: ./target/release/testnet > startup.log
         env:
           NODE_COUNT: 45
 
@@ -295,16 +301,26 @@ jobs:
 
       # register api
       - name: Client reg tests against local network
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+        timeout-minutes: 5
+
+      # reg api win (longer timeout for now)
+      - name: Win client reg tests against local network
+        if: matrix.os == 'windows-latest'
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
         timeout-minutes: 15
+        env:
+          SN_CLIENT_QUERY_TIMEOUT: 180
 
       # blob api unix
       - name: Unix client blob tests against local network
         shell: bash
         if: matrix.os != 'windows-latest'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
-        timeout-minutes: 15
+        timeout-minutes: 5
 
       # blob api win (longer timeout for now)
       - name: Win client blob tests against local network
@@ -354,7 +370,7 @@ jobs:
 
       - name: Run sn_api tests
         run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 15
+        timeout-minutes: 20
 
       - name: Are nodes still running...?
         if: failure() && matrix.os != 'windows-latest'
@@ -366,8 +382,12 @@ jobs:
         if: failure() && matrix.os == 'windows-latest'
         shell: bash
         run: |
-          echo "$(pgrep sn_node.exe | wc -l) nodes still running"
+          echo "$(tasklist | FIND "sn_node.exe" | find /c /v "") nodes still running"
           ls $HOME/.safe/node/local-test-network
+
+      - name: Print Testnet Startup output
+        run: cat startup.log
+        if: failure()
 
       - name: Print Network Log Stats
         run: cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
@@ -379,5 +399,13 @@ jobs:
         with:
           name: sn_node_logs
           path: $HOME/.safe/node/local-test-network/
+        if: failure()
+
+      - name: Upload Node Logs hardcoded path...
+          # Upload artifacts.
+        uses: actions/upload-artifact@v2
+        with:
+          name: sn_node_logs
+          path: /home/runner/.safe/node/local-test-network
         if: failure()
 

@@ -174,6 +174,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn split_network_assert_health_check() -> Result<()> {
+        let promoted_to_elder_nodes =
+            search_testnet_results_per_node(LogMarker::PromotedToElder.to_string())?.len();
         let prefix1_prior_elder_nodes =
             search_testnet_results_per_node(format!(r"{}: Prefix\(1\)", LogMarker::SplitSuccess))?
                 .len();
@@ -195,6 +197,7 @@ mod tests {
             search_testnet_results_per_node(LogMarker::SplitSuccess.to_string())?.len();
 
         println!("Found splits: {:?}", split_count);
+        println!("Promoted to elder so far: {:?}", promoted_to_elder_nodes);
 
         let total_elders = prefix0_prior_elder_nodes
             + prefix0_new_elder_nodes
