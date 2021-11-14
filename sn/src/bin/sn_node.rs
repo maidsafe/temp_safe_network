@@ -95,7 +95,7 @@ async fn run_node() -> Result<()> {
     };
 
     let _optional_guard = if let Some(log_dir) = config.log_dir() {
-        println!("Starting logging to file");
+        println!("Starting logging to file: {:?}", log_dir);
         let file_appender = tracing_appender::rolling::hourly(log_dir, "sn_node.log");
 
         // configure how tracing non-blocking works: https://tracing.rs/tracing_appender/non_blocking/struct.nonblockingbuilder#method.default
