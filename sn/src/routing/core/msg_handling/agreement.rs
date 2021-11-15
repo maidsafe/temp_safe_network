@@ -278,7 +278,17 @@ impl Core {
             return Ok(vec![]);
         }
 
+        let mut commands = vec![];
         let snapshot = self.state_snapshot().await;
+
+        if updates.len() == 1 {
+            // this should be a split
+            commands.extend(
+                self.update_self_after_split(updates.clone(), snapshot.clone())
+                    .await?,
+            );
+        }
+
         let old_chain = self.section_chain().await.clone();
 
         for (signed_sap, key_sig) in updates {
@@ -335,7 +345,11 @@ impl Core {
             self.network_knowledge.prefix_map()
         );
 
-        self.update_self_for_new_node_state_and_fire_events(snapshot)
-            .await
+        commands.extend(
+            self.update_self_for_new_node_state_and_fire_events(snapshot.clone())
+                .await?,
+        );
+
+        Ok(commands)
     }
 }

@@ -35,12 +35,17 @@ pub(crate) use register_storage::RegisterStorage;
 use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
 use crate::messaging::system::SystemMsg;
-use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
+use crate::messaging::{
+    signature_aggregator::SignatureAggregator,
+    system::{KeyedSig, Proposal, SectionAuth},
+};
 use crate::routing::{
     dkg::DkgVoter,
     error::Result,
     log_markers::LogMarker,
-    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
+    network_knowledge::{
+        NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider,
+    },
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
@@ -278,51 +283,87 @@ impl Core {
                 NodeElderChange::None
             };
 
-            let sibling_elders = if new.prefix != old.prefix {
-                trace!("{}", LogMarker::NewPrefix);
-
-                self.network_knowledge
-                    .get_sap(&new.prefix.sibling())
-                    .map(|sap| {
-                        let current: BTreeSet<_> = sap.names();
-                        let added = current.difference(&old.elders).copied().collect();
-                        let removed = old.elders.difference(&current).copied().collect();
-                        let remaining = old.elders.intersection(&current).copied().collect();
-                        Elders {
-                            prefix: new.prefix.sibling(),
-                            key: sap.section_key(),
-                            remaining,
-                            added,
-                            removed,
-                        }
-                    })
-            } else {
-                None
-            };
-
-            let event = if let Some(sibling_elders) = sibling_elders {
-                info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
-                // In case of split, send AE-Update to sibling new elder nodes.
-                commands.extend(self.send_ae_update_to_sibling_section(&old).await);
-
-                Event::SectionSplit {
-                    elders,
-                    sibling_elders,
-                    self_status_change,
-                }
-            } else {
-                Event::EldersChanged {
-                    elders,
-                    self_status_change,
-                }
-            };
-
-            self.send_event(event).await;
+            self.send_event(Event::EldersChanged {
+                elders,
+                self_status_change,
+            })
+            .await;
         }
 
         if !new.is_elder {
             commands.extend(self.return_relocate_promise().await);
         }
+
+        Ok(commands)
+    }
+
+    /// Just take our two updates and update our sibling section
+    pub(crate) async fn update_self_after_split(
+        &self,
+        updates: Vec<(SectionAuth<SectionAuthorityProvider>, KeyedSig)>,
+        old: StateSnapshot,
+    ) -> Result<Vec<Command>> {
+        let mut commands = vec![];
+        let new = self.state_snapshot().await;
+
+        if updates.len() != 2 {
+            error!("We expected two updates after a split");
+            return Ok(vec![]);
+        }
+        // This is such a dumb way of doing this
+        let our_prefix = self.network_knowledge.prefix().await;
+        let updated_and_located: Vec<_> = updates
+            .iter()
+            .map(|(sap, _sig)| {
+                let is_our_section = sap.prefix() == our_prefix;
+
+                let current: BTreeSet<_> = sap.names();
+                let added = current.difference(&old.elders).copied().collect();
+                let removed = old.elders.difference(&current).copied().collect();
+                let remaining = old.elders.intersection(&current).copied().collect();
+                let elders = Elders {
+                    prefix: sap.prefix(),
+                    key: sap.section_key(),
+                    remaining,
+                    added,
+                    removed,
+                };
+                (is_our_section, elders)
+            })
+            .collect();
+
+        let our_elders = if updated_and_located[0].0 {
+            updated_and_located[0].1.clone()
+        } else {
+            updated_and_located[1].1.clone()
+        };
+
+        let their_elders = if !updated_and_located[0].0 {
+            updated_and_located[0].1.clone()
+        } else {
+            updated_and_located[1].1.clone()
+        };
+
+        let self_status_change = if !old.is_elder && new.is_elder {
+            trace!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
+            NodeElderChange::Promoted
+        } else if old.is_elder && !new.is_elder {
+            trace!("{}", LogMarker::DemotedFromElder);
+            info!("Demoted");
+            self.section_keys_provider.wipe().await;
+            NodeElderChange::Demoted
+        } else {
+            NodeElderChange::None
+        };
+
+        self.send_event(Event::SectionSplit {
+            elders: our_elders,
+            sibling_elders: their_elders,
+            self_status_change,
+        })
+        .await;
+
+        commands.extend(self.send_ae_update_to_sibling_section(&old).await);
 
         Ok(commands)
     }
@@ -359,6 +400,7 @@ impl Core {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct StateSnapshot {
     is_elder: bool,
     section_key: bls::PublicKey,

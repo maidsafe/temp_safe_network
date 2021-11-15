@@ -350,11 +350,6 @@ impl NetworkKnowledge {
     }
 
     // Get SectionAuthorityProvider of a known section with the given prefix.
-    pub(super) fn get_sap(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
-        self.prefix_map.get(prefix)
-    }
-
-    // Get SectionAuthorityProvider of a known section with the given prefix.
     pub(super) async fn get_closest_or_opposite_signed_sap(
         &self,
         name: &XorName,
