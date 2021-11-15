@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.39.0 (2021-11-12)
+## v0.40.0 (2021-11-15)
 
 ### New Features
 
@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+ - <csr-id-ad633e1b6882db1aac0cb1a530300d9e4d666fd8/> avoid holding write lock on ae_backoff_cache during sleep
+   This could inadvertently be slowing down other joins if we're holding the write lock on the cache while we backoff
  - <csr-id-366ad9a42034fe450c30908d372fede0ff92f655/> draining backlog before process DKG message
  - <csr-id-c4a42fb5965c79aaae2a0ef2ae62fcb987c37525/> less DKG progression interval; switch SAP on DKGcompletion when OurElder already received
  - <csr-id-adf9feac964fb7f690bd43aeef3270c82fde419c/> fix `Eq` for `SectionPeers`
@@ -71,8 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 24 commits contributed to the release over the course of 2 calendar days.
- - 24 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 27 commits contributed to the release over the course of 5 calendar days.
+ - 27 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -82,7 +84,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - retry on connection loss of reused connection ([`1389ffa`](https://github.com/git//maidsafe/safe_network.git/commit/1389ffa00762e126047a206abc475599c277930c))
+    - avoid holding write lock on ae_backoff_cache during sleep ([`ad633e1`](https://github.com/git//maidsafe/safe_network.git/commit/ad633e1b6882db1aac0cb1a530300d9e4d666fd8))
     - remove unnecessary peer lagging check ([`5a3b70e`](https://github.com/git//maidsafe/safe_network.git/commit/5a3b70e9721fcdfdd809d2a6bd85968446b4e9a3))
+    - safe_network v0.39.0 ([`ab00cf0`](https://github.com/git//maidsafe/safe_network.git/commit/ab00cf08d217654c57449437348b73576a65e89f))
     - make `NodeState` not `Copy` ([`0a5027c`](https://github.com/git//maidsafe/safe_network.git/commit/0a5027cd9b2c62833ccf70e2bcca5ab22625a840))
     - duplicate `SectionAuthorityProvider` in `routing` ([`ee165d4`](https://github.com/git//maidsafe/safe_network.git/commit/ee165d41ca40be378423394b6422570d1d47727c))
     - duplicate `NodeState` in `routing` ([`645047b`](https://github.com/git//maidsafe/safe_network.git/commit/645047b231eaf69f1299dee22ff2079feb7f5a95))
@@ -108,6 +113,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - provide the SAP proof chain in JoinResponse::Retry msgs ([`9b8ddfd`](https://github.com/git//maidsafe/safe_network.git/commit/9b8ddfde0287e47b6f18a77a8e8847d80ee84bcd))
 </details>
 
+## v0.39.0 (2021-11-12)
+
+### New Features
+
+ - <csr-id-b8b0097ac86645f0c7a7352f2bf220279068228c/> support `--json-logs` in `testnet`
+   This makes it easier to enable JSON logs for local testnets.
+ - <csr-id-044fd61950be76e3207694094dcec81313937403/> allow to change the default interval for testnet nodes
+
+### Bug Fixes
+
+ - <csr-id-366ad9a42034fe450c30908d372fede0ff92f655/> draining backlog before process DKG message
+ - <csr-id-c4a42fb5965c79aaae2a0ef2ae62fcb987c37525/> less DKG progression interval; switch SAP on DKGcompletion when OurElder already received
+ - <csr-id-adf9feac964fb7f690bd43aeef3270c82fde419c/> fix `Eq` for `SectionPeers`
+   This would have always returned true, since it was comparing with
+   itself...
+
+### New Features (BREAKING)
+
+ - <csr-id-9b8ddfde0287e47b6f18a77a8e8847d80ee84bcd/> provide the SAP proof chain in JoinResponse::Retry msgs
+   - Joining node now makes use of the NetworkPrefixMap to validate and
+   accept new SAPs using the proof chain provided in JoinResponse::Retry.
+- Expected age of joining node for genesis section is now calculated
+     in a deterministic way using the peer's address.
+
+### refactor (BREAKING)
+
+ - <csr-id-ee165d41ca40be378423394b6422570d1d47727c/> duplicate `SectionAuthorityProvider` in `routing`
+   This is part of the move towards passing connection handles through
+   network knowledge. Whilst it would be possible to put a connection
+   handle in the `messaging` struct, and just skip it when (de)serialising,
+   this seems less clean than having a separate struct.
+ - <csr-id-00acf0c0d8a65bdd5355ba909d73e74729a27044/> move `SectionPeers` from `messaging` to `routing`
+   `SectionPeers` was only used in the `SystemMsg::AntiEntropyUpdate`
+   message. Rather than simply inlining the `DashMap`, it's been replaced
+   by `BTreeSet<SectionAuth<NodeState>>` since the map keys are redundant
+   with the `name` field of `NodeState` (and `BTreeSet` specifically for
+   deterministic ordering).
+   
+   With the move, it's also become `pub(crate)`, so from the perspective of
+   the public API this type has been removed.
+ - <csr-id-7d5d5e11fef39a6dc1b89c972e42772db807374c/> move `ElderCandidates` to `routing`
+   The `ElderCandidate` type was in `messaging`, and was only used in the
+   `SystemMsg::DkStart` message. It was more commonly used as network
+   state, so homing it in `routing::network_knowledge` makes more sense.
+   This also means the type no longer needs to be public, and doesn't need
+   to be (de)serialisable, which opens up the possibility of putting more
+   stuff in it in future (e.g. connection handles...).
+   
+   As a first step down that road, the `elders` field now contains `Peer`s
+   rather than merely `SocketAddr`s. The majority of reads of the field
+   ultimately want either name-only or `Peer`s, so this seems reasonable
+   regardless.
+ - <csr-id-855b8ff87217e92a5f7d55fb78ab73c9d81f75a2/> make `SectionAuthorityProviderUtils` `pub(crate)`
+   This shouldn't really be part of the public API, and having it such
+   transitively grows the visibility of its collaborators (e.g.
+   `ElderCandidates`) which also don't need to be in the public API.
+ - <csr-id-23b8a08e97fa415b9216caac5da18cb97ede980f/> remove `Copy` from `Peer`
+   Eventually we may want to put a `Connection` into `Peer`, which is not
+   `Copy`. As such, `Peer` itself will be unable to derive `Copy`. Although
+   this might not happen for a while, removing dependence on `Copy` now
+   will make it smoother when the time comes.
+
 ## v0.38.0 (2021-11-10)
 
 ### New Features
@@ -125,9 +192,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-9b8ddfde0287e47b6f18a77a8e8847d80ee84bcd/> provide the SAP proof chain in JoinResponse::Retry msgs
    - Joining node now makes use of the NetworkPrefixMap to validate and
    accept new SAPs using the proof chain provided in JoinResponse::Retry.
-- Expected age of joining node for genesis section is now calculated
-     in a deterministic way using the peer's address.
 
+<csr-unknown>
+Expected age of joining node for genesis section is now calculatedin a deterministic way using the peer’s address.<csr-unknown/>
 ## v0.37.0 (2021-11-09)
 
 ### New Features
@@ -419,5 +486,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - move safe_network code into sn directory ([`2254329`](https://github.com/git//maidsafe/safe_network.git/commit/225432908839359800d301d9e5aa8274e4652ee1))
 </details>
 
-<csr-unknown>
- add more prioritiy leves for different types of messages stepped fixed age during first section read prefix_map from disk if available use tokio::semaphore for limiting concurrent joins add AE backoff before resending messages to a node backoff during join request looping make subcommand optional, to get stats quickly enable pleasant span viewing for node logs<csr-unknown/>
