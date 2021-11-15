@@ -12,12 +12,12 @@ if [[ $commit_message == *"safe_network"* ]]; then
     gh_release_tag_name="safe_network-v$sn_version/"
 fi
 if [[ $commit_message == *"sn_api"* ]]; then
-    gh_release_name="Safe API v$sn_api_version/"
-    gh_release_tag_name="safe_api-v$sn_api_version/"
+    gh_release_name="${gh_release_name}Safe API v$sn_api_version/"
+    gh_release_tag_name="${gh_release_tag_name}sn_api-v$sn_api_version/"
 fi
 if [[ $commit_message == *"sn_cli"* ]]; then
-    gh_release_name="Safe CLI v$sn_cli_version/"
-    gh_release_tag_name="safe_cli-v$sn_cli_version/"
+    gh_release_name="${gh_release_name}Safe CLI v$sn_cli_version/"
+    gh_release_tag_name="${gh_release_tag_name}sn_cli-v$sn_cli_version/"
 fi
 
 # strip off any trailing '/' 
