@@ -43,7 +43,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Duration;
 use tracing::{error, warn};
 
-const JOINING_TIMEOUT: u64 = 360; // 360 seconds
+const JOINING_TIMEOUT: u64 = 720; // 720 seconds
 
 /// Static info about the node.
 #[derive(Clone, Debug)]
