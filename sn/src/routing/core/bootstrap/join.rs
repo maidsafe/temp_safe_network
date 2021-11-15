@@ -24,7 +24,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    Peer,
+    Peer, MIN_ADULT_AGE,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -104,23 +104,29 @@ impl<'a> Join<'a> {
     async fn run(self, bootstrap_addr: SocketAddr) -> Result<(Node, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
         let dst_xorname = self.node.name();
-        let recipients = vec![Peer::new(dst_xorname, bootstrap_addr)];
         let genesis_key = self.prefix_map.genesis_key();
+        let (target_section_key, recipients) =
+            if let Ok(sap) = self.prefix_map.section_by_name(&dst_xorname) {
+                (sap.section_key(), sap.peers())
+            } else {
+                (genesis_key, vec![Peer::new(dst_xorname, bootstrap_addr)])
+            };
 
-        self.join(genesis_key, recipients).await
+        self.join(genesis_key, target_section_key, recipients).await
     }
 
     #[tracing::instrument(skip(self))]
     async fn join(
         mut self,
         network_genesis_key: BlsPublicKey,
+        target_section_key: BlsPublicKey,
         recipients: Vec<Peer>,
     ) -> Result<(Node, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
         // Once we are approved to join, we will make sure the SAP we receive can
         // be validated with the received proof chain and the 'network_genesis_key'.
-        let mut section_key = network_genesis_key;
+        let mut section_key = target_section_key;
 
         // We send a first join request to obtain the resource challenge, which
         // we will then use to generate the challenge proof and send the
@@ -229,7 +235,9 @@ impl<'a> Join<'a> {
                     }
 
                     // make sure our joining age is the expected by the network
-                    if self.node.age() != expected_age {
+                    if self.node.age() != expected_age
+                        && (self.node.age() > expected_age || self.node.age() == MIN_ADULT_AGE)
+                    {
                         trace!("re-generate name due to mis-matched age, current {:?} vs. expected {:?}",
                             self.node.age(), expected_age);
                         let new_keypair = ed25519::gen_keypair(
@@ -925,7 +933,7 @@ mod tests {
         let elders = (0..ELDER_SIZE)
             .map(|_| Peer::new(good_prefix.substituted_in(rand::random()), gen_addr()))
             .collect();
-        let join_task = state.join(section_key, elders);
+        let join_task = state.join(section_key, section_key, elders);
 
         let test_task = async {
             let (wire_msg, _) = send_rx
