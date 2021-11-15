@@ -53,14 +53,9 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
+      - uses: Swatinem/rust-cache@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
+          cache-on-failure: true
 
       - name: Download network config
         shell: bash
