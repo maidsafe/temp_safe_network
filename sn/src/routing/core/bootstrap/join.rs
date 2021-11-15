@@ -105,9 +105,14 @@ impl<'a> Join<'a> {
         // Use our XorName as we do not know their name or section key yet.
         let dst_xorname = self.node.name();
         let recipients = vec![Peer::new(dst_xorname, bootstrap_addr)];
-        let genesis_key = self.prefix_map.genesis_key();
+        let target_key = if let Some(sap) = self.prefix_map.closest_or_opposite(&dst_xorname, None)
+        {
+            sap.section_key()
+        } else {
+            self.prefix_map.genesis_key()
+        };
 
-        self.join(genesis_key, recipients).await
+        self.join(target_key, recipients).await
     }
 
     #[tracing::instrument(skip(self))]
