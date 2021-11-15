@@ -3079,7 +3079,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
- "sn_launch_tool 0.9.2",
+ "sn_launch_tool 0.9.3",
  "structopt",
  "strum",
  "strum_macros",
@@ -3130,8 +3130,9 @@ dependencies = [
 
 [[package]]
 name = "secured_linked_list"
-version = "0.4.0"
-source = "git+https://github.com/bochaco/secured_linked_list.git?branch=fix-get-proof-chain#8c533fb271202be1dfc888fc09a7c3bcad4763fc"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26ac297fb99cf4d4fb2d50b22f9f8689f874972950859adda33332d48168f58c"
 dependencies = [
  "bincode",
  "blsttc",
@@ -3514,8 +3515,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.9.2"
-source = "git+https://github.com/joshuef/sn_launch_tool?branch=InheritStdOut#c6ec77c8319c938d4cc16a79a121ef98cd3ea13e"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af6d179a9b80c510bc20aa2d9a59c32207e002378d9bc34d81656daba0c65ee1"
 dependencies = [
  "color-eyre",
  "dirs-next 1.0.2",
