@@ -33,15 +33,9 @@ jobs:
           override: true
           components: rustfmt, clippy
 
-      - name: Cargo cache registry, index and build
-        if: steps.sn_changes.outputs.src == 'true'
-        uses: actions/cache@v2.1.4
+      - uses: Swatinem/rust-cache@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
+          cache-on-failure: true
 
       - name: Check formatting
         if: steps.sn_changes.outputs.src == 'true'
