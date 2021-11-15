@@ -351,7 +351,7 @@ impl<'a> Join<'a> {
             } else {
                 error!("Waiting before attempting to join again");
 
-                tokio::time::sleep(2 * self.backoff.max_interval).await;
+                tokio::time::sleep(self.backoff.max_interval).await;
                 self.backoff.reset();
             }
         }
