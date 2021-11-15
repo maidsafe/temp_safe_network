@@ -121,6 +121,14 @@ impl NetworkPrefixMap {
             .collect()
     }
 
+    #[allow(dead_code)]
+    /// Get `SectionAuthorityProvider` of a known section with the given prefix.
+    pub(crate) fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
+        self.sections
+            .get(prefix)
+            .map(|entry| entry.value().value.clone())
+    }
+
     /// Get signed `SectionAuthorityProvider` of a known section with the given prefix.
     pub(crate) fn get_signed(
         &self,
