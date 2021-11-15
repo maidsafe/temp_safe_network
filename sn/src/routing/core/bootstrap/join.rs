@@ -88,7 +88,7 @@ impl<'a> Join<'a> {
             prefix_map,
             backoff: ExponentialBackoff {
                 initial_interval: Duration::from_millis(50),
-                max_interval: Duration::from_millis(750),
+                max_interval: Duration::from_millis(3000),
                 max_elapsed_time: Some(Duration::from_secs(60)),
                 ..Default::default()
             },
