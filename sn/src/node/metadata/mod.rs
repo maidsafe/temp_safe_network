@@ -10,7 +10,6 @@ mod elder_stores;
 
 use crate::messaging::data::{DataExchange, StorageLevel};
 use crate::node::{network::Network, Result};
-use crate::routing::Prefix;
 use crate::types::PublicKey;
 use elder_stores::ElderStores;
 use std::{
@@ -50,10 +49,6 @@ impl Metadata {
             .network
             .set_storage_level(&node_id, level)
             .await
-    }
-
-    pub(crate) async fn get_data_exchange_packet(&self, prefix: Prefix) -> Result<DataExchange> {
-        self.elder_stores.get_data_of(prefix).await
     }
 
     pub(crate) async fn update(&mut self, data: DataExchange) -> Result<()> {

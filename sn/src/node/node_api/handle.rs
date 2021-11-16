@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    interaction::push_state,
     messaging::{send, send_error, send_to_nodes},
     role::{AdultRole, ElderRole, Role},
     Node,
@@ -17,7 +16,7 @@ use crate::node::{
     node_ops::{NodeDuties, NodeDuty},
     Result,
 };
-use crate::{messaging::MessageId, routing::MIN_LEVEL_WHEN_FULL};
+use crate::routing::MIN_LEVEL_WHEN_FULL;
 
 use crate::routing::ELDER_SIZE;
 use tokio::task::JoinHandle;
@@ -50,11 +49,7 @@ impl Node {
                 *elder.received_initial_sync.write().await = true;
                 Ok(NodeTask::None)
             }
-            NodeDuty::EldersChanged {
-                our_prefix,
-                new_elders,
-                newbie,
-            } => {
+            NodeDuty::EldersChanged { newbie, .. } => {
                 if newbie {
                     info!("Promoted to Elder on Churn");
                     self.level_up().await?;
@@ -64,26 +59,9 @@ impl Node {
                         let elder = self.as_elder().await?;
                         *elder.received_initial_sync.write().await = true;
                     }
-                    Ok(NodeTask::None)
-                } else {
-                    info!("Updating on elder churn");
-                    let elder = self.as_elder().await?;
-                    let network = self.network_api.clone();
-                    let handle = tokio::spawn(async move {
-                        let ops = vec![
-                            push_state(&elder, our_prefix, MessageId::new(), new_elders).await?,
-                        ];
-                        let our_adults = network.our_adults().await;
-                        elder
-                            .meta_data
-                            .write()
-                            .await
-                            .retain_members_only(our_adults)
-                            .await?;
-                        Ok(NodeTask::from(ops))
-                    });
-                    Ok(NodeTask::Thread(handle))
                 }
+
+                Ok(NodeTask::None)
             }
             NodeDuty::AdultsChanged {
                 added,
@@ -102,16 +80,8 @@ impl Node {
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::SectionSplit {
-                our_key,
-                our_prefix,
-                newbie,
+                our_key, newbie, ..
             } => {
-                debug!(
-                    "@@@@@@ SPLIT: Our prefix: {:?}, neighbour: {:?}",
-                    our_prefix,
-                    our_prefix.sibling(),
-                );
-                debug!("@@@@@@ SPLIT: Our key: {:?}", our_key);
                 if newbie {
                     info!("Beginning split as Newbie");
                     self.begin_split_as_newbie(our_key).await?;

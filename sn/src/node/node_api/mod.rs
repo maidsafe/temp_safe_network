@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod handle;
-mod interaction;
 mod member_churn;
 mod messaging;
 mod role;
