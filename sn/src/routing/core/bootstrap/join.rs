@@ -424,7 +424,9 @@ impl<'a> Join<'a> {
                             }) => {
                                 let sender_addr = match sender {
                                     Sender::Ourself => self.node.addr,
-                                    Sender::Connected(addr) => addr,
+                                    Sender::Connected(connection) => connection.remote_address(),
+                                    #[cfg(test)]
+                                    Sender::Test(addr) => addr,
                                 };
                                 (
                                     *resp,

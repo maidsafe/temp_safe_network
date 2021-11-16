@@ -122,7 +122,11 @@ pub(crate) enum Sender {
     Ourself,
 
     /// The message was sent from a connected peer.
-    Connected(SocketAddr),
+    Connected(qp2p::Connection),
+
+    /// The message was sent from a test.
+    #[cfg(test)]
+    Test(SocketAddr),
 }
 
 #[cfg(test)]
