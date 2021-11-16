@@ -313,7 +313,7 @@ impl Core {
                         .await
                         .peers()
                         .into_iter()
-                        .filter(|peer| new.elders.contains(&peer.name()))
+                        .filter(|peer| !old.elders.contains(&peer.name()))
                         .collect(),
                     old.section_key,
                 )
