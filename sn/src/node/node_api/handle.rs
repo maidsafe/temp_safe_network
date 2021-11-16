@@ -104,7 +104,6 @@ impl Node {
             NodeDuty::SectionSplit {
                 our_key,
                 our_prefix,
-                our_new_elders,
                 newbie,
             } => {
                 debug!(
@@ -116,24 +115,9 @@ impl Node {
                 if newbie {
                     info!("Beginning split as Newbie");
                     self.begin_split_as_newbie(our_key).await?;
-                    Ok(NodeTask::None)
-                } else {
-                    info!("Beginning split as Oldie");
-                    let elder = self.as_elder().await?;
-                    let network = self.network_api.clone();
-                    let handle = tokio::spawn(async move {
-                        Ok(NodeTask::from(
-                            Self::begin_split_as_oldie(
-                                &elder,
-                                &network,
-                                our_prefix,
-                                our_new_elders,
-                            )
-                            .await?,
-                        ))
-                    });
-                    Ok(NodeTask::Thread(handle))
                 }
+
+                Ok(NodeTask::None)
             }
             NodeDuty::ProcessLostMember { name, .. } => {
                 info!("Member Lost: {:?}", name);

@@ -34,7 +34,8 @@ pub(crate) use register_storage::RegisterStorage;
 
 use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
-use crate::messaging::system::SystemMsg;
+use crate::messaging::data::DataExchange;
+use crate::messaging::system::{NodeCmd, SystemMsg};
 use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
 use crate::routing::{
     dkg::DkgVoter,
@@ -284,7 +285,16 @@ impl Core {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
                 // In case of split, send AE-Update to sibling new elder nodes.
                 // TODO: confirm in case of sibling's SAP is missing, how to handle such case.
-                commands.extend(self.send_ae_update_to_sibling_section(&old).await);
+                commands.extend(self.send_updates_to_sibling_section(&old).await?);
+                self.retain_members_only(
+                    self.network_knowledge
+                        .members()
+                        .all_members()
+                        .iter()
+                        .map(|peer| peer.name())
+                        .collect(),
+                )
+                .await?;
 
                 Event::SectionSplit {
                     elders,
@@ -297,7 +307,7 @@ impl Core {
                 }
             };
 
-            self.send_event(event).await;
+            self.send_event(event).await
         }
 
         if !new.is_elder {

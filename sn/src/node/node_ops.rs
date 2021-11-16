@@ -58,8 +58,6 @@ pub enum NodeDuty {
         our_prefix: Prefix,
         /// our section public key
         our_key: PublicKey,
-        /// The new Elders of our section.
-        our_new_elders: BTreeSet<XorName>,
         /// oldie or newbie?
         newbie: bool,
     },

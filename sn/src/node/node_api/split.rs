@@ -38,9 +38,6 @@ impl Node {
     ) -> Result<NodeDuties> {
         let mut ops = vec![];
 
-        // replicate state to our new elders
-        ops.push(push_state(elder, our_prefix, MessageId::new(), our_new_elders).await?);
-
         // replicate state to our neighbour's new elders
         // TODO: Confirming when sibling's SAP is available, does this need to be carried out.
         // let sibling_prefix = our_prefix.sibling();
