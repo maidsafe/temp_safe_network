@@ -281,7 +281,7 @@ impl Core {
             // During the split, sibling's SAP could be unknown to us yet.
             // Hence, fire the SectionSplit event whenever detect a prefix change.
             // We also need to update other nodes w/ our known data.
-            let event = if new.prefix != old.prefix {
+            let event = if (new.prefix != old.prefix) && new.is_elder {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
                 commands.extend(self.send_updates_to_sibling_section(&old).await?);
                 self.retain_members_only(
