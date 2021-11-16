@@ -29,8 +29,8 @@ use crate::routing::{
     },
     node::Node,
     relocation::{self, RelocatePayloadUtils},
-    supermajority, Error, Event, Peer, Result as RoutingResult, ELDER_SIZE, FIRST_SECTION_MAX_AGE,
-    FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
+    supermajority, Error, Event, Peer, Result as RoutingResult, Sender, ELDER_SIZE,
+    FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
@@ -102,7 +102,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let mut commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: new_node.addr,
+            sender: Sender::Ourself,
             wire_msg,
             original_bytes: None,
         },
@@ -195,7 +195,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: new_node.addr,
+            sender: Sender::Connected(new_node.addr),
             wire_msg,
             original_bytes: None,
         },
@@ -304,7 +304,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let inner_commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: relocated_node.addr,
+            sender: Sender::Connected(relocated_node.addr),
             wire_msg,
             original_bytes: None,
         },
@@ -378,7 +378,7 @@ async fn aggregate_proposals() -> Result<()> {
 
         let commands = get_internal_commands(
             Command::HandleMessage {
-                sender_addr: node.addr,
+                sender: Sender::Ourself,
                 wire_msg,
                 original_bytes: None,
             },
@@ -414,7 +414,7 @@ async fn aggregate_proposals() -> Result<()> {
 
     let mut commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: nodes[THRESHOLD].addr,
+            sender: Sender::Ourself,
             wire_msg,
             original_bytes: None,
         },
@@ -960,7 +960,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     let _commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: old_node.addr,
+            sender: Sender::Ourself,
             wire_msg,
             original_bytes: None,
         },
@@ -1040,7 +1040,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
 
     let _commands = get_internal_commands(
         Command::HandleMessage {
-            sender_addr: sender.addr,
+            sender: Sender::Ourself,
             wire_msg,
             original_bytes: None,
         },
@@ -1252,7 +1252,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     assert!(commands.is_empty());
 
     let msg_type = assert_matches!(comm_rx.recv().await, Some(ConnectionEvent::Received((sender, bytes))) => {
-        assert_eq!(sender, node.addr);
+        assert_matches!(sender, Sender::Connected(addr) => assert_eq!(addr, node.addr));
         assert_matches!(WireMsg::deserialize(bytes), Ok(msg_type) => msg_type)
     });
 

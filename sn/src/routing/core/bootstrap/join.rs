@@ -24,7 +24,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    Peer, MIN_ADULT_AGE,
+    Peer, Sender, MIN_ADULT_AGE,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -405,13 +405,13 @@ impl<'a> Join<'a> {
         while let Some(event) = self.recv_rx.recv().await {
             // We are interested only in `JoinResponse` type of messages
             let (join_response, sender) = match event {
-                ConnectionEvent::Received((sender_addr, bytes)) => match WireMsg::from(bytes) {
+                ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) => continue,
                         MsgKind::NodeBlsShareAuthMsg(_) => {
                             trace!(
                                 "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
-                                sender_addr,
+                                sender,
                                 wire_msg
                             );
                             continue;
@@ -421,17 +421,23 @@ impl<'a> Join<'a> {
                                 msg: SystemMsg::JoinResponse(resp),
                                 msg_authority,
                                 ..
-                            }) => (
-                                *resp,
-                                Peer::new(msg_authority.src_location().name(), sender_addr),
-                            ),
+                            }) => {
+                                let sender_addr = match sender {
+                                    Sender::Ourself => self.node.addr,
+                                    Sender::Connected(addr) => addr,
+                                };
+                                (
+                                    *resp,
+                                    Peer::new(msg_authority.src_location().name(), sender_addr),
+                                )
+                            }
                             Ok(
                                 MessageType::Service { msg_id, .. }
                                 | MessageType::System { msg_id, .. },
                             ) => {
                                 trace!(
                                     "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
-                                    sender_addr,
+                                    sender,
                                     msg_id
                                 );
                                 continue;
@@ -983,7 +989,7 @@ mod tests {
         debug!("wire msg built");
 
         recv_tx.try_send(ConnectionEvent::Received((
-            bootstrap_node.addr,
+            Sender::Ourself,
             wire_msg.serialize()?,
         )))?;
 
