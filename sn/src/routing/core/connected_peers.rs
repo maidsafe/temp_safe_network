@@ -1,9 +1,8 @@
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-};
+use std::net::SocketAddr;
+#[cfg(not(feature = "unstable-no-connection-pooling"))]
+use std::{collections::HashMap, net::IpAddr, sync::Arc};
 
+#[cfg(not(feature = "unstable-no-connection-pooling"))]
 use tokio::sync::RwLock;
 use xor_name::XorName;
 
@@ -22,9 +21,11 @@ use xor_name::XorName;
 /// ID.
 #[derive(Clone, Default)]
 pub(super) struct ConnectedPeers {
+    #[cfg(not(feature = "unstable-no-connection-pooling"))]
     peers: Arc<RwLock<HashMap<XorName, qp2p::Connection>>>,
 }
 
+#[cfg(not(feature = "unstable-no-connection-pooling"))]
 impl ConnectedPeers {
     /// Get the connected peer with the given `id`.
     ///
@@ -82,6 +83,18 @@ impl ConnectedPeers {
             }
         }
     }
+}
+
+#[cfg(feature = "unstable-no-connection-pooling")]
+impl ConnectedPeers {
+    pub(super) async fn get_by_id(&self, _id: &XorName) -> Option<ConnectedPeer> {
+        None
+    }
+    pub(super) async fn get_by_address(&self, _address: &SocketAddr) -> Option<ConnectedPeer> {
+        None
+    }
+    pub(super) async fn insert(&self, _connection: qp2p::Connection) {}
+    pub(super) async fn remove_by_address(&self, _address: &SocketAddr) {}
 }
 
 /// A peer connected to a node, as stored by [`ConnectedPeers`].
