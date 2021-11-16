@@ -105,7 +105,7 @@ impl Core {
     /// and members_info if required.
     pub(crate) async fn generate_ae_update(
         &self,
-        _dst_section_key: BlsPublicKey,
+        dst_section_key: BlsPublicKey,
         add_peer_info_to_update: bool,
     ) -> Result<SystemMsg> {
         let section_signed_auth = self
@@ -113,24 +113,20 @@ impl Core {
             .section_signed_authority_provider()
             .await
             .clone();
-        let section_auth = section_signed_auth.value;
+        let sap = section_signed_auth.value;
         let section_signed = section_signed_auth.sig;
 
-        let proof_chain = self.network_knowledge.chain().await;
-        /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
         let proof_chain = match self
             .network_knowledge
-            .chain()
-            .await
             .get_proof_chain_to_current(&dst_section_key)
+            .await
         {
             Ok(chain) => chain,
             Err(_) => {
-                // error getting chain from key, so lets send the whole thing
-                self.network_knowledge.chain().await
+                // error getting chain from key, so let's send the whole thing
+                self.network_knowledge.section_chain().await
             }
         };
-        */
 
         let members = if add_peer_info_to_update {
             Some(
@@ -145,7 +141,7 @@ impl Core {
         };
 
         Ok(SystemMsg::AntiEntropyUpdate {
-            section_auth: section_auth.into_msg(),
+            section_auth: sap.into_msg(),
             section_signed,
             proof_chain,
             members,
@@ -172,7 +168,7 @@ impl Core {
                 .await
                 .into_authed_msg(),
             node_state: node_state.into_authed_msg(),
-            section_chain: self.network_knowledge.chain().await,
+            section_chain: self.network_knowledge.section_chain().await,
         }));
 
         let dst_section_pk = self.network_knowledge.section_key().await;
@@ -242,12 +238,12 @@ impl Core {
         old: &StateSnapshot,
     ) -> Vec<Command> {
         debug!("{}", LogMarker::AeSendUpdateToSiblings);
-        if let Some(sibling_sec_auth) = self
+        if let Some(sibling_sap) = self
             .network_knowledge
             .prefix_map()
             .get_signed(&self.network_knowledge.prefix().await.sibling())
         {
-            let promoted_sibling_elders: Vec<_> = sibling_sec_auth
+            let promoted_sibling_elders: Vec<_> = sibling_sap
                 .peers()
                 .into_iter()
                 .filter(|peer| !old.elders.contains(&peer.name()))
@@ -258,30 +254,38 @@ impl Core {
                 return vec![];
             }
 
-            // Using previous_key as dst_section_key as newly promoted sibling elders shall still
-            // in the state of pre-split.
-            let previous_pk = sibling_sec_auth.sig.public_key;
+            // Using previous_key as dst_section_key as newly promoted
+            // sibling elders shall still in the state of pre-split.
+            let previous_section_key = old.section_key;
 
             // Compose a min sibling proof_chain.
+            let mut proof_chain = match self
+                .network_knowledge
+                .get_proof_chain_to_current(&previous_section_key)
+                .await
+            {
+                Ok(chain) => chain,
+                Err(err) => {
+                    error!("Failed to generate proof chain to send AE-Update to promoted siblings: {:?}", err);
+                    return vec![];
+                }
+            };
 
-            /* TODO: get a proof chain rather than whole chain once we have a DAG for our chain.
-            let mut proof_chain = SecuredLinkedList::new(previous_pk);
-            */
-            let mut proof_chain = self.network_knowledge.chain().await;
+            if let Err(err) = proof_chain.insert(
+                &previous_section_key,
+                sibling_sap.section_key(),
+                sibling_sap.sig.signature.clone(),
+            ) {
+                error!("Failed to insert latest SAP to proof chain to send AE-Update to promoted siblings: {:?}", err);
+            }
 
-            let _ = proof_chain.insert(
-                &previous_pk,
-                sibling_sec_auth.section_key(),
-                sibling_sec_auth.sig.signature.clone(),
-            );
-
-            let dst_name = sibling_sec_auth.prefix().name();
+            let dst_name = sibling_sap.prefix().name();
 
             // Those promoted elders shall already know about other adult members.
             // TODO: confirm no need to populate the members.
             let node_msg = SystemMsg::AntiEntropyUpdate {
-                section_signed: sibling_sec_auth.sig,
-                section_auth: sibling_sec_auth.value.into_msg(),
+                section_signed: sibling_sap.sig,
+                section_auth: sibling_sap.value.into_msg(),
                 proof_chain,
                 members: None,
             };
@@ -291,7 +295,7 @@ impl Core {
                     promoted_sibling_elders,
                     node_msg,
                     dst_name,
-                    previous_pk,
+                    previous_section_key,
                 )
                 .await
             {

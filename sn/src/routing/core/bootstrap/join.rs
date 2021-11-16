@@ -163,25 +163,17 @@ impl<'a> Join<'a> {
                     section_chain,
                     ..
                 } => {
-                    if genesis_key != network_genesis_key {
-                        debug!(
-                            "Ignoring JoinResponse::Approval with wrong network genesis key: {}, expected: {}",
-                            hex::encode(genesis_key.to_bytes()), hex::encode(network_genesis_key.to_bytes())
-                        );
-                        continue;
-                    }
-
                     trace!("{}", LogMarker::ReceivedJoinApproved);
 
-                    return Ok((
-                        self.node,
-                        NetworkKnowledge::new(
-                            genesis_key,
-                            section_chain,
-                            section_auth.into_authed_state(),
-                            Some(self.prefix_map),
-                        )?,
-                    ));
+                    // Building our network knowledge instance will validate SAP and section chain.
+                    let network_knowledge = NetworkKnowledge::new(
+                        genesis_key,
+                        section_chain,
+                        section_auth.into_authed_state(),
+                        Some(self.prefix_map),
+                    )?;
+
+                    return Ok((self.node, network_knowledge));
                 }
                 JoinResponse::Retry {
                     section_auth,
@@ -359,7 +351,7 @@ impl<'a> Join<'a> {
             } else {
                 error!("Waiting before attempting to join again");
 
-                tokio::time::sleep(2 * self.backoff.max_interval).await;
+                tokio::time::sleep(self.backoff.max_interval).await;
                 self.backoff.reset();
             }
         }

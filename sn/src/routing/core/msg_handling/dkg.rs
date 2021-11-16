@@ -138,13 +138,14 @@ impl Core {
 
     pub(crate) async fn handle_dkg_outcome(
         &self,
-        section_auth: SectionAuthorityProvider,
+        sap: SectionAuthorityProvider,
         key_share: SectionKeyShare,
     ) -> Result<Vec<Command>> {
+        let key_share_pk = key_share.public_key_set.public_key();
         trace!(
             "{} public_key={:?}",
             LogMarker::HandlingDkgSuccessfulOutcome,
-            key_share.public_key_set.public_key()
+            key_share_pk
         );
 
         // Add our new keyshare to our cache, we will then use
@@ -152,16 +153,19 @@ impl Core {
         self.section_keys_provider.insert(key_share.clone()).await;
 
         let snapshot = self.state_snapshot().await;
-        //
+
+        // If we are lagging, we may have been already approved as new Elder, and
+        // an AE update provided us with this same SAP but already signed by previous Elders,
+        // if so we can skip the SectionInfo agreement proposal phase.
         if self
             .network_knowledge
-            .skip_section_info_agreement(key_share.public_key_set.public_key())
+            .set_current_sap(key_share_pk, &sap.prefix())
             .await
         {
             self.update_self_for_new_node_state_and_fire_events(snapshot)
                 .await
         } else {
-            let proposal = Proposal::SectionInfo(section_auth.into_msg());
+            let proposal = Proposal::SectionInfo(sap.into_msg());
             let recipients: Vec<_> = self.network_knowledge.authority_provider().await.peers();
             self.send_proposal_with(recipients, proposal, &key_share)
                 .await

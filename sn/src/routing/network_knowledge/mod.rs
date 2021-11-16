@@ -43,7 +43,7 @@ use xor_name::{Prefix, XorName};
 pub(crate) struct NetworkKnowledge {
     /// Network genesis key
     genesis_key: BlsPublicKey,
-    /// The secured linked list of previous section keys, starting from genesis key
+    /// Current section chain of our own section, starting from genesis key
     chain: Arc<RwLock<SecuredLinkedList>>,
     /// Signed Section Authority Provider
     signed_sap: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
@@ -51,10 +51,8 @@ pub(crate) struct NetworkKnowledge {
     section_peers: SectionPeers,
     /// The network prefix map, i.e. a map from prefix to SAPs
     prefix_map: NetworkPrefixMap,
-    ///
-    cache_chain: Arc<RwLock<Option<SecuredLinkedList>>>,
-    ///
-    cache_sap: Arc<RwLock<Option<SectionAuth<SectionAuthorityProvider>>>>,
+    /// A DAG containing all section chains of the whole netwrk that we are aware of
+    all_sections_chains: Arc<RwLock<SecuredLinkedList>>,
 }
 
 impl NetworkKnowledge {
@@ -131,12 +129,11 @@ impl NetworkKnowledge {
 
         Ok(Self {
             genesis_key,
-            chain: Arc::new(RwLock::new(chain)),
+            chain: Arc::new(RwLock::new(chain.clone())),
             signed_sap: Arc::new(RwLock::new(signed_sap)),
             section_peers: SectionPeers::default(),
             prefix_map,
-            cache_chain: Arc::new(RwLock::new(None)),
-            cache_sap: Arc::new(RwLock::new(None)),
+            all_sections_chains: Arc::new(RwLock::new(chain)),
         })
     }
 
@@ -145,7 +142,7 @@ impl NetworkKnowledge {
         debug!("Node was relocated to {:?}", new_network_nowledge);
 
         let mut chain = self.chain.write().await;
-        *chain = new_network_nowledge.chain().await;
+        *chain = new_network_nowledge.section_chain().await;
         // don't hold write lock
         drop(chain);
 
@@ -198,47 +195,62 @@ impl NetworkKnowledge {
         Ok((network_knowledge, section_key_share))
     }
 
-    ///
-    pub(super) async fn skip_section_info_agreement(&self, section_key: BlsPublicKey) -> bool {
-        let mut switched = false;
-        if let Some(signed_sap) = self.cache_sap.read().await.clone() {
-            let provided_sap = signed_sap.value.clone();
-            if provided_sap.section_key() == section_key {
-                if let Some(proof_chain) = self.cache_chain.read().await.clone() {
-                    let our_prev_prefix = self.prefix().await;
-                    *self.signed_sap.write().await = signed_sap.clone();
-                    *self.chain.write().await = proof_chain.clone();
+    /// If we already have the signed SAP and section chain for the provided key and prefix
+    /// we make them the current SAP and section chain, and if so, this returns 'true'.
+    /// Note this function assumes we already have the key share for the provided section key.
+    pub(super) async fn set_current_sap(&self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
+        // Let's try to find the signed SAP corresponding to the provided prefix and section key
+        match self.prefix_map.get_signed(prefix) {
+            Some(signed_sap) if signed_sap.value.section_key() == section_key => {
+                // We have the signed SAP for the provided prefix and section key,
+                // we should be able to update our current SAP and section chain
+                match self
+                    .all_sections_chains
+                    .read()
+                    .await
+                    .get_proof_chain(&self.genesis_key, &section_key)
+                {
+                    Ok(section_chain) => {
+                        // Let's then update our current SAP and section chain
+                        let our_prev_prefix = self.prefix().await;
+                        *self.signed_sap.write().await = signed_sap.clone();
+                        *self.chain.write().await = section_chain;
 
-                    // Remove any peer which doesn't belong to our new section's prefix
-                    self.section_peers.retain(&provided_sap.prefix());
-                    info!(
-                        "Switched our section's SAP ({:?} to {:?}) with new one: {:?}",
-                        our_prev_prefix,
-                        provided_sap.prefix(),
-                        provided_sap
-                    );
+                        // Remove any peer which doesn't belong to our new section's prefix
+                        self.section_peers.retain(prefix);
+                        info!(
+                            "Switched our section's SAP ({:?} to {:?}) with new one: {:?}",
+                            our_prev_prefix, prefix, signed_sap
+                        );
 
-                    *self.cache_chain.write().await = None;
-                    *self.cache_sap.write().await = None;
-
-                    switched = true;
-                } else {
-                    warn!("Doesn't have cached chain for {:?}", section_key);
+                        true
+                    }
+                    Err(err) => {
+                        trace!(
+                            "We couldn't find section chain for {:?} and section key {:?}: {:?}",
+                            prefix,
+                            section_key,
+                            err
+                        );
+                        false
+                    }
                 }
-            } else {
+            }
+            Some(_) | None => {
                 trace!(
-                    "Cached sap({:?}) doesn't match key_share {:?}",
-                    provided_sap,
+                    "We yet don't have the signed SAP for {:?} and section key {:?}",
+                    prefix,
                     section_key
                 );
+                false
             }
-        } else {
-            trace!("Doesn't have cached SAP or chain for {:?}", section_key);
         }
-
-        switched
     }
 
+    /// Update our network knowledge if the provided SAP is valid and can be verified
+    /// with the provided proof chain.
+    /// If the 'update_sap' flag is set to 'true', the provided SAP and chain will be
+    /// set as our current.
     pub(super) async fn update_knowledge_if_valid(
         &self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
@@ -247,27 +259,14 @@ impl NetworkKnowledge {
         our_name: &XorName,
         update_sap: bool,
     ) -> Result<bool> {
+        let mut there_was_an_update = false;
         let provided_sap = signed_sap.value.clone();
 
-        // TODO: once we have a proper DAG implementation we won't
-        // need proof chains from genesis but from any other key in the chain
-        if proof_chain.root_key() != self.genesis_key() {
-            println!(
-                "Proof chain's first key is not the genesis key ({:?}): {:?}",
-                self.genesis_key(),
-                proof_chain.root_key()
-            );
-
-            return Ok(false);
-        }
-
-        let mut there_was_an_update = false;
-
-        // 1. Update the network prefix map
+        // Update the network prefix map
         match self.prefix_map.verify_with_chain_and_update(
             signed_sap.clone(),
             proof_chain,
-            &self.chain().await,
+            &self.section_chain().await,
         ) {
             Ok(true) => {
                 there_was_an_update = true;
@@ -276,29 +275,34 @@ impl NetworkKnowledge {
                     provided_sap.prefix()
                 );
 
+                // Join the proof chain to our DAG since it's a new SAP
+                // thus it shall extend some branch/chain.
+                self.all_sections_chains
+                    .write()
+                    .await
+                    .join(proof_chain.clone())?;
+
                 // We try to update our SAP and own chain only if we were flagged to,
                 // otherwise this update could be due to an AE message and we still don't have
                 // the key share for the new SAP, making this node unable to sign section messages
                 // and possibly being kicked out of the group of Elders.
-                if provided_sap.prefix().matches(our_name) {
-                    if update_sap {
-                        let our_prev_prefix = self.prefix().await;
-                        *self.signed_sap.write().await = signed_sap.clone();
-                        *self.chain.write().await = proof_chain.clone();
+                if update_sap && provided_sap.prefix().matches(our_name) {
+                    let our_prev_prefix = self.prefix().await;
+                    *self.signed_sap.write().await = signed_sap.clone();
+                    *self.chain.write().await = self
+                        .all_sections_chains
+                        .read()
+                        .await
+                        .get_proof_chain(&self.genesis_key, &provided_sap.section_key())?;
 
-                        // Remove any peer which doesn't belong to our new section's prefix
-                        self.section_peers.retain(&provided_sap.prefix());
-                        info!(
-                            "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
-                            our_prev_prefix,
-                            provided_sap.prefix(),
-                            provided_sap
-                        );
-                    } else {
-                        trace!("Cache the proof_chain to wait for the keyshare");
-                        *self.cache_chain.write().await = Some(proof_chain.clone());
-                        *self.cache_sap.write().await = Some(signed_sap.clone());
-                    }
+                    // Remove any peer which doesn't belong to our new section's prefix
+                    self.section_peers.retain(&provided_sap.prefix());
+                    info!(
+                        "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
+                        our_prev_prefix,
+                        provided_sap.prefix(),
+                        provided_sap
+                    );
                 }
             }
             Ok(false) => {
@@ -315,11 +319,7 @@ impl NetworkKnowledge {
             }
         }
 
-        // TODO:
-        // 2. Update the chains DAG with provided knowledge so we have all sections chains,
-        // inlcuding our own, to be able to provide proof chains when required, e.g. in AE responses.
-
-        // 3. Update members if changes were provided
+        // Update members if changes were provided
         if let Some(peers) = updated_members {
             if self.merge_members(peers).await? {
                 info!(
@@ -355,15 +355,31 @@ impl NetworkKnowledge {
         self.prefix_map.get(prefix)
     }
 
-    // Get SectionAuthorityProvider of a known section with the given prefix.
+    // Get SectionAuthorityProvider of a known section with the given prefix,
+    // along with its section chain.
     pub(super) async fn get_closest_or_opposite_signed_sap(
         &self,
         name: &XorName,
-    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        self.prefix_map
-            .closest_or_opposite(name, Some(&self.prefix().await))
+    ) -> Option<(SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
+        let closest_sap = self
+            .prefix_map
+            .closest_or_opposite(name, Some(&self.prefix().await));
+
+        if let Some(signed_sap) = closest_sap {
+            if let Ok(proof_chain) = self
+                .all_sections_chains
+                .read()
+                .await
+                .get_proof_chain(&self.genesis_key, &signed_sap.value.section_key())
+            {
+                return Some((signed_sap, proof_chain));
+            }
+        }
+
+        None
     }
 
+    // Return the network genesis key
     pub(super) fn genesis_key(&self) -> &bls::PublicKey {
         &self.genesis_key
     }
@@ -397,9 +413,24 @@ impl NetworkKnowledge {
         self.section_peers.update(node_state)
     }
 
-    /// Return a copy of the section chain
-    pub(super) async fn chain(&self) -> SecuredLinkedList {
+    /// Return a copy of our section chain
+    pub(super) async fn section_chain(&self) -> SecuredLinkedList {
         self.chain.read().await.clone()
+    }
+
+    /// Generate a proof chain from the provided key to our current section key
+    pub(super) async fn get_proof_chain_to_current(
+        &self,
+        from_key: &BlsPublicKey,
+    ) -> Result<SecuredLinkedList> {
+        let our_section_key = self.signed_sap.read().await.section_key();
+        let proof_chain = self
+            .chain
+            .read()
+            .await
+            .get_proof_chain(from_key, &our_section_key)?;
+
+        Ok(proof_chain)
     }
 
     /// Return current section key
@@ -543,7 +574,7 @@ impl NetworkKnowledge {
         let next_bit_index = if let Ok(index) = self.prefix().await.bit_count().try_into() {
             index
         } else {
-            debug!("at longest prefix");
+            error!("We cannot split as we are at longest prefix possible");
             // Already at the longest prefix, can't split further.
             return None;
         };

@@ -98,6 +98,7 @@ impl Session {
                     SystemMsg::AntiEntropyRedirect {
                         section_auth,
                         section_signed,
+                        section_chain,
                         bounced_msg,
                     },
                 ..
@@ -106,6 +107,7 @@ impl Session {
                     session,
                     section_auth.into_state(),
                     section_signed,
+                    section_chain,
                     bounced_msg,
                     src,
                 )
@@ -220,6 +222,7 @@ impl Session {
         session: Session,
         target_section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
+        _section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: SocketAddr,
     ) -> Result<(), Error> {
