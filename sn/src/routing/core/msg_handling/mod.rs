@@ -30,7 +30,7 @@ use crate::routing::{
     network_knowledge::SectionPeers,
     relocation::RelocateState,
     routing_api::command::Command,
-    Error, Event, MessageReceived, Peer, Result, Sender,
+    Error, Event, MessageReceived, Peer, Result, Sender, MIN_LEVEL_WHEN_FULL,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
 use bls::PublicKey as BlsPublicKey;
@@ -504,6 +504,13 @@ impl Core {
             // plugging in msg handlers.
             SystemMsg::NodeCmd(node_cmd) => {
                 match node_cmd {
+                    NodeCmd::RecordStorageLevel { node_id, level, .. } => {
+                        let changed = self.set_storage_level(&node_id, level).await;
+                        if changed && level.value() == MIN_LEVEL_WHEN_FULL {
+                            // ..then we accept a new node in place of the full node
+                            *self.joins_allowed.write().await = true;
+                        }
+                    }
                     NodeCmd::ReceiveExistingData { metadata } => {
                         info!("Processing received DataExchange packet: {:?}", msg_id);
 
