@@ -84,8 +84,6 @@ pub enum Event {
     SectionSplit {
         /// The Elders of our section.
         elders: Elders,
-        /// The Elders of the sibling section.
-        sibling_elders: Elders,
         /// Promoted, demoted or no change?
         self_status_change: NodeElderChange,
     },

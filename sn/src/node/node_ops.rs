@@ -60,10 +60,6 @@ pub enum NodeDuty {
         our_key: PublicKey,
         /// The new Elders of our section.
         our_new_elders: BTreeSet<XorName>,
-        /// The new Elders of our sibling section.
-        their_new_elders: BTreeSet<XorName>,
-        /// The PK of the sibling section, as this event is fired during a split.
-        sibling_key: PublicKey,
         /// oldie or newbie?
         newbie: bool,
     },

@@ -278,36 +278,16 @@ impl Core {
                 NodeElderChange::None
             };
 
-            let sibling_elders = if new.prefix != old.prefix {
-                trace!("{}", LogMarker::NewPrefix);
-
-                self.network_knowledge
-                    .get_sap(&new.prefix.sibling())
-                    .map(|sap| {
-                        let current: BTreeSet<_> = sap.names();
-                        let added = current.difference(&old.elders).copied().collect();
-                        let removed = old.elders.difference(&current).copied().collect();
-                        let remaining = old.elders.intersection(&current).copied().collect();
-                        Elders {
-                            prefix: new.prefix.sibling(),
-                            key: sap.section_key(),
-                            remaining,
-                            added,
-                            removed,
-                        }
-                    })
-            } else {
-                None
-            };
-
-            let event = if let Some(sibling_elders) = sibling_elders {
+            // During the split, sibling's SAP could be unknown to us yet.
+            // Hence, fire the SectionSplit event whenever detect a prefix change.
+            let event = if new.prefix != old.prefix {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
                 // In case of split, send AE-Update to sibling new elder nodes.
+                // TODO: confirm in case of sibling's SAP is missing, how to handle such case.
                 commands.extend(self.send_ae_update_to_sibling_section(&old).await);
 
                 Event::SectionSplit {
                     elders,
-                    sibling_elders,
                     self_status_change,
                 }
             } else {

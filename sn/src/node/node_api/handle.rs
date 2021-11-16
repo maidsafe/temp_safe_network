@@ -105,8 +105,6 @@ impl Node {
                 our_key,
                 our_prefix,
                 our_new_elders,
-                their_new_elders,
-                sibling_key,
                 newbie,
             } => {
                 debug!(
@@ -114,10 +112,7 @@ impl Node {
                     our_prefix,
                     our_prefix.sibling(),
                 );
-                debug!(
-                    "@@@@@@ SPLIT: Our key: {:?}, neighbour: {:?}",
-                    our_key, sibling_key
-                );
+                debug!("@@@@@@ SPLIT: Our key: {:?}", our_key);
                 if newbie {
                     info!("Beginning split as Newbie");
                     self.begin_split_as_newbie(our_key).await?;
@@ -133,7 +128,6 @@ impl Node {
                                 &network,
                                 our_prefix,
                                 our_new_elders,
-                                their_new_elders,
                             )
                             .await?,
                         ))

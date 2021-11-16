@@ -122,6 +122,7 @@ impl NetworkPrefixMap {
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
+    #[allow(unused)]
     pub(crate) fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
         self.sections
             .get(prefix)
