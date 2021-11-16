@@ -21,8 +21,8 @@ use crate::messaging::{
     data::{ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
     system::{NodeCmd, NodeQuery, SystemMsg},
-    DstLocation, EndUser, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
-    ServiceAuth, SrcLocation, WireMsg,
+    DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth, ServiceAuth,
+    WireMsg,
 };
 use crate::routing::{
     log_markers::LogMarker,
@@ -189,6 +189,16 @@ impl Core {
                 msg,
                 dst_location,
             } => {
+                let connection = if let Sender::Connected(connection) = &sender {
+                    connection
+                } else {
+                    error!(
+                        "Service msg has been dropped since sender was not connected (was {:?})",
+                        sender
+                    );
+                    return Ok(vec![]);
+                };
+
                 let dst_name = match msg.dst_address() {
                     Some(name) => name,
                     None => {
@@ -199,19 +209,9 @@ impl Core {
                         return Ok(vec![]);
                     }
                 };
-                let user = match self.comm.get_peer_connection_id(&sender_addr).await {
-                    Some(name) => EndUser(name),
-                    None => {
-                        error!(
-                            "Service msg has been dropped since client connection id for {} was not found: {:?}",
-                            sender_addr, msg
-                        );
-                        return Ok(cmds);
-                    }
-                };
 
-                let sender = Peer::new(user.0, sender_addr);
-                let src_location = SrcLocation::EndUser(user);
+                let src_location = wire_msg.msg_kind().src();
+                let sender = Peer::connected(src_location.name(), connection.clone());
 
                 if self.is_not_elder().await {
                     trace!("Redirecting from adult to section elders");
@@ -249,7 +249,7 @@ impl Core {
                 }
 
                 cmds.extend(
-                    self.handle_service_message(msg_id, auth, msg, dst_location, user)
+                    self.handle_service_message(msg_id, auth, msg, dst_location, sender)
                         .await?,
                 );
 
