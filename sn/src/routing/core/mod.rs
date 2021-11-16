@@ -34,8 +34,7 @@ pub(crate) use register_storage::RegisterStorage;
 
 use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
-use crate::messaging::data::DataExchange;
-use crate::messaging::system::{NodeCmd, SystemMsg};
+use crate::messaging::system::SystemMsg;
 use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
 use crate::routing::{
     dkg::DkgVoter,
@@ -281,6 +280,7 @@ impl Core {
 
             // During the split, sibling's SAP could be unknown to us yet.
             // Hence, fire the SectionSplit event whenever detect a prefix change.
+            // We also need to update other nodes w/ our known data.
             let event = if new.prefix != old.prefix {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
                 // In case of split, send AE-Update to sibling new elder nodes.
@@ -306,6 +306,21 @@ impl Core {
                     self_status_change,
                 }
             };
+
+            commands.extend(
+                self.send_data_updates_to(
+                    self.network_knowledge.prefix().await,
+                    self.network_knowledge
+                        .authority_provider()
+                        .await
+                        .peers()
+                        .into_iter()
+                        .filter(|peer| new.elders.contains(&peer.name()))
+                        .collect(),
+                    old.section_key,
+                )
+                .await?,
+            );
 
             self.send_event(event).await
         }

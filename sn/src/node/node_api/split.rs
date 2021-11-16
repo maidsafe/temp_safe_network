@@ -6,14 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::MessageId;
-use crate::node::{
-    network::Network, node_api::interaction::push_state, node_api::role::ElderRole,
-    node_ops::NodeDuties, Error, Node, Result,
-};
-use crate::routing::{Prefix, XorName};
+use crate::node::{Error, Node, Result};
 use crate::types::PublicKey;
-use std::collections::BTreeSet;
 
 impl Node {
     /// Called on split reported from routing layer.
@@ -27,31 +21,5 @@ impl Node {
         }
 
         self.level_up().await
-    }
-
-    /// Called on split reported from routing layer.
-    pub(crate) async fn begin_split_as_oldie(
-        elder: &ElderRole,
-        network_api: &Network,
-        our_prefix: Prefix,
-        our_new_elders: BTreeSet<XorName>,
-    ) -> Result<NodeDuties> {
-        let mut ops = vec![];
-
-        // replicate state to our neighbour's new elders
-        // TODO: Confirming when sibling's SAP is available, does this need to be carried out.
-        // let sibling_prefix = our_prefix.sibling();
-        // ops.push(push_state(elder, sibling_prefix, MessageId::new(), their_new_elders).await?);
-
-        let our_adults = network_api.our_adults().await;
-        // drop metadata state
-        elder
-            .meta_data
-            .write()
-            .await
-            .retain_members_only(our_adults)
-            .await?;
-
-        Ok(ops)
     }
 }
