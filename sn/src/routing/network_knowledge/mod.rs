@@ -350,6 +350,7 @@ impl NetworkKnowledge {
     }
 
     // Get SectionAuthorityProvider of a known section with the given prefix.
+    #[allow(unused)]
     pub(super) fn get_sap(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
         self.prefix_map.get(prefix)
     }

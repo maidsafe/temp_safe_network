@@ -42,7 +42,6 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
         } => map_node_msg(msg_id, src, dst, *msg),
         RoutingEvent::SectionSplit {
             elders,
-            sibling_elders,
             self_status_change,
         } => {
             let newbie = match self_status_change {
@@ -61,8 +60,6 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
                     our_prefix: elders.prefix,
                     our_key: PublicKey::from(elders.key),
                     our_new_elders: elders.added,
-                    their_new_elders: sibling_elders.added,
-                    sibling_key: PublicKey::from(sibling_elders.key),
                     newbie,
                 },
                 ctx: None,
