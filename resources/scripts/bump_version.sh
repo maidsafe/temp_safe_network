@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 commit_message=""
 sn_version=""
 sn_api_version=""
@@ -65,6 +67,7 @@ function amend_version_bump_commit() {
     git reset --soft HEAD~1
     git add --all
     git commit -m "$commit_message"
+    git --no-pager log
 }
 
 function amend_tags() {
