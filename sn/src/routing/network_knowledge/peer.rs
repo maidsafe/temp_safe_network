@@ -111,6 +111,20 @@ impl Peer {
     }
 }
 
+/// A peer who sent us a message.
+///
+/// When we receive a message, we don't know the identity of the sender, so we cannot represent them
+/// as a [`Peer`]. Contrary to `Peer`, we must have a physical connection to the peer, in order to
+/// have received the message.
+#[derive(Clone, Debug)]
+pub(crate) enum Sender {
+    /// The message was sent from ourself.
+    Ourself,
+
+    /// The message was sent from a connected peer.
+    Connected(SocketAddr),
+}
+
 #[cfg(test)]
 pub(crate) mod test_utils {
     use super::*;

@@ -30,13 +30,13 @@ use crate::routing::{
     network_knowledge::SectionPeers,
     relocation::RelocateState,
     routing_api::command::Command,
-    Error, Event, MessageReceived, Peer, Result,
+    Error, Event, MessageReceived, Peer, Result, Sender,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use rand::rngs::OsRng;
-use std::{collections::BTreeSet, net::SocketAddr};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 // Message handling
@@ -44,12 +44,19 @@ impl Core {
     #[instrument(skip(self, original_bytes))]
     pub(crate) async fn handle_message(
         &self,
-        sender_addr: SocketAddr,
+        sender: Sender,
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
         let mut cmds = vec![];
         trace!("handling msg");
+
+        // TODO: consider whether we should propagate `Sender` instead
+        let sender_addr = match sender {
+            Sender::Ourself => self.node.read().await.addr,
+            Sender::Connected(addr) => addr,
+        };
+
         // Apply backpressure if needed.
         if let Some(load_report) = self.comm.check_strain(sender_addr).await {
             let msg_src = wire_msg.msg_kind().src();
@@ -96,7 +103,7 @@ impl Core {
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
                     warn!(
                         "Untrusted message ({:?}) dropped from {:?}: {:?} ",
-                        msg_id, sender_addr, msg
+                        msg_id, sender, msg
                     );
                     return Ok(cmds);
                 }
@@ -104,7 +111,7 @@ impl Core {
                 trace!(
                     "Trusted msg authority in message ({:?}) from {:?}: {:?}",
                     msg_id,
-                    sender_addr,
+                    sender,
                     msg
                 );
 
