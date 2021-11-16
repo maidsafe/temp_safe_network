@@ -254,8 +254,8 @@ impl Core {
                 return vec![];
             }
 
-            // Using previous_key as dst_section_key as newly promoted sibling elders shall still
-            // in the state of pre-split.
+            // Using previous_key as dst_section_key as newly promoted
+            // sibling elders shall still in the state of pre-split.
             let previous_section_key = old.section_key;
 
             // Compose a min sibling proof_chain.
@@ -271,11 +271,13 @@ impl Core {
                 }
             };
 
-            let _ = proof_chain.insert(
+            if let Err(err) = proof_chain.insert(
                 &previous_section_key,
                 sibling_sap.section_key(),
                 sibling_sap.sig.signature.clone(),
-            );
+            ) {
+                error!("Failed to insert latest SAP to proof chain to send AE-Update to promoted siblings: {:?}", err);
+            }
 
             let dst_name = sibling_sap.prefix().name();
 
