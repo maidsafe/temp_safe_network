@@ -260,62 +260,11 @@ impl Core {
             // sibling elders shall still in the state of pre-split.
             let previous_section_key = old.section_key;
 
-            // Compose a min sibling proof_chain.
-            let mut proof_chain = match self
-                .network_knowledge
-                .get_proof_chain_to_current(&previous_section_key)
-                .await
-            {
-                Ok(chain) => chain,
-                Err(err) => {
-                    error!("Failed to generate proof chain to send AE-Update to promoted siblings: {:?}", err);
-                    return Ok(vec![]);
-                }
-            };
-
-            if let Err(err) = proof_chain.insert(
-                &previous_section_key,
-                sibling_sap.section_key(),
-                sibling_sap.sig.signature.clone(),
-            ) {
-                error!("Failed to insert latest SAP to proof chain to send AE-Update to promoted siblings: {:?}", err);
-            }
-
-            let dst_name = sibling_sap.prefix().name();
-
-            // Those promoted elders shall already know about other adult members.
-            // TODO: confirm no need to populate the members.
-            let node_msg = SystemMsg::AntiEntropyUpdate {
-                section_signed: sibling_sap.sig.clone(),
-                section_auth: sibling_sap.value.clone().into_msg(),
-                proof_chain,
-                members: None,
-            };
-
-            match self
-                .send_direct_message_to_nodes(
-                    promoted_sibling_elders.clone(),
-                    node_msg,
-                    dst_name,
-                    previous_section_key,
-                )
-                .await
-            {
-                Ok(cmd) => commands.push(cmd),
-                Err(err) => {
-                    error!(
-                        "Failed to send AE update to our promoted sibling elders: {:?}",
-                        err
-                    );
-                    return Ok(vec![]);
-                }
-            }
-
             commands.extend(
                 self.send_data_updates_to(
-                    sibling_sec_auth.prefix(),
+                    sibling_sap.prefix(),
                     promoted_sibling_elders,
-                    previous_pk,
+                    previous_section_key,
                 )
                 .await?,
             );

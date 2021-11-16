@@ -283,8 +283,6 @@ impl Core {
             // We also need to update other nodes w/ our known data.
             let event = if new.prefix != old.prefix {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
-                // In case of split, send AE-Update to sibling new elder nodes.
-                // TODO: confirm in case of sibling's SAP is missing, how to handle such case.
                 commands.extend(self.send_updates_to_sibling_section(&old).await?);
                 self.retain_members_only(
                     self.network_knowledge
