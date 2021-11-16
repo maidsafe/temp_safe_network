@@ -73,7 +73,7 @@ impl ConnectedPeers {
         let _existing = self.peers.write().await.remove(&id);
     }
 
-    fn address_to_id(address: &SocketAddr) -> XorName {
+    pub(crate) fn address_to_id(address: &SocketAddr) -> XorName {
         match address.ip() {
             IpAddr::V4(ip) => {
                 XorName::from_content_parts(&[&ip.octets(), &address.port().to_be_bytes()])
@@ -108,10 +108,6 @@ pub(super) struct ConnectedPeer {
 }
 
 impl ConnectedPeer {
-    pub(super) fn id(&self) -> XorName {
-        self.id
-    }
-
     pub(super) fn address(&self) -> SocketAddr {
         self.connection.remote_address()
     }

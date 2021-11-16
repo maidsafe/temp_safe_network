@@ -133,12 +133,6 @@ impl Comm {
         self.endpoint.public_addr()
     }
 
-    /// Get the connection ID (XorName) of an existing connection with the provided socket address
-    pub(crate) async fn get_peer_connection_id(&self, address: &SocketAddr) -> Option<XorName> {
-        let peer = self.connected_peers.get_by_address(address).await?;
-        Some(peer.id())
-    }
-
     /// Get the SocketAddr of a connection using the connection ID (XorName)
     pub(crate) async fn get_peer_address(&self, connection_id: &XorName) -> Option<SocketAddr> {
         let peer = self.connected_peers.get_by_id(connection_id).await?;
@@ -761,7 +755,7 @@ mod tests {
         assert_matches!(node_rx.recv().await, Some(ConnectionEvent::Received(_)));
         assert!(
             node_comm
-                .get_peer_connection_id(&client_addr)
+                .get_peer_address(&ConnectedPeers::address_to_id(&client_addr))
                 .await
                 .is_some(),
             "did not find expected connection"

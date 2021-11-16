@@ -46,7 +46,7 @@ use crate::routing::{
     routing_api::command::Command,
     Elders, Event, NodeElderChange, Peer,
 };
-use crate::types::utils::write_data_to_disk;
+use crate::types::{utils::write_data_to_disk, Cache};
 use backoff::ExponentialBackoff;
 use capacity::Capacity;
 use itertools::Itertools;
@@ -56,6 +56,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     path::PathBuf,
     sync::Arc,
+    time::Duration,
 };
 use tokio::sync::{mpsc, RwLock, Semaphore};
 use uluru::LRUCache;
@@ -66,6 +67,16 @@ pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
 pub(crate) const CONCURRENT_JOINS: usize = 7;
+
+// How long to hold on to correlated `Peer`s for chunk queries. Since chunk queries are forwarded
+// from elders (with whom the client is connected) to adults (who hold the data), the elder handling
+// the query cannot reply immediately. For now, they stash a reference to the client `Peer` in
+// `Core::pending_chunk_queries`, which is a cache with duration-based expiry.
+// TODO: The value chosen here is longer than the default client timeout (see
+// `crate::client::SN_CLIENT_QUERY_TIMEOUT`), but the timeout is configurable. Ideally this would be
+// based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
+// the section).
+const CHUNK_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
 
 // store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
@@ -93,6 +104,7 @@ pub(crate) struct Core {
     root_storage_dir: PathBuf,
     capacity: Capacity,
     liveness: Liveness,
+    pending_chunk_queries: Arc<Cache<XorName, Peer>>,
     ae_backoff_cache: AeBackoffCache,
 }
 
@@ -140,6 +152,7 @@ impl Core {
             capacity,
             liveness: adult_liveness,
             root_storage_dir,
+            pending_chunk_queries: Arc::new(Cache::with_expiry_duration(CHUNK_QUERY_TIMEOUT)),
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }

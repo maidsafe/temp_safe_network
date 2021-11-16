@@ -8,7 +8,7 @@
 
 use super::{capacity::CHUNK_COPY_COUNT, Command, Core, Prefix, Result};
 use crate::routing::log_markers::LogMarker;
-use crate::routing::{error::convert_to_error_message, Error};
+use crate::routing::{error::convert_to_error_message, Error, Peer};
 use crate::types::{Chunk, PublicKey};
 use crate::{
     messaging::{
@@ -76,7 +76,7 @@ impl Core {
         chunk: Chunk,
         msg_id: MessageId,
         auth: AuthorityProof<ServiceAuth>,
-        origin: EndUser,
+        origin: Peer,
     ) -> Result<Vec<Command>> {
         trace!("{:?}: {:?}", LogMarker::ChunkStoreReceivedAtElder, chunk);
 
@@ -85,7 +85,7 @@ impl Core {
         let msg = SystemMsg::NodeCmd(NodeCmd::StoreChunk {
             chunk,
             auth: auth.into_inner(),
-            origin,
+            origin: EndUser(origin.name()),
         });
 
         let targets = self.get_chunk_holder_adults(&target).await;
@@ -107,7 +107,7 @@ impl Core {
         &self,
         error: Error,
         msg_id: MessageId,
-        origin: EndUser,
+        origin: Peer,
     ) -> Result<Vec<Command>> {
         let error = convert_to_error_message(error);
         let error = CmdError::Data(error);
@@ -119,13 +119,14 @@ impl Core {
         &self,
         address: ChunkAddress,
         msg_id: MessageId,
-        origin: EndUser,
+        origin: Peer,
     ) -> Result<Vec<Command>> {
+        let operation_id = operation_id(&address)?;
         trace!(
             "{:?} preparing to query adults for chunk at {:?} with op_id: {:?}",
             LogMarker::ChunkQueryReceviedAtElder,
             address,
-            operation_id(&address)
+            operation_id
         );
 
         let targets = self.get_chunk_holder_adults(address.name()).await;
@@ -143,12 +144,29 @@ impl Core {
         let mut fresh_targets = BTreeSet::new();
         for target in targets {
             self.liveness
-                .add_a_pending_request_operation(target, operation_id(&address)?)
+                .add_a_pending_request_operation(target, operation_id.clone())
                 .await;
             let _existed = fresh_targets.insert(target);
         }
 
-        let msg = SystemMsg::NodeQuery(NodeQuery::GetChunk { address, origin });
+        let correlation_id = XorName::random();
+        let overwrote = self
+            .pending_chunk_queries
+            .set(correlation_id, origin, None)
+            .await;
+        if let Some(overwrote) = overwrote {
+            // Since `XorName` is a 256 bit value, we consider the probability negligible, but warn
+            // anyway so we're not totally lost if it does happen.
+            warn!(
+                "Overwrote an existing pending chunk query for {} from {} - what are the chances?",
+                correlation_id, overwrote
+            );
+        }
+
+        let msg = SystemMsg::NodeQuery(NodeQuery::GetChunk {
+            address,
+            origin: EndUser(correlation_id),
+        });
         let aggregation = false;
 
         self.send_node_msg_to_targets(msg, fresh_targets, aggregation)

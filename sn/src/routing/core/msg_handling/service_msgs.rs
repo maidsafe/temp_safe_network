@@ -15,7 +15,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     core::capacity::CHUNK_COPY_COUNT, error::Result, log_markers::LogMarker,
-    routing_api::command::Command,
+    routing_api::command::Command, Peer,
 };
 use crate::types::{ChunkAddress, PublicKey};
 use itertools::Itertools;
@@ -27,7 +27,7 @@ impl Core {
     pub(crate) fn send_cmd_error_response(
         &self,
         error: CmdError,
-        target: EndUser,
+        target: Peer,
         msg_id: MessageId,
     ) -> Result<Vec<Command>> {
         let the_error_msg = ServiceMsg::CmdError {
@@ -35,7 +35,7 @@ impl Core {
             correlation_id: msg_id,
         };
 
-        let dst = DstLocation::EndUser(target);
+        let dst = DstLocation::EndUser(EndUser(target.name()));
 
         // FIXME: define which signature/authority this message should really carry,
         // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
@@ -43,7 +43,10 @@ impl Core {
         let (msg_kind, payload) = Self::random_client_signature(&the_error_msg)?;
         let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst)?;
 
-        let command = Command::ParseAndSendWireMsg(wire_msg);
+        let command = Command::SendMessage {
+            recipients: vec![target],
+            wire_msg,
+        };
 
         Ok(vec![command])
     }
@@ -53,7 +56,7 @@ impl Core {
         &self,
         msg_id: MessageId,
         register_write: RegisterWrite,
-        user: EndUser,
+        user: Peer,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         trace!(
@@ -82,7 +85,7 @@ impl Core {
         &self,
         msg_id: MessageId,
         query: RegisterRead,
-        user: EndUser,
+        user: Peer,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         trace!(
@@ -113,10 +116,13 @@ impl Core {
                 // Giving a random sig temporarily
                 let (msg_kind, payload) = Self::random_client_signature(&msg)?;
 
-                let dst = DstLocation::EndUser(user);
+                let dst = DstLocation::EndUser(EndUser(user.name()));
                 let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
 
-                let command = Command::ParseAndSendWireMsg(wire_msg);
+                let command = Command::SendMessage {
+                    recipients: vec![user],
+                    wire_msg,
+                };
 
                 Ok(vec![command])
             }
@@ -250,15 +256,28 @@ impl Core {
             correlation_id,
         };
 
+        let origin = if let Some(origin) = self.pending_chunk_queries.get(&user.0).await {
+            origin
+        } else {
+            warn!(
+                "Dropping chunk query response from {} for unknown origin: {}",
+                sending_nodes_pk, user.0
+            );
+            return Ok(commands);
+        };
+
         // FIXME: define which signature/authority this message should really carry,
         // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
         // Giving a random sig temporarily
         let (msg_kind, payload) = Self::random_client_signature(&msg)?;
 
-        let dst = DstLocation::EndUser(user);
+        let dst = DstLocation::EndUser(EndUser(origin.name()));
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
 
-        let command = Command::ParseAndSendWireMsg(wire_msg);
+        let command = Command::SendMessage {
+            recipients: vec![origin],
+            wire_msg,
+        };
         commands.push(command);
         Ok(commands)
     }
@@ -268,7 +287,7 @@ impl Core {
         &self,
         msg_id: MessageId,
         msg: ServiceMsg,
-        user: EndUser,
+        user: Peer,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         match msg {
@@ -346,7 +365,7 @@ impl Core {
         auth: AuthorityProof<ServiceAuth>,
         msg: ServiceMsg,
         dst_location: DstLocation,
-        user: EndUser,
+        user: Peer,
     ) -> Result<Vec<Command>> {
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
         if let DstLocation::EndUser(_) = dst_location {
