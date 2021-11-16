@@ -5,11 +5,8 @@ on:
     branches:
       - main
 
-env:
-  NODE_ENV: 'development'
-
 jobs:
-  update_changelog:
+  bump_version:
     runs-on: ubuntu-20.04
     if: |
       github.repository_owner == 'maidsafe' &&
@@ -30,7 +27,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
       - shell: bash
-        run: cargo install smart-release
+        run: cargo install cargo-smart-release
       - shell: bash
         run: ./resources/scripts/bump_version.sh
       - shell: bash
