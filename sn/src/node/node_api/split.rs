@@ -35,16 +35,16 @@ impl Node {
         network_api: &Network,
         our_prefix: Prefix,
         our_new_elders: BTreeSet<XorName>,
-        their_new_elders: BTreeSet<XorName>,
     ) -> Result<NodeDuties> {
-        let sibling_prefix = our_prefix.sibling();
         let mut ops = vec![];
 
         // replicate state to our new elders
         ops.push(push_state(elder, our_prefix, MessageId::new(), our_new_elders).await?);
 
         // replicate state to our neighbour's new elders
-        ops.push(push_state(elder, sibling_prefix, MessageId::new(), their_new_elders).await?);
+        // TODO: Confirming when sibling's SAP is available, does this need to be carried out.
+        // let sibling_prefix = our_prefix.sibling();
+        // ops.push(push_state(elder, sibling_prefix, MessageId::new(), their_new_elders).await?);
 
         let our_adults = network_api.our_adults().await;
         // drop metadata state

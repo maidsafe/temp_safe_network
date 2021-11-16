@@ -238,12 +238,11 @@ async fn handle_event(index: usize, node: &mut Routing, event: Event) -> bool {
         }
         Event::SectionSplit {
             elders,
-            sibling_elders,
             self_status_change,
         } => {
             info!(
-                "Node #{} section split - elders: {:?}, sibling elders: {:?}, node elder status change: {:?}",
-                index, elders, sibling_elders, self_status_change
+                "Node #{} section split - elders: {:?}, node elder status change: {:?}",
+                index, elders, self_status_change
             );
         }
         Event::EldersChanged {
