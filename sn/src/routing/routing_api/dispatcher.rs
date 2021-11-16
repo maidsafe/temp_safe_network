@@ -8,7 +8,7 @@
 
 use super::{Command, Event};
 use crate::messaging::{
-    data::{ChunkDataExchange, StorageLevel},
+    data::StorageLevel,
     system::{Proposal, SystemMsg},
     DstLocation, EndUser, MsgKind, WireMsg,
 };
@@ -20,7 +20,7 @@ use crate::routing::{
     messages::WireMsgUtils,
     network_knowledge::NetworkKnowledge,
     node::Node,
-    Error, Peer, Prefix, XorName,
+    Error, Peer, XorName,
 };
 use crate::types::PublicKey;
 use itertools::Itertools;
@@ -63,10 +63,6 @@ impl Dispatcher {
 
     pub(super) async fn get_chunk_storage(&self) -> ChunkStore {
         self.core.chunk_storage.clone()
-    }
-
-    pub(super) async fn get_chunk_data_of(&self, prefix: &Prefix) -> ChunkDataExchange {
-        self.core.get_data_of(prefix).await
     }
 
     /// Returns whether the level changed or not.

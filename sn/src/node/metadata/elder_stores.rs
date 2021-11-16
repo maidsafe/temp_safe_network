@@ -8,7 +8,6 @@
 
 use crate::messaging::data::DataExchange;
 use crate::node::{network::Network, Error, Result};
-use crate::routing::Prefix;
 
 /// The various data type stores,
 /// that are only managed at Elders.
@@ -21,19 +20,6 @@ pub(super) struct ElderStores {
 impl ElderStores {
     pub(super) fn new(network: Network) -> Self {
         Self { network }
-    }
-
-    pub(super) async fn get_data_of(&self, prefix: Prefix) -> Result<DataExchange> {
-        // Prepare chunk_records, map and sequence data
-        let chunk_data = self.network.get_chunk_data_of(&prefix).await;
-
-        let register_storage = self.network.get_register_storage().await;
-        let reg_data = register_storage.get_data_of(prefix).await?;
-
-        Ok(DataExchange {
-            chunk_data,
-            reg_data,
-        })
     }
 
     // TODO: This should be moved into routing

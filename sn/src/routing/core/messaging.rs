@@ -345,16 +345,21 @@ impl Core {
         });
 
         match self
-            .send_direct_message_to_nodes(recipients, data_update_msg, prefix.name(), target_pk)
+            .send_direct_message_to_nodes(
+                recipients.clone(),
+                data_update_msg,
+                prefix.name(),
+                target_pk,
+            )
             .await
         {
             Ok(cmd) => Ok(vec![cmd]),
             Err(err) => {
                 error!(
-                    "Failed to send AE update to our promoted sibling elders: {:?}",
-                    err
+                    "Failed to send data updates to: {:?} with {:?}",
+                    recipients, err
                 );
-                return Ok(vec![]);
+                Ok(vec![])
             }
         }
     }
@@ -385,10 +390,7 @@ impl Core {
         {
             Ok(cmd) => vec![cmd],
             Err(err) => {
-                error!(
-                    "Failed to send AE update to our promoted sibling elders: {:?}",
-                    err
-                );
+                error!("Failed to send AE update to our adults: {:?}", err);
                 vec![]
             }
         }

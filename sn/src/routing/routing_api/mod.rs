@@ -222,9 +222,6 @@ impl Routing {
     pub(crate) async fn get_chunk_storage(&self) -> ChunkStore {
         self.dispatcher.get_chunk_storage().await
     }
-    pub(crate) async fn get_chunk_data_of(&self, prefix: &Prefix) -> ChunkDataExchange {
-        self.dispatcher.get_chunk_data_of(prefix).await
-    }
 
     /// Returns whether the level changed or not.
     pub(crate) async fn set_storage_level(

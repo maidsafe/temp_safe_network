@@ -69,10 +69,6 @@ impl Network {
         self.routing.get_chunk_storage().await
     }
 
-    pub(crate) async fn get_chunk_data_of(&self, prefix: &Prefix) -> ChunkDataExchange {
-        self.routing.get_chunk_data_of(prefix).await
-    }
-
     /// Returns whether the level changed or not.
     pub(crate) async fn set_storage_level(&self, node_id: &PublicKey, level: StorageLevel) -> bool {
         self.routing.set_storage_level(node_id, level).await
