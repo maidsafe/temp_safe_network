@@ -59,7 +59,6 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
                 op: NodeDuty::SectionSplit {
                     our_prefix: elders.prefix,
                     our_key: PublicKey::from(elders.key),
-                    our_new_elders: elders.added,
                     newbie,
                 },
                 ctx: None,
