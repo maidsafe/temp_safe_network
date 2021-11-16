@@ -79,4 +79,5 @@ pub enum LogMarker {
     // Connections
     ConnectionOpened,
     ConnectionClosed,
+    ConnectionReused,
 }
