@@ -163,12 +163,19 @@ impl Comm {
             let priority = wire_msg.msg_kind().priority();
             let retries = self.back_pressure.get(&addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-            self.connected_peers
-                .get_by_address(&addr)
-                .map(|res| res.ok_or(None))
-                .and_then(|client| async move {
-                    client
-                        .connection()
+            let connection = if let Some(connection) = recipient.connection() {
+                Ok(connection.clone())
+            } else {
+                self.connected_peers
+                    .get_by_address(&addr)
+                    .map(|res| res.ok_or(None))
+                    .map_ok(|client| client.connection().clone())
+                    .await
+            };
+
+            future::ready(connection)
+                .and_then(|connection| async move {
+                    connection
                         .send_with(bytes, priority, Some(&retries))
                         .await
                         .map_err(Some)
@@ -276,12 +283,22 @@ impl Comm {
 
                 let retries = self.back_pressure.get(&recipient.addr()).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-                let existing_connection =
-                    self.connected_peers.get_by_address(&recipient.addr()).await;
-
-                let (connection, reused) = if let Some(connection) =
-                    (!force_reconnection).then(|| existing_connection).flatten()
+                let (connection, reused) = if let Some(connection) = (!force_reconnection)
+                    .then(|| recipient.connection())
+                    .flatten()
                 {
+                    trace!(
+                        connection_id = connection.id(),
+                        src = %connection.remote_address(),
+                        "{}",
+                        LogMarker::ConnectionReused
+                    );
+                    (Ok(connection.clone()), true)
+                } else if let Some(connection) = {
+                    let existing_connection =
+                        self.connected_peers.get_by_address(&recipient.addr()).await;
+                    (!force_reconnection).then(|| existing_connection).flatten()
+                } {
                     let connection = connection.connection();
                     trace!(
                         connection_id = connection.id(),
