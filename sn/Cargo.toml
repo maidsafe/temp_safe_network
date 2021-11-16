@@ -38,6 +38,7 @@ required-features = ["test-utils"]
 default = []
 always-joinable = []
 chaos = []
+unstable-no-connection-pooling = []
 test-utils = []
 
 [dependencies]

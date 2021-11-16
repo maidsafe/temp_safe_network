@@ -101,6 +101,10 @@ async fn main() -> Result<()> {
             args.push("--features");
             args.push("test-utils");
         }
+        if cfg!(feature = "unstable-no-connection-pooling") {
+            args.push("--features");
+            args.push("unstable-no-connection-pooling");
+        }
 
         info!("Building current sn_node");
         debug!("Building current sn_node with args: {:?}", args);
