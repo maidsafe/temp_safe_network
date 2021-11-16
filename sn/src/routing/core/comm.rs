@@ -282,7 +282,14 @@ impl Comm {
                 let (connection, reused) = if let Some(connection) =
                     (!force_reconnection).then(|| existing_connection).flatten()
                 {
-                    (Ok(connection.connection().clone()), true)
+                    let connection = connection.connection();
+                    trace!(
+                        connection_id = connection.id(),
+                        src = %connection.remote_address(),
+                        "{}",
+                        LogMarker::ConnectionReused
+                    );
+                    (Ok(connection.clone()), true)
                 } else {
                     (
                         self.endpoint
