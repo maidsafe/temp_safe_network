@@ -9,9 +9,10 @@
 use super::Core;
 use super::ProposalUtils;
 use crate::messaging::{
+    data::DataExchange,
     system::{
-        DkgSessionId, JoinResponse, Proposal, RelocateDetails, RelocatePromise, SectionAuth,
-        SystemMsg,
+        DkgSessionId, JoinResponse, NodeCmd, Proposal, RelocateDetails, RelocatePromise,
+        SectionAuth, SystemMsg,
     },
     DstLocation, WireMsg,
 };
@@ -28,7 +29,7 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-use xor_name::XorName;
+use xor_name::{Prefix, XorName};
 
 impl Core {
     // Send proposal to all our elders.
@@ -233,11 +234,12 @@ impl Core {
     }
 
     #[instrument(skip_all)]
-    pub(crate) async fn send_ae_update_to_sibling_section(
+    pub(crate) async fn send_updates_to_sibling_section(
         &self,
         old: &StateSnapshot,
-    ) -> Vec<Command> {
+    ) -> Result<Vec<Command>> {
         debug!("{}", LogMarker::AeSendUpdateToSiblings);
+        let mut commands = vec![];
         if let Some(sibling_sap) = self
             .network_knowledge
             .prefix_map()
@@ -251,7 +253,7 @@ impl Core {
 
             if promoted_sibling_elders.is_empty() {
                 debug!("No promoted siblings found in our network knowledge to send AE-Update");
-                return vec![];
+                return Ok(vec![]);
             }
 
             // Using previous_key as dst_section_key as newly promoted
@@ -267,7 +269,7 @@ impl Core {
                 Ok(chain) => chain,
                 Err(err) => {
                     error!("Failed to generate proof chain to send AE-Update to promoted siblings: {:?}", err);
-                    return vec![];
+                    return Ok(vec![]);
                 }
             };
 
@@ -284,33 +286,76 @@ impl Core {
             // Those promoted elders shall already know about other adult members.
             // TODO: confirm no need to populate the members.
             let node_msg = SystemMsg::AntiEntropyUpdate {
-                section_signed: sibling_sap.sig,
-                section_auth: sibling_sap.value.into_msg(),
+                section_signed: sibling_sap.sig.clone(),
+                section_auth: sibling_sap.value.clone().into_msg(),
                 proof_chain,
                 members: None,
             };
 
             match self
                 .send_direct_message_to_nodes(
-                    promoted_sibling_elders,
+                    promoted_sibling_elders.clone(),
                     node_msg,
                     dst_name,
                     previous_section_key,
                 )
                 .await
             {
-                Ok(cmd) => vec![cmd],
+                Ok(cmd) => commands.push(cmd),
                 Err(err) => {
                     error!(
                         "Failed to send AE update to our promoted sibling elders: {:?}",
                         err
                     );
-                    vec![]
+                    return Ok(vec![]);
                 }
             }
+
+            commands.extend(
+                self.send_data_updates_to(
+                    sibling_sec_auth.prefix(),
+                    promoted_sibling_elders,
+                    previous_pk,
+                )
+                .await?,
+            );
+
+            Ok(commands)
         } else {
             error!("Failed to get sibling SAP during split.");
-            vec![]
+            Ok(vec![])
+        }
+    }
+
+    /// Send DataExchange packet to the target recipients
+    pub(crate) async fn send_data_updates_to(
+        &self,
+        prefix: Prefix,
+        recipients: Vec<Peer>,
+        target_pk: BlsPublicKey,
+    ) -> Result<Vec<Command>> {
+        let chunk_data = self.get_data_of(&prefix).await;
+        let reg_data = self.register_storage.get_data_of(prefix).await?;
+
+        let data_update_msg = SystemMsg::NodeCmd(NodeCmd::ReceiveExistingData {
+            metadata: DataExchange {
+                chunk_data,
+                reg_data,
+            },
+        });
+
+        match self
+            .send_direct_message_to_nodes(recipients, data_update_msg, prefix.name(), target_pk)
+            .await
+        {
+            Ok(cmd) => Ok(vec![cmd]),
+            Err(err) => {
+                error!(
+                    "Failed to send AE update to our promoted sibling elders: {:?}",
+                    err
+                );
+                return Ok(vec![]);
+            }
         }
     }
 
