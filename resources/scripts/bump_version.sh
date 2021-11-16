@@ -22,12 +22,15 @@ function determine_which_crates_have_changes() {
         --no-isolate-dependencies-from-breaking-changes \
         safe_network sn_api 2>&1)
     if [[ $output == *"WOULD auto-bump dependent package 'safe_network'"* ]]; then
+        echo "smart-release identified changes in safe_network"
         safe_network_has_changes=true
     fi
     if [[ $output == *"WOULD auto-bump dependent package 'sn_api'"* ]]; then
+        echo "smart-release identified changes in sn_api"
         sn_api_has_changes=true
     fi
     if [[ $output == *"WOULD auto-bump dependent package 'sn_cli'"* ]]; then
+        echo "smart-release identified changes in sn_cli"
         sn_cli_has_changes=true
     fi
 }
@@ -61,13 +64,13 @@ function generate_new_commit_message() {
         commit_message="${commit_message}sn_cli-${sn_cli_version}/"
     fi
     commit_message=${commit_message::-1} # strip off any trailing '/'
+    echo "generated commit message -- $commit_message"
 }
 
 function amend_version_bump_commit() {
     git reset --soft HEAD~1
     git add --all
     git commit -m "$commit_message"
-    git --no-pager log
 }
 
 function amend_tags() {
@@ -76,6 +79,7 @@ function amend_tags() {
     if [[ $sn_cli_has_changes == true ]]; then git tag "sn_cli-v${sn_cli_version}" -f; fi
 }
 
+git --no-pager tag
 determine_which_crates_have_changes
 generate_version_bump_commit
 generate_new_commit_message
