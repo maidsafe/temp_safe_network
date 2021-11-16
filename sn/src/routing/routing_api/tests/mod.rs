@@ -1530,13 +1530,8 @@ async fn handle_demote_during_split() -> Result<()> {
         }
     }
 
-    if prefix0.matches(&node_name) {
-        // everyone
-        assert_eq!(update_recipients.len(), 14);
-    } else {
-        // our node's whole section plus peer c
-        assert_eq!(update_recipients.len(), 8);
-    }
+    // our node's whole section
+    assert_eq!(update_recipients.len(), 7);
 
     Ok(())
 }
