@@ -195,7 +195,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let commands = get_internal_commands(
         Command::HandleMessage {
-            sender: Sender::Connected(new_node.addr),
+            sender: Sender::Test(new_node.addr),
             wire_msg,
             original_bytes: None,
         },
@@ -304,7 +304,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let inner_commands = get_internal_commands(
         Command::HandleMessage {
-            sender: Sender::Connected(relocated_node.addr),
+            sender: Sender::Test(relocated_node.addr),
             wire_msg,
             original_bytes: None,
         },
@@ -1252,7 +1252,10 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     assert!(commands.is_empty());
 
     let msg_type = assert_matches!(comm_rx.recv().await, Some(ConnectionEvent::Received((sender, bytes))) => {
-        assert_matches!(sender, Sender::Connected(addr) => assert_eq!(addr, node.addr));
+        assert_matches!(
+            sender,
+            Sender::Connected(connection) => assert_eq!(connection.remote_address(), node.addr)
+        );
         assert_matches!(WireMsg::deserialize(bytes), Ok(msg_type) => msg_type)
     });
 

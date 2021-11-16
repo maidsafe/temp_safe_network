@@ -52,9 +52,11 @@ impl Core {
         trace!("handling msg");
 
         // TODO: consider whether we should propagate `Sender` instead
-        let sender_addr = match sender {
+        let sender_addr = match &sender {
             Sender::Ourself => self.node.read().await.addr,
-            Sender::Connected(addr) => addr,
+            Sender::Connected(connection) => connection.remote_address(),
+            #[cfg(test)]
+            Sender::Test(addr) => *addr,
         };
 
         // Apply backpressure if needed.
