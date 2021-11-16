@@ -161,9 +161,26 @@ impl<'a> Join<'a> {
                     section_auth,
                     genesis_key,
                     section_chain,
-                    ..
+                    node_state,
                 } => {
                     trace!("{}", LogMarker::ReceivedJoinApproved);
+                    if node_state.name != self.node.name() {
+                        trace!("Ignore NodeApproval not for us: {:?}", node_state);
+                        continue;
+                    }
+
+                    if !node_state.verify(&section_chain) {
+                        error!(
+                            "Verification of node state in JoinResponse failed: {:?}",
+                            node_state
+                        );
+                        continue;
+                    }
+
+                    trace!(
+                        "This node has been approved to join the network at {:?}!",
+                        section_auth.prefix,
+                    );
 
                     // Building our network knowledge instance will validate SAP and section chain.
                     let network_knowledge = NetworkKnowledge::new(
@@ -260,8 +277,16 @@ impl<'a> Join<'a> {
                         .await?;
                 }
                 JoinResponse::Redirect(section_auth) => {
-                    let section_auth = section_auth.into_state();
+                    if section_auth.elders.is_empty() {
+                        error!(
+                            "Invalid JoinResponse::Redirect, empty list of Elders: {:?}",
+                            section_auth
+                        );
+                        continue;
+                    }
+                    trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
 
+                    let section_auth = section_auth.into_state();
                     if !section_auth.prefix().matches(&self.node.name()) {
                         warn!(
                             "Ignoring newer JoinResponse::Redirect response not for us {:?}, SAP {:?} from {:?}",
@@ -273,7 +298,6 @@ impl<'a> Join<'a> {
                     }
 
                     let new_section_key = section_auth.section_key();
-
                     let new_recipients: Vec<_> = section_auth
                         .peers()
                         .into_iter()
@@ -379,7 +403,7 @@ impl<'a> Join<'a> {
     #[tracing::instrument(skip(self))]
     async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
         while let Some(event) = self.recv_rx.recv().await {
-            // we are interested only in `JoinResponse` type of messages
+            // We are interested only in `JoinResponse` type of messages
             let (join_response, sender) = match event {
                 ConnectionEvent::Received((sender_addr, bytes)) => match WireMsg::from(bytes) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
@@ -425,59 +449,7 @@ impl<'a> Join<'a> {
                 },
             };
 
-            match join_response {
-                JoinResponse::ResourceChallenge { .. }
-                | JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(_))
-                | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
-                    return Ok((join_response, sender));
-                }
-                JoinResponse::Retry {
-                    ref section_auth, ..
-                }
-                | JoinResponse::Redirect(ref section_auth) => {
-                    if section_auth.elders.is_empty() {
-                        error!(
-                            "Invalid JoinResponse::Retry/Redirect, empty list of Elders: {:?}",
-                            join_response
-                        );
-                        continue;
-                    }
-                    trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
-
-                    return Ok((join_response, sender));
-                }
-                JoinResponse::Approval {
-                    ref section_auth,
-                    ref node_state,
-                    ref section_chain,
-                    ..
-                } => {
-                    if node_state.name != self.node.name() {
-                        trace!("Ignore NodeApproval not for us");
-                        continue;
-                    }
-
-                    if !section_auth.verify(section_chain) {
-                        error!(
-                            "Verification of section authority failed: {:?}",
-                            join_response
-                        );
-                        continue;
-                    }
-
-                    if !node_state.verify(section_chain) {
-                        error!("Verification of node state failed: {:?}", join_response);
-                        continue;
-                    }
-
-                    trace!(
-                        "This node has been approved to join the network at {:?}!",
-                        section_auth.prefix,
-                    );
-
-                    return Ok((join_response, sender));
-                }
-            }
+            return Ok((join_response, sender));
         }
 
         error!("NodeMsg sender unexpectedly closed");
