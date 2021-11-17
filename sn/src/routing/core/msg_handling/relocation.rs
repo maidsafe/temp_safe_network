@@ -54,7 +54,7 @@ impl Core {
                 continue;
             }
 
-            let peer = info.to_peer();
+            let peer = info.peer().clone();
 
             debug!(
                 "Relocating {:?} to {} (on churn of {})",
@@ -64,7 +64,7 @@ impl Core {
             );
 
             commands.extend(
-                self.propose(Proposal::Offline(info.relocate(*action.dst()).into_msg()))
+                self.propose(Proposal::Offline(info.relocate(*action.dst()).to_msg()))
                     .await?,
             );
 
@@ -215,9 +215,9 @@ impl Core {
         }
 
         if let Some(info) = self.network_knowledge.members().get(&promise.name) {
-            let peer = info.to_peer();
-            let details = RelocateDetails::new(&self.network_knowledge, &peer, promise.dst).await;
-            commands.extend(self.send_relocate(peer, details).await?);
+            let peer = info.peer();
+            let details = RelocateDetails::new(&self.network_knowledge, peer, promise.dst).await;
+            commands.extend(self.send_relocate(peer.clone(), details).await?);
         } else {
             error!(
                 "ignore returned RelocatePromise from {} - unknown node",

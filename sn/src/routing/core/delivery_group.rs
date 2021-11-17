@@ -159,7 +159,7 @@ async fn candidates(
 // Returns a `Peer` for a known node.
 fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer> {
     match network_knowledge.members().get(name) {
-        Some(info) => Some(info.to_peer()),
+        Some(info) => Some(info.peer().clone()),
         None => network_knowledge
             .section_by_name(name)
             .ok()?
@@ -219,7 +219,7 @@ mod tests {
         let name = ed25519::gen_name_with_age(MIN_ADULT_AGE);
         let dst_name = network_knowledge.prefix().await.substituted_in(name);
         let peer = Peer::new(dst_name, gen_addr());
-        let node_state = NodeState::joined(&peer, None);
+        let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(&sk, node_state)?;
         assert!(network_knowledge.update_member(node_state).await);
 
@@ -574,7 +574,7 @@ mod tests {
         let network_knowledge = NetworkKnowledge::new(genesis_pk, chain, section_auth0, None)?;
 
         for peer in elders0 {
-            let node_state = NodeState::joined(&peer, None);
+            let node_state = NodeState::joined(peer, None);
             let node_state = section_signed(genesis_sk, node_state)?;
             assert!(network_knowledge.update_member(node_state).await);
         }

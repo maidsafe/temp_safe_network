@@ -178,7 +178,7 @@ impl NetworkKnowledge {
         )?;
 
         for peer in network_knowledge.signed_sap.read().await.peers() {
-            let node_state = NodeState::joined(&peer, None);
+            let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
             let _changed = network_knowledge.section_peers.update(SectionAuth {
                 value: node_state,
@@ -532,7 +532,7 @@ impl NetworkKnowledge {
 
         for node_state in self.section_peers.joined() {
             if !self.is_elder(&node_state.name()).await {
-                live_adults.push(node_state.to_peer())
+                live_adults.push(node_state.peer().clone())
             }
         }
         live_adults
@@ -543,7 +543,7 @@ impl NetworkKnowledge {
             .joined()
             .into_iter()
             .find(|info| &info.addr() == addr)
-            .map(|info| info.to_peer())
+            .map(|info| info.peer().clone())
     }
 
     // Tries to split our section.

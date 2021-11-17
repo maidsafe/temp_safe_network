@@ -234,12 +234,12 @@ impl Core {
 
     pub(crate) async fn make_online_proposal(
         &self,
-        peer: &Peer,
+        peer: Peer,
         previous_name: Option<XorName>,
         dst_key: Option<bls::PublicKey>,
     ) -> Result<Vec<Command>> {
         self.propose(Proposal::Online {
-            node_state: NodeState::joined(peer, previous_name).into_msg(),
+            node_state: NodeState::joined(peer, previous_name).to_msg(),
             dst_key,
         })
         .await

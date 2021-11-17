@@ -597,7 +597,7 @@ mod tests {
 
             // Send JoinResponse::Approval
             let section_auth = section_signed(sk, section_auth.clone())?;
-            let node_state = section_signed(sk, NodeState::joined(&peer, None))?;
+            let node_state = section_signed(sk, NodeState::joined(peer, None))?;
             let proof_chain = SecuredLinkedList::new(section_key);
             send_response(
                 &recv_tx,

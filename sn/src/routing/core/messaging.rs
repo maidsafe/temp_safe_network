@@ -154,7 +154,7 @@ impl Core {
         &self,
         node_state: SectionAuth<NodeState>,
     ) -> Vec<Command> {
-        let peer = node_state.to_peer();
+        let peer = node_state.peer().clone();
         info!(
             "Our section with {:?} has approved peer {}.",
             self.network_knowledge.prefix().await,

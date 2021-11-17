@@ -81,7 +81,7 @@ impl SectionPeers {
     pub(crate) fn all_members(&self) -> Vec<Peer> {
         self.joined()
             .into_iter()
-            .map(|info| info.to_peer())
+            .map(|info| info.peer().clone())
             .collect()
     }
 
@@ -104,7 +104,7 @@ impl SectionPeers {
         self.joined()
             .into_iter()
             .filter(|info| info.is_mature())
-            .map(|info| info.to_peer())
+            .map(|info| info.peer().clone())
             .collect()
     }
 
@@ -234,7 +234,7 @@ fn elder_candidates(
     members
         .into_iter()
         .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
-        .map(|auth| auth.to_peer())
+        .map(|auth| auth.peer().clone())
         .take(elder_size)
         .collect()
 }

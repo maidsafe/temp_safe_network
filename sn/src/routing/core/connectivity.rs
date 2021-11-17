@@ -57,7 +57,7 @@ impl Core {
             if let Some(info) = self.network_knowledge.members().get(name) {
                 let info = info.leave()?;
                 if let Ok(commands) = self
-                    .send_proposal(elders.clone(), Proposal::Offline(info.into_msg()))
+                    .send_proposal(elders.clone(), Proposal::Offline(info.to_msg()))
                     .await
                 {
                     result.extend(commands);
