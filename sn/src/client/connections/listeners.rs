@@ -220,71 +220,48 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     async fn handle_ae_redirect_msg(
         session: Session,
-        target_section_auth: SectionAuthorityProvider,
+        target_sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
-        _section_chain: SecuredLinkedList,
+        section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: SocketAddr,
     ) -> Result<(), Error> {
-        // Check if SAP signature is valid
-        if !bincode::serialize(&target_section_auth)
-            .map(|bytes| section_signed.verify(&bytes))
-            .unwrap_or(false)
-        {
-            warn!(
-                "Signature returned with SAP in AE-Redirect response is invalid: {:?}",
-                target_section_auth
-            );
-            return Ok(());
-        }
-
         debug!(
             "Received AE-Redirect for from {}, with SAP: {:?}",
-            sender, target_section_auth
+            sender, target_sap
         );
 
-        if let Some((msg_id, elders, service_msg, mut dst_location, auth)) =
-            Self::new_elder_targets_if_any(
-                session.clone(),
-                bounced_msg.clone(),
-                Some(&target_section_auth),
-            )
-            .await?
+        // Try to update our network knowledge first
+        Self::update_network_knowledge(
+            &session,
+            target_sap.clone(),
+            section_signed,
+            section_chain,
+            sender,
+        )
+        .await;
+
+        if let Some((msg_id, elders, service_msg, dst_location, auth)) =
+            Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), Some(&target_sap))
+                .await?
         {
             if elders.is_empty() {
                 debug!("We have already resent this message on an AE-Redirect response. Dropping this instance");
                 return Ok(());
             }
 
-            let message = WireMsg::serialize_msg_payload(&service_msg)?;
-
-            // We cannot trust these Elders belong to the network we are intended to connect to (based on the genesis key we know).
-            // Here we purposefully try and use the genesis key trigger an AE-Retry and expand our network knowledge.
-
-            // TODO: can we attempt to verify the key against out knowledge? (was it signed by a key we know?)
-            let section_pk = session.genesis_key;
-            debug!("Genesis PK we'll be sending is: {:?}", section_pk);
-
-            dst_location.set_section_pk(section_pk);
-
-            // Let's rebuild the message with the updated destination details
+            let payload = WireMsg::serialize_msg_payload(&service_msg)?;
             let wire_msg = WireMsg::new_msg(
                 msg_id,
-                message,
+                payload,
                 MsgKind::ServiceMsg(auth.into_inner()),
                 dst_location,
             )?;
 
             debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 
-            send_message(
-                session.clone(),
-                elders.clone(),
-                wire_msg,
-                session.endpoint.clone(),
-                msg_id,
-            )
-            .await?;
+            let endpoint = session.endpoint.clone();
+            send_message(session, elders.clone(), wire_msg, endpoint, msg_id).await?;
         }
 
         Ok(())
@@ -294,57 +271,15 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     async fn handle_ae_retry_msg(
         session: Session,
-        section_auth: SectionAuthorityProvider,
+        sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
         bounced_msg: Bytes,
         proof_chain: SecuredLinkedList,
-        src: SocketAddr,
+        sender: SocketAddr,
     ) -> Result<(), Error> {
-        // Update our network knowledge making sure proof chain
-        // validates the new SAP based on currently known remote section SAP.
-        match session.network.update(
-            SectionAuth {
-                value: section_auth.clone(),
-                sig: section_signed,
-            },
-            &proof_chain,
-        ) {
-            Ok(updated) => {
-                if updated {
-                    debug!(
-                        "Anti-Entropy: updated remote section SAP updated for {:?}",
-                        section_auth.prefix()
-                    );
-                    // Update the PrefixMap on disk
-                    if let Err(e) =
-                        write_data_to_disk(&session.network, &session.root_dir.join("prefix_map"))
-                            .await
-                    {
-                        error!(
-                            "Error writing freshly updated PrefixMap to client dir: {:?}",
-                            e
-                        );
-                    }
-                } else {
-                    debug!(
-                            "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                            section_auth.prefix(), section_auth
-                        );
-                }
-            }
-            Err(err) => {
-                warn!(
-                    "Anti-Entropy: failed to update remote section SAP w/ err: {:?}",
-                    err
-                );
-                warn!(
-                    "Anti-Entropy: bounced msg dropped. Failed section auth was {:?} sent by: {:?}",
-                    section_auth.section_key(),
-                    src
-                );
-                return Ok(());
-            }
-        }
+        // Try to update our network knowledge first
+        Self::update_network_knowledge(&session, sap.clone(), section_signed, proof_chain, sender)
+            .await;
 
         // Extract necessary information for resending
         if let Some((msg_id, elders, service_msg, dst_location, auth)) =
@@ -360,7 +295,7 @@ impl Session {
                 }
             }
 
-            debug!("Received AE-Retry with new SAP: {:?}", section_auth);
+            debug!("Received AE-Retry with new SAP: {:?}", sap);
 
             if elders.is_empty() {
                 debug!("We have already responded to this message on an AE-Retry response. Dropping this instance");
@@ -368,7 +303,6 @@ impl Session {
             }
 
             let payload = WireMsg::serialize_msg_payload(&service_msg)?;
-
             let wire_msg = WireMsg::new_msg(
                 msg_id,
                 payload,
@@ -385,7 +319,59 @@ impl Session {
         Ok(())
     }
 
-    /// Checks AE cache to see if we should be forwarding this message (and to whom) or if it has already been dealt with
+    /// Update our network knowledge making sure proof chain validates the
+    /// new SAP based on currently known remote section SAP or genesis key.
+    async fn update_network_knowledge(
+        session: &Session,
+        sap: SectionAuthorityProvider,
+        section_signed: KeyedSig,
+        proof_chain: SecuredLinkedList,
+        sender: SocketAddr,
+    ) {
+        match session.network.update(
+            SectionAuth {
+                value: sap.clone(),
+                sig: section_signed,
+            },
+            &proof_chain,
+        ) {
+            Ok(true) => {
+                debug!(
+                    "Anti-Entropy: updated remote section SAP updated for {:?}",
+                    sap.prefix()
+                );
+                // Update the PrefixMap on disk
+                if let Err(e) =
+                    write_data_to_disk(&session.network, &session.root_dir.join("prefix_map")).await
+                {
+                    error!(
+                        "Error writing freshly updated PrefixMap to client dir: {:?}",
+                        e
+                    );
+                }
+            }
+            Ok(false) => {
+                debug!(
+                    "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                    sap.prefix(), sap
+                );
+            }
+            Err(err) => {
+                warn!(
+                    "Anti-Entropy: failed to update remote section SAP w/ err: {:?}",
+                    err
+                );
+                warn!(
+                    "Anti-Entropy: bounced msg dropped. Failed section auth was {:?} sent by: {:?}",
+                    sap.section_key(),
+                    sender
+                );
+            }
+        }
+    }
+
+    /// Checks AE cache to see if we should be forwarding this message (and to whom)
+    /// or if it has already been dealt with
     #[instrument(skip_all, level = "debug")]
     async fn new_elder_targets_if_any(
         session: Session,

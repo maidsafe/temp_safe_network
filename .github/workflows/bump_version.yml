@@ -1,24 +1,36 @@
-name: Version bump and create PR for changes
+name: version bump
 
 on:
-  # Trigger the workflow on push only for the master branch
   push:
     branches:
-      - master
-
-env:
-  NODE_ENV: 'development'
+      - main
 
 jobs:
-  update_changelog:
+  bump_version:
     runs-on: ubuntu-20.04
-    # Dont run if we're on a release commit
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.head_commit.message, 'chore(release):')
     steps:
       - uses: actions/checkout@v2
         with:
           fetch-depth: '0'
-      - name: Bump Version
-        uses: maidsafe/rust-version-bump-branch-creator@v2
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
         with:
-          token: ${{ secrets.BRANCH_CREATOR_TOKEN }}
+          profile: minimal
+          toolchain: stable
+          override: true
+      - shell: bash
+        run: |
+          git remote add github "$REPO"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      - shell: bash
+        run: cargo install cargo-smart-release --version 0.5.6
+      - shell: bash
+        run: ./resources/scripts/bump_version.sh
+      - shell: bash
+        run: |
+          git push "https://$GITHUB_ACTOR:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY" HEAD:main
+          git push "https://$GITHUB_ACTOR:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY" HEAD:main --tags

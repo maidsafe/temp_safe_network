@@ -57,7 +57,6 @@ pub enum LogMarker {
     // ae
     AeResendAfterRetry,
     AeResendAfterAeRedirect,
-    BounceAfterNewElderNotKnownLocally,
     AeSendRedirect,
     AeSendRetryAsOutdated,
     AeSendRetryDstPkFail,

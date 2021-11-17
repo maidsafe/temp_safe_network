@@ -344,17 +344,6 @@ impl NetworkKnowledge {
         self.prefix_map.section_by_name(name)
     }
 
-    // Returns the section authority provider for the prefix that matches name, excluding self section.
-    pub(super) fn section_by_prefix(&self, prefix: &Prefix) -> Result<SectionAuthorityProvider> {
-        self.prefix_map.section_by_prefix(prefix)
-    }
-
-    // Get SectionAuthorityProvider of a known section with the given prefix.
-    #[allow(unused)]
-    pub(super) fn get_sap(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
-        self.prefix_map.get(prefix)
-    }
-
     // Get SectionAuthorityProvider of a known section with the given prefix,
     // along with its section chain.
     pub(super) async fn get_closest_or_opposite_signed_sap(
