@@ -731,6 +731,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(not(feature = "unstable-no-connection-pooling"))]
     #[tokio::test(flavor = "multi_thread")]
     async fn connected_peers() -> Result<()> {
         let (node_tx, mut node_rx) = mpsc::channel(1);
