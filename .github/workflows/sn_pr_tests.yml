@@ -165,12 +165,6 @@ jobs:
         timeout-minutes: 5
 
       - run: ./target/release/testnet > startup.log
-        if: matrix.os != 'windows-latest'
-        env:
-          NODE_COUNT: 45
-
-      - run: ./target/release/testnet
-        if: matrix.os == 'windows-latest'
         env:
           NODE_COUNT: 45
 
@@ -196,26 +190,15 @@ jobs:
         continue-on-error: true
 
       - name: Kill Section if no split (unix)
-        if: matrix.os != 'windows-latest' && steps.split-check-1.outcome == 'failure'
+        shell: bash
+        if: steps.split-check-1.outcome == 'failure' || steps.split-check-1-win.outcome == 'failure'
         run: |
           killall sn_node
           rm -rf ~/.safe/node
 
-      - name: Kill section if no split (win)
-        if: matrix.os == 'windows-latest' && steps.split-check-1-win.outcome == 'failure'
-        shell: cmd
-        run: |
-          taskkill /IM sn_node.exe /F
-          rd /s /q %USERPROFILE%\.safe\node
-
       - name: Restart Section if no split
-        if: steps.split-check-1.outcome == 'failure'
-        run: ./target/release/testnet > startup.log
-        env:
-          NODE_COUNT: 45
-
-      - name: Restart Section if no split
-        if: steps.split-check-1-win.outcome == 'failure'
+        shell: bash
+        if: steps.split-check-1.outcome == 'failure' || steps.split-check-1-win.outcome == 'failure'
         run: ./target/release/testnet > startup.log
         env:
           NODE_COUNT: 45
@@ -244,35 +227,14 @@ jobs:
         continue-on-error: true
 
       - name: Kill Section if no split (unix)
-        if: matrix.os != 'windows-latest' && steps.split-check-2.outcome == 'failure'
+        if: steps.split-check-2.outcome == 'failure' || steps.split-check-2-win.outcome == 'failure'
         shell: bash
         run: |
           killall sn_node
           rm -rf ~/.safe/node
 
-      - name: Kill Section if no split (win)
-        if: matrix.os == 'windows-latest' && steps.split-check-2.outcome == 'failure'
-        shell: bash
-        run: |
-          killall sn_node.exe
-          rm -rf ~/.safe/node
-
-      # - name: Kill section if no split (win)
-      #   if: matrix.os == 'windows-latest' && steps.split-check-2-win.outcome == 'failure'
-      #   # shell: cmd
-      #   run: |
-      #     taskkill /IM sn_node.exe /F
-      #     rd /s /q %USERPROFILE%\.safe\node
-
       - name: Restart Section if no split
-        if: steps.split-check-2.outcome == 'failure'
-        shell: bash
-        run: ./target/release/testnet > startup.log
-        env:
-          NODE_COUNT: 45
-
-      - name: Restart Section if no split
-        if: steps.split-check-2-win.outcome == 'failure'
+        if: steps.split-check-2.outcome == 'failure' || steps.split-check-2-win.outcome == 'failure'
         shell: bash
         run: ./target/release/testnet > startup.log
         env:
@@ -361,11 +323,13 @@ jobs:
       #   run: ./resources/scripts/has_split.sh
 
       - name: Run sn_api tests
+        shell: bash
         run: ./resources/scripts/api_tests.sh
         timeout-minutes: 20
 
       - name: Are nodes still running...?
-        if: failure() && matrix.os != 'windows-latest'
+        shell: bash
+        if: failure() && matrix.os
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
@@ -378,10 +342,12 @@ jobs:
           ls $HOME/.safe/node/local-test-network
 
       - name: Print Testnet Startup output
+        shell: bash
         run: cat startup.log
         if: failure()
 
       - name: Print Network Log Stats
+        shell: bash
         run: cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
         if: failure()
 
@@ -392,12 +358,3 @@ jobs:
           name: sn_node_logs
           path: $HOME/.safe/node/local-test-network/
         if: failure()
-
-      - name: Upload Node Logs hardcoded path...
-          # Upload artifacts.
-        uses: actions/upload-artifact@v2
-        with:
-          name: sn_node_logs
-          path: /home/runner/.safe/node/local-test-network
-        if: failure()
-
