@@ -8,7 +8,7 @@
 
 use super::Session;
 use crate::client::connections::messaging::NUM_OF_ELDERS_SUBSET_FOR_QUERIES;
-use crate::client::{connections::messaging::send_message, Error};
+use crate::client::{connections::messaging::send_message, Error, Result};
 use crate::messaging::data::DataCmd;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
@@ -52,14 +52,12 @@ impl Session {
                             error!("Error while processing incoming message: {:?}. Listening for next message...", err);
                         }
                     },
-                    Err(Error::Generic(_)) => {
-                        // TODO: FIX error type
+                    Err(_) => {
+                        // TODO: Can we recover here?
                         info!("IncomingMessages listener has closed.");
                         break;
                     }
-                    Err(err) => {
-                        error!("Error while getting incoming message: {:?}. Listening for next message...", err);
-                    }
+
                 }
             }
 
