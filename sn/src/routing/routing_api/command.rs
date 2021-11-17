@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::messaging::system::SectionAuth;
 use crate::messaging::{
     system::{DkgFailureSigSet, KeyedSig, Proposal, SystemMsg},
     DstLocation, MessageId, NodeMsgAuthority, WireMsg,
@@ -13,7 +14,7 @@ use crate::messaging::{
 use crate::routing::{
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
-    Peer, Sender, XorName,
+    NodeState, Peer, Sender, XorName,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -56,6 +57,8 @@ pub(crate) enum Command {
     HandlePeerLost(Peer),
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
+    /// Handle a new Node joining agreement.
+    HandleNewNodeOnline(SectionAuth<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
     HandleElderAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
@@ -122,6 +125,7 @@ impl fmt::Display for Command {
             Command::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
             Command::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Command::HandleElderAgreement { .. } => write!(f, "HandleElderAgreement"),
+            Command::HandleNewNodeOnline { .. } => write!(f, "HandleNewNodeOnline"),
             Command::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Command::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
             Command::SendMessage { wire_msg, .. } => {
