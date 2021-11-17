@@ -500,68 +500,65 @@ impl Core {
                 self.handle_dkg_failure_observation(session_id, &failed_participants, sig)
             }
             // The following type of messages are all handled by upper sn_node layer.
-            // TODO: In the future the sn-node layer won't be receiving Events but just
-            // plugging in msg handlers.
-            SystemMsg::NodeCmd(node_cmd) => {
-                match node_cmd {
-                    NodeCmd::RecordStorageLevel { node_id, level, .. } => {
-                        let changed = self.set_storage_level(&node_id, level).await;
-                        if changed && level.value() == MIN_LEVEL_WHEN_FULL {
-                            // ..then we accept a new node in place of the full node
-                            *self.joins_allowed.write().await = true;
-                        }
-                    }
-                    NodeCmd::ReceiveExistingData { metadata } => {
-                        info!("Processing received DataExchange packet: {:?}", msg_id);
-
-                        self.register_storage.update(metadata.reg_data)?;
-                        self.update_chunks(metadata.chunk_data).await;
-                    }
-                    NodeCmd::StoreChunk { chunk, .. } => {
-                        info!("Processing chunk write with MessageId: {:?}", msg_id);
-                        // There is no point in verifying a sig from a sender A or B here.
-                        let level_report = self.chunk_storage.store(&chunk).await?;
-                        return Ok(self.record_if_any(level_report).await);
-                    }
-                    NodeCmd::ReplicateChunk(chunk) => {
-                        info!(
-                            "Processing replicate chunk cmd with MessageId: {:?}",
-                            msg_id
-                        );
-
-                        return if self.is_elder().await {
-                            self.republish_chunk(chunk).await
-                        } else {
-                            // We are an adult here, so just store away!
-
-                            // TODO: should this be a cmd returned for threading?
-                            let level_report =
-                                self.chunk_storage.store_for_replication(chunk).await?;
-                            Ok(self.record_if_any(level_report).await)
-                        };
-                    }
-                    NodeCmd::RepublishChunk(chunk) => {
-                        info!(
-                            "Republishing chunk {:?} with MessageId {:?}",
-                            chunk.name(),
-                            msg_id
-                        );
-
-                        return self.republish_chunk(chunk).await;
-                    }
-                    _ => {
-                        self.send_event(Event::MessageReceived {
-                            msg_id,
-                            src: msg_authority.src_location(),
-                            dst: dst_location,
-                            msg: Box::new(MessageReceived::NodeCmd(node_cmd)),
-                        })
-                        .await;
-                    }
+            // TODO: In the future the sn-node layer won't be receiving Events
+            SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
+                let changed = self.set_storage_level(&node_id, level).await;
+                if changed && level.value() == MIN_LEVEL_WHEN_FULL {
+                    // ..then we accept a new node in place of the full node
+                    *self.joins_allowed.write().await = true;
                 }
+                Ok(vec![])
+            }
+            SystemMsg::NodeCmd(NodeCmd::ReceiveExistingData { metadata }) => {
+                info!("Processing received DataExchange packet: {:?}", msg_id);
+
+                self.register_storage.update(metadata.reg_data)?;
+                self.update_chunks(metadata.chunk_data).await;
+                Ok(vec![])
+            }
+            SystemMsg::NodeCmd(NodeCmd::StoreChunk { chunk, .. }) => {
+                info!("Processing chunk write with MessageId: {:?}", msg_id);
+                // There is no point in verifying a sig from a sender A or B here.
+                let level_report = self.chunk_storage.store(&chunk).await?;
+                return Ok(self.record_if_any(level_report).await);
+            }
+            SystemMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk)) => {
+                info!(
+                    "Processing replicate chunk cmd with MessageId: {:?}",
+                    msg_id
+                );
+
+                return if self.is_elder().await {
+                    self.republish_chunk(chunk).await
+                } else {
+                    // We are an adult here, so just store away!
+
+                    // TODO: should this be a cmd returned for threading?
+                    let level_report = self.chunk_storage.store_for_replication(chunk).await?;
+                    Ok(self.record_if_any(level_report).await)
+                };
+            }
+            SystemMsg::NodeCmd(NodeCmd::RepublishChunk(chunk)) => {
+                info!(
+                    "Republishing chunk {:?} with MessageId {:?}",
+                    chunk.name(),
+                    msg_id
+                );
+
+                return self.republish_chunk(chunk).await;
+            }
+            SystemMsg::NodeCmd(node_cmd) => {
+                self.send_event(Event::MessageReceived {
+                    msg_id,
+                    src: msg_authority.src_location(),
+                    dst: dst_location,
+                    msg: Box::new(MessageReceived::NodeCmd(node_cmd)),
+                })
+                .await;
 
                 Ok(vec![])
             }
+
             SystemMsg::NodeQuery(node_query) => {
                 match node_query {
                     // A request from EndUser - via elders - for locally stored chunk
