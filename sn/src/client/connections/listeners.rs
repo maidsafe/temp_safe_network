@@ -49,13 +49,26 @@ impl Session {
                     Ok(msg) => match Self::handle_msg(msg, src, session.clone()).await {
                         Ok(()) => {},
                         Err(err) => {
-                            error!("Error while processing incoming message: {:?}. Listening for next message...", err);
+                            error!("Error while handling incoming message: {:?}. Listening for next message...", err);
                         }
                     },
-                    Err(_) => {
-                        // TODO: Can we recover here?
-                        info!("IncomingMessages listener has closed.");
-                        break;
+                    Err(error) => {
+                        match error {
+                            Error::Generic(_) => {
+                                // TODO: Can we recover here?
+                                info!("IncomingMessages listener has closed.");
+                                break;
+                            }
+                            Error::QuicP2p(qp2p_err) => {
+                                  // TODO: Can we recover here?
+                                  info!("Error from Qp2p received, closing listener loop. {:?}", qp2p_err);
+                                  break;
+                            },
+                            error => {
+                                error!("Error while processing incoming message: {:?}. Listening for next message...", error);
+
+                            }
+                        }
                     }
 
                 }
@@ -77,7 +90,7 @@ impl Session {
 
             Ok(msg_type)
         } else {
-            Err(Error::Generic("Nothing..".to_string())) // TODO: FIX error type
+            Err(Error::IncomingMessages)
         }
     }
 
