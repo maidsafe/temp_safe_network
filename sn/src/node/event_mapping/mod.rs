@@ -20,6 +20,7 @@ pub(super) struct Mapping {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(super) enum MsgContext {
     Node {
         msg: MessageReceived,
