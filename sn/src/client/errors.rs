@@ -61,6 +61,9 @@ pub enum Error {
     /// Could not send query to elder.
     #[error("Problem sending query via qp2p")]
     SendingQuery,
+    /// No query response before timeout
+    #[error("Query timed out")]
+    QueryTimedOut,
     /// Could not query elder.
     #[error("Problem receiving query internally in sn_client")]
     QueryReceiverError,
