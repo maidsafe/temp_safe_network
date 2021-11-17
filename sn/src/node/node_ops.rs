@@ -11,8 +11,6 @@ use crate::messaging::{
     system::SystemMsg,
     DstLocation, MessageId,
 };
-use crate::routing::Prefix;
-use crate::types::PublicKey;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -36,14 +34,6 @@ pub(super) type NodeDuties = Vec<NodeDuty>;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum NodeDuty {
-    SectionSplit {
-        /// Our section prefix.
-        our_prefix: Prefix,
-        /// our section public key
-        our_key: PublicKey,
-        /// oldie or newbie?
-        newbie: bool,
-    },
     /// Sets joining allowed to true or false.
     SetNodeJoinsAllowed(bool),
     /// Send a message to the specified dst.

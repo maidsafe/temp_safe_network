@@ -16,7 +16,7 @@ use crate::node::{
     Result,
 };
 use tokio::task::JoinHandle;
-use tracing::{debug, info};
+use tracing::debug;
 
 #[derive(Debug)]
 pub(super) enum NodeTask {
@@ -39,16 +39,6 @@ impl Node {
         }
 
         match duty {
-            NodeDuty::SectionSplit {
-                our_key, newbie, ..
-            } => {
-                if newbie {
-                    info!("Beginning split as Newbie");
-                    self.begin_split_as_newbie(our_key).await?;
-                }
-
-                Ok(NodeTask::None)
-            }
             //
             // ------- Misc ------------
             NodeDuty::Send(msg) => {
