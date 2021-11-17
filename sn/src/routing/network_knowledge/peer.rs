@@ -11,7 +11,9 @@ use std::{
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
     net::SocketAddr,
+    sync::Arc,
 };
+use tokio::sync::RwLock;
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Network peer identity.
@@ -27,7 +29,7 @@ pub struct Peer {
     // An existing connection to the peer. There are no guarantees about the state of the connection
     // except that it once connected to this peer's `addr` (e.g. it may already be closed or
     // otherwise unusable).
-    connection: Option<qp2p::Connection>,
+    connection: Arc<RwLock<Option<qp2p::Connection>>>,
 }
 
 impl Display for Peer {
@@ -77,7 +79,7 @@ impl Peer {
         Self {
             name,
             addr,
-            connection: None,
+            connection: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -86,7 +88,7 @@ impl Peer {
         Self {
             name,
             addr: connection.remote_address(),
-            connection: Some(connection),
+            connection: Arc::new(RwLock::new(Some(connection))),
         }
     }
 
@@ -105,9 +107,18 @@ impl Peer {
         self.name[XOR_NAME_LEN - 1]
     }
 
-    /// Get an existing connection to the peer, if any.
-    pub(crate) fn connection(&self) -> Option<&qp2p::Connection> {
-        self.connection.as_ref()
+    /// Get the existing connection to the peer, if any.
+    pub(crate) async fn connection(&self) -> Option<qp2p::Connection> {
+        self.connection.read().await.as_ref().cloned()
+    }
+
+    /// Set the connection to the peer.
+    ///
+    /// If there's an existing connection, it is overwritten and dropped, so ideally this should
+    /// only be performed if the existing connection is known to be lost (we cannot test that
+    /// without using the connection).
+    pub(crate) async fn set_connection(&self, connection: qp2p::Connection) {
+        let _existing = self.connection.write().await.replace(connection);
     }
 }
 

@@ -156,8 +156,8 @@ impl Comm {
             let priority = wire_msg.msg_kind().priority();
             let retries = self.back_pressure.get(&addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-            let connection = if let Some(connection) = recipient.connection() {
-                Ok(connection.clone())
+            let connection = if let Some(connection) = recipient.connection().await {
+                Ok(connection)
             } else {
                 self.connected_peers
                     .get_by_address(&addr)
@@ -276,17 +276,20 @@ impl Comm {
 
                 let retries = self.back_pressure.get(&recipient.addr()).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-                let (connection, reused) = if let Some(connection) = (!force_reconnection)
-                    .then(|| recipient.connection())
-                    .flatten()
-                {
+                let (connection, reused) = if let Some(connection) = {
+                    if force_reconnection {
+                        None
+                    } else {
+                        recipient.connection().await
+                    }
+                } {
                     trace!(
                         connection_id = connection.id(),
                         src = %connection.remote_address(),
                         "{}",
                         LogMarker::ConnectionReused
                     );
-                    (Ok(connection.clone()), true)
+                    (Ok(connection), true)
                 } else if let Some(connection) = {
                     let existing_connection =
                         self.connected_peers.get_by_address(&recipient.addr()).await;
@@ -305,6 +308,7 @@ impl Comm {
                         self.endpoint
                             .connect_to(&recipient.addr())
                             .and_then(|(connection, connection_incoming)| async move {
+                                recipient.set_connection(connection.clone()).await;
                                 self.connected_peers.insert(connection.clone()).await;
                                 let _ = task::spawn(handle_incoming_messages(
                                     connection.clone(),
