@@ -14,7 +14,6 @@ pub mod config_handler;
 mod error;
 mod event_mapping;
 mod logging;
-mod metadata;
 mod network;
 mod node_api;
 mod node_ops;

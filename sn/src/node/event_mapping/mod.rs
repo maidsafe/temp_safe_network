@@ -8,9 +8,8 @@
 
 use crate::messaging::SrcLocation;
 use crate::node::{network::Network, node_ops::NodeDuty};
-use crate::routing::{Event as RoutingEvent, MessageReceived, NodeElderChange, MIN_AGE};
-use crate::types::PublicKey;
-use tracing::{debug, error, info, trace};
+use crate::routing::{Event as RoutingEvent, MessageReceived, MIN_AGE};
+use tracing::{debug, info, trace};
 
 #[derive(Debug)]
 pub(super) struct Mapping {
@@ -31,31 +30,6 @@ pub(super) enum MsgContext {
 pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
     info!("Handling RoutingEvent: {:?}", event);
     match event {
-        RoutingEvent::SectionSplit {
-            elders,
-            self_status_change,
-        } => {
-            let newbie = match self_status_change {
-                NodeElderChange::None => false,
-                NodeElderChange::Promoted => true,
-                NodeElderChange::Demoted => {
-                    error!("This should be unreachable, as there would be no demotions of Elders during a split.");
-                    return Mapping {
-                        op: NodeDuty::NoOp,
-                        ctx: None,
-                    };
-                }
-            };
-            Mapping {
-                op: NodeDuty::SectionSplit {
-                    our_prefix: elders.prefix,
-                    our_key: PublicKey::from(elders.key),
-                    newbie,
-                },
-                ctx: None,
-            }
-        }
-
         RoutingEvent::MemberJoined { previous_name, .. } => {
             log_network_stats(network_api).await;
             let op = if previous_name.is_some() {

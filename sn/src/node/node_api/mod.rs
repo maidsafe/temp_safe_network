@@ -8,7 +8,6 @@
 
 mod handle;
 mod messaging;
-mod split;
 
 use crate::dbs::UsedSpace;
 

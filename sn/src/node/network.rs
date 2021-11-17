@@ -8,7 +8,7 @@
 
 use crate::dbs::UsedSpace;
 use crate::messaging::{system::SystemMsg, DstLocation, WireMsg};
-use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
+use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Result};
 use crate::routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
 };
@@ -57,17 +57,6 @@ impl Network {
 
     pub(crate) async fn age(&self) -> u8 {
         self.routing.age().await
-    }
-
-    /// Returns public key of our section public key set.
-    pub(crate) async fn section_public_key(&self) -> Result<PublicKey> {
-        Ok(PublicKey::Bls(
-            self.routing
-                .public_key_set()
-                .await
-                .map_err(|_| Error::NoSectionPublicKey)?
-                .public_key(),
-        ))
     }
 
     /// Returns our section's public key.
