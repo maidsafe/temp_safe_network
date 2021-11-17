@@ -23,7 +23,7 @@ use super::Core;
 // Agreement
 impl Core {
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn handle_non_elder_agreement(
+    pub(crate) async fn handle_general_agreements(
         &self,
         proposal: Proposal,
         sig: KeyedSig,
@@ -128,6 +128,7 @@ impl Core {
         Ok(commands)
     }
 
+    #[instrument(skip(self))]
     async fn handle_offline_agreement(
         &self,
         node_state: NodeState,

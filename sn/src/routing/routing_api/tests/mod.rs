@@ -726,6 +726,9 @@ async fn handle_agreement_on_online_of_rejoined_node_with_low_age_after_startup(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
+    crate::init_test_logger();
+    let _span = tracing::info_span!("handle_agreement_on_offline_of_non_elder").entered();
+
     let (section_auth, mut nodes, sk_set) = create_section_auth();
 
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
@@ -736,7 +739,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     let _updated = section.update_member(node_state).await;
 
-    let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let core = Core::new(
@@ -760,10 +763,12 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
-    assert_matches!(event_rx.recv().await, Some(Event::MemberLeft { name, age, }) => {
-        assert_eq!(name, existing_peer.name());
-        assert_eq!(age, MIN_AGE);
-    });
+    assert!(!dispatcher
+        .core
+        .network_knowledge()
+        .members()
+        .all_members()
+        .contains(&existing_peer));
 
     Ok(())
 }
@@ -790,7 +795,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .leave()?;
 
     // Create our node
-    let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
     let node = nodes.remove(0);
     let node_name = node.name();
@@ -856,9 +861,12 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     assert!(dkg_start_sent);
 
-    assert_matches!(event_rx.recv().await, Some(Event::MemberLeft { name, .. }) => {
-        assert_eq!(name, remove_peer.name());
-    });
+    assert!(!dispatcher
+        .core
+        .network_knowledge()
+        .members()
+        .all_members()
+        .contains(&remove_peer));
 
     // The removed peer is still our elder because we haven't yet processed the section update.
     assert!(dispatcher
