@@ -220,7 +220,7 @@ impl Dispatcher {
             }
             Command::HandleTimeout(token) => self.core.handle_timeout(token).await,
             Command::HandleAgreement { proposal, sig } => {
-                self.core.handle_non_elder_agreement(proposal, sig).await
+                self.core.handle_general_agreements(proposal, sig).await
             }
             Command::HandleElderAgreement { proposal, sig } => match proposal {
                 Proposal::OurElders(section_auth) => {
