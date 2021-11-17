@@ -272,7 +272,7 @@ impl Dispatcher {
                 dst_key,
             } => {
                 self.core
-                    .make_online_proposal(&peer, previous_name, dst_key)
+                    .make_online_proposal(peer, previous_name, dst_key)
                     .await
             }
             Command::ProposeOffline(name) => self.core.propose_offline(name).await,

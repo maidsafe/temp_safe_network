@@ -49,11 +49,9 @@ pub(crate) async fn actions(
 
     for node_state in candidates {
         if node_state.age() == max_age {
-            let peer = node_state.to_peer();
-            relocating_nodes.push((
-                node_state,
-                RelocateAction::new(network_knowledge, &peer, churn_name).await,
-            ))
+            let action =
+                RelocateAction::new(network_knowledge, node_state.peer(), churn_name).await;
+            relocating_nodes.push((node_state, action))
         }
     }
 
@@ -316,7 +314,7 @@ mod tests {
         )?;
 
         for peer in &peers {
-            let info = NodeState::joined(peer, None);
+            let info = NodeState::joined(peer.clone(), None);
             let info = section_signed(sk, info)?;
 
             let res = futures::executor::block_on(network_knowledge.update_member(info));

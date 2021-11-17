@@ -84,7 +84,7 @@ impl Core {
                 // having to send this `NodeApproval`.
                 commands.extend(self.send_node_approval(old_info.clone()).await);
 
-                let peer = new_info.to_peer();
+                let peer = new_info.peer().clone();
                 commands.extend(self.relocate_rejoining_peer(peer, new_age).await?);
 
                 return Ok(commands);

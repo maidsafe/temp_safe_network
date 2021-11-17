@@ -9,7 +9,7 @@
 use crate::messaging::system::{MembershipState, NodeState as NodeStateMsg, SectionAuth};
 use crate::routing::{error::Error, Peer};
 use std::net::SocketAddr;
-use xor_name::{XorName, XOR_NAME_LEN};
+use xor_name::XorName;
 
 /// The minimum age a node can have. The Infants will start at age 4. This is to prevent frequent
 /// relocations during the beginning of a node's lifetime.
@@ -26,20 +26,28 @@ pub const FIRST_SECTION_MIN_AGE: u8 = MIN_ADULT_AGE + 1;
 pub const FIRST_SECTION_MAX_AGE: u8 = 100;
 
 /// Information about a member of our section.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct NodeState {
-    name: XorName,
-    addr: SocketAddr,
+    peer: Peer,
     state: MembershipState,
     previous_name: Option<XorName>,
 }
 
+impl serde::Serialize for NodeState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Serialize as a `NodeStateMsg`
+        self.to_msg().serialize(serializer)
+    }
+}
+
 impl NodeState {
     // Creates a `NodeState` in the `Joined` state.
-    pub(crate) fn joined(peer: &Peer, previous_name: Option<XorName>) -> Self {
+    pub(crate) fn joined(peer: Peer, previous_name: Option<XorName>) -> Self {
         Self {
-            name: peer.name(),
-            addr: peer.addr(),
+            peer,
             state: MembershipState::Joined,
             previous_name,
         }
@@ -47,21 +55,24 @@ impl NodeState {
 
     // Creates a `NodeState` in the `Left` state.
     #[cfg(test)]
-    pub(crate) fn left(peer: &Peer, previous_name: Option<XorName>) -> Self {
+    pub(crate) fn left(peer: Peer, previous_name: Option<XorName>) -> Self {
         Self {
-            name: peer.name(),
-            addr: peer.addr(),
+            peer,
             state: MembershipState::Left,
             previous_name,
         }
     }
 
+    pub(crate) fn peer(&self) -> &Peer {
+        &self.peer
+    }
+
     pub(crate) fn name(&self) -> XorName {
-        self.name
+        self.peer.name()
     }
 
     pub(crate) fn addr(&self) -> SocketAddr {
-        self.addr
+        self.peer.addr()
     }
 
     pub(crate) fn state(&self) -> MembershipState {
@@ -73,7 +84,7 @@ impl NodeState {
     }
 
     pub(crate) fn age(&self) -> u8 {
-        self.name[XOR_NAME_LEN - 1]
+        self.peer.age()
     }
 
     // Is the age > `MIN_AGE`?
@@ -100,20 +111,17 @@ impl NodeState {
             ..self
         }
     }
-
-    pub(crate) fn to_peer(&self) -> Peer {
-        Peer::new(self.name, self.addr)
-    }
 }
 
 // Add conversion methods to/from `messaging::...::NodeState`
 // We prefer this over `From<...>` to make it easier to read the conversion.
 
 impl NodeState {
-    pub(crate) fn into_msg(self) -> NodeStateMsg {
+    /// Create a message from the current state.
+    pub(crate) fn to_msg(&self) -> NodeStateMsg {
         NodeStateMsg {
-            name: self.name,
-            addr: self.addr,
+            name: self.name(),
+            addr: self.addr(),
             state: self.state,
             previous_name: self.previous_name,
         }
@@ -123,7 +131,7 @@ impl NodeState {
 impl SectionAuth<NodeState> {
     pub(crate) fn into_authed_msg(self) -> SectionAuth<NodeStateMsg> {
         SectionAuth {
-            value: self.value.into_msg(),
+            value: self.value.to_msg(),
             sig: self.sig,
         }
     }
@@ -132,8 +140,7 @@ impl SectionAuth<NodeState> {
 impl NodeStateMsg {
     pub(crate) fn into_state(self) -> NodeState {
         NodeState {
-            name: self.name,
-            addr: self.addr,
+            peer: Peer::new(self.name, self.addr),
             state: self.state,
             previous_name: self.previous_name,
         }
