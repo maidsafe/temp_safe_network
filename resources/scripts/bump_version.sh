@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-
 commit_message=""
 sn_version=""
 sn_api_version=""
@@ -10,7 +8,8 @@ safe_network_has_changes=false
 sn_api_has_changes=false
 sn_cli_has_changes=false
 
-function determine_which_crates_have_changes() {
+function crate_has_changes() {
+    local crate_name="$1"
     local output
     output=$(cargo smart-release \
         --update-crates-index \
@@ -19,17 +18,20 @@ function determine_which_crates_have_changes() {
         --no-changelog-preview \
         --allow-fully-generated-changelogs \
         --no-changelog-github-release \
+        --no-isolate-dependencies-from-breaking-changes \
         safe_network sn_api 2>&1)
     if [[ $output == *"WOULD auto-bump dependent package 'safe_network'"* ]]; then
         echo "smart-release identified changes in safe_network"
         safe_network_has_changes=true
     fi
-    if [[ $output == *"WOULD auto-bump dependent package 'sn_api'"* ]]; then
-        echo "smart-release identified changes in sn_api"
+    has_changes=$(crate_has_changes "sn_api")
+    if [[ $has_changes == "true" ]]; then
+        echo "smart-release has determined sn_api crate has changes"
         sn_api_has_changes=true
     fi
-    if [[ $output == *"WOULD auto-bump dependent package 'sn_cli'"* ]]; then
-        echo "smart-release identified changes in sn_cli"
+    has_changes=$(crate_has_changes "sn_cli")
+    if [[ $has_changes == "true" ]]; then
+        echo "smart-release has determined sn_cli crate has changes"
         sn_cli_has_changes=true
     fi
 }
@@ -42,6 +44,7 @@ function generate_version_bump_commit() {
         --no-changelog-preview \
         --allow-fully-generated-changelogs \
         --no-changelog-github-release \
+        --no-isolate-dependencies-from-breaking-changes \
         --execute \
         safe_network sn_api
 }
@@ -77,7 +80,6 @@ function amend_tags() {
     if [[ $sn_cli_has_changes == true ]]; then git tag "sn_cli-v${sn_cli_version}" -f; fi
 }
 
-git --no-pager tag
 determine_which_crates_have_changes
 generate_version_bump_commit
 generate_new_commit_message
