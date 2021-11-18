@@ -238,8 +238,13 @@ impl<'a> Join<'a> {
                         }
                     };
 
+
+                    if !is_new_sap {
+                        debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
+                        continue;
+                    }
                     // if it's not a new SAP, ignore response unless the expected age is different.
-                    if self.node.age() != expected_age
+                    else if self.node.age() != expected_age
                         && (self.node.age() > expected_age || self.node.age() == MIN_ADULT_AGE)
                     {
                         // adjust our joining age to the expected by the network
@@ -256,9 +261,6 @@ impl<'a> Join<'a> {
 
                         info!("Setting Node name to {} (age {})", new_name, expected_age);
                         self.node = Node::new(new_keypair, self.node.addr);
-                    } else if !is_new_sap {
-                        debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
-                        continue;
                     }
 
                     info!(
