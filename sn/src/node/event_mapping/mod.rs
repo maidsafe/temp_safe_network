@@ -9,7 +9,7 @@
 use crate::messaging::SrcLocation;
 use crate::node::{network::Network, node_ops::NodeDuty};
 use crate::routing::{Event as RoutingEvent, MessageReceived, MIN_AGE};
-use tracing::{debug, info, trace};
+use tracing::info;
 
 #[derive(Debug)]
 pub(super) struct Mapping {
@@ -30,19 +30,6 @@ pub(super) enum MsgContext {
 pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
     info!("Handling RoutingEvent: {:?}", event);
     match event {
-        RoutingEvent::MemberJoined { previous_name, .. } => {
-            log_network_stats(network_api).await;
-            let op = if previous_name.is_some() {
-                trace!("A relocated node has joined the section.");
-                // Switch joins_allowed off a new adult joining.
-                NodeDuty::SetNodeJoinsAllowed(false)
-            } else if network_api.our_prefix().await.is_empty() {
-                NodeDuty::NoOp
-            } else {
-                NodeDuty::SetNodeJoinsAllowed(false)
-            };
-            Mapping { op, ctx: None }
-        }
         RoutingEvent::Relocated { .. } => {
             // Check our current status
             let age = network_api.age().await;
@@ -60,11 +47,4 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
             ctx: None,
         },
     }
-}
-
-pub(super) async fn log_network_stats(network_api: &Network) {
-    let adults = network_api.our_adults().await.len();
-    let elders = network_api.our_elder_names().await.len();
-    let prefix = network_api.our_prefix().await;
-    debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
 }
