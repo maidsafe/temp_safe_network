@@ -7,9 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod handle;
-mod member_churn;
 mod messaging;
-mod role;
 mod split;
 
 use crate::dbs::UsedSpace;
@@ -30,14 +28,12 @@ use crate::types::PublicKey;
 use futures::{future::BoxFuture, lock::Mutex, stream::FuturesUnordered, FutureExt, StreamExt};
 use handle::NodeTask;
 use rand::rngs::OsRng;
-use role::{AdultRole, Role};
 use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     path::PathBuf,
 };
-use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio::time::Duration;
 use tracing::{error, warn};
@@ -60,7 +56,6 @@ pub struct Node {
     network_api: Network,
     node_info: NodeInfo,
     used_space: UsedSpace,
-    role: Arc<RwLock<Role>>,
 }
 
 impl Node {
@@ -93,9 +88,6 @@ impl Node {
         .map_err(|_| Error::JoinTimeout)??;
 
         let node = Self {
-            role: Arc::new(RwLock::new(Role::Adult(AdultRole {
-                network_api: network_api.clone(),
-            }))),
             node_info,
             used_space,
             network_api: network_api.clone(),

@@ -26,7 +26,7 @@ use self::{
 use crate::dbs::UsedSpace;
 use crate::messaging::{system::SystemMsg, DstLocation, WireMsg};
 use crate::routing::{
-    core::{join_network, ChunkStore, Comm, ConnectionEvent, Core},
+    core::{join_network, Comm, ConnectionEvent, Core},
     ed25519,
     error::{Error, Result},
     log_markers::LogMarker,
@@ -213,10 +213,6 @@ impl Routing {
         let routing = Self { dispatcher };
 
         Ok((routing, event_stream))
-    }
-
-    pub(crate) async fn get_chunk_storage(&self) -> ChunkStore {
-        self.dispatcher.get_chunk_storage().await
     }
 
     /// Sets the JoinsAllowed flag.

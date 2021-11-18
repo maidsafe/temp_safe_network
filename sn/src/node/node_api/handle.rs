@@ -8,7 +8,6 @@
 
 use super::{
     messaging::{send, send_error, send_to_nodes},
-    role::{AdultRole, ElderRole, Role},
     Node,
 };
 use crate::node::{
@@ -16,7 +15,6 @@ use crate::node::{
     node_ops::{NodeDuties, NodeDuty},
     Result,
 };
-use crate::routing::ELDER_SIZE;
 use tokio::task::JoinHandle;
 use tracing::{debug, info};
 
@@ -41,42 +39,6 @@ impl Node {
         }
 
         match duty {
-            NodeDuty::Genesis => {
-                self.level_up().await?;
-                let elder = self.as_elder().await?;
-                *elder.received_initial_sync.write().await = true;
-                Ok(NodeTask::None)
-            }
-            NodeDuty::EldersChanged { newbie, .. } => {
-                if newbie {
-                    info!("Promoted to Elder on Churn");
-                    self.level_up().await?;
-                    if self.network_api.our_prefix().await.is_empty()
-                        && self.network_api.section_chain().await.len() <= ELDER_SIZE
-                    {
-                        let elder = self.as_elder().await?;
-                        *elder.received_initial_sync.write().await = true;
-                    }
-                }
-
-                Ok(NodeTask::None)
-            }
-            NodeDuty::AdultsChanged {
-                added,
-                removed,
-                remaining,
-            } => {
-                let our_name = self.our_name().await;
-                let adult_role = self.as_adult().await?;
-                let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(
-                        adult_role
-                            .reorganize_chunks(our_name, added, removed, remaining)
-                            .await?,
-                    ))
-                });
-                Ok(NodeTask::Thread(handle))
-            }
             NodeDuty::SectionSplit {
                 our_key, newbie, ..
             } => {
@@ -85,14 +47,6 @@ impl Node {
                     self.begin_split_as_newbie(our_key).await?;
                 }
 
-                Ok(NodeTask::None)
-            }
-            //
-            // ---------- Levelling --------------
-            NodeDuty::LevelDown => {
-                *self.role.write().await = Role::Adult(AdultRole {
-                    network_api: self.network_api.clone(),
-                });
                 Ok(NodeTask::None)
             }
             //
@@ -138,15 +92,5 @@ impl Node {
             }
             NodeDuty::NoOp => Ok(NodeTask::None),
         }
-    }
-
-    async fn as_adult(&self) -> Result<AdultRole> {
-        let role = self.role.read().await;
-        Ok(role.as_adult()?.clone())
-    }
-
-    async fn as_elder(&self) -> Result<ElderRole> {
-        let role = self.role.read().await;
-        Ok(role.as_elder()?.clone())
     }
 }

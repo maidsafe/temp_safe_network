@@ -36,23 +36,6 @@ pub(super) type NodeDuties = Vec<NodeDuty>;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum NodeDuty {
-    Genesis,
-    EldersChanged {
-        /// Our section prefix.
-        our_prefix: Prefix,
-        /// The new Elders.
-        new_elders: BTreeSet<XorName>,
-        /// Oldie or newbie?
-        newbie: bool,
-    },
-    AdultsChanged {
-        /// Remaining Adults in our section.
-        remaining: BTreeSet<XorName>,
-        /// New Adults in our section.
-        added: BTreeSet<XorName>,
-        /// Removed Adults in our section.
-        removed: BTreeSet<XorName>,
-    },
     SectionSplit {
         /// Our section prefix.
         our_prefix: Prefix,
@@ -61,8 +44,6 @@ pub enum NodeDuty {
         /// oldie or newbie?
         newbie: bool,
     },
-    /// When demoted, node levels down
-    LevelDown,
     /// Sets joining allowed to true or false.
     SetNodeJoinsAllowed(bool),
     /// Send a message to the specified dst.
