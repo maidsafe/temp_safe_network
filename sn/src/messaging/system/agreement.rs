@@ -101,6 +101,14 @@ pub enum Proposal {
     /// It signals the completion of a DKG by the elder candidates to the current elders.
     /// This proposal is then signed by the newly generated section key.
     SectionInfo(SectionAuthorityProvider),
+    /// Proposal to split a section.
+    ///
+    /// It signals the completion of a DKG by the Elder candidates to the current elders,
+    /// with the two new SAPs the current section shall split to.
+    SplittingSectionInfo {
+        prefix0: SectionAuthorityProvider,
+        prefix1: SectionAuthorityProvider,
+    },
     /// Proposal to change the elders (and possibly the prefix) of our section.
     /// NOTE: the `SectionAuthorityProvider` is already signed with the new key. This proposal is only to signs the
     /// new key with the current key. That way, when it aggregates, we obtain all the following
@@ -112,6 +120,10 @@ pub enum Proposal {
     /// Which we can use to update the section section authority provider and the section chain at
     /// the same time as a single atomic operation without needing to cache anything.
     OurElders(SectionAuth<SectionAuthorityProvider>),
+    SplitSectionElders {
+        prefix0: SectionAuth<SectionAuthorityProvider>,
+        prefix1: SectionAuth<SectionAuthorityProvider>,
+    },
     /// Proposal to change whether new nodes are allowed to join our section.
     JoinsAllowed(bool),
 }

@@ -11,7 +11,7 @@ use crate::routing::{dkg::SigShare, error::Result};
 use serde::{Serialize, Serializer};
 
 pub(crate) trait ProposalUtils {
-    fn prove(
+    fn sign_with_key_share(
         &self,
         public_key_set: bls::PublicKeySet,
         index: usize,
@@ -23,7 +23,7 @@ pub(crate) trait ProposalUtils {
 
 impl ProposalUtils for Proposal {
     /// Create SigShare for this proposal.
-    fn prove(
+    fn sign_with_key_share(
         &self,
         public_key_set: bls::PublicKeySet,
         index: usize,
