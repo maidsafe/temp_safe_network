@@ -35,7 +35,7 @@ use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
-use tracing::{self, error, info};
+use tracing::{self, error, info, trace};
 use tracing_subscriber::filter::EnvFilter;
 const MODULE_NAME: &str = "safe_network";
 
@@ -166,8 +166,9 @@ async fn run_node() -> Result<()> {
         BOOTSTRAP_RETRY_TIME
     );
 
-    let (node, event_stream) = loop {
-        match Node::new(&config).await {
+    let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60);
+    let (node, mut event_stream) = loop {
+        match Node::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
             Err(Error::Routing(routing::Error::CannotConnectEndpoint {
                 err: qp2p::EndpointError::Upnp(error),
@@ -219,7 +220,7 @@ async fn run_node() -> Result<()> {
                 );
             }
         }
-        sleep(Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60)).await;
+        sleep(bootstrap_retry_duration).await;
     };
 
     let our_conn_info = node.our_connection_info().await;
@@ -239,9 +240,10 @@ async fn run_node() -> Result<()> {
             });
     }
 
-    node.run(event_stream)
-        .await
-        .wrap_err("Node failed to start")?;
+    // This just keeps the node going as long as routing goes
+    while let Some(event) = event_stream.next().await {
+        trace!("Routing event! {:?}", event);
+    }
 
     Ok(())
 }
