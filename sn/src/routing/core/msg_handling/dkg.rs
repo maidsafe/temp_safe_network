@@ -173,8 +173,12 @@ impl Core {
             self.update_self_for_new_node_state_and_fire_events(snapshot)
                 .await
         } else {
-            let proposal = Proposal::SectionInfo(sap.into_msg());
-            let recipients: Vec<_> = self.network_knowledge.authority_provider().await.peers();
+            let proposal = Proposal::SectionInfo(sap.to_msg());
+            let recipients: Vec<_> = self
+                .network_knowledge
+                .authority_provider()
+                .await
+                .elders_vec();
             self.send_proposal_with(recipients, proposal, &key_share)
                 .await
         }

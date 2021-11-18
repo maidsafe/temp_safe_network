@@ -184,7 +184,7 @@ impl Core {
         let message = SystemMsg::AntiEntropyProbe(dst);
         let section_key = matching_section.section_key();
         let dst_name = matching_section.prefix().name();
-        let recipients = matching_section.peers();
+        let recipients = matching_section.elders_vec();
 
         info!(
             "ProbeMessage target {:?} w/key {:?}",
@@ -243,8 +243,7 @@ impl Core {
                     self.network_knowledge
                         .authority_provider()
                         .await
-                        .peers()
-                        .iter()
+                        .elders()
                         .format(", ")
                 );
 
@@ -320,7 +319,10 @@ impl Core {
                 commands.extend(
                     self.send_data_updates_to(
                         self.network_knowledge.prefix().await,
-                        self.network_knowledge.authority_provider().await.peers(),
+                        self.network_knowledge
+                            .authority_provider()
+                            .await
+                            .elders_vec(),
                         old.section_key,
                     )
                     .await?,
@@ -338,9 +340,9 @@ impl Core {
                     self.network_knowledge
                         .authority_provider()
                         .await
-                        .peers()
-                        .into_iter()
+                        .elders()
                         .filter(|peer| !old.elders.contains(&peer.name()))
+                        .cloned()
                         .collect(),
                     old.section_key,
                 )

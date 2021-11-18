@@ -494,7 +494,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let section = NetworkKnowledge::new(*chain.root_key(), chain, section_signed_sap, None)?;
     let mut expected_new_elders = BTreeSet::new();
 
-    for peer in section_auth.peers() {
+    for peer in section_auth.elders() {
         let node_state = NodeState::joined(peer.clone(), None);
         let sig = prove(sk_set.secret_key(), &node_state)?;
         let _updated = section
@@ -541,7 +541,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
-    let _changed = expected_new_elders.insert(new_peer);
+    let _changed = expected_new_elders.insert(&new_peer);
 
     for command in commands {
         let (recipients, wire_msg) = match command {
@@ -620,7 +620,7 @@ async fn handle_online_command(
                     ..
                 } = *response
                 {
-                    assert_eq!(section_signed_sap.value, section_auth.clone().into_msg());
+                    assert_eq!(section_signed_sap.value, section_auth.clone().to_msg());
                     assert_eq!(recipients, [peer]);
                     status.node_approval_sent = true;
                 }
@@ -785,7 +785,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let _updated = section.update_member(node_state).await;
 
     // Pick the elder to remove.
-    let auth_peers = section_auth.peers();
+    let auth_peers = section_auth.elders();
     let remove_peer = auth_peers.last().expect("section_auth is empty");
 
     let remove_node_state = section
@@ -842,10 +842,10 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         };
 
         let expected_new_elders: BTreeSet<_> = section_auth
-            .peers()
-            .into_iter()
-            .filter(|peer| peer != remove_peer)
-            .chain(iter::once(existing_peer.clone()))
+            .elders()
+            .filter(|peer| peer != &remove_peer)
+            .chain(iter::once(&existing_peer))
+            .cloned()
             .collect();
         itertools::assert_equal(actual_elder_candidates, expected_new_elders.clone());
 
@@ -932,9 +932,9 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     // Create the new `SectionAuthorityProvider` by replacing the last peer with a new one.
     let new_peer = create_peer(MIN_AGE);
     let new_elders = old_sap
-        .peers()
-        .into_iter()
+        .elders()
         .take(old_sap.elder_count() - 1)
+        .cloned()
         .chain(vec![new_peer]);
 
     let new_sap =
@@ -950,7 +950,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             section_pk: pk1,
         },
         SystemMsg::AntiEntropyUpdate {
-            section_auth: new_sap.into_msg(),
+            section_auth: new_sap.to_msg(),
             members: None,
             section_signed: signed_new_sap.sig,
             proof_chain: chain,
@@ -1011,7 +1011,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     // a valid AE msg but with a non-verifiable SAP...
     let bogus_section_pk = bls::SecretKey::random().public_key();
     let node_msg = SystemMsg::AntiEntropyUpdate {
-        section_auth: section_signed_our_section_auth.value.clone().into_msg(),
+        section_auth: section_signed_our_section_auth.value.clone().to_msg(),
         section_signed: section_signed_our_section_auth.sig,
         proof_chain: SecuredLinkedList::new(bogus_section_pk),
         members: None,
@@ -1128,10 +1128,10 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
     let relocated_peer = match relocated_peer_role {
         RelocatedPeerRole::Elder => section_auth
-            .peers()
-            .into_iter()
+            .elders()
             .nth(1)
-            .expect("too few elders"),
+            .expect("too few elders")
+            .clone(),
         RelocatedPeerRole::NonElder => non_elder_peer,
     };
 
@@ -1598,7 +1598,7 @@ async fn create_section(
         None,
     )?;
 
-    for peer in section_auth.peers() {
+    for peer in section_auth.elders() {
         let node_state = NodeState::joined(peer.clone(), None);
         let node_state = section_signed(sk_set.secret_key(), node_state)?;
         let _updated = section.update_member(node_state).await;

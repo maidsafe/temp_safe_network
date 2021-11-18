@@ -80,7 +80,7 @@ impl Core {
             let retry_sap = self.matching_section(&peer.name()).await?;
 
             let node_msg =
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap.into_msg())));
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap.to_msg())));
 
             trace!("Sending {:?} to {}", node_msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
@@ -148,7 +148,7 @@ impl Core {
                 .await;
 
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                section_auth: signed_sap.value.into_msg(),
+                section_auth: signed_sap.value.to_msg(),
                 section_signed: signed_sap.sig,
                 proof_chain,
                 expected_age,
@@ -223,7 +223,7 @@ impl Core {
                 ))
             } else {
                 SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                    self.network_knowledge.authority_provider().await.into_msg(),
+                    self.network_knowledge.authority_provider().await.to_msg(),
                 )))
             };
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
@@ -250,7 +250,7 @@ impl Core {
 
             let node_msg =
                 SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                    self.network_knowledge.authority_provider().await.into_msg(),
+                    self.network_knowledge.authority_provider().await.to_msg(),
                 )));
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);

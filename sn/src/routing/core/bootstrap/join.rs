@@ -107,7 +107,7 @@ impl<'a> Join<'a> {
         let genesis_key = self.prefix_map.genesis_key();
         let (target_section_key, recipients) =
             if let Ok(sap) = self.prefix_map.section_by_name(&dst_xorname) {
-                (sap.section_key(), sap.peers())
+                (sap.section_key(), sap.elders_vec())
             } else {
                 (genesis_key, vec![Peer::new(dst_xorname, bootstrap_addr)])
             };
@@ -274,7 +274,7 @@ impl<'a> Join<'a> {
                         resource_proof_response: None,
                     };
 
-                    let new_recipients = section_auth.peers();
+                    let new_recipients = section_auth.elders_vec();
                     self.send_join_requests(join_request, &new_recipients, section_key, true)
                         .await?;
                 }
@@ -301,9 +301,9 @@ impl<'a> Join<'a> {
 
                     let new_section_key = section_auth.section_key();
                     let new_recipients: Vec<_> = section_auth
-                        .peers()
-                        .into_iter()
+                        .elders()
                         .filter(|peer| used_recipient_saps.insert((peer.addr(), new_section_key)))
+                        .cloned()
                         .collect();
 
                     if new_recipients.is_empty() {
@@ -572,7 +572,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                    section_auth: section_auth.clone().into_msg(),
+                    section_auth: section_auth.to_msg(),
                     section_signed: signed_sap.sig,
                     proof_chain: section_chain,
                     expected_age: MIN_ADULT_AGE,
@@ -590,7 +590,7 @@ mod tests {
                 (msg, dst_location));
 
             assert_eq!(dst_location.section_pk(), Some(section_key));
-            itertools::assert_equal(recipients, section_auth.peers());
+            itertools::assert_equal(recipients, section_auth.elders());
             assert_matches!(node_msg, SystemMsg::JoinRequest(request) => {
                 assert_eq!(request.section_key, section_key);
             });
@@ -929,7 +929,7 @@ mod tests {
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
                     section_auth: gen_section_authority_provider(bad_prefix, ELDER_SIZE)
                         .0
-                        .into_msg(),
+                        .to_msg(),
                     section_signed: signed_sap.sig.clone(),
                     proof_chain: section_chain.clone(),
                     expected_age: MIN_ADULT_AGE,
@@ -943,7 +943,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                    section_auth: section_auth.into_msg(),
+                    section_auth: section_auth.to_msg(),
                     section_signed: signed_sap.sig,
                     proof_chain: section_chain,
                     expected_age: MIN_ADULT_AGE,

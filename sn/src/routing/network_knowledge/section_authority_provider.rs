@@ -12,21 +12,28 @@ use crate::messaging::{
 };
 use crate::routing::{Peer, Prefix, XorName};
 use bls::{PublicKey, PublicKeySet};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-};
+use std::{collections::BTreeSet, net::SocketAddr};
 
 /// Details of section authority.
 ///
 /// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being
 /// added or removed, or the section splitting or merging.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 // TODO: make pub(crate) - but it's used by routing stress_example atm
 pub struct SectionAuthorityProvider {
     prefix: Prefix,
     public_key_set: PublicKeySet,
-    elders: BTreeMap<XorName, SocketAddr>,
+    elders: BTreeSet<Peer>,
+}
+
+impl serde::Serialize for SectionAuthorityProvider {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Serialize as `SectionAuthorityProviderMsg`
+        self.to_msg().serialize(serializer)
+    }
 }
 
 impl SectionAuthorityProvider {
@@ -35,15 +42,10 @@ impl SectionAuthorityProvider {
     where
         I: IntoIterator<Item = Peer>,
     {
-        let elders = elders
-            .into_iter()
-            .map(|peer| (peer.name(), peer.addr()))
-            .collect();
-
         Self {
             prefix,
             public_key_set: pk_set,
-            elders,
+            elders: elders.into_iter().collect(),
         }
     }
 
@@ -55,10 +57,7 @@ impl SectionAuthorityProvider {
         SectionAuthorityProvider {
             prefix: elder_candidates.prefix(),
             public_key_set: pk_set,
-            elders: elder_candidates
-                .elders()
-                .map(|peer| (peer.name(), peer.addr()))
-                .collect(),
+            elders: elder_candidates.elders().cloned().collect(),
         }
     }
 
@@ -66,20 +65,18 @@ impl SectionAuthorityProvider {
         self.prefix
     }
 
-    pub(crate) fn elders(&self) -> &BTreeMap<XorName, SocketAddr> {
-        &self.elders
+    pub(crate) fn elders(&self) -> impl Iterator<Item = &Peer> + '_ {
+        self.elders.iter()
+    }
+
+    /// A convenience function since we often use SAP elders as recipients.
+    pub(crate) fn elders_vec(&self) -> Vec<Peer> {
+        self.elders.iter().cloned().collect()
     }
 
     /// Returns `ElderCandidates`, which doesn't have key related infos.
     pub(crate) fn elder_candidates(&self) -> ElderCandidates {
-        ElderCandidates::new(self.prefix, self.peers())
-    }
-
-    pub(crate) fn peers(&'_ self) -> Vec<Peer> {
-        self.elders
-            .iter()
-            .map(|(name, addr)| Peer::new(*name, *addr))
-            .collect()
+        ElderCandidates::new(self.prefix, self.elders.iter().cloned())
     }
 
     /// Returns the number of elders in the section.
@@ -89,21 +86,21 @@ impl SectionAuthorityProvider {
 
     /// Returns a map of name to socket_addr.
     pub(crate) fn contains_elder(&self, name: &XorName) -> bool {
-        self.elders.contains_key(name)
+        self.elders.iter().any(|elder| &elder.name() == name)
     }
 
-    /// Returns a socket_addr of an elder.
-    pub(crate) fn get_addr(&self, name: &XorName) -> Option<SocketAddr> {
-        self.elders.get(name).copied()
+    /// Returns the elder `Peer` witht the given `name`.
+    pub(crate) fn get_elder(&self, name: &XorName) -> Option<&Peer> {
+        self.elders.iter().find(|elder| &elder.name() == name)
     }
 
     /// Returns the set of elder names.
     pub(crate) fn names(&self) -> BTreeSet<XorName> {
-        self.elders.keys().copied().collect()
+        self.elders.iter().map(Peer::name).collect()
     }
 
     pub(crate) fn addresses(&self) -> Vec<SocketAddr> {
-        self.elders.values().copied().collect()
+        self.elders.iter().map(Peer::addr).collect()
     }
 
     /// Key of the section.
@@ -117,11 +114,15 @@ impl SectionAuthorityProvider {
 // We prefer this over `From<...>` to make it easier to read the conversion.
 
 impl SectionAuthorityProvider {
-    pub(crate) fn into_msg(self) -> SectionAuthorityProviderMsg {
+    pub(crate) fn to_msg(&self) -> SectionAuthorityProviderMsg {
         SectionAuthorityProviderMsg {
             prefix: self.prefix,
-            public_key_set: self.public_key_set,
-            elders: self.elders,
+            public_key_set: self.public_key_set.clone(),
+            elders: self
+                .elders
+                .iter()
+                .map(|elder| (elder.name(), elder.addr()))
+                .collect(),
         }
     }
 }
@@ -129,7 +130,7 @@ impl SectionAuthorityProvider {
 impl SectionAuth<SectionAuthorityProvider> {
     pub(crate) fn into_authed_msg(self) -> SectionAuth<SectionAuthorityProviderMsg> {
         SectionAuth {
-            value: self.value.into_msg(),
+            value: self.value.to_msg(),
             sig: self.sig,
         }
     }
@@ -140,7 +141,11 @@ impl SectionAuthorityProviderMsg {
         SectionAuthorityProvider {
             prefix: self.prefix,
             public_key_set: self.public_key_set,
-            elders: self.elders,
+            elders: self
+                .elders
+                .into_iter()
+                .map(|(name, value)| Peer::new(name, value))
+                .collect(),
         }
     }
 }

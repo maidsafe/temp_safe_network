@@ -452,13 +452,11 @@ impl Session {
         let mut target_elders: Vec<_> = if let Some(auth) = received_auth {
             target_public_key = auth.section_key();
             auth.elders()
-                .iter()
-                .sorted_by(|(lhs_name, _), (rhs_name, _)| {
-                    dst_address_of_bounced_msg.cmp_distance(lhs_name, rhs_name)
+                .sorted_by(|lhs, rhs| {
+                    dst_address_of_bounced_msg.cmp_distance(&lhs.name(), &rhs.name())
                 })
-                .map(|(_, addr)| addr)
+                .map(|elder| elder.addr())
                 .take(target_count)
-                .copied()
                 .collect()
         } else {
             // we use whatever is our latest knowledge at this point
@@ -469,7 +467,10 @@ impl Session {
             {
                 target_public_key = sap.section_key();
 
-                sap.elders().values().copied().take(target_count).collect()
+                sap.elders()
+                    .map(|elder| elder.addr())
+                    .take(target_count)
+                    .collect()
             } else {
                 error!("Cannot resend {:?}, no 'received auth' provided, and nothing relevant in session network prefixmap", msg_id);
                 return Ok(None);

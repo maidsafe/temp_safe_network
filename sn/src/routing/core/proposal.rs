@@ -70,7 +70,7 @@ mod tests {
         // Proposal::SectionInfo
         let (section_auth, _, _) =
             network_knowledge::test_utils::gen_section_authority_provider(Prefix::default(), 4);
-        let proposal = Proposal::SectionInfo(section_auth.clone().into_msg());
+        let proposal = Proposal::SectionInfo(section_auth.to_msg());
         verify_serialize_for_signing(&proposal, &section_auth)?;
 
         // Proposal::OurElders

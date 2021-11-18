@@ -314,7 +314,7 @@ impl Routing {
             .network_knowledge()
             .authority_provider()
             .await
-            .peers()
+            .elders_vec()
     }
 
     /// Returns the elders of our section sorted by their distance to `name` (closest first).

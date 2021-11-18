@@ -34,7 +34,11 @@ use xor_name::{Prefix, XorName};
 impl Core {
     // Send proposal to all our elders.
     pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
-        let elders: Vec<_> = self.network_knowledge.authority_provider().await.peers();
+        let elders = self
+            .network_knowledge
+            .authority_provider()
+            .await
+            .elders_vec();
         self.send_proposal(elders, proposal).await
     }
 
@@ -142,7 +146,7 @@ impl Core {
         };
 
         Ok(SystemMsg::AntiEntropyUpdate {
-            section_auth: sap.into_msg(),
+            section_auth: sap.to_msg(),
             section_signed,
             proof_chain,
             members,
@@ -246,9 +250,9 @@ impl Core {
             .get_signed(&self.network_knowledge.prefix().await.sibling())
         {
             let promoted_sibling_elders: Vec<_> = sibling_sap
-                .peers()
-                .into_iter()
+                .elders()
                 .filter(|peer| !old.elders.contains(&peer.name()))
+                .cloned()
                 .collect();
 
             if promoted_sibling_elders.is_empty() {
@@ -566,7 +570,11 @@ impl Core {
     // TODO: consider changing this so it sends only to a subset of the elders
     // (say 1/3 of the ones closest to our name or so)
     pub(crate) async fn send_message_to_our_elders(&self, node_msg: SystemMsg) -> Result<Command> {
-        let targets: Vec<_> = self.network_knowledge.authority_provider().await.peers();
+        let targets = self
+            .network_knowledge
+            .authority_provider()
+            .await
+            .elders_vec();
 
         let dst_section_pk = self.network_knowledge.section_key().await;
         let cmd = self
