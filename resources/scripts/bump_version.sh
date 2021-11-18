@@ -51,7 +51,14 @@ function generate_version_bump_commit() {
     if [[ $safe_network_has_changes ]]; then run_process="${run_process} safe_network "; fi
     if [[ $sn_api_has_changes ]]; then run_process="${run_process} sn_api "; fi
     if [[ $sn_cli_has_changes ]]; then run_process="${run_process} sn_cli "; fi
+    echo "Will run smart-release with the following command: "
+    echo "$run_process"
     eval $run_process
+    exit_code=$?
+    if [[ $exit_code -ne 0 ]]; then
+        echo "smart-release did not run successfully. Exiting with failure code."
+        exit 1
+    fi
 }
 
 function generate_new_commit_message() {
