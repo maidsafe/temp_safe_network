@@ -54,8 +54,7 @@ impl Session {
                     },
                     Err(error) => {
                         match error {
-                            Error::Generic(_) => {
-                                // TODO: Can we recover here?
+                            Error::IncomingMessages => {
                                 info!("IncomingMessages listener has closed.");
                                 break;
                             }
