@@ -15,7 +15,7 @@ use crate::routing::{
     log_markers::LogMarker,
     network_knowledge::{NodeState, SectionAuthorityProvider},
     routing_api::command::Command,
-    MIN_AGE,
+    Event, MIN_AGE,
 };
 
 use super::Core;
@@ -102,6 +102,15 @@ impl Core {
         }
 
         info!("handle Online: {} at {}", new_info.name(), new_info.addr());
+
+        // still used for testing
+        self.send_event(Event::MemberJoined {
+            name: new_info.name(),
+            previous_name: new_info.previous_name(),
+            age: new_info.age(),
+        })
+        .await;
+
         self.log_network_stats().await;
 
         if new_info.previous_name().is_some() {
