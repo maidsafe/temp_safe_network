@@ -27,7 +27,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
       - shell: bash
-        run: cargo install cargo-smart-release --version 0.5.6
+        run: cargo install cargo-smart-release
       - shell: bash
         run: ./resources/scripts/bump_version.sh
       - shell: bash

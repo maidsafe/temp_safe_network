@@ -19,7 +19,6 @@ function determine_which_crates_have_changes() {
         --no-changelog-preview \
         --allow-fully-generated-changelogs \
         --no-changelog-github-release \
-        --no-isolate-dependencies-from-breaking-changes \
         safe_network sn_api 2>&1)
     if [[ $output == *"WOULD auto-bump dependent package 'safe_network'"* ]]; then
         echo "smart-release identified changes in safe_network"
@@ -43,7 +42,6 @@ function generate_version_bump_commit() {
         --no-changelog-preview \
         --allow-fully-generated-changelogs \
         --no-changelog-github-release \
-        --no-isolate-dependencies-from-breaking-changes \
         --execute \
         safe_network sn_api
 }
