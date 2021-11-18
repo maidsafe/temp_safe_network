@@ -296,6 +296,11 @@ impl Core {
             // We also need to update other nodes w/ our known data.
             let event = if (new.prefix != old.prefix) && new.is_elder {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
+
+                if old.is_elder {
+                    info!("{}: {:?}", LogMarker::StillElderAfterAplit, new.prefix);
+                }
+
                 commands.extend(self.send_updates_to_sibling_section(&old).await?);
                 self.retain_members_only(
                     self.network_knowledge
