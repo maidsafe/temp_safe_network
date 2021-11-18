@@ -888,6 +888,9 @@ enum UntrustedMessageSource {
 #[tokio::test(flavor = "multi_thread")]
 // Checking when we get AE info that is ahead of us we should handle it.
 async fn ae_msg_from_the_future_is_handled() -> Result<()> {
+    crate::init_test_logger();
+    let _span = info_span!("ae_msg_from_the_future_is_handled").entered();
+
     // Create first `Section` with a chain of length 2
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
