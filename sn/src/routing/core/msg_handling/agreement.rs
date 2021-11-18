@@ -200,13 +200,13 @@ impl Core {
                 section_auth.prefix()
             );
 
-            let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
+            let signed_sap = SectionAuth::new(section_auth, sig.clone());
             let saps_candidates = self
                 .network_knowledge
                 .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
                 .await;
 
-            if !saps_candidates.contains(&signed_section_auth.elder_candidates()) {
+            if !saps_candidates.contains(&signed_sap.elder_candidates()) {
                 // SectionInfo out of date, ignore.
                 return Ok(vec![]);
             }
@@ -220,7 +220,7 @@ impl Core {
 
             self.send_proposal(
                 proposal_recipients,
-                Proposal::OurElders(signed_section_auth.into_authed_msg()),
+                Proposal::OurElders(signed_sap.into_authed_msg()),
             )
             .await
         } else {
@@ -237,70 +237,59 @@ impl Core {
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_our_elders_agreement(
         &self,
-        signed_section_auth: SectionAuth<SectionAuthorityProvider>,
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         trace!("{}", LogMarker::HandlingElderAgreement);
-        let updates = self.split_barrier.write().await.process(
-            &self.network_knowledge.prefix().await,
-            signed_section_auth.clone(),
-            key_sig,
-        );
-
-        if updates.is_empty() {
-            return Ok(vec![]);
-        }
 
         let snapshot = self.state_snapshot().await;
         let old_chain = self.section_chain().await.clone();
 
-        for (signed_sap, key_sig) in updates {
-            let prefix = signed_sap.prefix();
-            trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
+        let prefix = signed_sap.prefix();
+        trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
 
-            info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
+        info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
-            // If we have the key share for new SAP key we can switch to this new SAP
-            let switch_to_new_sap = (self.is_not_elder().await
-                && !signed_sap.contains_elder(&self.node.read().await.name()))
-                || self
-                    .section_keys_provider
-                    .key_share(&signed_sap.section_key())
-                    .await
-                    .is_ok();
+        // If we have the key share for new SAP key we can switch to this new SAP
+        let switch_to_new_sap = (self.is_not_elder().await
+            && !signed_sap.contains_elder(&self.node.read().await.name()))
+            || self
+                .section_keys_provider
+                .key_share(&signed_sap.section_key())
+                .await
+                .is_ok();
 
-            // Let's update our network knowledge, including our
-            // section SAP and chain if the new SAP's prefix matches our name
-            // We need to generate the proof chain to connect our current chain to new SAP.
-            let mut proof_chain = old_chain.clone();
-            match proof_chain.insert(
-                old_chain.last_key(),
-                signed_sap.section_key(),
-                key_sig.signature,
-            ) {
-                Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
-                Ok(()) => match self
-                    .network_knowledge
-                    .update_knowledge_if_valid(
-                        signed_sap,
-                        &proof_chain,
-                        None,
-                        &self.node.read().await.name(),
-                        switch_to_new_sap,
-                    )
-                    .await
-                {
-                    Err(err) => error!(
-                        "Error updating our network knowledge for {:?}: {:?}",
-                        prefix, err
-                    ),
-                    Ok(true) => {
-                        info!("Updated our network knowledge for {:?}", prefix);
-                        self.write_prefix_map().await
-                    }
-                    _ => {}
-                },
-            }
+        // Let's update our network knowledge, including our
+        // section SAP and chain if the new SAP's prefix matches our name
+        // We need to generate the proof chain to connect our current chain to new SAP.
+        let mut proof_chain = old_chain.clone();
+        match proof_chain.insert(
+            old_chain.last_key(),
+            signed_sap.section_key(),
+            key_sig.signature,
+        ) {
+            Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
+            Ok(()) => match self
+                .network_knowledge
+                .update_knowledge_if_valid(
+                    signed_sap,
+                    &proof_chain,
+                    None,
+                    &self.node.read().await.name(),
+                    switch_to_new_sap,
+                )
+                .await
+            {
+                Err(err) => error!(
+                    "Error updating our network knowledge for {:?}: {:?}",
+                    prefix, err
+                ),
+                Ok(true) => {
+                    info!("Updated our network knowledge for {:?}", prefix);
+                    self.write_prefix_map().await
+                }
+                _ => {}
+            },
         }
 
         info!(

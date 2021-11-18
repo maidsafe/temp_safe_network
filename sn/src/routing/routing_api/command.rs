@@ -115,8 +115,8 @@ impl fmt::Display for Command {
         match self {
             Command::HandleTimeout(_) => write!(f, "HandleTimeout"),
             Command::ScheduleTimeout { .. } => write!(f, "ScheduleTimeout"),
-            Command::HandleSystemMessage { msg_id, .. } => {
-                write!(f, "HandleSystemMessage {:?}", msg_id)
+            Command::HandleSystemMessage { msg_id, msg, .. } => {
+                write!(f, "HandleSystemMessage {:?} {:?}", msg_id, msg)
             }
             Command::HandleMessage { wire_msg, .. } => {
                 write!(f, "HandleMessage {:?}", wire_msg.msg_id())

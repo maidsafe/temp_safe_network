@@ -22,7 +22,6 @@ mod msg_count;
 mod msg_handling;
 mod proposal;
 mod register_storage;
-mod split_barrier;
 
 pub(crate) use back_pressure::BackPressure;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
@@ -32,7 +31,6 @@ pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub(crate) use proposal::ProposalUtils;
 pub(crate) use register_storage::RegisterStorage;
 
-use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
 use crate::messaging::system::SystemMsg;
 use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
@@ -90,7 +88,6 @@ pub(crate) struct Core {
     pub(crate) section_keys_provider: SectionKeysProvider,
     message_aggregator: SignatureAggregator,
     proposal_aggregator: SignatureAggregator,
-    split_barrier: Arc<RwLock<SplitBarrier>>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
     relocate_state: Arc<RwLock<Option<RelocateState>>>,
@@ -138,7 +135,6 @@ impl Core {
             network_knowledge,
             section_keys_provider,
             proposal_aggregator: SignatureAggregator::default(),
-            split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
             relocate_state: Arc::new(RwLock::new(None)),
