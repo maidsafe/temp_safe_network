@@ -178,7 +178,7 @@ impl<'a> Join<'a> {
                     }
 
                     trace!(
-                        "This node has been approved to join the network at {:?}!",
+                        ">>>>> 100 >>>>> This node has been approved to join the network at {:?}!",
                         section_auth.prefix,
                     );
 
@@ -213,7 +213,7 @@ impl<'a> Join<'a> {
                     let prefix = section_auth.prefix();
                     if !prefix.matches(&self.node.name()) {
                         warn!(
-                            "Ignoring newer JoinResponse::Retry response not for us {:?}, SAP {:?} from {:?}",
+                            ">>>>> 1.1 >>>>> Ignoring newer JoinResponse::Retry response not for us {:?}, SAP {:?} from {:?}",
                             self.node.name(),
                             section_auth,
                             sender,
@@ -231,7 +231,7 @@ impl<'a> Join<'a> {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!(
-                                "Ignoring JoinResponse::Retry with an invalid SAP: {:?}",
+                                ">>>>> 1.3 >>>>> Ignoring JoinResponse::Retry with an invalid SAP: {:?}",
                                 err
                             );
                             continue;
@@ -262,7 +262,7 @@ impl<'a> Join<'a> {
                     }
 
                     info!(
-                        "Newer Join response for us {:?}, SAP {:?} from {:?}",
+                        ">>>>> 1.5 >>>>> Newer Join response for us {:?}, SAP {:?} from {:?}",
                         self.node.name(),
                         section_auth,
                         sender
@@ -282,7 +282,7 @@ impl<'a> Join<'a> {
                     trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
                     if section_auth.elders.is_empty() {
                         error!(
-                            "Invalid JoinResponse::Redirect, empty list of Elders: {:?}",
+                            ">>>>> 2.1 >>>>> Invalid JoinResponse::Redirect, empty list of Elders: {:?}",
                             section_auth
                         );
                         continue;
@@ -291,7 +291,7 @@ impl<'a> Join<'a> {
                     let section_auth = section_auth.into_state();
                     if !section_auth.prefix().matches(&self.node.name()) {
                         warn!(
-                            "Ignoring newer JoinResponse::Redirect response not for us {:?}, SAP {:?} from {:?}",
+                            ">>>>> 2.2 >>>>> Ignoring newer JoinResponse::Redirect response not for us {:?}, SAP {:?} from {:?}",
                             self.node.name(),
                             section_auth,
                             sender,
@@ -308,14 +308,14 @@ impl<'a> Join<'a> {
 
                     if new_recipients.is_empty() {
                         debug!(
-                            "Ignoring JoinResponse::Redirect with old SAP that has been sent to: {:?}",
+                            ">>>>> 2.3 >>>>> Ignoring JoinResponse::Redirect with old SAP that has been sent to: {:?}",
                             section_auth
                         );
                         continue;
                     }
 
                     info!(
-                        "Newer JoinResponse::Redirect for us {:?}, SAP {:?} from {:?}",
+                        ">>>>> 2.4 >>>>> Newer JoinResponse::Redirect for us {:?}, SAP {:?} from {:?}",
                         self.node.name(),
                         section_auth,
                         sender
