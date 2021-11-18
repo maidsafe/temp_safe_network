@@ -111,19 +111,18 @@ impl Core {
         // During the first section, node shall use ranged age to avoid too many nodes got
         // relocated at the same time. After the first section got split, nodes shall only
         // start with age of MIN_ADULT_AGE
-        let expected_age: u8 = if our_prefix.is_empty() {
+        let (is_age_invalid, expected_age): (bool, u8) = if our_prefix.is_empty() {
             let section_members = self.network_knowledge.active_members().await.len();
-            // Calculate a deterministic value based on peer's address
-            // within the range [FIRST_SECTION_MIN_AGE, FIRST_SECTION_MAX_AGE].
-            // let value: u8 = bincode::serialize(&peer.addr())?.iter().sum();
-            // let range = FIRST_SECTION_MAX_AGE - FIRST_SECTION_MIN_AGE;
-
-            FIRST_SECTION_MAX_AGE - section_members as u8 * 2
+            // Calculate a value within the range [FIRST_SECTION_MIN_AGE, FIRST_SECTION_MAX_AGE].
+            let expected_age = FIRST_SECTION_MAX_AGE - section_members as u8 * 2;
+            let is_age_invalid = peer.age() == MIN_ADULT_AGE || peer.age() > expected_age;
+            (is_age_invalid, expected_age)
         } else {
-            MIN_ADULT_AGE
+            let is_age_invalid = peer.age() != MIN_ADULT_AGE;
+            (is_age_invalid, MIN_ADULT_AGE)
         };
 
-        if !section_key_matches || peer.age() != expected_age {
+        if !section_key_matches || is_age_invalid {
             if !section_key_matches {
                 trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
                 trace!(
@@ -135,7 +134,7 @@ impl Core {
             } else {
                 trace!("{}", LogMarker::SendJoinRetryAgeIssue);
                 trace!(
-                    "JoinReequest from {} doesn't have the expected age {:?}, expected age {}",
+                    "JoinRequest from {} (with age {}) doesn't have the expected: {}",
                     peer,
                     peer.age(),
                     expected_age,
