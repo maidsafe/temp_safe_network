@@ -201,11 +201,13 @@ impl<'a> Join<'a> {
                     let section_auth = section_auth.into_state();
 
                     trace!(
-                        "Joining node {:?} - {:?}/{:?} received a Retry with SAP {:?}",
+                        "Joining node {:?} - {:?}/{:?} received a Retry from {} with SAP {:?}, expected_age: {}, our age: {}",
                         self.prefix,
                         self.node.name(),
-                        self.node.age(),
-                        section_auth
+                        self.node.age(),sender,
+                        section_auth,
+                        expected_age,
+                        self.node.age()
                     );
 
                     let prefix = section_auth.prefix();
@@ -225,15 +227,8 @@ impl<'a> Join<'a> {
                     };
 
                     // make sure we received a valid and trusted new SAP
-                    match self.prefix_map.update(signed_sap, &proof_chain) {
-                        Ok(true) => {}
-                        Ok(false) => {
-                            // it's not a new SAP, ignore it unless the expected age is different.
-                            if self.node.age() == expected_age {
-                                debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
-                                continue;
-                            }
-                        }
+                    let is_new_sap = match self.prefix_map.update(signed_sap, &proof_chain) {
+                        Ok(updated) => updated,
                         Err(err) => {
                             debug!(
                                 "Ignoring JoinResponse::Retry with an invalid SAP: {:?}",
@@ -241,14 +236,18 @@ impl<'a> Join<'a> {
                             );
                             continue;
                         }
-                    }
+                    };
 
-                    // make sure our joining age is the expected by the network
+                    // if it's not a new SAP, ignore response unless the expected age is different.
                     if self.node.age() != expected_age
                         && (self.node.age() > expected_age || self.node.age() == MIN_ADULT_AGE)
                     {
-                        trace!("re-generate name due to mis-matched age, current {:?} vs. expected {:?}",
-                            self.node.age(), expected_age);
+                        // adjust our joining age to the expected by the network
+                        trace!(
+                            "Re-generating name due to mis-matched age, current {} vs. expected {}",
+                            self.node.age(),
+                            expected_age
+                        );
                         let new_keypair = ed25519::gen_keypair(
                             &Prefix::default().range_inclusive(),
                             expected_age,
@@ -257,6 +256,9 @@ impl<'a> Join<'a> {
 
                         info!("Setting Node name to {} (age {})", new_name, expected_age);
                         self.node = Node::new(new_keypair, self.node.addr);
+                    } else if !is_new_sap {
+                        debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
+                        continue;
                     }
 
                     info!(
@@ -277,6 +279,7 @@ impl<'a> Join<'a> {
                         .await?;
                 }
                 JoinResponse::Redirect(section_auth) => {
+                    trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
                     if section_auth.elders.is_empty() {
                         error!(
                             "Invalid JoinResponse::Redirect, empty list of Elders: {:?}",
@@ -284,7 +287,6 @@ impl<'a> Join<'a> {
                         );
                         continue;
                     }
-                    trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
 
                     let section_auth = section_auth.into_state();
                     if !section_auth.prefix().matches(&self.node.name()) {
@@ -336,6 +338,7 @@ impl<'a> Join<'a> {
                     nonce,
                     nonce_signature,
                 } => {
+                    trace!("Received a ResourceChallenge from {}", sender);
                     let rp = ResourceProof::new(data_size, difficulty);
                     let data = rp.create_proof_data(&nonce);
                     let mut prover = rp.create_prover(data.clone());

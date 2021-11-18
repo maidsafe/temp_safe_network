@@ -96,16 +96,17 @@ impl Node {
         let our_pid = std::process::id();
         let node_prefix = node.our_prefix().await;
         let node_name = node.our_name().await;
+        let node_age = node.our_age().await;
         let our_conn_info = node.our_connection_info().await;
         let our_conn_info_json = serde_json::to_string(&our_conn_info)
             .unwrap_or_else(|_| "Failed to serialize connection info".into());
         println!(
-            "Node PID: {:?}, prefix: {:?}, name: {}, connection info:\n{}",
-            our_pid, node_prefix, node_name, our_conn_info_json,
+            "Node PID: {:?}, prefix: {:?}, name: {:?}, age: {}, connection info:\n{}",
+            our_pid, node_prefix, node_name, node_age, our_conn_info_json,
         );
         info!(
-            "Node PID: {:?}, prefix: {:?}, name: {}, connection info: {}",
-            our_pid, node_prefix, node_name, our_conn_info_json,
+            "Node PID: {:?}, prefix: {:?}, name: {:?}, age: {}, connection info: {}",
+            our_pid, node_prefix, node_name, node_age, our_conn_info_json,
         );
 
         run_system_logger(LogCtx::new(network_api), config.resource_logs).await;
@@ -121,6 +122,11 @@ impl Node {
     /// Returns our name.
     pub async fn our_name(&self) -> XorName {
         self.network_api.our_name().await
+    }
+
+    /// Returns our age.
+    pub async fn our_age(&self) -> u8 {
+        self.network_api.age().await
     }
 
     /// Returns our prefix.
