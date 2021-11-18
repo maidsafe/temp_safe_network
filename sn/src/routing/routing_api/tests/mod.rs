@@ -866,7 +866,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .network_knowledge()
         .members()
         .all_members()
-        .contains(&remove_peer));
+        .contains(remove_peer));
 
     // The removed peer is still our elder because we haven't yet processed the section update.
     assert!(dispatcher
