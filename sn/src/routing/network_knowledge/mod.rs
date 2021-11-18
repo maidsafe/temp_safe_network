@@ -177,7 +177,7 @@ impl NetworkKnowledge {
             None,
         )?;
 
-        for peer in network_knowledge.signed_sap.read().await.peers() {
+        for peer in network_knowledge.signed_sap.read().await.elders().cloned() {
             let node_state = NodeState::joined(peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
             let _changed = network_knowledge.section_peers.update(SectionAuth {

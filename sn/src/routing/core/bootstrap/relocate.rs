@@ -149,12 +149,12 @@ impl JoiningAsRelocated {
 
                 let new_section_key = section_auth.section_key();
                 let new_recipients: Vec<_> = section_auth
-                    .peers()
-                    .into_iter()
+                    .elders()
                     .filter(|peer| {
                         self.used_recipient_saps
                             .insert((peer.addr(), new_section_key))
                     })
+                    .cloned()
                     .collect();
 
                 if new_recipients.is_empty() {
@@ -194,12 +194,12 @@ impl JoiningAsRelocated {
 
                 let new_section_key = section_auth.section_key();
                 let new_recipients: Vec<_> = section_auth
-                    .peers()
-                    .into_iter()
+                    .elders()
                     .filter(|peer| {
                         self.used_recipient_saps
                             .insert((peer.addr(), new_section_key))
                     })
+                    .cloned()
                     .collect();
 
                 if new_recipients.is_empty() {
@@ -297,7 +297,7 @@ impl JoiningAsRelocated {
         if !section_auth.prefix().matches(dst) {
             error!("Invalid JoinResponse bad prefix: {:?}", section_auth);
             false
-        } else if section_auth.elders().is_empty() {
+        } else if section_auth.elder_count() == 0 {
             error!(
                 "Invalid JoinResponse, empty list of Elders: {:?}",
                 section_auth

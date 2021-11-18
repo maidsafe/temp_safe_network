@@ -135,7 +135,16 @@ impl Core {
         sender: Peer,
     ) -> Result<Vec<Command>> {
         let dst_section_key = section_auth.section_key();
-        let dst_elders = section_auth.peers();
+
+        // We choose the Elder closest to the dest section key,
+        // just to pick one of them in an arbitrary but deterministic fashion.
+        let target_name = XorName::from(PublicKey::Bls(dst_section_key));
+        let chosen_dst_elder = section_auth
+            .elders()
+            .sorted_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
+            .peekable()
+            .peek()
+            .map(|elder| (*elder).clone());
 
         let to_resend = self
             .update_network_knowledge(
@@ -149,43 +158,33 @@ impl Core {
 
         match to_resend {
             None => Ok(vec![]),
-            Some((msg_to_redirect, msg_id)) => {
-                // We choose the Elder closest to the dest section key,
-                // just to pick one of them in a random but deterministic fashion.
-                let target_name = XorName::from(PublicKey::Bls(dst_section_key));
-                let chosen_dst_elder = dst_elders
-                    .into_iter()
-                    .sorted_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
-                    .next();
-
-                match chosen_dst_elder {
-                    None => {
-                        error!(
+            Some((msg_to_redirect, msg_id)) => match chosen_dst_elder {
+                None => {
+                    error!(
                             "Failed to find closest Elder to resend msg ({:?}) upon AE-Redirect response.",
                             msg_id
                         );
-                        Ok(vec![])
-                    }
-                    Some(elder) if elder.addr() == sender.addr() => {
-                        error!(
+                    Ok(vec![])
+                }
+                Some(elder) if elder.addr() == sender.addr() => {
+                    error!(
                             "Failed to find an alternative Elder to resend msg ({:?}) upon AE-Redirect response.",
                             msg_id
                         );
-                        Ok(vec![])
-                    }
-                    Some(elder) => {
-                        trace!("{}", LogMarker::AeResendAfterAeRedirect);
-
-                        self.create_or_wait_for_backoff(&elder).await;
-
-                        let cmd = self
-                            .send_direct_message(elder, msg_to_redirect, dst_section_key)
-                            .await?;
-
-                        Ok(vec![cmd])
-                    }
+                    Ok(vec![])
                 }
-            }
+                Some(elder) => {
+                    trace!("{}", LogMarker::AeResendAfterAeRedirect);
+
+                    self.create_or_wait_for_backoff(&elder).await;
+
+                    let cmd = self
+                        .send_direct_message(elder, msg_to_redirect, dst_section_key)
+                        .await?;
+
+                    Ok(vec![cmd])
+                }
+            },
         }
     }
 
@@ -314,7 +313,7 @@ impl Core {
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropyRedirect {
-                        section_auth: signed_sap.value.into_msg(),
+                        section_auth: signed_sap.value.to_msg(),
                         section_signed: signed_sap.sig,
                         section_chain,
                         bounced_msg,
@@ -381,7 +380,7 @@ impl Core {
                 trace!("{}", LogMarker::AeSendRetryAsOutdated);
 
                 SystemMsg::AntiEntropyRetry {
-                    section_auth: signed_sap.value.into_msg(),
+                    section_auth: signed_sap.value.to_msg(),
                     section_signed: signed_sap.sig,
                     proof_chain,
                     bounced_msg: original_bytes,
@@ -404,7 +403,7 @@ impl Core {
                 trace!("{}", LogMarker::AeSendRetryDstPkFail);
 
                 SystemMsg::AntiEntropyRetry {
-                    section_auth: signed_sap.value.into_msg(),
+                    section_auth: signed_sap.value.to_msg(),
                     section_signed: signed_sap.sig,
                     proof_chain,
                     bounced_msg: original_bytes,
@@ -438,7 +437,7 @@ impl Core {
             .await;
 
         let ae_msg = SystemMsg::AntiEntropyRedirect {
-            section_auth: signed_sap.value.into_msg(),
+            section_auth: signed_sap.value.to_msg(),
             section_signed: signed_sap.sig,
             section_chain: self.network_knowledge.section_chain().await,
             bounced_msg: original_wire_msg.serialize()?,
@@ -542,7 +541,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                assert_eq!(section_auth, env.genesis_sap.into_msg());
+                assert_eq!(section_auth, env.genesis_sap.to_msg());
             });
         });
 
@@ -581,7 +580,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                assert_eq!(section_auth, env.other_sap.value.into_msg());
+                assert_eq!(section_auth, env.other_sap.value.to_msg());
             });
         });
 
@@ -621,7 +620,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(section_auth, &env.core.network_knowledge().authority_provider().await.into_msg());
+                assert_eq!(section_auth, &env.core.network_knowledge().authority_provider().await.to_msg());
                 assert_eq!(proof_chain, &env.core.section_chain().await);
             });
         });
@@ -664,7 +663,7 @@ mod tests {
 
         assert_matches!(msg_type, MessageType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(*section_auth, env.core.network_knowledge().authority_provider().await.into_msg());
+                assert_eq!(*section_auth, env.core.network_knowledge().authority_provider().await.to_msg());
                 assert_eq!(*proof_chain, env.core.section_chain().await);
             });
         });

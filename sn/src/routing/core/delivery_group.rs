@@ -56,7 +56,7 @@ pub(crate) async fn delivery_targets(
             if !network_knowledge.is_elder(our_name).await {
                 // We are not Elder - return all the elders of our section,
                 // so the message can be properly relayed through them.
-                let targets: Vec<_> = network_knowledge.authority_provider().await.peers();
+                let targets: Vec<_> = network_knowledge.authority_provider().await.elders_vec();
                 let dg_size = targets.len();
                 Ok((targets, dg_size))
             } else {
@@ -82,10 +82,9 @@ async fn section_candidates(
     if info.prefix() == network_knowledge.prefix().await {
         // Exclude our name since we don't need to send to ourself
         let chosen_section: Vec<_> = info
-            .peers()
-            .iter()
-            .cloned()
+            .elders()
             .filter(|node| &node.name() != our_name)
+            .cloned()
             .collect();
         let dg_size = chosen_section.len();
         return Ok((chosen_section, dg_size));
@@ -106,7 +105,7 @@ async fn candidates(
     let sections = sections
         .iter()
         .sorted_by(|lhs, rhs| lhs.prefix().cmp_distance(&rhs.prefix(), target_name))
-        .map(|info| (info.prefix(), info.elder_count(), info.peers()))
+        .map(|info| (info.prefix(), info.elder_count(), info.elders_vec()))
         .collect_vec();
 
     // let sections = iter::once(&sap)
@@ -163,8 +162,8 @@ fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer
         None => network_knowledge
             .section_by_name(name)
             .ok()?
-            .get_addr(name)
-            .map(|addr| Peer::new(*name, addr)),
+            .get_elder(name)
+            .cloned(),
     }
 }
 
@@ -253,21 +252,16 @@ mod tests {
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
 
         // Send to all our elders except us.
-        let expected_recipients = network_knowledge
+        let expected_recipients: Vec<_> = network_knowledge
             .authority_provider()
             .await
-            .peers()
-            .into_iter()
-            .filter(|peer| peer.name() != our_name);
-        assert_eq!(dg_size, expected_recipients.count());
+            .elders()
+            .filter(|elder| elder.name() != our_name)
+            .cloned()
+            .collect();
 
-        let expected_recipients = network_knowledge
-            .authority_provider()
-            .await
-            .peers()
-            .into_iter()
-            .filter(|peer| peer.name() != our_name);
-        itertools::assert_equal(recipients, expected_recipients);
+        assert_eq!(dg_size, expected_recipients.len());
+        assert_eq!(recipients, expected_recipients);
 
         Ok(())
     }
@@ -315,8 +309,7 @@ mod tests {
 
         // Send to all elders in the dst section
         let expected_recipients = section_auth1
-            .peers()
-            .into_iter()
+            .elders()
             .sorted_by(|lhs, rhs| dst_name.cmp_distance(&lhs.name(), &rhs.name()));
         assert_eq!(dg_size, section_auth1.elder_count());
         itertools::assert_equal(recipients, expected_recipients);
@@ -347,8 +340,7 @@ mod tests {
 
         // Send to all elders in the dst section
         let expected_recipients = elders_info1
-            .peers()
-            .into_iter()
+            .elders()
             .sorted_by(|lhs, rhs| dst_name.cmp_distance(&lhs.name(), &rhs.name()));
         let min_dg_size =
             1 + elders_info1.elder_count() - supermajority(elders_info1.elder_count());
@@ -377,8 +369,7 @@ mod tests {
 
         // Send to all elders in the final dst section
         let expected_recipients = section_auth1
-            .peers()
-            .into_iter()
+            .elders()
             .sorted_by(|lhs, rhs| dst_name.cmp_distance(&lhs.name(), &rhs.name()));
         assert_eq!(dg_size, section_auth1.elder_count());
         itertools::assert_equal(recipients, expected_recipients);
@@ -411,8 +402,7 @@ mod tests {
         let min_dg_size =
             1 + elders_info1.elder_count() - supermajority(elders_info1.elder_count());
         let expected_recipients = elders_info1
-            .peers()
-            .into_iter()
+            .elders()
             .sorted_by(|lhs, rhs| dst_name.cmp_distance(&lhs.name(), &rhs.name()))
             .take(min_dg_size);
 
@@ -437,11 +427,11 @@ mod tests {
         // Send to chosen elder
         assert_eq!(dg_size, 1);
         assert_eq!(
-            Some(recipients[0].addr()),
+            Some(&recipients[0]),
             network_knowledge
                 .authority_provider()
                 .await
-                .get_addr(&dst_name),
+                .get_elder(&dst_name),
         );
 
         Ok(())
@@ -469,7 +459,7 @@ mod tests {
         );
         itertools::assert_equal(
             recipients,
-            network_knowledge.authority_provider().await.peers(),
+            network_knowledge.authority_provider().await.elders(),
         );
 
         Ok(())
@@ -497,7 +487,7 @@ mod tests {
         );
         itertools::assert_equal(
             recipients,
-            network_knowledge.authority_provider().await.peers(),
+            network_knowledge.authority_provider().await.elders(),
         );
 
         Ok(())
@@ -524,7 +514,7 @@ mod tests {
         );
         itertools::assert_equal(
             recipients,
-            network_knowledge.authority_provider().await.peers(),
+            network_knowledge.authority_provider().await.elders(),
         );
 
         Ok(())
@@ -551,7 +541,7 @@ mod tests {
         );
         itertools::assert_equal(
             recipients,
-            network_knowledge.authority_provider().await.peers(),
+            network_knowledge.authority_provider().await.elders(),
         );
 
         Ok(())
@@ -566,7 +556,7 @@ mod tests {
         let genesis_sk = secret_key_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
-        let elders0: Vec<_> = section_auth0.peers();
+        let elders0 = section_auth0.elders_vec();
         let section_auth0 = section_signed(genesis_sk, section_auth0)?;
 
         let chain = SecuredLinkedList::new(genesis_pk);

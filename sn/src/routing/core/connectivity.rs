@@ -47,8 +47,7 @@ impl Core {
             .network_knowledge
             .authority_provider()
             .await
-            .peers()
-            .iter()
+            .elders()
             .filter(|peer| !names.contains(&peer.name()))
             .cloned()
             .collect();
