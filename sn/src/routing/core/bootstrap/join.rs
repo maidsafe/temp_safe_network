@@ -238,7 +238,6 @@ impl<'a> Join<'a> {
                         }
                     };
 
-
                     if !is_new_sap {
                         debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
                         continue;
