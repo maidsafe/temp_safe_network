@@ -21,7 +21,7 @@ use xor_name::{XorName, XOR_NAME_LEN};
 /// When a node knows another node as a `Peer` it's logically connected to it. This is separate from
 /// being physically connected at the network layer, which is indicated by the optional `connection`
 /// field.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Peer {
     name: XorName,
     addr: SocketAddr,
@@ -30,6 +30,29 @@ pub struct Peer {
     // except that it once connected to this peer's `addr` (e.g. it may already be closed or
     // otherwise unusable).
     connection: Arc<RwLock<Option<qp2p::Connection>>>,
+}
+
+impl fmt::Debug for Peer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let guard = self.connection.try_read();
+        let connection; // needed to avoid issues with temporary bindings
+        f.debug_struct("Peer")
+            .field("name", &self.name)
+            .field("addr", &self.addr)
+            .field(
+                "connection",
+                // It's likely that the lock will be free, so attempt to read without blocking in
+                // order to show more useful info.
+                match &guard {
+                    Ok(guard) => {
+                        connection = guard.as_ref();
+                        &connection
+                    }
+                    Err(_) => &"<locked>",
+                },
+            )
+            .finish()
+    }
 }
 
 impl Display for Peer {
