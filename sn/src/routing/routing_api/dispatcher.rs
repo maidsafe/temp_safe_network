@@ -12,7 +12,6 @@ use crate::messaging::{
     DstLocation, EndUser, MsgKind, WireMsg,
 };
 use crate::routing::{
-    core::ChunkStore,
     core::{Core, SendStatus},
     error::Result,
     log_markers::LogMarker,
@@ -52,10 +51,6 @@ impl Dispatcher {
             cancel_timer_tx,
             cancel_timer_rx,
         }
-    }
-
-    pub(super) async fn get_chunk_storage(&self) -> ChunkStore {
-        self.core.chunk_storage.clone()
     }
 
     /// Handles the given command and transitively any new commands that are

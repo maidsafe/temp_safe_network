@@ -10,11 +10,10 @@ use crate::dbs::UsedSpace;
 use crate::messaging::{system::SystemMsg, DstLocation, WireMsg};
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Error, Result};
 use crate::routing::{
-    ChunkStore, Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
+    Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
 };
 use crate::types::PublicKey;
-use bls::{PublicKey as BlsPublicKey, PublicKeySet};
-use secured_linked_list::SecuredLinkedList;
+use bls::PublicKey as BlsPublicKey;
 use std::{collections::BTreeSet, net::SocketAddr, path::Path, sync::Arc};
 use xor_name::{Prefix, XorName};
 
@@ -56,10 +55,6 @@ impl Network {
         ))
     }
 
-    pub(crate) async fn get_chunk_storage(&self) -> ChunkStore {
-        self.routing.get_chunk_storage().await
-    }
-
     pub(crate) async fn age(&self) -> u8 {
         self.routing.age().await
     }
@@ -78,11 +73,6 @@ impl Network {
     /// Returns our section's public key.
     pub(crate) async fn our_section_public_key(&self) -> BlsPublicKey {
         self.routing.our_section_auth().await.section_key()
-    }
-
-    pub(crate) async fn our_public_key_set(&self) -> Result<PublicKeySet> {
-        let pk_set = self.routing.public_key_set().await?;
-        Ok(pk_set)
     }
 
     pub(crate) async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
@@ -109,10 +99,6 @@ impl Network {
         self.routing.genesis_key().await
     }
 
-    pub(crate) async fn section_chain(&self) -> SecuredLinkedList {
-        self.routing.section_chain().await
-    }
-
     pub(crate) async fn send_message(&self, wire_msg: WireMsg) -> Result<(), RoutingError> {
         self.routing.send_message(wire_msg).await
     }
@@ -120,11 +106,6 @@ impl Network {
     pub(crate) async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
         self.routing.set_joins_allowed(joins_allowed).await?;
         Ok(())
-    }
-
-    // Returns whether the node is Elder.
-    pub(crate) async fn is_elder(&self) -> bool {
-        self.routing.is_elder().await
     }
 
     pub(crate) async fn our_elder_names(&self) -> BTreeSet<XorName> {

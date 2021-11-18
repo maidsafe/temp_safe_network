@@ -10,7 +10,6 @@ use crate::messaging::SrcLocation;
 use crate::node::{network::Network, node_ops::NodeDuty};
 use crate::routing::{Event as RoutingEvent, MessageReceived, NodeElderChange, MIN_AGE};
 use crate::types::PublicKey;
-use std::{thread::sleep, time::Duration};
 use tracing::{debug, error, info, trace};
 
 #[derive(Debug)]
@@ -56,96 +55,7 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
                 ctx: None,
             }
         }
-        RoutingEvent::EldersChanged {
-            elders,
-            self_status_change,
-        } => {
-            log_network_stats(network_api).await;
-            let first_section = network_api.our_prefix().await.is_empty();
-            let first_elder = network_api.our_elder_names().await.len() == 1;
-            if first_section && first_elder {
-                return Mapping {
-                    op: NodeDuty::Genesis,
-                    ctx: None,
-                };
-            }
 
-            match self_status_change {
-                NodeElderChange::None => {
-                    if !network_api.is_elder().await {
-                        return Mapping {
-                            op: NodeDuty::NoOp,
-                            ctx: None,
-                        };
-                    }
-                    // sync to others if we are elder
-                    // -- ugly temporary until fixed in routing --
-                    let mut sanity_counter = 0_i32;
-                    while sanity_counter < 240 {
-                        match network_api.our_public_key_set().await {
-                            Ok(pk_set) => {
-                                if elders.key == pk_set.public_key() {
-                                    break;
-                                } else {
-                                    trace!("******Elders changed, we are still Elder but we seem to be lagging the DKG...");
-                                }
-                            }
-                            Err(e) => {
-                                trace!(
-                                    "******Elders changed, should NOT be an error here...! ({:?})",
-                                    e
-                                );
-                                sanity_counter += 1;
-                            }
-                        }
-                        sleep(Duration::from_millis(500))
-                    }
-                    // -- ugly temporary until fixed in routing --
-
-                    trace!("******Elders changed, we are still Elder");
-                    Mapping {
-                        op: NodeDuty::EldersChanged {
-                            our_prefix: elders.prefix,
-                            new_elders: elders.added,
-                            newbie: false,
-                        },
-                        ctx: None,
-                    }
-                }
-                NodeElderChange::Promoted => {
-                    // -- ugly temporary until fixed in routing --
-                    let mut sanity_counter = 0_i32;
-                    while network_api.our_public_key_set().await.is_err() {
-                        if sanity_counter > 240 {
-                            trace!("******Elders changed, we were promoted, but no key share found, so skip this..");
-                            return Mapping {
-                                op: NodeDuty::NoOp,
-                                ctx: None,
-                            };
-                        }
-                        sanity_counter += 1;
-                        trace!("******Elders changed, we are promoted, but still no key share..");
-                        sleep(Duration::from_millis(500))
-                    }
-                    // -- ugly temporary until fixed in routing --
-
-                    trace!("******Elders changed, we are promoted");
-
-                    Mapping {
-                        op: NodeDuty::EldersChanged {
-                            our_prefix: elders.prefix,
-                            new_elders: elders.added,
-                            newbie: true,
-                        },
-                        ctx: None,
-                    }
-                }
-                NodeElderChange::Demoted => Mapping {
-                    op: NodeDuty::LevelDown,
-                    ctx: None,
-                },
-            }
-        }
         RoutingEvent::MemberJoined { previous_name, .. } => {
             log_network_stats(network_api).await;
             let op = if previous_name.is_some() {
@@ -170,18 +80,6 @@ pub(super) async fn map_routing_event(event: RoutingEvent, network_api: &Network
                 ctx: None,
             }
         }
-        RoutingEvent::AdultsChanged {
-            remaining,
-            added,
-            removed,
-        } => Mapping {
-            op: NodeDuty::AdultsChanged {
-                remaining,
-                added,
-                removed,
-            },
-            ctx: None,
-        },
         // Ignore all other events
         _ => Mapping {
             op: NodeDuty::NoOp,

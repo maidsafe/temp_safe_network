@@ -20,6 +20,6 @@ impl Node {
             )));
         }
 
-        self.level_up().await
+        Ok(())
     }
 }

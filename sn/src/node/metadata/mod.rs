@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{network::Network, Result};
+use crate::node::network::Network;
 use std::fmt::{self, Display, Formatter};
 
 /// This module is called `Metadata`
@@ -18,12 +18,6 @@ use std::fmt::{self, Display, Formatter};
 pub(crate) struct Metadata {
     #[allow(dead_code)]
     network: Network,
-}
-
-impl Metadata {
-    pub(crate) async fn new(network: Network) -> Result<Self> {
-        Ok(Self { network })
-    }
 }
 
 impl Display for Metadata {

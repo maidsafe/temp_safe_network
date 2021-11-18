@@ -24,8 +24,7 @@
 // Public API
 // ############################################################################
 pub(crate) use self::{
-    core::ChunkStore,
-    core::{CHUNK_COPY_COUNT, MIN_LEVEL_WHEN_FULL},
+    core::MIN_LEVEL_WHEN_FULL,
     network_knowledge::{peer::Sender, section_keys::SectionKeyShare, SectionAuthorityProvider},
 };
 pub use self::{

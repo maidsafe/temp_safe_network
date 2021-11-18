@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::routing::{error::Result, Event};
+use crate::routing::{error::Result, routing_api::command::Command};
 use std::collections::BTreeSet;
 
 impl Core {
-    pub(crate) async fn fire_node_event_for_any_new_adults(&self) -> Result<()> {
+    pub(crate) async fn fire_node_event_for_any_new_adults(&self) -> Result<Vec<Command>> {
         let old_adults: BTreeSet<_> = self
             .network_knowledge
             .live_adults()
@@ -20,6 +20,7 @@ impl Core {
             .map(|p| p.name())
             .collect();
 
+        let mut commands = vec![];
         if self.is_not_elder().await {
             let current_adults: BTreeSet<_> = self
                 .network_knowledge
@@ -32,15 +33,16 @@ impl Core {
             let removed: BTreeSet<_> = old_adults.difference(&current_adults).copied().collect();
 
             if !added.is_empty() || !removed.is_empty() {
-                self.send_event(Event::AdultsChanged {
-                    remaining: old_adults.intersection(&current_adults).copied().collect(),
-                    added,
-                    removed,
-                })
-                .await;
+                // reorganise the chunks stored in this section
+                let our_name = self.node.read().await.name();
+                let remaining = old_adults.intersection(&current_adults).copied().collect();
+                commands.extend(
+                    self.reorganize_chunks(our_name, added, removed, remaining)
+                        .await?,
+                );
             }
         }
 
-        Ok(())
+        Ok(commands)
     }
 }
