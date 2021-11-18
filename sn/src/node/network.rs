@@ -14,7 +14,7 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-use std::{collections::BTreeSet, net::SocketAddr, path::Path, sync::Arc};
+use std::{net::SocketAddr, path::Path, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 ///
@@ -95,24 +95,6 @@ impl Network {
     pub(crate) async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
         self.routing.set_joins_allowed(joins_allowed).await?;
         Ok(())
-    }
-
-    pub(crate) async fn our_elder_names(&self) -> BTreeSet<XorName> {
-        self.routing
-            .our_elders()
-            .await
-            .iter()
-            .map(|p2p_node| p2p_node.name())
-            .collect::<BTreeSet<_>>()
-    }
-
-    pub(crate) async fn our_adults(&self) -> BTreeSet<XorName> {
-        self.routing
-            .our_adults()
-            .await
-            .into_iter()
-            .map(|p2p_node| p2p_node.name())
-            .collect::<BTreeSet<_>>()
     }
 
     pub(crate) async fn sign_msg_for_dst_accumulation(
