@@ -6,17 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod handle;
-mod messaging;
-
 use crate::dbs::UsedSpace;
 
 use crate::node::logging::log_ctx::LogCtx;
 use crate::node::logging::run_system_logger;
 use crate::node::{
-    event_mapping::{map_routing_event, Mapping, MsgContext},
     network::Network,
-    node_ops::NodeDuty,
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
@@ -24,20 +19,9 @@ use crate::routing::{
     EventStream, {Prefix, XorName},
 };
 use crate::types::PublicKey;
-use futures::{future::BoxFuture, lock::Mutex, stream::FuturesUnordered, FutureExt, StreamExt};
-use handle::NodeTask;
 use rand::rngs::OsRng;
-use std::sync::Arc;
-use std::{
-    fmt::{self, Display, Formatter},
-    net::SocketAddr,
-    path::PathBuf,
-};
-use tokio::task::JoinHandle;
+use std::{net::SocketAddr, path::PathBuf};
 use tokio::time::Duration;
-use tracing::{error, warn};
-
-const JOINING_TIMEOUT: u64 = 720; // 720 seconds
 
 /// Static info about the node.
 #[derive(Clone, Debug)]
@@ -59,7 +43,7 @@ pub struct Node {
 
 impl Node {
     /// Initialize a new node.
-    pub async fn new(config: &Config) -> Result<(Self, EventStream)> {
+    pub async fn new(config: &Config, joining_timeout: Duration) -> Result<(Self, EventStream)> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
         tokio::fs::create_dir_all(root_dir).await?;
@@ -80,7 +64,7 @@ impl Node {
         };
         let used_space = UsedSpace::new(config.max_capacity());
         let (network_api, network_events) = tokio::time::timeout(
-            Duration::from_secs(JOINING_TIMEOUT),
+            joining_timeout,
             Network::new(root_dir_buf.as_path(), config, used_space.clone()),
         )
         .await
@@ -136,119 +120,5 @@ impl Node {
     /// Returns the network's genesis key.
     pub async fn genesis_key(&self) -> bls::PublicKey {
         self.network_api.genesis_key().await
-    }
-
-    // TODO: remove this, and be processed, calling from routing code directly
-    async fn process_routing_event(
-        network_events: Arc<Mutex<EventStream>>,
-        network_api: Network,
-    ) -> Result<NodeTask> {
-        let node_task = if let Some(event) = network_events.lock().await.next().await {
-            let Mapping { op, ctx } = map_routing_event(event, &network_api).await;
-            NodeTask::Result(Box::new((vec![op], ctx)))
-        } else {
-            NodeTask::None
-        };
-        Ok(node_task)
-    }
-
-    /// Starts the node, and runs the main event loop.
-    /// Blocks until the node is terminated, which is done
-    /// by client sending in a `Command` to free it.
-    pub async fn run(&self, network_events: EventStream) -> Result<()> {
-        let network_api = self.network_api.clone();
-        let event_lock = Arc::new(Mutex::new(network_events));
-        let routing_task_handle = tokio::spawn(Self::process_routing_event(
-            event_lock.clone(),
-            network_api.clone(),
-        ));
-        let mut threads = FuturesUnordered::new();
-        threads.push(routing_task_handle);
-        while let Some(result) = threads.next().await {
-            match result {
-                Ok(Ok(NodeTask::Thread(handle))) => threads.push(handle),
-                Ok(Ok(NodeTask::Result(boxed))) => {
-                    let (duties, ctx) = *boxed;
-                    for duty in duties {
-                        let tasks = self.handle_and_get_threads(duty, ctx.clone()).await;
-                        threads.extend(tasks.into_iter());
-                    }
-                }
-                Ok(Ok(NodeTask::None)) => (),
-                Ok(Err(err)) => {
-                    let duty = try_handle_error(err, None);
-                    let tasks = self.handle_and_get_threads(duty, None).await;
-                    threads.extend(tasks.into_iter());
-                }
-                Err(err) => {
-                    error!("Error spawning task for task: {}", err);
-                }
-            }
-            // If the Mutex is locked, it means there is already a task running which
-            // is listening for routing events. If not, spawn a new task to listen for further events
-            if event_lock.try_lock().is_some() {
-                threads.push(tokio::spawn(Self::process_routing_event(
-                    event_lock.clone(),
-                    network_api.clone(),
-                )))
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_and_get_threads(
-        &self,
-        op: NodeDuty,
-        ctx: Option<MsgContext>,
-    ) -> BoxFuture<Vec<JoinHandle<Result<NodeTask>>>> {
-        async move {
-            let mut threads = vec![];
-            match self.handle(op).await {
-                Ok(node_task) => match node_task {
-                    NodeTask::Result(boxed) => {
-                        let (node_duties, ctx) = *boxed;
-                        for duty in node_duties {
-                            let tasks = self.handle_and_get_threads(duty, ctx.clone()).await;
-                            threads.extend(tasks.into_iter());
-                        }
-                    }
-                    NodeTask::Thread(task_handle) => {
-                        threads.push(task_handle);
-                    }
-                    NodeTask::None => (),
-                },
-                Err(err) => {
-                    let duty = try_handle_error(err, ctx.clone());
-                    let tasks = self.handle_and_get_threads(duty, ctx.clone()).await;
-                    threads.extend(tasks.into_iter());
-                }
-            }
-            threads
-        }
-        .boxed()
-    }
-}
-
-fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
-    use std::error::Error;
-    warn!("Error being handled by node: {:?}", err);
-    if let Some(source) = err.source() {
-        warn!("Source: {:?}", source);
-    }
-
-    match ctx {
-        None => {
-            error!(
-                    "Error when processing a message without a msg context, we cannot report it to the sender: {:?}", err
-                );
-            NodeDuty::NoOp
-        }
-        Some(_other) => NodeDuty::NoOp,
-    }
-}
-
-impl Display for Node {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "Node")
     }
 }

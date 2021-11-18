@@ -341,15 +341,6 @@ impl Routing {
             .collect()
     }
 
-    /// Returns our section's authority provider.
-    pub(crate) async fn our_section_auth(&self) -> SectionAuthorityProvider {
-        self.dispatcher
-            .core
-            .network_knowledge()
-            .authority_provider()
-            .await
-    }
-
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.dispatcher.core.matching_section(name).await
