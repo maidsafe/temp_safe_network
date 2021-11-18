@@ -18,10 +18,19 @@ function crate_has_changes() {
         --no-changelog-preview \
         --allow-fully-generated-changelogs \
         --no-changelog-github-release \
-        --no-isolate-dependencies-from-breaking-changes \
-        safe_network sn_api 2>&1)
-    if [[ $output == *"WOULD auto-bump dependent package 'safe_network'"* ]]; then
-        echo "smart-release identified changes in safe_network"
+        "$crate_name" 2>&1)
+    if [[ $output == *"WOULD auto-bump provided package '$crate_name'"* ]]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+function determine_which_crates_have_changes() {
+    local has_changes
+    has_changes=$(crate_has_changes "safe_network")
+    if [[ $has_changes == "true" ]]; then
+        echo "smart-release has determined safe_network crate has changes"
         safe_network_has_changes=true
     fi
     has_changes=$(crate_has_changes "sn_api")
@@ -37,16 +46,12 @@ function crate_has_changes() {
 }
 
 function generate_version_bump_commit() {
-    cargo smart-release \
-        --update-crates-index \
-        --no-push \
-        --no-publish \
-        --no-changelog-preview \
-        --allow-fully-generated-changelogs \
-        --no-changelog-github-release \
-        --no-isolate-dependencies-from-breaking-changes \
-        --execute \
-        safe_network sn_api
+    local run_process=""
+    run_process="cargo smart-release --update-crates-index --no-push --no-publish --no-changelog-preview --allow-fully-generated-changelogs --no-changelog-github-release --execute "
+    if [[ $safe_network_has_changes ]]; then run_process="${run_process} safe_network "; fi
+    if [[ $sn_api_has_changes ]]; then run_process="${run_process} sn_api "; fi
+    if [[ $sn_cli_has_changes ]]; then run_process="${run_process} sn_cli "; fi
+    eval $run_process
 }
 
 function generate_new_commit_message() {
