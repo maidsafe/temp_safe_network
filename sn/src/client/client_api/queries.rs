@@ -60,8 +60,20 @@ impl Client {
                     )
                     .await;
 
-                    debug!("Query {:?} result (w/ timeout) was: {:?}", query, res);
-                    res.map_err(backoff::Error::Transient)
+                    match res {
+                        Ok(inner_result) => match inner_result {
+                            Ok(query_result) => Ok(Ok(query_result)),
+                            Err(error) => match error {
+                                Error::InsufficientElderConnections { .. } => {
+                                    Err(error).map_err(backoff::Error::Transient)
+                                }
+                                _ => Err(error).map_err(backoff::Error::Permanent),
+                            },
+                        },
+                        Err(_elapsed) => {
+                            Err(Error::QueryTimedOut).map_err(backoff::Error::Transient)
+                        }
+                    }
                 }
                 .instrument(info_span!("Attempting a query"))
             },
