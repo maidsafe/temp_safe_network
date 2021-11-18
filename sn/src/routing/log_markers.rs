@@ -16,6 +16,7 @@ pub enum LogMarker {
     // stats
     TotalNetworkElders,
     // split
+    StillElderAfterAplit,
     SplitSuccess,
     SplitAttempt,
     NewPrefix,

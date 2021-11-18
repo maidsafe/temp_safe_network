@@ -12,9 +12,9 @@ echo "Checking logfiles to check for split"
 log_dir="$HOME/.safe/node/local-test-network"
 
 # -u needed here to search log dirs
-prefix1_prior_elder_nodes=$(rg "SplitSuccess: Prefix\(1\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
+prefix1_prior_elder_nodes=$(rg "StillElderAfterAplit: Prefix\(1\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
 prefix1_new_elder_nodes=$(rg "PromotedToElder: Prefix\(1\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
-prefix0_prior_elder_nodes=$(rg "SplitSuccess: Prefix\(0\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
+prefix0_prior_elder_nodes=$(rg "StillElderAfterAplit: Prefix\(0\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
 prefix0_new_elder_nodes=$(rg "PromotedToElder: Prefix\(0\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
 
 

@@ -176,17 +176,21 @@ mod tests {
     async fn split_network_assert_health_check() -> Result<()> {
         let promoted_to_elder_nodes =
             search_testnet_results_per_node(LogMarker::PromotedToElder.to_string())?.len();
-        let prefix1_prior_elder_nodes =
-            search_testnet_results_per_node(format!(r"{}: Prefix\(1\)", LogMarker::SplitSuccess))?
-                .len();
+        let prefix1_prior_elder_nodes = search_testnet_results_per_node(format!(
+            r"{}: Prefix\(1\)",
+            LogMarker::StillElderAfterAplit
+        ))?
+        .len();
         let prefix1_new_elder_nodes = search_testnet_results_per_node(format!(
             r"{}: Prefix\(1\)",
             LogMarker::PromotedToElder
         ))?
         .len();
-        let prefix0_prior_elder_nodes =
-            search_testnet_results_per_node(format!(r"{}: Prefix\(0\)", LogMarker::SplitSuccess))?
-                .len();
+        let prefix0_prior_elder_nodes = search_testnet_results_per_node(format!(
+            r"{}: Prefix\(0\)",
+            LogMarker::StillElderAfterAplit
+        ))?
+        .len();
         let prefix0_new_elder_nodes = search_testnet_results_per_node(format!(
             r"{}: Prefix\(0\)",
             LogMarker::PromotedToElder
