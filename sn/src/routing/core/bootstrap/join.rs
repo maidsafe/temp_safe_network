@@ -370,19 +370,19 @@ impl<'a> Join<'a> {
         section_key: BlsPublicKey,
         should_backoff: bool,
     ) -> Result<()> {
-        // if should_backoff {
-        //     // use exponential backoff here to delay our responses and avoid any intensive join reqs
-        //     let next_wait = self.backoff.next_backoff();
+        if should_backoff {
+            // use exponential backoff here to delay our responses and avoid any intensive join reqs
+            let _next_wait = self.backoff.next_backoff();
 
-        //     if let Some(wait) = next_wait {
-        //         tokio::time::sleep(wait).await;
-        //     } else {
-        //         error!("Waiting before attempting to join again");
+            // if let Some(wait) = next_wait {
+            //     tokio::time::sleep(wait).await;
+            // } else {
+            //     error!("Waiting before attempting to join again");
 
-        //         tokio::time::sleep(self.backoff.max_interval).await;
-        //         self.backoff.reset();
-        //     }
-        // }
+            //     tokio::time::sleep(self.backoff.max_interval).await;
+            //     self.backoff.reset();
+            // }
+        }
 
         info!("Sending {:?} to {:?}", join_request, recipients);
 
