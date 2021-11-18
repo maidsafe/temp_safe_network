@@ -431,8 +431,7 @@ dependencies = [
 [[package]]
 name = "bls_dkg"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f173ff0f6f9e5b3d30532a6fccd990318e5c6a1c98706b7af24e68046c9d23b8"
+source = "git+https://github.com/maqi/BLS-DKG?branch=DKG_AE#1fd3c41b05eab79368ac88be062ff30e79afff8f"
 dependencies = [
  "aes",
  "bincode",
@@ -444,6 +443,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "thiserror",
+ "tiny-keccak 2.0.2",
  "xor_name 3.1.0",
 ]
 

@@ -499,6 +499,26 @@ impl Core {
                 trace!("Handling msg: Dkg-FailureObservation from {}", sender);
                 self.handle_dkg_failure_observation(session_id, &failed_participants, sig)
             }
+            SystemMsg::DkgNotReady {
+                message,
+                session_id,
+            } => {
+                let src = sender.name();
+                Ok(self.handle_dkg_not_ready(
+                    sender,
+                    message,
+                    session_id,
+                    self.network_knowledge.section_by_name(&src)?.section_key(),
+                ))
+            }
+            SystemMsg::DkgRetry {
+                message_history,
+                message,
+                session_id,
+            } => {
+                self.handle_dkg_retry(session_id, message_history, message, sender.name())
+                    .await
+            }
             // The following type of messages are all handled by upper sn_node layer.
             // TODO: In the future the sn-node layer won't be receiving Events
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {

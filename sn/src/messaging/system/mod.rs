@@ -115,6 +115,23 @@ pub enum SystemMsg {
         /// The DKG message.
         message: DkgMessage,
     },
+    /// Message signalling that the node is not ready for the
+    /// DKG message yet
+    DkgNotReady {
+        /// The identifier of the DKG session this message is for.
+        session_id: DkgSessionId,
+        /// The sent DKG message.
+        message: DkgMessage,
+    },
+    /// Message containing a history of received DKG messages so other nodes can catch-up
+    DkgRetry {
+        /// History of messages received at the sender's end
+        message_history: Vec<DkgMessage>,
+        /// The identifier of the DKG session this message is for.
+        session_id: DkgSessionId,
+        /// The originally sent DKG message.
+        message: DkgMessage,
+    },
     /// Broadcast to the other DKG participants when a DKG failure is observed.
     DkgFailureObservation {
         /// The DKG key
