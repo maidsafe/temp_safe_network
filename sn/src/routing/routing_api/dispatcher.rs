@@ -424,7 +424,7 @@ impl Dispatcher {
     ) -> Result<()> {
         let previous_name = self.core.node.read().await.name();
         let new_keypair = new_node.keypair.clone();
-
+        let age = new_node.age();
         self.core.relocate(new_node, new_section).await?;
 
         self.core
@@ -433,6 +433,8 @@ impl Dispatcher {
                 new_keypair,
             })
             .await;
+
+        info!("Relocated, our Age: {:?}", age);
 
         Ok(())
     }
