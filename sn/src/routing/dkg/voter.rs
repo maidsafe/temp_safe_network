@@ -126,6 +126,7 @@ impl DkgVoter {
                 for message in self.backlog.write().await.take(&session_id).into_iter() {
                     commands.extend(session.process_message(
                         node,
+                        name,
                         &session_id,
                         message,
                         section_pk,
@@ -173,6 +174,7 @@ impl DkgVoter {
     // Handle a received DkgMessage.
     pub(crate) async fn process_message(
         &self,
+        sender: XorName,
         node: &Node,
         session_id: &DkgSessionId,
         message: DkgMessage,
@@ -186,10 +188,12 @@ impl DkgVoter {
             // which be pushed to the backlog.
             trace!("Draining backlog before process message");
             for message in self.backlog.write().await.take(session_id).into_iter() {
-                commands.extend(session.process_message(node, session_id, message, section_pk)?);
+                commands.extend(
+                    session.process_message(node, sender, session_id, message, section_pk)?,
+                );
             }
 
-            commands.extend(session.process_message(node, session_id, message, section_pk)?)
+            commands.extend(session.process_message(node, sender, session_id, message, section_pk)?)
         } else {
             trace!("Pushing to backlog {:?} - {:?}", session_id, message);
             self.backlog.write().await.push(*session_id, message);
@@ -206,5 +210,31 @@ impl DkgVoter {
         self.sessions
             .get_mut(session_id)?
             .process_failure(session_id, failed_participants, signed)
+    }
+
+    pub(crate) fn get_cached_messages(&self, session_id: &DkgSessionId) -> Vec<DkgMessage> {
+        if let Some(session) = self.sessions.get_mut(session_id) {
+            session.get_cached_messages()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub(crate) async fn handle_dkg_history(
+        &self,
+        node: &Node,
+        session_id: DkgSessionId,
+        message_history: Vec<DkgMessage>,
+        section_pk: BlsPublicKey,
+    ) -> Result<Vec<Command>> {
+        if let Some(mut session) = self.sessions.get_mut(&session_id) {
+            session.handle_dkg_history(node, session_id, message_history, section_pk)
+        } else {
+            for message in message_history {
+                trace!("Pushing to backlog {:?} - {:?}", session_id, message);
+                self.backlog.write().await.push(session_id, message);
+            }
+            Ok(vec![])
+        }
     }
 }

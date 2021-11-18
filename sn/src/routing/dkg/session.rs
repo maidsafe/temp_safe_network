@@ -23,7 +23,7 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
+use bls_dkg::key_gen::{message::Message as DkgMessage, Error as DkgError, KeyGen};
 use itertools::Itertools;
 use std::{
     collections::{BTreeSet, VecDeque},
@@ -58,27 +58,46 @@ impl Session {
     pub(crate) fn process_message(
         &mut self,
         node: &Node,
+        sender: XorName,
         session_id: &DkgSessionId,
         message: DkgMessage,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         trace!("process DKG message {:?}", message);
-        let responses = self
-            .key_gen
-            .handle_message(&mut rand::thread_rng(), message)
-            .unwrap_or_default();
-
-        // Only a valid DkgMessage, which results in some responses, shall reset the ticker.
-        let add_reset_timer = !responses.is_empty();
-
         let mut commands = vec![];
-        for response in responses.into_iter() {
-            commands.extend(self.broadcast(node, session_id, response, section_pk)?);
+        match self
+            .key_gen
+            .handle_message(&mut rand::thread_rng(), message.clone())
+        {
+            Ok(responses) => {
+                // Only a valid DkgMessage, which results in some responses, shall reset the ticker.
+                let add_reset_timer = !responses.is_empty();
+
+                for response in responses.into_iter() {
+                    commands.extend(self.broadcast(node, session_id, response, section_pk)?);
+                }
+                if add_reset_timer {
+                    commands.push(self.reset_timer());
+                }
+                commands.extend(self.check(node, session_id, section_pk)?);
+            }
+            Err(DkgError::UnexpectedPhase { .. }) => {
+                commands.push(Command::PrepareNodeMsgToSend {
+                    msg: SystemMsg::DkgNotReady {
+                        session_id: *session_id,
+                        message,
+                    },
+                    dst: DstLocation::Node {
+                        name: sender,
+                        section_pk,
+                    },
+                });
+            }
+            Err(error) => {
+                error!("Error processing DKG message: {:?}", error);
+            }
         }
-        if add_reset_timer {
-            commands.push(self.reset_timer());
-        }
-        commands.extend(self.check(node, session_id, section_pk)?);
+
         Ok(commands)
     }
 
@@ -128,7 +147,13 @@ impl Session {
             });
         }
 
-        commands.extend(self.process_message(node, session_id, message, section_pk)?);
+        commands.extend(self.process_message(
+            node,
+            node.name(),
+            session_id,
+            message,
+            section_pk,
+        )?);
         Ok(commands)
     }
 
@@ -314,6 +339,45 @@ impl Session {
         self.check_failure_agreement()
     }
 
+    pub(crate) fn get_cached_messages(&self) -> Vec<DkgMessage> {
+        self.key_gen.get_cached_message()
+    }
+
+    pub(crate) fn handle_dkg_history(
+        &mut self,
+        node: &Node,
+        session_id: DkgSessionId,
+        message_history: Vec<DkgMessage>,
+        section_pk: BlsPublicKey,
+    ) -> Result<Vec<Command>> {
+        let mut commands = vec![];
+        let (responses, unhandleable) = self
+            .key_gen
+            .handle_pre_session_messages(&mut rand::thread_rng(), message_history);
+        let add_reset_timer = !responses.is_empty();
+        for response in responses.into_iter() {
+            commands.extend(self.broadcast(node, &session_id, response, section_pk)?);
+        }
+        if add_reset_timer {
+            commands.push(self.reset_timer());
+        }
+        commands.extend(self.check(node, &session_id, section_pk)?);
+
+        for (sender, message) in unhandleable.into_iter() {
+            commands.push(Command::PrepareNodeMsgToSend {
+                msg: SystemMsg::DkgNotReady {
+                    session_id,
+                    message,
+                },
+                dst: DstLocation::Node {
+                    name: sender,
+                    section_pk,
+                },
+            });
+        }
+        Ok(commands)
+    }
+
     fn check_failure_agreement(&mut self) -> Option<Command> {
         if self.failures.has_agreement(&self.elder_candidates) {
             self.complete = true;
@@ -470,6 +534,7 @@ mod tests {
             let actor = actors.get_mut(&addr).context("Unknown message recipient")?;
 
             let commands = futures::executor::block_on(actor.voter.process_message(
+                actor.node.name(),
                 &actor.node,
                 &session_id,
                 message,
