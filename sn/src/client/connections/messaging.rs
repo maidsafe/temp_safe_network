@@ -226,7 +226,7 @@ impl Session {
             warn!("No op_id found for query");
         }
 
-        let discarded_responses = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
+        let failed_sends = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
 
         let dst_location = DstLocation::Section {
             name: dst,
@@ -241,7 +241,7 @@ impl Session {
         for socket in chosen_elders.clone() {
             let endpoint = endpoint.clone();
             let msg_bytes = msg_bytes.clone();
-            let counter_clone = discarded_responses.clone();
+            let counter_clone = failed_sends.clone();
 
             let task_handle = tokio::spawn({
                 let session = self.clone();
@@ -257,6 +257,7 @@ impl Session {
                                 connection.remote_address(),
                                 connection_incoming,
                             );
+
                             connection.send_with(msg_bytes, priority, None).await
                         })
                         .await;
@@ -296,6 +297,16 @@ impl Session {
                 error!("Error spawning task to send query: {:?} ", err);
                 discarded_responses += 1;
             }
+        }
+
+        let send_failures = *failed_sends.lock().await;
+        if send_failures >= 2 {
+            let successful_connections = 3 - send_failures;
+            error!("Could not send query to enough elders");
+            return Err(Error::InsufficientElderConnections(
+                successful_connections,
+                3,
+            ));
         }
 
         let response = loop {
@@ -574,7 +585,16 @@ pub(super) async fn send_message(
         );
     }
 
-    Ok(())
+    let successful_sends = *successes.read().await;
+    if failures > successful_sends {
+        error!("More send errors than success on send_message");
+        Err(Error::InsufficientElderConnections(
+            elders.len(),
+            successful_sends,
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 #[instrument(skip_all, level = "trace")]

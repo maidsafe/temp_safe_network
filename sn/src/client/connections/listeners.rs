@@ -8,7 +8,7 @@
 
 use super::Session;
 use crate::client::connections::messaging::NUM_OF_ELDERS_SUBSET_FOR_QUERIES;
-use crate::client::{connections::messaging::send_message, Error};
+use crate::client::{connections::messaging::send_message, Error, Result};
 use crate::messaging::data::DataCmd;
 use crate::messaging::{
     data::{CmdError, ServiceMsg},
@@ -49,17 +49,27 @@ impl Session {
                     Ok(msg) => match Self::handle_msg(msg, src, session.clone()).await {
                         Ok(()) => {},
                         Err(err) => {
-                            error!("Error while processing incoming message: {:?}. Listening for next message...", err);
+                            error!("Error while handling incoming message: {:?}. Listening for next message...", err);
                         }
                     },
-                    Err(Error::Generic(_)) => {
-                        // TODO: FIX error type
-                        info!("IncomingMessages listener has closed.");
-                        break;
+                    Err(error) => {
+                        match error {
+                            Error::IncomingMessages => {
+                                info!("IncomingMessages listener has closed.");
+                                break;
+                            }
+                            Error::QuicP2p(qp2p_err) => {
+                                  // TODO: Can we recover here?
+                                  info!("Error from Qp2p received, closing listener loop. {:?}", qp2p_err);
+                                  break;
+                            },
+                            error => {
+                                error!("Error while processing incoming message: {:?}. Listening for next message...", error);
+
+                            }
+                        }
                     }
-                    Err(err) => {
-                        error!("Error while getting incoming message: {:?}. Listening for next message...", err);
-                    }
+
                 }
             }
 
@@ -79,7 +89,7 @@ impl Session {
 
             Ok(msg_type)
         } else {
-            Err(Error::Generic("Nothing..".to_string())) // TODO: FIX error type
+            Err(Error::IncomingMessages)
         }
     }
 

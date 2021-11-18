@@ -47,6 +47,9 @@ pub enum Error {
     /// Client has not gone through qp2p bootstrap process yet
     #[error("Client has not yet acquired any network knowledge, so anything sent is guaranteed to have a lengthy AE process")]
     NoNetworkKnowledge,
+    /// qp2p's IncomingMessages errores
+    #[error("An error was returned from IncomingMessages on one of our connections")]
+    IncomingMessages,
     /// Could not connect to sufficient elder to retrieve reliable responses.
     #[error(
         "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. {0} were connected to, {1} needed."
@@ -58,6 +61,9 @@ pub enum Error {
     /// Could not send query to elder.
     #[error("Problem sending query via qp2p")]
     SendingQuery,
+    /// No query response before timeout
+    #[error("Query timed out")]
+    QueryTimedOut,
     /// Could not query elder.
     #[error("Problem receiving query internally in sn_client")]
     QueryReceiverError,
