@@ -48,9 +48,9 @@ function determine_which_crates_have_changes() {
 function generate_version_bump_commit() {
     local run_process=""
     run_process="cargo smart-release --update-crates-index --no-push --no-publish --no-changelog-preview --allow-fully-generated-changelogs --no-changelog-github-release --execute "
-    if [[ $safe_network_has_changes ]]; then run_process="${run_process} safe_network "; fi
-    if [[ $sn_api_has_changes ]]; then run_process="${run_process} sn_api "; fi
-    if [[ $sn_cli_has_changes ]]; then run_process="${run_process} sn_cli "; fi
+    if [[ $safe_network_has_changes == true ]]; then run_process="${run_process} safe_network "; fi
+    if [[ $sn_api_has_changes == true ]]; then run_process="${run_process} sn_api "; fi
+    if [[ $sn_cli_has_changes == true ]]; then run_process="${run_process} sn_cli "; fi
     echo "Will run smart-release with the following command: "
     echo "$run_process"
     eval $run_process
