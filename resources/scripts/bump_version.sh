@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-
 commit_message=""
 sn_version=""
 sn_api_version=""
@@ -10,7 +8,8 @@ safe_network_has_changes=false
 sn_api_has_changes=false
 sn_cli_has_changes=false
 
-function determine_which_crates_have_changes() {
+function crate_has_changes() {
+    local crate_name="$1"
     local output
     output=$(cargo smart-release \
         --update-crates-index \
@@ -19,31 +18,47 @@ function determine_which_crates_have_changes() {
         --no-changelog-preview \
         --allow-fully-generated-changelogs \
         --no-changelog-github-release \
-        safe_network sn_api 2>&1)
-    if [[ $output == *"WOULD auto-bump dependent package 'safe_network'"* ]]; then
-        echo "smart-release identified changes in safe_network"
+        "$crate_name" 2>&1)
+    if [[ $output == *"WOULD auto-bump provided package '$crate_name'"* ]]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+function determine_which_crates_have_changes() {
+    local has_changes
+    has_changes=$(crate_has_changes "safe_network")
+    if [[ $has_changes == "true" ]]; then
+        echo "smart-release has determined safe_network crate has changes"
         safe_network_has_changes=true
     fi
-    if [[ $output == *"WOULD auto-bump dependent package 'sn_api'"* ]]; then
-        echo "smart-release identified changes in sn_api"
+    has_changes=$(crate_has_changes "sn_api")
+    if [[ $has_changes == "true" ]]; then
+        echo "smart-release has determined sn_api crate has changes"
         sn_api_has_changes=true
     fi
-    if [[ $output == *"WOULD auto-bump dependent package 'sn_cli'"* ]]; then
-        echo "smart-release identified changes in sn_cli"
+    has_changes=$(crate_has_changes "sn_cli")
+    if [[ $has_changes == "true" ]]; then
+        echo "smart-release has determined sn_cli crate has changes"
         sn_cli_has_changes=true
     fi
 }
 
 function generate_version_bump_commit() {
-    cargo smart-release \
-        --update-crates-index \
-        --no-push \
-        --no-publish \
-        --no-changelog-preview \
-        --allow-fully-generated-changelogs \
-        --no-changelog-github-release \
-        --execute \
-        safe_network sn_api
+    local run_process=""
+    run_process="cargo smart-release --update-crates-index --no-push --no-publish --no-changelog-preview --allow-fully-generated-changelogs --no-changelog-github-release --execute "
+    if [[ $safe_network_has_changes == true ]]; then run_process="${run_process} safe_network "; fi
+    if [[ $sn_api_has_changes == true ]]; then run_process="${run_process} sn_api "; fi
+    if [[ $sn_cli_has_changes == true ]]; then run_process="${run_process} sn_cli "; fi
+    echo "Will run smart-release with the following command: "
+    echo "$run_process"
+    eval $run_process
+    exit_code=$?
+    if [[ $exit_code -ne 0 ]]; then
+        echo "smart-release did not run successfully. Exiting with failure code."
+        exit 1
+    fi
 }
 
 function generate_new_commit_message() {
@@ -77,7 +92,6 @@ function amend_tags() {
     if [[ $sn_cli_has_changes == true ]]; then git tag "sn_cli-v${sn_cli_version}" -f; fi
 }
 
-git --no-pager tag
 determine_which_crates_have_changes
 generate_version_bump_commit
 generate_new_commit_message

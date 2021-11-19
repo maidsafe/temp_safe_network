@@ -389,6 +389,18 @@ impl Core {
             .print();
         self.comm.print_stats();
     }
+
+    pub(super) async fn log_network_stats(&self) {
+        let adults = self.network_knowledge.adults().await.len();
+        let elders = self
+            .network_knowledge
+            .authority_provider()
+            .await
+            .peers()
+            .len();
+        let prefix = self.network_knowledge.prefix().await;
+        debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
+    }
 }
 
 pub(crate) struct StateSnapshot {

@@ -103,12 +103,22 @@ impl Core {
 
         info!("handle Online: {} at {}", new_info.name(), new_info.addr());
 
+        // still used for testing
         self.send_event(Event::MemberJoined {
             name: new_info.name(),
             previous_name: new_info.previous_name(),
             age: new_info.age(),
         })
         .await;
+
+        self.log_network_stats().await;
+
+        if new_info.previous_name().is_some() {
+            // Switch joins_allowed off a new adult joining.
+            *self.joins_allowed.write().await = false;
+        } else if !self.network_knowledge.prefix().await.is_empty() {
+            *self.joins_allowed.write().await = true;
+        }
 
         commands.extend(
             self.relocate_peers(&new_info.name(), &new_info.sig.signature)

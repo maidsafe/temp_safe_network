@@ -7,14 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::dbs::UsedSpace;
-use crate::messaging::{system::SystemMsg, DstLocation, WireMsg};
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Result};
-use crate::routing::{
-    Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
-};
-use crate::types::PublicKey;
+use crate::routing::{Config as RoutingConfig, EventStream, Routing as RoutingNode};
 use bls::PublicKey as BlsPublicKey;
-use std::{collections::BTreeSet, net::SocketAddr, path::Path, sync::Arc};
+use std::{net::SocketAddr, path::Path, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 ///
@@ -59,19 +55,6 @@ impl Network {
         self.routing.age().await
     }
 
-    /// Returns our section's public key.
-    pub(crate) async fn our_section_public_key(&self) -> BlsPublicKey {
-        self.routing.our_section_auth().await.section_key()
-    }
-
-    pub(crate) async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
-        self.routing
-            .matching_section(name)
-            .await
-            .map(|provider| PublicKey::from(provider.section_key()))
-            .map_err(From::from)
-    }
-
     pub(crate) async fn our_name(&self) -> XorName {
         self.routing.name().await
     }
@@ -86,53 +69,5 @@ impl Network {
 
     pub(crate) async fn genesis_key(&self) -> BlsPublicKey {
         self.routing.genesis_key().await
-    }
-
-    pub(crate) async fn send_message(&self, wire_msg: WireMsg) -> Result<(), RoutingError> {
-        self.routing.send_message(wire_msg).await
-    }
-
-    pub(crate) async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
-        self.routing.set_joins_allowed(joins_allowed).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn our_elder_names(&self) -> BTreeSet<XorName> {
-        self.routing
-            .our_elders()
-            .await
-            .iter()
-            .map(|p2p_node| p2p_node.name())
-            .collect::<BTreeSet<_>>()
-    }
-
-    pub(crate) async fn our_adults(&self) -> BTreeSet<XorName> {
-        self.routing
-            .our_adults()
-            .await
-            .into_iter()
-            .map(|p2p_node| p2p_node.name())
-            .collect::<BTreeSet<_>>()
-    }
-
-    pub(crate) async fn sign_msg_for_dst_accumulation(
-        &self,
-        node_msg: SystemMsg,
-        dst: DstLocation,
-    ) -> Result<WireMsg> {
-        let wire_msg = self
-            .routing
-            .sign_msg_for_dst_accumulation(node_msg, dst)
-            .await?;
-        Ok(wire_msg)
-    }
-
-    pub(crate) async fn sign_single_src_msg(
-        &self,
-        node_msg: SystemMsg,
-        dst: DstLocation,
-    ) -> Result<WireMsg> {
-        let wire_msg = self.routing.sign_single_src_msg(node_msg, dst).await?;
-        Ok(wire_msg)
     }
 }
