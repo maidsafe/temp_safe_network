@@ -33,11 +33,11 @@ jobs:
       - name: push version bump and changelog commit
         uses: ad-m/github-push-action@master
         with:
-          github_token: ${{ secrets.MERGE_BUMP_BRANCH_TOKEN }}
+          github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
           branch: main
       - name: push version tags
         uses: ad-m/github-push-action@master
         with:
-          github_token: ${{ secrets.MERGE_BUMP_BRANCH_TOKEN }}
+          github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
           branch: main
           tags: true
