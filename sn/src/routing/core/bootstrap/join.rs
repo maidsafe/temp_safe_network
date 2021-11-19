@@ -24,7 +24,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    Peer, Sender, MIN_ADULT_AGE,
+    Peer, MIN_ADULT_AGE,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -424,18 +424,10 @@ impl<'a> Join<'a> {
                                 msg: SystemMsg::JoinResponse(resp),
                                 msg_authority,
                                 ..
-                            }) => {
-                                let sender_addr = match sender {
-                                    Sender::Ourself => self.node.addr,
-                                    Sender::Connected(connection) => connection.remote_address(),
-                                    #[cfg(test)]
-                                    Sender::Test(addr) => addr,
-                                };
-                                (
-                                    *resp,
-                                    Peer::new(msg_authority.src_location().name(), sender_addr),
-                                )
-                            }
+                            }) => (
+                                *resp,
+                                Peer::new(msg_authority.src_location().name(), sender.addr()),
+                            ),
                             Ok(
                                 MessageType::Service { msg_id, .. }
                                 | MessageType::System { msg_id, .. },
@@ -500,7 +492,7 @@ mod tests {
         error::Error as RoutingError,
         messages::WireMsgUtils,
         network_knowledge::{test_utils::*, NodeState},
-        MIN_ADULT_AGE,
+        UnnamedPeer, MIN_ADULT_AGE,
     };
     use crate::{elder_count, init_test_logger};
 
@@ -998,7 +990,7 @@ mod tests {
         debug!("wire msg built");
 
         recv_tx.try_send(ConnectionEvent::Received((
-            Sender::Ourself,
+            UnnamedPeer::addressed(bootstrap_node.addr),
             wire_msg.serialize()?,
         )))?;
 
