@@ -63,6 +63,14 @@ impl Node {
             reward_key,
         };
         let used_space = UsedSpace::new(config.max_capacity());
+
+        let joining_timeout = if cfg!(feature = "always-joinable") {
+            joining_timeout
+        } else {
+            // arbitrarily long time, the join process should just loop w/ backoff until then
+            joining_timeout * 10
+        };
+
         let (network_api, network_events) = tokio::time::timeout(
             joining_timeout,
             Network::new(root_dir_buf.as_path(), config, used_space.clone()),
