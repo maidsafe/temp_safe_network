@@ -166,6 +166,7 @@ pub fn init_test_logger() {
 #[cfg(test)]
 mod tests {
     use crate::routing::log_markers::LogMarker;
+    use crate::routing::ELDER_SIZE;
     use crate::testnet_grep::search_testnet_results_per_node;
     use eyre::Result;
 
@@ -221,13 +222,13 @@ mod tests {
         );
         println!("Found prefix_1_new_elders: {:?}", prefix1_new_elder_nodes);
 
-        assert!(prefix0_new_elder_nodes + prefix0_prior_elder_nodes >= 7);
-        assert!(prefix1_prior_elder_nodes + prefix1_new_elder_nodes >= 7);
+        assert!(prefix0_new_elder_nodes + prefix0_prior_elder_nodes >= ELDER_SIZE);
+        assert!(prefix1_prior_elder_nodes + prefix1_new_elder_nodes >= ELDER_SIZE);
 
         // we're not discounting demotions at the moment, so just more than 14 is fine
-        assert!(total_elders >= 14);
+        assert!(total_elders >= 2 * ELDER_SIZE);
 
-        assert!(split_count >= 7);
+        assert!(split_count >= ELDER_SIZE);
 
         Ok(())
     }

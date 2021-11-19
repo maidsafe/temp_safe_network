@@ -12,6 +12,7 @@ use crate::messaging::{
     data::{DataCmd, ServiceMsg},
     ServiceAuth, WireMsg,
 };
+use crate::routing::ELDER_SIZE;
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
 use xor_name::XorName;
@@ -45,6 +46,8 @@ impl Client {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name();
 
+        let chunk_count = (ELDER_SIZE / 2) + 1;
+
         // (should be a global constant in the codebase,
         // derived from also global const Elder count,
         // and the max num faulty assumption - also as a const).
@@ -53,8 +56,8 @@ impl Client {
         // So it's no more than 2 with 7 Elders.
         // With 3 we are "guaranteed" 1 correctly functioning Elder.
         let targets = match &cmd {
-            DataCmd::StoreChunk(_) => 3, // stored at Adults, so only 1 correctly functioning Elder need to relay
-            DataCmd::Register(_) => 7,   // only stored at Elders, all need a copy
+            DataCmd::StoreChunk(_) => chunk_count, // stored at Adults, so only 1 correctly functioning Elder need to relay
+            DataCmd::Register(_) => ELDER_SIZE,    // only stored at Elders, all need a copy
         };
 
         let serialised_cmd = {

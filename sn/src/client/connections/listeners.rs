@@ -16,7 +16,7 @@ use crate::messaging::{
     DstLocation, MessageId, MessageType, MsgKind, WireMsg,
 };
 use crate::messaging::{AuthorityProof, ServiceAuth};
-use crate::routing::{log_markers::LogMarker, SectionAuthorityProvider};
+use crate::routing::{log_markers::LogMarker, SectionAuthorityProvider, ELDER_SIZE};
 use crate::types::utils::write_data_to_disk;
 use bytes::Bytes;
 use itertools::Itertools;
@@ -421,11 +421,13 @@ impl Session {
             service_msg
         );
 
-        let (mut target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
+        let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
             ServiceMsg::Cmd(cmd) => {
+                let chunk_count = (ELDER_SIZE / 2) + 1;
+
                 match &cmd {
-                    DataCmd::StoreChunk(_) => (3, cmd.dst_name()), // stored at Adults, so only 1 correctly functioning Elder need to relay
-                    DataCmd::Register(_) => (7, cmd.dst_name()), // only stored at Elders, all need a copy
+                    DataCmd::StoreChunk(_) => (chunk_count, cmd.dst_name()), // stored at Adults, so only 1 correctly functioning Elder need to relay
+                    DataCmd::Register(_) => (ELDER_SIZE, cmd.dst_name()), // only stored at Elders, all need a copy
                 }
             }
             ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),
@@ -442,9 +444,9 @@ impl Session {
 
         // In case of redirects, we can send the message to only 3 Elders as anyhow we will get back
         // an AE-Retry for this message consecutively.
-        if !is_retry {
-            target_count = 3;
-        }
+        // if !is_retry {
+        //     target_count = 3;
+        // }
 
         let target_public_key;
 
