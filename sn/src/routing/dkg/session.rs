@@ -81,7 +81,7 @@ impl Session {
                 }
                 commands.extend(self.check(node, session_id, section_pk)?);
             }
-            Err(DkgError::UnexpectedPhase { .. }) => {
+            Err(DkgError::UnexpectedPhase { .. }) | Err(DkgError::MissingPart) => {
                 commands.push(Command::PrepareNodeMsgToSend {
                     msg: SystemMsg::DkgNotReady {
                         session_id: *session_id,
