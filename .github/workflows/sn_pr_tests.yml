@@ -164,8 +164,7 @@ jobs:
         run: cd sn && cargo test --release --features=always-joinable,test-utils client --doc
         timeout-minutes: 5
 
-      - run: ./target/release/testnet > startup.log
-        timeout-minutes: 30
+      - run: ./target/release/testnet
         env:
           NODE_COUNT: 45
 
@@ -200,7 +199,7 @@ jobs:
       - name: Restart Section if no split
         shell: bash
         if: steps.split-check-1.outcome == 'failure' || steps.split-check-1-win.outcome == 'failure'
-        run: ./target/release/testnet > startup.log
+        run: ./target/release/testnet
         env:
           NODE_COUNT: 45
 
@@ -237,7 +236,7 @@ jobs:
       - name: Restart Section if no split
         if: steps.split-check-2.outcome == 'failure' || steps.split-check-2-win.outcome == 'failure'
         shell: bash
-        run: ./target/release/testnet > startup.log
+        run: ./target/release/testnet
         env:
           NODE_COUNT: 45
 
@@ -342,10 +341,10 @@ jobs:
           echo "$(tasklist | FIND "sn_node.exe" | find /c /v "") nodes still running"
           ls $HOME/.safe/node/local-test-network
 
-      - name: Print Testnet Startup output
-        shell: bash
-        run: cat startup.log
-        if: failure()
+      # - name: Print Testnet Startup output
+      #   shell: bash
+      #   run: cat startup.log
+      #   if: failure()
 
       - name: Print Network Log Stats
         shell: bash
