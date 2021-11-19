@@ -39,7 +39,7 @@ use tracing::{self, error, info, trace};
 use tracing_subscriber::filter::EnvFilter;
 const MODULE_NAME: &str = "safe_network";
 
-const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
+const BOOTSTRAP_RETRY_TIME: u64 = 6; // in minutes
 use safe_network::routing;
 
 /// Runs a Safe Network node.

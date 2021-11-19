@@ -215,7 +215,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: ./resources/scripts/network_is_ready.sh
         id: split-check-2
-        timeout-minutes: 5
+        timeout-minutes: 25
         continue-on-error: true
 
       - name: Wait for a healthy network (win)
