@@ -184,7 +184,7 @@ pub fn init_test_logger() {
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .with_target(false)
             .event_format(LogFormatter::default())
-            .init()
+            .try_init().unwrap_or_else(|_| println!("Error initializing logger"));
     });
 }
 

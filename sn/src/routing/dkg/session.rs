@@ -482,7 +482,9 @@ mod tests {
         // NOTE: `seed` is for seeding the rng that randomizes the message order.
         #[test]
         fn proptest_full_participation(nodes in arbitrary_elder_nodes(), seed in any::<u64>()) {
-            prop_assert!(proptest_full_participation_impl(nodes, seed).is_ok());
+            if let Err(error) = proptest_full_participation_impl(nodes, seed) {
+                panic!("{}", error);
+            }
         }
     }
 
@@ -593,6 +595,10 @@ mod tests {
                     Ok(vec![])
                 }
                 Command::ScheduleTimeout { .. } => Ok(vec![]),
+                Command::PrepareNodeMsgToSend {
+                    msg: SystemMsg::DkgNotReady { message, .. },
+                    ..
+                } => Ok(vec![(self.node.addr, message)]),
                 other_command => {
                     bail!("Unexpected command: {:?}", other_command)
                 }

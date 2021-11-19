@@ -494,7 +494,6 @@ async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::elder_count;
     use crate::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
     use crate::routing::{
         dkg::test_utils::*,
@@ -503,6 +502,7 @@ mod tests {
         network_knowledge::{test_utils::*, NodeState},
         MIN_ADULT_AGE,
     };
+    use crate::{elder_count, init_test_logger};
 
     use crate::types::PublicKey;
     use assert_matches::assert_matches;
@@ -728,7 +728,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn join_invalid_redirect_response() -> Result<()> {
-        crate::init_test_logger();
+        init_test_logger();
         let _span = tracing::info_span!("join_invalid_redirect_response").entered();
 
         let (send_tx, mut send_rx) = mpsc::channel(1);
@@ -872,7 +872,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn join_invalid_retry_prefix_response() -> Result<()> {
-        crate::init_test_logger();
+        init_test_logger();
         let _span = tracing::info_span!("join_invalid_retry_prefix_response").entered();
 
         let (send_tx, mut send_rx) = mpsc::channel(1);
