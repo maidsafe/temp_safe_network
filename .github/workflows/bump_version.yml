@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-env:
-  GITHUB_TOKEN: ${{ secrets.BRANCH_CREATOR_TOKEN }}
 
 jobs:
   bump_version:
@@ -32,7 +30,14 @@ jobs:
         run: cargo install cargo-smart-release
       - shell: bash
         run: ./resources/scripts/bump_version.sh
-      - shell: bash
-        run: |
-          git push "https://$GITHUB_ACTOR:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY" HEAD:main
-          git push "https://$GITHUB_ACTOR:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY" HEAD:main --tags
+      - name: push version bump and changelog commit
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.MERGE_BUMP_BRANCH_TOKEN }}
+          branch: main
+      - name: push version tags
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.MERGE_BUMP_BRANCH_TOKEN }}
+          branch: main
+          tags: true
