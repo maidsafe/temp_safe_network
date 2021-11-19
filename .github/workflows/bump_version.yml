@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+env:
+  GITHUB_TOKEN: ${{ secrets.BRANCH_CREATOR_TOKEN }}
 
 jobs:
   bump_version:
