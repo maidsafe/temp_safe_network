@@ -396,8 +396,7 @@ impl Core {
             .network_knowledge
             .authority_provider()
             .await
-            .peers()
-            .len();
+            .elder_count();
         let prefix = self.network_knowledge.prefix().await;
         debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
     }
