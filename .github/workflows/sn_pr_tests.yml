@@ -11,6 +11,8 @@ env:
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
   SN_CLIENT_QUERY_TIMEOUT: 180
+  NODE_COUNT: 33
+
 
 jobs:
   tests:
@@ -165,8 +167,7 @@ jobs:
         timeout-minutes: 5
 
       - run: ./target/release/testnet
-        env:
-          NODE_COUNT: 45
+
 
       - name: Healthcheck
         run: ./resources/scripts/has_split.sh
@@ -200,8 +201,6 @@ jobs:
         shell: bash
         if: steps.split-check-1.outcome == 'failure' || steps.split-check-1-win.outcome == 'failure'
         run: ./target/release/testnet
-        env:
-          NODE_COUNT: 45
 
     # second chance at network startup
       - name: Healthcheck
@@ -237,8 +236,6 @@ jobs:
         if: steps.split-check-2.outcome == 'failure' || steps.split-check-2-win.outcome == 'failure'
         shell: bash
         run: ./target/release/testnet
-        env:
-          NODE_COUNT: 45
 
       - name: Healthcheck
         run: ./resources/scripts/has_split.sh
