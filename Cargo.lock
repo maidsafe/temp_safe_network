@@ -430,8 +430,9 @@ dependencies = [
 
 [[package]]
 name = "bls_dkg"
-version = "0.7.1"
-source = "git+https://github.com/maqi/BLS-DKG?branch=DKG_AE#1fd3c41b05eab79368ac88be062ff30e79afff8f"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9ac57ba4e4bebdd49fa8e2d18aa785021a28f955029b6c6b3068f8b9752afd9"
 dependencies = [
  "aes",
  "bincode",
