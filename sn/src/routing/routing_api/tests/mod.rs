@@ -1425,7 +1425,6 @@ async fn handle_demote_during_split() -> Result<()> {
     let node_name = node.name();
     let prefix0 = Prefix::default().pushed(false);
     let prefix1 = Prefix::default().pushed(true);
-
     // These peers together with `node` are pre-split elders.
     // These peers together with `peer_c` are prefix-0 post-split elders.
     let peers_a: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix0, MIN_ADULT_AGE))
@@ -1445,7 +1444,6 @@ async fn handle_demote_during_split() -> Result<()> {
         Prefix::default(),
         sk_set_v0.public_keys(),
     );
-
     let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
 
     for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
@@ -1545,7 +1543,7 @@ async fn handle_demote_during_split() -> Result<()> {
     }
 
     // our node's whole section
-    assert_eq!(update_recipients.len(), 7);
+    assert_eq!(update_recipients.len(), ELDER_SIZE);
 
     Ok(())
 }

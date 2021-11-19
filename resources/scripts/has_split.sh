@@ -6,6 +6,8 @@ then
     exit
 fi
 
+elder_count=7;
+
 # It's better to use the network health test in rust as it's type safe.
 # This is needed for windows though at the moment due to the logfile locking...
 echo "Checking logfiles to check for split"
@@ -29,7 +31,7 @@ total_elders=$(($total_prefix1_elders + $total_prefix0_elders))
 
 
 # 14 elders or more (we're not discounting demotions here...)
-if ! [[ $total_elders -gt 13 ]]
+if ! [[ $total_elders -gt $((2*$elder_count - 1)) ]]
     then
         echo "No split, retry or perhaps change NODE_COUNT!"
         exit 100
