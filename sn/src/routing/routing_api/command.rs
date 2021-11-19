@@ -13,7 +13,7 @@ use crate::messaging::{
 use crate::routing::{
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
-    Peer, Sender, XorName,
+    Peer, UnnamedPeer, XorName,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -31,7 +31,7 @@ pub(crate) enum Command {
     /// Handle `message` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     HandleMessage {
-        sender: Sender,
+        sender: UnnamedPeer,
         wire_msg: WireMsg,
         #[debug(skip)]
         // original bytes to avoid reserializing for entropy checks

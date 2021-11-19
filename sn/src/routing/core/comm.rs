@@ -11,7 +11,7 @@ use crate::messaging::{system::LoadReport, WireMsg};
 use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
-    Peer, Sender,
+    Peer, UnnamedPeer,
 };
 use bytes::Bytes;
 use futures::{
@@ -428,7 +428,7 @@ impl Comm {
 
 #[derive(Debug)]
 pub(crate) enum ConnectionEvent {
-    Received((Sender, Bytes)),
+    Received((UnnamedPeer, Bytes)),
 }
 
 #[tracing::instrument(skip_all)]
@@ -471,7 +471,7 @@ async fn handle_incoming_messages(
             Ok(msg) => {
                 let _send_res = event_tx
                     .send(ConnectionEvent::Received((
-                        Sender::Connected(connection.clone()),
+                        UnnamedPeer::connected(connection.clone()),
                         msg,
                     )))
                     .await;

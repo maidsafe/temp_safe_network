@@ -25,7 +25,9 @@
 // ############################################################################
 pub(crate) use self::{
     core::MIN_LEVEL_WHEN_FULL,
-    network_knowledge::{peer::Sender, section_keys::SectionKeyShare, SectionAuthorityProvider},
+    network_knowledge::{
+        peer::UnnamedPeer, section_keys::SectionKeyShare, SectionAuthorityProvider,
+    },
 };
 pub use self::{
     dkg::SectionAuthUtils,
