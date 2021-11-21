@@ -322,7 +322,7 @@ jobs:
       - name: Run sn_api tests
         shell: bash
         run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 20
+        timeout-minutes: 30
 
       - name: Are nodes still running...?
         shell: bash
