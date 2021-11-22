@@ -78,6 +78,7 @@ pub(crate) mod test_utils {
             nodes
                 .iter()
                 .unique_by(|node| node.keypair.secret.as_bytes())
+                .unique_by(|node| node.addr)
                 .count()
                 == nodes.len()
         })
