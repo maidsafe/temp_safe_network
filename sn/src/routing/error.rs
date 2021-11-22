@@ -22,6 +22,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    #[error("Only messages requiring auth accumultion should be sent via \"send_messages_to_all_nodes_or_directly_handle_for_accumulation\"")]
+    SendOrHandlingNormalMsg,
     #[error("There was a problem during acquisition of a tokio::sync::semaphore permit.")]
     PermitAcquisitionFailed,
     #[error("Failed signature check.")]

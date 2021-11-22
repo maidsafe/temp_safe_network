@@ -14,12 +14,12 @@ use crate::messaging::{
         DkgSessionId, JoinResponse, NodeCmd, Proposal, RelocateDetails, RelocatePromise,
         SectionAuth, SystemMsg,
     },
-    DstLocation, WireMsg,
+    DstLocation, MsgKind, WireMsg,
 };
 use crate::routing::{
     core::StateSnapshot,
     dkg::DkgSessionIdUtils,
-    error::Result,
+    error::{Error, Result},
     log_markers::LogMarker,
     messages::WireMsgUtils,
     network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
@@ -84,8 +84,8 @@ impl Core {
 
         // Broadcast the proposal to the rest of the section elders.
         let node_msg = SystemMsg::Propose {
-            proposal,
-            sig_share,
+            proposal: proposal.clone(),
+            sig_share: sig_share.clone(),
         };
         // Name of the section_pk may not matches the section prefix.
         // Carry out a substitution to prevent the dst_location becomes other section.
@@ -100,7 +100,34 @@ impl Core {
             section_key,
         )?;
 
-        Ok(self.send_or_handle(wire_msg, recipients).await)
+        let msg_id = wire_msg.msg_id();
+
+        let mut commands = vec![];
+        let our_name = self.node.read().await.name();
+        // handle ourselves if we should
+        for peer in recipients.clone() {
+            if peer.name() == our_name {
+                commands.extend(
+                    self.handle_proposal(msg_id, proposal.clone(), sig_share.clone(), peer)
+                        .await?,
+                )
+            }
+        }
+
+        // remove ourself from recipients
+        let recipients = recipients
+            .into_iter()
+            .filter(|peer| peer.name() != our_name)
+            .collect();
+
+        commands.extend(
+            self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(
+                wire_msg, recipients,
+            )
+            .await?,
+        );
+
+        Ok(commands)
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -221,7 +248,7 @@ impl Core {
         };
 
         match self
-            .send_direct_message_to_nodes(
+            .send_direct_message_to_nodes_in_section(
                 nodes,
                 node_msg,
                 self.network_knowledge.prefix().await.name(),
@@ -298,7 +325,7 @@ impl Core {
         });
 
         match self
-            .send_direct_message_to_nodes(
+            .send_direct_message_to_nodes_in_section(
                 recipients.clone(),
                 data_update_msg,
                 prefix.name(),
@@ -333,7 +360,7 @@ impl Core {
         };
 
         match self
-            .send_direct_message_to_nodes(
+            .send_direct_message_to_nodes_in_section(
                 adults,
                 node_msg,
                 self.network_knowledge.prefix().await.name(),
@@ -463,24 +490,32 @@ impl Core {
             recipients
         );
 
-        Ok(self.send_or_handle(wire_msg, recipients).await)
+        Ok(self
+            .send_messages_to_all_nodes_or_directly_handle_for_accumulation(wire_msg, recipients)
+            .await?)
     }
 
     // Send the message to all `recipients`. If one of the recipients is us, don't send it over the
-    // network but handle it directly.
-    pub(crate) async fn send_or_handle(
+    // network but handle it directly (should only be used when accumulation is necesary)
+    pub(crate) async fn send_messages_to_all_nodes_or_directly_handle_for_accumulation(
         &self,
         mut wire_msg: WireMsg,
         recipients: Vec<Peer>,
-    ) -> Vec<Command> {
+    ) -> Result<Vec<Command>> {
         let mut commands = vec![];
         let mut others = Vec::new();
         let mut handle = false;
 
         trace!("Send {:?} to {:?}", wire_msg, recipients);
 
-        for recipient in recipients {
+        for recipient in recipients.clone() {
             if recipient.name() == self.node.read().await.name() {
+                match *wire_msg.msg_kind() {
+                    MsgKind::NodeBlsShareAuthMsg(_) => {
+                        // do nothing, continue we should be accumulating this
+                    }
+                    _ => return Err(Error::SendOrHandlingNormalMsg),
+                };
                 handle = true;
             } else {
                 others.push(recipient);
@@ -509,7 +544,7 @@ impl Core {
             });
         }
 
-        commands
+        Ok(commands)
     }
 
     pub(crate) async fn send_direct_message(
@@ -539,17 +574,17 @@ impl Core {
         })
     }
 
-    pub(crate) async fn send_direct_message_to_nodes(
+    pub(crate) async fn send_direct_message_to_nodes_in_section(
         &self,
         recipients: Vec<Peer>,
         node_msg: SystemMsg,
-        dst_name: XorName,
+        section_name: XorName,
         dst_section_pk: BlsPublicKey,
     ) -> Result<Command> {
         let wire_msg = WireMsg::single_src(
             &self.node.read().await.clone(),
             DstLocation::Section {
-                name: dst_name,
+                name: section_name,
                 section_pk: dst_section_pk,
             },
             node_msg,
@@ -578,7 +613,7 @@ impl Core {
 
         let dst_section_pk = self.network_knowledge.section_key().await;
         let cmd = self
-            .send_direct_message_to_nodes(
+            .send_direct_message_to_nodes_in_section(
                 targets,
                 node_msg,
                 self.network_knowledge
