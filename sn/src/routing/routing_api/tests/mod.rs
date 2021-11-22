@@ -10,6 +10,7 @@
 
 use super::{Comm, Command, Core, Dispatcher};
 use crate::dbs::UsedSpace;
+use crate::elder_count;
 use crate::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Proposal,
@@ -32,7 +33,6 @@ use crate::routing::{
     supermajority, Error, Event, Peer, Result as RoutingResult, Sender, FIRST_SECTION_MAX_AGE,
     FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
-use crate::ELDER_COUNT;
 
 use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
@@ -62,7 +62,7 @@ static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let prefix1 = Prefix::default().pushed(true);
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, ELDER_COUNT);
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, elder_count());
 
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
@@ -142,7 +142,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let prefix1 = Prefix::default().pushed(true);
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, ELDER_COUNT);
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, elder_count());
 
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
@@ -362,7 +362,7 @@ async fn aggregate_proposals() -> Result<()> {
     };
 
     let section_pk = section.section_key().await;
-    for (index, node) in nodes.iter().enumerate().take(THRESHOLD) {
+    for (index, node) in nodes.iter().enumerate().take(threshold()) {
         let sig_share = proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
 
         let wire_msg = WireMsg::single_src(
@@ -397,12 +397,12 @@ async fn aggregate_proposals() -> Result<()> {
 
     let sig_share = proposal.prove(
         pk_set.clone(),
-        THRESHOLD,
-        &sk_set.secret_key_share(THRESHOLD),
+        threshold(),
+        &sk_set.secret_key_share(threshold()),
     )?;
     let section_pk = section.section_key().await;
     let wire_msg = WireMsg::single_src(
-        &nodes[THRESHOLD],
+        &nodes[threshold()],
         DstLocation::Section {
             name: XorName::from(PublicKey::Bls(section_pk)),
             section_pk,
@@ -448,7 +448,7 @@ async fn handle_agreement_on_online() -> Result<()> {
 
     let prefix = Prefix::default();
 
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, ELDER_COUNT);
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
@@ -484,7 +484,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let chain = SecuredLinkedList::new(sk_set.secret_key().public_key());
 
     // Creates nodes where everybody has age 6 except one has 5.
-    let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), ELDER_COUNT, true);
+    let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), true);
 
     let section_auth = SectionAuthorityProvider::new(
         nodes.iter().map(Node::peer),
@@ -661,7 +661,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         NetworkPhase::Startup => Prefix::default(),
         NetworkPhase::Regular => "0".parse().unwrap(),
     };
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, ELDER_COUNT);
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
     // Make a left peer.
@@ -1099,7 +1099,9 @@ async fn relocation_of_non_elder() -> Result<()> {
     relocation(RelocatedPeerRole::NonElder).await
 }
 
-const THRESHOLD: usize = supermajority(ELDER_COUNT) - 1;
+fn threshold() -> usize {
+    supermajority(elder_count()) - 1
+}
 
 #[allow(dead_code)]
 enum RelocatedPeerRole {
@@ -1109,7 +1111,7 @@ enum RelocatedPeerRole {
 
 async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let prefix: Prefix = "0".parse().unwrap();
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, ELDER_COUNT);
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
     let non_elder_peer = create_peer(MIN_AGE);
@@ -1287,11 +1289,11 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
 async fn handle_elders_update() -> Result<()> {
     crate::init_test_logger();
     let _span = tracing::info_span!("handle_elders_update").entered();
-    // Start with section that has `ELDER_COUNT` elders with age 6, 1 non-elder with age 5 and one
+    // Start with section that has `elder_count()` elders with age 6, 1 non-elder with age 5 and one
     // to-be-elder with age 7:
     let node = create_node(MIN_AGE + 2, None);
     let mut other_elder_peers: Vec<_> = iter::repeat_with(|| create_peer(MIN_AGE + 2))
-        .take(ELDER_COUNT - 1)
+        .take(elder_count() - 1)
         .collect();
     let adult_peer = create_peer(MIN_ADULT_AGE);
     let promoted_peer = create_peer(MIN_AGE + 3);
@@ -1430,11 +1432,11 @@ async fn handle_demote_during_split() -> Result<()> {
     // These peers together with `node` are pre-split elders.
     // These peers together with `peer_c` are prefix-0 post-split elders.
     let peers_a: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix0, MIN_ADULT_AGE))
-        .take(ELDER_COUNT - 1)
+        .take(elder_count() - 1)
         .collect();
     // These peers are prefix-1 post-split elders.
     let peers_b: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix1, MIN_ADULT_AGE))
-        .take(ELDER_COUNT)
+        .take(elder_count())
         .collect();
     // This peer is a prefix-0 post-split elder.
     let peer_c = create_peer_in_prefix(&prefix0, MIN_ADULT_AGE);
@@ -1545,7 +1547,7 @@ async fn handle_demote_during_split() -> Result<()> {
     }
 
     // our node's whole section
-    assert_eq!(update_recipients.len(), ELDER_COUNT);
+    assert_eq!(update_recipients.len(), elder_count());
 
     Ok(())
 }
@@ -1575,7 +1577,7 @@ pub(crate) async fn create_comm() -> Result<Comm> {
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
 fn create_section_auth() -> (SectionAuthorityProvider, Vec<Node>, SecretKeySet) {
     let (section_auth, elders, secret_key_set) =
-        gen_section_authority_provider(Prefix::default(), ELDER_COUNT);
+        gen_section_authority_provider(Prefix::default(), elder_count());
     (section_auth, elders, secret_key_set)
 }
 
@@ -1648,7 +1650,7 @@ pub(crate) struct SecretKeySet {
 
 impl SecretKeySet {
     pub(crate) fn random() -> Self {
-        let poly = bls::poly::Poly::random(THRESHOLD, &mut rand::thread_rng());
+        let poly = bls::poly::Poly::random(threshold(), &mut rand::thread_rng());
         let key = bls::SecretKey::from_mut(&mut poly.evaluate(0));
         let set = bls::SecretKeySet::from(poly);
 

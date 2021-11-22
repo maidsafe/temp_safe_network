@@ -68,7 +68,29 @@ use tracing_subscriber::{
 };
 
 /// Number of elders per section.
-pub const ELDER_COUNT: usize = 5;
+pub(crate) const DEFAULT_ELDER_COUNT: usize = 7;
+const SN_ELDER_COUNT: &str = "SN_ELDER_COUNT";
+
+/// Get the expected elder count for our network, defaults to DEFAULT_ELDER_COUNT, but can be overridden by the env var SN_ELDER_COUNT
+pub(crate) fn elder_count() -> usize {
+    // if we have an env var for this, lets override
+    match std::env::var(SN_ELDER_COUNT) {
+        Ok(count) => match count.parse() {
+            Ok(count) => {
+                warn!(
+                    "ELDER_COUNT countout set from env var SN_ELDER_COUNT: {:?}",
+                    SN_ELDER_COUNT
+                );
+                count
+            }
+            Err(error) => {
+                warn!("There was an error parsing {:?} env var. Defaultelder_count() will be used: {:?}", SN_ELDER_COUNT, error);
+                DEFAULT_ELDER_COUNT
+            }
+        },
+        Err(_) => DEFAULT_ELDER_COUNT,
+    }
+}
 
 #[cfg(test)]
 use std::sync::Once;
@@ -168,9 +190,9 @@ pub fn init_test_logger() {
 
 #[cfg(test)]
 mod tests {
+    use crate::elder_count;
     use crate::routing::log_markers::LogMarker;
     use crate::testnet_grep::search_testnet_results_per_node;
-    use crate::ELDER_COUNT;
     use eyre::Result;
 
     // Check that with one split we have 14 elders.
@@ -225,13 +247,13 @@ mod tests {
         );
         println!("Found prefix_1_new_elders: {:?}", prefix1_new_elder_nodes);
 
-        assert!(prefix0_new_elder_nodes + prefix0_prior_elder_nodes >= ELDER_COUNT);
-        assert!(prefix1_prior_elder_nodes + prefix1_new_elder_nodes >= ELDER_COUNT);
+        assert!(prefix0_new_elder_nodes + prefix0_prior_elder_nodes >= elder_count());
+        assert!(prefix1_prior_elder_nodes + prefix1_new_elder_nodes >= elder_count());
 
         // we're not discounting demotions at the moment, so just more than 14 is fine
-        assert!(total_elders >= 2 * ELDER_COUNT);
+        assert!(total_elders >= 2 * elder_count());
 
-        assert!(split_count >= ELDER_COUNT);
+        assert!(split_count >= elder_count());
 
         Ok(())
     }

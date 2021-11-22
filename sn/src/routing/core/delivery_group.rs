@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::elder_count;
 use crate::messaging::DstLocation;
 use crate::routing::{
     error::{Error, Result},
     network_knowledge::NetworkKnowledge,
     supermajority, Peer,
 };
-use crate::ELDER_COUNT;
 use itertools::Itertools;
 use std::{cmp, iter};
 use xor_name::XorName;
@@ -116,7 +116,7 @@ async fn candidates(
     // .collect_vec();
 
     // gives at least 1 honest target among recipients.
-    let min_dg_size = 1 + ELDER_COUNT - supermajority(ELDER_COUNT);
+    let min_dg_size = 1 + elder_count() - supermajority(elder_count());
     let mut dg_size = min_dg_size;
     let mut candidates = Vec::new();
     for (idx, (prefix, len, connected)) in sections.iter().enumerate() {
@@ -553,7 +553,7 @@ mod tests {
         let prefix1 = Prefix::default().pushed(true);
 
         let (section_auth0, _, secret_key_set) =
-            gen_section_authority_provider(prefix0, ELDER_COUNT);
+            gen_section_authority_provider(prefix0, elder_count());
         let genesis_sk = secret_key_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -571,7 +571,7 @@ mod tests {
         }
 
         let (section_auth1, _, secret_key_set) =
-            gen_section_authority_provider(prefix1, ELDER_COUNT);
+            gen_section_authority_provider(prefix1, elder_count());
         let sk1 = secret_key_set.secret_key();
         let pk1 = sk1.public_key();
 
@@ -606,7 +606,7 @@ mod tests {
         let prefix0 = Prefix::default().pushed(false);
 
         let (section_auth, _, secret_key_set) =
-            gen_section_authority_provider(prefix0, ELDER_COUNT);
+            gen_section_authority_provider(prefix0, elder_count());
         let genesis_sk = secret_key_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
         let section_auth = section_signed(genesis_sk, section_auth)?;
