@@ -67,6 +67,9 @@ use tracing_subscriber::{
     registry::LookupSpan,
 };
 
+/// Number of elders per section.
+pub const ELDER_COUNT: usize = 5;
+
 #[cfg(test)]
 use std::sync::Once;
 
@@ -166,8 +169,8 @@ pub fn init_test_logger() {
 #[cfg(test)]
 mod tests {
     use crate::routing::log_markers::LogMarker;
-    use crate::routing::ELDER_SIZE;
     use crate::testnet_grep::search_testnet_results_per_node;
+    use crate::ELDER_COUNT;
     use eyre::Result;
 
     // Check that with one split we have 14 elders.
@@ -222,13 +225,13 @@ mod tests {
         );
         println!("Found prefix_1_new_elders: {:?}", prefix1_new_elder_nodes);
 
-        assert!(prefix0_new_elder_nodes + prefix0_prior_elder_nodes >= ELDER_SIZE);
-        assert!(prefix1_prior_elder_nodes + prefix1_new_elder_nodes >= ELDER_SIZE);
+        assert!(prefix0_new_elder_nodes + prefix0_prior_elder_nodes >= ELDER_COUNT);
+        assert!(prefix1_prior_elder_nodes + prefix1_new_elder_nodes >= ELDER_COUNT);
 
         // we're not discounting demotions at the moment, so just more than 14 is fine
-        assert!(total_elders >= 2 * ELDER_SIZE);
+        assert!(total_elders >= 2 * ELDER_COUNT);
 
-        assert!(split_count >= ELDER_SIZE);
+        assert!(split_count >= ELDER_COUNT);
 
         Ok(())
     }

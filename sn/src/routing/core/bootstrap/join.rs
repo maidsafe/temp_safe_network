@@ -500,8 +500,10 @@ mod tests {
         error::Error as RoutingError,
         messages::WireMsgUtils,
         network_knowledge::{test_utils::*, NodeState},
-        ELDER_SIZE, MIN_ADULT_AGE,
+        MIN_ADULT_AGE,
     };
+    use crate::ELDER_COUNT;
+
     use crate::types::PublicKey;
     use assert_matches::assert_matches;
     use eyre::{eyre, Error, Result};
@@ -520,7 +522,7 @@ mod tests {
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
         let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+            gen_section_authority_provider(Prefix::default(), ELDER_COUNT);
         let bootstrap_node = nodes.remove(0);
         let bootstrap_addr = bootstrap_node.addr;
         let sk = sk_set.secret_key();
@@ -629,7 +631,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+        let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_COUNT);
         let bootstrap_node = nodes.remove(0);
         let genesis_key = sk_set.secret_key().public_key();
 
@@ -664,12 +666,12 @@ mod tests {
                     assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
             // Send JoinResponse::Redirect
-            let new_bootstrap_addrs: BTreeMap<_, _> = (0..ELDER_SIZE)
+            let new_bootstrap_addrs: BTreeMap<_, _> = (0..ELDER_COUNT)
                 .map(|_| (XorName::random(), gen_addr()))
                 .collect();
 
             let (new_section_auth, _, new_sk_set) =
-                gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+                gen_section_authority_provider(Prefix::default(), ELDER_COUNT);
             let new_pk_set = new_sk_set.public_keys();
 
             send_response(
@@ -731,7 +733,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+        let (_, mut nodes, sk_set) = gen_section_authority_provider(Prefix::default(), ELDER_COUNT);
         let bootstrap_node = nodes.remove(0);
 
         let node = Node::new(
@@ -757,7 +759,7 @@ mod tests {
             assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
             let (new_section_auth, _, new_sk_set) =
-                gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+                gen_section_authority_provider(Prefix::default(), ELDER_COUNT);
             let new_pk_set = new_sk_set.public_keys();
 
             send_response(
@@ -774,7 +776,7 @@ mod tests {
             )?;
             task::yield_now().await;
 
-            let addrs = (0..ELDER_SIZE)
+            let addrs = (0..ELDER_COUNT)
                 .map(|_| (XorName::random(), gen_addr()))
                 .collect();
 
@@ -818,7 +820,7 @@ mod tests {
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
         let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), ELDER_SIZE);
+            gen_section_authority_provider(Prefix::default(), ELDER_COUNT);
         let bootstrap_node = nodes.remove(0);
 
         let node = Node::new(
@@ -895,7 +897,7 @@ mod tests {
             }
         };
 
-        let (section_auth, _, sk_set) = gen_section_authority_provider(good_prefix, ELDER_SIZE);
+        let (section_auth, _, sk_set) = gen_section_authority_provider(good_prefix, ELDER_COUNT);
         let section_key = sk_set.public_keys().public_key();
 
         let state = Join::new(
@@ -905,7 +907,7 @@ mod tests {
             NetworkPrefixMap::new(section_key),
         );
 
-        let elders = (0..ELDER_SIZE)
+        let elders = (0..ELDER_COUNT)
             .map(|_| Peer::new(good_prefix.substituted_in(rand::random()), gen_addr()))
             .collect();
         let join_task = state.join(section_key, section_key, elders);
@@ -927,7 +929,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                    section_auth: gen_section_authority_provider(bad_prefix, ELDER_SIZE)
+                    section_auth: gen_section_authority_provider(bad_prefix, ELDER_COUNT)
                         .0
                         .to_msg(),
                     section_signed: signed_sap.sig.clone(),

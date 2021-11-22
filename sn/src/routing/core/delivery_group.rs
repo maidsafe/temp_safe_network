@@ -10,8 +10,9 @@ use crate::messaging::DstLocation;
 use crate::routing::{
     error::{Error, Result},
     network_knowledge::NetworkKnowledge,
-    supermajority, Peer, ELDER_SIZE,
+    supermajority, Peer,
 };
+use crate::ELDER_COUNT;
 use itertools::Itertools;
 use std::{cmp, iter};
 use xor_name::XorName;
@@ -115,7 +116,7 @@ async fn candidates(
     // .collect_vec();
 
     // gives at least 1 honest target among recipients.
-    let min_dg_size = 1 + ELDER_SIZE - supermajority(ELDER_SIZE);
+    let min_dg_size = 1 + ELDER_COUNT - supermajority(ELDER_COUNT);
     let mut dg_size = min_dg_size;
     let mut candidates = Vec::new();
     for (idx, (prefix, len, connected)) in sections.iter().enumerate() {
@@ -552,7 +553,7 @@ mod tests {
         let prefix1 = Prefix::default().pushed(true);
 
         let (section_auth0, _, secret_key_set) =
-            gen_section_authority_provider(prefix0, ELDER_SIZE);
+            gen_section_authority_provider(prefix0, ELDER_COUNT);
         let genesis_sk = secret_key_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -570,7 +571,7 @@ mod tests {
         }
 
         let (section_auth1, _, secret_key_set) =
-            gen_section_authority_provider(prefix1, ELDER_SIZE);
+            gen_section_authority_provider(prefix1, ELDER_COUNT);
         let sk1 = secret_key_set.secret_key();
         let pk1 = sk1.public_key();
 
@@ -604,7 +605,8 @@ mod tests {
     async fn setup_adult() -> Result<(XorName, NetworkKnowledge)> {
         let prefix0 = Prefix::default().pushed(false);
 
-        let (section_auth, _, secret_key_set) = gen_section_authority_provider(prefix0, ELDER_SIZE);
+        let (section_auth, _, secret_key_set) =
+            gen_section_authority_provider(prefix0, ELDER_COUNT);
         let genesis_sk = secret_key_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
         let section_auth = section_signed(genesis_sk, section_auth)?;

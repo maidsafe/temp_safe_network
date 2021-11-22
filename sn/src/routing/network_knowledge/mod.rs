@@ -24,8 +24,9 @@ use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
     log_markers::LogMarker,
-    ELDER_SIZE, RECOMMENDED_SECTION_SIZE,
+    RECOMMENDED_SECTION_SIZE,
 };
+use crate::ELDER_COUNT;
 use bls::PublicKey as BlsPublicKey;
 pub(crate) use elder_candidates::ElderCandidates;
 pub(crate) use node_state::NodeState;
@@ -474,7 +475,7 @@ impl NetworkKnowledge {
         let sap = self.authority_provider().await;
         let expected_peers = self
             .section_peers
-            .elder_candidates(ELDER_SIZE, &sap, excluded_names);
+            .elder_candidates(ELDER_COUNT, &sap, excluded_names);
 
         let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).collect();
         let current_names: BTreeSet<_> = sap.names();
@@ -555,7 +556,7 @@ impl NetworkKnowledge {
         excluded_names: &BTreeSet<XorName>,
     ) -> Option<(ElderCandidates, ElderCandidates)> {
         trace!("{}", LogMarker::SplitAttempt);
-        if self.authority_provider().await.elder_count() < ELDER_SIZE {
+        if self.authority_provider().await.elder_count() < ELDER_COUNT {
             trace!("No attempt to split as our section does not have enough elders.");
             return None;
         }
@@ -600,13 +601,13 @@ impl NetworkKnowledge {
 
         let our_elders = self.section_peers.elder_candidates_matching_prefix(
             &our_prefix,
-            ELDER_SIZE,
+            ELDER_COUNT,
             &self.authority_provider().await,
             excluded_names,
         );
         let other_elders = self.section_peers.elder_candidates_matching_prefix(
             &other_prefix,
-            ELDER_SIZE,
+            ELDER_COUNT,
             &self.authority_provider().await,
             excluded_names,
         );

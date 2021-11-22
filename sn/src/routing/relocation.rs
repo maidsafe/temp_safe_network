@@ -245,9 +245,9 @@ mod tests {
     use crate::routing::{
         dkg::test_utils::section_signed,
         network_knowledge::peer::test_utils::arbitrary_unique_peers,
-        network_knowledge::SectionAuthorityProvider, routing_api::tests::SecretKeySet, ELDER_SIZE,
-        MIN_AGE,
+        network_knowledge::SectionAuthorityProvider, routing_api::tests::SecretKeySet, MIN_AGE,
     };
+    use crate::ELDER_COUNT;
     use assert_matches::assert_matches;
     use eyre::Result;
     use itertools::Itertools;
@@ -273,7 +273,7 @@ mod tests {
     proptest! {
         #[test]
         fn proptest_actions(
-            peers in arbitrary_unique_peers(2..ELDER_SIZE + 1, MIN_AGE..MAX_AGE),
+            peers in arbitrary_unique_peers(2..ELDER_COUNT + 1, MIN_AGE..MAX_AGE),
             signature_trailing_zeros in 0..MAX_AGE,
             seed in any::<u64>().no_shrink())
         {
@@ -292,14 +292,14 @@ mod tests {
         let sk = sk_set.secret_key();
         let genesis_pk = sk.public_key();
 
-        // Create `Section` with `peers` as its members and set the `ELDER_SIZE` oldest peers as
+        // Create `Section` with `peers` as its members and set the `ELDER_COUNT` oldest peers as
         // the elders.
         let section_auth = SectionAuthorityProvider::new(
             peers
                 .iter()
                 .sorted_by_key(|peer| peer.age())
                 .rev()
-                .take(ELDER_SIZE)
+                .take(ELDER_COUNT)
                 .cloned(),
             Prefix::default(),
             sk_set.public_keys(),
