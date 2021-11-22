@@ -46,7 +46,7 @@ impl Client {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name();
 
-        let chunk_count = (elder_count() / 2) + 1;
+        let chunk_count = (elder_count() / 3) + 1;
 
         // (should be a global constant in the codebase,
         // derived from also global const Elder count,
