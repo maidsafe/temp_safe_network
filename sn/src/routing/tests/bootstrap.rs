@@ -11,11 +11,13 @@ mod utils;
 use anyhow::{Error, Result};
 use ed25519_dalek::Keypair;
 use futures::future;
-use crate::routing::routing_api::{Config, Event, NodeElderChange, ELDER_SIZE};
+use crate::routing::routing_api::{Config, Event, NodeElderChange};
 use std::collections::HashSet;
 use tokio::time;
 use utils::*;
 use xor_name::XOR_NAME_LEN;
+use crate::ELDER_COUNT;
+
 /*
 #[tokio::test(flavor = "multi_thread")]
 async fn test_genesis_node() -> Result<()> {
@@ -73,9 +75,9 @@ async fn test_startup_section_bootstrapping() -> Result<()> {
         ..Default::default()
     })
     .await?;
-    let other_node_count = ELDER_SIZE - 1;
+    let other_node_count = ELDER_COUNT - 1;
 
-    // Then add more nodes to form a section. Because there is only `ELDER_SIZE` nodes in total,
+    // Then add more nodes to form a section. Because there is only `ELDER_COUNT` nodes in total,
     // we expect every one to be promoted to elder.
     let genesis_contact = genesis_node.our_connection_info();
     let nodes_joining_tasks = (0..other_node_count).map(|_| async {
@@ -116,10 +118,10 @@ async fn test_startup_section_bootstrapping() -> Result<()> {
     panic!("event stream unexpectedly closed")
 }
 
-// Test that the first `ELDER_SIZE` nodes in the network are promoted to elders.
+// Test that the first `ELDER_COUNT` nodes in the network are promoted to elders.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_startup_elders() -> Result<()> {
-    let mut nodes = create_connected_nodes(ELDER_SIZE).await?;
+    let mut nodes = create_connected_nodes(ELDER_COUNT).await?;
 
     future::join_all(nodes.iter_mut().map(|(node, stream)| async move {
         if node.is_elder().await {

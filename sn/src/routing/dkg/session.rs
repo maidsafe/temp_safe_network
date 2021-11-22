@@ -379,8 +379,10 @@ mod tests {
     use crate::routing::{
         dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
         network_knowledge::test_utils::gen_addr, node::test_utils::arbitrary_unique_nodes,
-        node::Node, ELDER_SIZE, MIN_ADULT_AGE,
+        node::Node, MIN_ADULT_AGE,
     };
+    use crate::ELDER_COUNT;
+
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};
     use proptest::prelude::*;
@@ -534,6 +536,6 @@ mod tests {
     }
 
     fn arbitrary_elder_nodes() -> impl Strategy<Value = Vec<Node>> {
-        arbitrary_unique_nodes(2..=ELDER_SIZE)
+        arbitrary_unique_nodes(2..=ELDER_COUNT)
     }
 }

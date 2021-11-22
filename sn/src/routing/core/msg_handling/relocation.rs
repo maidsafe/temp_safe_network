@@ -16,8 +16,9 @@ use crate::routing::{
     error::Result,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
-    Event, Peer, ELDER_SIZE,
+    Event, Peer,
 };
+use crate::ELDER_COUNT;
 use xor_name::XorName;
 
 // Relocation
@@ -35,7 +36,7 @@ impl Core {
             .authority_provider()
             .await
             .elder_count()
-            < ELDER_SIZE
+            < ELDER_COUNT
         {
             return Ok(commands);
         }

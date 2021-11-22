@@ -16,8 +16,9 @@ use crate::messaging::{
     DstLocation, MessageId, MessageType, MsgKind, WireMsg,
 };
 use crate::messaging::{AuthorityProof, ServiceAuth};
-use crate::routing::{log_markers::LogMarker, SectionAuthorityProvider, ELDER_SIZE};
+use crate::routing::{log_markers::LogMarker, SectionAuthorityProvider};
 use crate::types::utils::write_data_to_disk;
+use crate::ELDER_COUNT;
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::ConnectionIncoming;
@@ -423,11 +424,11 @@ impl Session {
 
         let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
             ServiceMsg::Cmd(cmd) => {
-                let chunk_count = (ELDER_SIZE / 2) + 1;
+                let chunk_count = (ELDER_COUNT / 2) + 1;
 
                 match &cmd {
                     DataCmd::StoreChunk(_) => (chunk_count, cmd.dst_name()), // stored at Adults, so only 1 correctly functioning Elder need to relay
-                    DataCmd::Register(_) => (ELDER_SIZE, cmd.dst_name()), // only stored at Elders, all need a copy
+                    DataCmd::Register(_) => (ELDER_COUNT, cmd.dst_name()), // only stored at Elders, all need a copy
                 }
             }
             ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),

@@ -73,10 +73,7 @@ mod routing_api;
 /// More nodes might be added if requested by the upper layers.
 /// This number also detemines when split happens - if both post-split sections would have at least
 /// this number of nodes.
-pub const RECOMMENDED_SECTION_SIZE: usize = 2 * ELDER_SIZE;
-
-/// Number of elders per section.
-pub const ELDER_SIZE: usize = 5;
+pub const RECOMMENDED_SECTION_SIZE: usize = 2 * crate::ELDER_COUNT;
 
 /// SuperMajority of a given group (i.e. > 2/3)
 #[inline]

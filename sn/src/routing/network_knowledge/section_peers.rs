@@ -266,7 +266,7 @@ fn cmp_elder_candidates(
 // Compare candidates for the next elders according to their peer state. The one comparing `Less`
 // wins. `Joined` is preferred over `Relocated` which is preferred over `Left`.
 // NOTE: we only consider `Relocated` peers as elder candidates if we don't have enough `Joined`
-// members to reach `ELDER_SIZE`.
+// members to reach `ELDER_COUNT`.
 fn cmp_elder_candidates_by_membership_state(
     lhs: &MembershipState,
     rhs: &MembershipState,
