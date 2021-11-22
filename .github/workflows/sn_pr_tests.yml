@@ -168,7 +168,6 @@ jobs:
 
       - run: ./target/release/testnet
 
-
       - name: Healthcheck
         run: ./resources/scripts/has_split.sh
         timeout-minutes: 5
@@ -182,6 +181,7 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
 
+
       - name: Wait for a healthy network (win)
         shell: bash
         if: matrix.os == 'windows-latest'
@@ -192,10 +192,17 @@ jobs:
 
       - name: Kill Section if no split (unix)
         shell: bash
-        if: steps.split-check-1.outcome == 'failure' || steps.split-check-1-win.outcome == 'failure'
+        if: steps.split-check-1.outcome == 'failure'
         run: |
           killall sn_node
           rm -rf ~/.safe/node
+
+      - name: Kill Section if no split (win)
+        shell: cmd
+        if:  steps.split-check-1-win.outcome == 'failure'
+        run: |
+          taskkill /IM sn_node /F
+          rmdir /s /q %userprofile%\.safe\node
 
       - name: Restart Section if no split
         shell: bash
@@ -226,11 +233,18 @@ jobs:
         continue-on-error: true
 
       - name: Kill Section if no split (unix)
-        if: steps.split-check-2.outcome == 'failure' || steps.split-check-2-win.outcome == 'failure'
         shell: bash
+        if: steps.split-check-2.outcome == 'failure'
         run: |
           killall sn_node
           rm -rf ~/.safe/node
+
+      - name: Kill Section if no split (win)
+        shell: cmd
+        if:  steps.split-check-2-win.outcome == 'failure'
+        run: |
+          taskkill /IM sn_node /F
+          rmdir /s /q %userprofile%\.safe\node
 
       - name: Restart Section if no split
         if: steps.split-check-2.outcome == 'failure' || steps.split-check-2-win.outcome == 'failure'
@@ -298,7 +312,7 @@ jobs:
       # - name: Kill the current network (not needed for next test)
       #   if: matrix.os == 'windows-latest'
       #   run: |
-      #     taskkill /IM sn_node.exe /F
+      #     taskkill /IM sn_node /F
       #     rd /s /q %USERPROFILE%\.safe\node
       #   shell: cmd
 
