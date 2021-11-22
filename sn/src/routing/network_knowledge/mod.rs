@@ -18,15 +18,15 @@ pub(crate) use self::section_authority_provider::test_utils;
 
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
+use crate::elder_count;
 use crate::messaging::system::{KeyedSig, SectionAuth};
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     dkg::SectionAuthUtils,
     error::{Error, Result},
     log_markers::LogMarker,
-    RECOMMENDED_SECTION_SIZE,
+    recommended_section_size,
 };
-use crate::ELDER_COUNT;
 use bls::PublicKey as BlsPublicKey;
 pub(crate) use elder_candidates::ElderCandidates;
 pub(crate) use node_state::NodeState;
@@ -473,9 +473,9 @@ impl NetworkKnowledge {
         // Candidates for elders out of all the nodes in the section, even out of the
         // relocating nodes if there would not be enough instead.
         let sap = self.authority_provider().await;
-        let expected_peers = self
-            .section_peers
-            .elder_candidates(ELDER_COUNT, &sap, excluded_names);
+        let expected_peers =
+            self.section_peers
+                .elder_candidates(elder_count(), &sap, excluded_names);
 
         let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).collect();
         let current_names: BTreeSet<_> = sap.names();
@@ -556,7 +556,7 @@ impl NetworkKnowledge {
         excluded_names: &BTreeSet<XorName>,
     ) -> Option<(ElderCandidates, ElderCandidates)> {
         trace!("{}", LogMarker::SplitAttempt);
-        if self.authority_provider().await.elder_count() < ELDER_COUNT {
+        if self.authority_provider().await.elder_count() < elder_count() {
             trace!("No attempt to split as our section does not have enough elders.");
             return None;
         }
@@ -591,7 +591,9 @@ impl NetworkKnowledge {
         );
 
         // If none of the two new sections would contain enough entries, return `None`.
-        if our_new_size < RECOMMENDED_SECTION_SIZE || sibling_new_size < RECOMMENDED_SECTION_SIZE {
+        if our_new_size < recommended_section_size()
+            || sibling_new_size < recommended_section_size()
+        {
             debug!(">>>> returning here TOO SMALLLLLLLLL hmmmmmm");
             return None;
         }
@@ -601,13 +603,13 @@ impl NetworkKnowledge {
 
         let our_elders = self.section_peers.elder_candidates_matching_prefix(
             &our_prefix,
-            ELDER_COUNT,
+            elder_count(),
             &self.authority_provider().await,
             excluded_names,
         );
         let other_elders = self.section_peers.elder_candidates_matching_prefix(
             &other_prefix,
-            ELDER_COUNT,
+            elder_count(),
             &self.authority_provider().await,
             excluded_names,
         );

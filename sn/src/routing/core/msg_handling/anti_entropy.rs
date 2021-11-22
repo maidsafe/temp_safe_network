@@ -462,6 +462,7 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elder_count;
     use crate::messaging::{DstLocation, MessageId, MessageType, MsgKind, NodeAuth};
     use crate::routing::{
         create_test_used_space_and_root_storage,
@@ -472,7 +473,6 @@ mod tests {
         routing_api::tests::create_comm,
         XorName, MIN_ADULT_AGE,
     };
-    use crate::ELDER_COUNT;
 
     use assert_matches::assert_matches;
     use bls::SecretKey;
@@ -687,7 +687,7 @@ mod tests {
 
             // generate a SAP for prefix0
             let (section_auth, mut nodes, secret_key_set) =
-                gen_section_authority_provider(prefix0, ELDER_COUNT);
+                gen_section_authority_provider(prefix0, elder_count());
             let node = nodes.remove(0);
             let sap_sk = secret_key_set.secret_key();
             let signed_sap = section_signed(sap_sk, section_auth)?;
@@ -718,7 +718,7 @@ mod tests {
 
             // generate other SAP for prefix1
             let (other_sap, _, secret_key_set) =
-                gen_section_authority_provider(prefix1, ELDER_COUNT);
+                gen_section_authority_provider(prefix1, elder_count());
             let other_sap_sk = secret_key_set.secret_key();
             let other_sap = section_signed(other_sap_sk, other_sap)?;
             // generate a proof chain for this other SAP

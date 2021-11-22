@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
+use crate::elder_count;
 use crate::messaging::{
     system::{Proposal, RelocateDetails, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
@@ -18,7 +19,6 @@ use crate::routing::{
     routing_api::command::Command,
     Event, Peer,
 };
-use crate::ELDER_COUNT;
 use xor_name::XorName;
 
 // Relocation
@@ -36,7 +36,7 @@ impl Core {
             .authority_provider()
             .await
             .elder_count()
-            < ELDER_COUNT
+            < elder_count()
         {
             return Ok(commands);
         }

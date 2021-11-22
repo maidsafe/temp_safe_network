@@ -375,13 +375,13 @@ impl Backlog {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elder_count;
     use crate::messaging::MessageType;
     use crate::routing::{
         dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
         network_knowledge::test_utils::gen_addr, node::test_utils::arbitrary_unique_nodes,
         node::Node, MIN_ADULT_AGE,
     };
-    use crate::ELDER_COUNT;
 
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};
@@ -536,6 +536,6 @@ mod tests {
     }
 
     fn arbitrary_elder_nodes() -> impl Strategy<Value = Vec<Node>> {
-        arbitrary_unique_nodes(2..=ELDER_COUNT)
+        arbitrary_unique_nodes(2..=elder_count())
     }
 }
