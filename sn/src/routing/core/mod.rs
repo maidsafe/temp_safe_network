@@ -192,7 +192,7 @@ impl Core {
             section_key
         );
 
-        self.send_direct_message_to_nodes(recipients, message, dst_name, section_key)
+        self.send_direct_message_to_nodes_in_section(recipients, message, dst_name, section_key)
             .await
     }
 

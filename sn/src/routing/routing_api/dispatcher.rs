@@ -15,12 +15,10 @@ use crate::routing::{
     core::{Core, SendStatus},
     error::Result,
     log_markers::LogMarker,
-    messages::WireMsgUtils,
     network_knowledge::NetworkKnowledge,
     node::Node,
     Error, Peer,
 };
-use itertools::Itertools;
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
@@ -276,33 +274,11 @@ impl Dispatcher {
                     .await
             }
             Command::ProposeOffline(name) => self.core.propose_offline(name).await,
-            Command::StartConnectivityTest(name) => {
-                let msg = {
-                    let core = &self.core;
-                    let node = core.node.read().await.clone();
-                    let section_pk = core.network_knowledge().section_key().await;
-                    WireMsg::single_src(
-                        &node,
-                        DstLocation::Section {
-                            name: node.name(),
-                            section_pk,
-                        },
-                        SystemMsg::StartConnectivityTest(name),
-                        section_pk,
-                    )?
-                };
-                let our_name = self.core.node.read().await.name();
-                let peers = self
-                    .core
-                    .network_knowledge()
-                    .active_members()
-                    .await
-                    .iter()
-                    .filter(|peer| peer.name() != name && peer.name() != our_name)
-                    .cloned()
-                    .collect_vec();
-                Ok(self.core.send_or_handle(msg, peers).await)
-            }
+            Command::StartConnectivityTest(name) => Ok(vec![
+                self.core
+                    .send_message_to_our_elders(SystemMsg::StartConnectivityTest(name))
+                    .await?,
+            ]),
             Command::TestConnectivity(name) => {
                 let mut commands = vec![];
                 if let Some(member_info) = self.core.network_knowledge().members().get(&name) {
