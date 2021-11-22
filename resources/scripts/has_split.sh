@@ -6,7 +6,7 @@ then
     exit
 fi
 
-elder_count=7;
+elder_count=5;
 
 # It's better to use the network health test in rust as it's type safe.
 # This is needed for windows though at the moment due to the logfile locking...
