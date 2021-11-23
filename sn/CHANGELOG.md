@@ -5,65 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.42.0 (2021-11-23)
-
-### New Features
-
- - <csr-id-f29c94d7dfab2e82b9db70fcfeddc4a71d987abb/> use AE to progress various intra-DKG phases
-   sometimes a DKG session might receive DKG messages from a further phase
-   that it has not reached yet. eg. it might receive Proposal messages
-   while in the Initialization phase. When this happens, the DKG can
-   respond with a DkgNotReady message to the message source which will sent
-   a list of 'DKG Messages' that can be applied to an existing DKG process
-   so it can progress to the next phase.
-   
-   note that this does not solve the case where the DKG session has not yet
-   started. that will need to be handled separately. they are currently
-   pushed to the backlog and handled later
- - <csr-id-46ea542731fa3e2cede4ce9357783d3681434643/> allow ELDER_COUNT to be overridden by env var SN_ELDER_COUNT
- - <csr-id-f6a3f78156b9cc0f934c19e5d4c0004238a593e4/> verify and use SAP received in AE-Redirect to update client's network knowledge
- - <csr-id-ae5fc40e29161652306b2e42b92d2a80fc746708/> verify and use SAP received in AE-Redirect to update our network knowledge
-
-### Bug Fixes
-
-<csr-id-d3b88f749ca6ee53f65e200105aeeea691581e83/>
-<csr-id-35a8fdb9dca60ca268d536958a9d32ce0a876792/>
-<csr-id-c27d7e997c5a7812f995f113f31edf30c2c21272/>
-<csr-id-55eb0f259a83faff470dbfdeb9365d314ed6a697/>
-<csr-id-42d90b763606e2d324c5ce1235fc801105c07acb/>
-<csr-id-302ce4e605d72a0925509bfe3220c2b1ddac677d/>
-<csr-id-c78513903457a701096b5c542f15012e71d33c46/>
-
- - <csr-id-9a82649f0ca01c6d2eae57f260d2f98246724556/> multiples fixes for unit tests
-   - error instead of panicking if logger is already initialized
-- use unique socker addrs for nodes
-- print error returned from proptest
-
-### New Features (BREAKING)
-
- - <csr-id-3a59ee3b532bbc26388780ddc2f5b51ddae61d4c/> include section chain in AE-Redirect messages
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - renaming some variables and functions for better readability ([`b456f2f`](https://github.com/maidsafe/safe_network/commit/b456f2f610ea57e5d8a4811fbca5a26175434645))
-</details>
-
-<csr-unknown>
- send DkgRetry for DkgError::MissingPart as well ensure client chunk count is 3 w/ 7 elders fix a compilation error introduced by merge joining node age to genesis section shall be less than or equal to suggested age use correct dst section key for AE-Update to siblings after split raise SectionSplit event whenever prefix changed during bootstrap, handling the case prefix_map was loaded<csr-unknown/>
-
 ## v0.41.0 (2021-11-23)
 
 ### New Features
@@ -85,25 +26,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
-<csr-id-d3b88f749ca6ee53f65e200105aeeea691581e83/>
-<csr-id-35a8fdb9dca60ca268d536958a9d32ce0a876792/>
-<csr-id-c27d7e997c5a7812f995f113f31edf30c2c21272/>
-<csr-id-55eb0f259a83faff470dbfdeb9365d314ed6a697/>
-<csr-id-42d90b763606e2d324c5ce1235fc801105c07acb/>
-<csr-id-302ce4e605d72a0925509bfe3220c2b1ddac677d/>
-<csr-id-c78513903457a701096b5c542f15012e71d33c46/>
-
  - <csr-id-9a82649f0ca01c6d2eae57f260d2f98246724556/> multiples fixes for unit tests
    - error instead of panicking if logger is already initialized
+   - use unique socker addrs for nodes
+   - print error returned from proptest
+ - <csr-id-d3b88f749ca6ee53f65e200105aeeea691581e83/> send DkgRetry for DkgError::MissingPart as well
+ - <csr-id-35a8fdb9dca60ca268d536958a9d32ce0a876792/> ensure client chunk count is 3 w/ 7 elders
+ - <csr-id-c27d7e997c5a7812f995f113f31edf30c2c21272/> fix a compilation error introduced by merge
+
+ - <csr-id-55eb0f259a83faff470dbfdeb9365d314ed6a697/> joining node age to genesis section shall be less than or equal to suggested age
+ - <csr-id-42d90b763606e2d324c5ce1235fc801105c07acb/> use correct dst section key for AE-Update to siblings after split
+ - <csr-id-302ce4e605d72a0925509bfe3220c2b1ddac677d/> raise SectionSplit event whenever prefix changed
+ - <csr-id-c78513903457a701096b5c542f15012e71d33c46/> during bootstrap, handling the case prefix_map was loaded
 
 ### New Features (BREAKING)
 
  - <csr-id-3a59ee3b532bbc26388780ddc2f5b51ddae61d4c/> include section chain in AE-Redirect messages
 
-<csr-unknown>
-use unique socker addrs for nodesprint error returned from proptest<csr-unknown>
- send DkgRetry for DkgError::MissingPart as well ensure client chunk count is 3 w/ 7 elders fix a compilation error introduced by merge joining node age to genesis section shall be less than or equal to suggested age use correct dst section key for AE-Update to siblings after split raise SectionSplit event whenever prefix changed during bootstrap, handling the case prefix_map was loaded<csr-unknown/>
-<csr-unknown/>
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 62 commits contributed to the release over the course of 7 calendar days.
+ - 59 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Remove always sending a message to ourself when we can handle it directly ([`dbdda13`](https://github.com/maidsafe/safe_network/commit/dbdda1392325e8a08a6a28988208769552d5e543))
+    - multiples fixes for unit tests ([`9a82649`](https://github.com/maidsafe/safe_network/commit/9a82649f0ca01c6d2eae57f260d2f98246724556))
+    - send DkgRetry for DkgError::MissingPart as well ([`d3b88f7`](https://github.com/maidsafe/safe_network/commit/d3b88f749ca6ee53f65e200105aeeea691581e83))
+    - use AE to progress various intra-DKG phases ([`f29c94d`](https://github.com/maidsafe/safe_network/commit/f29c94d7dfab2e82b9db70fcfeddc4a71d987abb))
+    - ensure client chunk count is 3 w/ 7 elders ([`35a8fdb`](https://github.com/maidsafe/safe_network/commit/35a8fdb9dca60ca268d536958a9d32ce0a876792))
+    - allow ELDER_COUNT to be overridden by env var SN_ELDER_COUNT ([`46ea542`](https://github.com/maidsafe/safe_network/commit/46ea542731fa3e2cede4ce9357783d3681434643))
+    - move ELDER_COUNT to root of sn ([`e8e44fb`](https://github.com/maidsafe/safe_network/commit/e8e44fb69dae7fe1cae3bbf39f7b03a90df44dd7))
+    - depend on ELDER_SIZE where it should be used ([`86c83be`](https://github.com/maidsafe/safe_network/commit/86c83bedf061b285b0d4f3effb54cc89a9fbd84d))
+    - set node count to be 33 ([`14328b3`](https://github.com/maidsafe/safe_network/commit/14328b3d5b2579e4f038624c2353ec36c45fa9ed))
+    - increase join timeout when always-joinable set ([`590bfea`](https://github.com/maidsafe/safe_network/commit/590bfea538bb78fd20bb9574c3ea9ed6dcceced0))
+    - increase join timeout before waiting to retry at bin/node ([`85f2b5f`](https://github.com/maidsafe/safe_network/commit/85f2b5fd2adbf1f57e184c9e687fd14929b911e7))
+    - fix a compilation error introduced by merge ([`c27d7e9`](https://github.com/maidsafe/safe_network/commit/c27d7e997c5a7812f995f113f31edf30c2c21272))
+    - store `Peer`s in `SectionAuthorityProvider` ([`b1297f2`](https://github.com/maidsafe/safe_network/commit/b1297f2e42cdd7f7945c9fd5b4012086f8298b85))
+    - reuse known `Peer`s in DKG sessions ([`680f943`](https://github.com/maidsafe/safe_network/commit/680f9431bc75efea455dd7c6985e41c11740dc3e))
+    - clarify `connection` in `Peer`'s `Debug` output ([`eb02910`](https://github.com/maidsafe/safe_network/commit/eb0291082e49d1114c853b214f55b8a25e18d1e1))
+    - store a `Peer` in `NodeState` ([`93bffbf`](https://github.com/maidsafe/safe_network/commit/93bffbf1343621a8d5187649d1bb6d2a81cba793))
+    - set `Peer::connection` on send ([`1268fb6`](https://github.com/maidsafe/safe_network/commit/1268fb6e46e4ba061ba7f724917371d8e0db0092))
+    - bye bye so much olde node code ([`14c6ab9`](https://github.com/maidsafe/safe_network/commit/14c6ab95da62a144a798665ade6da626fb5ee6f2))
+    - readd routing member joined event for tests ([`30d220c`](https://github.com/maidsafe/safe_network/commit/30d220c180c7586de56282fafe52b54c8b619860))
+    - log node age on relocation in routing ([`6c02091`](https://github.com/maidsafe/safe_network/commit/6c0209187797bb27fa1529dd2f0ee8116975a02d))
+    - set joins allowed in routing code ([`a328d70`](https://github.com/maidsafe/safe_network/commit/a328d70720a795b62ac05a68454abf1034e97b9d))
+    - add StillElderAfterSplit LogMarker ([`da1fe8d`](https://github.com/maidsafe/safe_network/commit/da1fe8dda6325e05b4d976d2b77d084c06d98cb0))
+    - remove AdultsChanged event and ahndle everything inside routing ([`078f451`](https://github.com/maidsafe/safe_network/commit/078f45148af2da8d1690490720ef5f95555d42cd))
+    - update client listener error handling ([`4c9b20e`](https://github.com/maidsafe/safe_network/commit/4c9b20ee58be9ca3579c7d1f4edd09452d59d38c))
+    - cleanup test clippy ([`49d3a29`](https://github.com/maidsafe/safe_network/commit/49d3a298be19a46dcb6232ee8087c9bf0381db23))
+    - feat(sn/client): retry client queires if elder conns fail ([`20bda03`](https://github.com/maidsafe/safe_network/commit/20bda03e07985114b8a54c866755be8a240c2504))
+    - chore(sn/client): dont always exit on client listener loop errors ([`cdc31cb`](https://github.com/maidsafe/safe_network/commit/cdc31cb44af8b6dc2393a0f15c98c0be364db6ff))
+    - fail query if we cannot send to more than 1 elder ([`bc71707`](https://github.com/maidsafe/safe_network/commit/bc717073fde5fef59cbbe670ab6b7a9d66253d3b))
+    - burn down more of the /node dir ([`a98cc81`](https://github.com/maidsafe/safe_network/commit/a98cc810409a4ccc78e3c7a36b38b5f00cfcb23a))
+    - joining node age to genesis section shall be less than or equal to suggested age ([`55eb0f2`](https://github.com/maidsafe/safe_network/commit/55eb0f259a83faff470dbfdeb9365d314ed6a697))
+    - fix routing tests failing after we no longer emit MemerLeft event ([`189aeb6`](https://github.com/maidsafe/safe_network/commit/189aeb6941d277f94e47ade0e851696206aaa146))
+    - chore(sn/routing): simplify msg handling for NodeCmds ([`9d5baf8`](https://github.com/maidsafe/safe_network/commit/9d5baf83c630e597407e5c5d4a47fc7f34805696))
+    - more node plumbing cleanup ([`9aaccb8`](https://github.com/maidsafe/safe_network/commit/9aaccb8784afd03454cd69f599dc2b7822ca130c))
+    - handle set storage level in routing directly ([`8f1cc32`](https://github.com/maidsafe/safe_network/commit/8f1cc32b87a9e333f32399020339dd41e2d0b049))
+    - handle member left directly in routing code ([`1fbc9b2`](https://github.com/maidsafe/safe_network/commit/1fbc9b24d14460c6a88a064297c3a327ca9182aa))
+    - handle receiving dataExchange packet in routing. ([`4e7da0a`](https://github.com/maidsafe/safe_network/commit/4e7da0aeddba7287c1556ca318d9cdd8459000d2))
+    - remove node plumbing ([`456c022`](https://github.com/maidsafe/safe_network/commit/456c022ddf66af5f991e6aca2240d2ab73f8241d))
+    - perform data exchange on split in routing ([`ccb7efd`](https://github.com/maidsafe/safe_network/commit/ccb7efda1ee0c6303ac537ca9edd4b6c5cfcc5f2))
+    - correlate client connections without `ConnectedPeers` ([`b70a105`](https://github.com/maidsafe/safe_network/commit/b70a1053adc267780215636dd80a759c45d533d5))
+    - use `qp2p::Connection` for connected senders ([`1d62fce`](https://github.com/maidsafe/safe_network/commit/1d62fcefd5d44ef0df84b8126ba88de1127bd2bd))
+    - represent `HandleMessage::sender` as an enum ([`20c1d7b`](https://github.com/maidsafe/safe_network/commit/20c1d7bf22907a44be2cc9585dd2ac55dd2985bf))
+    - add an `Option<qp2p::Connection>` to `Peer` ([`182c4db`](https://github.com/maidsafe/safe_network/commit/182c4db4531c77fa6c67b8267cd7895b49f26ae1))
+    - add a log marker for reusing a connection ([`02f1325`](https://github.com/maidsafe/safe_network/commit/02f1325c18779ff02e6bb7d903fda4519ca87231))
+    - add a feature to disable connection pooling ([`1bf1766`](https://github.com/maidsafe/safe_network/commit/1bf17662ecae4e1f3e9969ac03a8f543f57f2cd0))
+    - stop sending unnecessary AE-Update msgs to to-be-promoted candidates ([`4a1349c`](https://github.com/maidsafe/safe_network/commit/4a1349c5e99fdc45c038afdd2dac24486ee625ea))
+    - on split retain adult members only ([`d55978b`](https://github.com/maidsafe/safe_network/commit/d55978b38c9f69c0e31b335909ca650758c522c1))
+    - fix demotion sendmessage test ([`9a14911`](https://github.com/maidsafe/safe_network/commit/9a149113d6ffa4d4e5564ad8ba274117a4522685))
+    - only fire SplitSuccess if elder ([`f8de28a`](https://github.com/maidsafe/safe_network/commit/f8de28a8e040439fcf83f217261facb934cacd51))
+    - send data updates to new elders only ([`231bde0`](https://github.com/maidsafe/safe_network/commit/231bde07064d6597867b5668a1e5ff319de3a202))
+    - dont AE-update sibling elders on split. ([`3b7091b`](https://github.com/maidsafe/safe_network/commit/3b7091bd8b45fc5bbfa6f1714ec56e123d76c647))
+    - remove node plumbing ([`3b4e2e3`](https://github.com/maidsafe/safe_network/commit/3b4e2e33285f4b1a53bd52b147dc85c570ed2f6e))
+    - perform data exchange on split in routing ([`345033a`](https://github.com/maidsafe/safe_network/commit/345033abe74a86c212e3b38fc0f6b655216b63b0))
+    - verify and use SAP received in AE-Redirect to update client's network knowledge ([`f6a3f78`](https://github.com/maidsafe/safe_network/commit/f6a3f78156b9cc0f934c19e5d4c0004238a593e4))
+    - verify and use SAP received in AE-Redirect to update our network knowledge ([`ae5fc40`](https://github.com/maidsafe/safe_network/commit/ae5fc40e29161652306b2e42b92d2a80fc746708))
+    - log an error when failing to add latest sibling key to proof chain ([`d673283`](https://github.com/maidsafe/safe_network/commit/d6732833db0bb13d8414f99758e8767ab8ab2bdd))
+    - increase timeout for network forming ([`4f5e84d`](https://github.com/maidsafe/safe_network/commit/4f5e84da96d7277dfc4e385ff03edf6c1d84991e))
+    - update launch tool and secured linked list deps ([`d75e5c6`](https://github.com/maidsafe/safe_network/commit/d75e5c65d04c60dca477cca4e704308198cfd6cf))
+    - use correct dst section key for AE-Update to siblings after split ([`42d90b7`](https://github.com/maidsafe/safe_network/commit/42d90b763606e2d324c5ce1235fc801105c07acb))
+    - include section chain in AE-Redirect messages ([`3a59ee3`](https://github.com/maidsafe/safe_network/commit/3a59ee3b532bbc26388780ddc2f5b51ddae61d4c))
+    - use a DAG to keep track of all sections chains within our NetworkKnowledge ([`90f2979`](https://github.com/maidsafe/safe_network/commit/90f2979a5bcb7f8e1786b5bdd868793d2fe924b4))
+    - raise SectionSplit event whenever prefix changed ([`302ce4e`](https://github.com/maidsafe/safe_network/commit/302ce4e605d72a0925509bfe3220c2b1ddac677d))
+    - during bootstrap, handling the case prefix_map was loaded ([`c785139`](https://github.com/maidsafe/safe_network/commit/c78513903457a701096b5c542f15012e71d33c46))
+</details>
 
 ## v0.40.0 (2021-11-15)
 
