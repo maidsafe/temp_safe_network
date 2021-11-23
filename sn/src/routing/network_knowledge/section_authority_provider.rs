@@ -12,7 +12,11 @@ use crate::messaging::{
 };
 use crate::routing::{Peer, Prefix, XorName};
 use bls::{PublicKey, PublicKeySet};
-use std::{collections::BTreeSet, net::SocketAddr};
+use futures::{stream, StreamExt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+};
 
 /// Details of section authority.
 ///
@@ -101,6 +105,37 @@ impl SectionAuthorityProvider {
 
     pub(crate) fn addresses(&self) -> Vec<SocketAddr> {
         self.elders.iter().map(Peer::addr).collect()
+    }
+
+    /// Merge the connections from some source peers into our own elders.
+    // Although the library will compile if this is as an `async fn`, it seems to lose some fidelity
+    // in the lifetime bounds, since the routing stress example will fail to compile with a bizarre
+    // lifetime mismatch error.
+    #[allow(clippy::manual_async_fn)]
+    pub(crate) fn merge_connections<'a, 'b, I>(
+        &'a self,
+        sources: I,
+    ) -> impl std::future::Future<Output = ()> + Send + '_
+    where
+        I: IntoIterator<Item = &'b Peer> + Send + 'a,
+        I::IntoIter: Send,
+    {
+        async move {
+            let connections: BTreeMap<_, _> = stream::iter(sources)
+                .filter_map(|peer| async move {
+                    peer.connection()
+                        .await
+                        .map(|connection| (peer.addr(), connection))
+                })
+                .collect()
+                .await;
+
+            for elder in self.elders() {
+                if let Some(connection) = connections.get(&elder.addr()) {
+                    elder.set_connection(connection.clone()).await;
+                }
+            }
+        }
     }
 
     /// Key of the section.

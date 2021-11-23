@@ -86,7 +86,7 @@ impl Comm {
         bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
-    ) -> Result<(Self, SocketAddr)> {
+    ) -> Result<(Self, UnnamedPeer)> {
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
         let (endpoint, incoming_connections, bootstrap_peer) =
@@ -125,7 +125,7 @@ impl Comm {
                 back_pressure: BackPressure::new(),
                 connected_peers,
             },
-            bootstrap_peer.remote_address(),
+            UnnamedPeer::connected(bootstrap_peer),
         ))
     }
 
