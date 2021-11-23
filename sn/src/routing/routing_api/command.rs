@@ -126,8 +126,18 @@ impl fmt::Display for Command {
             Command::HandleElderAgreement { .. } => write!(f, "HandleElderAgreement"),
             Command::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Command::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
+            #[cfg(not(feature = "unstable-wiremsg-debuginfo"))]
             Command::SendMessage { wire_msg, .. } => {
                 write!(f, "SendMessage {:?}", wire_msg.msg_id())
+            }
+            #[cfg(feature = "unstable-wiremsg-debuginfo")]
+            Command::SendMessage { wire_msg, .. } => {
+                write!(
+                    f,
+                    "SendMessage {:?} {:?}",
+                    wire_msg.msg_id(),
+                    wire_msg.payload_debug
+                )
             }
             Command::ParseAndSendWireMsg(wire_msg) => {
                 write!(f, "ParseAndSendWireMsg {:?}", wire_msg.msg_id())

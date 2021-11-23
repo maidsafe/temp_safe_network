@@ -39,6 +39,7 @@ default = []
 always-joinable = []
 chaos = []
 unstable-no-connection-pooling = []
+unstable-wiremsg-debuginfo = []
 test-utils = []
 
 [dependencies]
