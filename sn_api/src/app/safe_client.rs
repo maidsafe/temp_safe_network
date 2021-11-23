@@ -139,7 +139,8 @@ impl SafeAppClient {
     }
 
     // === Register data operations ===
-    pub async fn store_register(
+    /// Low level method to create a register
+    pub async fn create_register(
         &self,
         name: Option<XorName>,
         tag: u64,
@@ -189,6 +190,7 @@ impl SafeAppClient {
         Ok(xorname)
     }
 
+    /// Low level method to read all register entries
     pub async fn read_register(
         &self,
         address: RegisterAddress,
@@ -209,6 +211,7 @@ impl SafeAppClient {
         })
     }
 
+    /// Low level method to read a register entry
     pub async fn get_register_entry(
         &self,
         address: RegisterAddress,
@@ -235,6 +238,7 @@ impl SafeAppClient {
         Ok(entry)
     }
 
+    /// Low level method to write to register
     pub async fn write_to_register(
         &self,
         address: RegisterAddress,

@@ -9,9 +9,8 @@
 
 use super::register::EntryHash;
 use crate::{Error, Result, Safe};
-use bytes::Bytes;
 use log::debug;
-use safe_network::types::{BytesAddress, DataAddress};
+use safe_network::types::DataAddress;
 use safe_network::url::{ContentType, Scope, Url, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -32,7 +31,7 @@ impl Safe {
         debug!("Creating a Multimap");
         let xorname = self
             .safe_client
-            .store_register(name, type_tag, None, private)
+            .create_register(name, type_tag, None, private)
             .await?;
 
         let scope = if private {
@@ -100,14 +99,7 @@ impl Safe {
             ))
         })?;
 
-        let data = Bytes::copy_from_slice(&serialised_entry);
-        let entry_xorname = self.safe_client.store_bytes(data.clone(), false).await?;
-        let entry_xorurl = Url::encode_bytes(
-            BytesAddress::Public(entry_xorname),
-            ContentType::Raw,
-            self.xorurl_base,
-        )?;
-        let entry_ptr = Url::from_xorurl(&entry_xorurl)?;
+        let data = serialised_entry.to_vec();
         let safeurl = Safe::parse_url(multimap_url)?;
         let address = match safeurl.address() {
             DataAddress::Register(reg_address) => reg_address,
@@ -120,7 +112,7 @@ impl Safe {
             }
         };
         self.safe_client
-            .write_to_register(address, entry_ptr, replace)
+            .write_to_register(address, data, replace)
             .await
     }
 
@@ -128,7 +120,7 @@ impl Safe {
     // the network without resolving the Url,
     // optionally filtering by hash and/or key.
     pub(crate) async fn fetch_multimap_values(&self, safeurl: &Url) -> Result<MultimapKeyValues> {
-        let entries = match self.fetch_register_entries(safeurl).await {
+        let entries = match self.register_fetch_entries(safeurl).await {
             Ok(data) => {
                 debug!("Multimap retrieved...");
                 Ok(data)
@@ -145,9 +137,8 @@ impl Safe {
 
         // We parse each entry in the Register as a 'MultimapKeyValue'
         let mut multimap_key_vals = MultimapKeyValues::new();
-        for (hash, entry_ptr) in entries.iter() {
-            let entry = self.fetch_public_data(entry_ptr, None).await?;
-            let key_val = Self::decode_multimap_entry(&entry)?;
+        for (hash, entry) in entries.iter() {
+            let key_val = Self::decode_multimap_entry(entry)?;
             multimap_key_vals.insert((*hash, key_val));
         }
         Ok(multimap_key_vals)
@@ -161,7 +152,7 @@ impl Safe {
         safeurl: &Url,
         hash: EntryHash,
     ) -> Result<MultimapKeyValue> {
-        let entry_ptr = match self.fetch_register_entry(safeurl, hash).await {
+        let entry = match self.register_fetch_entry(safeurl, hash).await {
             Ok(data) => {
                 debug!("Multimap retrieved...");
                 Ok(data)
@@ -176,7 +167,6 @@ impl Safe {
             Err(other) => Err(other),
         }?;
 
-        let entry = self.fetch_public_data(&entry_ptr, None).await?;
         let key_val = Self::decode_multimap_entry(&entry)?;
         Ok(key_val)
     }

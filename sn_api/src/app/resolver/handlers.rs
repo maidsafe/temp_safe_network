@@ -117,10 +117,10 @@ impl Safe {
             DataType::Register => {
                 let data = if retrieve_data {
                     match input_url.content_version() {
-                        None => self.fetch_register_entries(&input_url).await?,
+                        None => self.register_fetch_entries(&input_url).await?,
                         Some(v) => vec![(
                             v.entry_hash(),
-                            self.fetch_register_entry(&input_url, v.entry_hash())
+                            self.register_fetch_entry(&input_url, v.entry_hash())
                                 .await?,
                         )]
                         .into_iter()
