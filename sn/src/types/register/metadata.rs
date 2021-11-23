@@ -7,10 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::url::Url;
-use crdts::merkle_reg::Sha3Hash;
-use tiny_keccak::{Hasher, Sha3};
-
 /// An action on Register data type.
 #[derive(Clone, Debug, Copy, Eq, PartialEq)]
 pub enum Action {
@@ -21,12 +17,4 @@ pub enum Action {
 }
 
 /// An entry in a Register.
-pub type Entry = Url;
-
-impl Eq for Entry {}
-
-impl Sha3Hash for Entry {
-    fn hash(&self, hasher: &mut Sha3) {
-        hasher.update(self.to_string().as_bytes());
-    }
-}
+pub type Entry = Vec<u8>;

@@ -211,20 +211,17 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use crate::client::utils::test_utils::create_test_client_with;
+    use crate::client::{
+        utils::test_utils::{
+            create_test_client, gen_ed_keypair, init_test_logger, run_w_backoff_delayed,
+        },
+        Error,
+    };
     use crate::messaging::data::Error as ErrorMessage;
     use crate::routing::log_markers::LogMarker;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
-        BytesAddress, Error as DtError, PublicKey,
-    };
-    use crate::{
-        client::{
-            utils::test_utils::{
-                create_test_client, gen_ed_keypair, init_test_logger, run_w_backoff_delayed,
-            },
-            Error,
-        },
-        url::Url,
+        Error as DtError, PublicKey,
     };
     use crate::{retry_loop, retry_loop_for_pattern};
     use eyre::{bail, eyre, Result};
@@ -302,7 +299,7 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let value_1 = random_url()?;
+        let value_1 = random_register_entry();
 
         for i in 0..1000_usize {
             let now = Instant::now();
@@ -495,7 +492,7 @@ mod tests {
             .store_public_register(name, tag, owner, perms)
             .await?;
 
-        let value_1 = random_url()?;
+        let value_1 = random_register_entry();
 
         // write to the register
         let value1_hash = run_w_backoff_delayed(
@@ -516,7 +513,7 @@ mod tests {
         let current = hashes.iter().next();
         assert_eq!(current, Some(&(value1_hash, value_1.clone())));
 
-        let value_2 = random_url()?;
+        let value_2 = random_register_entry();
 
         drop(start_span);
         let _second_span = tracing::info_span!("test__register_write__second_write").entered();
@@ -704,27 +701,9 @@ mod tests {
         Ok(())
     }
 
-    fn random_url() -> Result<Url> {
-        use crate::url::*;
-        let xor_name = XorName::random();
-        let url = match Url::encode_bytes(
-            BytesAddress::Public(xor_name),
-            ContentType::Raw,
-            XorUrlBase::Base32z,
-        ) {
-            Ok(url) => url,
-            Err(e) => bail!(
-                "Unexpected error returned when attempting to encode blob: {:?}",
-                e
-            ),
-        };
-
-        match Url::from_url(&url) {
-            Ok(url) => Ok(url),
-            Err(e) => bail!(
-                "Unexpected error returned when attempting to parse url string: {:?}",
-                e
-            ),
-        }
+    fn random_register_entry() -> Vec<u8> {
+        use rand::Rng;
+        let random_bytes = rand::thread_rng().gen::<[u8; 32]>();
+        random_bytes.to_vec()
     }
 }

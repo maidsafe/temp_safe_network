@@ -51,6 +51,9 @@ pub enum Error {
     /// Entry already exists. Contains the current entry Key.
     #[error("Entry already exists {0}")]
     EntryExists(u8),
+    /// Entry is too big to fit inside a register
+    #[error("Entry is too big to fit inside a register: {0}, max: {1}")]
+    EntryTooBig(usize, usize),
     /// Supplied actions are not valid
     #[error("Some entry actions are not valid")]
     InvalidEntryActions(BTreeMap<Vec<u8>, Error>),
