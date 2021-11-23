@@ -122,6 +122,7 @@ impl Core {
                     &self.node.read().await.clone(),
                     session_id,
                     message_history,
+                    sender,
                     sender_pk,
                 )
                 .await?,

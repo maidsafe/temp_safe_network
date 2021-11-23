@@ -25,17 +25,11 @@ use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, Error as DkgError, KeyGen};
 use itertools::Itertools;
-use std::{
-    collections::{BTreeSet, VecDeque},
-    iter, mem,
-    time::Duration,
-};
+use std::{collections::BTreeSet, iter, mem, time::Duration};
 use xor_name::XorName;
 
 // Interval to progress DKG timed phase
 const DKG_PROGRESS_INTERVAL: Duration = Duration::from_secs(3);
-
-const BACKLOG_CAPACITY: usize = 100;
 
 // Data for a DKG participant.
 pub(crate) struct Session {
@@ -394,45 +388,6 @@ impl Session {
             duration: DKG_PROGRESS_INTERVAL,
             token: self.timer_token,
         }
-    }
-}
-
-pub(crate) struct Backlog(VecDeque<(DkgSessionId, DkgMessage)>);
-
-impl Backlog {
-    pub(crate) fn new() -> Self {
-        Self(VecDeque::with_capacity(BACKLOG_CAPACITY))
-    }
-
-    pub(crate) fn push(&mut self, session_id: DkgSessionId, message: DkgMessage) {
-        if self.0.len() == self.0.capacity() {
-            let _prev = self.0.pop_front();
-            trace!("Backlog removed {:?} due to capacity", _prev);
-        }
-
-        self.0.push_back((session_id, message))
-    }
-
-    pub(crate) fn take(&mut self, session_id: &DkgSessionId) -> Vec<DkgMessage> {
-        let mut output = Vec::new();
-        let max = self.0.len();
-
-        for _ in 0..max {
-            if let Some((message_dkg_key, message)) = self.0.pop_front() {
-                if &message_dkg_key == session_id {
-                    output.push(message)
-                } else {
-                    self.0.push_back((message_dkg_key, message))
-                }
-            }
-        }
-
-        output
-    }
-
-    pub(crate) fn prune(&mut self, session_id: &DkgSessionId) {
-        self.0
-            .retain(|(old_dkg_key, _)| old_dkg_key.generation >= session_id.generation)
     }
 }
 
