@@ -58,6 +58,9 @@ impl WireMsgUtils for WireMsg {
 
         let wire_msg = WireMsg::new_msg(MessageId::new(), msg_payload, msg_kind, dst)?;
 
+        #[cfg(feature = "unstable-wiremsg-debuginfo")]
+        let wire_msg = wire_msg.set_payload_debug(node_msg);
+
         Ok(wire_msg)
     }
 
@@ -76,6 +79,9 @@ impl WireMsgUtils for WireMsg {
         );
 
         let wire_msg = WireMsg::new_msg(MessageId::new(), msg_payload, msg_kind, dst)?;
+
+        #[cfg(feature = "unstable-wiremsg-debuginfo")]
+        let wire_msg = wire_msg.set_payload_debug(node_msg);
 
         Ok(wire_msg)
     }

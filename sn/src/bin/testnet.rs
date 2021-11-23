@@ -105,6 +105,10 @@ async fn main() -> Result<()> {
             args.push("--features");
             args.push("unstable-no-connection-pooling");
         }
+        if cfg!(feature = "unstable-wiremsg-debuginfo") {
+            args.push("--features");
+            args.push("unstable-wiremsg-debuginfo");
+        }
 
         info!("Building current sn_node");
         debug!("Building current sn_node with args: {:?}", args);
