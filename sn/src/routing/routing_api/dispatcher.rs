@@ -7,12 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Command, Event};
-use crate::messaging::{
-    system::{Proposal, SystemMsg},
-    DstLocation, EndUser, MsgKind, WireMsg,
-};
+use crate::messaging::{system::SystemMsg, DstLocation, EndUser, MsgKind, WireMsg};
 use crate::routing::{
-    core::{Core, SendStatus},
+    core::{Core, Proposal, SendStatus},
     error::Result,
     log_markers::LogMarker,
     network_knowledge::NetworkKnowledge,
@@ -218,7 +215,7 @@ impl Dispatcher {
             Command::HandleElderAgreement { proposal, sig } => match proposal {
                 Proposal::OurElders(section_auth) => {
                     self.core
-                        .handle_our_elders_agreement(section_auth.into_authed_state(), sig)
+                        .handle_our_elders_agreement(section_auth, sig)
                         .await
                 }
                 _ => {

@@ -8,8 +8,9 @@
 
 use super::{delivery_group, Comm, Core};
 use crate::dbs::UsedSpace;
-use crate::messaging::{system::Proposal, WireMsg};
+use crate::messaging::WireMsg;
 use crate::routing::{
+    core::Proposal,
     error::Result,
     log_markers::LogMarker,
     network_knowledge::{NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare},
@@ -236,7 +237,7 @@ impl Core {
         dst_key: Option<bls::PublicKey>,
     ) -> Result<Vec<Command>> {
         self.propose(Proposal::Online {
-            node_state: NodeState::joined(peer, previous_name).to_msg(),
+            node_state: NodeState::joined(peer, previous_name),
             dst_key,
         })
         .await

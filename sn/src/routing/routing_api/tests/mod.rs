@@ -12,14 +12,17 @@ use super::{Comm, Command, Core, Dispatcher};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     system::{
-        JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Proposal,
+        JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
         RelocateDetails, RelocatePayload, ResourceProofResponse, SectionAuth, SystemMsg,
     },
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
 use crate::routing::{
-    core::{ConnectionEvent, ProposalUtils, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
+    core::{
+        ConnectionEvent, Proposal, ProposalUtils, RESOURCE_PROOF_DATA_SIZE,
+        RESOURCE_PROOF_DIFFICULTY,
+    },
     create_test_used_space_and_root_storage,
     dkg::test_utils::{prove, section_signed},
     ed25519,
@@ -357,7 +360,7 @@ async fn aggregate_proposals() -> Result<()> {
     let new_peer = create_peer(MIN_AGE);
     let node_state = NodeState::joined(new_peer.clone(), None);
     let proposal = Proposal::Online {
-        node_state: node_state.to_msg(),
+        node_state,
         dst_key: None,
     };
 
@@ -373,7 +376,7 @@ async fn aggregate_proposals() -> Result<()> {
                 section_pk,
             },
             SystemMsg::Propose {
-                proposal: proposal.clone(),
+                proposal: proposal.clone().into_msg(),
                 sig_share,
             },
             section_auth.section_key(),
@@ -409,7 +412,7 @@ async fn aggregate_proposals() -> Result<()> {
             section_pk,
         },
         SystemMsg::Propose {
-            proposal: proposal.clone(),
+            proposal: proposal.clone().into_msg(),
             sig_share,
         },
         section_auth.section_key(),
@@ -533,7 +536,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let new_peer = create_peer(MIN_AGE + 2);
     let node_state = NodeState::joined(new_peer.clone(), Some(XorName::random()));
     let proposal = Proposal::Online {
-        node_state: node_state.to_msg(),
+        node_state,
         dst_key: Some(sk_set.secret_key().public_key()),
     };
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
@@ -589,7 +592,7 @@ async fn handle_online_command(
 ) -> Result<HandleOnlineStatus> {
     let node_state = NodeState::joined(peer.clone(), None);
     let proposal = Proposal::Online {
-        node_state: node_state.to_msg(),
+        node_state,
         dst_key: None,
     };
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
@@ -759,7 +762,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let node_state = NodeState::left(existing_peer.clone(), None);
-    let proposal = Proposal::Offline(node_state.to_msg());
+    let proposal = Proposal::Offline(node_state);
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let _commands = dispatcher
@@ -816,7 +819,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     // Handle agreement on the Offline proposal
-    let proposal = Proposal::Offline(remove_node_state.to_msg());
+    let proposal = Proposal::Offline(remove_node_state);
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let commands = dispatcher
@@ -1330,7 +1333,7 @@ async fn handle_elders_update() -> Result<()> {
     let elder_names1: BTreeSet<_> = sap1.names();
 
     let signed_sap1 = section_signed(sk_set1.secret_key(), sap1)?;
-    let proposal = Proposal::OurElders(signed_sap1.into_authed_msg());
+    let proposal = Proposal::OurElders(signed_sap1);
     let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
     let sig = KeyedSig {
         signature,
@@ -1505,7 +1508,7 @@ async fn handle_demote_during_split() -> Result<()> {
     );
 
     let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
-    let command = create_our_elders_command(signed_sap.into_authed_msg())?;
+    let command = create_our_elders_command(signed_sap)?;
     let commands = dispatcher.handle_command(command, "cmd-id-1").await?;
 
     assert_matches!(&commands[..], &[]);
@@ -1515,7 +1518,7 @@ async fn handle_demote_during_split() -> Result<()> {
         SectionAuthorityProvider::new(peers_b.iter().cloned(), prefix1, sk_set_v1_p1.public_keys());
 
     let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
-    let command = create_our_elders_command(signed_sap.into_authed_msg())?;
+    let command = create_our_elders_command(signed_sap)?;
 
     let commands = dispatcher.handle_command(command, "cmd-id-2").await?;
 
@@ -1616,8 +1619,7 @@ async fn create_section(
 fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<(Proposal, KeyedSig)> {
     loop {
         let proposal = Proposal::Online {
-            node_state: NodeState::joined(create_peer(MIN_ADULT_AGE), Some(rand::random()))
-                .to_msg(),
+            node_state: NodeState::joined(create_peer(MIN_ADULT_AGE), Some(rand::random())),
             dst_key: None,
         };
 

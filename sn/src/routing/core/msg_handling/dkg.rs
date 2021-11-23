@@ -7,11 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::super::Core;
-use crate::messaging::system::{
-    DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SystemMsg,
-};
+use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg};
 use crate::messaging::DstLocation;
 use crate::routing::{
+    core::Proposal,
     dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
     log_markers::LogMarker,
@@ -233,7 +232,7 @@ impl Core {
             self.update_self_for_new_node_state_and_fire_events(snapshot)
                 .await
         } else {
-            let proposal = Proposal::SectionInfo(sap.to_msg());
+            let proposal = Proposal::SectionInfo(sap);
             let recipients: Vec<_> = self
                 .network_knowledge
                 .authority_provider()

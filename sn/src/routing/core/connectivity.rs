@@ -7,8 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::system::Proposal;
-use crate::routing::{error::Result, routing_api::command::Command};
+use crate::routing::{core::Proposal, error::Result, routing_api::command::Command};
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
@@ -56,7 +55,7 @@ impl Core {
             if let Some(info) = self.network_knowledge.members().get(name) {
                 let info = info.leave()?;
                 if let Ok(commands) = self
-                    .send_proposal(elders.clone(), Proposal::Offline(info.to_msg()))
+                    .send_proposal(elders.clone(), Proposal::Offline(info))
                     .await
                 {
                     result.extend(commands);
