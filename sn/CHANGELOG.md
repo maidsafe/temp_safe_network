@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.41.0 (2021-11-23)
+## v0.42.0 (2021-11-23)
 
 ### New Features
 
@@ -48,8 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 62 commits contributed to the release over the course of 7 calendar days.
- - 59 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 68 commits contributed to the release over the course of 8 calendar days.
+ - 65 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -59,6 +59,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.41.0 ([`14fdaa6`](https://github.com/maidsafe/safe_network/commit/14fdaa6537619483e94424ead5751d5ab41c8a01))
+    - reuse connections during join flow ([`950a4ee`](https://github.com/maidsafe/safe_network/commit/950a4eece1a11f70b2aef71cc11404603bb2ec5c))
+    - add 'connectedness' to `Peer`'s `Display` ([`7a875a8`](https://github.com/maidsafe/safe_network/commit/7a875a88c911b5a9db59a55b81c94b995e2b95ae))
+    - inherit span on `Comm::send` incoming message listener ([`5514d9c`](https://github.com/maidsafe/safe_network/commit/5514d9c06ee400e983a258ba2eb37bff1abf0dd0))
+    - add a feature for increased `WireMsg` debug info ([`1848189`](https://github.com/maidsafe/safe_network/commit/1848189aa780f2f6aabddb3564b816c72f9bee6e))
+    - replace `Sender` with `UnknownPeer` ([`f73364e`](https://github.com/maidsafe/safe_network/commit/f73364efa66718b92e04f24d4546c1e248198ce8))
     - Remove always sending a message to ourself when we can handle it directly ([`dbdda13`](https://github.com/maidsafe/safe_network/commit/dbdda1392325e8a08a6a28988208769552d5e543))
     - multiples fixes for unit tests ([`9a82649`](https://github.com/maidsafe/safe_network/commit/9a82649f0ca01c6d2eae57f260d2f98246724556))
     - send DkgRetry for DkgError::MissingPart as well ([`d3b88f7`](https://github.com/maidsafe/safe_network/commit/d3b88f749ca6ee53f65e200105aeeea691581e83))
@@ -123,6 +129,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - during bootstrap, handling the case prefix_map was loaded ([`c785139`](https://github.com/maidsafe/safe_network/commit/c78513903457a701096b5c542f15012e71d33c46))
 </details>
 
+## v0.41.0 (2021-11-23)
+
+### New Features
+
+ - <csr-id-f29c94d7dfab2e82b9db70fcfeddc4a71d987abb/> use AE to progress various intra-DKG phases
+   sometimes a DKG session might receive DKG messages from a further phase
+   that it has not reached yet. eg. it might receive Proposal messages
+   while in the Initialization phase. When this happens, the DKG can
+   respond with a DkgNotReady message to the message source which will sent
+   a list of 'DKG Messages' that can be applied to an existing DKG process
+   so it can progress to the next phase.
+   
+   note that this does not solve the case where the DKG session has not yet
+   started. that will need to be handled separately. they are currently
+   pushed to the backlog and handled later
+ - <csr-id-46ea542731fa3e2cede4ce9357783d3681434643/> allow ELDER_COUNT to be overridden by env var SN_ELDER_COUNT
+ - <csr-id-f6a3f78156b9cc0f934c19e5d4c0004238a593e4/> verify and use SAP received in AE-Redirect to update client's network knowledge
+ - <csr-id-ae5fc40e29161652306b2e42b92d2a80fc746708/> verify and use SAP received in AE-Redirect to update our network knowledge
+
+### Bug Fixes
+
+<csr-id-d3b88f749ca6ee53f65e200105aeeea691581e83/>
+<csr-id-35a8fdb9dca60ca268d536958a9d32ce0a876792/>
+<csr-id-c27d7e997c5a7812f995f113f31edf30c2c21272/>
+<csr-id-55eb0f259a83faff470dbfdeb9365d314ed6a697/>
+<csr-id-42d90b763606e2d324c5ce1235fc801105c07acb/>
+<csr-id-302ce4e605d72a0925509bfe3220c2b1ddac677d/>
+<csr-id-c78513903457a701096b5c542f15012e71d33c46/>
+
+ - <csr-id-9a82649f0ca01c6d2eae57f260d2f98246724556/> multiples fixes for unit tests
+   - error instead of panicking if logger is already initialized
+- use unique socker addrs for nodes
+- print error returned from proptest
+
+### New Features (BREAKING)
+
+ - <csr-id-3a59ee3b532bbc26388780ddc2f5b51ddae61d4c/> include section chain in AE-Redirect messages
+
+<csr-unknown>
+ send DkgRetry for DkgError::MissingPart as well ensure client chunk count is 3 w/ 7 elders fix a compilation error introduced by merge joining node age to genesis section shall be less than or equal to suggested age use correct dst section key for AE-Update to siblings after split raise SectionSplit event whenever prefix changed during bootstrap, handling the case prefix_map was loaded<csr-unknown/>
+
 ## v0.40.0 (2021-11-15)
 
 ### New Features
@@ -146,8 +193,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-9b8ddfde0287e47b6f18a77a8e8847d80ee84bcd/> provide the SAP proof chain in JoinResponse::Retry msgs
    - Joining node now makes use of the NetworkPrefixMap to validate and
    accept new SAPs using the proof chain provided in JoinResponse::Retry.
-- Expected age of joining node for genesis section is now calculated
-     in a deterministic way using the peer's address.
 
 ### refactor (BREAKING)
 
@@ -207,6 +252,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - avoid holding write lock on ae_backoff_cache during sleep ([`ad633e1`](https://github.com/maidsafe/safe_network/commit/ad633e1b6882db1aac0cb1a530300d9e4d666fd8))
     - remove unnecessary peer lagging check ([`5a3b70e`](https://github.com/maidsafe/safe_network/commit/5a3b70e9721fcdfdd809d2a6bd85968446b4e9a3))
 </details>
+
+<csr-unknown>
+Expected age of joining node for genesis section is now calculatedin a deterministic way using the peer’s address.<csr-unknown/>
 
 ## v0.39.0 (2021-11-12)
 
@@ -303,9 +351,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - update bls_dkg and blsttc to 0.7 and 0.3.4 respectively ([`213cb39`](https://github.com/maidsafe/safe_network/commit/213cb39be8fbfdf614f3eb6248b14fe161927a14))
 </details>
 
-<csr-unknown>
-Expected age of joining node for genesis section is now calculatedin a deterministic way using the peer’s address.<csr-unknown/>
-
 ## v0.38.0 (2021-11-10)
 
 ### New Features
@@ -346,11 +391,6 @@ Expected age of joining node for genesis section is now calculatedin a determini
     - allow to change the default interval for testnet nodes ([`044fd61`](https://github.com/maidsafe/safe_network/commit/044fd61950be76e3207694094dcec81313937403))
     - provide the SAP proof chain in JoinResponse::Retry msgs ([`9b8ddfd`](https://github.com/maidsafe/safe_network/commit/9b8ddfde0287e47b6f18a77a8e8847d80ee84bcd))
 </details>
-
-<csr-unknown>
-<csr-unknown>
-Expected age of joining node for genesis section is now calculatedin a deterministic way using the peer’s address.<csr-unknown/>
-<csr-unknown/>
 
 ## v0.37.0 (2021-11-09)
 
