@@ -43,6 +43,12 @@ function determine_which_crates_have_changes() {
         echo "smart-release has determined sn_cli crate has changes"
         sn_cli_has_changes=true
     fi
+    if [[ $safe_network_has_changes == false ]] || \
+       [[ $sn_api_has_changes == false ]] || \
+       [[ $sn_cli_has_changes == false ]]; then
+        echo "smart-release detected no changes in any crates. Exiting."
+        exit 0
+    fi
 }
 
 function generate_version_bump_commit() {
