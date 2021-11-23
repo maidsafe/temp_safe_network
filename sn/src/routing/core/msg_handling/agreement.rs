@@ -8,12 +8,13 @@
 
 use std::{cmp, collections::BTreeSet};
 
+use crate::elder_count;
 use crate::messaging::system::{KeyedSig, MembershipState, Proposal, SectionAuth};
 use crate::routing::{
     dkg::SectionAuthUtils,
     error::Result,
     log_markers::LogMarker,
-    network_knowledge::{NodeState, SectionAuthorityProvider},
+    network_knowledge::{peer::Peer, ElderCandidates, NodeState, SectionAuthorityProvider},
     routing_api::command::Command,
     Event, MIN_AGE,
 };
@@ -263,62 +264,117 @@ impl Core {
 
         let snapshot = self.state_snapshot().await;
         let old_chain = self.section_chain().await.clone();
+        let mut commands = vec![];
 
         for (signed_sap, key_sig) in updates {
             let prefix = signed_sap.prefix();
+            let new_section_key = signed_sap.section_key();
             trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
 
             info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
-            // If we have the key share for new SAP key we can switch to this new SAP
-            let switch_to_new_sap = (self.is_not_elder().await
-                && !signed_sap.contains_elder(&self.node.read().await.name()))
-                || self
-                    .section_keys_provider
-                    .key_share(&signed_sap.section_key())
-                    .await
-                    .is_ok();
+            let our_sap = self.network_knowledge.authority_provider().await;
 
-            // Let's update our network knowledge, including our
-            // section SAP and chain if the new SAP's prefix matches our name
+            // Let's update our network knowledge. Additionally, if this represents a fork
+            // in **our** section chain trigger a DKG to resolve it, i.e. to merge the forks.
+            // TODO: support forks from even older section keys ??
+            let (parent_section_key, switch_to_new_sap) =
+                if prefix == our_sap.prefix() && key_sig.public_key != our_sap.section_key() {
+                    info!("Section chain fork detected at prefix {:?}", prefix);
+
+                    // Let's start a DKG round (with both forks' SAPs as participants)
+                    // to merge the forks
+                    commands.extend(
+                        self.start_dkg_to_merge_forks(&our_sap, &signed_sap.value)
+                            .await?,
+                    );
+
+                    // we don't switch to new SAP and chain when it's a fork, it's simply unnecessary
+                    // as forks will hopefully be merged, thus wwe stay in current chain/fork
+                    let switch_to_new_sap = false;
+                    (&key_sig.public_key, switch_to_new_sap)
+                } else {
+                    // If we have the key share for new SAP key we can switch to this new SAP
+                    let switch_to_new_sap = (self.is_not_elder().await
+                        && !signed_sap.contains_elder(&self.node.read().await.name()))
+                        || self
+                            .section_keys_provider
+                            .key_share(&new_section_key)
+                            .await
+                            .is_ok();
+
+                    (old_chain.last_key(), switch_to_new_sap)
+                };
+
             // We need to generate the proof chain to connect our current chain to new SAP.
             let mut proof_chain = old_chain.clone();
-            match proof_chain.insert(
-                old_chain.last_key(),
-                signed_sap.section_key(),
-                key_sig.signature,
-            ) {
-                Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
-                Ok(()) => match self
-                    .network_knowledge
-                    .update_knowledge_if_valid(
-                        signed_sap,
-                        &proof_chain,
-                        None,
-                        &self.node.read().await.name(),
-                        switch_to_new_sap,
-                    )
-                    .await
-                {
-                    Err(err) => error!(
-                        "Error updating our network knowledge for {:?}: {:?}",
-                        prefix, err
-                    ),
-                    Ok(true) => {
-                        info!("Updated our network knowledge for {:?}", prefix);
-                        self.write_prefix_map().await
-                    }
-                    _ => {}
-                },
+            if let Err(err) =
+                proof_chain.insert(parent_section_key, new_section_key, key_sig.signature)
+            {
+                error!("Failed to generate proof chain for new SAP: {:?}", err);
+                continue;
+            }
+
+            // Update our network knowledge, even if this is a fork in the chain.
+            // TODO: if it's a fork we will be replacing thee SAP for the prefix, we
+            // probably want to kepp the two SAPs in thee prefix map when theere is a fork??
+            match self
+                .network_knowledge
+                .update_knowledge_if_valid(
+                    signed_sap,
+                    &proof_chain,
+                    None,
+                    &self.node.read().await.name(),
+                    switch_to_new_sap,
+                )
+                .await
+            {
+                Err(err) => error!(
+                    "Error updating our network knowledge for {:?}: {:?}",
+                    prefix, err
+                ),
+                Ok(true) => {
+                    info!("Updated our network knowledge for {:?}", prefix);
+                    self.write_prefix_map().await
+                }
+                _ => {}
             }
         }
 
-        info!(
+        println!(
             "Prefixes we know about: {:?}",
             self.network_knowledge.prefix_map()
         );
 
-        self.update_self_for_new_node_state_and_fire_events(snapshot)
-            .await
+        commands.extend(
+            self.update_self_for_new_node_state_and_fire_events(snapshot)
+                .await?,
+        );
+
+        Ok(commands)
+    }
+
+    async fn start_dkg_to_merge_forks(
+        &self,
+        our_sap: &SectionAuthorityProvider,
+        forked_sap: &SectionAuthorityProvider,
+    ) -> Result<Vec<Command>> {
+        let expected_peers = self.network_knowledge.members().elder_candidates(
+            elder_count(),
+            forked_sap,
+            &BTreeSet::new(),
+        );
+
+        let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).collect();
+        let current_names: BTreeSet<_> = our_sap.names();
+
+        if expected_names != current_names
+            && expected_names.len() >= crate::routing::supermajority(current_names.len())
+        {
+            let elder_candidates = ElderCandidates::new(our_sap.prefix(), expected_peers);
+            self.send_dkg_start(elder_candidates).await
+        } else {
+            Ok(vec![])
+        }
     }
 }

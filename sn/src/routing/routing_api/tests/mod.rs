@@ -1550,6 +1550,132 @@ async fn handle_demote_during_split() -> Result<()> {
     Ok(())
 }
 
+// Test that demoted node still sends `Sync` messages on split.
+#[tokio::test(flavor = "multi_thread")]
+async fn handle_section_chain_fork() -> Result<()> {
+    init_test_logger();
+    let _span = tracing::info_span!("handle_section_chain_fork").entered();
+
+    let node = create_node(MIN_ADULT_AGE, None);
+    let prefix = Prefix::default();
+
+    // These peers are pre fork Elders.
+    let peers: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix, MIN_ADULT_AGE))
+        .take(elder_count() - 1)
+        .collect();
+
+    // These peers are forkA Elders.
+    let peers_fork_a: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix, MIN_ADULT_AGE))
+        .take(elder_count() - 1)
+        .collect();
+    // These peers are forkB Elders.
+    let peers_fork_b: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix, MIN_ADULT_AGE))
+        .take(elder_count() - 1)
+        .collect();
+
+    // Create the pre fork section
+    let sk_set = SecretKeySet::random();
+    let sap = SectionAuthorityProvider::new(
+        iter::once(node.peer()).chain(peers.iter().cloned()),
+        Prefix::default(),
+        sk_set.public_keys(),
+    );
+
+    let (section, section_key_share) = create_section(&sk_set, &sap).await?;
+
+    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
+    let core = Core::new(
+        create_comm().await?,
+        node.clone(),
+        section,
+        Some(section_key_share),
+        event_tx,
+        used_space,
+        root_storage_dir,
+        false,
+    )
+    .await?;
+
+    let sk_set_fork_a = SecretKeySet::random();
+    let sk_set_fork_b = SecretKeySet::random();
+
+    // Simulate DKG round finished succesfully by adding the new section
+    // key shares (for both forks) to our cache.
+    core.section_keys_provider
+        .insert(create_section_key_share(&sk_set_fork_a, 0))
+        .await;
+    core.section_keys_provider
+        .insert(create_section_key_share(&sk_set_fork_b, 0))
+        .await;
+
+    let dispatcher = Dispatcher::new(core);
+
+    // Create agreement on `OurElder` for both section chain forks
+
+    let create_our_elders_command = |signed_sap| -> Result<_> {
+        let proposal = Proposal::OurElders(signed_sap);
+        let signature = sk_set.secret_key().sign(&proposal.as_signable_bytes()?);
+        let sig = KeyedSig {
+            signature,
+            public_key: sk_set.public_keys().public_key(),
+        };
+
+        Ok(Command::HandleElderAgreement { proposal, sig })
+    };
+
+    // Handle agreement on `OurElders` for forkA.
+    let sap_fork_a = SectionAuthorityProvider::new(
+        iter::once(node.peer()).chain(peers_fork_a.iter().cloned()),
+        prefix,
+        sk_set_fork_a.public_keys(),
+    );
+    let signed_sap_fork_a = section_signed(sk_set_fork_a.secret_key(), sap_fork_a)?;
+    let command = create_our_elders_command(signed_sap_fork_a.into_authed_msg())?;
+    let _commands = dispatcher.handle_command(command, "cmd-id-1").await?;
+
+    // Handle agreement on `OurElders` for forkB.
+    let sap_fork_b = SectionAuthorityProvider::new(
+        iter::once(node.peer()).chain(peers_fork_b.iter().cloned()),
+        prefix,
+        sk_set_fork_b.public_keys(),
+    );
+    let signed_sap_fork_b = section_signed(sk_set_fork_b.secret_key(), sap_fork_b)?;
+    let command = create_our_elders_command(signed_sap_fork_b.into_authed_msg())?;
+    let commands = dispatcher.handle_command(command, "cmd-id-2").await?;
+
+    // Verify that commands to start a DKG session to resolve the fork are triggered
+    let mut update_recipients = BTreeMap::new();
+    for command in commands {
+        let (recipients, wire_msg) = match command {
+            Command::SendMessage {
+                recipients,
+                wire_msg,
+                ..
+            } => (recipients, wire_msg),
+            Command::HandleMessage { wire_msg, .. } => (vec![node.peer()], wire_msg),
+            _ => continue,
+        };
+
+        if matches!(
+            wire_msg.into_message(),
+            Ok(MessageType::System {
+                msg: SystemMsg::DkgStart { .. },
+                ..
+            })
+        ) {
+            for recipient in recipients {
+                let _old = update_recipients.insert(recipient.name(), recipient.addr());
+            }
+        }
+    }
+
+    // our node's whole section
+    assert_eq!(update_recipients.len(), elder_count());
+
+    Ok(())
+}
+
 fn create_peer(age: u8) -> Peer {
     let name = ed25519::gen_name_with_age(age);
     Peer::new(name, gen_addr())
