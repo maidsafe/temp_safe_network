@@ -29,6 +29,27 @@ pub(crate) enum Proposal {
     JoinsAllowed(bool),
 }
 
+impl Proposal {
+    /// Create SigShare for this proposal.
+    pub(crate) fn sign_with_key_share(
+        &self,
+        public_key_set: bls::PublicKeySet,
+        index: usize,
+        secret_key_share: &bls::SecretKeyShare,
+    ) -> Result<SigShare> {
+        Ok(SigShare::new(
+            public_key_set,
+            index,
+            secret_key_share,
+            &self.as_signable_bytes()?,
+        ))
+    }
+
+    pub(crate) fn as_signable_bytes(&self) -> Result<Vec<u8>> {
+        Ok(bincode::serialize(&SignableView(self))?)
+    }
+}
+
 // Add conversion methods to/from `messaging::...::Proposal`
 // We prefer this over `From<...>` to make it easier to read the conversion.
 
@@ -65,38 +86,6 @@ impl ProposalMsg {
             Self::OurElders(sap) => Proposal::OurElders(sap.into_authed_state()),
             Self::JoinsAllowed(allowed) => Proposal::JoinsAllowed(allowed),
         }
-    }
-}
-
-pub(crate) trait ProposalUtils {
-    fn sign_with_key_share(
-        &self,
-        public_key_set: bls::PublicKeySet,
-        index: usize,
-        secret_key_share: &bls::SecretKeyShare,
-    ) -> Result<SigShare>;
-
-    fn as_signable_bytes(&self) -> Result<Vec<u8>>;
-}
-
-impl ProposalUtils for Proposal {
-    /// Create SigShare for this proposal.
-    fn sign_with_key_share(
-        &self,
-        public_key_set: bls::PublicKeySet,
-        index: usize,
-        secret_key_share: &bls::SecretKeyShare,
-    ) -> Result<SigShare> {
-        Ok(SigShare::new(
-            public_key_set,
-            index,
-            secret_key_share,
-            &self.as_signable_bytes()?,
-        ))
-    }
-
-    fn as_signable_bytes(&self) -> Result<Vec<u8>> {
-        Ok(bincode::serialize(&SignableView(self))?)
     }
 }
 

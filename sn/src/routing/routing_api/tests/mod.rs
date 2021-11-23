@@ -19,10 +19,7 @@ use crate::messaging::{
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
 use crate::routing::{
-    core::{
-        ConnectionEvent, Proposal, ProposalUtils, RESOURCE_PROOF_DATA_SIZE,
-        RESOURCE_PROOF_DIFFICULTY,
-    },
+    core::{ConnectionEvent, Proposal, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     create_test_used_space_and_root_storage,
     dkg::test_utils::{prove, section_signed},
     ed25519,
