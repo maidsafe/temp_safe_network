@@ -10,12 +10,9 @@ use std::{cmp, collections::BTreeSet};
 
 use crate::messaging::system::{KeyedSig, MembershipState, Proposal, SectionAuth};
 use crate::routing::{
-    dkg::SectionAuthUtils,
-    error::Result,
-    log_markers::LogMarker,
-    network_knowledge::{NodeState, SectionAuthorityProvider},
-    routing_api::command::Command,
-    Event, MIN_AGE,
+    dkg::SectionAuthUtils, error::Result, log_markers::LogMarker,
+    network_knowledge::SectionAuthorityProvider, routing_api::command::Command, Event, NodeState,
+    MIN_AGE,
 };
 
 use super::Core;

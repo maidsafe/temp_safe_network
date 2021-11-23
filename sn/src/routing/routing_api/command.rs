@@ -8,13 +8,13 @@
 
 use crate::messaging::system::SectionAuth;
 use crate::messaging::{
-    system::{DkgFailureSigSet, KeyedSig, Proposal, SystemMsg},
+    system::{DkgFailureSigSet, KeyedSig, NodeState, Proposal, SystemMsg},
     DstLocation, MessageId, NodeMsgAuthority, WireMsg,
 };
 use crate::routing::{
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
-    NodeState, Peer, Sender, XorName,
+    Peer, Sender, XorName,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -125,7 +125,7 @@ impl fmt::Display for Command {
             Command::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
             Command::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Command::HandleElderAgreement { .. } => write!(f, "HandleElderAgreement"),
-            Command::HandleNewNodeOnline { .. } => write!(f, "HandleNewNodeOnline"),
+            Command::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
             Command::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Command::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
             Command::SendMessage { wire_msg, .. } => {
