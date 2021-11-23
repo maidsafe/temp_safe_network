@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+<csr-id-d3b88f749ca6ee53f65e200105aeeea691581e83/>
+<csr-id-35a8fdb9dca60ca268d536958a9d32ce0a876792/>
+<csr-id-c27d7e997c5a7812f995f113f31edf30c2c21272/>
+<csr-id-55eb0f259a83faff470dbfdeb9365d314ed6a697/>
+<csr-id-42d90b763606e2d324c5ce1235fc801105c07acb/>
+<csr-id-302ce4e605d72a0925509bfe3220c2b1ddac677d/>
+<csr-id-c78513903457a701096b5c542f15012e71d33c46/>
+
  - <csr-id-9a82649f0ca01c6d2eae57f260d2f98246724556/> multiples fixes for unit tests
    - error instead of panicking if logger is already initialized
    - use unique socker addrs for nodes
@@ -42,7 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Features (BREAKING)
 
  - <csr-id-3a59ee3b532bbc26388780ddc2f5b51ddae61d4c/> include section chain in AE-Redirect messages
-
 
 ### Commit Statistics
 
@@ -122,6 +129,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - raise SectionSplit event whenever prefix changed ([`302ce4e`](https://github.com/maidsafe/safe_network/commit/302ce4e605d72a0925509bfe3220c2b1ddac677d))
     - during bootstrap, handling the case prefix_map was loaded ([`c785139`](https://github.com/maidsafe/safe_network/commit/c78513903457a701096b5c542f15012e71d33c46))
 </details>
+
+<csr-unknown>
+ send DkgRetry for DkgError::MissingPart as well ensure client chunk count is 3 w/ 7 elders fix a compilation error introduced by merge joining node age to genesis section shall be less than or equal to suggested age use correct dst section key for AE-Update to siblings after split raise SectionSplit event whenever prefix changed during bootstrap, handling the case prefix_map was loaded<csr-unknown/>
 
 ## v0.40.0 (2021-11-15)
 
