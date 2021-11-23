@@ -22,20 +22,18 @@ jobs:
           toolchain: stable
           override: true
       - shell: bash
+        run: echo "GITHUB_ACTOR = $GITHUB_ACTOR"
+      - shell: bash
         run: |
-          git remote add github "$REPO"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
       - shell: bash
         run: cargo install cargo-smart-release
       - shell: bash
         run: ./resources/scripts/bump_version.sh
-      - name: push version bump and changelog commit
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
-          branch: main
-      - name: push version tags
+      - shell: bash
+        run: git log -5
+      - name: push version bump commit and tags
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
