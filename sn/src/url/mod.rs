@@ -228,7 +228,7 @@ impl UrlType {
 ///   public_name()   --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
 ///   top_name() --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
 ///   sub_names()   --> None
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Url {
     encoding_version: u64,      // currently only v1 supported
     public_name: String,        // "a.b.name" in "a.b.name"

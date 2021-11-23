@@ -27,6 +27,11 @@ use std::{
 };
 use xor_name::XorName;
 
+use self_encryption::MIN_ENCRYPTABLE_BYTES;
+
+/// Arbitrary maximum size of a register entry.
+const MAX_REG_ENTRY_SIZE: usize = MIN_ENCRYPTABLE_BYTES;
+
 /// Register mutation operation to apply to Register.
 pub type RegisterOp<T> = CrdtOperation<T>;
 
@@ -152,6 +157,11 @@ impl Register {
     ) -> Result<(EntryHash, RegisterOp<Entry>)> {
         self.check_permissions(Action::Write, None)?;
 
+        let size = entry.len();
+        if size > MAX_REG_ENTRY_SIZE {
+            return Err(Error::EntryTooBig(size, MAX_REG_ENTRY_SIZE));
+        }
+
         self.crdt.write(entry, children, self.authority)
     }
 
@@ -207,11 +217,7 @@ mod tests {
         },
         utils, Error, Keypair, Result,
     };
-    use crate::url::Url;
-    use crate::{
-        types::{BytesAddress, RegisterAddress as Address},
-        url::Scope,
-    };
+    use crate::{types::RegisterAddress as Address, url::Scope};
     use eyre::eyre;
     use proptest::prelude::*;
     use rand::{rngs::OsRng, seq::SliceRandom, thread_rng};
@@ -300,7 +306,7 @@ mod tests {
         );
 
         // And let's write an item to replica1 with autority1
-        let item1 = random_url()?;
+        let item1 = random_register_entry();
         let (_, op1) = replica1.write(item1, BTreeSet::new())?;
         let signed_write_op1 = sign_register_op(op1, &authority_keypair1)?;
 
@@ -309,7 +315,7 @@ mod tests {
         assert_eq!(replica2.size(None)?, 0);
 
         // Concurrently write another item with authority2 on replica2
-        let item2 = random_url()?;
+        let item2 = random_register_entry();
         let (_, op2) = replica2.write(item2, BTreeSet::new())?;
         let signed_write_op2 = sign_register_op(op2, &authority_keypair2)?;
 
@@ -330,9 +336,9 @@ mod tests {
     fn register_get_by_hash() -> eyre::Result<()> {
         let (_, register) = &mut create_public_reg_replicas(1)[0];
 
-        let entry1 = random_url()?;
-        let entry2 = random_url()?;
-        let entry3 = random_url()?;
+        let entry1 = random_register_entry();
+        let entry2 = random_register_entry();
+        let entry3 = random_register_entry();
 
         let (entry1_hash, _) = register.write(entry1.clone(), BTreeSet::new())?;
 
@@ -532,8 +538,8 @@ mod tests {
         );
 
         // let's write to both replicas with one first item
-        let item1 = random_url()?;
-        let item2 = random_url()?;
+        let item1 = random_register_entry();
+        let item2 = random_register_entry();
         let (_, op1) = replica1.write(item1, BTreeSet::new())?;
         let write_op1 = sign_register_op(op1, &authority_keypair1)?;
         check_op_not_allowed_failure(replica2.apply_op(write_op1))?;
@@ -586,8 +592,8 @@ mod tests {
         );
 
         // let's try to write to both registers
-        let item1 = random_url()?;
-        let item2 = random_url()?;
+        let item1 = random_register_entry();
+        let item2 = random_register_entry();
 
         let (entry1_hash, op1) = replica1.write(item1.clone(), BTreeSet::new())?;
         let write_op1 = sign_register_op(op1, &authority_keypair1)?;
@@ -813,7 +819,7 @@ mod tests {
             let (_, mut replica2) = replicas.remove(0);
 
             // Write an item on replicas
-            let (_, op) = replica1.write(random_url()?, BTreeSet::new())?;
+            let (_, op) = replica1.write(random_register_entry(), BTreeSet::new())?;
             let write_op = sign_register_op(op, &owner_keypair)?;
             replica2.apply_op(write_op)?;
 
@@ -849,7 +855,7 @@ mod tests {
             let mut children = BTreeSet::new();
             for _data in dataset {
                 // Write an item on replica1
-                let (hash, op) = replica1.write(random_url()?, children.clone())?;
+                let (hash, op) = replica1.write(random_register_entry(), children.clone())?;
                 let write_op = sign_register_op(op, &owner_keypair)?;
                 // now apply that op to replica 2
                 replica2.apply_op(write_op)?;
@@ -893,7 +899,7 @@ mod tests {
                 let children: BTreeSet<_> = list_of_hashes.choose_multiple(&mut OsRng, num_of_children).cloned().collect();
 
                 // Write an item on replica1 using the randomly generated set of children
-                let (hash, op) = replica1.write(random_url()?, children)?;
+                let (hash, op) = replica1.write(random_register_entry(), children)?;
                 let write_op = sign_register_op(op, &owner_keypair)?;
 
                 // now apply that op to replica 2
@@ -916,7 +922,7 @@ mod tests {
             let mut children = BTreeSet::new();
             for _data in dataset {
                 // first generate an op from one replica...
-                let (hash, op)= replicas[0].write(random_url()?, children)?;
+                let (hash, op)= replicas[0].write(random_register_entry(), children)?;
                 let signed_op = sign_register_op(op, &owner_keypair)?;
 
                 // then apply this to all replicas
@@ -943,7 +949,7 @@ mod tests {
 
             let mut children = BTreeSet::new();
             for _data in dataset {
-                let (hash, op) = replicas[0].write(random_url()?, children)?;
+                let (hash, op) = replicas[0].write(random_register_entry(), children)?;
                 let signed_op = sign_register_op(op, &owner_keypair)?;
                 ops.push(signed_op);
                 children = vec![hash].into_iter().collect();
@@ -976,7 +982,7 @@ mod tests {
             for _data in dataset {
                 if let Some(replica) = replicas.choose_mut(&mut OsRng)
                 {
-                    let (hash, op) = replica.write(random_url()?, children)?;
+                    let (hash, op) = replica.write(random_register_entry(), children)?;
                     let signed_op = sign_register_op(op, &owner_keypair)?;
                     ops.push(signed_op);
                     children = vec![hash].into_iter().collect();
@@ -1027,7 +1033,7 @@ mod tests {
             let mut ops = vec![];
             let mut children = BTreeSet::new();
             for (_data, delivery_chance) in dataset {
-                let (hash, op)= replica1.write(random_url()?, children)?;
+                let (hash, op)= replica1.write(random_register_entry(), children)?;
                 let signed_op = sign_register_op(op, &owner_keypair)?;
 
                 ops.push((signed_op, delivery_chance));
@@ -1070,7 +1076,7 @@ mod tests {
                 let index: usize = OsRng.gen_range(0, replicas.len());
                 let replica = &mut replicas[index];
 
-                let (hash, op)=replica.write(random_url()?, children)?;
+                let (hash, op)=replica.write(random_register_entry(), children)?;
                 let signed_op = sign_register_op(op, &owner_keypair)?;
                 ops.push((signed_op, delivery_chance));
                 children = vec![hash].into_iter().collect();
@@ -1117,7 +1123,7 @@ mod tests {
             for _data in dataset {
                 if let Some(replica) = replicas.choose_mut(&mut OsRng)
                 {
-                    let (hash, op)=replica.write(random_url()?, children)?;
+                    let (hash, op)=replica.write(random_register_entry(), children)?;
                     let signed_op = sign_register_op(op, &owner_keypair)?;
                     ops.push(signed_op);
                     children = vec![hash].into_iter().collect();
@@ -1133,7 +1139,7 @@ mod tests {
             // add bogus ops from bogus replica + bogus data
             let mut children = BTreeSet::new();
             for _data in bogus_dataset {
-                let (hash, op)=bogus_replica.write(random_url()?, children)?;
+                let (hash, op)=bogus_replica.write(random_register_entry(), children)?;
                 let bogus_op = sign_register_op(op, &random_owner_keypair)?;
                 bogus_replica.apply_op(bogus_op.clone())?;
                 ops.push(bogus_op);
@@ -1165,14 +1171,8 @@ mod tests {
         }
     }
 
-    fn random_url() -> Result<Url> {
-        use crate::url::*;
-        let url = Url::encode_bytes(
-            BytesAddress::Public(XorName::random()),
-            ContentType::Raw,
-            XorUrlBase::Base32z,
-        )
-        .map_err(|e| super::Error::Serialisation(e.to_string()))?;
-        Url::from_url(&url).map_err(|e| super::Error::FailedToParse(e.to_string()))
+    fn random_register_entry() -> Vec<u8> {
+        let random_bytes = thread_rng().gen::<[u8; 32]>();
+        random_bytes.to_vec()
     }
 }
