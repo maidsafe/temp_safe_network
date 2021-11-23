@@ -26,7 +26,7 @@ impl Safe {
     ) -> Result<XorUrl> {
         let xorname = self
             .safe_client
-            .store_register(name, type_tag, None, private)
+            .create_register(name, type_tag, None, private)
             .await?;
 
         let scope = if private {
@@ -45,7 +45,7 @@ impl Safe {
         debug!("Getting Public Register data from: {:?}", url);
         let safeurl = self.parse_and_resolve_url(url).await?;
 
-        self.fetch_register_entries(&safeurl).await
+        self.register_fetch_entries(&safeurl).await
     }
 
     /// Read value from a Register on the network by its hash
@@ -53,13 +53,13 @@ impl Safe {
         debug!("Getting Public Register data from: {:?}", url);
         let safeurl = self.parse_and_resolve_url(url).await?;
 
-        self.fetch_register_entry(&safeurl, hash).await
+        self.register_fetch_entry(&safeurl, hash).await
     }
 
     /// Fetch a Register from a Url without performing any type of URL resolution
     /// Supports version hashes:
     /// e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
-    pub(crate) async fn fetch_register_entries(
+    pub(crate) async fn register_fetch_entries(
         &self,
         url: &Url,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
@@ -67,7 +67,7 @@ impl Safe {
             Some(v) => {
                 debug!("Take entry with version hash");
                 let hash = v.entry_hash();
-                self.fetch_register_entry(url, hash)
+                self.register_fetch_entry(url, hash)
                     .await
                     .map(|entry| vec![(hash, entry)].into_iter().collect())
             }
@@ -96,7 +96,7 @@ impl Safe {
     }
 
     /// Fetch a Register from a Url without performing any type of URL resolution
-    pub(crate) async fn fetch_register_entry(&self, url: &Url, hash: EntryHash) -> Result<Entry> {
+    pub(crate) async fn register_fetch_entry(&self, url: &Url, hash: EntryHash) -> Result<Entry> {
         // TODO: allow to specify the hash with the Url as well: safeurl.content_hash(),
         // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
         let address = self.get_register_address(url)?;
@@ -104,7 +104,7 @@ impl Safe {
     }
 
     /// Write value to a Register on the network
-    pub async fn write_to_register(
+    pub async fn register_write(
         &self,
         url: &str,
         entry: Entry,
@@ -146,7 +146,7 @@ impl Safe {
 
 #[cfg(test)]
 mod tests {
-    use crate::{app::test_helpers::new_safe_instance, Url};
+    use crate::app::test_helpers::new_safe_instance;
     use anyhow::Result;
 
     #[tokio::test]
@@ -162,12 +162,12 @@ mod tests {
         assert!(received_data.is_empty());
         assert!(received_data_priv.is_empty());
 
-        let initial_data = Url::from_url("safe://test")?;
+        let initial_data = "initial data bytes".as_bytes().to_vec();
         let hash = safe
-            .write_to_register(&xorurl, initial_data.clone(), Default::default())
+            .register_write(&xorurl, initial_data.clone(), Default::default())
             .await?;
         let hash_priv = safe
-            .write_to_register(&xorurl_priv, initial_data.clone(), Default::default())
+            .register_write(&xorurl_priv, initial_data.clone(), Default::default())
             .await?;
 
         let received_entry = safe.register_read_entry(&xorurl, hash).await?;

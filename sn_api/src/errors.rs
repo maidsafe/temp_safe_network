@@ -74,6 +74,9 @@ pub enum Error {
     /// InvalidAmount
     #[error("InvalidAmount: {0}")]
     InvalidAmount(String),
+    /// InvalidUtf8Sequence
+    #[error("InvalidUtf8Sequence: {0}")]
+    InvalidUtf8Sequence(#[from] std::str::Utf8Error),
     /// InvalidXorUrl
     #[error("InvalidXorUrl: {0}")]
     InvalidXorUrl(String),

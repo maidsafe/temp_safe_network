@@ -17,6 +17,7 @@ use crate::{app::Safe, register::EntryHash, Error, Result, Url};
 use bytes::{Buf, Bytes};
 use log::{debug, info, warn};
 use std::collections::BTreeSet;
+use std::str;
 
 // Type tag to use for the NrsMapContainer stored on Register
 pub(crate) const NRS_MAP_TYPE_TAG: u64 = 1_500;
@@ -63,12 +64,12 @@ impl Safe {
         let reg_xorurl = self
             .register_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
             .await?;
-        let reg_entry = Url::from_xorurl(&nrs_map_xorurl)?;
+        let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
         // Note that we can use the higher level register API here
         // because reg_xorurl is not an NRS url
         // (high level register API uses resolution that uses NRS!)
         let entry_hash = self
-            .write_to_register(&reg_xorurl, reg_entry, BTreeSet::new())
+            .register_write(&reg_xorurl, reg_entry, BTreeSet::new())
             .await?;
 
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
@@ -109,7 +110,7 @@ impl Safe {
         // store updated nrs_map
         let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
         let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
-        let reg_entry = Url::from_xorurl(&nrs_map_xorurl)?;
+        let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
         let safe_url = Safe::parse_url(&url_str)?;
         let address = self.get_register_address(&safe_url)?;
         let entry_hash = self
@@ -187,7 +188,7 @@ impl Safe {
         // store updated nrs_map
         let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
         let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
-        let reg_entry = Url::from_xorurl(&nrs_map_xorurl)?;
+        let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
         let safe_url = Safe::parse_url(&url_str)?;
         let address = self.get_register_address(&safe_url)?;
         let entry_hash = self
@@ -248,7 +249,7 @@ impl Safe {
 
         // fetch entries and wrap errors
         let entries = self
-            .fetch_register_entries(&safe_url)
+            .register_fetch_entries(&safe_url)
             .await
             .map_err(|e| match e {
                 Error::ContentNotFound(_) => {
@@ -264,7 +265,7 @@ impl Safe {
         }
         let first_entry = entries.iter().next();
         let (version, nrs_map_url) = match first_entry {
-            Some((entry_hash, url)) => (entry_hash.into(), url),
+            Some((entry_hash, url)) => (entry_hash.into(), Url::from_xorurl(str::from_utf8(url)?)?),
             None => {
                 warn!(
                     "NRS map Register found at XOR name \"{:?}\" was empty",
@@ -275,7 +276,7 @@ impl Safe {
         };
 
         // Using the NrsMap url we can now fetch the NrsMap and deserialise it
-        let serialised_nrs_map = self.fetch_public_data(nrs_map_url, None).await?;
+        let serialised_nrs_map = self.fetch_public_data(&nrs_map_url, None).await?;
 
         debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
         let nrs_map = serde_json::from_str(&String::from_utf8_lossy(serialised_nrs_map.chunk()))

@@ -24,6 +24,7 @@ use relative_path::RelativePath;
 use safe_network::types::BytesAddress;
 use std::collections::{BTreeMap, HashSet};
 use std::iter::FromIterator;
+use std::str;
 use std::{fs, path::Path};
 
 pub(crate) use files_map::{file_map_for_path, get_file_link_and_metadata};
@@ -97,7 +98,7 @@ impl Safe {
             // Store the serialised FilesMap XOR-URL as the first entry value in the Register
             let xorname = self
                 .safe_client
-                .store_register(None, FILES_CONTAINER_TYPE_TAG, None, false)
+                .create_register(None, FILES_CONTAINER_TYPE_TAG, None, false)
                 .await?;
 
             let xor_url = Url::encode_register(
@@ -108,9 +109,9 @@ impl Safe {
                 self.xorurl_base,
             )?;
 
-            let entry = Url::from_xorurl(&files_map_xorurl)?;
+            let entry = files_map_xorurl.as_bytes().to_vec();
             let entry_hash = &self
-                .write_to_register(&xor_url, entry, Default::default())
+                .register_write(&xor_url, entry, Default::default())
                 .await?;
 
             let mut tmp_url = Url::from_xorurl(&xor_url)?;
@@ -151,7 +152,7 @@ impl Safe {
     ) -> Result<(VersionHash, FilesMap)> {
         // fetch register entries and wrap errors
         let entries = self
-            .fetch_register_entries(safe_url)
+            .register_fetch_entries(safe_url)
             .await
             .map_err(|e| match e {
                 Error::ContentNotFound(_) => {
@@ -179,7 +180,7 @@ impl Safe {
         }
         let first_entry = entries.iter().next();
         let (version, files_map_xorurl) = if let Some((v, m)) = first_entry {
-            (v.into(), m.to_owned())
+            (v.into(), str::from_utf8(m)?)
         } else {
             warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
             return Ok((VersionHash::default(), FilesMap::default()));
@@ -188,7 +189,8 @@ impl Safe {
         debug!("Files map retrieved.... v{:?}", &version);
         // TODO: use RDF format and deserialise it
         // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
-        let serialised_files_map = self.fetch_public_data(&files_map_xorurl, None).await?;
+        let files_map_url = Url::from_xorurl(files_map_xorurl)?;
+        let serialised_files_map = self.fetch_public_data(&files_map_url, None).await?;
         let files_map = serde_json::from_slice(serialised_files_map.chunk()).map_err(|err| {
             Error::ContentError(format!(
                 "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
@@ -518,10 +520,10 @@ impl Safe {
         let files_map_xorurl = self.store_files_map(new_files_map).await?;
 
         // append entry to register
-        let entry = Url::from_xorurl(&files_map_xorurl)?;
+        let entry = files_map_xorurl.as_bytes().to_vec();
         let replace = current_version.iter().map(|e| e.entry_hash()).collect();
         let entry_hash = &self
-            .write_to_register(&safe_url.to_string(), entry, replace)
+            .register_write(&safe_url.to_string(), entry, replace)
             .await?;
         let new_version: VersionHash = entry_hash.into();
 
