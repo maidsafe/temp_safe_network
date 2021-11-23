@@ -20,6 +20,7 @@ use ed25519_dalek::{
     Keypair as EdKeypair, PublicKey as EdPublicKey, Signature as EdSignature, Signer as _,
     Verifier as _,
 };
+use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
 /// Authority of a network peer.
@@ -132,7 +133,7 @@ impl SectionAuth {
 /// This is made possible by performing verification in all possible constructors of the type.
 ///
 /// Validation is defined by the [`VerifyAuthority`] impl for `T`.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AuthorityProof<T>(pub(crate) T);
 
 impl<T: VerifyAuthority> AuthorityProof<T> {

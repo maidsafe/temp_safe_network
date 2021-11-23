@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId};
+use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg};
+use crate::messaging::DstLocation;
 use crate::routing::{
-    dkg::session::{Backlog, Session},
+    dkg::session::Session,
     ed25519,
     error::Result,
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
@@ -21,7 +22,6 @@ use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use dashmap::DashMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use xor_name::XorName;
 
 /// DKG voter carries out the work of participating and/or observing a DKG.
@@ -43,18 +43,12 @@ use xor_name::XorName;
 #[derive(Clone)]
 pub(crate) struct DkgVoter {
     sessions: Arc<DashMap<DkgSessionId, Session>>,
-
-    // Due to the asyncronous nature of the network we might sometimes receive a DKG message before
-    // we created the corresponding session. To avoid losing those messages, we store them in this
-    // backlog and replay them once we create the session.
-    backlog: Arc<RwLock<Backlog>>,
 }
 
 impl Default for DkgVoter {
     fn default() -> Self {
         Self {
             sessions: Arc::new(DashMap::default()),
-            backlog: Arc::new(RwLock::new(Backlog::new())),
         }
     }
 }
@@ -121,27 +115,12 @@ impl DkgVoter {
                 let mut commands = vec![];
                 commands.extend(session.broadcast(node, &session_id, message, section_pk)?);
 
-                trace!("Start draining backlog");
-
-                for message in self.backlog.write().await.take(&session_id).into_iter() {
-                    commands.extend(session.process_message(
-                        node,
-                        name,
-                        &session_id,
-                        message,
-                        section_pk,
-                    )?);
-                }
-
-                trace!("Draining backlog completed");
-
                 let _prev = self.sessions.insert(session_id, session);
 
                 // Remove unneeded old sessions.
                 self.sessions.retain(|existing_session_id, _| {
                     existing_session_id.generation >= session_id.generation
                 });
-                self.backlog.write().await.prune(&session_id);
 
                 Ok(commands)
             }
@@ -183,20 +162,22 @@ impl DkgVoter {
         let mut commands = Vec::new();
 
         if let Some(mut session) = self.sessions.get_mut(session_id) {
-            // There is chance that when there is too many messages in the backlog,
-            // during the handling of them there will be new message reached,
-            // which be pushed to the backlog.
-            trace!("Draining backlog before process message");
-            for message in self.backlog.write().await.take(session_id).into_iter() {
-                commands.extend(
-                    session.process_message(node, sender, session_id, message, section_pk)?,
-                );
-            }
-
             commands.extend(session.process_message(node, sender, session_id, message, section_pk)?)
         } else {
-            trace!("Pushing to backlog {:?} - {:?}", session_id, message);
-            self.backlog.write().await.push(*session_id, message);
+            trace!(
+                "Sending DkgSessionUnknown {{ {:?} }} to {}",
+                &session_id,
+                &sender
+            );
+            commands.push(Command::PrepareNodeMsgToSend {
+                msg: SystemMsg::DkgSessionUnknown {
+                    session_id: *session_id,
+                },
+                dst: DstLocation::Node {
+                    name: sender,
+                    section_pk,
+                },
+            });
         }
         Ok(commands)
     }
@@ -225,16 +206,24 @@ impl DkgVoter {
         node: &Node,
         session_id: DkgSessionId,
         message_history: Vec<DkgMessage>,
+        sender: XorName,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         if let Some(mut session) = self.sessions.get_mut(&session_id) {
             session.handle_dkg_history(node, session_id, message_history, section_pk)
         } else {
-            for message in message_history {
-                trace!("Pushing to backlog {:?} - {:?}", session_id, message);
-                self.backlog.write().await.push(session_id, message);
-            }
-            Ok(vec![])
+            trace!(
+                "Sending DkgSessionUnknown {{ {:?} }} to {}",
+                &session_id,
+                &sender
+            );
+            Ok(vec![Command::PrepareNodeMsgToSend {
+                msg: SystemMsg::DkgSessionUnknown { session_id },
+                dst: DstLocation::Node {
+                    name: sender,
+                    section_pk,
+                },
+            }])
         }
     }
 }

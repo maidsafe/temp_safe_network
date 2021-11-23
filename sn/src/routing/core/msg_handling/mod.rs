@@ -17,13 +17,6 @@ mod service_msgs;
 mod update_section;
 
 use super::Core;
-use crate::messaging::{
-    data::{ServiceMsg, StorageLevel},
-    signature_aggregator::Error as AggregatorError,
-    system::{NodeCmd, NodeQuery, SystemMsg},
-    DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth, ServiceAuth,
-    WireMsg,
-};
 use crate::routing::{
     log_markers::LogMarker,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
@@ -33,6 +26,16 @@ use crate::routing::{
     Error, Event, MessageReceived, Peer, Result, UnnamedPeer, MIN_LEVEL_WHEN_FULL,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
+use crate::{
+    messaging::{
+        data::{ServiceMsg, StorageLevel},
+        signature_aggregator::Error as AggregatorError,
+        system::{NodeCmd, NodeQuery, SystemMsg},
+        AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority,
+        SectionAuth, ServiceAuth, WireMsg,
+    },
+    routing::core::DkgSessionInfo,
+};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use rand::rngs::OsRng;
@@ -454,7 +457,16 @@ impl Core {
                 if !elders.contains_key(&self.node.read().await.name()) {
                     return Ok(vec![]);
                 }
-
+                if let NodeMsgAuthority::Section(authority) = msg_authority {
+                    let _existing = self.dkg_sessions.write().await.insert(
+                        session_id,
+                        DkgSessionInfo {
+                            prefix,
+                            elders: elders.clone(),
+                            authority,
+                        },
+                    );
+                }
                 self.handle_dkg_start(session_id, prefix, elders).await
             }
             SystemMsg::DkgMessage {
@@ -599,6 +611,74 @@ impl Core {
                     sending_nodes_pk,
                 )
                 .await
+            }
+            SystemMsg::DkgSessionUnknown { session_id } => {
+                if let Some(session_info) = self.dkg_sessions.read().await.get(&session_id).cloned()
+                {
+                    let DkgSessionInfo {
+                        prefix,
+                        elders,
+                        authority: section_auth,
+                    } = session_info;
+                    let message_cache = self.dkg_voter.get_cached_messages(&session_id);
+                    trace!(
+                        "Sending DkgSessionInfo {{ {:?}, ... }} to {}",
+                        &session_id,
+                        &sender
+                    );
+                    Ok(vec![Command::PrepareNodeMsgToSend {
+                        msg: SystemMsg::DkgSessionInfo {
+                            session_id,
+                            elders,
+                            prefix,
+                            section_auth,
+                            message_cache,
+                        },
+                        dst: DstLocation::Node {
+                            name: sender.name(),
+                            section_pk: self.network_knowledge.section_key().await,
+                        },
+                    }])
+                } else {
+                    warn!("Unknown DkgSessionInfo requested");
+                    Ok(vec![])
+                }
+            }
+            SystemMsg::DkgSessionInfo {
+                session_id,
+                prefix,
+                elders,
+                message_cache,
+                section_auth,
+            } => {
+                let msg = message_cache.last().unwrap().clone();
+                let mut commands = vec![];
+                // Reconstruct the original DKG start message and verify the section signature
+                let payload = WireMsg::serialize_msg_payload(&SystemMsg::DkgStart {
+                    session_id,
+                    prefix,
+                    elders: elders.clone(),
+                })?;
+                let auth = section_auth.into_inner();
+                if self
+                    .network_knowledge
+                    .has_chain_key(&auth.sig.public_key)
+                    .await
+                {
+                    if let Err(err) = AuthorityProof::verify(auth, payload) {
+                        error!("Error verifying signature for DkgSessionInfo: {:?}", err)
+                    } else {
+                        trace!("DkgSessionInfo signature verified");
+                    }
+                } else {
+                    warn!("Cannot verify DkgSessionInfo. Unknown key!");
+                }
+                commands.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
+                commands.extend(
+                    self.handle_dkg_retry(session_id, message_cache, msg, sender.name())
+                        .await?,
+                );
+                Ok(commands)
             }
         }
     }
