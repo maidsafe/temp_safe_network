@@ -125,9 +125,11 @@ jobs:
       - name: Run Routing tests
         if: steps.changes.outputs.routing == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
-        timeout-minutes: 5
+        timeout-minutes: 10
 
-      - run: ./target/release/testnet
+      - name: Start the network
+        run: ./target/release/testnet
+        id: section-startup
 
       - name: Healthcheck
         run: ./resources/scripts/has_split.sh
@@ -166,13 +168,13 @@ jobs:
       - name: Client reg tests against local network
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
-        timeout-minutes: 15
+        timeout-minutes: 5
 
       # blob api unix
       - name: Unix client blob tests against local network
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
-        timeout-minutes: 15
+        timeout-minutes: 5
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 10
@@ -230,20 +232,16 @@ jobs:
           echo "$(tasklist | FIND "sn_node.exe" | find /c /v "") nodes still running"
           ls $HOME/.safe/node/local-test-network
 
-      # - name: Print Testnet Startup output
-      #   shell: bash
-      #   run: cat startup.log
-      #   if: failure()
-
       - name: Print Network Log Stats
         shell: bash
         run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
-        if: failure()
+        if: steps.section-startup.outcome == 'success'
+
 
       - name: Upload Node Logs
           # Upload artifacts.
         uses: actions/upload-artifact@v2
         with:
           name: sn_node_logs
-          path: ~/.safe/node/local-test-network/
+          path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
