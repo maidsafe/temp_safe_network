@@ -310,13 +310,16 @@ impl Comm {
                             .and_then(|(connection, connection_incoming)| async move {
                                 recipient.set_connection(connection.clone()).await;
                                 self.connected_peers.insert(connection.clone()).await;
-                                let _ = task::spawn(handle_incoming_messages(
-                                    connection.clone(),
-                                    connection_incoming,
-                                    self.event_tx.clone(),
-                                    self.msg_count.clone(),
-                                    self.connected_peers.clone(),
-                                ));
+                                let _ = task::spawn(
+                                    handle_incoming_messages(
+                                        connection.clone(),
+                                        connection_incoming,
+                                        self.event_tx.clone(),
+                                        self.msg_count.clone(),
+                                        self.connected_peers.clone(),
+                                    )
+                                    .in_current_span(),
+                                );
                                 Ok(connection)
                             })
                             .await,
