@@ -8,11 +8,12 @@
 
 use super::Core;
 
-use crate::messaging::{
-    signature_aggregator::Error as AggregatorError, system::Proposal, MessageId,
-};
+use crate::messaging::{signature_aggregator::Error as AggregatorError, MessageId};
 use crate::routing::{
-    core::ProposalUtils, dkg::SigShare, routing_api::command::Command, Peer, Result,
+    core::{Proposal, ProposalUtils},
+    dkg::SigShare,
+    routing_api::command::Command,
+    Peer, Result,
 };
 
 // Decisions
@@ -29,16 +30,16 @@ impl Core {
 
         // Any other proposal than SectionInfo needs to be signed by a known section key.
         if let Proposal::SectionInfo(section_auth) = &proposal {
-            if section_auth.prefix == self.network_knowledge.prefix().await
+            if section_auth.prefix() == self.network_knowledge.prefix().await
                 || section_auth
-                    .prefix
+                    .prefix()
                     .is_extension_of(&self.network_knowledge.prefix().await)
             {
                 // This `SectionInfo` is proposed by the DKG participants and
                 // it's signed by the new key created by the DKG so we don't
                 // know it yet. We only require the src_name of the
                 // proposal to be one of the DKG participants.
-                if !section_auth.elders.contains_key(&sender.name()) {
+                if !section_auth.contains_elder(&sender.name()) {
                     trace!(
                         "Ignoring proposal from src not being a DKG participant: {:?}",
                         proposal

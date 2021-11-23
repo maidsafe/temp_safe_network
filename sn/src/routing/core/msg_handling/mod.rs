@@ -442,7 +442,7 @@ impl Core {
                 }
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
-                self.handle_proposal(msg_id, proposal, sig_share, sender)
+                self.handle_proposal(msg_id, proposal.into_state(), sig_share, sender)
                     .await
             }
             SystemMsg::DkgStart {

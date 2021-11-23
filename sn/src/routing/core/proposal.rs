@@ -6,9 +6,67 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::Proposal;
-use crate::routing::{dkg::SigShare, error::Result};
+use crate::{
+    messaging::system::{Proposal as ProposalMsg, SectionAuth},
+    routing::{
+        dkg::SigShare,
+        error::Result,
+        network_knowledge::{NodeState, SectionAuthorityProvider},
+    },
+};
 use serde::{Serialize, Serializer};
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum Proposal {
+    Online {
+        node_state: NodeState,
+        dst_key: Option<bls::PublicKey>,
+    },
+    Offline(NodeState),
+    SectionInfo(SectionAuthorityProvider),
+    OurElders(SectionAuth<SectionAuthorityProvider>),
+    JoinsAllowed(bool),
+}
+
+// Add conversion methods to/from `messaging::...::Proposal`
+// We prefer this over `From<...>` to make it easier to read the conversion.
+
+impl Proposal {
+    pub(crate) fn into_msg(self) -> ProposalMsg {
+        match self {
+            Self::Online {
+                node_state,
+                dst_key,
+            } => ProposalMsg::Online {
+                node_state: node_state.to_msg(),
+                dst_key,
+            },
+            Self::Offline(node_state) => ProposalMsg::Offline(node_state.to_msg()),
+            Self::SectionInfo(sap) => ProposalMsg::SectionInfo(sap.to_msg()),
+            Self::OurElders(sap) => ProposalMsg::OurElders(sap.into_authed_msg()),
+            Self::JoinsAllowed(allowed) => ProposalMsg::JoinsAllowed(allowed),
+        }
+    }
+}
+
+impl ProposalMsg {
+    pub(crate) fn into_state(self) -> Proposal {
+        match self {
+            Self::Online {
+                node_state,
+                dst_key,
+            } => Proposal::Online {
+                node_state: node_state.into_state(),
+                dst_key,
+            },
+            Self::Offline(node_state) => Proposal::Offline(node_state.into_state()),
+            Self::SectionInfo(sap) => Proposal::SectionInfo(sap.into_state()),
+            Self::OurElders(sap) => Proposal::OurElders(sap.into_authed_state()),
+            Self::JoinsAllowed(allowed) => Proposal::JoinsAllowed(allowed),
+        }
+    }
+}
 
 pub(crate) trait ProposalUtils {
     fn sign_with_key_share(
@@ -70,14 +128,14 @@ mod tests {
         // Proposal::SectionInfo
         let (section_auth, _, _) =
             network_knowledge::test_utils::gen_section_authority_provider(Prefix::default(), 4);
-        let proposal = Proposal::SectionInfo(section_auth.to_msg());
+        let proposal = Proposal::SectionInfo(section_auth.clone());
         verify_serialize_for_signing(&proposal, &section_auth)?;
 
         // Proposal::OurElders
         let new_sk = bls::SecretKey::random();
         let new_pk = new_sk.public_key();
         let section_signed_auth = dkg::test_utils::section_signed(&new_sk, section_auth)?;
-        let proposal = Proposal::OurElders(section_signed_auth.into_authed_msg());
+        let proposal = Proposal::OurElders(section_signed_auth);
         verify_serialize_for_signing(&proposal, &new_pk)?;
 
         Ok(())
