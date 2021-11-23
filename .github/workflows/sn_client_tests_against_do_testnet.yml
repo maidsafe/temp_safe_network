@@ -7,7 +7,20 @@ on:
         description: 'Number of nodes to be deployed'
         required: false
         default: 50
+      launch-testnet:
+        description: 'Launch a new tesnet? (y/n)'
+        required: false
+        default: 'n'
+      run-client-tests:
+        description: 'Run Client tests? (y/n)'
+        required: false
+        default: 'n'
+      kill-testnet:
+        description: 'Kill testnet? (y/n)'
+        required: false
+        default: 'n'
   pull_request_target:
+    types: [ labeled ]
 
 env:
   CARGO_INCREMENTAL: '0'
@@ -16,8 +29,7 @@ env:
 
 jobs:
   launch-testnet:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    environment: approved_action
+    if: ${{ github.event.inputs.launch-testnet == 'y' || github.event.label.name == 'launch-testnet' }}
     name: Launch Digital Ocean testnet
     runs-on: ubuntu-latest
     steps:
@@ -32,11 +44,10 @@ jobs:
           node-count: ${{ github.event.inputs.node-count || 50 }}
 
   run-client-tests:
-    environment: approved_action
     name: Run Client tests
     runs-on: ubuntu-latest
     needs: [launch-testnet]
-    if: always() && !startsWith(github.event.pull_request.title, 'Automated version bump')
+    if: ${{ always() && (github.event.inputs.run-client-tests == 'y' || github.event.label.name == 'run-client-tests') }}
     steps:
       - uses: actions/checkout@v2
         with:
@@ -82,11 +93,10 @@ jobs:
         run: cargo run --release  --features=always-joinable,test-utils --example client_blob
 
   kill-testnet:
-    environment: approved_action
     name: Destroy Digital Ocean testnet
     runs-on: ubuntu-latest
     needs: [launch-testnet, run-client-tests]
-    if: always() && !startsWith(github.event.pull_request.title, 'Automated version bump')
+    if: ${{ always() && (github.event.inputs.kill-testnet == 'y' || github.event.label.name == 'kill-testnet') }}
     steps:
       - name: Kill testnet
         uses: maidsafe/sn_testnet_action@master
