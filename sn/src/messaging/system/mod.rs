@@ -33,6 +33,9 @@ use std::{
 };
 use xor_name::{Prefix, XorName};
 
+use super::authority::SectionAuth as SectionAuthProof;
+use super::AuthorityProof;
+
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
@@ -107,6 +110,24 @@ pub enum SystemMsg {
         prefix: Prefix,
         /// The section's complete set of elders as a map from their name to their socket address.
         elders: BTreeMap<XorName, SocketAddr>,
+    },
+    /// Message sent when a DKG session has not started
+    DkgSessionUnknown {
+        /// The identifier of the DKG session this message is for.
+        session_id: DkgSessionId,
+    },
+    /// DKG session info along with section authority
+    DkgSessionInfo {
+        /// The identifier of the DKG session to start.
+        session_id: DkgSessionId,
+        /// The section prefix. It matches all the members' names.
+        prefix: Prefix,
+        /// The section's complete set of elders as a map from their name to their socket address.
+        elders: BTreeMap<XorName, SocketAddr>,
+        /// Section authority for the DKG start message
+        section_auth: AuthorityProof<SectionAuthProof>,
+        /// Messages processed in the session so far
+        message_cache: Vec<DkgMessage>,
     },
     /// Message exchanged for DKG process.
     DkgMessage {

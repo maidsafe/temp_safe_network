@@ -34,8 +34,9 @@ pub(crate) use register_storage::RegisterStorage;
 
 use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
-use crate::messaging::system::SystemMsg;
+use crate::messaging::system::{DkgSessionId, SystemMsg};
 use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
+use crate::messaging::{AuthorityProof, SectionAuth};
 use crate::routing::{
     dkg::DkgVoter,
     error::Result,
@@ -52,6 +53,8 @@ use capacity::Capacity;
 use itertools::Itertools;
 use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
+use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::PathBuf,
@@ -82,6 +85,13 @@ const CHUNK_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
 pub(crate) type AeBackoffCache =
     Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
 
+#[derive(Clone)]
+pub(crate) struct DkgSessionInfo {
+    pub(crate) prefix: Prefix,
+    pub(crate) elders: BTreeMap<XorName, SocketAddr>,
+    pub(crate) authority: AuthorityProof<SectionAuth>,
+}
+
 // State + logic of a routing node.
 pub(crate) struct Core {
     pub(crate) comm: Comm,
@@ -91,6 +101,7 @@ pub(crate) struct Core {
     message_aggregator: SignatureAggregator,
     proposal_aggregator: SignatureAggregator,
     split_barrier: Arc<RwLock<SplitBarrier>>,
+    dkg_sessions: Arc<RwLock<HashMap<DkgSessionId, DkgSessionInfo>>>,
     // Voter for Dkg
     dkg_voter: DkgVoter,
     relocate_state: Arc<RwLock<Option<RelocateState>>>,
@@ -137,6 +148,7 @@ impl Core {
             node: Arc::new(RwLock::new(node)),
             network_knowledge,
             section_keys_provider,
+            dkg_sessions: Arc::new(RwLock::new(HashMap::default())),
             proposal_aggregator: SignatureAggregator::default(),
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: SignatureAggregator::default(),
