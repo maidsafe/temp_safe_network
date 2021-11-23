@@ -115,6 +115,8 @@ pub enum SystemMsg {
     DkgSessionUnknown {
         /// The identifier of the DKG session this message is for.
         session_id: DkgSessionId,
+        /// DKG message that came in
+        message: DkgMessage,
     },
     /// DKG session info along with section authority
     DkgSessionInfo {
@@ -128,6 +130,8 @@ pub enum SystemMsg {
         section_auth: AuthorityProof<SectionAuthProof>,
         /// Messages processed in the session so far
         message_cache: Vec<DkgMessage>,
+        /// The original DKG message
+        message: DkgMessage,
     },
     /// Message exchanged for DKG process.
     DkgMessage {

@@ -612,7 +612,10 @@ impl Core {
                 )
                 .await
             }
-            SystemMsg::DkgSessionUnknown { session_id } => {
+            SystemMsg::DkgSessionUnknown {
+                session_id,
+                message,
+            } => {
                 if let Some(session_info) = self.dkg_sessions.read().await.get(&session_id).cloned()
                 {
                     let DkgSessionInfo {
@@ -633,6 +636,7 @@ impl Core {
                             prefix,
                             section_auth,
                             message_cache,
+                            message,
                         },
                         dst: DstLocation::Node {
                             name: sender.name(),
@@ -650,8 +654,8 @@ impl Core {
                 elders,
                 message_cache,
                 section_auth,
+                message,
             } => {
-                let msg = message_cache.last().unwrap().clone();
                 let mut commands = vec![];
                 // Reconstruct the original DKG start message and verify the section signature
                 let payload = WireMsg::serialize_msg_payload(&SystemMsg::DkgStart {
@@ -659,23 +663,29 @@ impl Core {
                     prefix,
                     elders: elders.clone(),
                 })?;
-                let auth = section_auth.into_inner();
-                if self
-                    .network_knowledge
-                    .has_chain_key(&auth.sig.public_key)
-                    .await
-                {
+                let auth = section_auth.clone().into_inner();
+                if self.network_knowledge.section_key().await == auth.sig.public_key {
                     if let Err(err) = AuthorityProof::verify(auth, payload) {
-                        error!("Error verifying signature for DkgSessionInfo: {:?}", err)
+                        error!("Error verifying signature for DkgSessionInfo: {:?}", err);
+                        return Ok(commands);
                     } else {
                         trace!("DkgSessionInfo signature verified");
                     }
                 } else {
                     warn!("Cannot verify DkgSessionInfo. Unknown key!");
+                    return Ok(commands);
                 }
+                let _existing = self.dkg_sessions.write().await.insert(
+                    session_id,
+                    DkgSessionInfo {
+                        prefix,
+                        elders: elders.clone(),
+                        authority: section_auth,
+                    },
+                );
                 commands.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
                 commands.extend(
-                    self.handle_dkg_retry(session_id, message_cache, msg, sender.name())
+                    self.handle_dkg_retry(session_id, message_cache, message, sender.name())
                         .await?,
                 );
                 Ok(commands)
