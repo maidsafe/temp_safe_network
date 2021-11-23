@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use super::ProposalUtils;
 use crate::messaging::{
     data::DataExchange,
     system::{

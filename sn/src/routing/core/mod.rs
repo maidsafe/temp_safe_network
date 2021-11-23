@@ -29,7 +29,7 @@ pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::MIN_LEVEL_WHEN_FULL;
 pub(crate) use chunk_store::ChunkStore;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
-pub(crate) use proposal::{Proposal, ProposalUtils};
+pub(crate) use proposal::Proposal;
 pub(crate) use register_storage::RegisterStorage;
 
 use self::split_barrier::SplitBarrier;
