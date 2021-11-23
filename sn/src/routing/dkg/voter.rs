@@ -172,6 +172,7 @@ impl DkgVoter {
             commands.push(Command::PrepareNodeMsgToSend {
                 msg: SystemMsg::DkgSessionUnknown {
                     session_id: *session_id,
+                    message,
                 },
                 dst: DstLocation::Node {
                     name: sender,
@@ -212,18 +213,11 @@ impl DkgVoter {
         if let Some(mut session) = self.sessions.get_mut(&session_id) {
             session.handle_dkg_history(node, session_id, message_history, section_pk)
         } else {
-            trace!(
-                "Sending DkgSessionUnknown {{ {:?} }} to {}",
-                &session_id,
-                &sender
+            warn!(
+                "Recieved DKG message cache from {} without an active DKG session: {:?}",
+                &sender, &session_id,
             );
-            Ok(vec![Command::PrepareNodeMsgToSend {
-                msg: SystemMsg::DkgSessionUnknown { session_id },
-                dst: DstLocation::Node {
-                    name: sender,
-                    section_pk,
-                },
-            }])
+            Ok(vec![])
         }
     }
 }
