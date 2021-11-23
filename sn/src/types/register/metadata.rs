@@ -16,5 +16,5 @@ pub enum Action {
     Write,
 }
 
-/// An entry in a Register.
+/// An entry in a Register (note that the vec<u8> is size limited: MAX_REG_ENTRY_SIZE)
 pub type Entry = Vec<u8>;
