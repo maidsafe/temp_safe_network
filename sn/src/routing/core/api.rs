@@ -105,16 +105,12 @@ impl Core {
         Ok(self.key_share().await?.public_key_set)
     }
 
-    /// Returns the info about the section matching the name.
+    /// Returns the SAP of the section matching the name.
     pub(crate) async fn matching_section(
         &self,
         name: &XorName,
     ) -> Result<SectionAuthorityProvider> {
-        if self.network_knowledge.prefix().await.matches(name) {
-            Ok(self.network_knowledge.authority_provider().await)
-        } else {
-            self.network_knowledge.section_by_name(name)
-        }
+        self.network_knowledge.section_by_name(name)
     }
 
     /// Returns our index in the current BLS group if this node is a member of one, or
@@ -219,11 +215,12 @@ impl Core {
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
+        let our_name = self.node.read().await.name();
 
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         for elder_candidates in self
             .network_knowledge
-            .promote_and_demote_elders(&self.node.read().await.name(), excluded_names)
+            .promote_and_demote_elders(&our_name, excluded_names)
             .await
         {
             commands.extend(self.send_dkg_start(elder_candidates).await?);

@@ -52,7 +52,7 @@ pub(crate) struct NetworkKnowledge {
     section_peers: SectionPeers,
     /// The network prefix map, i.e. a map from prefix to SAPs
     prefix_map: NetworkPrefixMap,
-    /// A DAG containing all section chains of the whole netwrk that we are aware of
+    /// A DAG containing all section chains of the whole network that we are aware of
     all_sections_chains: Arc<RwLock<SecuredLinkedList>>,
 }
 
@@ -340,7 +340,7 @@ impl NetworkKnowledge {
         &self.prefix_map
     }
 
-    // Returns the section authority provider for the prefix that matches name, excluding self section.
+    // Returns the section authority provider for the prefix that matches name.
     pub(super) fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.prefix_map.section_by_name(name)
     }

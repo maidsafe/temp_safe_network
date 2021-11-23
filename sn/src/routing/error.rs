@@ -26,8 +26,6 @@ pub enum Error {
     SendOrHandlingNormalMsg,
     #[error("There was a problem during acquisition of a tokio::sync::semaphore permit.")]
     PermitAcquisitionFailed,
-    #[error("Failed signature check.")]
-    FailedSignature,
     #[error("Section authority provider cannot be trusted: {0}")]
     UntrustedSectionAuthProvider(String),
     #[error("Proof chain cannot be trusted: {0}")]

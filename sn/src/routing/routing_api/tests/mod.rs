@@ -363,7 +363,8 @@ async fn aggregate_proposals() -> Result<()> {
 
     let section_pk = section.section_key().await;
     for (index, node) in nodes.iter().enumerate().take(threshold()) {
-        let sig_share = proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
+        let sig_share =
+            proposal.sign_with_key_share(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
 
         let wire_msg = WireMsg::single_src(
             node,
@@ -395,7 +396,7 @@ async fn aggregate_proposals() -> Result<()> {
         }
     }
 
-    let sig_share = proposal.prove(
+    let sig_share = proposal.sign_with_key_share(
         pk_set.clone(),
         threshold(),
         &sk_set.secret_key_share(threshold()),
@@ -491,9 +492,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         Prefix::default(),
         sk_set.public_keys(),
     );
-    let section_signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+    let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section = NetworkKnowledge::new(*chain.root_key(), chain, section_signed_sap, None)?;
+    let section = NetworkKnowledge::new(*chain.root_key(), chain, signed_sap, None)?;
     let mut expected_new_elders = BTreeSet::new();
 
     for peer in section_auth.elders() {
@@ -618,11 +619,11 @@ async fn handle_online_command(
                 ..
             }) => {
                 if let JoinResponse::Approval {
-                    section_auth: section_signed_sap,
+                    section_auth: signed_sap,
                     ..
                 } = *response
                 {
-                    assert_eq!(section_signed_sap.value, section_auth.clone().to_msg());
+                    assert_eq!(signed_sap.value, section_auth.clone().to_msg());
                     assert_eq!(recipients, [peer]);
                     status.node_approval_sent = true;
                 }
@@ -1485,8 +1486,8 @@ async fn handle_demote_during_split() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     // Create agreement on `OurElder` for both sub-sections
-    let create_our_elders_command = |section_signed_sap| -> Result<_> {
-        let proposal = Proposal::OurElders(section_signed_sap);
+    let create_our_elders_command = |signed_sap| -> Result<_> {
+        let proposal = Proposal::OurElders(signed_sap);
         let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
         let sig = KeyedSig {
             signature,
@@ -1503,8 +1504,8 @@ async fn handle_demote_during_split() -> Result<()> {
         sk_set_v1_p0.public_keys(),
     );
 
-    let section_signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
-    let command = create_our_elders_command(section_signed_sap.into_authed_msg())?;
+    let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
+    let command = create_our_elders_command(signed_sap.into_authed_msg())?;
     let commands = dispatcher.handle_command(command, "cmd-id-1").await?;
 
     assert_matches!(&commands[..], &[]);
@@ -1513,8 +1514,8 @@ async fn handle_demote_during_split() -> Result<()> {
     let section_auth =
         SectionAuthorityProvider::new(peers_b.iter().cloned(), prefix1, sk_set_v1_p1.public_keys());
 
-    let section_signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
-    let command = create_our_elders_command(section_signed_sap.into_authed_msg())?;
+    let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
+    let command = create_our_elders_command(signed_sap.into_authed_msg())?;
 
     let commands = dispatcher.handle_command(command, "cmd-id-2").await?;
 
@@ -1591,14 +1592,10 @@ async fn create_section(
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
     let section_chain = SecuredLinkedList::new(sk_set.public_keys().public_key());
-    let section_signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+    let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section = NetworkKnowledge::new(
-        *section_chain.root_key(),
-        section_chain,
-        section_signed_sap,
-        None,
-    )?;
+    let section =
+        NetworkKnowledge::new(*section_chain.root_key(), section_chain, signed_sap, None)?;
 
     for peer in section_auth.elders() {
         let node_state = NodeState::joined(peer.clone(), None);
