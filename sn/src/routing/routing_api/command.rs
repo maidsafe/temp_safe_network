@@ -13,7 +13,7 @@ use crate::messaging::{
 use crate::routing::{
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
-    Peer, Sender, XorName,
+    Peer, UnnamedPeer, XorName,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -31,7 +31,7 @@ pub(crate) enum Command {
     /// Handle `message` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     HandleMessage {
-        sender: Sender,
+        sender: UnnamedPeer,
         wire_msg: WireMsg,
         #[debug(skip)]
         // original bytes to avoid reserializing for entropy checks
@@ -126,8 +126,18 @@ impl fmt::Display for Command {
             Command::HandleElderAgreement { .. } => write!(f, "HandleElderAgreement"),
             Command::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Command::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
+            #[cfg(not(feature = "unstable-wiremsg-debuginfo"))]
             Command::SendMessage { wire_msg, .. } => {
                 write!(f, "SendMessage {:?}", wire_msg.msg_id())
+            }
+            #[cfg(feature = "unstable-wiremsg-debuginfo")]
+            Command::SendMessage { wire_msg, .. } => {
+                write!(
+                    f,
+                    "SendMessage {:?} {:?}",
+                    wire_msg.msg_id(),
+                    wire_msg.payload_debug
+                )
             }
             Command::ParseAndSendWireMsg(wire_msg) => {
                 write!(f, "ParseAndSendWireMsg {:?}", wire_msg.msg_id())

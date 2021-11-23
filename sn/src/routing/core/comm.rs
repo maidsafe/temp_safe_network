@@ -11,7 +11,7 @@ use crate::messaging::{system::LoadReport, WireMsg};
 use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
-    Peer, Sender,
+    Peer, UnnamedPeer,
 };
 use bytes::Bytes;
 use futures::{
@@ -86,7 +86,7 @@ impl Comm {
         bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
-    ) -> Result<(Self, SocketAddr)> {
+    ) -> Result<(Self, UnnamedPeer)> {
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
         let (endpoint, incoming_connections, bootstrap_peer) =
@@ -125,7 +125,7 @@ impl Comm {
                 back_pressure: BackPressure::new(),
                 connected_peers,
             },
-            bootstrap_peer.remote_address(),
+            UnnamedPeer::connected(bootstrap_peer),
         ))
     }
 
@@ -310,13 +310,16 @@ impl Comm {
                             .and_then(|(connection, connection_incoming)| async move {
                                 recipient.set_connection(connection.clone()).await;
                                 self.connected_peers.insert(connection.clone()).await;
-                                let _ = task::spawn(handle_incoming_messages(
-                                    connection.clone(),
-                                    connection_incoming,
-                                    self.event_tx.clone(),
-                                    self.msg_count.clone(),
-                                    self.connected_peers.clone(),
-                                ));
+                                let _ = task::spawn(
+                                    handle_incoming_messages(
+                                        connection.clone(),
+                                        connection_incoming,
+                                        self.event_tx.clone(),
+                                        self.msg_count.clone(),
+                                        self.connected_peers.clone(),
+                                    )
+                                    .in_current_span(),
+                                );
                                 Ok(connection)
                             })
                             .await,
@@ -428,7 +431,7 @@ impl Comm {
 
 #[derive(Debug)]
 pub(crate) enum ConnectionEvent {
-    Received((Sender, Bytes)),
+    Received((UnnamedPeer, Bytes)),
 }
 
 #[tracing::instrument(skip_all)]
@@ -471,7 +474,7 @@ async fn handle_incoming_messages(
             Ok(msg) => {
                 let _send_res = event_tx
                     .send(ConnectionEvent::Received((
-                        Sender::Connected(connection.clone()),
+                        UnnamedPeer::connected(connection.clone()),
                         msg,
                     )))
                     .await;

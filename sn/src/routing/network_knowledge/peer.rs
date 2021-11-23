@@ -57,7 +57,19 @@ impl fmt::Debug for Peer {
 
 impl Display for Peer {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} at {}", self.name, self.addr)
+        write!(
+            f,
+            "{} at {} ({})",
+            self.name,
+            self.addr,
+            match self.connection.try_read() {
+                Ok(guard) => guard
+                    .as_ref()
+                    .map(|_| "connected")
+                    .unwrap_or("not connected"),
+                Err(_) => "<locked>",
+            }
+        )
     }
 }
 
@@ -106,15 +118,6 @@ impl Peer {
         }
     }
 
-    /// Creates a new `Peer` given a `name` and a `connection` to the peer.
-    pub(crate) fn connected(name: XorName, connection: qp2p::Connection) -> Self {
-        Self {
-            name,
-            addr: connection.remote_address(),
-            connection: Arc::new(RwLock::new(Some(connection))),
-        }
-    }
-
     /// Returns the `XorName` of the peer.
     pub fn name(&self) -> XorName {
         self.name
@@ -145,22 +148,49 @@ impl Peer {
     }
 }
 
-/// A peer who sent us a message.
+/// A peer whose name we don't yet know.
 ///
-/// When we receive a message, we don't know the identity of the sender, so we cannot represent them
-/// as a [`Peer`]. Contrary to `Peer`, we must have a physical connection to the peer, in order to
-/// have received the message.
+/// An `UnnamedPeer` represents a connected peer when we don't yet know the peer's name. For
+/// example, when we receive a message we don't know the identity of the sender.
+///
+/// One rough edge to this is that `UnnamedPeer` is also used to represent messages from "ourself".
+/// in this case there is no physical connection, and we technically would know our own identity.
+/// It's possible that we're self-sending at the wrong level of the API (e.g. we currently serialise
+/// and self-deliver a `WireMsg`, when we could instead directly generate the appropriate
+/// `Command`). One benefit of this is it also works with tests, where we also often don't have an
+/// actual connection.
 #[derive(Clone, Debug)]
-pub(crate) enum Sender {
-    /// The message was sent from ourself.
-    Ourself,
+pub(crate) struct UnnamedPeer {
+    addr: SocketAddr,
+    connection: Option<qp2p::Connection>,
+}
 
-    /// The message was sent from a connected peer.
-    Connected(qp2p::Connection),
+impl UnnamedPeer {
+    pub(crate) fn addressed(addr: SocketAddr) -> Self {
+        Self {
+            addr,
+            connection: None,
+        }
+    }
 
-    /// The message was sent from a test.
-    #[cfg(test)]
-    Test(SocketAddr),
+    pub(crate) fn connected(connection: qp2p::Connection) -> Self {
+        Self {
+            addr: connection.remote_address(),
+            connection: Some(connection),
+        }
+    }
+
+    pub(crate) fn addr(&self) -> SocketAddr {
+        self.addr
+    }
+
+    pub(crate) fn named(self, name: XorName) -> Peer {
+        Peer {
+            name,
+            addr: self.addr,
+            connection: Arc::new(RwLock::new(self.connection)),
+        }
+    }
 }
 
 #[cfg(test)]

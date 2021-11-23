@@ -30,7 +30,7 @@ use crate::routing::{
     network_knowledge::SectionPeers,
     relocation::RelocateState,
     routing_api::command::Command,
-    Error, Event, MessageReceived, Peer, Result, Sender, MIN_LEVEL_WHEN_FULL,
+    Error, Event, MessageReceived, Peer, Result, UnnamedPeer, MIN_LEVEL_WHEN_FULL,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
 use bls::PublicKey as BlsPublicKey;
@@ -44,23 +44,15 @@ impl Core {
     #[instrument(skip(self, original_bytes))]
     pub(crate) async fn handle_message(
         &self,
-        sender: Sender,
+        sender: UnnamedPeer,
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
         let mut cmds = vec![];
         trace!("handling msg");
 
-        // TODO: consider whether we should propagate `Sender` instead
-        let sender_addr = match &sender {
-            Sender::Ourself => self.node.read().await.addr,
-            Sender::Connected(connection) => connection.remote_address(),
-            #[cfg(test)]
-            Sender::Test(addr) => *addr,
-        };
-
         // Apply backpressure if needed.
-        if let Some(load_report) = self.comm.check_strain(sender_addr).await {
+        if let Some(load_report) = self.comm.check_strain(sender.addr()).await {
             let msg_src = wire_msg.msg_kind().src();
             cmds.push(Command::PrepareNodeMsgToSend {
                 msg: SystemMsg::BackPressure(load_report),
@@ -117,10 +109,7 @@ impl Core {
                     msg
                 );
 
-                // TODO: msg_authority.peer() exists, but will error if authority is
-                // section/sectionshare. It's not clear if this would actually
-                // represent a valid peer.
-                let sender = Peer::new(msg_authority.name(), sender_addr);
+                let sender = sender.named(msg_authority.name());
 
                 // Let's check for entropy before we proceed further
                 // Adult nodes don't need to carry out entropy checking,
@@ -189,29 +178,19 @@ impl Core {
                 msg,
                 dst_location,
             } => {
-                let connection = if let Sender::Connected(connection) = &sender {
-                    connection
-                } else {
-                    error!(
-                        "Service msg has been dropped since sender was not connected (was {:?})",
-                        sender
-                    );
-                    return Ok(vec![]);
-                };
-
                 let dst_name = match msg.dst_address() {
                     Some(name) => name,
                     None => {
                         error!(
                             "Service msg has been dropped since {:?} is not a valid msg to send from a client {}.",
-                            msg, sender_addr
+                            msg, sender.addr()
                         );
                         return Ok(vec![]);
                     }
                 };
 
                 let src_location = wire_msg.msg_kind().src();
-                let sender = Peer::connected(src_location.name(), connection.clone());
+                let sender = sender.named(src_location.name());
 
                 if self.is_not_elder().await {
                     trace!("Redirecting from adult to section elders");

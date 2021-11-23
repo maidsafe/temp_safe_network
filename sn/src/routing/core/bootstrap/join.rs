@@ -24,13 +24,12 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    Peer, Sender, MIN_ADULT_AGE,
+    Peer, UnnamedPeer, MIN_ADULT_AGE,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof;
-use std::net::SocketAddr;
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
@@ -44,7 +43,7 @@ pub(crate) async fn join_network(
     node: Node,
     comm: &Comm,
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
-    bootstrap_addr: SocketAddr,
+    bootstrap_peer: UnnamedPeer,
     genesis_key: BlsPublicKey,
 ) -> Result<(Node, NetworkKnowledge)> {
     let (send_tx, send_rx) = mpsc::channel(1);
@@ -56,7 +55,7 @@ pub(crate) async fn join_network(
 
     let state = Join::new(node, send_tx, incoming_conns, prefix_map);
 
-    future::join(state.run(bootstrap_addr), send_messages(send_rx, comm))
+    future::join(state.run(bootstrap_peer), send_messages(send_rx, comm))
         .instrument(span)
         .await
         .0
@@ -101,15 +100,17 @@ impl<'a> Join<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn run(self, bootstrap_addr: SocketAddr) -> Result<(Node, NetworkKnowledge)> {
+    async fn run(self, bootstrap_peer: UnnamedPeer) -> Result<(Node, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
-        let dst_xorname = self.node.name();
+        let bootstrap_peer = bootstrap_peer.named(self.node.name());
         let genesis_key = self.prefix_map.genesis_key();
+
         let (target_section_key, recipients) =
-            if let Ok(sap) = self.prefix_map.section_by_name(&dst_xorname) {
+            if let Ok(sap) = self.prefix_map.section_by_name(&bootstrap_peer.name()) {
+                sap.merge_connections([&bootstrap_peer]).await;
                 (sap.section_key(), sap.elders_vec())
             } else {
-                (genesis_key, vec![Peer::new(dst_xorname, bootstrap_addr)])
+                (genesis_key, vec![bootstrap_peer])
             };
 
         self.join(genesis_key, target_section_key, recipients).await
@@ -274,6 +275,9 @@ impl<'a> Join<'a> {
                         resource_proof_response: None,
                     };
 
+                    section_auth
+                        .merge_connections(recipients.iter().chain([&sender]))
+                        .await;
                     let new_recipients = section_auth.elders_vec();
                     self.send_join_requests(join_request, &new_recipients, section_key, true)
                         .await?;
@@ -329,6 +333,9 @@ impl<'a> Join<'a> {
                         resource_proof_response: None,
                     };
 
+                    section_auth
+                        .merge_connections(recipients.iter().chain([&sender]))
+                        .await;
                     self.send_join_requests(join_request, &new_recipients, section_key, true)
                         .await?;
                 }
@@ -424,18 +431,7 @@ impl<'a> Join<'a> {
                                 msg: SystemMsg::JoinResponse(resp),
                                 msg_authority,
                                 ..
-                            }) => {
-                                let sender_addr = match sender {
-                                    Sender::Ourself => self.node.addr,
-                                    Sender::Connected(connection) => connection.remote_address(),
-                                    #[cfg(test)]
-                                    Sender::Test(addr) => addr,
-                                };
-                                (
-                                    *resp,
-                                    Peer::new(msg_authority.src_location().name(), sender_addr),
-                                )
-                            }
+                            }) => (*resp, sender.named(msg_authority.src_location().name())),
                             Ok(
                                 MessageType::Service { msg_id, .. }
                                 | MessageType::System { msg_id, .. },
@@ -500,7 +496,7 @@ mod tests {
         error::Error as RoutingError,
         messages::WireMsgUtils,
         network_knowledge::{test_utils::*, NodeState},
-        MIN_ADULT_AGE,
+        UnnamedPeer, MIN_ADULT_AGE,
     };
     use crate::{elder_count, init_test_logger};
 
@@ -512,7 +508,7 @@ mod tests {
         pin_mut,
     };
     use secured_linked_list::SecuredLinkedList;
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, net::SocketAddr};
     use tokio::task;
     use xor_name::XorName;
 
@@ -544,7 +540,12 @@ mod tests {
         );
 
         // Create the bootstrap task, but don't run it yet.
-        let bootstrap = async move { state.run(bootstrap_addr).await.map_err(Error::from) };
+        let bootstrap = async move {
+            state
+                .run(UnnamedPeer::addressed(bootstrap_addr))
+                .await
+                .map_err(Error::from)
+        };
 
         // Create the task that executes the body of the test, but don't run it either.
         let others = async {
@@ -647,7 +648,7 @@ mod tests {
             NetworkPrefixMap::new(genesis_key),
         );
 
-        let bootstrap_task = state.run(bootstrap_node.addr);
+        let bootstrap_task = state.run(UnnamedPeer::addressed(bootstrap_node.addr));
         let test_task = async move {
             // Receive JoinRequest
             let (wire_msg, recipients) = send_rx
@@ -750,7 +751,7 @@ mod tests {
             NetworkPrefixMap::new(section_key),
         );
 
-        let bootstrap_task = state.run(bootstrap_node.addr);
+        let bootstrap_task = state.run(UnnamedPeer::addressed(bootstrap_node.addr));
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()
@@ -838,7 +839,7 @@ mod tests {
             NetworkPrefixMap::new(section_key),
         );
 
-        let bootstrap_task = state.run(bootstrap_node.addr);
+        let bootstrap_task = state.run(UnnamedPeer::addressed(bootstrap_node.addr));
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()
@@ -998,7 +999,7 @@ mod tests {
         debug!("wire msg built");
 
         recv_tx.try_send(ConnectionEvent::Received((
-            Sender::Ourself,
+            UnnamedPeer::addressed(bootstrap_node.addr),
             wire_msg.serialize()?,
         )))?;
 

@@ -24,13 +24,25 @@ use xor_name::XorName;
 /// along with a header (WireMsgHeader) which contains the information needed
 /// by the recipient to properly deserialize it.
 /// The WireMsg struct provides the utilities to serialize and deserialize messages.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Clone, Debug)]
 pub struct WireMsg {
     /// Message header
     pub header: WireMsgHeader,
     /// Serialised message
     #[debug(skip)]
     pub payload: Bytes,
+
+    /// Extra debug info if the relevant feature is enabled.
+    // This is behind a feature because it's potentially expensive to carry around the message as
+    // well as its serialization.
+    #[cfg(feature = "unstable-wiremsg-debuginfo")]
+    pub(crate) payload_debug: Option<std::sync::Arc<dyn std::fmt::Debug + Send + Sync>>,
+}
+
+impl PartialEq for WireMsg {
+    fn eq(&self, other: &Self) -> bool {
+        self.header == other.header && self.payload == other.payload
+    }
 }
 
 impl WireMsg {
@@ -59,6 +71,8 @@ impl WireMsg {
         Ok(Self {
             header: WireMsgHeader::new(msg_id, msg_kind, dst_location),
             payload,
+            #[cfg(feature = "unstable-wiremsg-debuginfo")]
+            payload_debug: None,
         })
     }
 
@@ -69,7 +83,12 @@ impl WireMsg {
         let (header, payload) = WireMsgHeader::from(bytes)?;
 
         // We can now create a deserialized WireMsg using the read bytes
-        Ok(Self { header, payload })
+        Ok(Self {
+            header,
+            payload,
+            #[cfg(feature = "unstable-wiremsg-debuginfo")]
+            payload_debug: None,
+        })
     }
 
     /// Return the serialized WireMsg, which contains the WireMsgHeader bytes,
@@ -212,6 +231,16 @@ impl WireMsg {
     /// Convenience function which validates the signature on a ServiceMsg.
     pub fn verify_sig(auth: ServiceAuth, msg: ServiceMsg) -> Result<AuthorityProof<ServiceAuth>> {
         Self::serialize_msg_payload(&msg).and_then(|payload| AuthorityProof::verify(auth, &payload))
+    }
+
+    #[cfg(feature = "unstable-wiremsg-debuginfo")]
+    pub(crate) fn set_payload_debug(
+        // take ownership for ergonomics in `cfg(...)` blocks
+        mut self,
+        payload_debug: impl std::fmt::Debug + Send + Sync + 'static,
+    ) -> Self {
+        self.payload_debug = Some(std::sync::Arc::new(payload_debug));
+        self
     }
 }
 
