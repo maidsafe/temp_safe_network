@@ -57,7 +57,19 @@ impl fmt::Debug for Peer {
 
 impl Display for Peer {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} at {}", self.name, self.addr)
+        write!(
+            f,
+            "{} at {} ({})",
+            self.name,
+            self.addr,
+            match self.connection.try_read() {
+                Ok(guard) => guard
+                    .as_ref()
+                    .map(|_| "connected")
+                    .unwrap_or("not connected"),
+                Err(_) => "<locked>",
+            }
+        )
     }
 }
 
