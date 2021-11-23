@@ -14,7 +14,6 @@ use crate::{
         network_knowledge::{NodeState, SectionAuthorityProvider},
     },
 };
-use serde::{Serialize, Serializer};
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq)]
@@ -46,7 +45,13 @@ impl Proposal {
     }
 
     pub(crate) fn as_signable_bytes(&self) -> Result<Vec<u8>> {
-        Ok(bincode::serialize(&SignableView(self))?)
+        Ok(match self {
+            Self::Online { node_state, .. } => bincode::serialize(node_state),
+            Self::Offline(node_state) => bincode::serialize(node_state),
+            Self::SectionInfo(info) => bincode::serialize(info),
+            Self::OurElders(info) => bincode::serialize(&info.sig.public_key),
+            Self::JoinsAllowed(joins_allowed) => bincode::serialize(&joins_allowed),
+        }?)
     }
 }
 
@@ -89,26 +94,12 @@ impl ProposalMsg {
     }
 }
 
-// View of a `Proposal` that can be serialized for the purpose of signing.
-pub(crate) struct SignableView<'a>(pub(crate) &'a Proposal);
-
-impl<'a> Serialize for SignableView<'a> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self.0 {
-            Proposal::Online { node_state, .. } => node_state.serialize(serializer),
-            Proposal::Offline(node_state) => node_state.serialize(serializer),
-            Proposal::SectionInfo(info) => info.serialize(serializer),
-            Proposal::OurElders(info) => info.sig.public_key.serialize(serializer),
-            Proposal::JoinsAllowed(joins_allowed) => joins_allowed.serialize(serializer),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::routing::{dkg, network_knowledge};
     use eyre::Result;
+    use serde::Serialize;
     use std::fmt::Debug;
     use xor_name::Prefix;
 
@@ -135,7 +126,7 @@ mod tests {
     where
         T: Serialize + Debug,
     {
-        let actual = bincode::serialize(&SignableView(proposal))?;
+        let actual = proposal.as_signable_bytes()?;
         let expected = bincode::serialize(should_serialize_as)?;
 
         assert_eq!(
