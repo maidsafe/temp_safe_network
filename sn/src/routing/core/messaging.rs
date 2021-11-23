@@ -76,7 +76,7 @@ impl Core {
             recipients,
         );
 
-        let sig_share = proposal.prove(
+        let sig_share = proposal.sign_with_key_share(
             key_share.public_key_set.clone(),
             key_share.index,
             &key_share.secret_key_share,
