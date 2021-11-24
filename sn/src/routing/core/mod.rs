@@ -13,7 +13,6 @@ mod capacity;
 mod chunk_records;
 mod chunk_store;
 mod comm;
-mod connected_peers;
 mod connectivity;
 mod delivery_group;
 mod liveness_tracking;
