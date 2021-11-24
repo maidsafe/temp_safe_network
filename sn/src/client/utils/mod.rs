@@ -10,8 +10,7 @@
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 
-use crate::types::{Encryption, PublicKey, Result as TypesResult};
-use crate::url::Scope;
+use crate::types::{Encryption, PublicKey, Result as TypesResult, Scope};
 use backoff::ExponentialBackoff;
 use bytes::Bytes;
 use futures::Future;

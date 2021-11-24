@@ -6,10 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::url::Scope;
-
 use super::super::{Result, XorName};
-use super::DataAddress;
+use super::{DataAddress, Scope};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 

@@ -224,7 +224,7 @@ mod tests {
         create_test_client, create_test_client_with, init_test_logger,
     };
     use crate::types::utils::random_bytes;
-    use crate::url::Scope;
+    use crate::types::Scope;
     use eyre::Result;
     use std::{
         collections::HashSet,

@@ -9,8 +9,8 @@
 
 mod nrs_map;
 
+pub use crate::url::{ContentType, VersionHash};
 pub use nrs_map::NrsMap;
-pub use safe_network::url::{ContentType, VersionHash};
 
 use crate::{app::Safe, register::EntryHash, Error, Result, Url};
 

@@ -18,9 +18,17 @@ pub use register::RegisterAddress;
 pub use safe_key::SafeKeyAddress;
 
 use super::{utils, Result};
-use crate::url::Scope;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
+
+/// We also encode the data scope - i.e. accessibility on the SAFE Network.
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
+pub enum Scope {
+    #[allow(missing_docs)]
+    Public = 0x00,
+    #[allow(missing_docs)]
+    Private = 0x01,
+}
 
 /// An address of data on the network
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
