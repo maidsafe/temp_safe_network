@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.41.2 (2021-11-24)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - simplify `Proposal::as_signable_bytes` ([`bf0488d`](https://github.com/maidsafe/safe_network/commit/bf0488d239fc52ce03c1f380ae0986810d753007))
+    - replace `ProposalUtils` with inherent impl ([`aca0fb7`](https://github.com/maidsafe/safe_network/commit/aca0fb7a451ffc25c6e34479cc9201fef42796be))
+    - duplicate `Proposal` in `routing` ([`c34c28d`](https://github.com/maidsafe/safe_network/commit/c34c28dd8776196a6c1c475b7f3ec3be709c0b6d))
+</details>
+
+## v0.41.1 (2021-11-23)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.41.1 ([`62aa668`](https://github.com/maidsafe/safe_network/commit/62aa668d5777058ae617f8952cfcb62be002abf3))
+    - revert "chore(release):" ([`ad1617f`](https://github.com/maidsafe/safe_network/commit/ad1617f96954a810898484e5b00b5b8b12495f4e))
+    - revert "chore(release): safe_network-0.42.0/sn_api-0.41.0" ([`d8ec5a8`](https://github.com/maidsafe/safe_network/commit/d8ec5a81ae566e8d7068592e01cff4e808b1cad1))
+    - chore(release): ([`d794bc6`](https://github.com/maidsafe/safe_network/commit/d794bc6862692004432699b8deae1a52a1ae1207))
+    - renaming some variables and functions for better readability ([`b456f2f`](https://github.com/maidsafe/safe_network/commit/b456f2f610ea57e5d8a4811fbca5a26175434645))
+    - safe_network-0.42.0/sn_api-0.41.0 ([`63432eb`](https://github.com/maidsafe/safe_network/commit/63432eb2e528401ae67da8eea0c82837ab42fc18))
+</details>
+
 ## v0.41.0 (2021-11-23)
 
 ### New Features
@@ -36,16 +83,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-9a82649f0ca01c6d2eae57f260d2f98246724556/> multiples fixes for unit tests
    - error instead of panicking if logger is already initialized
-   - use unique socker addrs for nodes
-   - print error returned from proptest
- - <csr-id-d3b88f749ca6ee53f65e200105aeeea691581e83/> send DkgRetry for DkgError::MissingPart as well
- - <csr-id-35a8fdb9dca60ca268d536958a9d32ce0a876792/> ensure client chunk count is 3 w/ 7 elders
- - <csr-id-c27d7e997c5a7812f995f113f31edf30c2c21272/> fix a compilation error introduced by merge
-
- - <csr-id-55eb0f259a83faff470dbfdeb9365d314ed6a697/> joining node age to genesis section shall be less than or equal to suggested age
- - <csr-id-42d90b763606e2d324c5ce1235fc801105c07acb/> use correct dst section key for AE-Update to siblings after split
- - <csr-id-302ce4e605d72a0925509bfe3220c2b1ddac677d/> raise SectionSplit event whenever prefix changed
- - <csr-id-c78513903457a701096b5c542f15012e71d33c46/> during bootstrap, handling the case prefix_map was loaded
 
 ### New Features (BREAKING)
 
@@ -55,8 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 62 commits contributed to the release over the course of 7 calendar days.
- - 59 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 68 commits contributed to the release over the course of 7 calendar days.
+ - 65 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -66,6 +103,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.41.0 ([`14fdaa6`](https://github.com/maidsafe/safe_network/commit/14fdaa6537619483e94424ead5751d5ab41c8a01))
+    - reuse connections during join flow ([`950a4ee`](https://github.com/maidsafe/safe_network/commit/950a4eece1a11f70b2aef71cc11404603bb2ec5c))
+    - add 'connectedness' to `Peer`'s `Display` ([`7a875a8`](https://github.com/maidsafe/safe_network/commit/7a875a88c911b5a9db59a55b81c94b995e2b95ae))
+    - inherit span on `Comm::send` incoming message listener ([`5514d9c`](https://github.com/maidsafe/safe_network/commit/5514d9c06ee400e983a258ba2eb37bff1abf0dd0))
+    - add a feature for increased `WireMsg` debug info ([`1848189`](https://github.com/maidsafe/safe_network/commit/1848189aa780f2f6aabddb3564b816c72f9bee6e))
+    - replace `Sender` with `UnknownPeer` ([`f73364e`](https://github.com/maidsafe/safe_network/commit/f73364efa66718b92e04f24d4546c1e248198ce8))
     - Remove always sending a message to ourself when we can handle it directly ([`dbdda13`](https://github.com/maidsafe/safe_network/commit/dbdda1392325e8a08a6a28988208769552d5e543))
     - multiples fixes for unit tests ([`9a82649`](https://github.com/maidsafe/safe_network/commit/9a82649f0ca01c6d2eae57f260d2f98246724556))
     - send DkgRetry for DkgError::MissingPart as well ([`d3b88f7`](https://github.com/maidsafe/safe_network/commit/d3b88f749ca6ee53f65e200105aeeea691581e83))
@@ -131,7 +174,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- send DkgRetry for DkgError::MissingPart as well ensure client chunk count is 3 w/ 7 elders fix a compilation error introduced by merge joining node age to genesis section shall be less than or equal to suggested age use correct dst section key for AE-Update to siblings after split raise SectionSplit event whenever prefix changed during bootstrap, handling the case prefix_map was loaded<csr-unknown/>
+use unique socker addrs for nodesprint error returned from proptest<csr-unknown/>
 
 ## v0.40.0 (2021-11-15)
 

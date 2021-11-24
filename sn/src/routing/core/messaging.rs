@@ -7,17 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use super::ProposalUtils;
 use crate::messaging::{
     data::DataExchange,
     system::{
-        DkgSessionId, JoinResponse, NodeCmd, Proposal, RelocateDetails, RelocatePromise,
-        SectionAuth, SystemMsg,
+        DkgSessionId, JoinResponse, NodeCmd, RelocateDetails, RelocatePromise, SectionAuth,
+        SystemMsg,
     },
     DstLocation, MsgKind, WireMsg,
 };
 use crate::routing::{
-    core::StateSnapshot,
+    core::{Proposal, StateSnapshot},
     dkg::DkgSessionIdUtils,
     error::{Error, Result},
     log_markers::LogMarker,
@@ -84,7 +83,7 @@ impl Core {
 
         // Broadcast the proposal to the rest of the section elders.
         let node_msg = SystemMsg::Propose {
-            proposal: proposal.clone(),
+            proposal: proposal.clone().into_msg(),
             sig_share: sig_share.clone(),
         };
         // Name of the section_pk may not matches the section prefix.
