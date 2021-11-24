@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use safe_network::url::XorUrlBase;
+use crate::url::XorUrlBase;
 
 // Default base encoding used for XOR URLs
 pub const DEFAULT_XORURL_BASE: XorUrlBase = XorUrlBase::Base32z;

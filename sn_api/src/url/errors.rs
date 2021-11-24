@@ -22,7 +22,7 @@ pub enum Error {
     /// InvalidInput
     #[error("InvalidInput: {0}")]
     InvalidInput(String),
-    /// InvalidMediaType
-    #[error("InvalidMediaType: {0}")]
-    InvalidMediaType(String),
+    /// UnsupportedMediaType
+    #[error("UnsupportedMediaType: {0}")]
+    UnsupportedMediaType(String),
 }

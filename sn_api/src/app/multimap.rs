@@ -8,10 +8,10 @@
 // Software.
 
 use super::register::EntryHash;
-use crate::{Error, Result, Safe};
+use crate::url::{ContentType, Url, XorUrl};
+use crate::{Error, Result, Safe, Scope};
 use log::debug;
 use safe_network::types::DataAddress;
-use safe_network::url::{ContentType, Scope, Url, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 

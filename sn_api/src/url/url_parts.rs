@@ -222,7 +222,7 @@ fn validate_url_chars(url: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use eyre::{eyre, Result};
+    use color_eyre::{eyre::eyre, Result};
 
     #[test]
     fn test_url_validate_url_chars_with_whitespace() -> Result<()> {

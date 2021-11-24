@@ -35,6 +35,7 @@ sha3 = "~0.9"
 safe_network = { path = "../sn", version ="^0.41.4"}
 thiserror = "1.0.23"
 time = { version = "0.3.4", features = ["formatting"] }
+tracing = "~0.1.26"
 uhttp_uri = "~0.5"
 url = "2.2.0"
 urlencoding = "1.1.1"

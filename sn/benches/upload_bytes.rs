@@ -8,7 +8,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use eyre::Result;
-use safe_network::url::Scope;
+use safe_network::types::Scope;
 use safe_network::{
     client::{
         utils::test_utils::{read_network_conn_info, run_w_backoff_delayed},

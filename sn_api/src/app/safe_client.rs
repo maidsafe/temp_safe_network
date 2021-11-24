@@ -15,9 +15,8 @@ use log::{debug, info};
 use safe_network::client::{Client, ClientConfig, Error as ClientError};
 use safe_network::types::{
     register::{Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
-    BytesAddress, Error as SafeNdError, Keypair, RegisterAddress,
+    BytesAddress, Error as SafeNdError, Keypair, RegisterAddress, Scope,
 };
-use safe_network::url::Scope;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},

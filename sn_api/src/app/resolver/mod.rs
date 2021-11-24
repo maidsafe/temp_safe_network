@@ -16,7 +16,7 @@ use super::{
     register::{Entry, EntryHash},
     Safe, XorName,
 };
-pub use super::{ContentType, DataType, Scope, Url, VersionHash, XorUrlBase};
+pub use super::{ContentType, DataType, Url, VersionHash, XorUrlBase};
 use crate::{Error, Result};
 use async_recursion::async_recursion;
 use bytes::Bytes;

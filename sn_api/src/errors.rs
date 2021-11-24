@@ -8,8 +8,8 @@
 // Software.
 
 use super::ipc::IpcError;
+use super::url::Error as UrlError;
 use safe_network::client::Error as ClientError;
-use safe_network::url::Error as UrlError;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;

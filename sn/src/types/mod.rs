@@ -21,7 +21,9 @@ mod errors;
 mod keys;
 mod token;
 
-pub use address::{BytesAddress, ChunkAddress, DataAddress, RegisterAddress, SafeKeyAddress};
+pub use address::{
+    BytesAddress, ChunkAddress, DataAddress, RegisterAddress, SafeKeyAddress, Scope,
+};
 pub use cache::Cache;
 pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
 pub use errors::{convert_dt_error_to_error_message, Error, Result};
