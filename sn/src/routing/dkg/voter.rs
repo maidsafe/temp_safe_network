@@ -100,7 +100,7 @@ impl DkgVoter {
         let participants = elder_candidates.names().collect();
 
         match KeyGen::initialize(name, threshold, participants) {
-            Ok((key_gen, message)) => {
+            Ok((key_gen, messages)) => {
                 trace!("DKG starting for {:?}", elder_candidates);
 
                 let mut session = Session {
@@ -113,7 +113,7 @@ impl DkgVoter {
                 };
 
                 let mut commands = vec![];
-                commands.extend(session.broadcast(node, &session_id, message, section_pk)?);
+                commands.extend(session.broadcast(node, &session_id, messages, section_pk)?);
 
                 let _prev = self.sessions.insert(session_id, session);
 

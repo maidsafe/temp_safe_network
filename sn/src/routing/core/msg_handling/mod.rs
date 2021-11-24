@@ -461,8 +461,8 @@ impl Core {
                 sig_share,
             } => {
                 if self.is_not_elder().await {
-                    trace!("Dropping Propose msg from {}: {:?}", sender, msg_id);
-                    return Ok(vec![]);
+                    trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
+                    // return Ok(vec![]);
                 }
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
