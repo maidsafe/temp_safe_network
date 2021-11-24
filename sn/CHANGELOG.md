@@ -7,12 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.41.2 (2021-11-24)
 
+### New Features
+
+ - <csr-id-b96034796d479352340caaf3d6e6b6d7e6e425ad/> adapt registers to hold vec u8 instead of Url in sn
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -22,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - add comment about vec size ([`9d65724`](https://github.com/maidsafe/safe_network/commit/9d657249f3d0391e7c3bbeae6f81909993802cc7))
+    - adapt registers to hold vec u8 instead of Url in sn ([`b960347`](https://github.com/maidsafe/safe_network/commit/b96034796d479352340caaf3d6e6b6d7e6e425ad))
     - simplify `Proposal::as_signable_bytes` ([`bf0488d`](https://github.com/maidsafe/safe_network/commit/bf0488d239fc52ce03c1f380ae0986810d753007))
     - replace `ProposalUtils` with inherent impl ([`aca0fb7`](https://github.com/maidsafe/safe_network/commit/aca0fb7a451ffc25c6e34479cc9201fef42796be))
     - duplicate `Proposal` in `routing` ([`c34c28d`](https://github.com/maidsafe/safe_network/commit/c34c28dd8776196a6c1c475b7f3ec3be709c0b6d))
@@ -172,9 +178,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - raise SectionSplit event whenever prefix changed ([`302ce4e`](https://github.com/maidsafe/safe_network/commit/302ce4e605d72a0925509bfe3220c2b1ddac677d))
     - during bootstrap, handling the case prefix_map was loaded ([`c785139`](https://github.com/maidsafe/safe_network/commit/c78513903457a701096b5c542f15012e71d33c46))
 </details>
-
-<csr-unknown>
-use unique socker addrs for nodesprint error returned from proptest<csr-unknown/>
 
 ## v0.40.0 (2021-11-15)
 
