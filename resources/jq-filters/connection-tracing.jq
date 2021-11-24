@@ -1,7 +1,8 @@
-reduce inputs as $item ([]; . + [$item])
+reduce inputs as $item ([]; . + [$item + {input_filename: input_filename}])
 | map(select(.fields.message))
 | map(select(.fields.message | (contains("ConnectionOpened") or contains("ConnectionClosed"))))
 | map({
+    input_filename,
     timestamp,
     event: .fields.message,
     conn_id: .fields.connection_id,
