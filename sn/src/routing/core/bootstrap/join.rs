@@ -45,7 +45,7 @@ pub(crate) async fn join_network(
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
     bootstrap_peer: UnnamedPeer,
     genesis_key: BlsPublicKey,
-) -> Result<(Node, NetworkKnowledge)> {
+) -> Result<(Node, NetworkKnowledge, Vec<ConnectionEvent>)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap");
@@ -100,7 +100,10 @@ impl<'a> Join<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn run(self, bootstrap_peer: UnnamedPeer) -> Result<(Node, NetworkKnowledge)> {
+    async fn run(
+        self,
+        bootstrap_peer: UnnamedPeer,
+    ) -> Result<(Node, NetworkKnowledge, Vec<ConnectionEvent>)> {
         // Use our XorName as we do not know their name or section key yet.
         let bootstrap_peer = bootstrap_peer.named(self.node.name());
         let genesis_key = self.prefix_map.genesis_key();
@@ -122,7 +125,7 @@ impl<'a> Join<'a> {
         network_genesis_key: BlsPublicKey,
         target_section_key: BlsPublicKey,
         recipients: Vec<Peer>,
-    ) -> Result<(Node, NetworkKnowledge)> {
+    ) -> Result<(Node, NetworkKnowledge, Vec<ConnectionEvent>)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
         // Once we are approved to join, we will make sure the SAP we receive can
@@ -143,8 +146,15 @@ impl<'a> Join<'a> {
         // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
         let mut used_recipient_saps = UsedRecipientSaps::new();
 
+        // A buffer of connection events containing messages we suspect might be DKG-related.
+        // This is a workaround for a race condition: since elders will send the join approval and
+        // the DKG start at roughly the same time, it's common for the DKG start to arrive first. We
+        // can't handle that here, and would previously just drop the message. For now, we instead
+        // push `ShareSigned` messages into the buffer, and return them to the caller to deal with.
+        let mut dkg_buffer = vec![];
+
         loop {
-            let (response, sender) = self.receive_join_response().await?;
+            let (response, sender) = self.receive_join_response(&mut dkg_buffer).await?;
 
             match response {
                 JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
@@ -191,7 +201,7 @@ impl<'a> Join<'a> {
                         Some(self.prefix_map),
                     )?;
 
-                    return Ok((self.node, network_knowledge));
+                    return Ok((self.node, network_knowledge, dkg_buffer));
                 }
                 JoinResponse::Retry {
                     section_auth,
@@ -421,19 +431,23 @@ impl<'a> Join<'a> {
     // TODO: receive JoinResponse from the JoinResponse handler directly,
     // analogous to the JoinAsRelocated flow.
     #[tracing::instrument(skip(self))]
-    async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
+    async fn receive_join_response(
+        &mut self,
+        dkg_buffer: &mut Vec<ConnectionEvent>,
+    ) -> Result<(JoinResponse, Peer)> {
         while let Some(event) = self.recv_rx.recv().await {
             // We are interested only in `JoinResponse` type of messages
             let (join_response, sender) = match event {
-                ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
+                ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes.clone()) {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) => continue,
                         MsgKind::NodeBlsShareAuthMsg(_) => {
                             trace!(
-                                "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
+                                "Bootstrap message buffered: sender: {:?} wire_msg: {:?}",
                                 sender,
                                 wire_msg
                             );
+                            dkg_buffer.push(ConnectionEvent::Received((sender, bytes)));
                             continue;
                         }
                         MsgKind::NodeAuthMsg(NodeAuth { .. }) => match wire_msg.into_message() {
@@ -628,7 +642,7 @@ mod tests {
         };
 
         // Drive both tasks to completion concurrently (but on the same thread).
-        let ((node, section), _) = future::try_join(bootstrap, others).await?;
+        let ((node, section, _), _) = future::try_join(bootstrap, others).await?;
 
         assert_eq!(section.authority_provider().await, section_auth);
         assert_eq!(section.section_key().await, section_key);

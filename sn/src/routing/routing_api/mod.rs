@@ -160,7 +160,7 @@ impl Routing {
                     .collect_vec()
                     .as_slice(),
                 config.network_config,
-                connection_event_tx,
+                connection_event_tx.clone(),
             )
             .await?;
             info!(
@@ -173,7 +173,7 @@ impl Routing {
             );
 
             let joining_node = Node::new(keypair, comm.our_connection_info());
-            let (node, network_knowledge) = join_network(
+            let (node, network_knowledge, dkg_buffer) = join_network(
                 joining_node,
                 &comm,
                 &mut connection_event_rx,
@@ -194,6 +194,18 @@ impl Routing {
             )
             .await?;
             info!("{} Joined the network!", core.node.read().await.name());
+
+            // This is a workaround for a race condition: since elders will send the join approval
+            // and the DKG start at roughly the same time, it's common for the DKG start to arrive
+            // first. We can't handle that here, and would previously just drop the message. For
+            // now, we instead push `ShareSigned` messages into the buffer, and return them to the
+            // caller to deal with.
+            let _handle = task::spawn(async move {
+                for event in dkg_buffer {
+                    // if the connection event receiver is gone, we would never process it anyway
+                    let _ = connection_event_tx.send(event).await;
+                }
+            });
 
             core
         };
