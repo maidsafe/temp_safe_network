@@ -1,4 +1,4 @@
-name: 'workspace: release'
+name: release
 
 on:
   push:
