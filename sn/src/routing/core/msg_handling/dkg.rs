@@ -33,18 +33,28 @@ impl Core {
         prefix: Prefix,
         elders: BTreeMap<XorName, SocketAddr>,
     ) -> Result<Vec<Command>> {
+        let section_auth = self.network_knowledge().authority_provider().await;
         let section_peers = self.network_knowledge().members();
+
         let elder_candidates = ElderCandidates::new(
             prefix,
             elders.into_iter().map(|(name, addr)| {
                 // Reuse known peers from network_knowledge, in order to preserve connections
-                if let Some(node) = section_peers.get(&name).filter(|node| node.addr() == addr) {
+                if let Some(elder) = section_auth
+                    .get_elder(&name)
+                    .filter(|elder| elder.addr() == addr)
+                {
+                    elder.clone()
+                } else if let Some(node) =
+                    section_peers.get(&name).filter(|node| node.addr() == addr)
+                {
                     node.peer().clone()
                 } else {
                     Peer::new(name, addr)
                 }
             }),
         );
+
         trace!("Received DkgStart for {:?}", elder_candidates);
         self.dkg_voter
             .start(
