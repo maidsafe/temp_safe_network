@@ -23,13 +23,19 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-use bls_dkg::key_gen::{message::Message as DkgMessage, Error as DkgError, KeyGen};
+use bls_dkg::key_gen::{
+    message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget,
+};
 use itertools::Itertools;
-use std::{collections::BTreeSet, iter, mem, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter, mem,
+    time::Duration,
+};
 use xor_name::XorName;
 
 // Interval to progress DKG timed phase
-const DKG_PROGRESS_INTERVAL: Duration = Duration::from_secs(3);
+const DKG_PROGRESS_INTERVAL: Duration = Duration::from_secs(6);
 
 // Data for a DKG participant.
 pub(crate) struct Session {
@@ -67,22 +73,39 @@ impl Session {
                 // Only a valid DkgMessage, which results in some responses, shall reset the ticker.
                 let add_reset_timer = !responses.is_empty();
 
-                for response in responses.into_iter() {
-                    commands.extend(self.broadcast(node, session_id, response, section_pk)?);
-                }
+                commands.extend(self.broadcast(node, session_id, responses, section_pk)?);
+
                 if add_reset_timer {
                     commands.push(self.reset_timer());
                 }
                 commands.extend(self.check(node, session_id, section_pk)?);
             }
             Err(DkgError::UnexpectedPhase { .. }) | Err(DkgError::MissingPart) => {
+                // When the message in trouble is an Acknowledgement,
+                // we shall query the ack.proposer .
+                let target = match message {
+                    DkgMessage::Acknowledgment { ref ack, .. } => {
+                        if let Some(name) = self.key_gen.node_id_from_index(ack.0) {
+                            name
+                        } else {
+                            warn!("Cannot get node_id for index {:?}", ack.0);
+                            return Ok(vec![]);
+                        }
+                    }
+                    _ => sender,
+                };
+                trace!(
+                    "Targeting DkgNotReady to {:?} on unhandable message {:?}",
+                    target,
+                    message
+                );
                 commands.push(Command::PrepareNodeMsgToSend {
                     msg: SystemMsg::DkgNotReady {
                         session_id: *session_id,
                         message,
                     },
                     dst: DstLocation::Node {
-                        name: sender,
+                        name: target,
                         section_pk,
                     },
                 });
@@ -103,51 +126,62 @@ impl Session {
             .collect()
     }
 
+    fn peers(&self) -> BTreeMap<XorName, Peer> {
+        self.elder_candidates
+            .elders()
+            .map(|peer| (peer.name(), peer.clone()))
+            .collect()
+    }
+
     pub(crate) fn broadcast(
         &mut self,
         node: &Node,
         session_id: &DkgSessionId,
-        message: DkgMessage,
+        messages: Vec<MessageAndTarget>,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
-        let recipients = self.recipients();
-        if !recipients.is_empty() {
-            trace!(
-                "DKG broadcasting {:?} - {:?} to {:?}",
-                message,
-                session_id,
-                recipients
-            );
-            let node_msg = SystemMsg::DkgMessage {
-                session_id: *session_id,
-                message: message.clone(),
-            };
-            let wire_msg = WireMsg::single_src(
-                node,
-                DstLocation::Section {
-                    name: XorName::from(PublicKey::Bls(section_pk)),
-                    section_pk,
-                },
-                node_msg,
-                section_pk,
-            )?;
-            trace!("{}", LogMarker::DkgBroadcastMsg);
+        trace!("{}", LogMarker::DkgBroadcastMsg);
 
-            commands.push(Command::SendMessage {
-                recipients,
-                wire_msg,
-            });
+        let peers = self.peers();
+        for (target, message) in messages {
+            if target == node.name() {
+                commands.extend(self.process_message(
+                    node,
+                    node.name(),
+                    session_id,
+                    message,
+                    section_pk,
+                )?);
+            } else if let Some(peer) = peers.get(&target) {
+                trace!(
+                    "DKG sending {:?} - {:?} to {:?}",
+                    message,
+                    session_id,
+                    target
+                );
+                let node_msg = SystemMsg::DkgMessage {
+                    session_id: *session_id,
+                    message,
+                };
+                let wire_msg = WireMsg::single_src(
+                    node,
+                    DstLocation::Node {
+                        name: target,
+                        section_pk,
+                    },
+                    node_msg,
+                    section_pk,
+                )?;
+
+                commands.push(Command::SendMessage {
+                    recipients: vec![peer.clone()],
+                    wire_msg,
+                });
+            }
         }
 
-        commands.extend(self.process_message(
-            node,
-            node.name(),
-            session_id,
-            message,
-            section_pk,
-        )?);
         Ok(commands)
     }
 
@@ -166,9 +200,7 @@ impl Session {
         match self.key_gen.timed_phase_transition(&mut rand::thread_rng()) {
             Ok(messages) => {
                 let mut commands = vec![];
-                for message in messages.into_iter() {
-                    commands.extend(self.broadcast(node, session_id, message, section_pk)?);
-                }
+                commands.extend(self.broadcast(node, session_id, messages, section_pk)?);
                 commands.push(self.reset_timer());
                 commands.extend(self.check(node, session_id, section_pk)?);
                 Ok(commands)
@@ -349,26 +381,21 @@ impl Session {
             .key_gen
             .handle_pre_session_messages(&mut rand::thread_rng(), message_history);
         let add_reset_timer = !responses.is_empty();
-        for response in responses.into_iter() {
-            commands.extend(self.broadcast(node, &session_id, response, section_pk)?);
-        }
+
+        commands.extend(self.broadcast(node, &session_id, responses, section_pk)?);
+
         if add_reset_timer {
             commands.push(self.reset_timer());
         }
         commands.extend(self.check(node, &session_id, section_pk)?);
 
-        for (sender, message) in unhandleable.into_iter() {
-            commands.push(Command::PrepareNodeMsgToSend {
-                msg: SystemMsg::DkgNotReady {
-                    session_id,
-                    message,
-                },
-                dst: DstLocation::Node {
-                    name: sender,
-                    section_pk,
-                },
-            });
+        if !unhandleable.is_empty() {
+            trace!(
+                "Having unhandleables among the message_history. {:?}",
+                unhandleable
+            );
         }
+
         Ok(commands)
     }
 
