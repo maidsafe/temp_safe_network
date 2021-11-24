@@ -111,6 +111,19 @@ pub(crate) enum Command {
     TestConnectivity(XorName),
 }
 
+impl Command {
+    /// Return the commands priority, higher being higher prio
+    pub(crate) fn priority(&self) -> i32 {
+        match self {
+            Self::HandleMessage { wire_msg, .. } => wire_msg.msg_kind().priority(),
+            Self::HandleDkgOutcome { .. } | Self::HandleDkgFailure(_) => 3,
+            Self::HandleElderAgreement { .. } => 2,
+            Self::HandleAgreement { .. } | Self::HandleSystemMessage { .. } => 1,
+            _ => -2,
+        }
+    }
+}
+
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

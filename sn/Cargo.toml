@@ -51,6 +51,7 @@ bls = { package = "blsttc", version = "3.1.0" }
 bls_dkg = "0.8.0"
 bytes = { version = "1.0.1", features = ["serde"] }
 color-eyre = "0.5.11"
+crossbeam-queue="0.3.2"
 crdts = "~7.0"
 custom_debug = "0.5.0"
 dashmap = {version = "~4.0.2", features = [ "serde" ]}

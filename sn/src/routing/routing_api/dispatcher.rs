@@ -16,6 +16,7 @@ use crate::routing::{
     node::Node,
     Error, Peer,
 };
+use crossbeam_queue::ArrayQueue;
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
@@ -29,6 +30,10 @@ pub(super) struct Dispatcher {
 
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
+    high_prio: Arc<ArrayQueue<Command>>,
+    med_high_prio: Arc<ArrayQueue<Command>>,
+    med_prio: Arc<ArrayQueue<Command>>,
+    low_prio: Arc<ArrayQueue<Command>>,
 }
 
 impl Drop for Dispatcher {
@@ -45,43 +50,91 @@ impl Dispatcher {
             core,
             cancel_timer_tx,
             cancel_timer_rx,
+            high_prio: Arc::new(ArrayQueue::new(100)),
+            med_high_prio: Arc::new(ArrayQueue::new(100)),
+            med_prio: Arc::new(ArrayQueue::new(100)),
+            low_prio: Arc::new(ArrayQueue::new(100)),
         }
     }
 
-    /// Handles the given command and transitively any new commands that are
+    /// Add the command to the correct dispatcher queue based upon its priority
+    pub(crate) fn enqueue_command(&self, command: Command) {
+        let prio = command.priority();
+        let command_display = command.to_string();
+
+        let failed_command = if prio > 2 {
+            self.high_prio.push(command)
+        } else if prio > 1 {
+            self.med_high_prio.push(command)
+        } else if prio > 0 {
+            self.med_prio.push(command)
+        } else {
+            self.low_prio.push(command)
+        };
+
+        if failed_command.is_err() {
+            error!(
+                "Command could not be added to the correct queue as it was full: {:?}",
+                command_display
+            );
+        }
+    }
+
+    // return the next command to be handled based upon priority
+    pub(crate) fn get_next_command_to_handle(&self) -> Option<Command> {
+        if let Some(command) = self.high_prio.pop() {
+            Some(command)
+        } else if let Some(command) = self.med_prio.pop() {
+            Some(command)
+        } else {
+            self.low_prio.pop()
+        }
+    }
+
+    /// Enqueues the given command and handles whatever command is in the next priority queue and transitively queues any new commands that are
     /// produced during its handling. Trace logs will include the provided command id,
     /// and any sub-commands produced will have it as a common root cmd id.
     /// If a command id string is not provided a random one will be generated.
-    pub(super) async fn handle_commands(
+    pub(super) async fn enqueue_and_handle_next_command_and_any_offshoots(
         self: Arc<Self>,
         command: Command,
         cmd_id: Option<String>,
     ) -> Result<()> {
-        let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
-        let cmd_id_clone = cmd_id.clone();
-        let command_display = command.to_string();
-        let _ = tokio::spawn(async move {
-            if let Ok(commands) = self.handle_command(command, &cmd_id).await {
-                for (sub_cmd_count, command) in commands.into_iter().enumerate() {
-                    let sub_cmd_id = format!("{}.{}", cmd_id, sub_cmd_count);
-                    self.clone().spawn_handle_commands(command, sub_cmd_id);
+        // first queue it
+        self.enqueue_command(command);
+        if let Some(command) = self.get_next_command_to_handle() {
+            let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
+            let cmd_id_clone = cmd_id.clone();
+            let command_display = command.to_string();
+            let _ = tokio::spawn(async move {
+                if let Ok(commands) = self.process_command(command, &cmd_id).await {
+                    for (sub_cmd_count, command) in commands.into_iter().enumerate() {
+                        let sub_cmd_id = format!("{}.{}", cmd_id, sub_cmd_count);
+                        self.clone().spawn_handle_commands(command, sub_cmd_id);
+                    }
                 }
-            }
-        });
+            });
 
-        trace!(
-            "{:?} {} cmd_id={}",
-            LogMarker::CommandHandleSpawned,
-            command_display,
-            cmd_id_clone
-        );
+            trace!(
+                "{:?} {} cmd_id={}",
+                LogMarker::CommandHandleSpawned,
+                command_display,
+                cmd_id_clone
+            );
+        }
+
         Ok(())
     }
 
     // Note: this indirecton is needed. Trying to call `spawn(self.handle_commands(...))` directly
     // inside `handle_commands` causes compile error about type check cycle.
     fn spawn_handle_commands(self: Arc<Self>, command: Command, cmd_id: String) {
-        let _ = tokio::spawn(self.handle_commands(command, Some(cmd_id)));
+        self.enqueue_command(command);
+        if let Some(command) = self.get_next_command_to_handle() {
+            let _ = tokio::spawn(
+                self.enqueue_and_handle_next_command_and_any_offshoots(command, Some(cmd_id)),
+            );
+        }
     }
 
     pub(super) async fn start_network_probing(self: Arc<Self>) {
@@ -100,7 +153,10 @@ impl Dispatcher {
                     match core.generate_probe_message().await {
                         Ok(command) => {
                             info!("Sending ProbeMessage");
-                            if let Err(e) = dispatcher.clone().handle_commands(command, None).await
+                            if let Err(e) = dispatcher
+                                .clone()
+                                .enqueue_and_handle_next_command_and_any_offshoots(command, None)
+                                .await
                             {
                                 error!("Error sending a Probe message to the network: {:?}", e);
                             }
@@ -118,7 +174,7 @@ impl Dispatcher {
     }
 
     /// Handles a single command.
-    pub(super) async fn handle_command(
+    pub(super) async fn process_command(
         &self,
         command: Command,
         cmd_id: &str,
@@ -149,7 +205,7 @@ impl Dispatcher {
             trace!("{:?}", LogMarker::CommandHandleStart);
 
             let command_display = command.to_string();
-            match self.try_handle_command(command).await {
+            match self.try_processing_a_command(command).await {
                 Ok(outcome) => {
                     trace!("{:?} {}", LogMarker::CommandHandleEnd, command_display);
                     Ok(outcome)
@@ -173,7 +229,8 @@ impl Dispatcher {
         .await
     }
 
-    async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
+    /// Actually process the command
+    async fn try_processing_a_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
             Command::HandleSystemMessage {
                 sender,
