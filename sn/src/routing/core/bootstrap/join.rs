@@ -194,10 +194,15 @@ impl<'a> Join<'a> {
                     );
 
                     // Building our network knowledge instance will validate SAP and section chain.
+                    let section_auth = section_auth.into_authed_state();
+
+                    // Include the sender's connection in our initial knowledge
+                    section_auth.merge_connections([&sender]).await;
+
                     let network_knowledge = NetworkKnowledge::new(
                         genesis_key,
                         section_chain,
-                        section_auth.into_authed_state(),
+                        section_auth,
                         Some(self.prefix_map),
                     )?;
 
