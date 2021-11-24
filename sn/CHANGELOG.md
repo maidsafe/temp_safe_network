@@ -5,14 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.41.1 (2021-11-23)
+## v0.41.2 (2021-11-24)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -22,6 +22,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - simplify `Proposal::as_signable_bytes` ([`bf0488d`](https://github.com/maidsafe/safe_network/commit/bf0488d239fc52ce03c1f380ae0986810d753007))
+    - replace `ProposalUtils` with inherent impl ([`aca0fb7`](https://github.com/maidsafe/safe_network/commit/aca0fb7a451ffc25c6e34479cc9201fef42796be))
+    - duplicate `Proposal` in `routing` ([`c34c28d`](https://github.com/maidsafe/safe_network/commit/c34c28dd8776196a6c1c475b7f3ec3be709c0b6d))
+</details>
+
+## v0.41.1 (2021-11-23)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.41.1 ([`62aa668`](https://github.com/maidsafe/safe_network/commit/62aa668d5777058ae617f8952cfcb62be002abf3))
     - revert "chore(release):" ([`ad1617f`](https://github.com/maidsafe/safe_network/commit/ad1617f96954a810898484e5b00b5b8b12495f4e))
     - revert "chore(release): safe_network-0.42.0/sn_api-0.41.0" ([`d8ec5a8`](https://github.com/maidsafe/safe_network/commit/d8ec5a81ae566e8d7068592e01cff4e808b1cad1))
     - chore(release): ([`d794bc6`](https://github.com/maidsafe/safe_network/commit/d794bc6862692004432699b8deae1a52a1ae1207))
@@ -60,8 +83,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-9a82649f0ca01c6d2eae57f260d2f98246724556/> multiples fixes for unit tests
    - error instead of panicking if logger is already initialized
-- use unique socker addrs for nodes
-- print error returned from proptest
 
 ### New Features (BREAKING)
 
@@ -153,7 +174,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- send DkgRetry for DkgError::MissingPart as well ensure client chunk count is 3 w/ 7 elders fix a compilation error introduced by merge joining node age to genesis section shall be less than or equal to suggested age use correct dst section key for AE-Update to siblings after split raise SectionSplit event whenever prefix changed during bootstrap, handling the case prefix_map was loaded<csr-unknown/>
+use unique socker addrs for nodesprint error returned from proptest<csr-unknown/>
 
 ## v0.40.0 (2021-11-15)
 
