@@ -8,8 +8,9 @@
 
 use std::{cmp, collections::BTreeSet};
 
-use crate::messaging::system::{KeyedSig, MembershipState, Proposal, SectionAuth};
+use crate::messaging::system::{KeyedSig, MembershipState, SectionAuth};
 use crate::routing::{
+    core::Proposal,
     dkg::SectionAuthUtils,
     error::Result,
     log_markers::LogMarker,
@@ -31,16 +32,11 @@ impl Core {
         debug!("handle agreement on {:?}", proposal);
         match proposal {
             Proposal::Online { node_state, .. } => {
-                self.handle_online_agreement(node_state.into_state(), sig)
-                    .await
+                self.handle_online_agreement(node_state, sig).await
             }
-            Proposal::Offline(node_state) => {
-                self.handle_offline_agreement(node_state.into_state(), sig)
-                    .await
-            }
+            Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
             Proposal::SectionInfo(section_auth) => {
-                self.handle_section_info_agreement(section_auth.into_state(), sig)
-                    .await
+                self.handle_section_info_agreement(section_auth, sig).await
             }
             Proposal::OurElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
@@ -230,7 +226,7 @@ impl Core {
 
             self.send_proposal(
                 proposal_recipients,
-                Proposal::OurElders(signed_section_auth.into_authed_msg()),
+                Proposal::OurElders(signed_section_auth),
             )
             .await
         } else {

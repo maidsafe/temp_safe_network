@@ -23,8 +23,6 @@ jobs:
           toolchain: stable
           override: true
       - shell: bash
-        run: echo "GITHUB_ACTOR = $GITHUB_ACTOR"
-      - shell: bash
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"

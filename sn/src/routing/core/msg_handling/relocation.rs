@@ -9,11 +9,11 @@
 use super::Core;
 use crate::elder_count;
 use crate::messaging::{
-    system::{Proposal, RelocateDetails, RelocatePromise, SystemMsg},
+    system::{RelocateDetails, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
 };
 use crate::routing::{
-    core::bootstrap::JoiningAsRelocated,
+    core::{bootstrap::JoiningAsRelocated, Proposal},
     error::Result,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
@@ -65,7 +65,7 @@ impl Core {
             );
 
             commands.extend(
-                self.propose(Proposal::Offline(info.relocate(*action.dst()).to_msg()))
+                self.propose(Proposal::Offline(info.relocate(*action.dst())))
                     .await?,
             );
 

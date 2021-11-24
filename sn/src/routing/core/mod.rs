@@ -29,13 +29,13 @@ pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::MIN_LEVEL_WHEN_FULL;
 pub(crate) use chunk_store::ChunkStore;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
-pub(crate) use proposal::ProposalUtils;
+pub(crate) use proposal::Proposal;
 pub(crate) use register_storage::RegisterStorage;
 
 use self::split_barrier::SplitBarrier;
 use crate::dbs::UsedSpace;
+use crate::messaging::signature_aggregator::SignatureAggregator;
 use crate::messaging::system::SystemMsg;
-use crate::messaging::{signature_aggregator::SignatureAggregator, system::Proposal};
 use crate::routing::{
     dkg::DkgVoter,
     error::Result,
@@ -202,7 +202,7 @@ impl Core {
 
         // Write to the node's root dir
         if let Err(e) = write_data_to_disk(
-            &self.network_knowledge.prefix_map(),
+            self.network_knowledge.prefix_map(),
             &self.root_storage_dir.join("prefix_map"),
         )
         .await
@@ -216,7 +216,7 @@ impl Core {
                 safe_dir.push(".safe");
                 safe_dir.push("prefix_map");
                 if let Err(e) =
-                    write_data_to_disk(&self.network_knowledge.prefix_map(), &safe_dir).await
+                    write_data_to_disk(self.network_knowledge.prefix_map(), &safe_dir).await
                 {
                     error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
                 }
