@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{connected_peers::ConnectedPeers, msg_count::MsgCount, BackPressure};
+use super::{msg_count::MsgCount, BackPressure};
 use crate::messaging::{system::LoadReport, WireMsg};
 use crate::routing::{
     error::{Error, Result},
@@ -15,14 +15,13 @@ use crate::routing::{
 };
 use bytes::Bytes;
 use futures::{
-    future::{FutureExt, TryFutureExt},
+    future::TryFutureExt,
     stream::{FuturesUnordered, StreamExt},
 };
 use qp2p::Endpoint;
 use std::{future, net::SocketAddr};
 use tokio::{sync::mpsc, task};
 use tracing::Instrument;
-use xor_name::XorName;
 
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
@@ -31,7 +30,6 @@ pub(crate) struct Comm {
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
     back_pressure: BackPressure,
-    connected_peers: ConnectedPeers,
 }
 
 impl Drop for Comm {
@@ -57,16 +55,10 @@ impl Comm {
             Endpoint::new(local_addr, Default::default(), config).await?;
 
         let msg_count = MsgCount::new();
-        let connected_peers = ConnectedPeers::default();
 
         let _handle = task::spawn(
-            handle_incoming_connections(
-                incoming_connections,
-                event_tx.clone(),
-                msg_count.clone(),
-                connected_peers.clone(),
-            )
-            .in_current_span(),
+            handle_incoming_connections(incoming_connections, event_tx.clone(), msg_count.clone())
+                .in_current_span(),
         );
 
         let back_pressure = BackPressure::new();
@@ -76,7 +68,6 @@ impl Comm {
             event_tx,
             msg_count,
             back_pressure,
-            connected_peers,
         })
     }
 
@@ -94,16 +85,10 @@ impl Comm {
         let (bootstrap_peer, peer_incoming) = bootstrap_peer.ok_or(Error::BootstrapFailed)?;
 
         let msg_count = MsgCount::new();
-        let connected_peers = ConnectedPeers::default();
 
         let _handle = task::spawn(
-            handle_incoming_connections(
-                incoming_connections,
-                event_tx.clone(),
-                msg_count.clone(),
-                connected_peers.clone(),
-            )
-            .in_current_span(),
+            handle_incoming_connections(incoming_connections, event_tx.clone(), msg_count.clone())
+                .in_current_span(),
         );
 
         let _ = task::spawn(
@@ -112,7 +97,6 @@ impl Comm {
                 peer_incoming,
                 event_tx.clone(),
                 msg_count.clone(),
-                connected_peers.clone(),
             )
             .in_current_span(),
         );
@@ -123,7 +107,6 @@ impl Comm {
                 event_tx,
                 msg_count,
                 back_pressure: BackPressure::new(),
-                connected_peers,
             },
             UnnamedPeer::connected(bootstrap_peer),
         ))
@@ -131,12 +114,6 @@ impl Comm {
 
     pub(crate) fn our_connection_info(&self) -> SocketAddr {
         self.endpoint.public_addr()
-    }
-
-    /// Get the SocketAddr of a connection using the connection ID (XorName)
-    pub(crate) async fn get_peer_address(&self, connection_id: &XorName) -> Option<SocketAddr> {
-        let peer = self.connected_peers.get_by_id(connection_id).await?;
-        Some(peer.address())
     }
 
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
@@ -159,11 +136,7 @@ impl Comm {
             let connection = if let Some(connection) = recipient.connection().await {
                 Ok(connection)
             } else {
-                self.connected_peers
-                    .get_by_address(&addr)
-                    .map(|res| res.ok_or(None))
-                    .map_ok(|client| client.connection().clone())
-                    .await
+                Err(None)
             };
 
             future::ready(connection)
@@ -290,33 +263,18 @@ impl Comm {
                         LogMarker::ConnectionReused
                     );
                     (Ok(connection), true)
-                } else if let Some(connection) = {
-                    let existing_connection =
-                        self.connected_peers.get_by_address(&recipient.addr()).await;
-                    (!force_reconnection).then(|| existing_connection).flatten()
-                } {
-                    let connection = connection.connection();
-                    trace!(
-                        connection_id = connection.id(),
-                        src = %connection.remote_address(),
-                        "{}",
-                        LogMarker::ConnectionReused
-                    );
-                    (Ok(connection.clone()), true)
                 } else {
                     (
                         self.endpoint
                             .connect_to(&recipient.addr())
                             .and_then(|(connection, connection_incoming)| async move {
                                 recipient.set_connection(connection.clone()).await;
-                                self.connected_peers.insert(connection.clone()).await;
                                 let _ = task::spawn(
                                     handle_incoming_messages(
                                         connection.clone(),
                                         connection_incoming,
                                         self.event_tx.clone(),
                                         self.msg_count.clone(),
-                                        self.connected_peers.clone(),
                                     )
                                     .in_current_span(),
                                 );
@@ -439,31 +397,26 @@ async fn handle_incoming_connections(
     mut incoming_connections: qp2p::IncomingConnections,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
-    connected_peers: ConnectedPeers,
 ) {
     while let Some((connection, connection_incoming)) = incoming_connections.next().await {
-        connected_peers.insert(connection.clone()).await;
-
         let _ = task::spawn(
             handle_incoming_messages(
                 connection,
                 connection_incoming,
                 event_tx.clone(),
                 msg_count.clone(),
-                connected_peers.clone(),
             )
             .in_current_span(),
         );
     }
 }
 
-#[tracing::instrument(skip(incoming_msgs, event_tx, msg_count, connected_peers))]
+#[tracing::instrument(skip(incoming_msgs, event_tx, msg_count))]
 async fn handle_incoming_messages(
     connection: qp2p::Connection,
     mut incoming_msgs: qp2p::ConnectionIncoming,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
-    connected_peers: ConnectedPeers,
 ) {
     let connection_id = connection.id();
     let src = connection.remote_address();
@@ -487,9 +440,6 @@ async fn handle_incoming_messages(
             }
         }
     }
-
-    // remove the connection once we notice it end
-    connected_peers.remove_by_address(&src).await;
 
     trace!(%connection_id, %src, "{}", LogMarker::ConnectionClosed);
 }
@@ -516,6 +466,7 @@ mod tests {
     use rand::rngs::OsRng;
     use std::{net::Ipv4Addr, time::Duration};
     use tokio::{net::UdpSocket, sync::mpsc, time};
+    use xor_name::XorName;
 
     const TIMEOUT: Duration = Duration::from_secs(1);
 
@@ -734,50 +685,6 @@ mod tests {
         drop(comm1);
 
         assert_matches!(time::timeout(TIMEOUT, rx0.recv()).await, Err(_));
-
-        Ok(())
-    }
-
-    #[cfg(not(feature = "unstable-no-connection-pooling"))]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn connected_peers() -> Result<()> {
-        let (node_tx, mut node_rx) = mpsc::channel(1);
-        let node_comm = Comm::new(local_addr(), Config::default(), node_tx).await?;
-        let node_addr = node_comm.our_connection_info();
-
-        let (client_tx, mut client_rx) = mpsc::channel(1);
-        let client_comm = Comm::new(local_addr(), Config::default(), client_tx).await?;
-        let client_addr = client_comm.our_connection_info();
-
-        // Establish a connection by sending a message
-        let status = client_comm
-            .send(
-                &[Peer::new(XorName::random(), node_addr)],
-                1,
-                new_test_message()?,
-            )
-            .await?;
-        assert_matches!(status, SendStatus::AllRecipients);
-
-        // We should have recorded the connection
-        assert_matches!(node_rx.recv().await, Some(ConnectionEvent::Received(_)));
-        assert!(
-            node_comm
-                .get_peer_address(&ConnectedPeers::address_to_id(&client_addr))
-                .await
-                .is_some(),
-            "did not find expected connection"
-        );
-
-        // We can reply to the client over the existing connection
-        node_comm
-            .send_on_existing_connection(
-                &[Peer::new(XorName::random(), client_addr)],
-                new_test_message()?,
-            )
-            .await?;
-
-        assert_matches!(client_rx.recv().await, Some(ConnectionEvent::Received(_)));
 
         Ok(())
     }

@@ -347,32 +347,12 @@ impl Dispatcher {
     }
 
     /// Send a message, either section to section, node to node, or to an end user.
-    pub(super) async fn send_wire_message(&self, mut wire_msg: WireMsg) -> Result<Vec<Command>> {
-        if let DstLocation::EndUser(EndUser(name)) = wire_msg.dst_location() {
-            let addr = self.core.comm.get_peer_address(name).await;
-
-            if let Some(socket_addr) = addr {
-                // Send a message to a client peer.
-                // Messages sent to a client are not signed
-                // or validated as part of the routing library.
-                debug!("Sending client msg to {:?}: {:?}", socket_addr, wire_msg);
-
-                let recipients = vec![Peer::new(*name, socket_addr)];
-                wire_msg.set_dst_section_pk(self.core.network_knowledge().section_key().await);
-
-                let command = Command::SendMessage {
-                    recipients,
-                    wire_msg,
-                };
-
-                Ok(vec![command])
-            } else {
-                error!(
-                        "End user msg dropped at send. Could not find socketaddr corresponding to xorname {:?}: {:?}",
-                        name, wire_msg
-                    );
-                Ok(vec![])
-            }
+    pub(super) async fn send_wire_message(&self, wire_msg: WireMsg) -> Result<Vec<Command>> {
+        if let DstLocation::EndUser(EndUser(_)) = wire_msg.dst_location() {
+            error!(
+                "End user msg dropped at send. You need to remember the Peer, and use a different send API for service messages.",
+            );
+            Ok(vec![])
         } else {
             // This message is not for an end user, then send it to peer/s over the network
             let cmd = self.core.send_msg_to_peers(wire_msg).await?;
