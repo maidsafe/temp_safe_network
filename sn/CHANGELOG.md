@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.41.2 (2021-11-24)
+## v0.41.3 (2021-11-24)
 
 ### New Features
 
@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -28,9 +28,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - add comment about vec size ([`9d65724`](https://github.com/maidsafe/safe_network/commit/9d657249f3d0391e7c3bbeae6f81909993802cc7))
     - adapt registers to hold vec u8 instead of Url in sn ([`b960347`](https://github.com/maidsafe/safe_network/commit/b96034796d479352340caaf3d6e6b6d7e6e425ad))
+    - sn_api-0.41.0 ([`df25e49`](https://github.com/maidsafe/safe_network/commit/df25e4920c570771f6813ca03da02f6dfc8e59fb))
     - simplify `Proposal::as_signable_bytes` ([`bf0488d`](https://github.com/maidsafe/safe_network/commit/bf0488d239fc52ce03c1f380ae0986810d753007))
     - replace `ProposalUtils` with inherent impl ([`aca0fb7`](https://github.com/maidsafe/safe_network/commit/aca0fb7a451ffc25c6e34479cc9201fef42796be))
     - duplicate `Proposal` in `routing` ([`c34c28d`](https://github.com/maidsafe/safe_network/commit/c34c28dd8776196a6c1c475b7f3ec3be709c0b6d))
+</details>
+
+## v0.41.2 (2021-11-24)
+
+### New Features
+
+ - <csr-id-b96034796d479352340caaf3d6e6b6d7e6e425ad/> adapt registers to hold vec u8 instead of Url in sn
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.41.2/sn_api-0.40.1 ([`a973039`](https://github.com/maidsafe/safe_network/commit/a973039178af33b859d421cf36571de49cceff17))
 </details>
 
 ## v0.41.1 (2021-11-23)
