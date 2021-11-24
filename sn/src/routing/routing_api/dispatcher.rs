@@ -7,7 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Command, Event};
-use crate::messaging::{system::SystemMsg, DstLocation, EndUser, MsgKind, WireMsg};
+use crate::messaging::{
+    serialisation::{
+        AE_MSG_PRIORITY, DKG_MSG_PRIORITY, INFRASTRUCTURE_MSG_PRIORITY, JOIN_RESPONSE_PRIORITY,
+        NODE_DATA_MSG_PRIORITY,
+    },
+    system::SystemMsg,
+    DstLocation, EndUser, MsgKind, WireMsg,
+};
 use crate::routing::{
     core::{Core, Proposal, SendStatus},
     error::Result,
@@ -16,12 +23,26 @@ use crate::routing::{
     node::Node,
     Error, Peer,
 };
+use std::collections::BTreeMap;
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
-use tokio::{sync::watch, time};
+use tokio::{
+    sync::{watch, OwnedSemaphorePermit, RwLock, Semaphore},
+    time,
+};
 use tracing::Instrument;
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
+const CONCURRENCY_COUNT: usize = 7;
+
+// A command/subcommand id e.g. "963111461", "963111461.0"
+type CmdId = String;
+
+fn get_root_cmd_id(cmd_id: &str) -> CmdId {
+    let mut root_cmd_id = cmd_id.to_string();
+    root_cmd_id.truncate(cmd_id.find('.').unwrap_or_else(|| cmd_id.len()));
+    root_cmd_id
+}
 
 // `Command` Dispatcher.
 pub(super) struct Dispatcher {
@@ -29,6 +50,12 @@ pub(super) struct Dispatcher {
 
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
+    join_permits: Arc<Semaphore>,
+    ae_permits: Arc<Semaphore>,
+    infra_permits: Arc<Semaphore>,
+    node_data_permits: Arc<Semaphore>,
+    dkg_permits: Arc<Semaphore>,
+    cmd_permit_map: Arc<RwLock<BTreeMap<CmdId, OwnedSemaphorePermit>>>,
 }
 
 impl Drop for Dispatcher {
@@ -45,26 +72,205 @@ impl Dispatcher {
             core,
             cancel_timer_tx,
             cancel_timer_rx,
+            join_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
+            ae_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
+            infra_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
+            dkg_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
+            node_data_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
+            cmd_permit_map: Arc::new(RwLock::new(BTreeMap::default())),
         }
     }
 
-    /// Handles the given command and transitively any new commands that are
-    /// produced during its handling. Trace logs will include the provided command id,
-    /// and any sub-commands produced will have it as a common root cmd id.
-    /// If a command id string is not provided a random one will be generated.
-    pub(super) async fn handle_commands(
+    /// block progress until there are no tasks pending in this semaphore
+    /// intended to allow us to wait for super high priority tasks before doing others...
+    /// It should only be used after checking that no permits are held by a root cmd eg
+    async fn wait_for_priority_commands_to_finish(&self, semaphore: Arc<Semaphore>, count: usize) {
+        // there's probably a neater way to do this
+        while semaphore.available_permits() != count {
+            time::sleep(Duration::from_millis(100)).await
+        }
+    }
+
+    /// Based upon message priority will wait for any higher priority commands to be completed before continuing
+    async fn acquire_permit_or_wait(&self, prio: i32, cmd_id: CmdId) {
+        let root_cmd_id = get_root_cmd_id(&cmd_id);
+
+        let permit = match prio {
+            JOIN_RESPONSE_PRIORITY => Some(
+                self.join_permits
+                    .clone()
+                    .acquire_owned()
+                    .await
+                    .map_err(|_| Error::SemaphoreClosed),
+            ),
+            DKG_MSG_PRIORITY => {
+                self.wait_for_priority_commands_to_finish(
+                    self.join_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+
+                Some(
+                    self.join_permits
+                        .clone()
+                        .acquire_owned()
+                        .await
+                        .map_err(|_| Error::SemaphoreClosed),
+                )
+            }
+            AE_MSG_PRIORITY => {
+                self.wait_for_priority_commands_to_finish(
+                    self.join_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.dkg_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+
+                Some(
+                    self.ae_permits
+                        .clone()
+                        .acquire_owned()
+                        .await
+                        .map_err(|_| Error::SemaphoreClosed),
+                )
+            }
+            INFRASTRUCTURE_MSG_PRIORITY => {
+                self.wait_for_priority_commands_to_finish(
+                    self.join_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.dkg_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.ae_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+
+                Some(
+                    self.infra_permits
+                        .clone()
+                        .acquire_owned()
+                        .await
+                        .map_err(|_| Error::SemaphoreClosed),
+                )
+            }
+            NODE_DATA_MSG_PRIORITY => {
+                self.wait_for_priority_commands_to_finish(
+                    self.join_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.dkg_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.ae_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.infra_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+
+                Some(
+                    self.node_data_permits
+                        .clone()
+                        .acquire_owned()
+                        .await
+                        .map_err(|_| Error::SemaphoreClosed),
+                )
+            }
+            _ => {
+                self.wait_for_priority_commands_to_finish(
+                    self.join_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.dkg_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.ae_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.infra_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+                self.wait_for_priority_commands_to_finish(
+                    self.node_data_permits.clone(),
+                    CONCURRENCY_COUNT,
+                )
+                .await;
+
+                None
+            }
+        };
+
+        if let Some(permit) = permit {
+            match permit {
+                Ok(permit) => {
+                    let permit_map = self.cmd_permit_map.clone();
+                    let mut permit_map_write_guard = permit_map.write().await;
+                    let _old_permit = permit_map_write_guard.insert(root_cmd_id, permit);
+                }
+                Err(error) => {
+                    // log error, it can only be permi acquisition here, so that's okay and we ignore it / drop command as we've bigger issues
+                    error!("{:?}", error)
+                }
+            }
+        }
+    }
+
+    /// Enqueues the given command and handles whatever command is in the next priority queue and triggers handling after any required waits for higher priority tasks
+    pub(super) async fn enqueue_and_handle_next_command_and_any_offshoots(
         self: Arc<Self>,
         command: Command,
         cmd_id: Option<String>,
     ) -> Result<()> {
-        let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
+        let _ = tokio::spawn(async {
+            let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
+            self.acquire_permit_or_wait(command.priority()?, cmd_id.clone())
+                .await;
+            self.handle_command_and_any_offshoots(command, cmd_id).await
+        });
+        Ok(())
+    }
+
+    /// Handles command and transitively queues any new commands that are
+    /// produced during its handling. Trace logs will include the provided command id,
+    /// and any sub-commands produced will have it as a common root cmd id.
+    /// If a command id string is not provided a random one will be generated.
+    pub(super) async fn handle_command_and_any_offshoots(
+        self: Arc<Self>,
+        command: Command,
+        cmd_id: String,
+    ) -> Result<()> {
         let cmd_id_clone = cmd_id.clone();
         let command_display = command.to_string();
         let _ = tokio::spawn(async move {
-            if let Ok(commands) = self.handle_command(command, &cmd_id).await {
+            if let Ok(commands) = self.process_command(command, &cmd_id).await {
                 for (sub_cmd_count, command) in commands.into_iter().enumerate() {
                     let sub_cmd_id = format!("{}.{}", cmd_id, sub_cmd_count);
-                    self.clone().spawn_handle_commands(command, sub_cmd_id);
+                    // Error here is only related to queueing, and so a dropped command will be logged
+                    let _result = self.clone().spawn_handle_commands(command, sub_cmd_id);
                 }
             }
         });
@@ -75,13 +281,20 @@ impl Dispatcher {
             command_display,
             cmd_id_clone
         );
+
         Ok(())
     }
 
     // Note: this indirecton is needed. Trying to call `spawn(self.handle_commands(...))` directly
     // inside `handle_commands` causes compile error about type check cycle.
-    fn spawn_handle_commands(self: Arc<Self>, command: Command, cmd_id: String) {
-        let _ = tokio::spawn(self.handle_commands(command, Some(cmd_id)));
+    fn spawn_handle_commands(self: Arc<Self>, command: Command, cmd_id: String) -> Result<()> {
+        // self.enqueue_command(command)?;
+        // if let Some(command) = self.get_next_command_to_handle() {
+        let _ = tokio::spawn(
+            self.enqueue_and_handle_next_command_and_any_offshoots(command, Some(cmd_id)),
+        );
+        // }
+        Ok(())
     }
 
     pub(super) async fn start_network_probing(self: Arc<Self>) {
@@ -100,7 +313,10 @@ impl Dispatcher {
                     match core.generate_probe_message().await {
                         Ok(command) => {
                             info!("Sending ProbeMessage");
-                            if let Err(e) = dispatcher.clone().handle_commands(command, None).await
+                            if let Err(e) = dispatcher
+                                .clone()
+                                .enqueue_and_handle_next_command_and_any_offshoots(command, None)
+                                .await
                             {
                                 error!("Error sending a Probe message to the network: {:?}", e);
                             }
@@ -118,7 +334,7 @@ impl Dispatcher {
     }
 
     /// Handles a single command.
-    pub(super) async fn handle_command(
+    pub(super) async fn process_command(
         &self,
         command: Command,
         cmd_id: &str,
@@ -149,9 +365,10 @@ impl Dispatcher {
             trace!("{:?}", LogMarker::CommandHandleStart);
 
             let command_display = command.to_string();
-            match self.try_handle_command(command).await {
+            let res = match self.try_processing_a_command(command).await {
                 Ok(outcome) => {
                     trace!("{:?} {}", LogMarker::CommandHandleEnd, command_display);
+
                     Ok(outcome)
                 }
                 Err(error) => {
@@ -167,13 +384,20 @@ impl Dispatcher {
                     );
                     Err(error)
                 }
-            }
+            };
+            // and now we're done, free up the permit
+            let root_cmd_id = get_root_cmd_id(cmd_id);
+            let permit_map = self.cmd_permit_map.clone();
+            let mut permit_map_write_guard = permit_map.write().await;
+            let _used_permit = permit_map_write_guard.remove(&root_cmd_id);
+            res
         }
         .instrument(span)
         .await
     }
 
-    async fn try_handle_command(&self, command: Command) -> Result<Vec<Command>> {
+    /// Actually process the command
+    async fn try_processing_a_command(&self, command: Command) -> Result<Vec<Command>> {
         match command {
             Command::HandleSystemMessage {
                 sender,

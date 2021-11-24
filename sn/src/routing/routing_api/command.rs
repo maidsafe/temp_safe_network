@@ -13,6 +13,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     core::Proposal,
+    error::Result,
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
     Peer, UnnamedPeer, XorName,
@@ -110,6 +111,21 @@ pub(crate) enum Command {
     StartConnectivityTest(XorName),
     /// Test Connectivity
     TestConnectivity(XorName),
+}
+
+impl Command {
+    /// Return the commands priority, higher being higher prio
+    pub(crate) fn priority(&self) -> Result<i32> {
+        let prio = match self {
+            Self::HandleMessage { wire_msg, .. } => wire_msg.into_message()?.priority(),
+            Self::HandleDkgOutcome { .. } | Self::HandleDkgFailure(_) => 3,
+            Self::HandleElderAgreement { .. } => 2,
+            Self::HandleAgreement { .. } | Self::HandleSystemMessage { .. } => 1,
+            _ => -2,
+        };
+
+        Ok(prio)
+    }
 }
 
 impl fmt::Display for Command {
