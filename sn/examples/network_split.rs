@@ -25,8 +25,7 @@ use tiny_keccak::{Hasher, Sha3};
 use eyre::{eyre, Context, Result};
 use safe_network::{
     client::{utils::test_utils::read_network_conn_info, Client, ClientConfig},
-    types::{utils::random_bytes, BytesAddress},
-    url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
+    types::{utils::random_bytes, BytesAddress, Scope},
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -233,8 +232,7 @@ async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
     println!("Storing bytes w/ hash {:?}", output);
 
     let address = client.upload(bytes, Scope::Public).await?;
-    let xorurl = Url::encode_bytes(address, ContentType::Raw, DEFAULT_XORURL_BASE)?;
-    println!("Bytes stored at xorurl: {}", xorurl);
+    println!("Bytes stored at address: {:?}", address);
 
     let delay = 2;
     println!("Reading bytes from the network in {} secs...", delay);

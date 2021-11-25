@@ -19,10 +19,12 @@ mod authenticator;
 mod common;
 mod constants;
 mod errors;
+mod url;
 
 // re-export these useful types from sn_data_types
 pub use safe_network::types::{
-    BytesAddress, DataAddress, Keypair, PublicKey, RegisterAddress, SafeKeyAddress, SecretKey,
+    BytesAddress, DataAddress, Keypair, PublicKey, RegisterAddress, SafeKeyAddress, Scope,
+    SecretKey,
 };
 
 #[cfg(feature = "app")]
@@ -45,3 +47,6 @@ pub use common::auth_types::*;
 pub use common::{ed_sk_from_hex, sk_to_hex};
 
 pub use errors::{Error, Result};
+
+// use the local url module (in this crate) and not the external rust url crate
+pub use crate::url::*;

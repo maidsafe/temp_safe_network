@@ -18,7 +18,7 @@ pub use policy::{
 pub use reg_crdt::EntryHash;
 
 use super::{Error, PublicKey, Result};
-use crate::{types::RegisterAddress as Address, url::Scope};
+use crate::{types::RegisterAddress as Address, types::Scope};
 use reg_crdt::{CrdtOperation, RegisterCrdt};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -217,7 +217,7 @@ mod tests {
         },
         utils, Error, Keypair, Result,
     };
-    use crate::{types::RegisterAddress as Address, url::Scope};
+    use crate::{types::RegisterAddress as Address, types::Scope};
     use eyre::eyre;
     use proptest::prelude::*;
     use rand::{rngs::OsRng, seq::SliceRandom, thread_rng};

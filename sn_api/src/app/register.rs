@@ -9,10 +9,10 @@
 
 pub use safe_network::types::register::{Entry, EntryHash};
 
+use crate::url::{ContentType, Url, XorUrl};
 use crate::{Error, Result, Safe};
 use log::debug;
-use safe_network::types::{DataAddress, RegisterAddress};
-use safe_network::url::{ContentType, Scope, Url, XorUrl};
+use safe_network::types::{DataAddress, RegisterAddress, Scope};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 

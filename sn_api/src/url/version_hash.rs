@@ -7,8 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::types::register::EntryHash;
 use multibase::Base;
+use safe_network::types::register::EntryHash;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 use std::{
@@ -75,7 +75,7 @@ impl VersionHash {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use eyre::{bail, Result};
+    use color_eyre::{eyre::bail, Result};
 
     #[test]
     fn test_version_hash_encode_decode() -> Result<()> {

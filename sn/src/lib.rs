@@ -55,7 +55,6 @@ pub mod node;
 pub mod prefix_map;
 pub mod routing;
 pub mod types;
-pub mod url;
 
 use tracing_core::{Event, Subscriber};
 use tracing_subscriber::{

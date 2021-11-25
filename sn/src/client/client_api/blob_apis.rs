@@ -13,8 +13,7 @@ use super::{
 use crate::{
     client::{client_api::data::DataMapLevel, utils::encryption, Error, Result},
     messaging::data::{DataCmd, DataQuery, QueryResponse},
-    types::{BytesAddress, Chunk, ChunkAddress, Encryption},
-    url::Scope,
+    types::{BytesAddress, Chunk, ChunkAddress, Encryption, Scope},
 };
 
 use bincode::deserialize;
@@ -327,8 +326,7 @@ mod tests {
         Client,
     };
     use crate::routing::log_markers::LogMarker;
-    use crate::types::{utils::random_bytes, BytesAddress, Keypair};
-    use crate::url::Scope;
+    use crate::types::{utils::random_bytes, BytesAddress, Keypair, Scope};
     use bytes::Bytes;
     use eyre::Result;
     use futures::future::join_all;

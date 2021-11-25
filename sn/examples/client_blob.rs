@@ -9,8 +9,7 @@
 use eyre::Result;
 use safe_network::{
     client::{utils::test_utils::read_network_conn_info, Client, ClientConfig},
-    types::utils::random_bytes,
-    url::{ContentType, Scope, Url, DEFAULT_XORURL_BASE},
+    types::{utils::random_bytes, Scope},
 };
 use std::time::Duration;
 use tokio::time::sleep;
@@ -37,8 +36,7 @@ async fn main() -> Result<()> {
     println!("Storing {} bytes..", bytes.len());
 
     let address = client.upload(bytes, Scope::Public).await?;
-    let xorurl = Url::encode_bytes(address, ContentType::Raw, DEFAULT_XORURL_BASE)?;
-    println!("Bytes stored at xorurl: {}", xorurl);
+    println!("Bytes stored at address: {:?}", address);
 
     let delay = 5;
     println!("Reading bytes from the network in {} secs...", delay);

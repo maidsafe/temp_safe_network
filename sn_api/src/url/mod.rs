@@ -14,9 +14,9 @@ mod url_parts;
 mod version_hash;
 mod xorurl_media_types;
 
-use crate::types::{BytesAddress, DataAddress, RegisterAddress, SafeKeyAddress};
 pub use errors::{Error, Result};
 use multibase::{decode as base_decode, encode as base_encode, Base};
+use safe_network::types::{BytesAddress, DataAddress, RegisterAddress, SafeKeyAddress, Scope};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tracing::{info, trace, warn};
@@ -143,7 +143,7 @@ impl ContentType {
             Self::Multimap => Ok(4),
             Self::MediaType(media_type) => match MEDIA_TYPE_CODES.get(media_type) {
                 Some(media_type_code) => Ok(*media_type_code),
-                None => Err(Error::InvalidMediaType(format!("Media-type '{}' not supported. You can use 'ContentType::Raw' as the 'content_type' for this type of content", media_type))),
+                None => Err(Error::UnsupportedMediaType(format!("Media-type '{}' not supported. You can use 'ContentType::Raw' as the 'content_type' for this type of content", media_type))),
             },
         }
     }
@@ -166,15 +166,6 @@ impl std::fmt::Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
-}
-
-/// We also encode the data scope - i.e. accessibility on the SAFE Network.
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
-pub enum Scope {
-    #[allow(missing_docs)]
-    Public = 0x00,
-    #[allow(missing_docs)]
-    Private = 0x01,
 }
 
 /// An enumeration of possible Url types.
@@ -1215,8 +1206,8 @@ impl fmt::Display for Url {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::BytesAddress;
-    use eyre::{bail, eyre, Result};
+    use color_eyre::{eyre::bail, eyre::eyre, Result};
+    use safe_network::types::BytesAddress;
 
     macro_rules! verify_expected_result {
             ($result:expr, $pattern:pat $(if $cond:expr)?) => {
@@ -1246,7 +1237,7 @@ mod tests {
             None,
             None,
         );
-        verify_expected_result!(result, Err(Error::InvalidMediaType(err)) if err.contains("You can use 'ContentType::Raw'"))?;
+        verify_expected_result!(result, Err(Error::UnsupportedMediaType(err)) if err.contains("You can use 'ContentType::Raw'"))?;
 
         // test: "nrs_name cannot be empty string."
         let result = Url::new(

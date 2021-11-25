@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::url::Scope;
+use super::Scope;
 use xor_name::XorName;
 
 /// Address of Bytes data type.
@@ -21,8 +21,8 @@ pub enum BytesAddress {
 }
 
 impl BytesAddress {
-    ///
-    pub(crate) fn new(name: XorName, scope: Scope) -> BytesAddress {
+    /// Creates a new BytesAddress
+    pub fn new(name: XorName, scope: Scope) -> BytesAddress {
         match scope {
             Scope::Public => Self::Public(name),
             Scope::Private => Self::Private(name),
