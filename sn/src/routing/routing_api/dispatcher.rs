@@ -55,7 +55,8 @@ pub(super) struct Dispatcher {
     infra_permits: Arc<Semaphore>,
     node_data_permits: Arc<Semaphore>,
     dkg_permits: Arc<Semaphore>,
-    cmd_permit_map: Arc<RwLock<BTreeMap<CmdId, OwnedSemaphorePermit>>>,
+    // root cmd id to semaphore and a count of processes using it
+    cmd_permit_map: Arc<RwLock<BTreeMap<CmdId, (OwnedSemaphorePermit, usize)>>>,
 }
 
 impl Drop for Dispatcher {
@@ -93,7 +94,19 @@ impl Dispatcher {
 
     /// Based upon message priority will wait for any higher priority commands to be completed before continuing
     async fn acquire_permit_or_wait(&self, prio: i32, cmd_id: CmdId) {
+        // oif we already have a permit, increase our count and continue
         let root_cmd_id = get_root_cmd_id(&cmd_id);
+        let permit_map = self.cmd_permit_map.clone();
+        if let Some((current_root_permit, mut count)) =
+            permit_map.write().await.remove(&root_cmd_id)
+        {
+            count += 1;
+            let _nonexistant_entry = permit_map
+                .write()
+                .await
+                .insert(root_cmd_id.clone(), (current_root_permit, count));
+            return;
+        }
 
         let permit = match prio {
             JOIN_RESPONSE_PRIORITY => Some(
@@ -224,12 +237,13 @@ impl Dispatcher {
             }
         };
 
+        // if there is a permit to be got...
         if let Some(permit) = permit {
             match permit {
+                // and there was no error w/ semaphore
                 Ok(permit) => {
-                    let permit_map = self.cmd_permit_map.clone();
                     let mut permit_map_write_guard = permit_map.write().await;
-                    let _old_permit = permit_map_write_guard.insert(root_cmd_id, permit);
+                    let _old_permit = permit_map_write_guard.insert(root_cmd_id, (permit, 1));
                 }
                 Err(error) => {
                     // log error, it can only be permi acquisition here, so that's okay and we ignore it / drop command as we've bigger issues
@@ -385,11 +399,21 @@ impl Dispatcher {
                     Err(error)
                 }
             };
-            // and now we're done, free up the permit
+            // and now we're done, reduce permit count or drop if none left using it.
             let root_cmd_id = get_root_cmd_id(cmd_id);
             let permit_map = self.cmd_permit_map.clone();
             let mut permit_map_write_guard = permit_map.write().await;
-            let _used_permit = permit_map_write_guard.remove(&root_cmd_id);
+            if let Some((permit, mut count)) = permit_map_write_guard.remove(&root_cmd_id) {
+                // if we're not the last spawned command here
+                if count > 1 {
+                    count -= 1;
+                    // put the permit back as other commands are still being handled under it.
+                    let _nonexistant_entry = permit_map
+                        .write()
+                        .await
+                        .insert(root_cmd_id.clone(), (permit, count));
+                }
+            }
             res
         }
         .instrument(span)
