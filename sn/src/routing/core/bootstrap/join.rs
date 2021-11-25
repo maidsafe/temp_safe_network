@@ -237,9 +237,18 @@ impl<'a> Join<'a> {
                                 resource_proof_response: None,
                                 aggregated: Some(auth),
                             };
-
+                            let name = self.node.name();
+                            let recipients: Vec<Peer> = if let Some(signed_sap) =
+                                self.prefix_map.closest_or_opposite(&name, None)
+                            {
+                                signed_sap.value.elders().cloned().collect()
+                            } else {
+                                warn!("cannot find recipients to send aggregated JoinApproval");
+                                continue;
+                            };
+                            trace!("Sending aggregated JoinRequest to {:?}", recipients);
                             // Resend the JoinRequest now that we have collected enough ApprovalShares from the Elders
-                            self.send_join_requests(join_req, &[sender], section_key, true)
+                            self.send_join_requests(join_req, &recipients, section_key, false)
                                 .await?;
                             continue;
                         }
@@ -303,10 +312,19 @@ impl<'a> Join<'a> {
                             self.node.age(),
                             expected_age
                         );
-                        let new_keypair = ed25519::gen_keypair(
-                            &Prefix::default().range_inclusive(),
-                            expected_age,
-                        );
+                        // The expected_age is a sequence of 98, 96, 94, 92, ...
+                        // The expected_prefix is deduced from it.
+                        let mut cur_age = expected_age / 2;
+                        let mut expected_prefix = Prefix::default();
+                        while cur_age > 0 {
+                            let remain_age = cur_age / 2;
+                            expected_prefix = expected_prefix.pushed(cur_age != (remain_age * 2));
+                            cur_age = remain_age;
+                        }
+                        trace!("Name shall have the prefix of {:?}", expected_prefix);
+
+                        let new_keypair =
+                            ed25519::gen_keypair(&expected_prefix.range_inclusive(), expected_age);
                         let new_name = ed25519::name(&new_keypair.public);
 
                         info!("Setting Node name to {} (age {})", new_name, expected_age);
