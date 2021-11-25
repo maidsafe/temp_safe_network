@@ -493,15 +493,12 @@ impl Core {
             SystemMsg::DkgNotReady {
                 message,
                 session_id,
-            } => {
-                let src = sender.name();
-                Ok(self.handle_dkg_not_ready(
-                    sender,
-                    message,
-                    session_id,
-                    self.network_knowledge.section_by_name(&src)?.section_key(),
-                ))
-            }
+            } => Ok(self.handle_dkg_not_ready(
+                sender,
+                message,
+                session_id,
+                self.network_knowledge.section_key().await,
+            )),
             SystemMsg::DkgRetry {
                 message_history,
                 message,
@@ -644,7 +641,7 @@ impl Core {
                         },
                     }])
                 } else {
-                    warn!("Unknown DkgSessionInfo requested");
+                    warn!("Unknown DkgSessionInfo: {:?} requested", &session_id);
                     Ok(vec![])
                 }
             }
@@ -672,7 +669,14 @@ impl Core {
                         trace!("DkgSessionInfo signature verified");
                     }
                 } else {
-                    warn!("Cannot verify DkgSessionInfo. Unknown key!");
+                    warn!(
+                        "Cannot verify DkgSessionInfo: {:?}. Unknown key: {:?}!",
+                        &session_id, auth.sig.public_key
+                    );
+                    warn!(
+                        "Chain: {:?}",
+                        self.network_knowledge().section_chain().await
+                    );
                     return Ok(commands);
                 }
                 let _existing = self.dkg_sessions.write().await.insert(
