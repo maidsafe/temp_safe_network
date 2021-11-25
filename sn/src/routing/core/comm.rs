@@ -332,25 +332,15 @@ impl Comm {
         // TODO: more laid back retries with lower priority, more aggressive with higher
         let retries = self.back_pressure.get(&recipient.addr()).await;
 
-        let (connection, reused_connection) = if let Some(connection) = {
-            recipient
-                .connection()
-                .await
-                .filter(|connection| Some(connection.id()) != failed_connection_id)
-        } {
-            trace!(
-                connection_id = connection.id(),
-                src = %connection.remote_address(),
-                "{}",
-                LogMarker::ConnectionReused
-            );
-            (Ok(connection), true)
-        } else {
-            (
-                self.endpoint
-                    .connect_to(&recipient.addr())
-                    .and_then(|(connection, connection_incoming)| async move {
-                        recipient.set_connection(connection.clone()).await;
+        let mut reused_connection = true;
+        let connection = recipient
+            .ensure_connection(
+                |connection| Some(connection.id()) != failed_connection_id,
+                |addr| {
+                    reused_connection = false;
+                    async move {
+                        let (connection, connection_incoming) =
+                            self.endpoint.connect_to(&addr).await?;
                         let _ = task::spawn(
                             handle_incoming_messages(
                                 connection.clone(),
@@ -361,12 +351,20 @@ impl Comm {
                             .in_current_span(),
                         );
                         Ok(connection)
-                    })
-                    .await
-                    .map_err(SendToOneError::Connection),
-                false,
+                    }
+                },
             )
-        };
+            .await
+            .map_err(SendToOneError::Connection);
+
+        if let (true, Ok(connection)) = (reused_connection, &connection) {
+            trace!(
+                connection_id = connection.id(),
+                src = %connection.remote_address(),
+                "{}",
+                LogMarker::ConnectionReused
+            );
+        }
 
         let result = future::ready(connection)
             .and_then(|connection| async move {
