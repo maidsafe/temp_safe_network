@@ -29,7 +29,11 @@ use tokio::{
 use tracing::Instrument;
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
-const CONCURRENCY_COUNT: usize = 7;
+
+// this doesn't realistically limit concurrency
+// the prioritisation will do that, preventing lower prio messages being kicked off when
+// high prio messages exist
+const SEMAPHORE_COUNT: usize = 10000;
 
 // A command/subcommand id e.g. "963111461", "963111461.0"
 type CmdId = String;
@@ -51,7 +55,8 @@ pub(super) struct Dispatcher {
     infra_permits: Arc<Semaphore>,
     node_data_permits: Arc<Semaphore>,
     dkg_permits: Arc<Semaphore>,
-    cmd_permit_map: Arc<RwLock<BTreeMap<CmdId, OwnedSemaphorePermit>>>,
+    // root cmd id to semaphore and a count of processes using it
+    cmd_permit_map: Arc<RwLock<BTreeMap<CmdId, (OwnedSemaphorePermit, usize)>>>,
 }
 
 impl Drop for Dispatcher {
@@ -68,11 +73,11 @@ impl Dispatcher {
             core,
             cancel_timer_tx,
             cancel_timer_rx,
-            join_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
-            ae_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
-            infra_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
-            dkg_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
-            node_data_permits: Arc::new(Semaphore::new(CONCURRENCY_COUNT)),
+            join_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
+            ae_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
+            infra_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
+            dkg_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
+            node_data_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
             cmd_permit_map: Arc::new(RwLock::new(BTreeMap::default())),
         }
     }
@@ -82,14 +87,28 @@ impl Dispatcher {
     /// It should only be used after checking that no permits are held by a root cmd eg
     async fn wait_for_priority_commands_to_finish(&self, semaphore: Arc<Semaphore>, count: usize) {
         // there's probably a neater way to do this
+        debug!("available, permits {:?}", semaphore.available_permits());
         while semaphore.available_permits() != count {
-            time::sleep(Duration::from_millis(100)).await
+            time::sleep(Duration::from_millis(50)).await
         }
     }
 
     /// Based upon message priority will wait for any higher priority commands to be completed before continuing
     async fn acquire_permit_or_wait(&self, prio: i32, cmd_id: CmdId) {
+        // oif we already have a permit, increase our count and continue
         let root_cmd_id = get_root_cmd_id(&cmd_id);
+        let permit_map = self.cmd_permit_map.clone();
+        debug!("Permits issued: {:?}", permit_map.read().await.len());
+        if let Some((current_root_permit, mut count)) =
+            permit_map.write().await.remove(&root_cmd_id)
+        {
+            count += 1;
+            let _nonexistant_entry = permit_map
+                .write()
+                .await
+                .insert(root_cmd_id.clone(), (current_root_permit, count));
+            return;
+        }
 
         let permit = match prio {
             JOIN_RESPONSE_PRIORITY => Some(
@@ -100,14 +119,18 @@ impl Dispatcher {
                     .map_err(|_| Error::SemaphoreClosed),
             ),
             DKG_MSG_PRIORITY => {
+                trace!(
+                    "{:?} Awaiting Join Completion before continuing with DKG Msg",
+                    cmd_id
+                );
                 self.wait_for_priority_commands_to_finish(
                     self.join_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
 
                 Some(
-                    self.join_permits
+                    self.dkg_permits
                         .clone()
                         .acquire_owned()
                         .await
@@ -115,14 +138,18 @@ impl Dispatcher {
                 )
             }
             AE_MSG_PRIORITY => {
+                trace!(
+                    "{:?} Awaiting DKG Completion before continuing with Join Msg",
+                    cmd_id
+                );
                 self.wait_for_priority_commands_to_finish(
                     self.join_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
 
@@ -135,21 +162,22 @@ impl Dispatcher {
                 )
             }
             INFRASTRUCTURE_MSG_PRIORITY => {
+                trace!(
+                    "{:?} Awaiting AE/Join/DKG Completion before continuing msg",
+                    cmd_id
+                );
                 self.wait_for_priority_commands_to_finish(
                     self.join_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
-                self.wait_for_priority_commands_to_finish(
-                    self.ae_permits.clone(),
-                    CONCURRENCY_COUNT,
-                )
-                .await;
+                self.wait_for_priority_commands_to_finish(self.ae_permits.clone(), SEMAPHORE_COUNT)
+                    .await;
 
                 Some(
                     self.infra_permits
@@ -160,24 +188,25 @@ impl Dispatcher {
                 )
             }
             NODE_DATA_MSG_PRIORITY => {
+                trace!(
+                    "{:?} Awaiting Infra/AE/Join/DKG Completion before continuing msg",
+                    cmd_id
+                );
                 self.wait_for_priority_commands_to_finish(
                     self.join_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
-                self.wait_for_priority_commands_to_finish(
-                    self.ae_permits.clone(),
-                    CONCURRENCY_COUNT,
-                )
-                .await;
+                self.wait_for_priority_commands_to_finish(self.ae_permits.clone(), SEMAPHORE_COUNT)
+                    .await;
                 self.wait_for_priority_commands_to_finish(
                     self.infra_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
 
@@ -190,42 +219,44 @@ impl Dispatcher {
                 )
             }
             _ => {
+                trace!(
+                    "{:?} Awaiting Data/Infra/AE/Join/DKG Completion before continuing msg",
+                    cmd_id
+                );
                 self.wait_for_priority_commands_to_finish(
                     self.join_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
-                self.wait_for_priority_commands_to_finish(
-                    self.ae_permits.clone(),
-                    CONCURRENCY_COUNT,
-                )
-                .await;
+                self.wait_for_priority_commands_to_finish(self.ae_permits.clone(), SEMAPHORE_COUNT)
+                    .await;
                 self.wait_for_priority_commands_to_finish(
                     self.infra_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
                 self.wait_for_priority_commands_to_finish(
                     self.node_data_permits.clone(),
-                    CONCURRENCY_COUNT,
+                    SEMAPHORE_COUNT,
                 )
                 .await;
 
                 None
             }
         };
-
+        trace!("{:?} continuing", cmd_id);
+        // if there is a permit to be got...
         if let Some(permit) = permit {
             match permit {
+                // and there was no error w/ semaphore
                 Ok(permit) => {
-                    let permit_map = self.cmd_permit_map.clone();
                     let mut permit_map_write_guard = permit_map.write().await;
-                    let _old_permit = permit_map_write_guard.insert(root_cmd_id, permit);
+                    let _old_permit = permit_map_write_guard.insert(root_cmd_id, (permit, 1));
                 }
                 Err(error) => {
                     // log error, it can only be permi acquisition here, so that's okay and we ignore it / drop command as we've bigger issues
@@ -381,11 +412,21 @@ impl Dispatcher {
                     Err(error)
                 }
             };
-            // and now we're done, free up the permit
+            // and now we're done, reduce permit count or drop if none left using it.
             let root_cmd_id = get_root_cmd_id(cmd_id);
             let permit_map = self.cmd_permit_map.clone();
             let mut permit_map_write_guard = permit_map.write().await;
-            let _used_permit = permit_map_write_guard.remove(&root_cmd_id);
+            if let Some((permit, mut count)) = permit_map_write_guard.remove(&root_cmd_id) {
+                // if we're not the last spawned command here
+                if count > 1 {
+                    count -= 1;
+                    // put the permit back as other commands are still being handled under it.
+                    let _nonexistant_entry = permit_map
+                        .write()
+                        .await
+                        .insert(root_cmd_id.clone(), (permit, count));
+                }
+            }
             res
         }
         .instrument(span)
