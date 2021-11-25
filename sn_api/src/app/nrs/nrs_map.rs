@@ -8,10 +8,9 @@
 // Software.
 
 use crate::{
-    app::resolver::{ContentType, DataType},
     Error, Result, Url,
 };
-use log::{debug, info};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -32,16 +31,6 @@ pub struct NrsMap {
 }
 
 impl NrsMap {
-    /// Associates a link with a public name in the NrsMap
-    pub fn associate(&mut self, public_name: &str, link: &Url) -> Result<String> {
-        info!("Updating NRS map for: {}", public_name);
-        // NRS resolver doesn't allow unversioned links
-        validate_nrs_url(link)?;
-        let subname = parse_out_subnames(public_name);
-        self.map.insert(subname, link.to_owned());
-        Ok(link.to_string())
-    }
-
     /// Get the Url associated with the input public name in the NrsMap
     pub fn get(&self, public_name: &str) -> Result<Url> {
         let subname = parse_out_subnames(public_name);
@@ -65,25 +54,11 @@ impl NrsMap {
         }
     }
 
-    /// Remove a public name from the NrsMap
-    pub fn remove(&mut self, public_name: &str) -> Result<()> {
-        info!("Removing public name from NRS map: {}", public_name);
-        let sub_name = parse_out_subnames(public_name);
-        match self.map.remove(&sub_name) {
-            Some(_link) => Ok(()),
-            None => Err(Error::ContentError(
-                "Sub name not found in NRS Map Container".to_string(),
-            )),
-        }
-    }
-
     /// Prints a summary for the NRS map.
     ///
     /// This is used in the CLI for printing out the details of a map.
+    /// TODO: remove this placeholder func now that RDF is dropped, fix CLI accordingly
     pub fn get_map_summary(&self) -> BTreeMap<String, BTreeMap<String, String>> {
-        // let mut nrs_map_summary = BTreeMap::new();
-        //gen_nrs_map_summary(self, "", &mut nrs_map_summary);
-        // nrs_map_summary
         BTreeMap::new()
     }
 }
@@ -92,35 +67,10 @@ impl NrsMap {
 /// "sub.sub.topname" -> "sub.sub"
 /// "sub.cooltopname" -> "sub"
 /// "lonetopname" -> ""
-fn parse_out_subnames(name: &str) -> String {
+pub(super) fn parse_out_subnames(name: &str) -> String {
     let sanitized_name = str::replace(name, "safe://", "");
     let mut parts = sanitized_name.split('.');
     // pop out the topname (last part)
     let _ = parts.next_back();
     parts.collect::<Vec<&str>>().join(".")
-}
-
-// helper function to check a xorurl used for NRS
-// - checks if the url is valid
-// - checks if it has a version if its data is versionable
-fn validate_nrs_url(link: &Url) -> Result<()> {
-    if link.content_version().is_none() {
-        let content_type = link.content_type();
-        let data_type = link.data_type();
-        if content_type == ContentType::FilesContainer
-            || content_type == ContentType::NrsMapContainer
-        {
-            return Err(Error::UnversionedContentError(format!(
-                "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
-                content_type, link.to_string()
-            )));
-        } else if data_type == DataType::Register {
-            return Err(Error::UnversionedContentError(format!(
-                "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
-                data_type, link.to_string()
-            )));
-        }
-    }
-
-    Ok(())
 }

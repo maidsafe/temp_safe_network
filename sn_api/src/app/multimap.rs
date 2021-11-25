@@ -20,6 +20,8 @@ pub type MultimapValue = Vec<u8>;
 pub type MultimapKeyValue = (MultimapKey, MultimapValue);
 pub type MultimapKeyValues = BTreeSet<(EntryHash, MultimapKeyValue)>;
 
+const MULTIMAP_REMOVED_MARK: &[u8] = b"";
+
 impl Safe {
     /// Create a Multimap on the network
     pub async fn multimap_create(
@@ -116,9 +118,38 @@ impl Safe {
             .await
     }
 
+    /// Remove entries from a Multimap on the network
+    /// This tombstones the removed entries, effectively hiding them if they where the latest
+    /// Note that they are still stored on the network as history is kept,
+    /// and you can still access them with their EntryHash
+    pub async fn multimap_remove(
+        &self,
+        url: &str,
+        to_remove: BTreeSet<EntryHash>,
+    ) -> Result<EntryHash> {
+        debug!("Removing from Multimap at {}: {:?}", url, to_remove);
+        let safeurl = Safe::parse_url(url)?;
+        let address = match safeurl.address() {
+            DataAddress::Register(reg_address) => reg_address,
+            other => {
+                return Err(Error::InvalidXorUrl(format!(
+                    "The multimap url {} has an {:?} address.\
+                    To remove an entry from a multimap, the address must be a register address.",
+                    url, other
+                )))
+            }
+        };
+        let hash = self
+            .safe_client
+            .write_to_register(address, MULTIMAP_REMOVED_MARK.to_vec(), to_remove)
+            .await?;
+
+        Ok(hash)
+    }
+
     // Crate's helper to return the value of a Multimap on
     // the network without resolving the Url,
-    // optionally filtering by hash and/or key.
+    // filtering by hash if a version is provided
     pub(crate) async fn fetch_multimap_values(&self, safeurl: &Url) -> Result<MultimapKeyValues> {
         let entries = match self.register_fetch_entries(safeurl).await {
             Ok(data) => {
@@ -127,17 +158,22 @@ impl Safe {
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
                 "Multimap found at \"{}\" was empty",
-                safeurl
+                safeurl.to_string()
             ))),
-            Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
-                "No Multimap found at this address".to_string(),
-            )),
+            Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(format!(
+                "No Multimap found at \"{}\"",
+                safeurl.to_string()
+            ))),
             other => other,
         }?;
 
         // We parse each entry in the Register as a 'MultimapKeyValue'
         let mut multimap_key_vals = MultimapKeyValues::new();
         for (hash, entry) in entries.iter() {
+            if entry == MULTIMAP_REMOVED_MARK {
+                // this is a tombstone entry created to delete some old entries
+                continue;
+            }
             let key_val = Self::decode_multimap_entry(entry)?;
             multimap_key_vals.insert((*hash, key_val));
         }
@@ -167,8 +203,16 @@ impl Safe {
             Err(other) => Err(other),
         }?;
 
-        let key_val = Self::decode_multimap_entry(&entry)?;
-        Ok(key_val)
+        // We parse the entry in the Register as a 'MultimapKeyValue'
+        if entry == MULTIMAP_REMOVED_MARK {
+            Err(Error::EmptyContent(format!(
+                "Entry found at \"{}\" is a tombstone (deletion marker)",
+                safeurl
+            )))
+        } else {
+            let key_val = Self::decode_multimap_entry(&entry)?;
+            Ok(key_val)
+        }
     }
 
     fn decode_multimap_entry(entry: &[u8]) -> Result<MultimapKeyValue> {
@@ -303,6 +347,64 @@ mod tests {
 
         assert_eq!(received_data, key_val2.clone());
         assert_eq!(received_data_priv, key_val2);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_multimap_remove() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let key = b"key".to_vec();
+        let val = b"value".to_vec();
+        let key_val = (key.clone(), val.clone());
+
+        let xorurl = safe.multimap_create(None, 25_000, false).await?;
+        let xorurl_priv = safe.multimap_create(None, 25_000, true).await?;
+
+        let _ = retry_loop!(safe.multimap_get_by_key(&xorurl, &key));
+        let _ = retry_loop!(safe.multimap_get_by_key(&xorurl_priv, &key));
+
+        let hash = safe
+            .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new())
+            .await?;
+        let hash_priv = safe
+            .multimap_insert(&xorurl_priv, key_val, BTreeSet::new())
+            .await?;
+
+        let received_data = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl, &key), Ok(v) if !v.is_empty())?;
+        let received_data_priv = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl_priv, &key), Ok(v) if !v.is_empty())?;
+
+        assert_eq!(received_data.len(), 1);
+        let (read_hash, read_key_val) = received_data.into_iter().next().unwrap();
+        assert_eq!(
+            (read_hash, read_key_val),
+            (hash, (key.clone(), val.clone()))
+        );
+
+        let hashes_to_remove = vec![hash].into_iter().collect();
+        let removed_mark_hash = safe.multimap_remove(&xorurl, hashes_to_remove).await?;
+        assert_ne!(removed_mark_hash, hash);
+
+        assert_eq!(
+            retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl, &key),
+                                    Ok(entries) if entries.is_empty())?,
+            Default::default()
+        );
+
+        assert_eq!(received_data_priv.len(), 1);
+        let (read_hash, read_key_val) = received_data_priv.into_iter().next().unwrap();
+        assert_eq!((read_hash, read_key_val), (hash_priv, (key.clone(), val)));
+
+        let hashes_to_remove = vec![hash_priv].into_iter().collect();
+        let removed_mark_hash = safe.multimap_remove(&xorurl_priv, hashes_to_remove).await?;
+        assert_ne!(removed_mark_hash, hash_priv);
+
+        assert_eq!(
+            retry_loop_for_pattern!(
+                safe.multimap_get_by_key(&xorurl_priv, &key),
+                Ok(entries) if entries.is_empty())?,
+            Default::default()
+        );
 
         Ok(())
     }
