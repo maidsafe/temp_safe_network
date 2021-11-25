@@ -5,12 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.41.0 (2021-11-24)
+## v0.42.0 (2021-11-25)
 
 ### New Features (BREAKING)
 
  - <csr-id-11750ed18391c7e8cb112d4a34a19f15eedaed1d/> propagate registers (with vec u8 instead of Url) change to sn_api
 
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - propagate registers (with vec u8 instead of Url) change to sn_api ([`11750ed`](https://github.com/maidsafe/safe_network/commit/11750ed18391c7e8cb112d4a34a19f15eedaed1d))
+    - safe_network-0.41.3 ([`4b72bfc`](https://github.com/maidsafe/safe_network/commit/4b72bfc9a6c3a0db4821e7ebf1f4b5daa7cc56d1))
+</details>
+
+## v0.41.0 (2021-11-24)
+
+### New Features (BREAKING)
+
+ - <csr-id-11750ed18391c7e8cb112d4a34a19f15eedaed1d/> propagate registers (with vec u8 instead of Url) change to sn_api
 
 ### Commit Statistics
 
@@ -27,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - propagate registers (with vec u8 instead of Url) change to sn_api ([`11750ed`](https://github.com/maidsafe/safe_network/commit/11750ed18391c7e8cb112d4a34a19f15eedaed1d))
+    - sn_api-0.41.0 ([`df25e49`](https://github.com/maidsafe/safe_network/commit/df25e4920c570771f6813ca03da02f6dfc8e59fb))
 </details>
 
 ## v0.40.1 (2021-11-24)
