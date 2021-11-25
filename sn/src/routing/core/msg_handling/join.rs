@@ -95,17 +95,22 @@ impl Core {
         }
 
         if *self.is_dkg_underway.read().await {
-            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                JoinRejectionReason::DKGUnderway,
-            )));
+            if self.dkg_voter.has_dkg_underway() {
+                let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+                    JoinRejectionReason::DKGUnderway,
+                )));
 
-            trace!("{}", LogMarker::SendDKGUnderway);
+                trace!("{}", LogMarker::SendDKGUnderway);
 
-            trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![
-                self.send_direct_message(peer, node_msg, our_section_key)
-                    .await?,
-            ]);
+                trace!("Sending {:?} to {}", node_msg, peer);
+                return Ok(vec![
+                    self.send_direct_message(peer, node_msg, our_section_key)
+                        .await?,
+                ]);
+            } else {
+                trace!("is_dkg_underway flag is true, however dkg_voter doesn't have ongoing dkg");
+                *self.is_dkg_underway.write().await = false;
+            }
         }
 
         if !*self.joins_allowed.read().await {
@@ -129,11 +134,12 @@ impl Core {
         // During the first section, nodes shall use ranged age to avoid too many nodes getting
         // relocated at the same time. After the first section splits, nodes shall only
         // start with an age of MIN_ADULT_AGE
+        let mut section_members = 0;
 
         // Prefix will be empty for first section
         let (is_age_invalid, expected_age): (bool, u8) = if our_prefix.is_empty() {
             let elders = self.network_knowledge.elders().await;
-            let section_members = self.network_knowledge.active_members().await.len();
+            section_members = self.network_knowledge.active_members().await.len();
             // Forces the joining node to be younger than the youngest elder in genesis section
             // avoiding unnecessary churn.
 
@@ -141,15 +147,16 @@ impl Core {
             if elders.len() == elder_count() {
                 // Check if the joining node is younger than the youngest elder and older than
                 // MIN_AGE in the first section to avoid unnecessary churn during genesis.
-                let is_age_valid = FIRST_SECTION_MIN_ELDER_AGE > peer.age() && peer.age() > MIN_AGE;
+                let is_age_valid =
+                    !(FIRST_SECTION_MIN_ELDER_AGE > peer.age() && peer.age() > MIN_AGE);
                 let expected_age = FIRST_SECTION_MIN_ELDER_AGE - section_members as u8 * 2;
                 (is_age_valid, expected_age)
             } else {
                 // Since enough elders haven't joined the first section calculate a value
                 //  within the range [FIRST_SECTION_MIN_ELDER_AGE, FIRST_SECTION_MAX_AGE].
                 let expected_age = FIRST_SECTION_MAX_AGE - section_members as u8 * 2;
-                let is_age_invalid =
-                    peer.age() == FIRST_SECTION_MIN_ELDER_AGE || peer.age() > expected_age;
+                // TODO: avoid looping by ensure can only update to lower non-FIRST_SECTION_MIN_ELDER_AGE age
+                let is_age_invalid = peer.age() != expected_age;
                 (is_age_invalid, expected_age)
             }
         } else {
@@ -157,6 +164,14 @@ impl Core {
             let is_age_invalid = peer.age() != MIN_ADULT_AGE;
             (is_age_invalid, MIN_ADULT_AGE)
         };
+
+        trace!(
+            "our_prefix {:?} section_members {:?} expected_age {:?} is_age_invalid {:?}",
+            our_prefix,
+            section_members,
+            expected_age,
+            is_age_invalid
+        );
 
         if !section_key_matches || is_age_invalid {
             if !section_key_matches {
