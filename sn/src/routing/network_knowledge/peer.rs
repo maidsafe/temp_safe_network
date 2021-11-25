@@ -9,11 +9,12 @@
 use std::{
     cmp::Ordering,
     fmt::{self, Display, Formatter},
+    future::Future,
     hash::{Hash, Hasher},
     net::SocketAddr,
     sync::Arc,
 };
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockReadGuard};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Network peer identity.
@@ -145,6 +146,65 @@ impl Peer {
     /// without using the connection).
     pub(crate) async fn set_connection(&self, connection: qp2p::Connection) {
         let _existing = self.connection.write().await.replace(connection);
+    }
+
+    /// Ensure the peer has a connection, and connect if not.
+    ///
+    /// This method is tailored to the use-case of connecting on send. In particular, it can be used
+    /// to ensure that `connect` is only called once, even if there are many concurrent calls to
+    /// `ensure_connection`.
+    ///
+    /// `is_valid` is used to determine whether to continue with the existing connection, or whether
+    /// to call `connect` anyway. For example, setting `is_valid = |_| true` would always use any
+    /// existing connection, and so `connect` would only be called once. This mechanism was chosen
+    /// so that, e.g. the connection'd ID could be compared to see if a reconnection had already
+    /// occurred, or force one otherwise (e.g. by setting
+    /// `is_valid = |connection| connection.id() != last_connection_id`).
+    pub(crate) async fn ensure_connection<Connect, Fut>(
+        &self,
+        is_valid: impl Fn(&qp2p::Connection) -> bool,
+        connect: Connect,
+    ) -> Result<RwLockReadGuard<'_, qp2p::Connection>, qp2p::ConnectionError>
+    where
+        Connect: FnOnce(SocketAddr) -> Fut,
+        Fut: Future<Output = Result<qp2p::Connection, qp2p::ConnectionError>>,
+    {
+        // Fast-path: try to get a read lock synchronously, and return the existing connection.
+        if let Some(guard) = self
+            .connection
+            .try_read()
+            .ok()
+            .and_then(|guard| RwLockReadGuard::try_map(guard, Option::as_ref).ok())
+        {
+            if is_valid(&guard) {
+                return Ok(guard);
+            }
+        }
+
+        // If we couldn't get the read lock synchronously, we conservatively take the write lock.
+        // This will prevent anyone else from looking at the connection until we have set one.
+        let mut guard = self.connection.write().await;
+
+        if let Some(connection) = guard.as_ref() {
+            // Someone else set the connection while we waited.
+
+            if is_valid(connection) {
+                // We can't avoid an unwrap here, but we can be sure it will succeed because we hold
+                // the write lock (meaning no one else can fiddle with `self.connection`), and
+                // because we just tested that a connection is set.
+                return Ok(RwLockReadGuard::try_map(guard.downgrade(), Option::as_ref)
+                    .expect("write-locked value can't have changed"));
+            }
+        }
+
+        // We now know the connection isn't set/valid, so we call `connect` and set it.
+        let _ = guard.replace(connect(self.addr).await?);
+
+        // We can't avoid an unwrap here, but we can be sure it will succeed because we hold the
+        // write lock (meaning no one else can fiddle with `self.connection`), and we just set a
+        // connection above.
+        Ok(RwLockReadGuard::try_map(guard.downgrade(), Option::as_ref)
+            .expect("write-locked value can't have changed"))
     }
 }
 
