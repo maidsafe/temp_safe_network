@@ -8,6 +8,7 @@
 
 use crate::messaging::system::SectionAuth;
 use crate::messaging::{
+    serialisation::{DKG_MSG_PRIORITY, INFRASTRUCTURE_MSG_PRIORITY},
     system::{DkgFailureSigSet, KeyedSig, NodeState, SystemMsg},
     DstLocation, MessageId, NodeMsgAuthority, WireMsg,
 };
@@ -116,11 +117,16 @@ pub(crate) enum Command {
 impl Command {
     /// Return the commands priority, higher being higher prio
     pub(crate) fn priority(&self) -> Result<i32> {
+        // we should not have to worry about child commands here
+        // we use the cmd_id to check for a "root cmd" and go off that commands priority
+        // so this prio may not have an impact if the root was higher/lower
         let prio = match self {
             Self::HandleMessage { wire_msg, .. } => wire_msg.into_message()?.priority(),
-            Self::HandleDkgOutcome { .. } | Self::HandleDkgFailure(_) => 3,
-            Self::HandleElderAgreement { .. } => 2,
-            Self::HandleAgreement { .. } | Self::HandleSystemMessage { .. } => 1,
+            Self::HandleDkgOutcome { .. } | Self::HandleDkgFailure(_) => DKG_MSG_PRIORITY,
+            Self::HandleElderAgreement { .. } => DKG_MSG_PRIORITY, // its end of DKG
+            Self::HandleAgreement { .. } | Self::HandleSystemMessage { .. } => {
+                INFRASTRUCTURE_MSG_PRIORITY
+            }
             _ => -2,
         };
 
