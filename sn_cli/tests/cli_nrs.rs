@@ -150,7 +150,7 @@ fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
     let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&output);
     let version = container_url.content_version().unwrap();
 
-    let output = safe_cmd_stdout(["cat", &nrs_map_xorurl], Some(0))?;
+    let output = safe_cmd_stdout(["cat", &nrs_map_xorurl.to_string()], Some(0))?;
 
     assert!(output.contains("safe://"));
     assert!(output.contains("another.md"));
@@ -221,7 +221,7 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() -> Result<()> {
     let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&output);
     let version = container_xorurl.content_version().unwrap();
 
-    let output = safe_cmd_stdout(["cat", &nrs_map_xorurl], Some(0))?;
+    let output = safe_cmd_stdout(["cat", &nrs_map_xorurl.to_string()], Some(0))?;
 
     assert!(output.contains("safe://"));
     assert!(output.contains("another.md"));
@@ -264,7 +264,7 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
     let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&output);
     let url = Url::from_url(&container_xorurl)?;
     let version = url.content_version().unwrap();
-    let output = safe_cmd_stdout(["cat", &nrs_map_xorurl], Some(0))?;
+    let output = safe_cmd_stdout(["cat", &nrs_map_xorurl.to_string()], Some(0))?;
 
     assert!(output.contains("safe://"));
     assert!(output.contains("another.md"));
