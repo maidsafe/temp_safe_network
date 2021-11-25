@@ -309,7 +309,7 @@ impl<'a> Join<'a> {
 
                     // if it's not a new SAP, ignore response unless the expected age is different.
                     if self.node.age() != expected_age
-                        && (self.node.age() > expected_age || self.node.age() == MIN_ADULT_AGE)
+                        && (self.node.age() > expected_age || self.node.age() <= MIN_ADULT_AGE)
                     {
                         // adjust our joining age to the expected by the network
                         trace!(
@@ -318,18 +318,18 @@ impl<'a> Join<'a> {
                             expected_age
                         );
                         // The expected_age is a sequence of 98, 96, 94, 92, ...
-                        // The expected_prefix is deduced from it.
+                        // The prefix is deduced from the age's bits.
                         let mut cur_age = expected_age / 2;
-                        let mut expected_prefix = Prefix::default();
+                        let mut new_prefix = Prefix::default();
                         while cur_age > 0 {
                             let push_prefix_0 = cur_age % 2 == 1;
-                            expected_prefix = expected_prefix.pushed(push_prefix_0);
+                            new_prefix = new_prefix.pushed(push_prefix_0);
                             cur_age /= 2;
                         }
-                        trace!("Name shall have the prefix of {:?}", expected_prefix);
+                        trace!("Name shall have the prefix of {:?}", new_prefix);
 
                         let new_keypair =
-                            ed25519::gen_keypair(&expected_prefix.range_inclusive(), expected_age);
+                            ed25519::gen_keypair(&new_prefix.range_inclusive(), expected_age);
                         let new_name = ed25519::name(&new_keypair.public);
 
                         info!("Setting Node name to {} (age {})", new_name, expected_age);
