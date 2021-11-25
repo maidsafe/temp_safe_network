@@ -239,9 +239,7 @@ impl Comm {
         // succeeds or if there are no more recipients to pick.
         let mut tasks: FuturesUnordered<_> = recipients[0..delivery_group_size]
             .iter()
-            .map(|recipient| {
-                self.send_to_one(recipient, msg_id, priority, msg_bytes.clone(), false)
-            })
+            .map(|recipient| self.send_to_one(recipient, msg_id, priority, msg_bytes.clone(), None))
             .collect();
 
         let mut next = delivery_group_size;
@@ -262,6 +260,7 @@ impl Comm {
                 }
                 Err(SendToOneError::Send {
                     source: qp2p::SendError::ConnectionLost(_),
+                    connection_id,
                     reused_connection: true,
                 }) => {
                     // We reused an existing connection, but it was lost when we tried to send. This
@@ -273,7 +272,7 @@ impl Comm {
                         msg_id,
                         priority,
                         msg_bytes.clone(),
-                        true,
+                        Some(connection_id),
                     ));
                 }
                 Err(error) => {
@@ -286,7 +285,7 @@ impl Comm {
                             msg_id,
                             priority,
                             msg_bytes.clone(),
-                            false,
+                            None,
                         ));
                         next += 1;
                     }
@@ -321,7 +320,7 @@ impl Comm {
         msg_id: MessageId,
         msg_priority: i32,
         msg_bytes: Bytes,
-        force_reconnection: bool,
+        failed_connection_id: Option<usize>,
     ) -> (&'r Peer, Result<(), SendToOneError>) {
         trace!(
             "Sending message ({} bytes, msg_id: {:?}) to {}",
@@ -334,11 +333,10 @@ impl Comm {
         let retries = self.back_pressure.get(&recipient.addr()).await;
 
         let (connection, reused_connection) = if let Some(connection) = {
-            if force_reconnection {
-                None
-            } else {
-                recipient.connection().await
-            }
+            recipient
+                .connection()
+                .await
+                .filter(|connection| Some(connection.id()) != failed_connection_id)
         } {
             trace!(
                 connection_id = connection.id(),
@@ -377,6 +375,7 @@ impl Comm {
                     .await
                     .map_err(|source| SendToOneError::Send {
                         source,
+                        connection_id: connection.id(),
                         reused_connection,
                     })
             })
@@ -410,6 +409,7 @@ enum SendToOneError {
     Connection(qp2p::ConnectionError),
     Send {
         source: qp2p::SendError,
+        connection_id: usize,
         reused_connection: bool,
     },
 }
