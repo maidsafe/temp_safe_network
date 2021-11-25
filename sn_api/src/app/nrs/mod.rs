@@ -9,14 +9,15 @@
 
 mod nrs_map;
 
-pub use crate::url::{ContentType, VersionHash};
-pub use nrs_map::NrsMap;
+pub use crate::url::{ContentType, VersionHash, DataType};
+pub use nrs_map::{NrsMap};
+
+use nrs_map::{parse_out_subnames, SubName};
 
 use crate::{app::Safe, register::EntryHash, Error, Result, Url};
 
-use bytes::{Buf, Bytes};
-use log::{debug, info, warn};
-use std::collections::BTreeSet;
+use log::{debug, info};
+use std::collections::{BTreeSet, BTreeMap};
 use std::str;
 
 // Type tag to use for the NrsMapContainer stored on Register
@@ -35,9 +36,8 @@ impl Safe {
     ///            Public Name
     /// ```
     /// Registers the given NRS top name on the network.
-    /// Returns the versioned NRS Url (containing a VersionHash)
-    /// `safe://{top_name}?v={version_hash}`
-    /// Note that this NRS Url is not linked yet to anything. You just registered the topname here.
+    /// Returns the NRS Url: `safe://{top_name}
+    /// Note that this NRS Url is not linked to anything yet. You just registered the topname here.
     /// You can now associate public_names (with that topname) to links using `nrs_associate` or `nrs_add`
     pub async fn nrs_create(&self, top_name: &str, dry_run: bool) -> Result<Url> {
         info!("Creating an NRS map for: {}", top_name);
@@ -56,23 +56,14 @@ impl Safe {
             ));
         }
 
-        // Create and store NrsMap for top_name in a Public Blob
-        let nrs_map = NrsMap::default();
-        let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
-
-        // Create a new Register and reference the NRS map's blob in the Register
-        let reg_xorurl = self
-            .register_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
-            .await?;
-        let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
-        // Note that we can use the higher level register API here
-        // because reg_xorurl is not an NRS url
-        // (high level register API uses resolution that uses NRS!)
-        let entry_hash = self
-            .register_write(&reg_xorurl, reg_entry, BTreeSet::new())
+        // Create a new empty Multimap
+        let _ = self
+            .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
             .await?;
 
-        Ok(get_versioned_nrs_url(url_str, entry_hash)?)
+        let mut url = Url::from_url(&url_str)?;
+        url.set_content_type(ContentType::NrsMapContainer)?;
+        Ok(url)
     }
 
     /// # Associates a public name to a link
@@ -82,8 +73,7 @@ impl Safe {
     ///        |-----------------|
     ///            Public Name
     /// ```
-    /// Associates the given public_name to the link, stores it in the NrsMap registered for the
-    /// public name's top name on the network.
+    /// Associates the given public_name to the link.
     /// Errors out if the topname is not registered.
     /// Returns the versioned NRS Url (containing a VersionHash) now pointing to the provided link:
     /// `safe://{public_name}?v={version_hash}`
@@ -93,30 +83,46 @@ impl Safe {
             public_name, link
         );
 
-        // check public_name
+        // check input
         let url_str = validate_nrs_public_name(public_name)?;
+        validate_nrs_url(link)?;
 
-        // fetch and edit nrs_map
-        let (mut nrs_map, version) = self.fetch_nrs_map(public_name, None).await?;
-        nrs_map.associate(public_name, link)?;
-        debug!("The new NRS Map: {:?}", nrs_map);
-
+        // dry run
         if dry_run {
             return Err(Error::NotImplementedError(
                 "No dry run for nrs_add. Version info cannot be determined. (Register operations need this functionality implemented first.)".to_string(),
             ));
         }
 
-        // store updated nrs_map
-        let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
-        let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
-        let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
-        let safe_url = Safe::parse_url(&url_str)?;
-        let address = self.get_register_address(&safe_url)?;
-        let entry_hash = self
-            .safe_client
-            .write_to_register(address, reg_entry, old_values)
-            .await?;
+        // get current latest for subname
+        let safe_url = Safe::parse_url(public_name)?;
+        let subname = parse_out_subnames(public_name);
+        let current_versions = self
+            .fetch_multimap_value_by_key(&safe_url, &subname.as_bytes()).await?
+            .into_iter()
+            .map(|(hash, _)| hash)
+            .collect();
+
+        // update with new entry
+        let entry = (subname.as_bytes().to_vec(), link.to_string().as_bytes().to_vec());
+        let entry_hash = self.multimap_insert(&url_str, entry, current_versions).await?;
+
+        // // fetch and edit nrs_map
+        // let (mut nrs_map, version) = self.fetch_nrs_map(public_name, None).await?;
+        // nrs_map.associate(public_name, link)?;
+        // debug!("The new NRS Map: {:?}", nrs_map);
+        //
+        //
+        // // store updated nrs_map
+        // let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
+        // let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
+        // let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
+        // let safe_url = Safe::parse_url(&url_str)?;
+        // let address = self.get_register_address(&safe_url)?;
+        // let entry_hash = self
+        //     .safe_client
+        //     .write_to_register(address, reg_entry, old_values)
+        //     .await?;
 
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
     }
@@ -175,26 +181,39 @@ impl Safe {
         // check public_name
         let url_str = validate_nrs_public_name(public_name)?;
 
-        // fetch and edit nrs_map
-        let (mut nrs_map, version) = self.fetch_nrs_map(public_name, None).await?;
-        nrs_map.remove(public_name)?;
-
+        // dry run
         if dry_run {
             return Err(Error::NotImplementedError(
                 "No dry run for nrs_remove. Version info cannot be determined. (Register operations need this functionality implemented first.)".to_string(),
             ));
         }
 
-        // store updated nrs_map
-        let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
-        let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
-        let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
-        let safe_url = Safe::parse_url(&url_str)?;
-        let address = self.get_register_address(&safe_url)?;
-        let entry_hash = self
-            .safe_client
-            .write_to_register(address, reg_entry, old_values)
-            .await?;
+        // get current latest for subname
+        let safe_url = Safe::parse_url(public_name)?;
+        let subname = parse_out_subnames(public_name);
+        let current_versions = self
+            .fetch_multimap_value_by_key(&safe_url, &subname.as_bytes()).await?
+            .into_iter()
+            .map(|(hash, _)| hash)
+            .collect();
+
+        // remove
+        let entry_hash = self.multimap_remove(&url_str, current_versions).await?;
+
+        // // fetch and edit nrs_map
+        // let (mut nrs_map, version) = self.fetch_nrs_map(public_name, None).await?;
+        // nrs_map.remove(public_name)?;
+        //
+        // // store updated nrs_map
+        // let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
+        // let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
+        // let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
+        // let safe_url = Safe::parse_url(&url_str)?;
+        // let address = self.get_register_address(&safe_url)?;
+        // let entry_hash = self
+        //     .safe_client
+        //     .write_to_register(address, reg_entry, old_values)
+        //     .await?;
 
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
     }
@@ -208,7 +227,7 @@ impl Safe {
     ///            Public Name
     /// ```
     /// Finds the Url associated with the given public name on the network.
-    /// Returns the associated Url for the given public name for that version along with the NrsMap
+    /// Returns the associated Url for the given public name for that version along with an NrsMap
     pub async fn nrs_get(
         &self,
         public_name: &str,
@@ -219,7 +238,7 @@ impl Safe {
             public_name, version
         );
 
-        let (nrs_map, _version) = self.fetch_nrs_map(public_name, version).await?;
+        let nrs_map = self.nrs_get_subnames_map(public_name, version).await?;
         let url = nrs_map.get(public_name)?;
         Ok((url, nrs_map))
     }
@@ -230,82 +249,55 @@ impl Safe {
         public_name: &str,
         version: Option<VersionHash>,
     ) -> Result<NrsMap> {
-        let (nrs_map, _version) = self.fetch_nrs_map(public_name, version).await?;
-        Ok(nrs_map)
-    }
+        // fetch multimap entries
+        let safe_url = Safe::parse_url(public_name)?;
+        let res = self
+            .fetch_multimap_values(&safe_url).await;
+        let multimap_keyvals = match res {
+            Ok(s) => Ok(s),
+            Err(Error::EmptyContent(_)) => Ok(BTreeSet::new()),
+            Err(Error::ContentNotFound(e)) => Err(Error::ContentNotFound(format!(
+                "No Nrs Map entry found at {}: {}", safe_url.to_string(), e
+            ))),
+            Err(e) => Err(Error::NetDataError(format!("Failed to get Nrs Map entries: {}", e))),
+        }?;
 
-    // Private helper function to fetch the nrs_map from the network
-    // If no version is provided, fetches the latest
-    // Always returns the version of the fetched content along with the NrsMap
-    async fn fetch_nrs_map(
-        &self,
-        public_name: &str,
-        version: Option<VersionHash>,
-    ) -> Result<(NrsMap, VersionHash)> {
-        // assign version
-        let mut safe_url = Safe::parse_url(public_name)?;
-        safe_url.set_content_version(version);
-        let safe_url = safe_url;
-
-        // fetch entries and wrap errors
-        let entries = self
-            .register_fetch_entries(&safe_url)
-            .await
-            .map_err(|e| match e {
-                Error::ContentNotFound(_) => {
-                    Error::ContentNotFound("No NRS Map found at this address".to_string())
+        // collect a raw map with serialized data, get specific version if needed
+        let raw_set = match version {
+            Some(v) => {
+                let hash = v.entry_hash();
+                if multimap_keyvals.iter().any(|(h, _)| VersionHash::from(h) == v) {
+                    // just return the key val set if we have the version we're looking for
+                    multimap_keyvals.into_iter().map(|(_hash, key_val)| key_val).collect()
+                } else {
+                    // manually fetch the missing versionned entry
+                    let mut key_vals:BTreeSet<_> = multimap_keyvals.into_iter().map(|(_hash, key_val)| key_val).collect();
+                    let key_val = self.fetch_multimap_value_by_hash(&safe_url, hash).await?;
+                    key_vals.insert(key_val);
+                    key_vals
                 }
-                Error::VersionNotFound(msg) => Error::VersionNotFound(msg),
-                err => Error::NetDataError(format!("Failed to get current version: {}", err)),
-            })?;
-
-        // take the 1st entry (TODO Multiple entries)
-        if entries.len() > 1 {
-            return Err(Error::RegisterFork("Multiple NRS map entries not managed, this happends when 2 clients write concurrently to a NRS map".to_string()));
-        }
-        let first_entry = entries.iter().next();
-        let (version, nrs_map_url) = match first_entry {
-            Some((entry_hash, url)) => (entry_hash.into(), Url::from_xorurl(str::from_utf8(url)?)?),
+            }
             None => {
-                warn!(
-                    "NRS map Register found at XOR name \"{:?}\" was empty",
-                    safe_url.xorname()
-                );
-                return Ok((NrsMap::default(), VersionHash::default()));
+                multimap_keyvals.into_iter().map(|(_hash, key_val)| key_val).collect()
             }
         };
 
-        // Using the NrsMap url we can now fetch the NrsMap and deserialise it
-        let serialised_nrs_map = self.fetch_public_data(&nrs_map_url, None).await?;
+        // check for duplicate entries for a single key (subname)
+        let set_len = raw_set.len();
+        let raw_map: BTreeMap<Vec<u8>, Vec<u8>> = raw_set.clone().into_iter().collect();
+        if raw_map.len() != set_len {
+            // let map_set = raw_map TODO user friendlier: tell users which key is dup
+            return Err(Error::RegisterFork("Multiple NRS map entries not managed, this happends when 2 clients write concurrently to a NRS map".to_string()));
+        }
 
-        debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
-        let nrs_map = serde_json::from_str(&String::from_utf8_lossy(serialised_nrs_map.chunk()))
-            .map_err(|err| {
-                Error::ContentError(format!(
-                    "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
-                    err
-                ))
-            })?;
+        // deserialize and return
+        let subnames_map: Result<BTreeMap<SubName, Url>> = raw_set.into_iter().map(|(subname_bytes, url_bytes)| {
+            let subname = str::from_utf8(&subname_bytes)?;
+            let url = Url::from_url(str::from_utf8(&url_bytes)?)?;
+            Ok((subname.to_owned(), url))
+        }).collect();
 
-        Ok((nrs_map, version))
-    }
-
-    // Private helper to serialise an NrsMap and store it in a Public Blob
-    async fn store_nrs_map(&self, nrs_map: &NrsMap) -> Result<String> {
-        // The NrsMapContainer is a Register where each NRS Map version is
-        // an entry containing the XOR-URL of the Blob that contains the serialised NrsMap.
-        let serialised_nrs_map = serde_json::to_string(nrs_map).map_err(|err| {
-            Error::Serialisation(format!(
-                "Couldn't serialise the NrsMap generated: {:?}",
-                err
-            ))
-        })?;
-
-        let nrs_map_xorurl = self
-            .store_public_bytes(Bytes::from(serialised_nrs_map), None, false)
-            .await?;
-
-        Ok(nrs_map_xorurl)
+        Ok(NrsMap{map: subnames_map?})
     }
 }
 
@@ -339,6 +331,31 @@ fn validate_nrs_public_name(public_name: &str) -> Result<String> {
         ));
     }
     Ok(sanitised_url)
+}
+
+// helper function to check a Url used for NRS
+// - checks if the url is valid
+// - checks if it has a version if its data is versionable
+fn validate_nrs_url(link: &Url) -> Result<()> {
+    if link.content_version().is_none() {
+        let content_type = link.content_type();
+        let data_type = link.data_type();
+        if content_type == ContentType::FilesContainer
+            || content_type == ContentType::NrsMapContainer
+        {
+            return Err(Error::UnversionedContentError(format!(
+                "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
+                content_type, link.to_string()
+            )));
+        } else if data_type == DataType::Register {
+            return Err(Error::UnversionedContentError(format!(
+                "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
+                data_type, link.to_string()
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 // Makes sure there’s a (and only one) "safe://" in front of input name
