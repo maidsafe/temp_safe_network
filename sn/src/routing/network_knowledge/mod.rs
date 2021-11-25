@@ -29,13 +29,20 @@ use crate::routing::{
 };
 use bls::PublicKey as BlsPublicKey;
 pub(crate) use elder_candidates::ElderCandidates;
+use futures::{stream, StreamExt};
 pub(crate) use node_state::NodeState;
 use peer::Peer;
 pub(crate) use section_authority_provider::SectionAuthorityProvider;
 pub(crate) use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    convert::TryInto,
+    iter,
+    net::SocketAddr,
+    sync::Arc,
+};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
@@ -545,6 +552,32 @@ impl NetworkKnowledge {
             .into_iter()
             .find(|info| &info.addr() == addr)
             .map(|info| info.peer().clone())
+    }
+
+    /// Merge the connections from some source peers into our state.
+    ///
+    /// Peers are held in `signed_sap` and `section_peers`, and we match relevant peers with both.
+    pub(super) async fn merge_connections(&self, sources: impl IntoIterator<Item = &Peer>) {
+        let connections: BTreeMap<_, _> = stream::iter(sources)
+            .filter_map(|peer| async move {
+                peer.connection()
+                    .await
+                    .map(|connection| (peer.addr(), connection))
+            })
+            .collect()
+            .await;
+
+        for elder in self.signed_sap.read().await.elders() {
+            if let Some(connection) = connections.get(&elder.addr()) {
+                elder.set_connection(connection.clone()).await;
+            }
+        }
+
+        for node in self.section_peers.iter() {
+            if let Some(connection) = connections.get(&node.addr()) {
+                node.peer().set_connection(connection.clone()).await;
+            }
+        }
     }
 
     // Tries to split our section.
