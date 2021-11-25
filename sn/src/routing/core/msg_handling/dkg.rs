@@ -121,19 +121,18 @@ impl Core {
         message: DkgMessage,
         sender: XorName,
     ) -> Result<Vec<Command>> {
-        let sender_pk = self.network_knowledge().section_key().await;
-        let mut commands = vec![];
-        commands.extend(
-            self.dkg_voter
-                .handle_dkg_history(
-                    &self.node.read().await.clone(),
-                    session_id,
-                    message_history,
-                    sender,
-                    sender_pk,
-                )
-                .await?,
-        );
+        let section_key = self.network_knowledge().section_key().await;
+        let mut commands = self
+            .dkg_voter
+            .handle_dkg_history(
+                &self.node.read().await.clone(),
+                session_id,
+                message_history,
+                sender,
+                section_key,
+            )
+            .await?;
+
         commands.extend(
             self.dkg_voter
                 .process_message(
@@ -141,7 +140,7 @@ impl Core {
                     &self.node.read().await.clone(),
                     &session_id,
                     message,
-                    sender_pk,
+                    section_key,
                 )
                 .await?,
         );

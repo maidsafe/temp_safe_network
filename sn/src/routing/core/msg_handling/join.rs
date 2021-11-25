@@ -20,7 +20,7 @@ use crate::routing::{
     log_markers::LogMarker,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    Peer, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE, MIN_AGE,
+    Peer, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::vec;
@@ -146,14 +146,13 @@ impl Core {
             // Check if `elder_count()` Elders are already present
             if elders.len() == elder_count() {
                 // Check if the joining node is younger than the youngest elder and older than
-                // MIN_AGE in the first section to avoid unnecessary churn during genesis.
-                let is_age_valid =
-                    !(FIRST_SECTION_MIN_ELDER_AGE > peer.age() && peer.age() > MIN_AGE);
+                // MIN_ADULT_AGE in the first section, to avoid unnecessary churn during genesis.
                 let expected_age = FIRST_SECTION_MIN_ELDER_AGE - section_members as u8 * 2;
-                (is_age_valid, expected_age)
+                let is_age_invalid = peer.age() <= MIN_ADULT_AGE || peer.age() > expected_age;
+                (is_age_invalid, expected_age)
             } else {
                 // Since enough elders haven't joined the first section calculate a value
-                //  within the range [FIRST_SECTION_MIN_ELDER_AGE, FIRST_SECTION_MAX_AGE].
+                // within the range [FIRST_SECTION_MIN_ELDER_AGE, FIRST_SECTION_MAX_AGE].
                 let expected_age = FIRST_SECTION_MAX_AGE - section_members as u8 * 2;
                 // TODO: avoid looping by ensure can only update to lower non-FIRST_SECTION_MIN_ELDER_AGE age
                 let is_age_invalid = peer.age() != expected_age;
