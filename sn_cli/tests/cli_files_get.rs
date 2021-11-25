@@ -533,8 +533,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
 
     let tmp_data_nrs = get_random_nrs_string();
     let tmp_data_nrs_url = create_nrs_link(&tmp_data_nrs, &url.to_string())?;
-    let url = Url::from_url(&tmp_data_nrs_url)?;
-    let version = url.content_version().unwrap();
+    let version = tmp_data_nrs_url.content_version().unwrap();
 
     let src = format!(
         "safe://{}/subfolder?v={}",
