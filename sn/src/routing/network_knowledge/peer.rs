@@ -139,13 +139,53 @@ impl Peer {
         self.connection.read().await.as_ref().cloned()
     }
 
-    /// Set the connection to the peer.
+    /// Copy the connection from another peer, if this peer doesn't have one.
     ///
-    /// If there's an existing connection, it is overwritten and dropped, so ideally this should
-    /// only be performed if the existing connection is known to be lost (we cannot test that
-    /// without using the connection).
-    pub(crate) async fn set_connection(&self, connection: qp2p::Connection) {
-        let _existing = self.connection.write().await.replace(connection);
+    /// This prefers the keep the existing connection, if one is set. This choice is made to avoid
+    /// taking the write lock if we don't need to. [`ensure_connection`] can be used to force a new
+    /// connection to be set, if necessary.
+    pub(crate) async fn merge_connection(&self, other: &Self) {
+        // As a quick sanity check, do nothing if the addresses differ
+        if self.addr != other.addr {
+            return;
+        }
+
+        // Fast-path: try to get a read lock synchronously, and if the connection is set do nothing
+        if let Ok(true) = self
+            .connection
+            .try_read()
+            .map(|connection| connection.is_some())
+        {
+            return;
+        }
+
+        let other_connection = if let Ok(connection) =
+            RwLockReadGuard::try_map(other.connection.read().await, Option::as_ref)
+        {
+            // eager clone to drop the read lock, clones should be quite cheap
+            connection.clone()
+        } else {
+            // There's nothing to do if `other` has no connection
+            return;
+        };
+
+        // Another sanity check: the connection itself matches our address
+        // TODO: we could consider panicking here, since this would represent corrupt state
+        if self.addr != other_connection.remote_address() {
+            return;
+        }
+
+        // Either we couldn't get the read lock, or the connection isn't set, so we have to take the
+        // write lock.
+        let mut guard = self.connection.write().await;
+
+        if guard.is_some() {
+            // The connection was set while we waited, defer to it and do nothing
+            return;
+        }
+
+        // Set the connection
+        *guard = Some(other_connection);
     }
 
     /// Ensure the peer has a connection, and connect if not.
@@ -198,7 +238,9 @@ impl Peer {
         }
 
         // We now know the connection isn't set/valid, so we call `connect` and set it.
-        let _ = guard.replace(connect(self.addr).await?);
+        // TODO: we could consider panicking here if `connect` breaks our invariant by returning an
+        // connection with the wrong address.
+        *guard = Some(connect(self.addr).await?);
 
         // We can't avoid an unwrap here, but we can be sure it will succeed because we hold the
         // write lock (meaning no one else can fiddle with `self.connection`), and we just set a
