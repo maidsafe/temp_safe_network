@@ -29,7 +29,6 @@ use crate::routing::{
 };
 use bls::PublicKey as BlsPublicKey;
 pub(crate) use elder_candidates::ElderCandidates;
-use futures::{stream, StreamExt};
 pub(crate) use node_state::NodeState;
 use peer::Peer;
 pub(crate) use section_authority_provider::SectionAuthorityProvider;
@@ -563,24 +562,20 @@ impl NetworkKnowledge {
     ///
     /// Peers are held in `signed_sap` and `section_peers`, and we match relevant peers with both.
     pub(super) async fn merge_connections(&self, sources: impl IntoIterator<Item = &Peer>) {
-        let connections: BTreeMap<_, _> = stream::iter(sources)
-            .filter_map(|peer| async move {
-                peer.connection()
-                    .await
-                    .map(|connection| (peer.addr(), connection))
-            })
-            .collect()
-            .await;
+        let sources: BTreeMap<_, _> = sources
+            .into_iter()
+            .map(|peer| (peer.addr(), peer))
+            .collect();
 
         for elder in self.signed_sap.read().await.elders() {
-            if let Some(connection) = connections.get(&elder.addr()) {
-                elder.set_connection(connection.clone()).await;
+            if let Some(source) = sources.get(&elder.addr()) {
+                elder.merge_connection(source).await;
             }
         }
 
         for node in self.section_peers.iter() {
-            if let Some(connection) = connections.get(&node.addr()) {
-                node.peer().set_connection(connection.clone()).await;
+            if let Some(source) = sources.get(&node.addr()) {
+                node.peer().merge_connection(source).await;
             }
         }
     }

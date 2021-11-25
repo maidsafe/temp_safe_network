@@ -12,7 +12,6 @@ use crate::messaging::{
 };
 use crate::routing::{Peer, Prefix, XorName};
 use bls::{PublicKey, PublicKeySet};
-use futures::{stream, StreamExt};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -121,18 +120,14 @@ impl SectionAuthorityProvider {
         I::IntoIter: Send,
     {
         async move {
-            let connections: BTreeMap<_, _> = stream::iter(sources)
-                .filter_map(|peer| async move {
-                    peer.connection()
-                        .await
-                        .map(|connection| (peer.addr(), connection))
-                })
-                .collect()
-                .await;
+            let sources: BTreeMap<_, &Peer> = sources
+                .into_iter()
+                .map(|peer| (peer.addr(), peer))
+                .collect();
 
             for elder in self.elders() {
-                if let Some(connection) = connections.get(&elder.addr()) {
-                    elder.set_connection(connection.clone()).await;
+                if let Some(source) = sources.get(&elder.addr()) {
+                    elder.merge_connection(source).await;
                 }
             }
         }
