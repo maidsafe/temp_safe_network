@@ -220,4 +220,10 @@ impl DkgVoter {
             Ok(vec![])
         }
     }
+
+    pub(crate) fn has_dkg_underway(&self) -> bool {
+        self.sessions
+            .iter()
+            .any(|ref_multi| !ref_multi.value().is_finalized())
+    }
 }
