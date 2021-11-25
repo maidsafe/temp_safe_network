@@ -317,9 +317,9 @@ impl<'a> Join<'a> {
                         let mut cur_age = expected_age / 2;
                         let mut expected_prefix = Prefix::default();
                         while cur_age > 0 {
-                            let remain_age = cur_age / 2;
-                            expected_prefix = expected_prefix.pushed(cur_age != (remain_age * 2));
-                            cur_age = remain_age;
+                            let push_prefix_0 = cur_age % 2 == 1;
+                            expected_prefix = expected_prefix.pushed(push_prefix_0);
+                            cur_age /= 2;
                         }
                         trace!("Name shall have the prefix of {:?}", expected_prefix);
 

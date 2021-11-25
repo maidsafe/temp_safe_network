@@ -273,6 +273,7 @@ impl Core {
                     .key_share(&signed_sap.section_key())
                     .await
                     .is_ok();
+            trace!("switch_to_new_sap {:?}", switch_to_new_sap);
 
             // Let's update our network knowledge, including our
             // section SAP and chain if the new SAP's prefix matches our name
