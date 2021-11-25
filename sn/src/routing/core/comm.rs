@@ -248,21 +248,22 @@ impl Comm {
         let mut successes = 0;
         let mut failed_recipients = vec![];
 
-        while let Some((recipient, result, reused)) = tasks.next().await {
+        while let Some((recipient, result)) = tasks.next().await {
             match result {
                 Ok(()) => {
                     successes += 1;
                     // count outgoing msgs..
                     self.msg_count.increase_outgoing(recipient.addr());
                 }
-                Err(Error::ConnectionClosed) => {
+                Err(error) if error.is_local_close() => {
                     // The connection was closed by us which means
                     // we are terminating so let's cut this short.
                     return Err(Error::ConnectionClosed);
                 }
-                Err(Error::AddressNotReachable {
-                    err: qp2p::RpcError::Send(qp2p::SendError::ConnectionLost(_)),
-                }) if reused => {
+                Err(SendToOneError::Send {
+                    source: qp2p::SendError::ConnectionLost(_),
+                    reused_connection: true,
+                }) => {
                     // We reused an existing connection, but it was lost when we tried to send. This
                     // could indicate the connection timed out whilst it was held, or some other
                     // transient connection issue. We don't treat this as a failed recipient, and
@@ -275,7 +276,8 @@ impl Comm {
                         true,
                     ));
                 }
-                Err(_) => {
+                Err(error) => {
+                    warn!("during sending, received error {:?}", error);
                     failed_recipients.push(recipient.clone());
 
                     if next < recipients.len() {
@@ -320,7 +322,7 @@ impl Comm {
         msg_priority: i32,
         msg_bytes: Bytes,
         force_reconnection: bool,
-    ) -> (&'r Peer, Result<(), Error>, bool) {
+    ) -> (&'r Peer, Result<(), SendToOneError>) {
         trace!(
             "Sending message ({} bytes, msg_id: {:?}) to {}",
             msg_bytes.len(),
@@ -331,7 +333,7 @@ impl Comm {
         // TODO: more laid back retries with lower priority, more aggressive with higher
         let retries = self.back_pressure.get(&recipient.addr()).await;
 
-        let (connection, reused) = if let Some(connection) = {
+        let (connection, reused_connection) = if let Some(connection) = {
             if force_reconnection {
                 None
             } else {
@@ -362,30 +364,25 @@ impl Comm {
                         );
                         Ok(connection)
                     })
-                    .await,
+                    .await
+                    .map_err(SendToOneError::Connection),
                 false,
             )
         };
 
         let result = future::ready(connection)
-            .err_into()
             .and_then(|connection| async move {
                 connection
                     .send_with(msg_bytes, msg_priority, Some(&retries))
                     .await
+                    .map_err(|source| SendToOneError::Send {
+                        source,
+                        reused_connection,
+                    })
             })
-            .await
-            .map_err(|err| match err {
-                qp2p::SendError::ConnectionLost(qp2p::ConnectionError::Closed(
-                    qp2p::Close::Local,
-                )) => Error::ConnectionClosed,
-                _ => {
-                    warn!("during sending, received error {:?}", err);
-                    err.into()
-                }
-            });
+            .await;
 
-        (recipient, result, reused)
+        (recipient, result)
     }
 
     /// Regulates comms with the specified peer
@@ -404,6 +401,31 @@ impl Comm {
         let outgoing = self.msg_count.outgoing();
         info!("*** Incoming msgs: {:?} ***", incoming);
         info!("*** Outgoing msgs: {:?} ***", outgoing);
+    }
+}
+
+/// Errors that can be returned from `Comm::send_to_one`.
+#[derive(Debug)]
+enum SendToOneError {
+    Connection(qp2p::ConnectionError),
+    Send {
+        source: qp2p::SendError,
+        reused_connection: bool,
+    },
+}
+
+impl SendToOneError {
+    fn is_local_close(&self) -> bool {
+        matches!(
+            self,
+            SendToOneError::Connection(qp2p::ConnectionError::Closed(qp2p::Close::Local))
+                | SendToOneError::Send {
+                    source: qp2p::SendError::ConnectionLost(qp2p::ConnectionError::Closed(
+                        qp2p::Close::Local
+                    )),
+                    ..
+                }
+        )
     }
 }
 
