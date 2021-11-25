@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.42.0 (2021-11-25)
+
+### New Features
+
+ - <csr-id-a8c0e645d9bf11834557049045cca95f8d715a77/> deduce expected_prefix from expected_age
+
+### New Features (BREAKING)
+
+ - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - remove url deps from sn ([`bad0833`](https://github.com/maidsafe/safe_network/commit/bad083332fdcc3a0bc3c3f13628c00315f1b2519))
+    - move Url to sn_api ([`3fe9d7a`](https://github.com/maidsafe/safe_network/commit/3fe9d7a6624fe5503f80395f6ed11426b131d3b1))
+    - deduce expected_prefix from expected_age ([`a8c0e64`](https://github.com/maidsafe/safe_network/commit/a8c0e645d9bf11834557049045cca95f8d715a77))
+</details>
+
 ## v0.41.4 (2021-11-25)
 
 ### New Features
@@ -27,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - deduce expected_prefix from expected_age ([`a8c0e64`](https://github.com/maidsafe/safe_network/commit/a8c0e645d9bf11834557049045cca95f8d715a77))
+    - safe_network-0.41.4/sn_api-0.42.0 ([`8b8a361`](https://github.com/maidsafe/safe_network/commit/8b8a3616673405005d77868dc397bd7542ab3ea7))
     - add comment about vec size ([`9d65724`](https://github.com/maidsafe/safe_network/commit/9d657249f3d0391e7c3bbeae6f81909993802cc7))
     - adapt registers to hold vec u8 instead of Url in sn ([`b960347`](https://github.com/maidsafe/safe_network/commit/b96034796d479352340caaf3d6e6b6d7e6e425ad))
 </details>
