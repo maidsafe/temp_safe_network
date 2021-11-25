@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{msg_count::MsgCount, BackPressure};
-use crate::messaging::{system::LoadReport, WireMsg};
+use crate::messaging::{system::LoadReport, MessageId, WireMsg};
 use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
@@ -237,87 +237,18 @@ impl Comm {
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
         // succeeds or if there are no more recipients to pick.
-        let send = |recipient: &'r Peer, msg_bytes: Bytes, force_reconnection: bool| {
-            async move {
-                trace!(
-                    "Sending message ({} bytes, msg_id: {:?}) to {} of delivery group size {}",
-                    msg_bytes.len(),
-                    msg_id,
-                    recipient,
-                    delivery_group_size,
-                );
-
-                let retries = self.back_pressure.get(&recipient.addr()).await; // TODO: more laid back retries with lower priority, more aggressive with higher
-
-                let (connection, reused) = if let Some(connection) = {
-                    if force_reconnection {
-                        None
-                    } else {
-                        recipient.connection().await
-                    }
-                } {
-                    trace!(
-                        connection_id = connection.id(),
-                        src = %connection.remote_address(),
-                        "{}",
-                        LogMarker::ConnectionReused
-                    );
-                    (Ok(connection), true)
-                } else {
-                    (
-                        self.endpoint
-                            .connect_to(&recipient.addr())
-                            .and_then(|(connection, connection_incoming)| async move {
-                                recipient.set_connection(connection.clone()).await;
-                                let _ = task::spawn(
-                                    handle_incoming_messages(
-                                        connection.clone(),
-                                        connection_incoming,
-                                        self.event_tx.clone(),
-                                        self.msg_count.clone(),
-                                    )
-                                    .in_current_span(),
-                                );
-                                Ok(connection)
-                            })
-                            .await,
-                        false,
-                    )
-                };
-
-                let result = future::ready(connection)
-                    .err_into()
-                    .and_then(|connection| async move {
-                        connection
-                            .send_with(msg_bytes, priority, Some(&retries))
-                            .await
-                    })
-                    .await
-                    .map_err(|err| match err {
-                        qp2p::SendError::ConnectionLost(qp2p::ConnectionError::Closed(
-                            qp2p::Close::Local,
-                        )) => Error::ConnectionClosed,
-                        _ => {
-                            warn!("during sending, received error {:?}", err);
-                            err.into()
-                        }
-                    });
-
-                (result, recipient, reused)
-            }
-            .in_current_span()
-        };
-
         let mut tasks: FuturesUnordered<_> = recipients[0..delivery_group_size]
             .iter()
-            .map(|recipient| send(recipient, msg_bytes.clone(), false))
+            .map(|recipient| {
+                self.send_to_one(recipient, msg_id, priority, msg_bytes.clone(), false)
+            })
             .collect();
 
         let mut next = delivery_group_size;
         let mut successes = 0;
         let mut failed_recipients = vec![];
 
-        while let Some((result, recipient, reused)) = tasks.next().await {
+        while let Some((recipient, result, reused)) = tasks.next().await {
             match result {
                 Ok(()) => {
                     successes += 1;
@@ -336,13 +267,25 @@ impl Comm {
                     // could indicate the connection timed out whilst it was held, or some other
                     // transient connection issue. We don't treat this as a failed recipient, and
                     // instead push the same recipient again, but force a reconnection.
-                    tasks.push(send(recipient, msg_bytes.clone(), true));
+                    tasks.push(self.send_to_one(
+                        recipient,
+                        msg_id,
+                        priority,
+                        msg_bytes.clone(),
+                        true,
+                    ));
                 }
                 Err(_) => {
                     failed_recipients.push(recipient.clone());
 
                     if next < recipients.len() {
-                        tasks.push(send(&recipients[next], msg_bytes.clone(), false));
+                        tasks.push(self.send_to_one(
+                            &recipients[next],
+                            msg_id,
+                            priority,
+                            msg_bytes.clone(),
+                            false,
+                        ));
                         next += 1;
                     }
                 }
@@ -366,6 +309,83 @@ impl Comm {
         } else {
             Ok(SendStatus::MinDeliveryGroupSizeFailed(failed_recipients))
         }
+    }
+
+    // Helper to send a message to a single recipient.
+    #[allow(clippy::needless_lifetimes)] // clippy is wrong here
+    async fn send_to_one<'r>(
+        &self,
+        recipient: &'r Peer,
+        msg_id: MessageId,
+        msg_priority: i32,
+        msg_bytes: Bytes,
+        force_reconnection: bool,
+    ) -> (&'r Peer, Result<(), Error>, bool) {
+        trace!(
+            "Sending message ({} bytes, msg_id: {:?}) to {}",
+            msg_bytes.len(),
+            msg_id,
+            recipient,
+        );
+
+        // TODO: more laid back retries with lower priority, more aggressive with higher
+        let retries = self.back_pressure.get(&recipient.addr()).await;
+
+        let (connection, reused) = if let Some(connection) = {
+            if force_reconnection {
+                None
+            } else {
+                recipient.connection().await
+            }
+        } {
+            trace!(
+                connection_id = connection.id(),
+                src = %connection.remote_address(),
+                "{}",
+                LogMarker::ConnectionReused
+            );
+            (Ok(connection), true)
+        } else {
+            (
+                self.endpoint
+                    .connect_to(&recipient.addr())
+                    .and_then(|(connection, connection_incoming)| async move {
+                        recipient.set_connection(connection.clone()).await;
+                        let _ = task::spawn(
+                            handle_incoming_messages(
+                                connection.clone(),
+                                connection_incoming,
+                                self.event_tx.clone(),
+                                self.msg_count.clone(),
+                            )
+                            .in_current_span(),
+                        );
+                        Ok(connection)
+                    })
+                    .await,
+                false,
+            )
+        };
+
+        let result = future::ready(connection)
+            .err_into()
+            .and_then(|connection| async move {
+                connection
+                    .send_with(msg_bytes, msg_priority, Some(&retries))
+                    .await
+            })
+            .await
+            .map_err(|err| match err {
+                qp2p::SendError::ConnectionLost(qp2p::ConnectionError::Closed(
+                    qp2p::Close::Local,
+                )) => Error::ConnectionClosed,
+                _ => {
+                    warn!("during sending, received error {:?}", err);
+                    err.into()
+                }
+            });
+
+        (recipient, result, reused)
     }
 
     /// Regulates comms with the specified peer
