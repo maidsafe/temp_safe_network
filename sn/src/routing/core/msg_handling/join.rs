@@ -94,25 +94,6 @@ impl Core {
             ]);
         }
 
-        if *self.is_dkg_underway.read().await {
-            if self.dkg_voter.has_dkg_underway() {
-                let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                    JoinRejectionReason::DKGUnderway,
-                )));
-
-                trace!("{}", LogMarker::SendDKGUnderway);
-
-                trace!("Sending {:?} to {}", node_msg, peer);
-                return Ok(vec![
-                    self.send_direct_message(peer, node_msg, our_section_key)
-                        .await?,
-                ]);
-            } else {
-                trace!("is_dkg_underway flag is true, however dkg_voter doesn't have ongoing dkg");
-                *self.is_dkg_underway.write().await = false;
-            }
-        }
-
         if !*self.joins_allowed.read().await {
             debug!(
                 "Rejecting JoinRequest from {} - joins currently not allowed.",

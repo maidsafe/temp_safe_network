@@ -74,7 +74,6 @@ pub enum LogMarker {
     SendJoinRetryAgeIssue,
     SendJoinRetryNotAdult,
     SendJoinsDisallowed,
-    SendDKGUnderway,
     SendNodeApproval,
     // approved to join
     ReceivedJoinApproved,

@@ -65,7 +65,6 @@ impl Core {
                 self.network_knowledge().section_key().await,
             )
             .await?;
-        // *self.is_dkg_underway.write().await = true;
         Ok(commands)
     }
 
@@ -205,8 +204,6 @@ impl Core {
             "Received DKG failure agreement, we will restart with candidates: {:?} except failed participants: {:?}",
             elder_candidates, failure_set.failed_participants
         );
-
-        *self.is_dkg_underway.write().await = false;
 
         commands.extend(
             self.promote_and_demote_elders_except(&failure_set.failed_participants)

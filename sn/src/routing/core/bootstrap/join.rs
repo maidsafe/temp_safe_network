@@ -164,12 +164,6 @@ impl<'a> Join<'a> {
                     error!("Network is set to not taking any new joining node, try join later.");
                     return Err(Error::TryJoinLater);
                 }
-                JoinResponse::Rejected(JoinRejectionReason::DKGUnderway) => {
-                    error!("The Section we are trying to join is going through DKG, backing off and retrying again");
-                    self.send_join_requests(join_request.clone(), &recipients, section_key, true)
-                        .await?;
-                    continue;
-                }
                 JoinResponse::Approval {
                     section_auth,
                     genesis_key,

@@ -102,6 +102,4 @@ pub enum JoinRejectionReason {
     JoinsDisallowed,
     /// The requesting node is not externally reachable
     NodeNotReachable(SocketAddr),
-    /// Backoff as the section is undergoing DKG
-    DKGUnderway,
 }
