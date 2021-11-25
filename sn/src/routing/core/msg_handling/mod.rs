@@ -285,6 +285,8 @@ impl Core {
         sender: Peer,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Command>> {
+        self.network_knowledge().merge_connections([&sender]).await;
+
         let src_name = msg_authority.name();
         trace!("Handling non blocking message");
         match node_msg {
