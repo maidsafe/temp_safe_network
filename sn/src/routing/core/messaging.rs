@@ -26,7 +26,6 @@ use crate::routing::{
     routing_api::command::Command,
     Peer, UnnamedPeer,
 };
-use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use xor_name::{Prefix, XorName};
 
@@ -449,7 +448,7 @@ impl Core {
         self.send_message_for_dst_accumulation(
             src_prefix.name(),
             DstLocation::Section {
-                name: XorName::from(PublicKey::Bls(section_pk)),
+                name: src_prefix.name(),
                 section_pk,
             },
             node_msg,

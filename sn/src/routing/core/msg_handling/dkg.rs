@@ -111,10 +111,7 @@ impl Core {
         message: DkgMessage,
         sender: XorName,
     ) -> Result<Vec<Command>> {
-        let sender_pk = self
-            .network_knowledge()
-            .section_by_name(&sender)?
-            .section_key();
+        let sender_pk = self.network_knowledge().section_key().await;
         let mut commands = vec![];
         commands.extend(
             self.dkg_voter
