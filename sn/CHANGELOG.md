@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.43.0 (2021-11-26)
+
+### New Features
+
+ - <csr-id-cc256bdf3f493f8841be07b9d7634c486e21a1cf/> avoid broadcasting DKG messages
+ - <csr-id-60e6a5b1c1db4011c6bcdb473be3dbfea8858d6a/> revamp joins/rejoins to follow BRB
+
+### Bug Fixes
+
+ - <csr-id-23bd9b23243da1d20cee8e7f06adc90f0894c2e7/> fix node joining age for genesis section Adults
+ - <csr-id-5dd0961c5172ed890b2453eb33332380e4757ad3/> refactor join flows to use the new Peer type
+ - <csr-id-1822857e35b888df75bea652a2858cfd34b8c2fc/> remove redundant send_node_approval
+
+### New Features (BREAKING)
+
+ - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
+
+
+### Bug Fixes (BREAKING)
+
+ - <csr-id-94c91e16135e524202608b2dc6312102890eab94/> include the original message when requesting DkgSessionInfo
+   - also early-returns when signature verification fails / the key is
+   outdated
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 27 commits contributed to the release.
+ - 27 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - prefer existing connection when merging `Peer`s ([`0f27864`](https://github.com/maidsafe/safe_network/commit/0f2786483016adb2f44199cd4e5bf55e8c54adc3))
+    - prevent concurrent sends from opening many connections ([`ee6431e`](https://github.com/maidsafe/safe_network/commit/ee6431e9509dd5b02ec2eca4c10ea17c7dddcfc9))
+    - only recreate failed connections in `Comm::send` ([`d73deeb`](https://github.com/maidsafe/safe_network/commit/d73deebbf94e65898d29455d6d4ed951ca59b814))
+    - simplify `Comm::send` error handling ([`3fa2957`](https://github.com/maidsafe/safe_network/commit/3fa2957fe4f4a1f14b9001e101270dec4e386c14))
+    - replace `Comm::send` closure with normal `fn` ([`612f843`](https://github.com/maidsafe/safe_network/commit/612f8437429d4d9852f54fa0e297b059b8e86827))
+    - fix node joining age for genesis section Adults ([`23bd9b2`](https://github.com/maidsafe/safe_network/commit/23bd9b23243da1d20cee8e7f06adc90f0894c2e7))
+    - use bls-dkg 0.9.0 ([`2003e34`](https://github.com/maidsafe/safe_network/commit/2003e34cc26c450486151fa1df74ffea61c8c9ae))
+    - reuse system message sender connections ([`0ab3c35`](https://github.com/maidsafe/safe_network/commit/0ab3c35e424e60ffbed0edf8c1f71da48daa0978))
+    - merge sender connection into SAP when joining ([`c7b9d74`](https://github.com/maidsafe/safe_network/commit/c7b9d748b12e6d1e23d2a2972f2553af50343b22))
+    - remove connection pooling ([`d85d896`](https://github.com/maidsafe/safe_network/commit/d85d896ceaa68785797b1c525ae8653ef26f2708))
+    - reuse more `Peer`s in DKG sessions ([`1c5929b`](https://github.com/maidsafe/safe_network/commit/1c5929bcc0638e8ff05dd495b3cedfdeff7540aa))
+    - reduce the testnet node numbers and make name deduce more ([`c051e02`](https://github.com/maidsafe/safe_network/commit/c051e02afdcbd2c21deec19b1baebfb8293d515c))
+    - fixes to node joining and DKG flows ([`016b7d4`](https://github.com/maidsafe/safe_network/commit/016b7d47f708308490c1883db4ba239fc2add59b))
+    - avoid broadcasting DKG messages ([`cc256bd`](https://github.com/maidsafe/safe_network/commit/cc256bdf3f493f8841be07b9d7634c486e21a1cf))
+    - get section name from prefix and get section key from our ([`e6df2ec`](https://github.com/maidsafe/safe_network/commit/e6df2ec1d2c8ab02bdaa95ed4c3288cfc0e532cc))
+    - include the original message when requesting DkgSessionInfo ([`94c91e1`](https://github.com/maidsafe/safe_network/commit/94c91e16135e524202608b2dc6312102890eab94))
+    - replace dkg message backlog with message exchange ([`ddd3726`](https://github.com/maidsafe/safe_network/commit/ddd3726a0a2a131ae7c05a4190edb8bdc7fa3665))
+    - add comments and use backoff for DKGUnderway on joining ([`580f2e2`](https://github.com/maidsafe/safe_network/commit/580f2e26baf787bdee64c093a03ae9470668619d))
+    - refactor join flows to use the new Peer type ([`5dd0961`](https://github.com/maidsafe/safe_network/commit/5dd0961c5172ed890b2453eb33332380e4757ad3))
+    - send a retry join message if DKG is underway ([`52a39b4`](https://github.com/maidsafe/safe_network/commit/52a39b4c41b09ec33c60bc09c55fc63484e524cf))
+    - adults join with age lesser than the youngest elder in genesis section ([`f69c0e3`](https://github.com/maidsafe/safe_network/commit/f69c0e319b639b678b46b73724a77ed7172cfec3))
+    - backoff BRB join response ([`da39113`](https://github.com/maidsafe/safe_network/commit/da39113a7f97f6881643e66a48e19f2e06368e8d))
+    - fixes node join/rejoin tests to support the BRB join process ([`7ae741f`](https://github.com/maidsafe/safe_network/commit/7ae741f93f39c437618bde150458eedd7663b512))
+    - remove redundant send_node_approval ([`1822857`](https://github.com/maidsafe/safe_network/commit/1822857e35b888df75bea652a2858cfd34b8c2fc))
+    - revamp joins/rejoins to follow BRB ([`60e6a5b`](https://github.com/maidsafe/safe_network/commit/60e6a5b1c1db4011c6bcdb473be3dbfea8858d6a))
+    - remove url deps from sn ([`bad0833`](https://github.com/maidsafe/safe_network/commit/bad083332fdcc3a0bc3c3f13628c00315f1b2519))
+    - move Url to sn_api ([`3fe9d7a`](https://github.com/maidsafe/safe_network/commit/3fe9d7a6624fe5503f80395f6ed11426b131d3b1))
+</details>
+
 ## v0.42.0 (2021-11-25)
 
 ### New Features
@@ -15,13 +83,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -31,8 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - remove url deps from sn ([`bad0833`](https://github.com/maidsafe/safe_network/commit/bad083332fdcc3a0bc3c3f13628c00315f1b2519))
-    - move Url to sn_api ([`3fe9d7a`](https://github.com/maidsafe/safe_network/commit/3fe9d7a6624fe5503f80395f6ed11426b131d3b1))
+    - safe_network-0.42.0/sn_api-0.43.0 ([`ca21d1e`](https://github.com/maidsafe/safe_network/commit/ca21d1e97fcd28ca351887636affffff78e3aeb3))
     - deduce expected_prefix from expected_age ([`a8c0e64`](https://github.com/maidsafe/safe_network/commit/a8c0e645d9bf11834557049045cca95f8d715a77))
 </details>
 
