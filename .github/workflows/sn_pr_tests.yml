@@ -320,7 +320,7 @@ jobs:
 
       - name: Print Network Log Stats
         shell: bash
-        run: cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
+        run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
         if: failure()
 
       - name: Upload Node Logs
