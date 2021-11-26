@@ -118,3 +118,19 @@ sn_cli-package-version-artifacts-for-deploy:
 
 	mv *.tar.gz ${DEPLOY_PROD_PATH}
 	mv *.zip ${DEPLOY_PROD_PATH}
+
+.ONESHELL:
+upload-sn_node-musl-to-s3:
+	# This target can be used for quickly uploading a build to S3 to be used with the testnet tool.
+	# The testnet tool will download this 'latest' version as the default.
+	rm -rf target
+	rm -rf deploy
+	mkdir -p deploy
+	rustup target add x86_64-unknown-linux-musl
+	cargo build --release --target x86_64-unknown-linux-musl
+	(
+		cd deploy;
+		tar -C ../target/x86_64-unknown-linux-musl/release \
+			-zcvf sn_node-latest-x86_64-unknown-linux-musl.tar.gz sn_node;
+		aws s3 cp sn_node-latest-x86_64-unknown-linux-musl.tar.gz s3://sn-node --acl public-read;
+	)
