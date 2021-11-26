@@ -265,15 +265,7 @@ impl Core {
 
             info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
-            // If we have the key share for new SAP key we can switch to this new SAP
-            let switch_to_new_sap = (self.is_not_elder().await
-                && !signed_sap.contains_elder(&self.node.read().await.name()))
-                || self
-                    .section_keys_provider
-                    .key_share(&signed_sap.section_key())
-                    .await
-                    .is_ok();
-            trace!("switch_to_new_sap {:?}", switch_to_new_sap);
+            let our_name = self.node.read().await.name();
 
             // Let's update our network knowledge, including our
             // section SAP and chain if the new SAP's prefix matches our name
@@ -287,13 +279,7 @@ impl Core {
                 Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
                 Ok(()) => match self
                     .network_knowledge
-                    .update_knowledge_if_valid(
-                        signed_sap,
-                        &proof_chain,
-                        None,
-                        &self.node.read().await.name(),
-                        switch_to_new_sap,
-                    )
+                    .update_knowledge_if_valid(signed_sap.clone(), &proof_chain, None)
                     .await
                 {
                     Err(err) => error!(
@@ -302,6 +288,23 @@ impl Core {
                     ),
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
+
+                        // If we have the key share for new SAP key we can switch to this new SAP
+                        let switch_to_new_sap = (self.is_not_elder().await
+                            && !signed_sap.contains_elder(&self.node.read().await.name()))
+                            || self
+                                .section_keys_provider
+                                .key_share(&signed_sap.section_key())
+                                .await
+                                .is_ok();
+                        trace!("switch_to_new_sap {:?}", switch_to_new_sap);
+                        if switch_to_new_sap {
+                            let _ = self
+                                .network_knowledge
+                                .switch_to_sap(signed_sap, &our_name)
+                                .await;
+                        }
+
                         self.write_prefix_map().await
                     }
                     _ => {}
