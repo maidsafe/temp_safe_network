@@ -38,6 +38,9 @@ const SEMAPHORE_COUNT: usize = 10000;
 // A command/subcommand id e.g. "963111461", "963111461.0"
 type CmdId = String;
 
+type SubcommandsCount = usize;
+type Priority = i32;
+
 fn get_root_cmd_id(cmd_id: &str) -> CmdId {
     let mut root_cmd_id = cmd_id.to_string();
     root_cmd_id.truncate(cmd_id.find('.').unwrap_or_else(|| cmd_id.len()));
@@ -55,8 +58,9 @@ pub(super) struct Dispatcher {
     infra_permits: Arc<Semaphore>,
     node_data_permits: Arc<Semaphore>,
     dkg_permits: Arc<Semaphore>,
-    // root cmd id to semaphore and a count of processes using it
-    cmd_permit_map: Arc<RwLock<BTreeMap<CmdId, (OwnedSemaphorePermit, usize)>>>,
+    // root cmd id to semaphore and a count of processes using it, and the root priority
+    cmd_permit_map:
+        Arc<RwLock<BTreeMap<CmdId, (OwnedSemaphorePermit, SubcommandsCount, Priority)>>>,
 }
 
 impl Drop for Dispatcher {
@@ -93,24 +97,41 @@ impl Dispatcher {
         }
     }
 
-    /// Based upon message priority will wait for any higher priority commands to be completed before continuing
-    async fn acquire_permit_or_wait(&self, prio: i32, cmd_id: CmdId) {
-        // oif we already have a permit, increase our count and continue
-        let root_cmd_id = get_root_cmd_id(&cmd_id);
+    /// returns the root cmd priority if a permit already exists for that command
+    async fn a_root_cmd_permit_exists(&self, root_cmd_id: String) -> Option<Priority> {
         let permit_map = self.cmd_permit_map.clone();
-        debug!("Permits issued: {:?}", permit_map.read().await.len());
-        if let Some((current_root_permit, mut count)) =
-            permit_map.write().await.remove(&root_cmd_id)
-        {
+        let mut write_guard = permit_map.write().await;
+        let prior_permit = write_guard.remove(&root_cmd_id);
+        if let Some((current_root_permit, mut count, root_prio)) = prior_permit {
             count += 1;
-            let _nonexistant_entry = permit_map
-                .write()
-                .await
-                .insert(root_cmd_id.clone(), (current_root_permit, count));
-            return;
+            let _nonexistant_entry =
+                write_guard.insert(root_cmd_id.clone(), (current_root_permit, count, root_prio));
+            return Some(root_prio);
         }
 
-        let permit = match prio {
+        None
+    }
+
+    /// Based upon message priority will wait for any higher priority commands to be completed before continuing
+    async fn acquire_permit_or_wait(&self, prio: i32, cmd_id: CmdId) {
+        debug!("{:?} start of acquire permit", cmd_id);
+        let mut the_prio = prio;
+        // if we already have a permit, increase our count and continue
+        let root_cmd_id = get_root_cmd_id(&cmd_id);
+        let permit_map = self.cmd_permit_map.clone();
+        let len = permit_map.read().await.len();
+        debug!("Permits issued: {:?}", len);
+
+        let root_prio = self.a_root_cmd_permit_exists(root_cmd_id.clone()).await;
+
+        if let Some(prio) = root_prio {
+            // use the root priority for all subsequent commands
+            the_prio = prio;
+        }
+
+        // now, no matter the command/root, we wait for anything higher prio than the _root_ priority
+
+        let permit = match the_prio {
             JOIN_RESPONSE_PRIORITY => Some(
                 self.join_permits
                     .clone()
@@ -128,6 +149,10 @@ impl Dispatcher {
                     SEMAPHORE_COUNT,
                 )
                 .await;
+
+                if root_prio.is_some() {
+                    return;
+                }
 
                 Some(
                     self.dkg_permits
@@ -152,6 +177,10 @@ impl Dispatcher {
                     SEMAPHORE_COUNT,
                 )
                 .await;
+
+                if root_prio.is_some() {
+                    return;
+                }
 
                 Some(
                     self.ae_permits
@@ -178,6 +207,10 @@ impl Dispatcher {
                 .await;
                 self.wait_for_priority_commands_to_finish(self.ae_permits.clone(), SEMAPHORE_COUNT)
                     .await;
+
+                if root_prio.is_some() {
+                    return;
+                }
 
                 Some(
                     self.infra_permits
@@ -209,6 +242,10 @@ impl Dispatcher {
                     SEMAPHORE_COUNT,
                 )
                 .await;
+
+                if root_prio.is_some() {
+                    return;
+                }
 
                 Some(
                     self.node_data_permits
@@ -249,14 +286,17 @@ impl Dispatcher {
                 None
             }
         };
-        trace!("{:?} continuing", cmd_id);
+
+        trace!("{:?} continuing...", cmd_id);
         // if there is a permit to be got...
         if let Some(permit) = permit {
             match permit {
                 // and there was no error w/ semaphore
                 Ok(permit) => {
+                    debug!("inserting permit for cmd {:?}", cmd_id);
                     let mut permit_map_write_guard = permit_map.write().await;
-                    let _old_permit = permit_map_write_guard.insert(root_cmd_id, (permit, 1));
+                    let _old_permit = permit_map_write_guard.insert(root_cmd_id, (permit, 1, prio));
+                    debug!("inserted permit");
                 }
                 Err(error) => {
                     // log error, it can only be permi acquisition here, so that's okay and we ignore it / drop command as we've bigger issues
@@ -416,15 +456,13 @@ impl Dispatcher {
             let root_cmd_id = get_root_cmd_id(cmd_id);
             let permit_map = self.cmd_permit_map.clone();
             let mut permit_map_write_guard = permit_map.write().await;
-            if let Some((permit, mut count)) = permit_map_write_guard.remove(&root_cmd_id) {
+            if let Some((permit, mut count, prio)) = permit_map_write_guard.remove(&root_cmd_id) {
                 // if we're not the last spawned command here
                 if count > 1 {
                     count -= 1;
                     // put the permit back as other commands are still being handled under it.
-                    let _nonexistant_entry = permit_map
-                        .write()
-                        .await
-                        .insert(root_cmd_id.clone(), (permit, count));
+                    let _nonexistant_entry =
+                        permit_map_write_guard.insert(root_cmd_id.clone(), (permit, count, prio));
                 }
             }
             res
