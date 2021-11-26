@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.43.0 (2021-11-26)
+## v0.44.0 (2021-11-26)
 
 ### New Features
 
@@ -14,14 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+ - <csr-id-0e505be2f57ab427cd3ed8c9564fd8b84909f6f3/> restore `ServiceMsg` authority check
+   The `AuthorityProof` struct is designed to be a proof of valid
+   authority, by ensuring all possible constructors either generate or
+   validate a signature. This can only be guaranteed if the field remains
+   module-private. At some point it seems the field was made `pub(crate)`,
+   which meant we were missing an authority check for some `ServiceMsg`s,
  - <csr-id-23bd9b23243da1d20cee8e7f06adc90f0894c2e7/> fix node joining age for genesis section Adults
  - <csr-id-5dd0961c5172ed890b2453eb33332380e4757ad3/> refactor join flows to use the new Peer type
  - <csr-id-1822857e35b888df75bea652a2858cfd34b8c2fc/> remove redundant send_node_approval
-
-### New Features (BREAKING)
-
- - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
-
 
 ### Bug Fixes (BREAKING)
 
@@ -33,8 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 27 commits contributed to the release.
- - 27 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 26 commits contributed to the release.
+ - 26 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -44,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - restore `ServiceMsg` authority check ([`0e505be`](https://github.com/maidsafe/safe_network/commit/0e505be2f57ab427cd3ed8c9564fd8b84909f6f3))
     - prefer existing connection when merging `Peer`s ([`0f27864`](https://github.com/maidsafe/safe_network/commit/0f2786483016adb2f44199cd4e5bf55e8c54adc3))
     - prevent concurrent sends from opening many connections ([`ee6431e`](https://github.com/maidsafe/safe_network/commit/ee6431e9509dd5b02ec2eca4c10ea17c7dddcfc9))
     - only recreate failed connections in `Comm::send` ([`d73deeb`](https://github.com/maidsafe/safe_network/commit/d73deebbf94e65898d29455d6d4ed951ca59b814))
@@ -69,6 +71,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - fixes node join/rejoin tests to support the BRB join process ([`7ae741f`](https://github.com/maidsafe/safe_network/commit/7ae741f93f39c437618bde150458eedd7663b512))
     - remove redundant send_node_approval ([`1822857`](https://github.com/maidsafe/safe_network/commit/1822857e35b888df75bea652a2858cfd34b8c2fc))
     - revamp joins/rejoins to follow BRB ([`60e6a5b`](https://github.com/maidsafe/safe_network/commit/60e6a5b1c1db4011c6bcdb473be3dbfea8858d6a))
+</details>
+
+## v0.43.0 (2021-11-26)
+
+### New Features
+
+ - <csr-id-cc256bdf3f493f8841be07b9d7634c486e21a1cf/> avoid broadcasting DKG messages
+ - <csr-id-60e6a5b1c1db4011c6bcdb473be3dbfea8858d6a/> revamp joins/rejoins to follow BRB
+
+### Bug Fixes
+
+ - <csr-id-23bd9b23243da1d20cee8e7f06adc90f0894c2e7/> fix node joining age for genesis section Adults
+ - <csr-id-5dd0961c5172ed890b2453eb33332380e4757ad3/> refactor join flows to use the new Peer type
+ - <csr-id-1822857e35b888df75bea652a2858cfd34b8c2fc/> remove redundant send_node_approval
+
+### New Features (BREAKING)
+
+ - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
+
+### Bug Fixes (BREAKING)
+
+ - <csr-id-94c91e16135e524202608b2dc6312102890eab94/> include the original message when requesting DkgSessionInfo
+   - also early-returns when signature verification fails / the key is
+   outdated
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.43.0 ([`c78f470`](https://github.com/maidsafe/safe_network/commit/c78f4703a970e8b7466b091ad331d0f2233aa9a3))
     - remove url deps from sn ([`bad0833`](https://github.com/maidsafe/safe_network/commit/bad083332fdcc3a0bc3c3f13628c00315f1b2519))
     - move Url to sn_api ([`3fe9d7a`](https://github.com/maidsafe/safe_network/commit/3fe9d7a6624fe5503f80395f6ed11426b131d3b1))
 </details>
