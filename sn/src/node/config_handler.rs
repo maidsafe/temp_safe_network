@@ -92,10 +92,11 @@ pub struct Config {
     /// be used, if specified.
     #[structopt(long, parse(try_from_str = parse_public_addr))]
     pub public_addr: Option<SocketAddr>,
-    /// This flag can be used to skip port forwarding using IGD. This is used when running a network on LAN
-    /// or when a node is connected to the internect directly without a router. Eg. Digital Ocean droplets.
+    /// This flag can be used to skip automated port forwarding using IGD. This is used when running
+    /// a network on a LAN or when a node is connected to the internet directly, without a router,
+    /// e.g. Digital Ocean droplets.
     #[structopt(long)]
-    pub skip_igd: bool,
+    pub skip_auto_port_forwarding: bool,
     /// Hard Coded contacts
     #[structopt(
         short,
@@ -246,7 +247,7 @@ impl Config {
             self.network_config.external_ip = Some(public_addr.ip());
         }
 
-        self.network_config.forward_port = !config.skip_igd;
+        self.network_config.forward_port = !config.skip_auto_port_forwarding;
 
         if !config.hard_coded_contacts.is_empty() {
             self.hard_coded_contacts = config.hard_coded_contacts;

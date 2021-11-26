@@ -105,6 +105,7 @@ pub fn node_run(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn node_join(
     network_launcher: &mut Box<impl NetworkLauncher>,
     node_directory_path: PathBuf,
@@ -123,7 +124,7 @@ pub fn node_join(
         sn_launch_tool_args.push("--local".to_string());
     }
     if disable_port_forwarding {
-        sn_launch_tool_args.push("--disable-port-forwarding".to_string());
+        sn_launch_tool_args.push("--skip-auto-port-forwarding".to_string());
     }
     if let Some(local_ip) = local_addr.map(|addr| addr.to_string()) {
         sn_launch_tool_args.push("--local-addr".to_string());

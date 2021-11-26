@@ -37,7 +37,7 @@ pub enum NodeSubCommands {
         version: Option<String>,
     },
     #[structopt(name = "join")]
-    /// Join an already running network
+    /// Join an existing network
     Join {
         /// The name of a network from the `networks` command list. Use this argument to join one
         /// of those networks.
@@ -92,14 +92,14 @@ pub enum NodeSubCommands {
         /// locally. This will launch the node and skip any port forwarding.
         #[structopt(short = "l", long)]
         local: bool,
-        /// Use this flag to pass --skip-igd to the node binary, which will disable port forwarding.
+        /// Use this flag to skip the automated, software-based port forwading on the node binary.
         ///
         /// This option can also be used when you're trying to join a remote network, but your join
         /// request was rejected because the other nodes were unable to reach your node. In this
         /// case, you can setup 'manual' port forwarding on your router, then use this option to set
-        /// disable the port forwarding in the node binary.
+        /// disable the software-based port forwarding in the node binary.
         #[structopt(long)]
-        disable_port_forwarding: bool,
+        skip_auto_port_forwarding: bool,
     },
     #[structopt(name = "run-baby-fleming")]
     /// Run nodes to form a local single-section Safe network
@@ -159,7 +159,7 @@ pub async fn node_commander(
             public_addr,
             clear_data,
             local,
-            disable_port_forwarding,
+            skip_auto_port_forwarding: disable_port_forwarding,
         }) => {
             if network_name.is_some() && contact_list.is_some() {
                 return Err(eyre!(
@@ -189,16 +189,14 @@ pub async fn node_commander(
                         "Please re-run the command and supply the --genesis-key argument."
                     });
                 }
+            } else if let Some(name) = network_name {
+                let msg = format!("Joining the '{}' network...", name);
+                debug!("{}", msg);
+                println!("{}", msg);
+                config.get_network_info(&name).await?
             } else {
-                if let Some(name) = network_name {
-                    let msg = format!("Joining the '{}' network...", name);
-                    debug!("{}", msg);
-                    println!("{}", msg);
-                    config.get_network_info(&name).await?
-                } else {
-                    let (_, node_config) = config.read_current_node_config()?;
-                    node_config
-                }
+                let (_, node_config) = config.read_current_node_config()?;
+                node_config
             };
 
             let msg = format!("Joining network with contacts {:?} ...", node_config);
@@ -732,7 +730,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -786,7 +784,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -831,7 +829,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -875,7 +873,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -892,7 +890,7 @@ mod join_command {
     }
 
     #[tokio::test]
-    async fn should_pass_the_disable_port_forwarding_flag() -> Result<()> {
+    async fn should_pass_the_skip_auto_port_forwarding_flag() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
@@ -920,7 +918,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            disable_port_forwarding: true,
+            skip_auto_port_forwarding: true,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -929,7 +927,7 @@ mod join_command {
         assert!(launcher
             .launch_args
             .iter()
-            .any(|x| x == "--disable-port-forwarding"));
+            .any(|x| x == "--skip-auto-port-forwarding"));
         Ok(())
     }
 
@@ -962,7 +960,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: false,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1005,7 +1003,7 @@ mod join_command {
             )),
             clear_data: false,
             local: false,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1045,7 +1043,7 @@ mod join_command {
             public_addr: None,
             clear_data: true,
             local: true,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1084,7 +1082,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: true,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1133,7 +1131,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: true,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1195,7 +1193,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: true,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1239,7 +1237,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: true,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1289,7 +1287,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: true,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
@@ -1340,7 +1338,7 @@ mod join_command {
             public_addr: None,
             clear_data: false,
             local: true,
-            disable_port_forwarding: false,
+            skip_auto_port_forwarding: false,
         };
 
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
