@@ -880,7 +880,7 @@ fn files_get_src_path_is_invalid() -> Result<()> {
     // Assert
     assert!(String::from_utf8_lossy(&output.stderr)
         .into_owned()
-        .contains("No data found for path \"/path/is/invalid/\" on the FilesContainer"));
+        .contains("no data found for path: /path/is/invalid/"));
 
     Ok(())
 }

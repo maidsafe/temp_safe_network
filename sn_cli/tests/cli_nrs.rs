@@ -68,11 +68,10 @@ fn calling_safe_nrs_add_with_y_but_name_already_exists() -> Result<()> {
         "-l",
         &fake_target,
         "--create-top-name", // long for "-y"
-        "--json",
     ])
     .assert()
     .stdout(predicate::str::contains("Existing NRS Map updated"))
-    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(3))
+    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(2))
     .stdout(predicate::str::contains(fake_target).count(1))
     .stdout(predicate::str::contains("+").count(1))
     .success();
@@ -93,11 +92,10 @@ fn calling_safe_nrs_with_y_but_name_doesnt_exist() -> Result<()> {
         "-l",
         &fake_target,
         "--create-top-name", // long for "-y"
-        "--json",
     ])
     .assert()
     .stdout(predicate::str::contains("New NRS Map created"))
-    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(3))
+    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(2))
     .stdout(predicate::str::contains(fake_target).count(1))
     .stdout(predicate::str::contains("+").count(1))
     .success();
@@ -287,8 +285,8 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Resul
     let test_name_w_sub = format!("a.b.{}", &test_name);
     let test_name_w_new_sub = format!("x.b.{}", &test_name);
 
-    let (_a_sign, another_md_xor) = &file_map["./testdata/another.md"];
-    let (_t_sign, test_md_xor) = &file_map["./testdata/test.md"];
+    let (_a_sign, another_md_xor) = &file_map["../resources/testdata/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["../resources/testdata/test.md"];
 
     let cat_of_another_raw = safe_cmd_stdout(["cat", another_md_xor], Some(0))?;
     assert_eq!(cat_of_another_raw, "exists");
@@ -340,8 +338,8 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result
     let test_name_w_sub = format!("a.b.{}", &test_name);
     let test_name_w_new_sub = format!("x.b.{}", &test_name);
 
-    let (_a_sign, another_md_xor) = &file_map["./testdata/another.md"];
-    let (_t_sign, test_md_xor) = &file_map["./testdata/test.md"];
+    let (_a_sign, another_md_xor) = &file_map["../resources/testdata/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["../resources/testdata/test.md"];
 
     let cat_of_another_raw = safe_cmd_stdout(["cat", another_md_xor], Some(0))?;
     assert_eq!(cat_of_another_raw, "exists");
@@ -387,8 +385,8 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
     let test_name_w_sub = format!("a.b.{}", &test_name);
     let test_name_w_new_sub = format!("x.b.{}", &test_name);
 
-    let (_a_sign, another_md_xor) = &file_map["./testdata/another.md"];
-    let (_t_sign, test_md_xor) = &file_map["./testdata/test.md"];
+    let (_a_sign, another_md_xor) = &file_map["../resources/testdata/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["../resources/testdata/test.md"];
 
     let cat_of_another_raw = safe_cmd_stdout(["cat", another_md_xor], Some(0))?;
     assert_eq!(cat_of_another_raw, "exists");

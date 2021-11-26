@@ -15,8 +15,8 @@ use sn_api::{Url, VersionHash};
 use sn_cmd_test_utilities::util::{
     get_directory_file_count, get_directory_len, get_file_len, get_random_nrs_string,
     mk_emptyfolder, parse_files_container_output, parse_files_put_or_sync_output,
-    parse_files_tree_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout, safeurl_from,
-    test_symlinks_are_valid, upload_path, upload_test_symlinks_folder,
+    parse_files_tree_output, parse_nrs_create_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout,
+    safeurl_from, test_symlinks_are_valid, upload_path, upload_test_symlinks_folder,
     upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use std::{process::Command, str::FromStr};
@@ -472,9 +472,8 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         ],
         Some(0),
     )?;
-    let (nrs_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
-    let url = Url::from_url(&nrs_xorurl)?;
-    let nrs_version = url.content_version().unwrap();
+    let (nrs_xorurl, _files_map) = parse_nrs_create_output(&output);
+    let nrs_version = nrs_xorurl.content_version().unwrap();
 
     let empty_dir = tmp_data_dir.child("emptyfolder2");
     empty_dir.create_dir_all()?;
@@ -755,7 +754,7 @@ fn calling_files_ls_with_invalid_path() -> Result<()> {
     let stderr = safe_cmd_stderr(["files", "ls", &partial_path, "--json"], Some(1))
         .map_err(|e| eyre!(e.to_string()))?;
 
-    assert!(stderr.contains("No data found for path"));
+    assert!(stderr.contains("no data found for path: /subfold/"));
 
     Ok(())
 }
