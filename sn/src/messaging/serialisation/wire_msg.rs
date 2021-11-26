@@ -131,7 +131,7 @@ impl WireMsg {
                 {
                     AuthorityProof::verify(auth, payload)?
                 } else {
-                    AuthorityProof(auth)
+                    AuthorityProof::verify(auth, &self.payload)?
                 };
 
                 Ok(MessageType::Service {

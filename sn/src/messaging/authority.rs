@@ -130,11 +130,12 @@ impl SectionAuth {
 /// Verified authority.
 ///
 /// Values of this type constitute a proof that the signature is valid for a particular payload.
-/// This is made possible by performing verification in all possible constructors of the type.
+/// This is made possible by keeping the field private, and performing verification in all possible
+/// constructors of the type.
 ///
 /// Validation is defined by the [`VerifyAuthority`] impl for `T`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct AuthorityProof<T>(pub(crate) T);
+pub struct AuthorityProof<T>(T);
 
 impl<T: VerifyAuthority> AuthorityProof<T> {
     /// Verify the authority of `inner`.
