@@ -138,7 +138,8 @@ fn calling_safe_cat_hexdump() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
+#[ignore = "files sync url has bytes address issue"]
+fn calling_safe_cat_xorurl_with_version() -> Result<()> {
     let tmp_dir = assert_fs::TempDir::new()?;
     let md_file1 = tmp_dir.child("test.md");
     let md_file2 = tmp_dir.child("another.md");
@@ -188,6 +189,7 @@ fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
 }
 
 #[test]
+#[ignore = "files sync url issue"]
 fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     let tmp_dir = assert_fs::TempDir::new()?;
     let md_file1 = tmp_dir.child("test.md");
