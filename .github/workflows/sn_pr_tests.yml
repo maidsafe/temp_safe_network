@@ -27,17 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: dorny/paths-filter@v2
-        id: messaging_changes
+        id: changes
         with:
           filters: |
-            src:
+            messaging:
               - 'sn/src/messaging/**'
               - 'sn/src/types/**'
-      - uses: dorny/paths-filter@v2
-        id: node_changes
-        with:
-          filters: |
-            src:
+            node:
               - 'sn/src/node/**'
               - 'sn/src/routing/**'
               - 'sn/src/messaging/**'
@@ -45,49 +41,23 @@ jobs:
               - 'sn/src/dbs/**'
               - 'sn/src/prefix_map/**'
               - 'sn/src/url/**'
-      - uses: dorny/paths-filter@v2
-        id: client_changes
-        with:
-          filters: |
-            src:
+            client:
               - 'sn/src/client/**'
               - 'sn/src/messaging/**'
               - 'sn/src/types/**'
               - 'sn/src/dbs/**'
               - 'sn/src/prefix_map/**'
               - 'sn/src/url/**'
-      - uses: dorny/paths-filter@v2
-        id: routing_changes
-        with:
-          filters: |
-            src:
+            routing:
               - 'sn/src/routing/**'
               - 'sn/src/messaging/**'
               - 'sn/src/types/**'
               - 'sn/src/prefix_map/**'
-      - uses: dorny/paths-filter@v2
-        id: url_changes
-        with:
-          filters: |
-            src:
-              - 'sn/src/url/**'
-      - uses: dorny/paths-filter@v2
-        id: data_types_changes
-        with:
-          filters: |
-            src:
+            types:
               - 'sn/src/types/**'
-      - uses: dorny/paths-filter@v2
-        id: dbs_changes
-        with:
-          filters: |
-            src:
+            dbs:
               - 'sn/src/dbs/**'
-      - uses: dorny/paths-filter@v2
-        id: prefix_map_changes
-        with:
-          filters: |
-            src:
+            prefix_map:
               - 'sn/src/prefix_map/**'
 
       - name: Mac install ripgrep
@@ -128,43 +98,33 @@ jobs:
         run: cd sn && cargo build --all-targets --release --features=always-joinable,test-utils
 
       - name: Run Data Types tests
-        if: steps.data_types_changes.outputs.src == 'true'
+        if: steps.changes.outputs.types == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- types
         timeout-minutes: 10
 
       - name: Run DBs tests
-        if: steps.dbs_changes.outputs.src == 'true'
+        if: steps.changes.outputs.dbs == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- dbs
         timeout-minutes: 5
 
       - name: Run PrefixMap tests
-        if: steps.prefix_map_changes.outputs.src == 'true'
+        if: steps.changes.outputs.prefix_map == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- prefix_map
         timeout-minutes: 5
 
-      - name: Run URL tests
-        if: steps.url_changes.outputs.src == 'true'
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- url
-        timeout-minutes: 5
-
       - name: Run Messaging tests
-        if: steps.messaging_changes.outputs.src == 'true'
+        if: steps.changes.outputs.messaging == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- messaging
         timeout-minutes: 5
 
       - name: Run Node tests
-        if: steps.node_changes.outputs.src == 'true'
+        if: steps.changes.outputs.node == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- node
         timeout-minutes: 5
 
       - name: Run Routing tests
-        if: steps.routing_changes.outputs.src == 'true'
+        if: steps.changes.outputs.routing == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
-        timeout-minutes: 5
-
-      - name: Run Doc tests
-        if: steps.node_changes.outputs.src == 'true'
-        run: cd sn && cargo test --release --features=always-joinable,test-utils client --doc
         timeout-minutes: 5
 
       - run: ./target/release/testnet
