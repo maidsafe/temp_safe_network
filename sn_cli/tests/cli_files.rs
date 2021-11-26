@@ -448,6 +448,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
 }
 
 #[test]
+#[ignore = "relative url without a base"]
 fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_dir = assert_fs::TempDir::new()?;
