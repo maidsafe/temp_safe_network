@@ -115,7 +115,7 @@ async fn main() -> Result<()> {
 
     assert_eq!(
         config.network_config.forward_port,
-        !command_line_args.skip_igd
+        !command_line_args.skip_auto_port_forwarding
     );
 
     if !command_line_args.hard_coded_contacts.is_empty() {
