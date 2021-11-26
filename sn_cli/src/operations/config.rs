@@ -33,7 +33,8 @@ const CONFIG_NETWORKS_DIRNAME: &str = "networks";
 ///
 /// The only reason the trait exists is for enabling unit testing.
 pub trait NetworkLauncher {
-    fn launch(&mut self, args: Vec<&str>, interval: u64) -> Result<(), Report>;
+    fn launch(&mut self, args: Vec<String>, interval: u64) -> Result<(), Report>;
+    fn join(&mut self, args: Vec<String>) -> Result<(), Report>;
 }
 
 /// A network launcher based on the `sn_launch_tool`, which provides an implementation of a
@@ -43,7 +44,7 @@ pub trait NetworkLauncher {
 #[derive(Default)]
 pub struct SnLaunchToolNetworkLauncher {}
 impl NetworkLauncher for SnLaunchToolNetworkLauncher {
-    fn launch(&mut self, args: Vec<&str>, interval: u64) -> Result<(), Report> {
+    fn launch(&mut self, args: Vec<String>, interval: u64) -> Result<(), Report> {
         debug!("Running network launch tool with args: {:?}", args);
         println!("Starting a node to join a Safe network...");
         sn_launch_tool::Launch::from_iter_safe(&args)
@@ -54,6 +55,16 @@ impl NetworkLauncher for SnLaunchToolNetworkLauncher {
         let interval_duration = Duration::from_secs(interval * 15);
         thread::sleep(interval_duration);
 
+        Ok(())
+    }
+
+    fn join(&mut self, args: Vec<String>) -> Result<(), Report> {
+        debug!("Running network launch tool with args: {:?}", args);
+        println!("Starting a node to join a Safe network...");
+        sn_launch_tool::Join::from_iter_safe(&args)
+            .map_err(|e| eyre!(e))
+            .and_then(|launch| launch.run())
+            .wrap_err("Error launching node")?;
         Ok(())
     }
 }

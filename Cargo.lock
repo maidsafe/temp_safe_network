@@ -3080,7 +3080,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
- "sn_launch_tool 0.9.3",
+ "sn_launch_tool 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt",
  "strum",
  "strum_macros",
@@ -3471,7 +3471,7 @@ dependencies = [
  "shrust",
  "sn_api",
  "sn_cmd_test_utilities",
- "sn_launch_tool 0.7.0",
+ "sn_launch_tool 0.9.3",
  "structopt",
  "tokio",
  "tracing",
@@ -3500,9 +3500,7 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b756e3149e2e7243f64770fe7303f5521a4873afaabd868482f0adae7ebc8a29"
+version = "0.9.3"
 dependencies = [
  "color-eyre",
  "dirs-next 1.0.2",
@@ -3510,7 +3508,7 @@ dependencies = [
  "serde_json",
  "structopt",
  "tracing",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber 0.3.1",
 ]
 
 [[package]]
