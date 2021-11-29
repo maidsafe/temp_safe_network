@@ -37,7 +37,7 @@ const SEMAPHORE_COUNT: usize = 10000;
 
 // A command/subcommand id e.g. "963111461", "963111461.0"
 type CmdId = String;
-
+type PermitInfo = (OwnedSemaphorePermit, SubcommandsCount, Priority);
 type SubcommandsCount = usize;
 type Priority = i32;
 
@@ -59,8 +59,7 @@ pub(super) struct Dispatcher {
     node_data_permits: Arc<Semaphore>,
     dkg_permits: Arc<Semaphore>,
     // root cmd id to semaphore and a count of processes using it, and the root priority
-    cmd_permit_map:
-        Arc<RwLock<BTreeMap<CmdId, (OwnedSemaphorePermit, SubcommandsCount, Priority)>>>,
+    cmd_permit_map: Arc<RwLock<BTreeMap<CmdId, PermitInfo>>>,
 }
 
 impl Drop for Dispatcher {
