@@ -31,12 +31,12 @@ pub enum KeysSubCommands {
     #[structopt(name = "create")]
     /// Create a new SafeKey
     Create {
-        /// The secret key of a SafeKey for paying the operation costs. If not provided, the application's default wallet will be used, unless '--test-coins' was set
-        #[structopt(short = "w", long = "pay-with")]
-        pay_with: Option<String>,
-        /// Create a SafeKey and allocate test-coins onto it
-        #[structopt(long = "test-coins")]
-        test_coins: bool,
+        // /// The secret key of a SafeKey for paying the operation costs. If not provided, the application's default wallet will be used, unless '--test-coins' was set
+        // #[structopt(short = "w", long = "pay-with")]
+        // pay_with: Option<String>,
+        // /// Create a SafeKey and allocate test-coins onto it
+        // #[structopt(long = "test-coins")]
+        // test_coins: bool,
         /// Set the newly created keys to be used by CLI
         #[structopt(long = "for-cli")]
         for_cli: bool,
