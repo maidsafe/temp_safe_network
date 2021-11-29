@@ -92,7 +92,12 @@ impl Dispatcher {
         // there's probably a neater way to do this
         debug!("available, permits {:?}", semaphore.available_permits());
         while semaphore.available_permits() != count {
-            time::sleep(Duration::from_millis(50)).await
+            time::sleep(Duration::from_millis(500)).await;
+            trace!(
+                "looping while we wait for available permits to be {:?}: {:?}",
+                count,
+                semaphore.available_permits()
+            );
         }
     }
 
