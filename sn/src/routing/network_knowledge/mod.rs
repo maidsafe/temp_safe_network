@@ -254,37 +254,6 @@ impl NetworkKnowledge {
         }
     }
 
-    pub(super) async fn switch_to_sap(
-        &self,
-        signed_sap: SectionAuth<SectionAuthorityProvider>,
-        our_name: &XorName,
-    ) -> Result<()> {
-        let provided_sap = signed_sap.value.clone();
-        // We try to update our SAP and own chain only if we were flagged to,
-        // otherwise this update could be due to an AE message and we still don't have
-        // the key share for the new SAP, making this node unable to sign section messages
-        // and possibly being kicked out of the group of Elders.
-        if provided_sap.prefix().matches(our_name) {
-            let our_prev_prefix = self.prefix().await;
-            *self.signed_sap.write().await = signed_sap.clone();
-            *self.chain.write().await = self
-                .all_sections_chains
-                .read()
-                .await
-                .get_proof_chain(&self.genesis_key, &provided_sap.section_key())?;
-
-            // Remove any peer which doesn't belong to our new section's prefix
-            self.section_peers.retain(&provided_sap.prefix());
-            info!(
-                "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
-                our_prev_prefix,
-                provided_sap.prefix(),
-                provided_sap
-            );
-        }
-        Ok(())
-    }
-
     /// Update our network knowledge if the provided SAP is valid and can be verified
     /// with the provided proof chain.
     /// If the 'update_sap' flag is set to 'true', the provided SAP and chain will be
@@ -294,6 +263,8 @@ impl NetworkKnowledge {
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
         updated_members: Option<SectionPeers>,
+        our_name: &XorName,
+        section_keys_provider: &SectionKeysProvider,
     ) -> Result<bool> {
         let mut there_was_an_update = false;
         let provided_sap = signed_sap.value.clone();
@@ -317,6 +288,40 @@ impl NetworkKnowledge {
                     .write()
                     .await
                     .join(proof_chain.clone())?;
+
+                let switch_to_new_sap = (!self.is_elder(our_name).await
+                    && !provided_sap.contains_elder(our_name))
+                    || section_keys_provider
+                        .key_share(&signed_sap.section_key())
+                        .await
+                        .is_ok();
+                trace!(
+                    "update_knowledge_if_valid switch_to_new_sap {:?}",
+                    switch_to_new_sap
+                );
+
+                // We try to update our SAP and own chain only if we were flagged to,
+                // otherwise this update could be due to an AE message and we still don't have
+                // the key share for the new SAP, making this node unable to sign section messages
+                // and possibly being kicked out of the group of Elders.
+                if switch_to_new_sap && provided_sap.prefix().matches(our_name) {
+                    let our_prev_prefix = self.prefix().await;
+                    *self.signed_sap.write().await = signed_sap.clone();
+                    *self.chain.write().await = self
+                        .all_sections_chains
+                        .read()
+                        .await
+                        .get_proof_chain(&self.genesis_key, &provided_sap.section_key())?;
+
+                    // Remove any peer which doesn't belong to our new section's prefix
+                    self.section_peers.retain(&provided_sap.prefix());
+                    info!(
+                        "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
+                        our_prev_prefix,
+                        provided_sap.prefix(),
+                        provided_sap
+                    );
+                }
             }
             Ok(false) => {
                 debug!(

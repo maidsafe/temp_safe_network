@@ -46,28 +46,14 @@ impl Core {
 
         let _updated = self
             .network_knowledge
-            .update_knowledge_if_valid(signed_sap.clone(), &proof_chain, members)
+            .update_knowledge_if_valid(
+                signed_sap.clone(),
+                &proof_chain,
+                members,
+                &our_name,
+                &self.section_keys_provider,
+            )
             .await?;
-
-        // If we have the key share for new SAP key we can switch to this new SAP.
-        // Otherwise, only update when not being the elder of new SAP.
-        let switch_to_new_sap = (self.is_not_elder().await
-            && !section_auth.contains_elder(&self.node.read().await.name()))
-            || self
-                .section_keys_provider
-                .key_share(&section_signed.public_key)
-                .await
-                .is_ok();
-        trace!(
-            "handle_anti_entropy_update_msg switch_to_new_sap {:?}",
-            switch_to_new_sap
-        );
-        if switch_to_new_sap {
-            let _ = self
-                .network_knowledge
-                .switch_to_sap(signed_sap, &our_name)
-                .await;
-        }
 
         let mut commands = vec![];
 
@@ -228,7 +214,13 @@ impl Core {
         // Update our network knowledge.
         if self
             .network_knowledge
-            .update_knowledge_if_valid(signed_sap.clone(), &proof_chain, None)
+            .update_knowledge_if_valid(
+                signed_sap.clone(),
+                &proof_chain,
+                None,
+                &our_name,
+                &self.section_keys_provider,
+            )
             .await?
         {
             self.write_prefix_map().await;
@@ -236,26 +228,6 @@ impl Core {
                 "PrefixMap written to disk with update for prefix {:?}",
                 prefix
             );
-        }
-
-        // If we have the key share for new SAP key we can switch to this new SAP.
-        // Otherwise, only update when not being the elder of new SAP.
-        let switch_to_new_sap = (self.is_not_elder().await
-            && !section_auth.contains_elder(&self.node.read().await.name()))
-            || self
-                .section_keys_provider
-                .key_share(&section_signed.public_key)
-                .await
-                .is_ok();
-        trace!(
-            "handle_anti_entropy_update_msg switch_to_new_sap {:?}",
-            switch_to_new_sap
-        );
-        if switch_to_new_sap {
-            let _ = self
-                .network_knowledge
-                .switch_to_sap(signed_sap, &our_name)
-                .await;
         }
 
         // If the new SAP's section key is the same as the section key set when the
@@ -478,10 +450,13 @@ mod tests {
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
-        network_knowledge::test_utils::{gen_addr, gen_section_authority_provider},
+        network_knowledge::{
+            test_utils::{gen_addr, gen_section_authority_provider},
+            SectionKeysProvider,
+        },
         node::Node,
         routing_api::tests::create_comm,
-        XorName, MIN_ADULT_AGE,
+        SectionKeyShare, XorName, MIN_ADULT_AGE,
     };
 
     use assert_matches::assert_matches;
@@ -561,7 +536,13 @@ mod tests {
         assert!(
             env.core
                 .network_knowledge()
-                .update_knowledge_if_valid(env.other_sap.clone(), &env.proof_chain, None,)
+                .update_knowledge_if_valid(
+                    env.other_sap.clone(),
+                    &env.proof_chain,
+                    None,
+                    &env.core.node.read().await.name(),
+                    &env.core.section_keys_provider
+                )
                 .await?
         );
 
@@ -702,7 +683,7 @@ mod tests {
             assert_eq!(genesis_pk, *chain.root_key());
 
             let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
-            let core = Core::first_node(
+            let mut core = Core::first_node(
                 create_comm().await?,
                 node.clone(),
                 mpsc::channel(1).0,
@@ -713,15 +694,24 @@ mod tests {
             .await?;
 
             let genesis_sap = core.network_knowledge().authority_provider().await;
+            let section_key_share = SectionKeyShare {
+                public_key_set: secret_key_set.public_keys(),
+                index: 0,
+                secret_key_share: secret_key_set.secret_key_share(0),
+            };
+
+            core.section_keys_provider = SectionKeysProvider::new(Some(section_key_share)).await;
 
             // get our Core to now be in prefix(0)
             let _ = core
                 .network_knowledge()
-                .update_knowledge_if_valid(signed_sap.clone(), &chain, None)
-                .await;
-            let _ = core
-                .network_knowledge()
-                .switch_to_sap(signed_sap, &node.name())
+                .update_knowledge_if_valid(
+                    signed_sap.clone(),
+                    &chain,
+                    None,
+                    &node.name(),
+                    &core.section_keys_provider,
+                )
                 .await;
 
             // generate other SAP for prefix1
