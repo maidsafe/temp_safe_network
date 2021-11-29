@@ -313,8 +313,11 @@ impl Dispatcher {
     ) -> Result<()> {
         let _ = tokio::spawn(async {
             let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
-            self.acquire_permit_or_wait(command.priority()?, cmd_id.clone())
-                .await;
+
+            if cfg!(feature = "unstable-command-prioritisation") {
+                self.acquire_permit_or_wait(command.priority()?, cmd_id.clone())
+                    .await;
+            }
             self.handle_command_and_any_offshoots(command, cmd_id).await
         });
         Ok(())
