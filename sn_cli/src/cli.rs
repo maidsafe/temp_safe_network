@@ -49,9 +49,6 @@ pub struct CmdArgs {
     /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default), base32 and base64
     #[structopt(long = "xorurl", global(true))]
     xorurl_base: Option<XorUrlBase>,
-    /// Endpoint of the Authenticator daemon where to send requests to. If not provided, https://localhost:33000 is assumed.
-    #[structopt(long = "endpoint", global(true))]
-    pub endpoint: Option<String>,
 }
 
 pub async fn run() -> Result<()> {

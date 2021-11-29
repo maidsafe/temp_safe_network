@@ -35,7 +35,7 @@ impl Session {
         src: SocketAddr,
         mut incoming_messages: ConnectionIncoming,
     ) {
-        debug!("Listening for incoming messages");
+        debug!("Listening for incoming messages from {}", src);
 
         trace!(
             "{} to {} (id: {})",
@@ -76,7 +76,7 @@ impl Session {
 
             // once the message loop breaks, we know the connection is closed
             trace!("{} to {} (id: {})", LogMarker::ConnectionClosed, src, connection_id);
-        }.instrument(info_span!("Listening for incoming msgs"))).in_current_span();
+        }.instrument(info_span!("Listening for incoming msgs from {}", ?src))).in_current_span();
     }
 
     #[instrument(skip_all, level = "debug")]
