@@ -9,15 +9,15 @@
 
 mod nrs_map;
 
-pub use crate::url::{ContentType, VersionHash, DataType};
-pub use nrs_map::{NrsMap};
+pub use crate::url::{ContentType, DataType, VersionHash};
+pub use nrs_map::NrsMap;
 
 use nrs_map::{parse_out_subnames, SubName};
 
 use crate::{app::Safe, register::EntryHash, Error, Result, Url};
 
 use log::{debug, info};
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::str;
 
 // Type tag to use for the NrsMapContainer stored on Register
@@ -98,14 +98,20 @@ impl Safe {
         let safe_url = Safe::parse_url(public_name)?;
         let subname = parse_out_subnames(public_name);
         let current_versions = self
-            .fetch_multimap_value_by_key(&safe_url, &subname.as_bytes()).await?
+            .fetch_multimap_value_by_key(&safe_url, subname.as_bytes())
+            .await?
             .into_iter()
             .map(|(hash, _)| hash)
             .collect();
 
         // update with new entry
-        let entry = (subname.as_bytes().to_vec(), link.to_string().as_bytes().to_vec());
-        let entry_hash = self.multimap_insert(&url_str, entry, current_versions).await?;
+        let entry = (
+            subname.as_bytes().to_vec(),
+            link.to_string().as_bytes().to_vec(),
+        );
+        let entry_hash = self
+            .multimap_insert(&url_str, entry, current_versions)
+            .await?;
 
         // // fetch and edit nrs_map
         // let (mut nrs_map, version) = self.fetch_nrs_map(public_name, None).await?;
@@ -192,7 +198,8 @@ impl Safe {
         let safe_url = Safe::parse_url(public_name)?;
         let subname = parse_out_subnames(public_name);
         let current_versions = self
-            .fetch_multimap_value_by_key(&safe_url, &subname.as_bytes()).await?
+            .fetch_multimap_value_by_key(&safe_url, subname.as_bytes())
+            .await?
             .into_iter()
             .map(|(hash, _)| hash)
             .collect();
@@ -251,35 +258,49 @@ impl Safe {
     ) -> Result<NrsMap> {
         // fetch multimap entries
         let safe_url = Safe::parse_url(public_name)?;
-        let res = self
-            .fetch_multimap_values(&safe_url).await;
+        let res = self.fetch_multimap_values(&safe_url).await;
         let multimap_keyvals = match res {
             Ok(s) => Ok(s),
             Err(Error::EmptyContent(_)) => Ok(BTreeSet::new()),
             Err(Error::ContentNotFound(e)) => Err(Error::ContentNotFound(format!(
-                "No Nrs Map entry found at {}: {}", safe_url.to_string(), e
+                "No Nrs Map entry found at {}: {}",
+                safe_url.to_string(),
+                e
             ))),
-            Err(e) => Err(Error::NetDataError(format!("Failed to get Nrs Map entries: {}", e))),
+            Err(e) => Err(Error::NetDataError(format!(
+                "Failed to get Nrs Map entries: {}",
+                e
+            ))),
         }?;
 
         // collect a raw map with serialized data, get specific version if needed
         let raw_set = match version {
             Some(v) => {
                 let hash = v.entry_hash();
-                if multimap_keyvals.iter().any(|(h, _)| VersionHash::from(h) == v) {
+                if multimap_keyvals
+                    .iter()
+                    .any(|(h, _)| VersionHash::from(h) == v)
+                {
                     // just return the key val set if we have the version we're looking for
-                    multimap_keyvals.into_iter().map(|(_hash, key_val)| key_val).collect()
+                    multimap_keyvals
+                        .into_iter()
+                        .map(|(_hash, key_val)| key_val)
+                        .collect()
                 } else {
                     // manually fetch the missing versionned entry
-                    let mut key_vals:BTreeSet<_> = multimap_keyvals.into_iter().map(|(_hash, key_val)| key_val).collect();
+                    let mut key_vals: BTreeSet<_> = multimap_keyvals
+                        .into_iter()
+                        .map(|(_hash, key_val)| key_val)
+                        .collect();
                     let key_val = self.fetch_multimap_value_by_hash(&safe_url, hash).await?;
                     key_vals.insert(key_val);
                     key_vals
                 }
             }
-            None => {
-                multimap_keyvals.into_iter().map(|(_hash, key_val)| key_val).collect()
-            }
+            None => multimap_keyvals
+                .into_iter()
+                .map(|(_hash, key_val)| key_val)
+                .collect(),
         };
 
         // check for duplicate entries for a single key (subname)
@@ -291,13 +312,16 @@ impl Safe {
         }
 
         // deserialize and return
-        let subnames_map: Result<BTreeMap<SubName, Url>> = raw_set.into_iter().map(|(subname_bytes, url_bytes)| {
-            let subname = str::from_utf8(&subname_bytes)?;
-            let url = Url::from_url(str::from_utf8(&url_bytes)?)?;
-            Ok((subname.to_owned(), url))
-        }).collect();
+        let subnames_map: Result<BTreeMap<SubName, Url>> = raw_set
+            .into_iter()
+            .map(|(subname_bytes, url_bytes)| {
+                let subname = str::from_utf8(&subname_bytes)?;
+                let url = Url::from_url(str::from_utf8(&url_bytes)?)?;
+                Ok((subname.to_owned(), url))
+            })
+            .collect();
 
-        Ok(NrsMap{map: subnames_map?})
+        Ok(NrsMap { map: subnames_map? })
     }
 }
 

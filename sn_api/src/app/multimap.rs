@@ -223,7 +223,7 @@ impl Safe {
 
 #[cfg(test)]
 mod tests {
-    use crate::{app::test_helpers::new_safe_instance, retry_loop_for_pattern};
+    use crate::{app::test_helpers::new_safe_instance, retry_loop, retry_loop_for_pattern};
     use anyhow::Result;
     use std::collections::BTreeSet;
 
