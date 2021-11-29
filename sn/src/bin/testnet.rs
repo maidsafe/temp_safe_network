@@ -93,6 +93,10 @@ async fn main() -> Result<()> {
         let mut args = vec!["build", "--release"];
 
         // Keep features consistent to avoid recompiling when possible
+        if cfg!(feature = "unstable-command-prioritisation") {
+            args.push("--features");
+            args.push("unstable-command-prioritisation");
+        }
         if cfg!(feature = "always-joinable") {
             args.push("--features");
             args.push("always-joinable");
