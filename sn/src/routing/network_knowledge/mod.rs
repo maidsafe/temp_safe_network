@@ -642,7 +642,7 @@ impl NetworkKnowledge {
             });
 
         debug!(
-            ">>>> our size {:?}, theirs {:?}",
+            "Upon section split attempt: our section size {:?}, theirs {:?}",
             our_new_size, sibling_new_size
         );
 
@@ -650,7 +650,6 @@ impl NetworkKnowledge {
         if our_new_size < recommended_section_size()
             || sibling_new_size < recommended_section_size()
         {
-            debug!(">>>> returning here TOO SMALLLLLLLLL hmmmmmm");
             return None;
         }
 
@@ -673,7 +672,6 @@ impl NetworkKnowledge {
         let our_elder_candidates = ElderCandidates::new(our_prefix, our_elders);
         let other_elder_candidates = ElderCandidates::new(other_prefix, other_elders);
 
-        debug!(">>>>> end of split attempt");
         Some((our_elder_candidates, other_elder_candidates))
     }
 }
