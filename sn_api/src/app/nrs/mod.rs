@@ -641,8 +641,8 @@ mod tests {
 
         // check for the error content
         if let Err(Error::ConflictingNrsEntries(_, dups)) = conflict_error {
-            let got_entries: Result<()> = dups
-                .into_iter().try_for_each(|(subname_bytes, url_bytes)| {
+            let got_entries: Result<()> =
+                dups.into_iter().try_for_each(|(subname_bytes, url_bytes)| {
                     let subname = str::from_utf8(&subname_bytes)?;
                     let url = Url::from_url(str::from_utf8(&url_bytes)?)?;
                     assert_eq!(subname, "");
