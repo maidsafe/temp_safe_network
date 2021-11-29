@@ -113,23 +113,6 @@ impl Safe {
             .multimap_insert(&url_str, entry, current_versions)
             .await?;
 
-        // // fetch and edit nrs_map
-        // let (mut nrs_map, version) = self.fetch_nrs_map(public_name, None).await?;
-        // nrs_map.associate(public_name, link)?;
-        // debug!("The new NRS Map: {:?}", nrs_map);
-        //
-        //
-        // // store updated nrs_map
-        // let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
-        // let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
-        // let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
-        // let safe_url = Safe::parse_url(&url_str)?;
-        // let address = self.get_register_address(&safe_url)?;
-        // let entry_hash = self
-        //     .safe_client
-        //     .write_to_register(address, reg_entry, old_values)
-        //     .await?;
-
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
     }
 
@@ -207,21 +190,6 @@ impl Safe {
         // remove
         let entry_hash = self.multimap_remove(&url_str, current_versions).await?;
 
-        // // fetch and edit nrs_map
-        // let (mut nrs_map, version) = self.fetch_nrs_map(public_name, None).await?;
-        // nrs_map.remove(public_name)?;
-        //
-        // // store updated nrs_map
-        // let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
-        // let old_values: BTreeSet<EntryHash> = [version.entry_hash()].iter().copied().collect();
-        // let reg_entry = nrs_map_xorurl.as_bytes().to_vec();
-        // let safe_url = Safe::parse_url(&url_str)?;
-        // let address = self.get_register_address(&safe_url)?;
-        // let entry_hash = self
-        //     .safe_client
-        //     .write_to_register(address, reg_entry, old_values)
-        //     .await?;
-
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
     }
 
@@ -293,6 +261,12 @@ impl Safe {
                         .map(|(_hash, key_val)| key_val)
                         .collect();
                     let key_val = self.fetch_multimap_value_by_hash(&safe_url, hash).await?;
+                    let fetched_key = &key_val.0;
+
+                    // remove other entries with the same key
+                    key_vals.retain(|(k, _)| k != fetched_key);
+
+                    // insert the versioned entry
                     key_vals.insert(key_val);
                     key_vals
                 }
@@ -307,8 +281,10 @@ impl Safe {
         let set_len = raw_set.len();
         let raw_map: BTreeMap<Vec<u8>, Vec<u8>> = raw_set.clone().into_iter().collect();
         if raw_map.len() != set_len {
-            // let map_set = raw_map TODO user friendlier: tell users which key is dup
-            return Err(Error::RegisterFork("Multiple NRS map entries not managed, this happends when 2 clients write concurrently to a NRS map".to_string()));
+            let set_after_map: BTreeSet<(Vec<u8>, Vec<u8>)> = raw_map.into_iter().collect();
+            let dups: Vec<(Vec<u8>, Vec<u8>)> =
+                raw_set.difference(&set_after_map).cloned().collect();
+            return Err(Error::ConflictingNrsEntries("Found multiple entries for the same name, this happens when 2 clients write concurrently to the same NRS mapping. It can be fixed by simply associating a new link to the conflicting names.".to_string(), dups));
         }
 
         // deserialize and return
@@ -392,10 +368,10 @@ mod tests {
     use super::*;
     use crate::{
         app::test_helpers::{new_safe_instance, random_nrs_name},
-        retry_loop, retry_loop_for_pattern, Url,
+        retry_loop, retry_loop_for_pattern, Error, Url,
     };
     use anyhow::{anyhow, bail, Result};
-    use std::str::FromStr;
+    use std::{matches, str::FromStr};
 
     #[tokio::test]
     async fn test_nrs_create() -> Result<()> {
@@ -621,6 +597,66 @@ mod tests {
             Err(Error::InvalidInput(e)) => assert_eq!(e, expected_err),
             Err(_) => bail!("Expected an InvalidInput error kind, got smth else"),
         };
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_nrs_conflicting_names() -> Result<()> {
+        let site_name = random_nrs_name();
+        let mut safe = new_safe_instance().await?;
+
+        // let's create an empty files container so we have a valid to link
+        let (link, _, _) = safe
+            .files_container_create(None, None, true, true, false)
+            .await?;
+        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+
+        // associate a first name
+        let mut valid_link = Url::from_url(&link)?;
+        valid_link.set_content_version(Some(version0));
+
+        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &valid_link, false));
+        assert!(did_create);
+
+        let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
+
+        // manually add a conflicting name
+        let another_valid_url = nrs_url;
+        let url_str = validate_nrs_top_name(&site_name)?;
+        let entry = (
+            "".as_bytes().to_vec(),
+            another_valid_url.to_string().as_bytes().to_vec(),
+        );
+        let _ = safe
+            .multimap_insert(&url_str, entry, BTreeSet::new())
+            .await?;
+
+        // get should error out
+        let conflict_error =
+            retry_loop_for_pattern!(safe.nrs_get(&site_name, None), Err(_) if true);
+        assert!(matches!(
+            conflict_error,
+            Err(Error::ConflictingNrsEntries { .. })
+        ));
+
+        // check for the error content
+        if let Err(Error::ConflictingNrsEntries(_, dups)) = conflict_error {
+            let got_entries: Result<()> = dups
+                .into_iter().try_for_each(|(subname_bytes, url_bytes)| {
+                    let subname = str::from_utf8(&subname_bytes)?;
+                    let url = Url::from_url(str::from_utf8(&url_bytes)?)?;
+                    assert_eq!(subname, "");
+                    assert!(url == valid_link || url == another_valid_url);
+                    Ok(())
+                });
+            assert!(got_entries.is_ok());
+        }
+
+        // resolve the error
+        let _ = retry_loop!(safe.nrs_associate(&site_name, &valid_link, false));
+
+        // get should work now
+        let _ = retry_loop_for_pattern!(safe.nrs_get(&site_name, None), Ok((res_url, _)) if res_url == &valid_link)?;
         Ok(())
     }
 }

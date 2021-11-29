@@ -37,6 +37,9 @@ pub enum Error {
     /// AuthenticatorError
     #[error("AuthenticatorError: {0}")]
     AuthenticatorError(String),
+    /// ConflictingNrsEntries
+    #[error("ConflictingNrsEntries: {0}")]
+    ConflictingNrsEntries(String, Vec<(Vec<u8>, Vec<u8>)>),
     /// ConnectionError
     #[error("ConnectionError: {0}")]
     ConnectionError(String),
@@ -107,7 +110,4 @@ pub enum Error {
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),
-    /// RegisterFork
-    #[error("RegisterFork: {0}")]
-    RegisterFork(String),
 }
