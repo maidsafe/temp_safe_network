@@ -7,9 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{
-    Error, Result, Url,
-};
+use crate::{Error, Result, Url};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
