@@ -13,7 +13,7 @@ use super::{
 use crate::{
     client::{client_api::data::DataMapLevel, utils::encryption, Error, Result},
     messaging::data::{DataCmd, DataQuery, QueryResponse},
-    types::{BytesAddress, Chunk, ChunkAddress, Encryption, Scope},
+    types::{BytesAddress, Chunk, ChunkAddress, Encryption, PublicKey, Scope},
 };
 
 use bincode::deserialize;
@@ -130,27 +130,35 @@ impl Client {
     #[instrument(skip_all, level = "trace")]
     pub fn chunk_bytes(&self, bytes: Bytes, scope: Scope) -> Result<(BytesAddress, Vec<Chunk>)> {
         if let Ok(blob) = Blob::new(bytes.clone()) {
-            self.encrypt_blob(blob, scope)
+            Self::encrypt_blob(blob, scope, self.public_key())
         } else {
             let spot = Spot::new(bytes)?;
-            let (address, chunk) = self.package_spot(spot, scope)?;
+            let (address, chunk) = Self::package_spot(spot, scope, self.public_key())?;
             Ok((address, vec![chunk]))
         }
     }
 
     /// Encrypts a binary large object (blob) and returns the resulting address and all chunks.
     /// Does not store anything to the network.
-    #[instrument(skip(self, blob), level = "trace")]
-    fn encrypt_blob(&self, blob: Blob, scope: Scope) -> Result<(BytesAddress, Vec<Chunk>)> {
-        let owner = encryption(scope, self.public_key());
+    #[instrument(skip(blob), level = "trace")]
+    fn encrypt_blob(
+        blob: Blob,
+        scope: Scope,
+        public_key: PublicKey,
+    ) -> Result<(BytesAddress, Vec<Chunk>)> {
+        let owner = encryption(scope, public_key);
         encrypt_blob(blob.bytes(), owner.as_ref())
     }
 
-    /// Packages a small piece of t(d)ata (spot) and returns the resulting address and the chunk.
+    /// Packages a small piece of data (spot) and returns the resulting address and the chunk.
     /// The chunk content will be in plain text if it has public scope, or encrypted if it is instead private.
     /// Does not store anything to the network.
-    fn package_spot(&self, spot: Spot, scope: Scope) -> Result<(BytesAddress, Chunk)> {
-        let encryption = encryption(scope, self.public_key());
+    fn package_spot(
+        spot: Spot,
+        scope: Scope,
+        public_key: PublicKey,
+    ) -> Result<(BytesAddress, Chunk)> {
+        let encryption = encryption(scope, public_key);
         let chunk = to_chunk(spot.bytes(), encryption.as_ref())?;
         if chunk.value().len() >= self_encryption::MIN_ENCRYPTABLE_BYTES {
             return Err(Error::Generic("You might need to pad the `Spot` contents and then store it as a `Blob`, as the encryption has made it slightly too big".to_string()));
@@ -176,11 +184,27 @@ impl Client {
         }
     }
 
+    /// Calculates a Blob's/Spot's address from self encrypted chunks,
+    /// without storing them onto the network.
+    #[instrument(skip(bytes), level = "debug")]
+    pub fn calculate_address(bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
+        // we use just a random BLS public key as the owner
+        let public_key = PublicKey::Bls(bls::SecretKey::random().public_key());
+        if let Ok(blob) = Blob::new(bytes.clone()) {
+            let (head_address, _all_chunks) = Self::encrypt_blob(blob, scope, public_key)?;
+            Ok(head_address)
+        } else {
+            let spot = Spot::new(bytes)?;
+            let (address, _chunk) = Self::package_spot(spot, scope, public_key)?;
+            Ok(address)
+        }
+    }
+
     /// Directly writes a [`Blob`] to the network in the
     /// form of immutable self encrypted chunks, without any batching.
     #[instrument(skip_all, level = "trace")]
     async fn upload_blob(&self, blob: Blob, scope: Scope) -> Result<BytesAddress> {
-        let (head_address, all_chunks) = self.encrypt_blob(blob, scope)?;
+        let (head_address, all_chunks) = Self::encrypt_blob(blob, scope, self.public_key())?;
 
         let tasks = all_chunks.into_iter().map(|chunk| {
             let writer = self.clone();
@@ -200,7 +224,7 @@ impl Client {
     /// form of a single chunk, without any batching.
     #[instrument(skip_all, level = "trace")]
     async fn upload_spot(&self, spot: Spot, scope: Scope) -> Result<BytesAddress> {
-        let (address, chunk) = self.package_spot(spot, scope)?;
+        let (address, chunk) = Self::package_spot(spot, scope, self.public_key())?;
         self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
         Ok(address)
     }
@@ -633,9 +657,12 @@ mod tests {
             tracing::info_span!("store_and_read_private_blob", size).entered()
         };
 
-        let blob = Blob::new(random_bytes(size))?;
+        let blob_bytes = random_bytes(size);
+        let blob = Blob::new(blob_bytes.clone())?;
 
+        let expected_address = Client::calculate_address(blob_bytes, scope)?;
         let address = client.upload_blob(blob.clone(), scope).await?;
+        assert_eq!(address, expected_address);
 
         // the larger the file, the longer we have to wait before we start querying
         let delay = tokio::time::Duration::from_secs(usize::max(1, size / DELAY_DIVIDER) as u64);
@@ -658,10 +685,14 @@ mod tests {
             tracing::info_span!("store_and_read_private_spot", size).entered()
         };
 
-        let spot = Spot::new(random_bytes(size))?;
+        let spot_bytes = random_bytes(size);
+
+        let spot = Spot::new(spot_bytes.clone())?;
         let client = create_test_client().await?;
 
+        let expected_address = Client::calculate_address(spot_bytes, scope)?;
         let address = client.upload_spot(spot.clone(), scope).await?;
+        assert_eq!(address, expected_address);
 
         // the larger the size, the longer we have to wait before we start querying
         let delay = tokio::time::Duration::from_secs(usize::max(1, size / DELAY_DIVIDER) as u64);

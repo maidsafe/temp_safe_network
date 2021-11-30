@@ -99,9 +99,12 @@ impl SafeAppClient {
     //
     pub async fn store_bytes(&self, bytes: Bytes, dry_run: bool) -> Result<XorName> {
         let xorname = if dry_run {
-            // I don't see the equivalent API for doing a dry run, so just returning the default
-            // address for now.
-            XorName::default()
+            debug!(
+                "Calculating network address for {} bytes of data",
+                bytes.len()
+            );
+            let address = Client::calculate_address(bytes, Scope::Public)?;
+            *address.name()
         } else {
             debug!("Storing {} bytes of data", bytes.len());
             let client = self.get_safe_client()?;
