@@ -243,7 +243,7 @@ jobs:
       - name: Print Network Log Stats
         shell: bash
         run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
 
       - name: Upload Node Logs to AWS
