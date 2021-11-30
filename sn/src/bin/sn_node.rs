@@ -118,9 +118,7 @@ async fn run_node() -> Result<()> {
         if config.json_logs {
             builder.json().init();
         } else {
-            builder
-                // .event_format(LogFormatter::default())
-                .init();
+            builder.event_format(LogFormatter::default()).init();
         }
 
         Some(guard)
