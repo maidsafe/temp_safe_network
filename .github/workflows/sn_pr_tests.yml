@@ -149,6 +149,11 @@ jobs:
         run: ./resources/scripts/network_is_ready_cli.sh
         timeout-minutes: 5
 
+      - name: Print Network Log Stats at start
+        shell: bash
+        run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+
       - name: Run network asserts one by one
         shell: bash
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
