@@ -223,6 +223,26 @@ impl<'a> Join<'a> {
                             node_state_serialized
                         };
 
+                    let sig_pk = sig_share.public_key_set.public_key();
+
+                    if sig_pk != section_key {
+                        info!(
+                            "ApprovalShare from {} has the wrong signing section key (expected: {:?}, actual: {:?}), retrying",
+                            sender,
+                            section_key,
+                            sig_share.public_key_set.public_key()
+                        );
+
+                        let join_request = JoinRequest {
+                            section_key,
+                            resource_proof_response: None,
+                            aggregated: None,
+                        };
+                        self.send_join_requests(join_request, &[sender], section_key, true)
+                            .await?;
+                        continue;
+                    }
+
                     info!("Aggregating received ApprovalShare from {:?}", sender);
                     match self
                         .signature_aggregator
