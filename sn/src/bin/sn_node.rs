@@ -119,7 +119,7 @@ async fn run_node() -> Result<()> {
             builder.json().init();
         } else {
             builder
-                // .event_format(LogFormatter::default())
+                .event_format(LogFormatter::default())
                 .init();
         }
 
