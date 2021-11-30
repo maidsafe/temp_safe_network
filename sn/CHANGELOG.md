@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.44.5 (2021-11-30)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - only check split count for health check for now ([`d364a7e`](https://github.com/maidsafe/safe_network/commit/d364a7e364827b2d71f196a9f897b7d613bbab94))
+    - log desired elder count during health check ([`0da3c99`](https://github.com/maidsafe/safe_network/commit/0da3c99785e026075214b7cfa7933f64420aa00f))
+    - add SN_AE_WAIT env var ([`9deb9e7`](https://github.com/maidsafe/safe_network/commit/9deb9e7e2ae5d909eeb745e9021cf7660ed55dc3))
+    - spawn writing prefix_map to disk as separate thread ([`e841ae0`](https://github.com/maidsafe/safe_network/commit/e841ae0cf3caf852e8a48b559dcffb64b7fcecad))
+</details>
+
 ## v0.44.4 (2021-11-30)
 
 ### New Features
@@ -36,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - spawn writing prefix_map to disk as separate thread ([`e841ae0`](https://github.com/maidsafe/safe_network/commit/e841ae0cf3caf852e8a48b559dcffb64b7fcecad))
+    - safe_network-0.44.4 ([`984c5f8`](https://github.com/maidsafe/safe_network/commit/984c5f83e3f4d889dc4e0583b09571e540357cf9))
     - start a fresh round of joins when aggregation is erroring. ([`d2c3521`](https://github.com/maidsafe/safe_network/commit/d2c352198c0e421cf4b7327a17c4343dc693b2dd))
     - increase join node aggregatin expiration. ([`9885536`](https://github.com/maidsafe/safe_network/commit/9885536afe337bf109e3ab18eec054100bf3fd82))
     - improve node logging ([`cf67a37`](https://github.com/maidsafe/safe_network/commit/cf67a374ae5aa5a9f95d39357fdbd937eb5e1a1a))
