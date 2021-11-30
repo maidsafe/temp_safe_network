@@ -36,6 +36,8 @@ use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
 
+const JOIN_SHARE_EXPIRATION_DURATION: Duration = Duration::from_secs(300);
+
 /// Join the network as new node.
 ///
 /// NOTE: It's not guaranteed this function ever returns. This can happen due to messages being
@@ -89,7 +91,7 @@ impl<'a> Join<'a> {
             node,
             prefix: Prefix::default(),
             prefix_map,
-            signature_aggregator: SignatureAggregator::new(),
+            signature_aggregator: SignatureAggregator::with_expiration(JOIN_SHARE_EXPIRATION_DURATION),
             node_state_serialized: None,
             backoff: ExponentialBackoff {
                 initial_interval: Duration::from_millis(50),
