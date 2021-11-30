@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.44.5 (2021-11-30)
+## v0.45.0 (2021-11-30)
+
+### chore (BREAKING)
+
+ - <csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/> include remote addrs in listerners threads log entries
+
 
 ### Commit Statistics
 
@@ -22,9 +27,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - include remote addrs in listerners threads log entries ([`f3d3ab2`](https://github.com/maidsafe/safe_network/commit/f3d3ab2b059040ff08b6239c8a6583c64eac160e))
     - only check split count for health check for now ([`d364a7e`](https://github.com/maidsafe/safe_network/commit/d364a7e364827b2d71f196a9f897b7d613bbab94))
     - log desired elder count during health check ([`0da3c99`](https://github.com/maidsafe/safe_network/commit/0da3c99785e026075214b7cfa7933f64420aa00f))
     - add SN_AE_WAIT env var ([`9deb9e7`](https://github.com/maidsafe/safe_network/commit/9deb9e7e2ae5d909eeb745e9021cf7660ed55dc3))
+</details>
+
+## v0.44.5 (2021-11-30)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.44.5 ([`aaab10b`](https://github.com/maidsafe/safe_network/commit/aaab10b3a5a44d9ec844757c71ac091016f51fd1))
     - spawn writing prefix_map to disk as separate thread ([`e841ae0`](https://github.com/maidsafe/safe_network/commit/e841ae0cf3caf852e8a48b559dcffb64b7fcecad))
 </details>
 
