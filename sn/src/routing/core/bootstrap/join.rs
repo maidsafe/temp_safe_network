@@ -76,6 +76,7 @@ struct Join<'a> {
     signature_aggregator: SignatureAggregator,
     node_state_serialized: Option<Vec<u8>>,
     backoff: ExponentialBackoff,
+    aggregation_errors: usize,
 }
 
 impl<'a> Join<'a> {
@@ -91,7 +92,9 @@ impl<'a> Join<'a> {
             node,
             prefix: Prefix::default(),
             prefix_map,
-            signature_aggregator: SignatureAggregator::with_expiration(JOIN_SHARE_EXPIRATION_DURATION),
+            signature_aggregator: SignatureAggregator::with_expiration(
+                JOIN_SHARE_EXPIRATION_DURATION,
+            ),
             node_state_serialized: None,
             backoff: ExponentialBackoff {
                 initial_interval: Duration::from_millis(50),
@@ -99,6 +102,7 @@ impl<'a> Join<'a> {
                 max_elapsed_time: Some(Duration::from_secs(60)),
                 ..Default::default()
             },
+            aggregation_errors: 0,
         }
     }
 
@@ -285,6 +289,31 @@ impl<'a> Join<'a> {
                                 "Error received as part of signature aggregation during join: {:?}",
                                 error
                             );
+                            self.aggregation_errors += 1;
+
+                            // if we've have aggregation errors, we should start fresh as there's likely been a key change
+                            if self.aggregation_errors >= recipients.len() / 2 {
+                                let join_request = JoinRequest {
+                                    section_key,
+                                    resource_proof_response: None,
+                                    aggregated: None,
+                                };
+
+                                // reset aggregation
+                                self.aggregation_errors = 0;
+                                self.signature_aggregator = SignatureAggregator::with_expiration(
+                                    JOIN_SHARE_EXPIRATION_DURATION,
+                                );
+
+                                self.send_join_requests(
+                                    join_request,
+                                    &recipients,
+                                    section_key,
+                                    true,
+                                )
+                                .await?;
+                            }
+
                             continue;
                         }
                     }
