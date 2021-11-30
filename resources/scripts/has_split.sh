@@ -20,6 +20,7 @@ prefix1_prior_elder_nodes=$(rg "StillElderAfterAplit: Prefix\(1\)" "$log_dir" -g
 prefix1_new_elder_nodes=$(rg "PromotedToElder: Prefix\(1\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
 prefix0_prior_elder_nodes=$(rg "StillElderAfterAplit: Prefix\(0\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
 prefix0_new_elder_nodes=$(rg "PromotedToElder: Prefix\(0\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
+split_count=$(rg "LogMarker::SplitSuccess" "$log_dir" -g "*.log.*"  -u -c | wc -l)
 
 
 echo "Prefix(1) prior nodes found: $prefix1_prior_elder_nodes ."
@@ -32,8 +33,8 @@ total_prefix1_elders=$(($prefix1_new_elder_nodes + $prefix1_prior_elder_nodes))
 total_elders=$(($total_prefix1_elders + $total_prefix0_elders))
 
 
-# 14 elders or more (we're not discounting demotions here...)
-if ! [[ $total_elders -gt $((2*$ELDER_COUNT - 1)) ]]
+# 14 elders after or more (we're not discounting demotions here...)
+if ! [[ $split_count -gt $((2*$ELDER_COUNT - 1)) ]]
     then
         echo "No split, retry or perhaps change NODE_COUNT!"
         exit 100
