@@ -141,7 +141,7 @@ jobs:
       - name: Healthcheck
         run: ./resources/scripts/has_split.sh
         shell: bash
-        timeout-minutes: 5
+        timeout-minutes: 1
         continue-on-error: true
 
       - name: Wait for a healthy network
@@ -228,16 +228,10 @@ jobs:
 
       - name: Are nodes still running...?
         shell: bash
+        timeout-minutes: 1
         if: failure() && matrix.os
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
-
-      - name: Are nodes still running...?
-        if: failure() && matrix.os == 'windows-latest'
-        shell: bash
-        run: |
-          echo "$(tasklist | FIND "sn_node.exe" | find /c /v "") nodes still running"
           ls $HOME/.safe/node/local-test-network
 
       - name: Print Network Log Stats
