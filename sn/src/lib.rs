@@ -227,7 +227,10 @@ mod tests {
 
         let desired_elder_count = elder_count();
         println!("Found splits: {:?}", split_count);
-        println!("Desired elder_count() per section: {:?}", desired_elder_count);
+        println!(
+            "Desired elder_count() per section: {:?}",
+            desired_elder_count
+        );
         println!("Promoted to elder so far: {:?}", promoted_to_elder_nodes);
 
         let total_elders = prefix0_prior_elder_nodes
