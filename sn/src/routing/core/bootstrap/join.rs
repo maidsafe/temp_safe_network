@@ -31,6 +31,7 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof;
+use std::collections::BTreeMap;
 use tokio::time::sleep;
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
@@ -170,7 +171,7 @@ impl<'a> Join<'a> {
                     error!("Network is set to not taking any new joining node, try join later.");
                     return Err(Error::TryJoinLater);
                 }
-                JoinResponse::Rejected(JoinRejectionReason::DKGUnderway) => {
+                JoinResponse::Rejected(JoinRejectionReason::DkgUnderway) => {
                     error!("The Section we are trying to join is going through DKG, backing off and retrying again");
                     self.send_join_requests(join_request.clone(), &recipients, section_key, true)
                         .await?;

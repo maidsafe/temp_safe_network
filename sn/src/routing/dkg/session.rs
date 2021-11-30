@@ -185,10 +185,6 @@ impl Session {
         Ok(commands)
     }
 
-    pub(crate) fn is_finalized(&self) -> bool {
-        self.key_gen.is_finalized()
-    }
-
     pub(crate) fn handle_timeout(
         &mut self,
         node: &Node,
