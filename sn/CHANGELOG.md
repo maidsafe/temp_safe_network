@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.44.2 (2021-11-30)
+
+### Bug Fixes
+
+ - <csr-id-5523d0fcca7bbbbd05b6d125692f5fbd1a8f50d7/> avoid use outdated keyshare status
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - move key_share check into network_knowledge_update ([`a3c5ef6`](https://github.com/maidsafe/safe_network/commit/a3c5ef63f37ec0d2f98d45176e27da7de31baabc))
+    - avoid use outdated keyshare status ([`5523d0f`](https://github.com/maidsafe/safe_network/commit/5523d0fcca7bbbbd05b6d125692f5fbd1a8f50d7))
+    - remove Core::is_dkg_underway flag which is not necessary ([`10e135b`](https://github.com/maidsafe/safe_network/commit/10e135b4f77dcd30de99eb7bc370ba1e15bbd148))
+</details>
+
 ## v0.44.1 (2021-11-29)
 
 ### Bug Fixes
@@ -31,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - remove Core::is_dkg_underway flag which is not necessary ([`10e135b`](https://github.com/maidsafe/safe_network/commit/10e135b4f77dcd30de99eb7bc370ba1e15bbd148))
+    - safe_network-0.44.1 ([`14c84c9`](https://github.com/maidsafe/safe_network/commit/14c84c9db23557626e4889eff0ff403a574dccad))
     - restore `ServiceMsg` authority check ([`0e505be`](https://github.com/maidsafe/safe_network/commit/0e505be2f57ab427cd3ed8c9564fd8b84909f6f3))
 </details>
 
