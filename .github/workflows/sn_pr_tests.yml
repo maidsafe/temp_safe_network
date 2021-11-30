@@ -13,7 +13,9 @@ env:
   SN_CLIENT_QUERY_TIMEOUT: 270
   NODE_COUNT: 33
   SN_ELDER_COUNT: 5
-
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
   tests:
@@ -243,6 +245,11 @@ jobs:
         run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success'
 
+
+      - name: Upload Node Logs to AWS
+          # Upload artifacts.
+        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{matrix.os}}/${{env.GITHUB_RUN_ID}}-${{env.GITHUB_RUN_NUMBER}}
+        if: failure()
 
       - name: Upload Node Logs
           # Upload artifacts.
