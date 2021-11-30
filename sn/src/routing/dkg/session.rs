@@ -185,8 +185,6 @@ impl Session {
         Ok(commands)
     }
 
-
-
     pub(crate) fn handle_timeout(
         &mut self,
         node: &Node,
