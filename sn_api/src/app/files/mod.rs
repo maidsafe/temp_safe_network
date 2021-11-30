@@ -1303,7 +1303,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "dry_run not implemented"]
     async fn test_files_container_create_dry_run() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let filename = "./testdata/";
@@ -1594,7 +1593,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "dry_run not implemented"]
     async fn test_files_container_sync_dry_run() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
@@ -2367,7 +2365,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "dry_run not implemented"]
     async fn test_files_container_add_dry_run() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
