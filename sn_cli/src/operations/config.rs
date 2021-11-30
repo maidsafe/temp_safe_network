@@ -219,7 +219,7 @@ impl Config {
             NetworkInfo::NodeConfig(_) => {}
             NetworkInfo::ConnInfoLocation(location) => {
                 let result = url::Url::parse(location);
-                if result.is_err() {
+                if result.is_err() || !result.unwrap().has_host() {
                     // The location is not a valid URL, so try and parse it as a file.
                     let pb = PathBuf::from(Path::new(&location));
                     if !pb.is_file() {
@@ -623,7 +623,7 @@ mod add_network {
     use predicates::prelude::*;
     use std::collections::BTreeSet;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn given_network_info_not_supplied_then_current_network_config_will_be_cached() -> Result<()> {
@@ -669,11 +669,9 @@ mod add_network {
             NetworkInfo::NodeConfig(_) => {
                 return Err(eyre!("node config doesn't apply to this test"));
             }
-            NetworkInfo::ConnInfoLocation(path) => {
-                assert_eq!(
-                    *path,
-                    String::from(new_network_file.path().to_str().unwrap())
-                );
+            NetworkInfo::ConnInfoLocation(conn_info_path) => {
+                let path = Path::new(conn_info_path);
+                assert_eq!(path, new_network_file.path());
             }
         }
         Ok(())
@@ -742,7 +740,7 @@ mod add_network {
     #[test]
     fn given_no_pre_existing_config_and_a_non_existent_file_path_is_used_then_the_result_should_be_an_error(
     ) -> Result<()> {
-        let config_dir = assert_fs::TempDir::new()?;
+        let config_dir = assert_fs::TempDir::new()?.into_persistent();
         let cli_config_file = config_dir.child(".safe/cli/config.json");
         let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
         let mut config = Config::new(
@@ -771,7 +769,11 @@ mod add_network {
     ) -> Result<()> {
         let config_dir = assert_fs::TempDir::new()?;
         let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
+        let node_config_file = config_dir.child(
+            Path::new(".safe")
+                .join("node")
+                .join("node_connection_info.config"),
+        );
         node_config_file.write_str("file that is not a network config")?;
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),

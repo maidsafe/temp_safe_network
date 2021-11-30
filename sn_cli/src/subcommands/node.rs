@@ -280,7 +280,7 @@ mod run_command {
     use crate::operations::node::SN_NODE_EXECUTABLE;
     use assert_fs::prelude::*;
     use color_eyre::{eyre::eyre, Result};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     // Each of these tests will assume the launch tool runs successfully and a node config is
     // written out as a result of the running network. This dummy config will be read when the
@@ -660,11 +660,9 @@ mod run_command {
             NetworkInfo::NodeConfig(_) => {
                 return Err(eyre!("node config doesn't apply to this test"));
             }
-            NetworkInfo::ConnInfoLocation(path) => {
-                assert_eq!(
-                    *path,
-                    String::from(baby_fleming_config_file.path().to_str().unwrap())
-                );
+            NetworkInfo::ConnInfoLocation(conn_info_path) => {
+                let path = Path::new(conn_info_path);
+                assert_eq!(path, baby_fleming_config_file.path());
             }
         }
 
