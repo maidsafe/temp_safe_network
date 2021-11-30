@@ -10,10 +10,12 @@ env:
   RUST_LOG: "safe_network=trace"
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
-  SN_CLIENT_QUERY_TIMEOUT: 180
-  NODE_COUNT: 33
+  SN_CLIENT_QUERY_TIMEOUT: 270
+  NODE_COUNT: 45
   SN_ELDER_COUNT: 5
-
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
   tests:
@@ -131,6 +133,11 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
 
+      - name: Print Network Log Stats at start
+        shell: bash
+        run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+
       - name: Healthcheck
         run: ./resources/scripts/has_split.sh
         shell: bash
@@ -149,10 +156,6 @@ jobs:
         run: ./resources/scripts/network_is_ready_cli.sh
         timeout-minutes: 5
 
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: Run network asserts one by one
         shell: bash
@@ -173,13 +176,13 @@ jobs:
       - name: Client reg tests against local network
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       # blob api unix
       - name: Unix client blob tests against local network
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 10
@@ -240,8 +243,13 @@ jobs:
       - name: Print Network Log Stats
         shell: bash
         run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
+
+      - name: Upload Node Logs to AWS
+          # Upload artifacts.
+        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{matrix.os}}/${{env.GITHUB_RUN_ID}}-${{env.GITHUB_RUN_NUMBER}}
+        if: failure()
 
       - name: Upload Node Logs
           # Upload artifacts.
