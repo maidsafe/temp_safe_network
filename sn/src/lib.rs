@@ -203,7 +203,7 @@ mod tests {
             search_testnet_results_per_node(LogMarker::PromotedToElder.to_string())?.len();
         let prefix1_prior_elder_nodes = search_testnet_results_per_node(format!(
             r"{}: Prefix\(1\)",
-            LogMarker::StillElderAfterAplit
+            LogMarker::StillElderAfterSplit
         ))?
         .len();
         let prefix1_new_elder_nodes = search_testnet_results_per_node(format!(
@@ -213,7 +213,7 @@ mod tests {
         .len();
         let prefix0_prior_elder_nodes = search_testnet_results_per_node(format!(
             r"{}: Prefix\(0\)",
-            LogMarker::StillElderAfterAplit
+            LogMarker::StillElderAfterSplit
         ))?
         .len();
         let prefix0_new_elder_nodes = search_testnet_results_per_node(format!(
