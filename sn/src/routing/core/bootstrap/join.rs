@@ -37,7 +37,8 @@ use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
 
-const JOIN_SHARE_EXPIRATION_DURATION: Duration = Duration::from_secs(300);
+// arbitrarily long. No join in a non splitting section should fail to get signature shares in anything like a few minutes
+const JOIN_SHARE_EXPIRATION_DURATION: Duration = Duration::from_secs(900);
 
 /// Join the network as new node.
 ///
@@ -74,10 +75,9 @@ struct Join<'a> {
     node: Node,
     prefix: Prefix,
     prefix_map: NetworkPrefixMap,
-    signature_aggregator: SignatureAggregator,
+    signature_aggregators: BTreeMap<BlsPublicKey, SignatureAggregator>,
     node_state_serialized: Option<Vec<u8>>,
     backoff: ExponentialBackoff,
-    aggregation_errors: usize,
 }
 
 impl<'a> Join<'a> {
@@ -93,9 +93,7 @@ impl<'a> Join<'a> {
             node,
             prefix: Prefix::default(),
             prefix_map,
-            signature_aggregator: SignatureAggregator::with_expiration(
-                JOIN_SHARE_EXPIRATION_DURATION,
-            ),
+            signature_aggregators: BTreeMap::default(),
             node_state_serialized: None,
             backoff: ExponentialBackoff {
                 initial_interval: Duration::from_millis(50),
@@ -103,7 +101,6 @@ impl<'a> Join<'a> {
                 max_elapsed_time: Some(Duration::from_secs(60)),
                 ..Default::default()
             },
-            aggregation_errors: 0,
         }
     }
 
@@ -250,12 +247,14 @@ impl<'a> Join<'a> {
                         continue;
                     }
 
+                    // get the aggregator or make a new one for this new section public key
+                    let aggregator =
+                        self.signature_aggregators.entry(sig_pk).or_insert_with(|| {
+                            SignatureAggregator::with_expiration(JOIN_SHARE_EXPIRATION_DURATION)
+                        });
+
                     info!("Aggregating received ApprovalShare from {:?}", sender);
-                    match self
-                        .signature_aggregator
-                        .add(&serialized_details, sig_share.clone())
-                        .await
-                    {
+                    match aggregator.add(&serialized_details, sig_share.clone()).await {
                         Ok(sig) => {
                             info!("Successfully aggregated ApprovalShares for joining the network");
 
@@ -290,30 +289,16 @@ impl<'a> Join<'a> {
                                 "Error received as part of signature aggregation during join: {:?}",
                                 error
                             );
-                            self.aggregation_errors += 1;
 
                             // if we've have aggregation errors, we should start fresh as there's likely been a key change
-                            if self.aggregation_errors >= recipients.len() / 2 {
-                                let join_request = JoinRequest {
-                                    section_key,
-                                    resource_proof_response: None,
-                                    aggregated: None,
-                                };
+                            let join_request = JoinRequest {
+                                section_key,
+                                resource_proof_response: None,
+                                aggregated: None,
+                            };
 
-                                // reset aggregation
-                                self.aggregation_errors = 0;
-                                self.signature_aggregator = SignatureAggregator::with_expiration(
-                                    JOIN_SHARE_EXPIRATION_DURATION,
-                                );
-
-                                self.send_join_requests(
-                                    join_request,
-                                    &recipients,
-                                    section_key,
-                                    true,
-                                )
+                            self.send_join_requests(join_request, &recipients, section_key, true)
                                 .await?;
-                            }
 
                             continue;
                         }
