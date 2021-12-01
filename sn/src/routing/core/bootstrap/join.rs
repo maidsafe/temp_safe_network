@@ -223,24 +223,6 @@ impl<'a> Join<'a> {
 
                     let sig_pk = sig_share.public_key_set.public_key();
 
-                    if sig_pk != section_key {
-                        info!(
-                            "ApprovalShare from {} has the wrong signing section key (expected: {:?}, actual: {:?}), retrying",
-                            sender,
-                            section_key,
-                            sig_share.public_key_set.public_key()
-                        );
-
-                        let join_request = JoinRequest {
-                            section_key,
-                            resource_proof_response: None,
-                            aggregated: None,
-                        };
-                        self.send_join_requests(join_request, &[sender], section_key, true)
-                            .await?;
-                        continue;
-                    }
-
                     // get the aggregator or make a new one for this new section public key
                     let aggregator =
                         self.signature_aggregators.entry(sig_pk).or_insert_with(|| {
@@ -284,15 +266,22 @@ impl<'a> Join<'a> {
                                 error
                             );
 
-                            // if we've have aggregation errors, we should start fresh as there's likely been a key change
-                            let join_request = JoinRequest {
-                                section_key,
-                                resource_proof_response: None,
-                                aggregated: None,
-                            };
+                            if sig_pk != section_key {
+                                // if we've have aggregation errors, we attempt a fresh join as there's likely been a key change
+                                let join_request = JoinRequest {
+                                    section_key,
+                                    resource_proof_response: None,
+                                    aggregated: None,
+                                };
 
-                            self.send_join_requests(join_request, &recipients, section_key, true)
+                                self.send_join_requests(
+                                    join_request,
+                                    &recipients,
+                                    section_key,
+                                    true,
+                                )
                                 .await?;
+                            }
 
                             continue;
                         }
