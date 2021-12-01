@@ -5,7 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.46.1 (2021-12-01)
+
+### Bug Fixes
+
+ - <csr-id-8de5ecf50008793546760621d906f23e8fe9791f/> make has_split.sh detect SplitSuccess correctly
+ - <csr-id-8cfc5a4adf8a31bf6916273597cf4c18aa5adc46/> reduce backoff time; avoid start DKG shrink elders
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - make has_split.sh detect SplitSuccess correctly ([`8de5ecf`](https://github.com/maidsafe/safe_network/commit/8de5ecf50008793546760621d906f23e8fe9791f))
+    - reduce backoff time; avoid start DKG shrink elders ([`8cfc5a4`](https://github.com/maidsafe/safe_network/commit/8cfc5a4adf8a31bf6916273597cf4c18aa5adc46))
+    - unify skip port forwarding arguments ([`3f77429`](https://github.com/maidsafe/safe_network/commit/3f77429e8bd659a5b2e7aa377437fac1b3d709c0))
+</details>
+
 ## v0.46.0 (2021-12-01)
+
+<csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/>
 
 ### New Features
 
@@ -31,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - unify skip port forwarding arguments ([`3f77429`](https://github.com/maidsafe/safe_network/commit/3f77429e8bd659a5b2e7aa377437fac1b3d709c0))
+    - safe_network-0.46.0 ([`8ea9498`](https://github.com/maidsafe/safe_network/commit/8ea94983b37b1d559358a62d6ca075b97c193f0d))
     - safe_network-0.45.0 ([`a7e0585`](https://github.com/maidsafe/safe_network/commit/a7e058536ae6ae27228bd2254ea6465c5eface35))
     - expose API for calculate Blob/Spot address without a network connection ([`24f1aa0`](https://github.com/maidsafe/safe_network/commit/24f1aa0208e3e474862c18b21ea9f048cb6abf25))
     - include remote addrs in listerners threads log entries ([`f3d3ab2`](https://github.com/maidsafe/safe_network/commit/f3d3ab2b059040ff08b6239c8a6583c64eac160e))
