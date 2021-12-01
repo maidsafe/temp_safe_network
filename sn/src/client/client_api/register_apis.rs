@@ -16,18 +16,58 @@ use crate::types::{
     },
     PublicKey, RegisterAddress as Address,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
+
+/// Register Operation Batch
+///
+/// Batches up register write operation before publishing them up to the network.
+/// Can also be used as a way to implement dry runs:
+/// nothing is uploaded to the network as long as the batch is not published.
+/// Batches can be republished without duplication risks thanks to the CRDT nature of registers.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RegisterOpBatch {
+    batch: Vec<DataCmd>,
+}
+
+impl RegisterOpBatch {
+    /// Creates a new RegisterOpBatch from a register data cmd
+    pub(crate) fn new(cmd: DataCmd) -> RegisterOpBatch {
+        RegisterOpBatch { batch: vec![cmd] }
+    }
+
+    /// Merge together with another register operation batch
+    ///
+    /// Merges the given batch into itself
+    pub fn merge(&mut self, mut other: RegisterOpBatch) {
+        self.batch.append(&mut other.batch);
+    }
+}
 
 impl Client {
     //----------------------
     // Write Operations
     //---------------------
 
+    /// Publish all register mutation operations in a batch to the network
+    ///
+    /// Batches can be republished without duplication risks thanks to the CRDT nature of registers.
+    #[instrument(skip(self), level = "debug")]
+    pub async fn publish_register_op_batch(&self, batch: &RegisterOpBatch) -> Result<(), Error> {
+        for cmd in &batch.batch {
+            self.send_cmd(cmd.clone()).await?;
+        }
+        Ok(())
+    }
+
     /// Create a Private Register onto the Network
     ///
     /// Creates a private Register on the network which can then be written to.
     /// Private data can be removed from the network at a later date.
+    ///
+    /// Returns a batch of register operations, note that the changes are not uploaded to the
+    /// network until the batch is published with `publish_register_op_batch`
     ///
     /// A tag must be supplied.
     /// A xorname must be supplied, this can be random or deterministic as per your apps needs.
@@ -38,22 +78,26 @@ impl Client {
         tag: u64,
         owner: PublicKey,
         permissions: BTreeMap<PublicKey, PrivatePermissions>,
-    ) -> Result<Address, Error> {
+    ) -> Result<(Address, RegisterOpBatch), Error> {
         let pk = self.public_key();
         let policy = PrivatePolicy { owner, permissions };
         let priv_register = Register::new_private(pk, name, tag, Some(policy));
         let address = *priv_register.address();
 
-        self.pay_and_write_register_to_network(priv_register)
+        let batch = self
+            .batch_up_pay_write_register_to_network(priv_register)
             .await?;
 
-        Ok(address)
+        Ok((address, batch))
     }
 
     /// Create a Public Register onto the Network
     ///
     /// Creates a public Register on the network which can then be written to.
     /// Public data _can not_ be removed from the network at a later date.
+    ///
+    /// Returns a batch of register operations, note that the changes are not uploaded to the
+    /// network until the batch is published with `publish_register_op_batch`
     ///
     /// A tag must be supplied.
     /// A xorname must be supplied, this can be random or deterministic as per your apps needs.
@@ -64,27 +108,38 @@ impl Client {
         tag: u64,
         owner: PublicKey,
         permissions: BTreeMap<User, PublicPermissions>,
-    ) -> Result<Address, Error> {
+    ) -> Result<(Address, RegisterOpBatch), Error> {
         let pk = self.public_key();
         let policy = PublicPolicy { owner, permissions };
         let pub_register = Register::new_public(pk, name, tag, Some(policy));
         let address = *pub_register.address();
 
-        self.pay_and_write_register_to_network(pub_register).await?;
+        let batch = self
+            .batch_up_pay_write_register_to_network(pub_register)
+            .await?;
 
-        Ok(address)
+        Ok((address, batch))
     }
 
     /// Delete Register
     ///
-    /// You're only able to delete a PrivateRegister. Public data can no be removed from the network.
+    /// Returns a batch of register operations, note that the changes are not uploaded to the
+    /// network until the batch is published with `publish_register_op_batch`
+    ///
+    /// You're only able to delete a PrivateRegister. Public data can not be removed from the network.
     #[instrument(skip(self), level = "debug")]
-    pub async fn delete_register(&self, address: Address) -> Result<(), Error> {
+    pub async fn delete_register(&self, address: Address) -> Result<RegisterOpBatch, Error> {
         let cmd = DataCmd::Register(RegisterWrite::Delete(address));
-        self.send_cmd(cmd).await
+
+        let batch = RegisterOpBatch::new(cmd);
+
+        Ok(batch)
     }
 
     /// Write to Register
+    ///
+    /// Returns a batch of register operations, note that the changes are not uploaded to the
+    /// network until the batch is published with `publish_register_op_batch`
     ///
     /// Public or private isn't important for writing, though the data you write will
     /// be Public or Private according to the type of the targeted Register.
@@ -94,7 +149,7 @@ impl Client {
         address: Address,
         entry: Entry,
         children: BTreeSet<EntryHash>,
-    ) -> Result<EntryHash, Error> {
+    ) -> Result<(EntryHash, RegisterOpBatch), Error> {
         // First we fetch it so we can get the causality info,
         // either from local CRDT replica or from the network if not found
         let mut register = self.get_register(address).await?;
@@ -105,22 +160,26 @@ impl Client {
         let signature = self.keypair.sign(&bytes);
         op.signature = Some(signature);
 
-        // Finally we can send the mutation to the network's replicas
+        // Finally we package the mutation for the network's replicas (its now ready to be sent)
         let cmd = DataCmd::Register(RegisterWrite::Edit(op));
-        self.send_cmd(cmd).await?;
-
-        Ok(hash)
+        let batch = RegisterOpBatch::new(cmd);
+        Ok((hash, batch))
     }
 
     /// Store a new Register data object
     /// Wraps msg_contents for payment validation and mutation
+    ///
+    /// Returns a batch of register operations, note that the changes are not uploaded to the
+    /// network until the batch is published with `publish_register_op_batch`
     #[instrument(skip_all, level = "trace")]
-    pub(crate) async fn pay_and_write_register_to_network(
+    pub(crate) async fn batch_up_pay_write_register_to_network(
         &self,
         data: Register,
-    ) -> Result<(), Error> {
+    ) -> Result<RegisterOpBatch, Error> {
         let cmd = DataCmd::Register(RegisterWrite::New(data));
-        self.send_cmd(cmd).await
+
+        let batch = RegisterOpBatch::new(cmd);
+        Ok(batch)
     }
 
     //----------------------
@@ -234,6 +293,66 @@ mod tests {
     use xor_name::XorName;
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_register_batching() -> Result<()> {
+        init_test_logger();
+        let _outer_span = tracing::info_span!("test__register_basics").entered();
+
+        let client = create_test_client().await?;
+        let one_sec = tokio::time::Duration::from_secs(1);
+        let name = XorName(rand::random());
+        let tag = 15000;
+        let owner = client.public_key();
+
+        // store a Private Register
+        let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
+        let _ = perms.insert(owner, PrivatePermissions::new(true, true));
+        let (address, mut batch) = client
+            .store_private_register(name, tag, owner, perms)
+            .await?;
+
+        // make sure private register was not created
+        tokio::time::sleep(one_sec).await;
+        let register = client.get_register(address).await;
+        assert!(register.is_err());
+
+        // store a Public Register
+        let mut perms = BTreeMap::<User, PublicPermissions>::new();
+        let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
+        let (address2, batch2) = client
+            .store_public_register(name, tag, owner, perms)
+            .await?;
+
+        // make sure public register was not created
+        tokio::time::sleep(one_sec).await;
+        let register = client.get_register(address2).await;
+        assert!(register.is_err());
+
+        // batch them up
+        batch.merge(batch2);
+
+        // publish that batch to the network
+        client.publish_register_op_batch(&batch).await?;
+        tokio::time::sleep(one_sec).await;
+
+        // check they're both there
+        let priv_register = client.get_register(address).await?;
+        assert!(priv_register.is_private());
+        assert_eq!(*priv_register.name(), name);
+        assert_eq!(priv_register.tag(), tag);
+        assert_eq!(priv_register.size(None)?, 0);
+        assert_eq!(priv_register.owner(), owner);
+
+        let pub_register = client.get_register(address2).await?;
+        assert!(pub_register.is_public());
+        assert_eq!(*pub_register.name(), name);
+        assert_eq!(pub_register.tag(), tag);
+        assert_eq!(pub_register.size(None)?, 0);
+        assert_eq!(pub_register.owner(), owner);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn register_network_assert_expected_log_counts() -> Result<()> {
         init_test_logger();
@@ -257,9 +376,10 @@ mod tests {
         // store a Private Register
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let address = client
+        let (address, batch) = client
             .store_private_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         // small delay to ensure logs have written
         tokio::time::sleep(delay).await;
@@ -295,9 +415,10 @@ mod tests {
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Key(owner), PublicPermissions::new(true));
 
-        let address = client
+        let (address, batch) = client
             .store_public_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         let value_1 = random_register_entry();
 
@@ -307,9 +428,11 @@ mod tests {
             // write to the register
             let _value1_hash = run_w_backoff_delayed(
                 || async {
-                    Ok(client
+                    let (hash, batch) = client
                         .write_to_register(address, value_1.clone(), BTreeSet::new())
-                        .await?)
+                        .await?;
+                    client.publish_register_op_batch(&batch).await?;
+                    Ok(hash)
                 },
                 10,
                 1,
@@ -341,9 +464,10 @@ mod tests {
         // store a Private Register
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let address = client
+        let (address, batch) = client
             .store_private_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
@@ -359,9 +483,10 @@ mod tests {
         // store a Public Register
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
-        let address = client
+        let (address, batch) = client
             .store_public_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         tokio::time::sleep(delay).await;
         let register = client.get_register(address).await?;
@@ -386,9 +511,10 @@ mod tests {
         let owner = client.public_key();
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let address = client
+        let (address, batch) = client
             .store_private_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
@@ -438,9 +564,10 @@ mod tests {
         let owner = client.public_key();
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Key(owner), PublicPermissions::new(None));
-        let address = client
+        let (address, batch) = client
             .store_public_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
@@ -488,18 +615,21 @@ mod tests {
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Key(owner), PublicPermissions::new(true));
 
-        let address = client
+        let (address, batch) = client
             .store_public_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         let value_1 = random_register_entry();
 
         // write to the register
         let value1_hash = run_w_backoff_delayed(
             || async {
-                Ok(client
+                let (hash, batch) = client
                     .write_to_register(address, value_1.clone(), BTreeSet::new())
-                    .await?)
+                    .await?;
+                client.publish_register_op_batch(&batch).await?;
+                Ok(hash)
             },
             10,
             1,
@@ -520,9 +650,11 @@ mod tests {
         // write to the register
         let value2_hash = run_w_backoff_delayed(
             || async {
-                Ok(client
+                let (hash, batch) = client
                     .write_to_register(address, value_2.clone(), BTreeSet::new())
-                    .await?)
+                    .await?;
+                client.publish_register_op_batch(&batch).await?;
+                Ok(hash)
             },
             10,
             1,
@@ -578,9 +710,10 @@ mod tests {
         let owner = client.public_key();
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let address = client
+        let (address, batch) = client
             .store_private_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         // Assert that the data is stored.
         let current_owner = client.get_register_owner(address).await?;
@@ -603,9 +736,10 @@ mod tests {
         // store a Private Register
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let address = client
+        let (address, batch) = client
             .store_private_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
@@ -614,13 +748,15 @@ mod tests {
 
         assert!(register.is_private());
 
-        client.delete_register(address).await?;
+        let batch2 = client.delete_register(address).await?;
+        client.publish_register_op_batch(&batch2).await?;
 
         client.query_timeout = Duration::from_secs(5); // override with a short timeout
         let mut res = client.get_register(address).await;
         while res.is_ok() {
             // attempt to delete register again (perhaps a message was dropped)
-            client.delete_register(address).await?;
+            let batch3 = client.delete_register(address).await?;
+            client.publish_register_op_batch(&batch3).await?;
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             res = client.get_register(address).await;
         }
@@ -649,9 +785,10 @@ mod tests {
         // store a Public Register
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
-        let address = client
+        let (address, batch) = client
             .store_public_register(name, tag, owner, perms)
             .await?;
+        client.publish_register_op_batch(&batch).await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
@@ -659,7 +796,8 @@ mod tests {
         let register = client.get_register(address).await?;
         assert!(register.is_public());
 
-        match client.delete_register(address).await {
+        let batch2 = client.delete_register(address).await?;
+        match client.publish_register_op_batch(&batch2).await {
             Err(Error::ErrorMessage {
                 source: ErrorMessage::InvalidOperation(_),
                 ..
@@ -689,10 +827,10 @@ mod tests {
         // store a Public Register
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
-        let address = client
+        let (address, batch) = client
             .store_public_register(name, 15000, client.public_key(), perms)
             .await?;
-
+        client.publish_register_op_batch(&batch).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         let register = client.get_register(address).await?;
