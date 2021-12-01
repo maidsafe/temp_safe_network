@@ -55,7 +55,11 @@ impl Core {
             }),
         );
 
-        trace!("Received DkgStart for {:?}", elder_candidates);
+        trace!(
+            "Received DkgStart for {:?} - {:?}",
+            session_id,
+            elder_candidates
+        );
         let commands = self
             .dkg_voter
             .start(

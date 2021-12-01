@@ -25,6 +25,7 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
+use std::time::Duration;
 use xor_name::XorName;
 
 impl Core {
@@ -95,7 +96,11 @@ impl Core {
                 // TODO: we may need to check if 'bounced_msg' dest section pk is different
                 // from the received new SAP key, to prevent from endlessly resending a msg
                 // if a sybil/corrupt peer keeps sending us the same AE msg.
-                trace!("{}", LogMarker::AeResendAfterRetry);
+                trace!(
+                    "{} resending {:?}",
+                    LogMarker::AeResendAfterRetry,
+                    msg_to_resend
+                );
 
                 self.create_or_wait_for_backoff(&sender).await;
 
@@ -250,13 +255,24 @@ impl Core {
 
         if let Some(backoff) = our_backoff {
             let next_backoff = backoff.next_backoff();
-            drop(ae_backoff_guard);
-
-            if let Some(next_wait) = next_backoff {
-                tokio::time::sleep(next_wait).await;
+            let sleep_time = if let Some(mut next_wait) = next_backoff {
+                // The default setup start with around 400ms
+                // then increases to around 50s after 25 calls.
+                next_wait /= 100;
+                if next_wait > Duration::from_secs(1) {
+                    backoff.reset();
+                }
+                Some(next_wait)
             } else {
                 // TODO: we've done all backoffs and are _still_ getting messages?
                 // we should probably penalise the node here.
+                None
+            };
+
+            drop(ae_backoff_guard);
+
+            if let Some(sleep_time) = sleep_time {
+                tokio::time::sleep(sleep_time).await;
             }
         } else {
             let _res = ae_backoff_guard.insert((peer.clone(), ExponentialBackoff::default()));

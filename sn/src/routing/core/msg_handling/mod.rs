@@ -455,7 +455,7 @@ impl Core {
                 prefix,
                 elders,
             } => {
-                trace!("Handling msg: Dkg-Start from {}", sender);
+                trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
                 if !elders.contains_key(&self.node.read().await.name()) {
                     return Ok(vec![]);
                 }
@@ -624,8 +624,9 @@ impl Core {
                     } = session_info;
                     let message_cache = self.dkg_voter.get_cached_messages(&session_id);
                     trace!(
-                        "Sending DkgSessionInfo {{ {:?}, ... }} to {}",
+                        "Sending DkgSessionInfo {{ {:?}, elders {:?}, ... }} to {}",
                         &session_id,
+                        elders,
                         &sender
                     );
                     Ok(vec![Command::PrepareNodeMsgToSend {
@@ -689,6 +690,7 @@ impl Core {
                         authority: section_auth,
                     },
                 );
+                trace!("DkgSessionInfo handling {:?} - {:?}", session_id, elders);
                 commands.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
                 commands.extend(
                     self.handle_dkg_retry(session_id, message_cache, message, sender.name())

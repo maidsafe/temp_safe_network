@@ -501,6 +501,15 @@ impl NetworkKnowledge {
         } else if expected_names.len() < crate::routing::supermajority(current_names.len()) {
             warn!("ignore attempt to reduce the number of elders too much");
             vec![]
+        } else if expected_names.len() < current_names.len() {
+            // Could be due to the newly promoted elder doesn't have enough knowledge of
+            // existing members.
+            warn!("Ignore attempt to shrink the elders");
+            trace!("current_names  {:?}", current_names);
+            trace!("expected_names {:?}", expected_names);
+            trace!("excluded_names {:?}", excluded_names);
+            trace!("section_peers {:?}", self.section_peers);
+            vec![]
         } else {
             let elder_candidates = ElderCandidates::new(sap.prefix(), expected_peers);
             vec![elder_candidates]
