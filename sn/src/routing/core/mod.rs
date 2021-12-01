@@ -307,7 +307,7 @@ impl Core {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
 
                 if old.is_elder {
-                    info!("{}: {:?}", LogMarker::StillElderAfterAplit, new.prefix);
+                    info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
                 }
 
                 commands.extend(self.send_updates_to_sibling_section(&old).await?);
