@@ -237,10 +237,18 @@ jobs:
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
+      - name: Kill the current network (not needed for next test)
+        if: matrix.os == 'windows-latest'
+        run: |
+          taskkill /IM sn_node /F
+          rd /s /q %USERPROFILE%\.safe\node
+        shell: cmd
+
+
       - name: Print Network Log Stats
         shell: bash
         run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: steps.section-startup.outcome == 'success'
 
 
       - name: Upload Node Logs to AWS
