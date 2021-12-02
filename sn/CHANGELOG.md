@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.46.4 (2021-12-02)
+
+### Bug Fixes
+
+ - <csr-id-01a5c961fc02f9ca8d6f60286306d5efba460e4e/> avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo
+ - <csr-id-27868bc51ba2dd12cc584396c53a158706d0c07b/> avoid network_knowledge lookup when sending DKGNotReady or DkgSessionUnknown
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo ([`01a5c96`](https://github.com/maidsafe/safe_network/commit/01a5c961fc02f9ca8d6f60286306d5efba460e4e))
+    - avoid network_knowledge lookup when sending DKGNotReady or DkgSessionUnknown ([`27868bc`](https://github.com/maidsafe/safe_network/commit/27868bc51ba2dd12cc584396c53a158706d0c07b))
+</details>
+
 ## v0.46.3 (2021-12-02)
 
 ### New Features
@@ -33,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - avoid network_knowledge lookup when sending DKGNotReady or DkgSessionUnknown ([`27868bc`](https://github.com/maidsafe/safe_network/commit/27868bc51ba2dd12cc584396c53a158706d0c07b))
+    - safe_network-0.46.3 ([`69e9be2`](https://github.com/maidsafe/safe_network/commit/69e9be2a1567bfa211af7e9d7595381d9a0a3b38))
     - remove sig check on join ApprovalShare receipt ([`b4f0306`](https://github.com/maidsafe/safe_network/commit/b4f0306fb945cce096de7f68c3cf6ece6905786d))
     - remove Joinrejection DkgUnderway ([`204f927`](https://github.com/maidsafe/safe_network/commit/204f927220c8bd1829ac89feaed1c48a8034e80b))
     - leave longer wait on testnet startup ([`2ef8e45`](https://github.com/maidsafe/safe_network/commit/2ef8e45f53ff6925e56321ed0ebc922d2d4dd9b9))
