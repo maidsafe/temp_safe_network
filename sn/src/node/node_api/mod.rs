@@ -20,7 +20,7 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use rand::rngs::OsRng;
-use std::{net::SocketAddr, path::PathBuf};
+use std::net::SocketAddr;
 use tokio::time::Duration;
 
 /// Main node struct.
@@ -38,7 +38,7 @@ impl Node {
         let root_dir = root_dir_buf.as_path();
         tokio::fs::create_dir_all(root_dir).await?;
 
-        let reward_key = match get_reward_pk(root_dir).await? {
+        let _reward_key = match get_reward_pk(root_dir).await? {
             Some(public_key) => PublicKey::Ed25519(public_key),
             None => {
                 let mut rng = OsRng;

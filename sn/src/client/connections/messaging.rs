@@ -12,7 +12,6 @@ use super::AeCache;
 use crate::client::Error;
 use crate::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
-    signature_aggregator::SignatureAggregator,
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::prefix_map::NetworkPrefixMap;
@@ -68,14 +67,12 @@ impl Session {
         write_data_to_path(&prefix_map, &root_dir.join("prefix_map")).await?;
 
         let session = Session {
-            client_pk,
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
             endpoint,
             network: Arc::new(prefix_map),
             ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
             ae_retry_cache: Arc::new(RwLock::new(AeCache::default())),
-            aggregator: Arc::new(RwLock::new(SignatureAggregator::new())),
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             standard_wait,

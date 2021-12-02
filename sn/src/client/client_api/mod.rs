@@ -39,6 +39,7 @@ use xor_name::XorName;
 #[derive(Clone, Debug)]
 pub struct Client {
     keypair: Keypair,
+    #[allow(dead_code)]
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
     pub(crate) query_timeout: Duration,
