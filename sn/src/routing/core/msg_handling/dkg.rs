@@ -34,6 +34,11 @@ impl Core {
         prefix: Prefix,
         elders: BTreeMap<XorName, SocketAddr>,
     ) -> Result<Vec<Command>> {
+        let current_generation = self.network_knowledge.chain_len().await;
+        if session_id.generation < current_generation {
+            trace!("Skipping DkgStart for older generation: {:?}", &session_id);
+            return Ok(vec![]);
+        }
         let section_auth = self.network_knowledge().authority_provider().await;
         let section_peers = self.network_knowledge().members();
 
@@ -61,6 +66,12 @@ impl Core {
             session_id,
             elder_candidates
         );
+        self.dkg_sessions
+            .write()
+            .await
+            .retain(|existing_session_id, _| {
+                existing_session_id.generation >= session_id.generation
+            });
         let commands = self
             .dkg_voter
             .start(
@@ -135,6 +146,14 @@ impl Core {
         sender: Peer,
     ) -> Result<Vec<Command>> {
         let section_key = self.network_knowledge().section_key().await;
+        let current_generation = self.network_knowledge.chain_len().await;
+        if session_id.generation < current_generation {
+            trace!(
+                "Ignoring DkgRetry for expired DKG session: {:?}",
+                &session_id
+            );
+            return Ok(vec![]);
+        }
         let mut commands = self
             .dkg_voter
             .handle_dkg_history(
