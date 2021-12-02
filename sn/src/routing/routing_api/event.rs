@@ -136,6 +136,7 @@ pub enum Event {
 
 /// Type of messages that are received from a peer
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum MessageReceived {
     /// Cmds only sent a among Nodes in the network.
     NodeCmd(NodeCmd),

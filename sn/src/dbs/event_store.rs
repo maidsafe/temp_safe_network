@@ -16,7 +16,6 @@ use xor_name::XorName;
 #[derive(Clone, Debug)]
 pub(crate) struct EventStore<TEvent: Debug + Serialize + DeserializeOwned> {
     tree: Tree,
-    db_name: String,
     _phantom: PhantomData<TEvent>,
 }
 
@@ -29,7 +28,6 @@ where
         let tree = db.open_tree(&db_name)?;
         Ok(Self {
             tree,
-            db_name,
             _phantom: PhantomData::default(),
         })
     }

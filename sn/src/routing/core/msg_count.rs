@@ -18,6 +18,7 @@ pub(super) struct MsgCount {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(super) struct MsgNumbers {
     pub(super) total: usize,
     pub(super) max_node: Option<(SocketAddr, usize)>,
