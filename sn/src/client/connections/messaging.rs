@@ -391,7 +391,6 @@ impl Session {
     ) -> Result<(), Error> {
         let endpoint = self.endpoint.clone();
         // Get DataSection elders details.
-        // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
         let (elders_or_adults, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
                 let mut nodes: Vec<_> = sap
