@@ -18,9 +18,140 @@ env:
   AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
-  tests:
+  build:
+    name: Build and cache safe_network libs
+    runs-on: ${{ matrix.os }}
+    strategy:
+          fail-fast: false
+          matrix:
+            os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+    - uses: actions/checkout@v2
+
+    # Install Rust
+    - name: Install Rust
+      id: toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+
+    - uses: Swatinem/rust-cache@v1
+      with:
+        cache-on-failure: true
+        sharedKey: ${{github.run_id}}
+
+    - name: Build all safe_network targets
+      run: cargo build --all-targets --release --all-features
+
+  # TODO: this can be removed once e2e is stable atop splits.
+  splits:
+    needs: build
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run all test categories
+    name: Test Section Splits
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
+
+      # Install Rust
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+
+      - name: Start the network
+        run: ./target/release/testnet
+        id: section-startup
+
+      - name: Print Network Log Stats at start
+        shell: bash
+        run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+
+      - name: Healthcheck
+        run: ./resources/scripts/has_split.sh
+        shell: bash
+        timeout-minutes: 1
+        continue-on-error: true
+
+      - name: Wait for a healthy network
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        run: ./resources/scripts/network_is_ready.sh
+        timeout-minutes: 5
+
+      - name: Wait for a healthy network (win)
+        shell: bash
+        if: matrix.os == 'windows-latest'
+        run: ./resources/scripts/network_is_ready_cli.sh
+        timeout-minutes: 5
+
+      - name: Run network asserts one by one
+        shell: bash
+        # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
+        timeout-minutes: 7
+        continue-on-error: true
+
+      - name: Are nodes still running...?
+        shell: bash
+        timeout-minutes: 1
+        if: failure()
+        continue-on-error: true
+        run: |
+          echo "$(pgrep sn_node | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
+
+      - name: Kill the current network (not needed for next test)
+        continue-on-error: true
+        if: matrix.os == 'windows-latest'
+        run: |
+          taskkill /IM sn_node /F
+          rd /s /q %USERPROFILE%\.safe\node
+        shell: cmd
+
+      - name: Upload Node Logs to AWS
+          # Upload artifacts.
+        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
+        if: failure()
+
+      - name: Upload Node Logs
+          # Upload artifacts.
+        uses: actions/upload-artifact@v2
+        with:
+          name: sn_node_logs
+          path: ~/.safe/node/local-test-network/**/*.log*
+        if: failure()
+
+
+  unit:
+    needs: build
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run all relevant unit test categories
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -86,18 +217,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           cache-on-failure: true
-
-      # - name: Cargo cache registry, index and build
-      #   uses: actions/cache@v2.1.4
-      #   with:
-      #     path: |
-      #       ~/.cargo/registry
-      #       ~/.cargo/git
-      #       target
-      #     key: ${{ runner.os }}-${{ steps.toolchain.outputs.rustc_hash }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
-
-      - name: Build all safe_network targets
-        run: cd sn && cargo build --all-targets --release --features=always-joinable,test-utils
+          sharedKey: ${{github.run_id}}
 
       - name: run sn_cli unit tests (no running network is necessary)
         run: cargo test --release --bin safe
@@ -131,6 +251,44 @@ jobs:
         if: steps.changes.outputs.routing == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
         timeout-minutes: 10
+
+  e2e:
+    needs: build
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run e2e tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
+
+      # Install Rust
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
 
       - name: Start the network
         run: ./target/release/testnet
@@ -239,17 +397,17 @@ jobs:
 
       - name: Kill the current network (not needed for next test)
         if: matrix.os == 'windows-latest'
+        continue-on-error: true
         run: |
           taskkill /IM sn_node /F
           rd /s /q %USERPROFILE%\.safe\node
         shell: cmd
 
-
       - name: Print Network Log Stats
         shell: bash
+        continue-on-error: true
         run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success'
-
 
       - name: Upload Node Logs to AWS
           # Upload artifacts.
