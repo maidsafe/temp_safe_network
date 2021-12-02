@@ -553,7 +553,7 @@ fn build_tree(
             return (dirs, files);
         }
 
-        let mut node = match node.find_child(item) {
+        let node = match node.find_child(item) {
             Some(n) => n,
             None => {
                 let (fs_type, d, di, fi) = match details["type"].as_str() {
@@ -583,7 +583,7 @@ fn build_tree(
                 }
             }
         };
-        let (di, fi) = build_tree(&mut node, path_parts, details, depth + 1);
+        let (di, fi) = build_tree(node, path_parts, details, depth + 1);
         dirs += di;
         files += fi;
     }
