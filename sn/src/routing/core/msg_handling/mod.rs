@@ -494,12 +494,15 @@ impl Core {
             SystemMsg::DkgNotReady {
                 message,
                 session_id,
-            } => Ok(self.handle_dkg_not_ready(
-                sender,
-                message,
-                session_id,
-                self.network_knowledge.section_key().await,
-            )),
+            } => {
+                self.handle_dkg_not_ready(
+                    sender,
+                    message,
+                    session_id,
+                    self.network_knowledge.section_key().await,
+                )
+                .await
+            }
             SystemMsg::DkgRetry {
                 message_history,
                 message,
@@ -628,19 +631,29 @@ impl Core {
                         elders,
                         &sender
                     );
-                    Ok(vec![Command::PrepareNodeMsgToSend {
-                        msg: SystemMsg::DkgSessionInfo {
-                            session_id,
-                            elders,
-                            prefix,
-                            section_auth,
-                            message_cache,
-                            message,
-                        },
-                        dst: DstLocation::Node {
+
+                    let node_msg = SystemMsg::DkgSessionInfo {
+                        session_id,
+                        elders,
+                        prefix,
+                        section_auth,
+                        message_cache,
+                        message,
+                    };
+                    let section_pk = self.network_knowledge.section_key().await;
+                    let wire_msg = WireMsg::single_src(
+                        &self.node.read().await.clone(),
+                        DstLocation::Node {
                             name: sender.name(),
-                            section_pk: self.network_knowledge.section_key().await,
+                            section_pk,
                         },
+                        node_msg,
+                        section_pk,
+                    )?;
+
+                    Ok(vec![Command::SendMessage {
+                        recipients: vec![sender],
+                        wire_msg,
                     }])
                 } else {
                     warn!("Unknown DkgSessionInfo: {:?} requested", &session_id);

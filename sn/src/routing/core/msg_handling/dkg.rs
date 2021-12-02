@@ -10,10 +10,11 @@ use super::super::Core;
 use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg};
 use crate::messaging::DstLocation;
 use crate::routing::{
-    core::Proposal,
+    core::{msg_handling::WireMsg, Proposal},
     dkg::DkgFailureSigSetUtils,
     error::{Error, Result},
     log_markers::LogMarker,
+    messages::WireMsgUtils,
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     routing_api::command::Command,
     Peer,
@@ -97,25 +98,33 @@ impl Core {
             .await
     }
 
-    pub(crate) fn handle_dkg_not_ready(
+    pub(crate) async fn handle_dkg_not_ready(
         &self,
         sender: Peer,
         message: DkgMessage,
         session_id: DkgSessionId,
         section_pk: BlsPublicKey,
-    ) -> Vec<Command> {
+    ) -> Result<Vec<Command>> {
         let message_history = self.dkg_voter.get_cached_messages(&session_id);
-        vec![Command::PrepareNodeMsgToSend {
-            msg: SystemMsg::DkgRetry {
-                message_history,
-                message,
-                session_id,
-            },
-            dst: DstLocation::Node {
+        let node_msg = SystemMsg::DkgRetry {
+            message_history,
+            message,
+            session_id,
+        };
+        let wire_msg = WireMsg::single_src(
+            &self.node.read().await.clone(),
+            DstLocation::Node {
                 name: sender.name(),
                 section_pk,
             },
-        }]
+            node_msg,
+            section_pk,
+        )?;
+
+        Ok(vec![Command::SendMessage {
+            recipients: vec![sender],
+            wire_msg,
+        }])
     }
 
     pub(crate) async fn handle_dkg_retry(
