@@ -231,13 +231,29 @@ impl Core {
         sap: SectionAuthorityProvider,
         key_share: SectionKeyShare,
     ) -> Result<Vec<Command>> {
+        // Check if the elected Elders are still `active members` in our section.
+        for elder in sap.elders_vec().iter() {
+            if !self
+                .network_knowledge
+                .active_members()
+                .await
+                .contains(elder)
+            {
+                error!("Dropping a DKGOutcome as one of the participants is not an active member in our section");
+                error!("Inactive Participant {:?}", elder);
+                error!("Dropped SAP {:?}", sap);
+                return Err(Error::UntrustedSectionAuthProvider(
+                    "One of the participants in not an active member in our section".to_string(),
+                ));
+            }
+        }
+
         let key_share_pk = key_share.public_key_set.public_key();
         trace!(
             "{} public_key={:?}",
             LogMarker::HandlingDkgSuccessfulOutcome,
             key_share_pk
         );
-
         // Add our new keyshare to our cache, we will then use
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone()).await;
