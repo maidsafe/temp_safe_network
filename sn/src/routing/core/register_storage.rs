@@ -27,7 +27,7 @@ use sled::Db;
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
-    path::{Path, PathBuf},
+    path::Path,
     sync::Arc,
 };
 use tracing::info;
@@ -41,7 +41,6 @@ type RegisterOpStore = EventStore<RegisterCmd>;
 // TODO: dont expose this
 #[derive(Clone, Debug)]
 pub(crate) struct RegisterStorage {
-    path: PathBuf,
     used_space: UsedSpace,
     registers: Arc<DashMap<XorName, Option<StateEntry>>>,
     db: Db,
@@ -66,7 +65,6 @@ impl RegisterStorage {
             .map_err(Error::from)?;
 
         Ok(Self {
-            path: path.to_path_buf(),
             used_space,
             registers: Arc::new(DashMap::new()),
             db,

@@ -10,6 +10,7 @@ use sysinfo::{DiskUsage, ProcessExt};
 
 /// Struct containing a process' information.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(super) struct Process {
     pub(super) memory: u64,
     pub(super) virtual_memory: u64,

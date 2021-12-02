@@ -62,6 +62,7 @@ pub enum NodeCmd {
 
 /// Query originating at a node
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum NodeQuery {
     /// Metadata is handled by Elders
     Metadata {
