@@ -12,7 +12,7 @@ mod nrs_map;
 pub use crate::url::{ContentType, DataType, VersionHash};
 pub use nrs_map::NrsMap;
 
-use nrs_map::{parse_out_subnames, SubName};
+use nrs_map::parse_out_subnames;
 
 use crate::{app::Safe, register::EntryHash, Error, Result, Url};
 
@@ -202,6 +202,10 @@ impl Safe {
     ///            Public Name
     /// ```
     /// Finds the Url associated with the given public name on the network.
+    /// If multiple entries are found for the same public name, there's a conflict.
+    /// If there are conflicts for subnames other than the one requested, get proceeds as usual,
+    /// but the NrsMap returned will ignore those conflicts.
+    /// Otherwise, it returns an error.
     /// Returns the associated Url for the given public name for that version along with an NrsMap
     pub async fn nrs_get(
         &self,
@@ -213,7 +217,20 @@ impl Safe {
             public_name, version
         );
 
-        let nrs_map = self.nrs_get_subnames_map(public_name, version).await?;
+        // get nrs_map, ignoring conflicting entries if they are not the ones we're getting
+        let nrs_map = match self.nrs_get_subnames_map(public_name, version).await {
+            Ok(map) => Ok(map),
+            Err(Error::ConflictingNrsEntries(str, conflicting_entries, map)) => {
+                let subname = parse_out_subnames(public_name);
+                if conflicting_entries.iter().any(|(sub, _)| sub == &subname) {
+                    Err(Error::ConflictingNrsEntries(str, conflicting_entries, map))
+                } else {
+                    Ok(map)
+                }
+            }
+            Err(e) => Err(e),
+        }?;
+
         let url = nrs_map.get(public_name)?;
         Ok((url, nrs_map))
     }
@@ -277,27 +294,33 @@ impl Safe {
                 .collect(),
         };
 
-        // check for duplicate entries for a single key (subname)
-        let set_len = raw_set.len();
-        let raw_map: BTreeMap<Vec<u8>, Vec<u8>> = raw_set.clone().into_iter().collect();
-        if raw_map.len() != set_len {
-            let set_after_map: BTreeSet<(Vec<u8>, Vec<u8>)> = raw_map.into_iter().collect();
-            let dups: Vec<(Vec<u8>, Vec<u8>)> =
-                raw_set.difference(&set_after_map).cloned().collect();
-            return Err(Error::ConflictingNrsEntries("Found multiple entries for the same name, this happens when 2 clients write concurrently to the same NRS mapping. It can be fixed by simply associating a new link to the conflicting names.".to_string(), dups));
-        }
-
-        // deserialize and return
-        let subnames_map: Result<BTreeMap<SubName, Url>> = raw_set
+        // deserialize
+        let clean_set: BTreeSet<(String, Url)> = raw_set
             .into_iter()
             .map(|(subname_bytes, url_bytes)| {
                 let subname = str::from_utf8(&subname_bytes)?;
                 let url = Url::from_url(str::from_utf8(&url_bytes)?)?;
                 Ok((subname.to_owned(), url))
             })
-            .collect();
+            .collect::<Result<BTreeSet<(String, Url)>>>()?;
 
-        Ok(NrsMap { map: subnames_map? })
+        // turn into map
+        let subnames_map: BTreeMap<String, Url> = clean_set.clone().into_iter().collect();
+        let nrs_map = NrsMap {
+            map: subnames_map.clone(),
+        };
+
+        // check for conflicting entries (same subname, different url)
+        let set_len = clean_set.len();
+        let map_len = subnames_map.len();
+        if map_len != set_len {
+            let set_from_map: BTreeSet<(String, Url)> = subnames_map.into_iter().collect();
+            let conflicting_entries: Vec<(String, Url)> =
+                clean_set.difference(&set_from_map).cloned().collect();
+            return Err(Error::ConflictingNrsEntries("Found multiple entries for the same name, this happens when 2 clients write concurrently to the same NRS mapping. It can be fixed by simply associating a new link to the conflicting names.".to_string(), conflicting_entries, nrs_map));
+        }
+
+        Ok(nrs_map)
     }
 }
 
@@ -620,6 +643,17 @@ mod tests {
 
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
 
+        // associate a second name
+        let second_valid_link = Url::from_url(&link)?;
+        valid_link.set_content_version(Some(version0));
+        let site_name2 = format!("sub.{}", &site_name);
+
+        let (nrs_url2, did_create) =
+            retry_loop!(safe.nrs_add(&site_name2, &second_valid_link, false));
+        assert!(!did_create);
+
+        let _ = retry_loop!(safe.fetch(&nrs_url2.to_string(), None));
+
         // manually add a conflicting name
         let another_valid_url = nrs_url;
         let url_str = validate_nrs_top_name(&site_name)?;
@@ -631,7 +665,10 @@ mod tests {
             .multimap_insert(&url_str, entry, BTreeSet::new())
             .await?;
 
-        // get should error out
+        // get of other name should be ok
+        let _ = retry_loop_for_pattern!(safe.nrs_get(&site_name2, None), Ok((res_url, _)) if res_url == &second_valid_link)?;
+
+        // get of conflicting name should error out
         let conflict_error =
             retry_loop_for_pattern!(safe.nrs_get(&site_name, None), Err(_) if true);
         assert!(matches!(
@@ -640,15 +677,12 @@ mod tests {
         ));
 
         // check for the error content
-        if let Err(Error::ConflictingNrsEntries(_, dups)) = conflict_error {
-            let got_entries: Result<()> =
-                dups.into_iter().try_for_each(|(subname_bytes, url_bytes)| {
-                    let subname = str::from_utf8(&subname_bytes)?;
-                    let url = Url::from_url(str::from_utf8(&url_bytes)?)?;
-                    assert_eq!(subname, "");
-                    assert!(url == valid_link || url == another_valid_url);
-                    Ok(())
-                });
+        if let Err(Error::ConflictingNrsEntries(_, dups, _)) = conflict_error {
+            let got_entries: Result<()> = dups.into_iter().try_for_each(|(subname, url)| {
+                assert_eq!(subname, "");
+                assert!(url == valid_link || url == another_valid_url);
+                Ok(())
+            });
             assert!(got_entries.is_ok());
         }
 
