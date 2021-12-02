@@ -94,21 +94,37 @@ impl Session {
                     }
                     _ => sender,
                 };
-                trace!(
-                    "Targeting DkgNotReady to {:?} on unhandable message {:?}",
-                    target,
-                    message
-                );
-                commands.push(Command::PrepareNodeMsgToSend {
-                    msg: SystemMsg::DkgNotReady {
+
+                if let Some(peer) = self.peers().get(&target) {
+                    trace!(
+                        "Targeting DkgNotReady to {:?} on unhandable message {:?}",
+                        target,
+                        message
+                    );
+                    let node_msg = SystemMsg::DkgNotReady {
                         session_id: *session_id,
                         message,
-                    },
-                    dst: DstLocation::Node {
-                        name: target,
+                    };
+                    let wire_msg = WireMsg::single_src(
+                        node,
+                        DstLocation::Node {
+                            name: target,
+                            section_pk,
+                        },
+                        node_msg,
                         section_pk,
-                    },
-                });
+                    )?;
+
+                    commands.push(Command::SendMessage {
+                        recipients: vec![peer.clone()],
+                        wire_msg,
+                    });
+                } else {
+                    warn!(
+                        "Failed to fetch peer of {:?} among {:?}",
+                        target, self.elder_candidates
+                    );
+                }
             }
             Err(error) => {
                 error!("Error processing DKG message: {:?}", error);
@@ -518,7 +534,7 @@ mod tests {
             let actor = actors.get_mut(&addr).context("Unknown message recipient")?;
 
             let commands = futures::executor::block_on(actor.voter.process_message(
-                actor.node.name(),
+                actor.peer(),
                 &actor.node,
                 &session_id,
                 message,
@@ -546,6 +562,10 @@ mod tests {
             }
         }
 
+        fn peer(&self) -> Peer {
+            self.node.peer()
+        }
+
         fn handle(
             &mut self,
             command: Command,
@@ -570,6 +590,10 @@ mod tests {
                             .map(|peer| (peer.addr(), message.clone()))
                             .collect())
                     }
+                    MessageType::System {
+                        msg: SystemMsg::DkgNotReady { message, .. },
+                        ..
+                    } => Ok(vec![(self.node.addr, message)]),
                     other_message => bail!("Unexpected message: {:?}", other_message),
                 },
                 Command::HandleDkgOutcome { outcome, .. } => {
@@ -577,10 +601,6 @@ mod tests {
                     Ok(vec![])
                 }
                 Command::ScheduleTimeout { .. } => Ok(vec![]),
-                Command::PrepareNodeMsgToSend {
-                    msg: SystemMsg::DkgNotReady { message, .. },
-                    ..
-                } => Ok(vec![(self.node.addr, message)]),
                 other_command => {
                     bail!("Unexpected command: {:?}", other_command)
                 }

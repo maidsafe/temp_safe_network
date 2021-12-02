@@ -6,16 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg};
 use crate::messaging::DstLocation;
+use crate::messaging::{
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+    WireMsg,
+};
 use crate::routing::{
     dkg::session::Session,
     ed25519,
     error::Result,
+    messages::WireMsgUtils,
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
-    supermajority,
+    supermajority, Peer,
 };
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
@@ -153,7 +157,7 @@ impl DkgVoter {
     // Handle a received DkgMessage.
     pub(crate) async fn process_message(
         &self,
-        sender: XorName,
+        sender: Peer,
         node: &Node,
         session_id: &DkgSessionId,
         message: DkgMessage,
@@ -162,22 +166,37 @@ impl DkgVoter {
         let mut commands = Vec::new();
 
         if let Some(mut session) = self.sessions.get_mut(session_id) {
-            commands.extend(session.process_message(node, sender, session_id, message, section_pk)?)
+            commands.extend(session.process_message(
+                node,
+                sender.name(),
+                session_id,
+                message,
+                section_pk,
+            )?)
         } else {
             trace!(
                 "Sending DkgSessionUnknown {{ {:?} }} to {}",
                 &session_id,
                 &sender
             );
-            commands.push(Command::PrepareNodeMsgToSend {
-                msg: SystemMsg::DkgSessionUnknown {
-                    session_id: *session_id,
-                    message,
-                },
-                dst: DstLocation::Node {
-                    name: sender,
+
+            let node_msg = SystemMsg::DkgSessionUnknown {
+                session_id: *session_id,
+                message,
+            };
+            let wire_msg = WireMsg::single_src(
+                node,
+                DstLocation::Node {
+                    name: sender.name(),
                     section_pk,
                 },
+                node_msg,
+                section_pk,
+            )?;
+
+            commands.push(Command::SendMessage {
+                recipients: vec![sender],
+                wire_msg,
             });
         }
         Ok(commands)
