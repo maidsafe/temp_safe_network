@@ -481,8 +481,7 @@ impl Core {
                     message,
                     sender
                 );
-                self.handle_dkg_message(session_id, message, sender.name())
-                    .await
+                self.handle_dkg_message(session_id, message, sender).await
             }
             SystemMsg::DkgFailureObservation {
                 session_id,
@@ -506,7 +505,7 @@ impl Core {
                 message,
                 session_id,
             } => {
-                self.handle_dkg_retry(session_id, message_history, message, sender.name())
+                self.handle_dkg_retry(session_id, message_history, message, sender)
                     .await
             }
             // The following type of messages are all handled by upper sn_node layer.
@@ -693,7 +692,7 @@ impl Core {
                 trace!("DkgSessionInfo handling {:?} - {:?}", session_id, elders);
                 commands.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
                 commands.extend(
-                    self.handle_dkg_retry(session_id, message_cache, message, sender.name())
+                    self.handle_dkg_retry(session_id, message_cache, message, sender)
                         .await?,
                 );
                 Ok(commands)

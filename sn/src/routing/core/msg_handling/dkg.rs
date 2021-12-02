@@ -77,7 +77,7 @@ impl Core {
         &self,
         session_id: DkgSessionId,
         message: DkgMessage,
-        sender: XorName,
+        sender: Peer,
     ) -> Result<Vec<Command>> {
         trace!(
             "{} {:?} from {}",
@@ -123,7 +123,7 @@ impl Core {
         session_id: DkgSessionId,
         message_history: Vec<DkgMessage>,
         message: DkgMessage,
-        sender: XorName,
+        sender: Peer,
     ) -> Result<Vec<Command>> {
         let section_key = self.network_knowledge().section_key().await;
         let mut commands = self
@@ -132,7 +132,7 @@ impl Core {
                 &self.node.read().await.clone(),
                 session_id,
                 message_history,
-                sender,
+                sender.name(),
                 section_key,
             )
             .await?;
