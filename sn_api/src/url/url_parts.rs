@@ -67,6 +67,7 @@ const INVALID_NRS_CHARS: [char; 30] = [
 // This is kept internal to the parent module.
 #[derive(Debug, Clone)]
 pub(super) struct UrlParts {
+    #[allow(dead_code)]
     pub(super) scheme: String,
     pub(super) public_name: String, // "a.b.name" in "a.b.name"
     pub(super) top_name: String,    // "name"     in "a.b.name"
