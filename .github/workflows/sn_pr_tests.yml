@@ -222,7 +222,7 @@ jobs:
           sharedKey: ${{github.run_id}}
 
       - name: run sn_cli unit tests (no running network is necessary)
-        run: cargo test  -p safe_network --release --bin safe
+        run: cargo test --release --bin safe
 
       - name: Run Data Types tests
         if: steps.changes.outputs.types == 'true'
