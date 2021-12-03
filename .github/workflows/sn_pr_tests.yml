@@ -44,6 +44,8 @@ jobs:
 
     - name: Build all safe_network targets
       run: cargo build --all-targets --release --all-features
+    - name: Build all safe_network TEST targets
+      run: cargo test --release --no-run --features=always-joinable,test-utils
 
   # TODO: this can be removed once e2e is stable atop splits.
   splits:
