@@ -226,32 +226,32 @@ jobs:
 
       - name: Run Data Types tests
         if: steps.changes.outputs.types == 'true'
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- types
+        run: cargo test --lib --release --features=always-joinable,test-utils -- types
         timeout-minutes: 10
 
       - name: Run DBs tests
         if: steps.changes.outputs.dbs == 'true'
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- dbs
+        run: cargo test --lib --release --features=alwaystig-joinable,test-utils -- dbs
         timeout-minutes: 5
 
       - name: Run PrefixMap tests
         if: steps.changes.outputs.prefix_map == 'true'
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- prefix_map
+        run: cargo test --lib --release --features=always-joinable,test-utils -- prefix_map
         timeout-minutes: 5
 
       - name: Run Messaging tests
         if: steps.changes.outputs.messaging == 'true'
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- messaging
+        run: cargo test --lib --release --features=always-joinable,test-utils -- messaging
         timeout-minutes: 5
 
       - name: Run Node tests
         if: steps.changes.outputs.node == 'true'
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- node
+        run: cargo test --lib --release --features=always-joinable,test-utils -- node
         timeout-minutes: 5
 
       - name: Run Routing tests
         if: steps.changes.outputs.routing == 'true'
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- routing
+        run: cargo test --lib --release --features=always-joinable,test-utils -- routing
         timeout-minutes: 10
 
   e2e:
