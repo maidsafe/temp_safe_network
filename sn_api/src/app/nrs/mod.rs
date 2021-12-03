@@ -321,7 +321,7 @@ fn validate_nrs_top_name(top_name: &str) -> Result<String> {
     let safe_url = Safe::parse_url(&sanitised_url)?;
     if safe_url.top_name() != top_name {
         return Err(Error::InvalidInput(
-            format!("The NRS top name \"{}\" is invalid because it contains url parts, please remove any path, version, subnames, etc...", top_name)
+            format!("The NRS top name \"{}\" is invalid because it contains url parts. Please remove any path, version or subnames.", top_name)
         ));
     }
     Ok(sanitised_url)
@@ -333,7 +333,7 @@ fn validate_nrs_public_name(public_name: &str) -> Result<String> {
     let safe_url = Safe::parse_url(&sanitised_url)?;
     if safe_url.public_name() != public_name {
         return Err(Error::InvalidInput(
-            format!("The NRS public name \"{}\" is invalid because it contains url parts, please remove any path, version, etc...", public_name)
+            format!("The NRS public name \"{}\" is invalid because it contains url parts. Please remove any path or version.", public_name)
         ));
     }
     Ok(sanitised_url)
@@ -467,7 +467,7 @@ mod tests {
             Err(Error::InvalidInput(msg)) => assert_eq!(
                 msg,
                 format!(
-                    "The NRS public name \"{}\" is invalid because it contains url parts, please remove any path, version, etc...",
+                    "The NRS public name \"{}\" is invalid because it contains url parts. Please remove any path or version.",
                     versioned_sitename
                 )
             ),
@@ -482,7 +482,7 @@ mod tests {
                 assert_eq!(
                     msg,
                     format!(
-                        "The NRS public name \"{}\" is invalid because it contains url parts, please remove any path, version, etc...",
+                        "The NRS public name \"{}\" is invalid because it contains url parts. Please remove any path or version.",
                         versioned_sitename
                     )
                 );
@@ -597,7 +597,7 @@ mod tests {
 
         // test with invalid top name
         let invalid_top_name = "atffdgasd/d";
-        let expected_err = format!("The NRS top name \"{}\" is invalid because it contains url parts, please remove any path, version, subnames, etc...", invalid_top_name);
+        let expected_err = format!("The NRS top name \"{}\" is invalid because it contains url parts. Please remove any path, version or subnames.", invalid_top_name);
         match safe.nrs_create(invalid_top_name, true).await {
             Ok(_) => bail!("Unexpected NRS success when expected to fail with invalid top name"),
             Err(Error::InvalidInput(e)) => assert_eq!(e, expected_err),
