@@ -135,3 +135,12 @@ upload-sn_node-musl-to-s3:
 			-zcvf sn_node-latest-x86_64-unknown-linux-musl.tar.gz sn_node;
 		aws s3 cp sn_node-latest-x86_64-unknown-linux-musl.tar.gz s3://sn-node --acl public-read;
 	)
+
+.ONESHELL:
+run-local-baby-fleming:
+	pgrep sn_node | xargs kill -9
+	rm -rf ~/.safe
+	mkdir -p ~/.safe/node
+	(cd sn && cargo build --release)
+	cp target/release/sn_node ~/.safe/node
+	cargo run --release node run-baby-fleming
