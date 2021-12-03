@@ -231,7 +231,7 @@ jobs:
 
       - name: Run DBs tests
         if: steps.changes.outputs.dbs == 'true'
-        run: cargo test --lib --release --features=alwaystig-joinable,test-utils -- dbs
+        run: cargo test --lib --release --features=always-joinable,test-utils -- dbs
         timeout-minutes: 5
 
       - name: Run PrefixMap tests
