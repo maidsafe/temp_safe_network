@@ -41,26 +41,13 @@ jobs:
       with:
         cache-on-failure: true
         sharedKey: ${{github.run_id}}
-        working-directory: sn
-
-    - uses: Swatinem/rust-cache@v1
-      with:
-        cache-on-failure: true
-        sharedKey: ${{github.run_id}}
-        working-directory: sn_api
-
-    - uses: Swatinem/rust-cache@v1
-      with:
-        cache-on-failure: true
-        sharedKey: ${{github.run_id}}
-        working-directory: sn_cli
 
     - name: Build all safe_network targets
       # all = all crates in workspace, lib/bins targets, with these features...
-      run: cd sn && cargo build --all --lib --bins --release --features=always-joinable,test-utils
+      run: cargo build --all --lib --bins --release --features=always-joinable,test-utils
       # run: cargo build --all-targets --release --features=always-joinable,test-utils
     - name: Build all safe_network TEST targets
-      run: cd sn && cargo test --all --release --no-run --features=always-joinable,test-utils --lib --bins --examples
+      run: cargo test --all --release --no-run --features=always-joinable,test-utils --lib --bins --examples
 
   # TODO: this can be removed once e2e is stable atop splits.
   splits:
@@ -99,19 +86,6 @@ jobs:
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
-          working-directory: sn
-
-      - uses: Swatinem/rust-cache@v1
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-          working-directory: sn_api
-
-      - uses: Swatinem/rust-cache@v1
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-          working-directory: sn_cli
 
       - name: Start the network
         run: ./target/release/testnet
@@ -248,19 +222,7 @@ jobs:
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
-          working-directory: sn
 
-      - uses: Swatinem/rust-cache@v1
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-          working-directory: sn_api
-
-      - uses: Swatinem/rust-cache@v1
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-          working-directory: sn_cli
 
       - run: ls ./target/release
 
