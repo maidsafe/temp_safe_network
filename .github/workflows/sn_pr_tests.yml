@@ -41,6 +41,19 @@ jobs:
       with:
         cache-on-failure: true
         sharedKey: ${{github.run_id}}
+        working-directory: sn
+
+    - uses: Swatinem/rust-cache@v1
+      with:
+        cache-on-failure: true
+        sharedKey: ${{github.run_id}}
+        working-directory: sn_api
+
+    - uses: Swatinem/rust-cache@v1
+      with:
+        cache-on-failure: true
+        sharedKey: ${{github.run_id}}
+        working-directory: sn_cli
 
     - name: Build all safe_network targets
       # all = all crates in workspace, lib/bins targets, with these features...
@@ -86,6 +99,19 @@ jobs:
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
+          working-directory: sn
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+          working-directory: sn_api
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+          working-directory: sn_cli
 
       - name: Start the network
         run: ./target/release/testnet
@@ -222,38 +248,53 @@ jobs:
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
+          working-directory: sn
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+          working-directory: sn_api
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+          working-directory: sn_cli
+
+      - run: ls ./target/release
 
       - name: run sn_cli unit tests (no running network is necessary)
-        run: cargo test --release --bin safe
+        run: cd sn_cli && cargo test --release --bin safe
 
       - name: Run Data Types tests
         if: steps.changes.outputs.types == 'true'
-        run: cargo test --lib --release --features=always-joinable,test-utils -- types
+        run: cd sn && cargo test --lib --release --features=always-joinable,test-utils -- types
         timeout-minutes: 10
 
       - name: Run DBs tests
         if: steps.changes.outputs.dbs == 'true'
-        run: cargo test --lib --release --features=always-joinable,test-utils -- dbs
+        run: cd sn && cargo test --lib --release --features=always-joinable,test-utils -- dbs
         timeout-minutes: 5
 
       - name: Run PrefixMap tests
         if: steps.changes.outputs.prefix_map == 'true'
-        run: cargo test --lib --release --features=always-joinable,test-utils -- prefix_map
+        run: cd sn &&  cargo test --lib --release --features=always-joinable,test-utils -- prefix_map
         timeout-minutes: 5
 
       - name: Run Messaging tests
         if: steps.changes.outputs.messaging == 'true'
-        run: cargo test --lib --release --features=always-joinable,test-utils -- messaging
+        run: cd sn && cargo test --lib --release --features=always-joinable,test-utils -- messaging
         timeout-minutes: 5
 
       - name: Run Node tests
         if: steps.changes.outputs.node == 'true'
-        run: cargo test --lib --release --features=always-joinable,test-utils -- node
+        run: cd sn && cargo test --lib --release --features=always-joinable,test-utils -- node
         timeout-minutes: 5
 
       - name: Run Routing tests
         if: steps.changes.outputs.routing == 'true'
-        run: cargo test --lib --release --features=always-joinable,test-utils -- routing
+        run: cd sn && cargo test --lib --release --features=always-joinable,test-utils -- routing
         timeout-minutes: 10
 
   e2e:
@@ -325,7 +366,7 @@ jobs:
       - name: Run network asserts one by one
         shell: bash
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
+        run: cd sn && cargo test  -p safe_network --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
         timeout-minutes: 7
         continue-on-error: true
 
@@ -334,25 +375,25 @@ jobs:
       - name: Initial client tests...
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::blob && sleep 5
+        run: cd sn && cargo test  -p safe_network --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::blob && sleep 5
         timeout-minutes: 5
 
       # register api
       - name: Client reg tests against local network
         shell: bash
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+        run: cd sn && cargo test  -p safe_network --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
         timeout-minutes: 10
 
       # blob api unix
       - name: Unix client blob tests against local network
         shell: bash
-        run: cargo test  -p safe_network --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
+        run: cd sn && cargo test  -p safe_network --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
         timeout-minutes: 10
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 10
         shell: bash
-        run: cargo run  -p safe_network --release  --features=always-joinable,test-utils --example client_blob
+        run: cd sn && cargo run  -p safe_network --release  --features=always-joinable,test-utils --example client_blob
 
 
       # - name: Kill the current network (not needed for next test)
