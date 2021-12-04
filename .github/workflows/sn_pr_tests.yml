@@ -44,10 +44,12 @@ jobs:
 
     - name: Build all safe_network targets
       # all = all crates in workspace, lib/bins targets, with these features...
-      run: cargo build --all --lib --bins --tests --release --features=always-joinable,test-utils
+      run: cd sn && cargo build --all-targets --release --features=always-joinable,test-utils
+
+      # run: cargo build --all --lib --bins --tests --release --features=always-joinable,test-utils
       # run: cargo build --all-targets --release --features=always-joinable,test-utils
-    # - name: Build all safe_network TEST targets
-    #   run: cargo test --all --release --no-run --features=always-joinable,test-utils --lib --bins --examples
+    - name: Build all safe_network TEST targets
+      run: cd sn && cargo test --all --release --no-run --features=always-joinable,test-utils --lib --bins --examples
 
   # TODO: this can be removed once e2e is stable atop splits.
   splits:
@@ -87,9 +89,9 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
+      # - name: Start the network
+      #   run: ./target/release/testnet
+      #   id: section-startup
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -117,7 +119,7 @@ jobs:
       - name: Run network asserts one by one
         shell: bash
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cargo test -p safe_network --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
+        run: cd sn && cargo test -p safe_network --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
         timeout-minutes: 7
         continue-on-error: true
 
@@ -226,8 +228,8 @@ jobs:
 
       - run: ls ./target/release
 
-      - name: run sn_cli unit tests (no running network is necessary)
-        run: cd sn_cli && cargo test --release --bin safe
+      # - name: run sn_cli unit tests (no running network is necessary)
+      #   run: cd sn_cli && cargo test --release --bin safe
 
       - name: Run Data Types tests
         if: steps.changes.outputs.types == 'true'
@@ -241,7 +243,7 @@ jobs:
 
       - name: Run PrefixMap tests
         if: steps.changes.outputs.prefix_map == 'true'
-        run: cd sn &&  cargo test --lib --release --features=always-joinable,test-utils -- prefix_map
+        run: cd sn && cargo test --lib --release --features=always-joinable,test-utils -- prefix_map
         timeout-minutes: 5
 
       - name: Run Messaging tests
@@ -389,10 +391,10 @@ jobs:
       # - name: Was there a section split?
       #   run: ./resources/scripts/has_split.sh
 
-      - name: Run sn_api tests
-        shell: bash
-        run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 45
+      # - name: Run sn_api tests
+      #   shell: bash
+      #   run: ./resources/scripts/api_tests.sh
+      #   timeout-minutes: 45
 
       - name: Are nodes still running...?
         shell: bash
