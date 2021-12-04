@@ -43,9 +43,11 @@ jobs:
         sharedKey: ${{github.run_id}}
 
     - name: Build all safe_network targets
-      run: cargo build --all-targets --release --all-features
+      # all = all crates in workspace, lib/bins targets, with these features...
+      run: cargo build --all --lib --bins --release --features=always-joinable,test-utils
+      # run: cargo build --all-targets --release --features=always-joinable,test-utils
     - name: Build all safe_network TEST targets
-      run: cargo test --release --no-run --features=always-joinable,test-utils
+      run: cargo test --all --release --no-run --features=always-joinable,test-utils --lib --bins --examples
 
   # TODO: this can be removed once e2e is stable atop splits.
   splits:
