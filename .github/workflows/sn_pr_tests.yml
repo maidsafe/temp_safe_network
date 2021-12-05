@@ -48,8 +48,8 @@ jobs:
 
       # run: cargo build --all --lib --bins --tests --release --features=always-joinable,test-utils
       # run: cargo build --all-targets --release --features=always-joinable,test-utils
-    - name: Build all safe_network TEST targets
-      run: cargo test --all --release --no-run --features=always-joinable,test-utils --lib --bins --examples
+    # - name: Build all safe_network TEST targets
+    #   run: cargo test --all --release --no-run --features=always-joinable,test-utils --lib --bins --examples
 
   # TODO: this can be removed once e2e is stable atop splits.
   splits:
