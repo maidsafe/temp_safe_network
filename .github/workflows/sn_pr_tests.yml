@@ -119,7 +119,7 @@ jobs:
       - name: Run network asserts one by one
         shell: bash
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cargo test -p safe_network --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
         timeout-minutes: 7
         continue-on-error: true
 
@@ -330,7 +330,7 @@ jobs:
       - name: Run network asserts one by one
         shell: bash
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cargo test -p safe_network --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
         timeout-minutes: 7
         continue-on-error: true
 
@@ -339,25 +339,25 @@ jobs:
       - name: Initial client tests...
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cargo test -p safe_network --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::blob && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::blob && sleep 5
         timeout-minutes: 5
 
       # register api
       - name: Client reg tests against local network
         shell: bash
-        run: cargo test -p safe_network --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
         timeout-minutes: 10
 
       # blob api unix
       - name: Unix client blob tests against local network
         shell: bash
-        run: cargo test -p safe_network --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
+        run: cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
         timeout-minutes: 10
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 10
         shell: bash
-        run: cargo run  -p safe_network --release  --features=always-joinable,test-utils --example client_blob
+        run: cargo run  --release  --features=always-joinable,test-utils --example client_blob
 
 
       # - name: Kill the current network (not needed for next test)
