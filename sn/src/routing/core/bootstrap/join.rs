@@ -176,7 +176,6 @@ impl<'a> Join<'a> {
                     section_chain,
                     node_state,
                 } => {
-
                     debug!("JoinResponseApproval received: {:?}", node_state);
                     if node_state.name != self.node.name() {
                         trace!("Ignore NodeApproval not for us: {:?}", node_state);
