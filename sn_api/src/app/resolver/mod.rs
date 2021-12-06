@@ -18,7 +18,6 @@ use super::{
 };
 pub use super::{ContentType, DataType, Url, VersionHash, XorUrlBase};
 use crate::{Error, Result};
-use async_recursion::async_recursion;
 use bytes::Bytes;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -90,7 +89,6 @@ pub enum SafeData {
         data: BTreeSet<(EntryHash, Entry)>,
         resolved_from: String,
     },
-    // TODO? Suggestion: Error type for easy error tracking in a resolution chain?
 }
 
 impl SafeData {
@@ -149,20 +147,15 @@ impl SafeData {
 
 impl Safe {
     /// Parses a string URL "safe://url" and returns a safe URL
-    /// Recursively resolves until it reaches the final URL
+    /// Resolves until it reaches the final URL
     pub async fn parse_and_resolve_url(&self, url: &str) -> Result<Url> {
         let safe_url = Safe::parse_url(url)?;
         let orig_path = safe_url.path_decoded()?;
 
         // Obtain the resolution chain without resolving the URL's path
         let mut resolution_chain = self
-            .recursive_resolve_url(
-                safe_url,
-                None,
-                false,
-                None,
-                false, // don't resolve the URL's path
-                INDIRECTION_LIMIT,
+            .fully_resolve_url(
+                safe_url, None, false, None, false, // don't resolve the URL's path
             )
             .await?;
 
@@ -214,7 +207,7 @@ impl Safe {
         info!("URL parsed successfully, fetching: {}", url);
 
         let mut resolution_chain = self
-            .recursive_resolve_url(safe_url, None, true, range, true, INDIRECTION_LIMIT)
+            .fully_resolve_url(safe_url, None, true, range, true)
             .await?;
 
         resolution_chain
@@ -225,7 +218,8 @@ impl Safe {
     /// # Inspect a safe:// URL and retrieve metadata information but the actual target content
     /// # As opposed to 'fetch' function, the actual target content won't be fetched, and only
     /// # the URL will be inspected resolving it as necessary to find the target location.
-    /// # This is helpful if you are interested in knowing about the target content rather than
+    /// # This is helpful if you are interested in knowing about the target content,
+    /// # and/or each of the Url resolution steps taken to the target content, rather than
     /// # trying to revieve the actual content.
     ///
     /// ## Examples
@@ -266,16 +260,16 @@ impl Safe {
     pub async fn inspect(&mut self, url: &str) -> Result<Vec<SafeData>> {
         let safe_url = Safe::parse_url(url)?;
         info!("URL parsed successfully, inspecting: {}", url);
-        self.recursive_resolve_url(safe_url, None, false, None, true, INDIRECTION_LIMIT)
+        self.fully_resolve_url(safe_url, None, false, None, true)
             .await
     }
 
-    // Retrieves all pieces of data that resulted from resolving the given URL.
-    // Keeping a copy of the intermediary steps when indirections occur
-    // Recursively resolves the given URL until
+    // Retrieves all pieces of data that resulted from resolving the given URL,
+    // keeping a copy of the intermediary resolution steps when indirections occur.
+    // Resolves the given URL until
     // - it reaches the final piece of data
     // - or reaches the indirection limit
-    // Returns a Vector with the data for all steps
+    // Returns a Vector with the data for all resolution steps
     //
     // NB: When resolving a Blob, metadata can be attached to it (attached_metadata)
     // Blobs don't have metadata on SAFE but the FileContainers linking to them have it
@@ -286,15 +280,13 @@ impl Safe {
     // NB: recursive (resolutions that resolve to themselves) aren't managed but since the
     // indirections are limited, it's probably not worth the overhead check.
     // Will need it if we allow infinite indirections though.
-    #[async_recursion]
-    async fn recursive_resolve_url(
+    async fn fully_resolve_url(
         &self,
         input_url: Url,
         attached_metadata: Option<FileInfo>,
         retrieve_data: bool,
         range: Range,
         resolve_path: bool,
-        indirections_limit: usize,
     ) -> Result<Vec<SafeData>> {
         debug!(
             "Fetching URL: {} with content of type: {:?}, data type: {:?}",
@@ -303,42 +295,33 @@ impl Safe {
             input_url.data_type()
         );
 
-        // fetch safe_data from URL
-        let safe_data = self
-            .resolve_url(
-                input_url,
-                attached_metadata,
-                retrieve_data,
-                range,
-                resolve_path,
-            )
-            .await?;
-        let next_step = safe_data.resolves_into();
+        let mut indirections_limit = INDIRECTION_LIMIT;
+        let mut safe_data_vec = vec![];
+        let mut next_url = input_url;
+        let mut metadata = attached_metadata;
+        loop {
+            // fetch safe_data from URL
+            let safe_data = self
+                .resolve_url(next_url, metadata, retrieve_data, range, resolve_path)
+                .await?;
 
-        // stop cases
-        let next_url;
-        match next_step {
-            None => return Ok(vec![safe_data]),
-            Some(url) => next_url = url,
+            let next_step = safe_data.resolves_into();
+            metadata = safe_data.metadata();
+            safe_data_vec.push(safe_data);
+
+            match next_step {
+                None => break,
+                Some(_) if indirections_limit == 0 => {
+                    return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
+                }
+                Some(url) => {
+                    // fetch next (and attach current metadata to it)
+                    next_url = url;
+                    indirections_limit -= 1;
+                }
+            }
         }
-        if indirections_limit == 0 {
-            return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
-        }
 
-        // fetch next (and attach current metadata to it)
-        let next_safe_data = self
-            .recursive_resolve_url(
-                next_url,
-                safe_data.metadata(),
-                retrieve_data,
-                range,
-                resolve_path,
-                indirections_limit - 1,
-            )
-            .await?;
-
-        let mut safe_data_vec = vec![safe_data];
-        safe_data_vec.extend(next_safe_data);
         Ok(safe_data_vec)
     }
 
@@ -348,31 +331,33 @@ impl Safe {
         &self,
         input_url: Url,
         attached_metadata: Option<FileInfo>,
-        fetch_mode: bool,
+        retrieve_data: bool,
         range: Range,
         resolve_path: bool,
     ) -> Result<SafeData> {
         debug!(
-            "Resolving URL: {}, of content type: {:?}, and data type: {:?}",
+            "Resolving URL: {}, of content type: {:?}, and data type: {:?}, address {:?}",
             input_url.to_xorurl_string(),
             input_url.content_type(),
-            input_url.data_type()
+            input_url.data_type(),
+            input_url.address()
         );
+
         match input_url.content_type() {
             ContentType::FilesContainer => {
                 self.resolve_file_container(input_url, resolve_path).await
             }
             ContentType::NrsMapContainer => self.resolve_nrs_map_container(input_url).await,
-            ContentType::Multimap => self.resolve_multimap(input_url, fetch_mode).await,
+            ContentType::Multimap => self.resolve_multimap(input_url, retrieve_data).await,
             ContentType::Raw => {
-                self.resolve_raw(input_url, attached_metadata, fetch_mode, range)
+                self.resolve_raw(input_url, attached_metadata, retrieve_data, range)
                     .await
             }
             ContentType::MediaType(media_type_str) => {
                 self.resolve_mediatype(
                     input_url,
                     attached_metadata,
-                    fetch_mode,
+                    retrieve_data,
                     range,
                     media_type_str,
                 )

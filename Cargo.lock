@@ -3394,7 +3394,6 @@ name = "sn_api"
 version = "0.44.0"
 dependencies = [
  "anyhow",
- "async-recursion",
  "bincode",
  "blsttc",
  "bytes",
