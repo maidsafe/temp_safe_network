@@ -587,8 +587,8 @@ pub(super) async fn send_message(
     if failures > successful_sends {
         error!("More send errors than success on send_message");
         Err(Error::InsufficientElderConnections(
-            elders.len(),
             successful_sends,
+            elders.len(),
         ))
     } else {
         Ok(())
