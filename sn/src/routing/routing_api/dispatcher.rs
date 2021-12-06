@@ -19,7 +19,7 @@ use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
 use tracing::Instrument;
 
-const PROBE_INTERVAL: Duration = Duration::from_secs(3);
+const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 
 // `Command` Dispatcher.
 pub(super) struct Dispatcher {
