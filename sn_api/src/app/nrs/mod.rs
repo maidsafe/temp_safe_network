@@ -50,15 +50,9 @@ impl Safe {
             return Err(Error::NrsNameAlreadyExists(top_name.to_owned()));
         }
 
-        if dry_run {
-            return Err(Error::NotImplementedError(
-                "No dry run for nrs_create. Version info cannot be determined. (Register operations need this functionality implemented first.)".to_string(),
-            ));
-        }
-
         // Create a new empty Multimap
         let _ = self
-            .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
+            .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false, dry_run)
             .await?;
 
         let mut url = Url::from_url(&url_str)?;
@@ -68,6 +62,7 @@ impl Safe {
 
     /// # Associates a public name to a link
     /// The top name of the input public name needs to be registered first with `nrs_create`
+    ///
     /// ```no_run
     /// safe://<subName>.<topName>/path/to/whatever?var=value
     ///        |-----------------|
@@ -87,13 +82,6 @@ impl Safe {
         let url_str = validate_nrs_public_name(public_name)?;
         validate_nrs_url(link)?;
 
-        // dry run
-        if dry_run {
-            return Err(Error::NotImplementedError(
-                "No dry run for nrs_add. Version info cannot be determined. (Register operations need this functionality implemented first.)".to_string(),
-            ));
-        }
-
         // get current latest for subname
         let safe_url = Safe::parse_url(public_name)?;
         let subname = parse_out_subnames(public_name);
@@ -110,7 +98,7 @@ impl Safe {
             link.to_string().as_bytes().to_vec(),
         );
         let entry_hash = self
-            .multimap_insert(&url_str, entry, current_versions)
+            .multimap_insert(&url_str, entry, current_versions, dry_run)
             .await?;
 
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
@@ -170,13 +158,6 @@ impl Safe {
         // check public_name
         let url_str = validate_nrs_public_name(public_name)?;
 
-        // dry run
-        if dry_run {
-            return Err(Error::NotImplementedError(
-                "No dry run for nrs_remove. Version info cannot be determined. (Register operations need this functionality implemented first.)".to_string(),
-            ));
-        }
-
         // get current latest for subname
         let safe_url = Safe::parse_url(public_name)?;
         let subname = parse_out_subnames(public_name);
@@ -188,7 +169,9 @@ impl Safe {
             .collect();
 
         // remove
-        let entry_hash = self.multimap_remove(&url_str, current_versions).await?;
+        let entry_hash = self
+            .multimap_remove(&url_str, current_versions, dry_run)
+            .await?;
 
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
     }
@@ -662,7 +645,7 @@ mod tests {
             another_valid_url.to_string().as_bytes().to_vec(),
         );
         let _ = safe
-            .multimap_insert(&url_str, entry, BTreeSet::new())
+            .multimap_insert(&url_str, entry, BTreeSet::new(), false)
             .await?;
 
         // get of other name should be ok

@@ -23,8 +23,9 @@ impl Safe {
         name: Option<XorName>,
         type_tag: u64,
         private: bool,
+        dry_run: bool,
     ) -> Result<XorUrl> {
-        let xorname = self
+        let (xorname, op_batch) = self
             .safe_client
             .create_register(name, type_tag, None, private)
             .await?;
@@ -36,6 +37,10 @@ impl Safe {
         };
         let xorurl =
             Url::encode_register(xorname, type_tag, scope, ContentType::Raw, self.xorurl_base)?;
+
+        if !dry_run {
+            self.safe_client.apply_register_ops(op_batch).await?;
+        }
 
         Ok(xorurl)
     }
@@ -109,6 +114,7 @@ impl Safe {
         url: &str,
         entry: Entry,
         parents: BTreeSet<EntryHash>,
+        dry_run: bool,
     ) -> Result<EntryHash> {
         /*
         let safeurl = Safe::parse_url(url)?;
@@ -124,9 +130,16 @@ impl Safe {
 
         let reg_url = self.parse_and_resolve_url(url).await?;
         let address = self.get_register_address(&reg_url)?;
-        self.safe_client
+        let (entry_hash, op_batch) = self
+            .safe_client
             .write_to_register(address, entry, parents)
-            .await
+            .await?;
+
+        if !dry_run {
+            self.safe_client.apply_register_ops(op_batch).await?;
+        }
+
+        Ok(entry_hash)
     }
 
     pub(crate) fn get_register_address(&self, url: &Url) -> Result<RegisterAddress> {
@@ -153,8 +166,8 @@ mod tests {
     async fn test_register_create() -> Result<()> {
         let safe = new_safe_instance().await?;
 
-        let xorurl = safe.register_create(None, 25_000, false).await?;
-        let xorurl_priv = safe.register_create(None, 25_000, true).await?;
+        let xorurl = safe.register_create(None, 25_000, false, false).await?;
+        let xorurl_priv = safe.register_create(None, 25_000, true, false).await?;
 
         let received_data = safe.register_read(&xorurl).await?;
         let received_data_priv = safe.register_read(&xorurl_priv).await?;
@@ -164,10 +177,15 @@ mod tests {
 
         let initial_data = "initial data bytes".as_bytes().to_vec();
         let hash = safe
-            .register_write(&xorurl, initial_data.clone(), Default::default())
+            .register_write(&xorurl, initial_data.clone(), Default::default(), false)
             .await?;
         let hash_priv = safe
-            .register_write(&xorurl_priv, initial_data.clone(), Default::default())
+            .register_write(
+                &xorurl_priv,
+                initial_data.clone(),
+                Default::default(),
+                false,
+            )
             .await?;
 
         let received_entry = safe.register_read_entry(&xorurl, hash).await?;
