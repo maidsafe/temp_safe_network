@@ -46,11 +46,6 @@ jobs:
       # all = all crates in workspace, lib/bins targets, with these features...
       run: cargo build --all-targets --release --features=always-joinable,test-utils --tests
 
-      # run: cargo build --all --lib --bins --tests --release --features=always-joinable,test-utils
-      # run: cargo build --all-targets --release --features=always-joinable,test-utils
-    # - name: Build all safe_network TEST targets
-    #   run: cargo test --all --release --no-run --features=always-joinable,test-utils --lib --bins --examples
-
   # TODO: this can be removed once e2e is stable atop splits.
   splits:
     needs: build
@@ -88,6 +83,11 @@ jobs:
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
+
+      - name: Build all safe_network targets
+        # all = all crates in workspace, lib/bins targets, with these features...
+        run: cargo test --no-run -p safe_network --release --features=always-joinable,test-utils --lib
+        timeout-minutes: 10
 
       # - name: Start the network
       #   run: ./target/release/testnet
@@ -225,11 +225,13 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
+      - name: Build all safe_network targets
+        # all = all crates in workspace, lib/bins targets, with these features...
+        run: cargo test --no-run --all-targets --release --features=always-joinable,test-utils
+        timeout-minutes: 10
 
-      - run: ls ./target/release
-
-      # - name: run sn_cli unit tests (no running network is necessary)
-      #   run: cd sn_cli && cargo test --release --bin safe
+      - name: run sn_cli unit tests (no running network is necessary)
+        run: cd sn_cli && cargo test --release --bin safe
 
       - name: Run Data Types tests
         if: steps.changes.outputs.types == 'true'
@@ -298,6 +300,11 @@ jobs:
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
+
+      - name: Build all safe_network targets
+        # all = all crates in workspace, lib/bins targets, with these features...
+        run: cargo test --no-run -p safe_network --release --features=always-joinable,test-utils --lib
+        timeout-minutes: 10
 
       - name: Start the network
         run: ./target/release/testnet
