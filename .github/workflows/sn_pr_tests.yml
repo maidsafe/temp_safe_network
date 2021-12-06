@@ -152,11 +152,11 @@ jobs:
       #   run: ./resources/scripts/network_is_ready.sh
       #   timeout-minutes: 5
 
-      # - name: Wait for a healthy network (win)
-      #   shell: bash
-      #   if: matrix.os == 'windows-latest'
-      #   run: ./resources/scripts/network_is_ready_cli.sh
-      #   timeout-minutes: 5
+      - name: Wait for a healthy network
+        shell: bash
+        # if: matrix.os == 'windows-latest'
+        run: ./resources/scripts/network_is_ready_cli.sh
+        timeout-minutes: 5
 
 
       - name: Run network asserts one by one
@@ -238,8 +238,9 @@ jobs:
 
       - name: Kill the current network (not needed for next test)
         if: matrix.os == 'windows-latest'
+        continue-on-error: true
         run: |
-          taskkill /IM sn_node /F
+          taskkill /IM sn_node.exe /F
           rd /s /q %USERPROFILE%\.safe\node
         shell: cmd
 
@@ -254,6 +255,7 @@ jobs:
           # Upload artifacts.
         run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
         if: failure()
+        continue-on-error: true
 
       - name: Upload Node Logs
           # Upload artifacts.

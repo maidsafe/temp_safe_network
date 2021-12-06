@@ -176,7 +176,8 @@ impl<'a> Join<'a> {
                     section_chain,
                     node_state,
                 } => {
-                    trace!("{}", LogMarker::ReceivedJoinApproved);
+
+                    debug!("JoinResponseApproval received: {:?}", node_state);
                     if node_state.name != self.node.name() {
                         trace!("Ignore NodeApproval not for us: {:?}", node_state);
                         continue;
@@ -190,6 +191,7 @@ impl<'a> Join<'a> {
                         continue;
                     }
 
+                    trace!("{}", LogMarker::ReceivedJoinApproved);
                     trace!(
                         "This node has been approved to join the network at {:?}!",
                         section_auth.prefix,
