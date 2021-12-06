@@ -11,15 +11,14 @@
 use super::helpers::download_and_install_github_release_asset;
 use crate::operations::config::NetworkLauncher;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
+use sn_api::NodeConfig;
 use std::{
-    collections::BTreeSet,
     fs::create_dir_all,
     io::{self, Write},
     net::SocketAddr,
     path::PathBuf,
     process::{Command, Stdio},
 };
-use structopt::StructOpt;
 use tracing::debug;
 
 #[cfg(not(target_os = "windows"))]
@@ -85,130 +84,81 @@ pub fn node_install(node_path: Option<PathBuf>, version: Option<String>) -> Resu
 pub fn node_run(
     network_launcher: &mut Box<impl NetworkLauncher>,
     node_directory_path: PathBuf,
-    nodes_dir: &str,
+    node_data_dir_name: &str,
     interval: u64,
     num_of_nodes: &str,
     ip: Option<String>,
 ) -> Result<()> {
-    let arg_node_path = node_directory_path
-        .join(SN_NODE_EXECUTABLE)
-        .display()
-        .to_string();
-    debug!("Running node from {}", arg_node_path);
-
-    let nodes_dir = node_directory_path.join(nodes_dir);
-    if !nodes_dir.exists() {
-        println!("Creating '{}' folder", nodes_dir.display());
-        create_dir_all(nodes_dir.clone())
-            .wrap_err("Couldn't create target path to store nodes' generated data")?;
-    }
-    let arg_nodes_dir = nodes_dir.display().to_string();
-    println!("Storing nodes' generated data at {}", arg_nodes_dir);
-
-    let int_arg = interval.clone().to_string();
-    let mut sn_launch_tool_args = vec![
-        "sn_launch_tool",
-        "--node-path",
-        &arg_node_path,
-        "--nodes-dir",
-        &arg_nodes_dir,
-        "--interval",
-        &int_arg,
-        "--num-nodes",
-        num_of_nodes,
-    ];
-
-    if let Some(ref launch_ip) = ip {
-        sn_launch_tool_args.push("--ip");
+    let mut sn_launch_tool_args =
+        get_initial_sn_launch_args(node_directory_path, node_data_dir_name)?;
+    sn_launch_tool_args.push("--interval".to_string());
+    sn_launch_tool_args.push(interval.clone().to_string());
+    sn_launch_tool_args.push("--num-nodes".to_string());
+    sn_launch_tool_args.push(num_of_nodes.to_string());
+    if let Some(launch_ip) = ip {
+        sn_launch_tool_args.push("--ip".to_string());
         sn_launch_tool_args.push(launch_ip);
     } else {
-        sn_launch_tool_args.push("--local");
+        sn_launch_tool_args.push("--local".to_string());
     }
-
     network_launcher.launch(sn_launch_tool_args, interval)?;
-
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn node_join(
-    node_path: Option<PathBuf>,
-    node_data_dir: &str,
+    network_launcher: &mut Box<impl NetworkLauncher>,
+    node_directory_path: PathBuf,
+    node_data_dir_name: &str,
     verbosity: u8,
-    contacts: &BTreeSet<SocketAddr>,
+    node_config: NodeConfig,
     local_addr: Option<SocketAddr>,
     public_addr: Option<SocketAddr>,
     clear_data: bool,
+    local: bool,
+    disable_port_forwarding: bool,
 ) -> Result<()> {
-    let node_path = get_node_bin_path(node_path)?;
-
-    let arg_node_path = node_path.join(SN_NODE_EXECUTABLE).display().to_string();
-    debug!("Running node from {}", arg_node_path);
-
-    let node_data_dir = node_path.join(node_data_dir);
-    if !node_data_dir.exists() {
-        println!("Creating '{}' folder", node_data_dir.display());
-        create_dir_all(node_data_dir.clone())
-            .wrap_err("Couldn't create target path to store nodes' generated data")?;
+    let mut sn_launch_tool_args =
+        get_initial_sn_launch_args(node_directory_path, node_data_dir_name)?;
+    if local {
+        sn_launch_tool_args.push("--local".to_string());
     }
-    let arg_nodes_dir = node_data_dir.display().to_string();
-    println!("Storing nodes' generated data at {}", arg_nodes_dir);
-
-    // Let's create an args array to pass to the network launcher tool
-    let mut sn_launch_tool_args = vec![
-        "sn_launch_tool-join",
-        "-v",
-        "--node-path",
-        &arg_node_path,
-        "--nodes-dir",
-        &arg_nodes_dir,
-    ];
-
-    let local_addr_str = local_addr.map(|addr| addr.to_string());
-    let public_addr_str = public_addr.map(|addr| addr.to_string());
-
-    if let Some(ref local) = local_addr_str {
-        sn_launch_tool_args.push("--local-addr");
-        sn_launch_tool_args.push(local);
+    if disable_port_forwarding {
+        sn_launch_tool_args.push("--skip-auto-port-forwarding".to_string());
     }
-
-    if let Some(ref public) = public_addr_str {
-        sn_launch_tool_args.push("--public-addr");
-        sn_launch_tool_args.push(public);
+    if let Some(local_ip) = local_addr.map(|addr| addr.to_string()) {
+        sn_launch_tool_args.push("--local-addr".to_string());
+        sn_launch_tool_args.push(local_ip);
     }
-
+    if let Some(public_ip) = public_addr.map(|addr| addr.to_string()) {
+        sn_launch_tool_args.push("--public-addr".to_string());
+        sn_launch_tool_args.push(public_ip);
+    }
     if clear_data {
-        sn_launch_tool_args.push("--clear-data");
+        sn_launch_tool_args.push("--clear-data".to_string());
     }
-
     let mut verbosity_arg = String::from("-");
     if verbosity > 0 {
         let v = "y".repeat(verbosity as usize);
         println!("V: {}", v);
         verbosity_arg.push_str(&v);
-        sn_launch_tool_args.push(&verbosity_arg);
+        sn_launch_tool_args.push(verbosity_arg);
     }
+    sn_launch_tool_args.push("--genesis-key".to_string());
+    let genesis_key = hex::encode(node_config.0.to_bytes());
+    sn_launch_tool_args.push(genesis_key);
 
-    sn_launch_tool_args.push("--hard-coded-contacts");
+    sn_launch_tool_args.push("--hard-coded-contacts".to_string());
+    let contacts = &node_config.1;
     let contacts_list = contacts
         .iter()
         .map(|c| c.to_string())
         .collect::<Vec<String>>();
-
     for peer in &contacts_list {
-        sn_launch_tool_args.push(peer);
+        sn_launch_tool_args.push(peer.to_string());
     }
 
-    debug!(
-        "Running network launch tool with args: {:?}",
-        sn_launch_tool_args
-    );
-
-    // We can now call the tool with the args
-    println!("Starting a node to join a Safe network...");
-    sn_launch_tool::Join::from_iter_safe(&sn_launch_tool_args)
-        .map_err(|e| eyre!(e))
-        .and_then(|launch| launch.run())
-        .wrap_err("Error launching node")?;
+    network_launcher.join(sn_launch_tool_args)?;
     Ok(())
 }
 
@@ -236,6 +186,38 @@ pub fn node_shutdown(node_path: Option<PathBuf>) -> Result<()> {
         node_exec_name
     );
     kill_nodes(node_exec_name)
+}
+
+fn get_initial_sn_launch_args(
+    node_directory_path: PathBuf,
+    node_data_dir_name: &str,
+) -> Result<Vec<String>> {
+    let arg_node_path = node_directory_path
+        .join(SN_NODE_EXECUTABLE)
+        .display()
+        .to_string();
+    debug!("Running node from {}", arg_node_path);
+
+    let node_data_dir_path = node_directory_path.join(node_data_dir_name);
+    if !node_data_dir_path.exists() {
+        println!("Creating '{}' folder", node_data_dir_path.display());
+        create_dir_all(node_data_dir_path.clone())
+            .wrap_err("Couldn't create target path to store nodes' generated data")?;
+    }
+    let arg_nodes_dir = node_data_dir_path.display().to_string();
+    println!("Storing nodes' generated data at {}", arg_nodes_dir);
+
+    // This first positional "sn_launch_tool" argument is required to get the tool to run
+    // correctly, even though it doesn't appear to actually do anything. It seems you can't just
+    // pass an optional argument as the first one.
+    let sn_launch_tool_args = vec![
+        String::from("sn_launch_tool"),
+        String::from("--node-path"),
+        arg_node_path,
+        String::from("--nodes-dir"),
+        arg_nodes_dir,
+    ];
+    Ok(sn_launch_tool_args)
 }
 
 fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {

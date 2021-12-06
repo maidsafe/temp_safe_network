@@ -3036,7 +3036,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe_network"
-version = "0.44.1"
+version = "0.46.5"
 dependencies = [
  "assert_matches",
  "async-recursion",
@@ -3080,7 +3080,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
- "sn_launch_tool 0.9.3",
+ "sn_launch_tool",
  "structopt",
  "strum",
  "strum_macros",
@@ -3471,7 +3471,7 @@ dependencies = [
  "shrust",
  "sn_api",
  "sn_cmd_test_utilities",
- "sn_launch_tool 0.7.0",
+ "sn_launch_tool",
  "structopt",
  "tokio",
  "tracing",
@@ -3500,24 +3500,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.7.0"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b756e3149e2e7243f64770fe7303f5521a4873afaabd868482f0adae7ebc8a29"
-dependencies = [
- "color-eyre",
- "dirs-next 1.0.2",
- "eyre",
- "serde_json",
- "structopt",
- "tracing",
- "tracing-subscriber 0.2.25",
-]
-
-[[package]]
-name = "sn_launch_tool"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af6d179a9b80c510bc20aa2d9a59c32207e002378d9bc34d81656daba0c65ee1"
+checksum = "091de12d5e970370cfc3f8118ef70ec14279f5280e1f9dc219fc6cbc04bcd361"
 dependencies = [
  "color-eyre",
  "dirs-next 1.0.2",

@@ -25,6 +25,7 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
+use std::time::Duration;
 use xor_name::XorName;
 
 impl Core {
@@ -38,29 +39,20 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let snapshot = self.state_snapshot().await;
 
-        // If we have the key share for new SAP key we can switch to this new SAP.
-        // Otherwise, only update when not being the elder of new SAP.
-        let switch_to_new_sap = (self.is_not_elder().await
-            && !section_auth.contains_elder(&self.node.read().await.name()))
-            || self
-                .section_keys_provider
-                .key_share(&section_signed.public_key)
-                .await
-                .is_ok();
-
+        let our_name = self.node.read().await.name();
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
-            sig: section_signed,
+            sig: section_signed.clone(),
         };
 
         let _updated = self
             .network_knowledge
             .update_knowledge_if_valid(
-                signed_sap,
+                signed_sap.clone(),
                 &proof_chain,
                 members,
-                &self.node.read().await.name(),
-                switch_to_new_sap,
+                &our_name,
+                &self.section_keys_provider,
             )
             .await?;
 
@@ -104,7 +96,11 @@ impl Core {
                 // TODO: we may need to check if 'bounced_msg' dest section pk is different
                 // from the received new SAP key, to prevent from endlessly resending a msg
                 // if a sybil/corrupt peer keeps sending us the same AE msg.
-                trace!("{}", LogMarker::AeResendAfterRetry);
+                trace!(
+                    "{} resending {:?}",
+                    LogMarker::AeResendAfterRetry,
+                    msg_to_resend
+                );
 
                 self.create_or_wait_for_backoff(&sender).await;
 
@@ -212,32 +208,23 @@ impl Core {
 
         info!("Anti-Entropy: message received from peer: {}", sender);
 
-        // If we have the key share for new SAP key we can switch to this new SAP.
-        // Otherwise, only update when not being the elder of new SAP.
-        let switch_to_new_sap = (self.is_not_elder().await
-            && !section_auth.contains_elder(&self.node.read().await.name()))
-            || self
-                .section_keys_provider
-                .key_share(&section_signed.public_key)
-                .await
-                .is_ok();
-
         let prefix = section_auth.prefix();
         let dst_section_key = section_auth.section_key();
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
-            sig: section_signed,
+            sig: section_signed.clone(),
         };
+        let our_name = self.node.read().await.name();
 
         // Update our network knowledge.
         if self
             .network_knowledge
             .update_knowledge_if_valid(
-                signed_sap,
+                signed_sap.clone(),
                 &proof_chain,
                 None,
-                &self.node.read().await.name(),
-                switch_to_new_sap,
+                &our_name,
+                &self.section_keys_provider,
             )
             .await?
         {
@@ -268,13 +255,24 @@ impl Core {
 
         if let Some(backoff) = our_backoff {
             let next_backoff = backoff.next_backoff();
-            drop(ae_backoff_guard);
-
-            if let Some(next_wait) = next_backoff {
-                tokio::time::sleep(next_wait).await;
+            let sleep_time = if let Some(mut next_wait) = next_backoff {
+                // The default setup start with around 400ms
+                // then increases to around 50s after 25 calls.
+                next_wait /= 100;
+                if next_wait > Duration::from_secs(1) {
+                    backoff.reset();
+                }
+                Some(next_wait)
             } else {
                 // TODO: we've done all backoffs and are _still_ getting messages?
                 // we should probably penalise the node here.
+                None
+            };
+
+            drop(ae_backoff_guard);
+
+            if let Some(sleep_time) = sleep_time {
+                tokio::time::sleep(sleep_time).await;
             }
         } else {
             let _res = ae_backoff_guard.insert((peer.clone(), ExponentialBackoff::default()));
@@ -468,10 +466,13 @@ mod tests {
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
-        network_knowledge::test_utils::{gen_addr, gen_section_authority_provider},
+        network_knowledge::{
+            test_utils::{gen_addr, gen_section_authority_provider},
+            SectionKeysProvider,
+        },
         node::Node,
         routing_api::tests::create_comm,
-        XorName, MIN_ADULT_AGE,
+        SectionKeyShare, XorName, MIN_ADULT_AGE,
     };
 
     use assert_matches::assert_matches;
@@ -556,7 +557,7 @@ mod tests {
                     &env.proof_chain,
                     None,
                     &env.core.node.read().await.name(),
-                    false,
+                    &env.core.section_keys_provider
                 )
                 .await?
         );
@@ -698,7 +699,7 @@ mod tests {
             assert_eq!(genesis_pk, *chain.root_key());
 
             let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
-            let core = Core::first_node(
+            let mut core = Core::first_node(
                 create_comm().await?,
                 node.clone(),
                 mpsc::channel(1).0,
@@ -709,11 +710,24 @@ mod tests {
             .await?;
 
             let genesis_sap = core.network_knowledge().authority_provider().await;
+            let section_key_share = SectionKeyShare {
+                public_key_set: secret_key_set.public_keys(),
+                index: 0,
+                secret_key_share: secret_key_set.secret_key_share(0),
+            };
+
+            core.section_keys_provider = SectionKeysProvider::new(Some(section_key_share)).await;
 
             // get our Core to now be in prefix(0)
             let _ = core
                 .network_knowledge()
-                .update_knowledge_if_valid(signed_sap, &chain, None, &node.name(), true)
+                .update_knowledge_if_valid(
+                    signed_sap.clone(),
+                    &chain,
+                    None,
+                    &node.name(),
+                    &core.section_keys_provider,
+                )
                 .await;
 
             // generate other SAP for prefix1

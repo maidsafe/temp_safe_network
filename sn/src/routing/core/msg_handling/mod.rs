@@ -455,7 +455,7 @@ impl Core {
                 prefix,
                 elders,
             } => {
-                trace!("Handling msg: Dkg-Start from {}", sender);
+                trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
                 if !elders.contains_key(&self.node.read().await.name()) {
                     return Ok(vec![]);
                 }
@@ -481,8 +481,7 @@ impl Core {
                     message,
                     sender
                 );
-                self.handle_dkg_message(session_id, message, sender.name())
-                    .await
+                self.handle_dkg_message(session_id, message, sender).await
             }
             SystemMsg::DkgFailureObservation {
                 session_id,
@@ -495,18 +494,21 @@ impl Core {
             SystemMsg::DkgNotReady {
                 message,
                 session_id,
-            } => Ok(self.handle_dkg_not_ready(
-                sender,
-                message,
-                session_id,
-                self.network_knowledge.section_key().await,
-            )),
+            } => {
+                self.handle_dkg_not_ready(
+                    sender,
+                    message,
+                    session_id,
+                    self.network_knowledge.section_key().await,
+                )
+                .await
+            }
             SystemMsg::DkgRetry {
                 message_history,
                 message,
                 session_id,
             } => {
-                self.handle_dkg_retry(session_id, message_history, message, sender.name())
+                self.handle_dkg_retry(session_id, message_history, message, sender)
                     .await
             }
             // The following type of messages are all handled by upper sn_node layer.
@@ -624,23 +626,34 @@ impl Core {
                     } = session_info;
                     let message_cache = self.dkg_voter.get_cached_messages(&session_id);
                     trace!(
-                        "Sending DkgSessionInfo {{ {:?}, ... }} to {}",
+                        "Sending DkgSessionInfo {{ {:?}, elders {:?}, ... }} to {}",
                         &session_id,
+                        elders,
                         &sender
                     );
-                    Ok(vec![Command::PrepareNodeMsgToSend {
-                        msg: SystemMsg::DkgSessionInfo {
-                            session_id,
-                            elders,
-                            prefix,
-                            section_auth,
-                            message_cache,
-                            message,
-                        },
-                        dst: DstLocation::Node {
+
+                    let node_msg = SystemMsg::DkgSessionInfo {
+                        session_id,
+                        elders,
+                        prefix,
+                        section_auth,
+                        message_cache,
+                        message,
+                    };
+                    let section_pk = self.network_knowledge.section_key().await;
+                    let wire_msg = WireMsg::single_src(
+                        &self.node.read().await.clone(),
+                        DstLocation::Node {
                             name: sender.name(),
-                            section_pk: self.network_knowledge.section_key().await,
+                            section_pk,
                         },
+                        node_msg,
+                        section_pk,
+                    )?;
+
+                    Ok(vec![Command::SendMessage {
+                        recipients: vec![sender],
+                        wire_msg,
                     }])
                 } else {
                     warn!("Unknown DkgSessionInfo: {:?} requested", &session_id);
@@ -689,9 +702,10 @@ impl Core {
                         authority: section_auth,
                     },
                 );
+                trace!("DkgSessionInfo handling {:?} - {:?}", session_id, elders);
                 commands.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
                 commands.extend(
-                    self.handle_dkg_retry(session_id, message_cache, message, sender.name())
+                    self.handle_dkg_retry(session_id, message_cache, message, sender)
                         .await?,
                 );
                 Ok(commands)

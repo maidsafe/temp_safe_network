@@ -414,10 +414,11 @@ impl Session {
         let msg_id = MessageId::new();
 
         debug!(
-            "Making initial contact with nodes. Our PublicAddr: {:?}. Using {:?} to {} nodes",
+            "Making initial contact with nodes. Our PublicAddr: {:?}. Using {:?} to {} nodes: {:?}",
             endpoint.public_addr(),
             msg_id,
-            elders_or_adults.len()
+            elders_or_adults.len(),
+            elders_or_adults
         );
 
         // TODO: Don't use genesis key if we have a full section

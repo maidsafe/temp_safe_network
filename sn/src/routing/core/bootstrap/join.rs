@@ -31,10 +31,14 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof;
+use std::collections::BTreeMap;
 use tokio::time::sleep;
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
+
+// arbitrarily long. No join in a non splitting section should fail to get signature shares in anything like a few minutes
+const JOIN_SHARE_EXPIRATION_DURATION: Duration = Duration::from_secs(900);
 
 /// Join the network as new node.
 ///
@@ -71,7 +75,7 @@ struct Join<'a> {
     node: Node,
     prefix: Prefix,
     prefix_map: NetworkPrefixMap,
-    signature_aggregator: SignatureAggregator,
+    signature_aggregators: BTreeMap<BlsPublicKey, SignatureAggregator>,
     node_state_serialized: Option<Vec<u8>>,
     backoff: ExponentialBackoff,
 }
@@ -89,7 +93,7 @@ impl<'a> Join<'a> {
             node,
             prefix: Prefix::default(),
             prefix_map,
-            signature_aggregator: SignatureAggregator::new(),
+            signature_aggregators: BTreeMap::default(),
             node_state_serialized: None,
             backoff: ExponentialBackoff {
                 initial_interval: Duration::from_millis(50),
@@ -164,12 +168,6 @@ impl<'a> Join<'a> {
                     error!("Network is set to not taking any new joining node, try join later.");
                     return Err(Error::TryJoinLater);
                 }
-                JoinResponse::Rejected(JoinRejectionReason::DKGUnderway) => {
-                    error!("The Section we are trying to join is going through DKG, backing off and retrying again");
-                    self.send_join_requests(join_request.clone(), &recipients, section_key, true)
-                        .await?;
-                    continue;
-                }
                 JoinResponse::Approval {
                     section_auth,
                     genesis_key,
@@ -223,12 +221,16 @@ impl<'a> Join<'a> {
                             node_state_serialized
                         };
 
+                    let sig_pk = sig_share.public_key_set.public_key();
+
+                    // get the aggregator or make a new one for this new section public key
+                    let aggregator =
+                        self.signature_aggregators.entry(sig_pk).or_insert_with(|| {
+                            SignatureAggregator::with_expiration(JOIN_SHARE_EXPIRATION_DURATION)
+                        });
+
                     info!("Aggregating received ApprovalShare from {:?}", sender);
-                    match self
-                        .signature_aggregator
-                        .add(&serialized_details, sig_share.clone())
-                        .await
-                    {
+                    match aggregator.add(&serialized_details, sig_share.clone()).await {
                         Ok(sig) => {
                             info!("Successfully aggregated ApprovalShares for joining the network");
 
@@ -258,7 +260,31 @@ impl<'a> Join<'a> {
                             continue;
                         }
                         Err(AggregatorError::NotEnoughShares) => continue,
-                        _ => return Err(Error::InvalidSignatureShare),
+                        error => {
+                            warn!(
+                                "Error received as part of signature aggregation during join: {:?}",
+                                error
+                            );
+
+                            if sig_pk != section_key {
+                                // if we've have aggregation errors, we attempt a fresh join as there's likely been a key change
+                                let join_request = JoinRequest {
+                                    section_key,
+                                    resource_proof_response: None,
+                                    aggregated: None,
+                                };
+
+                                self.send_join_requests(
+                                    join_request,
+                                    &recipients,
+                                    section_key,
+                                    true,
+                                )
+                                .await?;
+                            }
+
+                            continue;
+                        }
                     }
                 }
                 JoinResponse::Retry {

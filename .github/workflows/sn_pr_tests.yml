@@ -1,4 +1,4 @@
-name: 'sn: PR Tests'
+name: PR Tests
 
 on: pull_request
 
@@ -10,10 +10,12 @@ env:
   RUST_LOG: "safe_network=trace"
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
-  SN_CLIENT_QUERY_TIMEOUT: 180
-  NODE_COUNT: 33
+  SN_CLIENT_QUERY_TIMEOUT: 270
+  NODE_COUNT: 45
   SN_ELDER_COUNT: 5
-
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
   tests:
@@ -97,6 +99,9 @@ jobs:
       - name: Build all safe_network targets
         run: cd sn && cargo build --all-targets --release --features=always-joinable,test-utils
 
+      - name: run sn_cli unit tests (no running network is necessary)
+        run: cargo test --release --bin safe
+
       - name: Run Data Types tests
         if: steps.changes.outputs.types == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- types
@@ -125,97 +130,21 @@ jobs:
       - name: Run Routing tests
         if: steps.changes.outputs.routing == 'true'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
-        timeout-minutes: 5
+        timeout-minutes: 10
 
-      - run: ./target/release/testnet
-
-      - name: Healthcheck
-        run: ./resources/scripts/has_split.sh
-        timeout-minutes: 5
-        continue-on-error: true
-
-      - name: Wait for a healthy network
-        shell: bash
-        if: matrix.os != 'windows-latest'
-        run: ./resources/scripts/network_is_ready.sh
-        id: split-check-1
-        timeout-minutes: 5
-        continue-on-error: true
-
-
-      - name: Wait for a healthy network (win)
-        shell: bash
-        if: matrix.os == 'windows-latest'
-        run: ./resources/scripts/network_is_ready_cli.sh
-        id: split-check-1-win
-        timeout-minutes: 5
-        continue-on-error: true
-
-      - name: Kill Section if no split (unix)
-        shell: bash
-        if: steps.split-check-1.outcome == 'failure'
-        run: |
-          killall sn_node
-          rm -rf ~/.safe/node
-
-      - name: Kill Section if no split (win)
-        shell: cmd
-        if:  steps.split-check-1-win.outcome == 'failure'
-        run: |
-          taskkill /IM sn_node /F
-          rmdir /s /q %userprofile%\.safe\node
-
-      - name: Restart Section if no split
-        shell: bash
-        if: steps.split-check-1.outcome == 'failure' || steps.split-check-1-win.outcome == 'failure'
+      - name: Start the network
         run: ./target/release/testnet
+        id: section-startup
 
-    # second chance at network startup
-      - name: Healthcheck
+      - name: Print Network Log Stats at start
         shell: bash
-        run: ./resources/scripts/has_split.sh
-        timeout-minutes: 5
-        continue-on-error: true
-
-      - name: Wait for a healthy network
-        shell: bash
-        if: matrix.os != 'windows-latest'
-        run: ./resources/scripts/network_is_ready.sh
-        id: split-check-2
-        timeout-minutes: 25
-        continue-on-error: true
-
-      - name: Wait for a healthy network (win)
-        shell: bash
-        if: matrix.os == 'windows-latest'
-        run: ./resources/scripts/network_is_ready_cli.sh
-        id: split-check-2-win
-        timeout-minutes: 5
-        continue-on-error: true
-
-      - name: Kill Section if no split (unix)
-        shell: bash
-        if: steps.split-check-2.outcome == 'failure'
-        run: |
-          killall sn_node
-          rm -rf ~/.safe/node
-
-      - name: Kill Section if no split (win)
-        shell: cmd
-        if:  steps.split-check-2-win.outcome == 'failure'
-        run: |
-          taskkill /IM sn_node /F
-          rmdir /s /q %userprofile%\.safe\node
-
-      - name: Restart Section if no split
-        if: steps.split-check-2.outcome == 'failure' || steps.split-check-2-win.outcome == 'failure'
-        shell: bash
-        run: ./target/release/testnet
+        run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: Healthcheck
         run: ./resources/scripts/has_split.sh
         shell: bash
-        timeout-minutes: 5
+        timeout-minutes: 1
         continue-on-error: true
 
       - name: Wait for a healthy network
@@ -229,6 +158,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: ./resources/scripts/network_is_ready_cli.sh
         timeout-minutes: 5
+
 
       - name: Run network asserts one by one
         shell: bash
@@ -249,13 +179,13 @@ jobs:
       - name: Client reg tests against local network
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
-        timeout-minutes: 15
+        timeout-minutes: 10
 
       # blob api unix
       - name: Unix client blob tests against local network
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
-        timeout-minutes: 15
+        timeout-minutes: 10
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 10
@@ -301,26 +231,29 @@ jobs:
 
       - name: Are nodes still running...?
         shell: bash
+        timeout-minutes: 1
         if: failure() && matrix.os
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
-      - name: Are nodes still running...?
-        if: failure() && matrix.os == 'windows-latest'
-        shell: bash
+      - name: Kill the current network (not needed for next test)
+        if: matrix.os == 'windows-latest'
         run: |
-          echo "$(tasklist | FIND "sn_node.exe" | find /c /v "") nodes still running"
-          ls $HOME/.safe/node/local-test-network
+          taskkill /IM sn_node /F
+          rd /s /q %USERPROFILE%\.safe\node
+        shell: cmd
 
-      # - name: Print Testnet Startup output
-      #   shell: bash
-      #   run: cat startup.log
-      #   if: failure()
 
       - name: Print Network Log Stats
         shell: bash
         run: cd sn && cargo run --bin log_cmds_inspector --release --features=always-joinable,test-utils $HOME/.safe/node/local-test-network
+        if: steps.section-startup.outcome == 'success'
+
+
+      - name: Upload Node Logs to AWS
+          # Upload artifacts.
+        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
         if: failure()
 
       - name: Upload Node Logs
@@ -328,5 +261,5 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: sn_node_logs
-          path: ~/.safe/node/local-test-network/
+          path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()

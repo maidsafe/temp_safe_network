@@ -118,9 +118,7 @@ async fn run_node() -> Result<()> {
         if config.json_logs {
             builder.json().init();
         } else {
-            builder
-                // .event_format(LogFormatter::default())
-                .init();
+            builder.event_format(LogFormatter::default()).init();
         }
 
         Some(guard)
@@ -174,7 +172,7 @@ async fn run_node() -> Result<()> {
                 err: qp2p::EndpointError::Upnp(error),
             })) => {
                 return Err(error).suggestion(
-                    "You can disable port forwarding by supplying --skip-igd. Without port\n\
+                    "You can disable port forwarding by supplying --skip-auto-port-forwarding. Without port\n\
                     forwarding, your machine must be publicly reachable by the given\n\
                     --public-addr. If your machine is not publicly reachable, you may have to\n\
                     adjust your router settings to either:\n\

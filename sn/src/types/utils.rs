@@ -53,6 +53,7 @@ pub(crate) fn decode<I: AsRef<str>, O: DeserializeOwned>(encoded: I) -> Result<O
 }
 
 pub(crate) async fn write_data_to_disk<T: Serialize>(data: &T, path: &Path) -> Result<()> {
+    trace!("writing data to disk {:?}", path);
     let serialized = rmp_serde::to_vec(data).map_err(|e| Error::Serialisation(e.to_string()))?;
 
     let mut file = File::create(path)

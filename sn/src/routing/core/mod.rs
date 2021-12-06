@@ -211,30 +211,29 @@ impl Core {
         info!("Writing our latest PrefixMap to disk");
         // TODO: Make this serialization human readable
 
-        // Write to the node's root dir
-        if let Err(e) = write_data_to_disk(
-            self.network_knowledge.prefix_map(),
-            &self.root_storage_dir.join("prefix_map"),
-        )
-        .await
-        {
-            error!("Error writing PrefixMap to root dir: {:?}", e);
-        }
+        let prefix_map = self.network_knowledge.prefix_map().clone();
+        let storage_dir = self.root_storage_dir.join("prefix_map");
+        let is_genesis_node = self.is_genesis_node;
 
-        // If we are genesis Node, write to `~/.safe` dir
-        if self.is_genesis_node {
-            if let Some(mut safe_dir) = dirs_next::home_dir() {
-                safe_dir.push(".safe");
-                safe_dir.push("prefix_map");
-                if let Err(e) =
-                    write_data_to_disk(self.network_knowledge.prefix_map(), &safe_dir).await
-                {
-                    error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
-                }
-            } else {
-                error!("Could not write PrefixMap in SAFE dir: Home directory not found");
+        let _ = tokio::spawn(async move {
+            // Write to the node's root dir
+            if let Err(e) = write_data_to_disk(&prefix_map, &storage_dir).await {
+                error!("Error writing PrefixMap to root dir: {:?}", e);
             }
-        }
+
+            // If we are genesis Node, write to `~/.safe` dir
+            if is_genesis_node {
+                if let Some(mut safe_dir) = dirs_next::home_dir() {
+                    safe_dir.push(".safe");
+                    safe_dir.push("prefix_map");
+                    if let Err(e) = write_data_to_disk(&prefix_map, &safe_dir).await {
+                        error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
+                    }
+                } else {
+                    error!("Could not write PrefixMap in SAFE dir: Home directory not found");
+                }
+            }
+        });
     }
 
     /// Generate commands and fire events based upon any node state changes.
@@ -308,7 +307,7 @@ impl Core {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
 
                 if old.is_elder {
-                    info!("{}: {:?}", LogMarker::StillElderAfterAplit, new.prefix);
+                    info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
                 }
 
                 commands.extend(self.send_updates_to_sibling_section(&old).await?);

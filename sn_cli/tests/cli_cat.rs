@@ -14,8 +14,8 @@ use predicates::prelude::*;
 use sn_api::resolver::{ContentType, DataType, Url};
 use sn_cmd_test_utilities::util::{
     create_and_get_keys, get_random_nrs_string, parse_files_container_output,
-    parse_files_put_or_sync_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout, safeurl_from,
-    test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
+    parse_files_put_or_sync_output, parse_nrs_create_output, safe_cmd, safe_cmd_stderr,
+    safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
 const TEST_DATA: &str = "../resources/testdata/";
@@ -138,7 +138,8 @@ fn calling_safe_cat_hexdump() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
+#[ignore = "files sync url has bytes address issue"]
+fn calling_safe_cat_xorurl_with_version() -> Result<()> {
     let tmp_dir = assert_fs::TempDir::new()?;
     let md_file1 = tmp_dir.child("test.md");
     let md_file2 = tmp_dir.child("another.md");
@@ -188,6 +189,7 @@ fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
 }
 
 #[test]
+#[ignore = "files sync url issue"]
 fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     let tmp_dir = assert_fs::TempDir::new()?;
     let md_file1 = tmp_dir.child("test.md");
@@ -206,9 +208,8 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
         ["nrs", "create", &nrsurl, "-l", &container_xorurl, "--json"],
         Some(0),
     )?;
-    let (nrs_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
-    let url = Url::from_url(&nrs_xorurl)?;
-    let nrs_version = url.content_version().unwrap();
+    let (nrs_xorurl, _files_map) = parse_nrs_create_output(&output);
+    let nrs_version = nrs_xorurl.content_version().unwrap();
 
     let nrsurl_with_path = format!("{}/test.md", nrsurl);
     safe_cmd(["cat", &nrsurl_with_path], Some(0))?;

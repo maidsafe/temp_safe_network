@@ -5,6 +5,328 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.46.5 (2021-12-02)
+
+### Bug Fixes
+
+ - <csr-id-fdc4ba6bb36dff85126c8273cdfc67f9b07e2175/> multiple fixes for DKG-AE
+   - discard DKG session info for older sessions
+   - skip DkgStart and DkgRetry messages for expired sessions
+ - <csr-id-01a5c961fc02f9ca8d6f60286306d5efba460e4e/> avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - multiple fixes for DKG-AE ([`fdc4ba6`](https://github.com/maidsafe/safe_network/commit/fdc4ba6bb36dff85126c8273cdfc67f9b07e2175))
+    - avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo ([`01a5c96`](https://github.com/maidsafe/safe_network/commit/01a5c961fc02f9ca8d6f60286306d5efba460e4e))
+</details>
+
+## v0.46.4 (2021-12-02)
+
+### Bug Fixes
+
+ - <csr-id-01a5c961fc02f9ca8d6f60286306d5efba460e4e/> avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo
+ - <csr-id-27868bc51ba2dd12cc584396c53a158706d0c07b/> avoid network_knowledge lookup when sending DKGNotReady or DkgSessionUnknown
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.46.4 ([`de3051e`](https://github.com/maidsafe/safe_network/commit/de3051e7e809a8f75507c54f3cf053a4244fdf19))
+    - avoid network_knowledge lookup when sending DKGNotReady or DkgSessionUnknown ([`27868bc`](https://github.com/maidsafe/safe_network/commit/27868bc51ba2dd12cc584396c53a158706d0c07b))
+</details>
+
+## v0.46.3 (2021-12-02)
+
+### New Features
+
+ - <csr-id-5b003745ce3421b0554f35a6198d58cf67a1f4c6/> aggregate joins per section key
+   Previously we only did one aggregation. But errors could arise if we had to resend and scrap aggregation.
+   
+   This means we can aggregate any number of churning section keys.
+
+### Bug Fixes
+
+ - <csr-id-27868bc51ba2dd12cc584396c53a158706d0c07b/> avoid network_knowledge lookup when sending DKGNotReady or DkgSessionUnknown
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.46.3 ([`69e9be2`](https://github.com/maidsafe/safe_network/commit/69e9be2a1567bfa211af7e9d7595381d9a0a3b38))
+    - remove sig check on join ApprovalShare receipt ([`b4f0306`](https://github.com/maidsafe/safe_network/commit/b4f0306fb945cce096de7f68c3cf6ece6905786d))
+    - remove Joinrejection DkgUnderway ([`204f927`](https://github.com/maidsafe/safe_network/commit/204f927220c8bd1829ac89feaed1c48a8034e80b))
+    - leave longer wait on testnet startup ([`2ef8e45`](https://github.com/maidsafe/safe_network/commit/2ef8e45f53ff6925e56321ed0ebc922d2d4dd9b9))
+    - aggregate joins per section key ([`5b00374`](https://github.com/maidsafe/safe_network/commit/5b003745ce3421b0554f35a6198d58cf67a1f4c6))
+    - dont send dkg underway ([`1eea844`](https://github.com/maidsafe/safe_network/commit/1eea84476294c1dbfbfe72fe0e9acdb997762595))
+</details>
+
+## v0.46.2 (2021-12-01)
+
+### New Features
+
+ - <csr-id-5b003745ce3421b0554f35a6198d58cf67a1f4c6/> aggregate joins per section key
+   Previously we only did one aggregation. But errors could arise if we had to resend and scrap aggregation.
+   
+   This means we can aggregate any number of churning section keys.
+
+### Bug Fixes
+
+ - <csr-id-8de5ecf50008793546760621d906f23e8fe9791f/> make has_split.sh detect SplitSuccess correctly
+ - <csr-id-8cfc5a4adf8a31bf6916273597cf4c18aa5adc46/> reduce backoff time; avoid start DKG shrink elders
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.46.2 ([`260eaab`](https://github.com/maidsafe/safe_network/commit/260eaabd2d1b0c26dec9febc963929e65d7ec912))
+    - make has_split.sh detect SplitSuccess correctly ([`8de5ecf`](https://github.com/maidsafe/safe_network/commit/8de5ecf50008793546760621d906f23e8fe9791f))
+    - reduce backoff time; avoid start DKG shrink elders ([`8cfc5a4`](https://github.com/maidsafe/safe_network/commit/8cfc5a4adf8a31bf6916273597cf4c18aa5adc46))
+</details>
+
+## v0.46.1 (2021-12-01)
+
+### Bug Fixes
+
+ - <csr-id-8de5ecf50008793546760621d906f23e8fe9791f/> make has_split.sh detect SplitSuccess correctly
+ - <csr-id-8cfc5a4adf8a31bf6916273597cf4c18aa5adc46/> reduce backoff time; avoid start DKG shrink elders
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.46.1 ([`bf55f9b`](https://github.com/maidsafe/safe_network/commit/bf55f9b7e3b96319de4423e19333bf3b16fd1c78))
+    - unify skip port forwarding arguments ([`3f77429`](https://github.com/maidsafe/safe_network/commit/3f77429e8bd659a5b2e7aa377437fac1b3d709c0))
+</details>
+
+## v0.46.0 (2021-12-01)
+
+<csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/>
+
+### New Features
+
+ - <csr-id-24f1aa0208e3e474862c18b21ea9f048cb6abf25/> expose API for calculate Blob/Spot address without a network connection
+
+### chore (BREAKING)
+
+ - <csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/> include remote addrs in listerners threads log entries
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.46.0 ([`8ea9498`](https://github.com/maidsafe/safe_network/commit/8ea94983b37b1d559358a62d6ca075b97c193f0d))
+    - safe_network-0.45.0 ([`a7e0585`](https://github.com/maidsafe/safe_network/commit/a7e058536ae6ae27228bd2254ea6465c5eface35))
+    - expose API for calculate Blob/Spot address without a network connection ([`24f1aa0`](https://github.com/maidsafe/safe_network/commit/24f1aa0208e3e474862c18b21ea9f048cb6abf25))
+    - include remote addrs in listerners threads log entries ([`f3d3ab2`](https://github.com/maidsafe/safe_network/commit/f3d3ab2b059040ff08b6239c8a6583c64eac160e))
+    - only check split count for health check for now ([`d364a7e`](https://github.com/maidsafe/safe_network/commit/d364a7e364827b2d71f196a9f897b7d613bbab94))
+    - log desired elder count during health check ([`0da3c99`](https://github.com/maidsafe/safe_network/commit/0da3c99785e026075214b7cfa7933f64420aa00f))
+    - add SN_AE_WAIT env var ([`9deb9e7`](https://github.com/maidsafe/safe_network/commit/9deb9e7e2ae5d909eeb745e9021cf7660ed55dc3))
+</details>
+
+## v0.45.0 (2021-11-30)
+
+<csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/>
+
+### New Features
+
+ - <csr-id-24f1aa0208e3e474862c18b21ea9f048cb6abf25/> expose API for calculate Blob/Spot address without a network connection
+
+### chore (BREAKING)
+
+ - <csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/> include remote addrs in listerners threads log entries
+
+
+## v0.44.5 (2021-11-30)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.44.5 ([`aaab10b`](https://github.com/maidsafe/safe_network/commit/aaab10b3a5a44d9ec844757c71ac091016f51fd1))
+    - spawn writing prefix_map to disk as separate thread ([`e841ae0`](https://github.com/maidsafe/safe_network/commit/e841ae0cf3caf852e8a48b559dcffb64b7fcecad))
+</details>
+
+## v0.44.4 (2021-11-30)
+
+### New Features
+
+ - <csr-id-d2c352198c0e421cf4b7327a17c4343dc693b2dd/> start a fresh round of joins when aggregation is erroring.
+   Aggregation may error, perhaps due to section churn. If we half or more bad signaturs that would prevent aggregation. We clean the slate and start a fresh round of aggregation and join messaging.
+
+### Bug Fixes
+
+ - <csr-id-758661d87edfef0fee6676993f1e96b3fd2d26bb/> don't crash node on failed signature aggregation on join
+ - <csr-id-b79e8d6dbd18a4a0787d326a6b10146fa6b90f30/> retry joins on section key mismatch.
+   We could sometimes get a key sent from nodes with a newer section_pk
+   than we were expecting.
+   
+   We should then retry
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.44.4 ([`984c5f8`](https://github.com/maidsafe/safe_network/commit/984c5f83e3f4d889dc4e0583b09571e540357cf9))
+    - start a fresh round of joins when aggregation is erroring. ([`d2c3521`](https://github.com/maidsafe/safe_network/commit/d2c352198c0e421cf4b7327a17c4343dc693b2dd))
+    - increase join node aggregatin expiration. ([`9885536`](https://github.com/maidsafe/safe_network/commit/9885536afe337bf109e3ab18eec054100bf3fd82))
+    - improve node logging ([`cf67a37`](https://github.com/maidsafe/safe_network/commit/cf67a374ae5aa5a9f95d39357fdbd937eb5e1a1a))
+    - don't crash node on failed signature aggregation on join ([`758661d`](https://github.com/maidsafe/safe_network/commit/758661d87edfef0fee6676993f1e96b3fd2d26bb))
+    - retry joins on section key mismatch. ([`b79e8d6`](https://github.com/maidsafe/safe_network/commit/b79e8d6dbd18a4a0787d326a6b10146fa6b90f30))
+</details>
+
+## v0.44.3 (2021-11-30)
+
+### New Features
+
+ - <csr-id-d2c352198c0e421cf4b7327a17c4343dc693b2dd/> start a fresh round of joins when aggregation is erroring.
+   Aggregation may error, perhaps due to section churn. If we half or more bad signaturs that would prevent aggregation. We clean the slate and start a fresh round of aggregation and join messaging.
+
+### Bug Fixes
+
+ - <csr-id-758661d87edfef0fee6676993f1e96b3fd2d26bb/> don't crash node on failed signature aggregation on join
+ - <csr-id-b79e8d6dbd18a4a0787d326a6b10146fa6b90f30/> retry joins on section key mismatch.
+   We could sometimes get a key sent from nodes with a newer section_pk
+   than we were expecting.
+   
+   We should then retry
+ - <csr-id-5523d0fcca7bbbbd05b6d125692f5fbd1a8f50d7/> avoid use outdated keyshare status
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.44.3 ([`ec3dd49`](https://github.com/maidsafe/safe_network/commit/ec3dd4991535bb22235e2d1d413dd93489b8aedf))
+    - move key_share check into network_knowledge_update ([`a3c5ef6`](https://github.com/maidsafe/safe_network/commit/a3c5ef63f37ec0d2f98d45176e27da7de31baabc))
+    - avoid use outdated keyshare status ([`5523d0f`](https://github.com/maidsafe/safe_network/commit/5523d0fcca7bbbbd05b6d125692f5fbd1a8f50d7))
+</details>
+
+## v0.44.2 (2021-11-30)
+
+### Bug Fixes
+
+ - <csr-id-5523d0fcca7bbbbd05b6d125692f5fbd1a8f50d7/> avoid use outdated keyshare status
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.44.2 ([`51b0f00`](https://github.com/maidsafe/safe_network/commit/51b0f0068c9a279da9a1edf45509cf80a90e663d))
+    - remove Core::is_dkg_underway flag which is not necessary ([`10e135b`](https://github.com/maidsafe/safe_network/commit/10e135b4f77dcd30de99eb7bc370ba1e15bbd148))
+</details>
+
 ## v0.44.1 (2021-11-29)
 
 ### Bug Fixes
@@ -31,7 +353,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - remove Core::is_dkg_underway flag which is not necessary ([`10e135b`](https://github.com/maidsafe/safe_network/commit/10e135b4f77dcd30de99eb7bc370ba1e15bbd148))
+    - safe_network-0.44.1 ([`14c84c9`](https://github.com/maidsafe/safe_network/commit/14c84c9db23557626e4889eff0ff403a574dccad))
     - restore `ServiceMsg` authority check ([`0e505be`](https://github.com/maidsafe/safe_network/commit/0e505be2f57ab427cd3ed8c9564fd8b84909f6f3))
 </details>
 

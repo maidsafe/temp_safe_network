@@ -24,7 +24,7 @@ use crate::routing::{
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{
-    message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget,
+    message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget, Phase,
 };
 use itertools::Itertools;
 use std::{
@@ -50,9 +50,74 @@ pub(crate) struct Session {
     pub(crate) complete: bool,
 }
 
+fn is_dkg_behind(expected: Phase, actual: Phase) -> bool {
+    if let (Phase::Contribution, Phase::Initialization) = (expected, actual) {
+        true
+    } else {
+        trace!("Our DKG session is ahead. Skipping DkgAE");
+        false
+    }
+}
+
 impl Session {
     pub(crate) fn timer_token(&self) -> u64 {
         self.timer_token
+    }
+
+    fn send_dkg_not_ready(
+        &mut self,
+        node: &Node,
+        message: DkgMessage,
+        session_id: &DkgSessionId,
+        sender: XorName,
+        section_pk: BlsPublicKey,
+    ) -> Result<Vec<Command>> {
+        let mut commands = vec![];
+        // When the message in trouble is an Acknowledgement,
+        // we shall query the ack.proposer .
+        let target = match message {
+            DkgMessage::Acknowledgment { ref ack, .. } => {
+                if let Some(name) = self.key_gen.node_id_from_index(ack.0) {
+                    name
+                } else {
+                    warn!("Cannot get node_id for index {:?}", ack.0);
+                    return Ok(vec![]);
+                }
+            }
+            _ => sender,
+        };
+
+        if let Some(peer) = self.peers().get(&target) {
+            trace!(
+                "Targeting DkgNotReady to {:?} on unhandable message {:?}",
+                target,
+                message
+            );
+            let node_msg = SystemMsg::DkgNotReady {
+                session_id: *session_id,
+                message,
+            };
+            let wire_msg = WireMsg::single_src(
+                node,
+                DstLocation::Node {
+                    name: target,
+                    section_pk,
+                },
+                node_msg,
+                section_pk,
+            )?;
+
+            commands.push(Command::SendMessage {
+                recipients: vec![peer.clone()],
+                wire_msg,
+            });
+        } else {
+            warn!(
+                "Failed to fetch peer of {:?} among {:?}",
+                target, self.elder_candidates
+            );
+        }
+        Ok(commands)
     }
 
     pub(crate) fn process_message(
@@ -80,35 +145,17 @@ impl Session {
                 }
                 commands.extend(self.check(node, session_id, section_pk)?);
             }
-            Err(DkgError::UnexpectedPhase { .. }) | Err(DkgError::MissingPart) => {
-                // When the message in trouble is an Acknowledgement,
-                // we shall query the ack.proposer .
-                let target = match message {
-                    DkgMessage::Acknowledgment { ref ack, .. } => {
-                        if let Some(name) = self.key_gen.node_id_from_index(ack.0) {
-                            name
-                        } else {
-                            warn!("Cannot get node_id for index {:?}", ack.0);
-                            return Ok(vec![]);
-                        }
-                    }
-                    _ => sender,
-                };
-                trace!(
-                    "Targeting DkgNotReady to {:?} on unhandable message {:?}",
-                    target,
-                    message
+            Err(DkgError::UnexpectedPhase { expected, actual })
+                if is_dkg_behind(expected, actual) =>
+            {
+                commands.extend(
+                    self.send_dkg_not_ready(node, message, session_id, sender, section_pk)?,
                 );
-                commands.push(Command::PrepareNodeMsgToSend {
-                    msg: SystemMsg::DkgNotReady {
-                        session_id: *session_id,
-                        message,
-                    },
-                    dst: DstLocation::Node {
-                        name: target,
-                        section_pk,
-                    },
-                });
+            }
+            Err(DkgError::MissingPart) => {
+                commands.extend(
+                    self.send_dkg_not_ready(node, message, session_id, sender, section_pk)?,
+                );
             }
             Err(error) => {
                 error!("Error processing DKG message: {:?}", error);
@@ -183,10 +230,6 @@ impl Session {
         }
 
         Ok(commands)
-    }
-
-    pub(crate) fn is_finalized(&self) -> bool {
-        self.key_gen.is_finalized()
     }
 
     pub(crate) fn handle_timeout(
@@ -522,7 +565,7 @@ mod tests {
             let actor = actors.get_mut(&addr).context("Unknown message recipient")?;
 
             let commands = futures::executor::block_on(actor.voter.process_message(
-                actor.node.name(),
+                actor.peer(),
                 &actor.node,
                 &session_id,
                 message,
@@ -550,6 +593,10 @@ mod tests {
             }
         }
 
+        fn peer(&self) -> Peer {
+            self.node.peer()
+        }
+
         fn handle(
             &mut self,
             command: Command,
@@ -574,6 +621,10 @@ mod tests {
                             .map(|peer| (peer.addr(), message.clone()))
                             .collect())
                     }
+                    MessageType::System {
+                        msg: SystemMsg::DkgNotReady { message, .. },
+                        ..
+                    } => Ok(vec![(self.node.addr, message)]),
                     other_message => bail!("Unexpected message: {:?}", other_message),
                 },
                 Command::HandleDkgOutcome { outcome, .. } => {
@@ -581,10 +632,6 @@ mod tests {
                     Ok(vec![])
                 }
                 Command::ScheduleTimeout { .. } => Ok(vec![]),
-                Command::PrepareNodeMsgToSend {
-                    msg: SystemMsg::DkgNotReady { message, .. },
-                    ..
-                } => Ok(vec![(self.node.addr, message)]),
                 other_command => {
                     bail!("Unexpected command: {:?}", other_command)
                 }

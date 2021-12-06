@@ -209,7 +209,7 @@ pub async fn run_network() -> Result<()> {
     Launch::from_iter_safe(&sn_launch_tool_args)?.run()?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_millis(args.interval);
+    let interval_duration = Duration::from_millis(args.interval * (node_count as u64 / 10));
 
     sleep(interval_duration).await;
 
