@@ -35,7 +35,7 @@ use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
-use tracing::{self, error, info, trace};
+use tracing::{self, error, info, trace, warn};
 use tracing_subscriber::filter::EnvFilter;
 const MODULE_NAME: &str = "safe_network";
 
@@ -182,6 +182,14 @@ async fn run_node() -> Result<()> {
                       reachable, and supplying that address with --public-addr."
                         .header("Disable port forwarding or change your router settings"),
                 );
+            }
+            #[cfg(feature = "always-joinable")]
+            Err(Error::Routing(routing::Error::CannotConnectEndpoint { err, .. })) => {
+                warn!(
+                    "In 'always-joinable' mode. Continuing to try and join after error: {:?}",
+                    err
+                );
+                continue;
             }
             Err(Error::Routing(routing::Error::TryJoinLater)) => {
                 println!("{}", log);

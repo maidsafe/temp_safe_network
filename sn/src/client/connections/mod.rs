@@ -11,11 +11,9 @@ mod messaging;
 
 use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
-    signature_aggregator::SignatureAggregator,
     MessageId,
 };
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 pub(crate) use messaging::SAFE_CLIENT_DIR;
@@ -40,8 +38,6 @@ pub(crate) type AeCache = LRUCache<(Vec<SocketAddr>, BlsPublicKey, Bytes), 100>;
 
 #[derive(Clone, Debug)]
 pub(super) struct Session {
-    // PublicKey of the client
-    client_pk: PublicKey,
     // Session endpoint.
     endpoint: Endpoint,
     // Channels for sending responses to upper layers
@@ -54,8 +50,6 @@ pub(super) struct Session {
     ae_redirect_cache: Arc<RwLock<AeCache>>,
     // AE retry cache
     ae_retry_cache: Arc<RwLock<AeCache>>,
-    /// BLS Signature aggregator for aggregating network messages
-    aggregator: Arc<RwLock<SignatureAggregator>>,
     /// Network's genesis key
     genesis_key: bls::PublicKey,
     /// Initial network comms messageId

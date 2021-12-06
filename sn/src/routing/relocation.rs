@@ -155,7 +155,7 @@ impl RelocatePayloadUtils for RelocatePayload {
         }
     }
 }
-
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum RelocateState {
     // Node is undergoing delayed relocation. This happens when the node is selected for relocation
     // while being an elder. It must keep fulfilling its duties as elder until its demoted, then it

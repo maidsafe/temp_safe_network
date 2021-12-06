@@ -1122,7 +1122,7 @@ async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Resu
 // create a FilesMap with file's metadata and their corresponding links
 async fn files_map_create(
     safe: &mut Safe,
-    mut content: &mut ProcessedFiles,
+    content: &mut ProcessedFiles,
     location: &str,
     dest_path: Option<&str>,
     follow_links: bool,
@@ -1170,7 +1170,7 @@ async fn files_map_create(
             false,
             dry_run,
             &mut files_map,
-            &mut content,
+            content,
         )
         .await;
     }

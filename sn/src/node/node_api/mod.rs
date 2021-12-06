@@ -20,24 +20,14 @@ use crate::routing::{
 };
 use crate::types::PublicKey;
 use rand::rngs::OsRng;
-use std::{net::SocketAddr, path::PathBuf};
+use std::net::SocketAddr;
 use tokio::time::Duration;
-
-/// Static info about the node.
-#[derive(Clone, Debug)]
-struct NodeInfo {
-    ///
-    root_dir: PathBuf,
-    /// The key used by the node to receive earned rewards.
-    reward_key: PublicKey,
-}
 
 /// Main node struct.
 #[derive(custom_debug::Debug)]
 pub struct Node {
     #[debug(skip)]
     network_api: Network,
-    node_info: NodeInfo,
     used_space: UsedSpace,
 }
 
@@ -48,7 +38,7 @@ impl Node {
         let root_dir = root_dir_buf.as_path();
         tokio::fs::create_dir_all(root_dir).await?;
 
-        let reward_key = match get_reward_pk(root_dir).await? {
+        let _reward_key = match get_reward_pk(root_dir).await? {
             Some(public_key) => PublicKey::Ed25519(public_key),
             None => {
                 let mut rng = OsRng;
@@ -58,10 +48,6 @@ impl Node {
             }
         };
 
-        let node_info = NodeInfo {
-            root_dir: root_dir_buf.clone(),
-            reward_key,
-        };
         let used_space = UsedSpace::new(config.max_capacity());
 
         let joining_timeout = if cfg!(feature = "always-joinable") {
@@ -83,7 +69,6 @@ impl Node {
         .map_err(|_| Error::JoinTimeout)??;
 
         let node = Self {
-            node_info,
             used_space,
             network_api: network_api.clone(),
         };

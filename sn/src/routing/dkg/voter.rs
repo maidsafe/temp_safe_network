@@ -67,7 +67,11 @@ impl DkgVoter {
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
         if self.sessions.contains_key(&session_id) {
-            trace!("DKG already in progress for {:?}", elder_candidates);
+            trace!(
+                "DKG already in progress for {:?} - {:?}",
+                session_id,
+                elder_candidates
+            );
             return Ok(vec![]);
         }
 
@@ -119,7 +123,14 @@ impl DkgVoter {
                 let mut commands = vec![];
                 commands.extend(session.broadcast(node, &session_id, messages, section_pk)?);
 
-                let _prev = self.sessions.insert(session_id, session);
+                // This is to avoid the case that between the above existence check
+                // and the insertion, there is another thread created and updated the session.
+                if self.sessions.contains_key(&session_id) {
+                    warn!("DKG already in progress for {:?}", session_id);
+                    return Ok(vec![]);
+                } else {
+                    let _prev = self.sessions.insert(session_id, session);
+                }
 
                 // Remove unneeded old sessions.
                 self.sessions.retain(|existing_session_id, _| {
