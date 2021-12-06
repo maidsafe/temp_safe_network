@@ -12,7 +12,7 @@ use crate::{ipc::NodeConfig, Error, Result};
 use bytes::Bytes;
 use hex::encode;
 use log::{debug, info};
-use safe_network::client::{Client, ClientConfig, Error as ClientError};
+use safe_network::client::{Client, ClientConfig, Error as ClientError, RegisterWriteAheadLog};
 use safe_network::types::{
     register::{Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
     BytesAddress, Error as SafeNdError, Keypair, RegisterAddress, Scope,
@@ -142,13 +142,15 @@ impl SafeAppClient {
 
     // === Register data operations ===
     /// Low level method to create a register
+    /// Returns a register operation batch that can be used to apply changes on the network.
+    /// Nothing is sent to the network, without applying the batch, it's pretty much a dry run.
     pub async fn create_register(
         &self,
         name: Option<XorName>,
         tag: u64,
         _permissions: Option<String>,
         private: bool,
-    ) -> Result<XorName> {
+    ) -> Result<(XorName, RegisterWriteAheadLog)> {
         debug!(
             "Storing {} Register data with tag type: {}, xorname: {:?}",
             if private { "Private" } else { "Public" },
@@ -164,7 +166,7 @@ impl SafeAppClient {
         let my_pk = client.public_key();
 
         // Store the Register on the network
-        let _ = if private {
+        let (_, op_batch) = if private {
             // Set read and write  permissions to this application
             let mut perms = BTreeMap::default();
             let _ = perms.insert(my_pk, PrivatePermissions::new(true, true));
@@ -173,7 +175,10 @@ impl SafeAppClient {
                 .store_private_register(xorname, tag, my_pk, perms)
                 .await
                 .map_err(|e| {
-                    Error::NetDataError(format!("Failed to store Private Register data: {:?}", e))
+                    Error::NetDataError(format!(
+                        "Failed to prepare store Private Register operation: {:?}",
+                        e
+                    ))
                 })?
         } else {
             // Set write permissions to this application
@@ -185,11 +190,14 @@ impl SafeAppClient {
                 .store_public_register(xorname, tag, my_pk, perms)
                 .await
                 .map_err(|e| {
-                    Error::NetDataError(format!("Failed to store Public Register data: {:?}", e))
+                    Error::NetDataError(format!(
+                        "Failed to prepare store Public Register: operation {:?}",
+                        e
+                    ))
                 })?
         };
 
-        Ok(xorname)
+        Ok((xorname, op_batch))
     }
 
     /// Low level method to read all register entries
@@ -241,18 +249,32 @@ impl SafeAppClient {
     }
 
     /// Low level method to write to register
+    /// Returns a register operation batch that can be used to apply changes on the network.
+    /// Nothing is sent to the network, without applying the batch, it's pretty much a dry run.
     pub async fn write_to_register(
         &self,
         address: RegisterAddress,
         entry: Entry,
         parents: BTreeSet<EntryHash>,
-    ) -> Result<EntryHash> {
+    ) -> Result<(EntryHash, RegisterWriteAheadLog)> {
         debug!("Writing to Register at {:?}", address);
         let client = self.get_safe_client()?;
 
         client
             .write_to_register(address, entry, parents)
             .await
-            .map_err(|e| Error::NetDataError(format!("Failed to write to Register: {:?}", e)))
+            .map_err(|e| {
+                Error::NetDataError(format!(
+                    "Failed to prepare write to Register operation: {:?}",
+                    e
+                ))
+            })
+    }
+
+    /// Low level method to apply register operations batches and send them to the network
+    pub async fn apply_register_ops(&self, mut batch: RegisterWriteAheadLog) -> Result<()> {
+        let client = self.get_safe_client()?;
+        client.publish_register_ops(&mut batch).await?;
+        Ok(())
     }
 }
