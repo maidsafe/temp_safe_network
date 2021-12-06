@@ -211,6 +211,7 @@ impl<'a> Join<'a> {
                 JoinResponse::ApprovalShare {
                     node_state,
                     sig_share,
+                    ..
                 } => {
                     let serialized_details =
                         if let Some(node_state_serialized) = &self.node_state_serialized {

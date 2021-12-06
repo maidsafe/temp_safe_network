@@ -257,6 +257,8 @@ impl Core {
         let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::ApprovalShare {
             node_state,
             sig_share,
+            section_chain: self.network_knowledge.section_chain().await,
+            members: self.network_knowledge.members().to_msg(),
         }));
         Ok(vec![
             self.send_direct_message(peer, node_msg, section_key)

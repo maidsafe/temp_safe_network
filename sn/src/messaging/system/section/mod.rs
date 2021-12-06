@@ -8,5 +8,15 @@
 
 mod node_state;
 
+use super::agreement::SectionAuth;
+use serde::{Deserialize, Serialize};
+
 pub use node_state::MembershipState;
 pub use node_state::NodeState;
+
+/// Information about members of our section.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+pub struct SectionPeers {
+    /// Info of members
+    pub members: Vec<SectionAuth<NodeState>>,
+}

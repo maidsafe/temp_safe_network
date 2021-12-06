@@ -15,11 +15,10 @@ use crate::messaging::{
     AuthorityProof, DstLocation, SectionAuth, WireMsg,
 };
 use crate::routing::{
-    dkg::SectionAuthUtils,
     ed25519,
     error::{Error, Result},
     messages::WireMsgUtils,
-    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider},
+    network_knowledge::SectionAuthorityProvider,
     node::Node,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
@@ -32,7 +31,7 @@ use xor_name::{Prefix, XorName};
 
 /// Re-join as a relocated node.
 pub(crate) struct JoiningAsRelocated {
-    node: Node,
+    pub(crate) node: Node,
     genesis_key: BlsPublicKey,
     dst_section_key: BlsPublicKey,
     relocate_details: RelocateDetails,
@@ -51,12 +50,14 @@ impl JoiningAsRelocated {
         node_msg: SystemMsg,
         section_auth: AuthorityProof<SectionAuth>,
     ) -> Result<Self> {
-        let dst_section_key = relocate_details.dst_key;
-
+        // First JoinAsRelocatedRequest doesn't contain RelocatePayload,
+        // which triggers a Response being sent back anyway.
+        // Setting dst_section_key to correct one could cause the check to fail
+        // when handling such response.
         Ok(Self {
             node,
             genesis_key,
-            dst_section_key,
+            dst_section_key: genesis_key,
             relocate_details,
             node_msg,
             node_msg_auth: section_auth,
@@ -83,7 +84,7 @@ impl JoiningAsRelocated {
         // we will then use to generate the relocation payload and send the
         // `JoinAsRelocatedRequest` again with it.
         // TODO: include the section Prefix in the RelocationDetails so we save one request.
-        self.build_join_request_cmd(&recipients)
+        self.build_join_request_cmd(&recipients, dst_xorname)
     }
 
     // Handles a `JoinAsRelocatedResponse`, if it's a:
@@ -96,54 +97,17 @@ impl JoiningAsRelocated {
         join_response: JoinAsRelocatedResponse,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
+        trace!("Hanlde JoinResponse {:?}", join_response);
         match join_response {
-            JoinAsRelocatedResponse::Approval {
-                section_auth,
-                section_chain,
-                node_state,
-            } => {
-                if node_state.name != self.node.name() {
-                    trace!("Ignore NodeApproval not for us");
-                    return Ok(None);
-                }
-
-                if self.genesis_key != *section_chain.root_key() {
-                    trace!("Genesis key doesn't match");
-                    return Ok(None);
-                }
-
-                if !section_auth.verify(&section_chain) || !node_state.verify(&section_chain) {
-                    return Err(Error::InvalidMessage);
-                }
-
-                if !section_chain.check_trust(Some(&self.dst_section_key)) {
-                    error!("Verification failed - untrusted Join approval message",);
-                    return Ok(None);
-                }
-
-                trace!(
-                    "This node has been approved to join the network at {:?}!",
-                    section_auth.prefix,
-                );
-
-                Ok(Some(Command::HandleRelocationComplete {
-                    node: self.node.clone(),
-                    // FIXME: pass our existing prefixmap here
-                    section: NetworkKnowledge::new(
-                        self.genesis_key,
-                        section_chain,
-                        section_auth.into_authed_state(),
-                        None,
-                    )?,
-                }))
-            }
             JoinAsRelocatedResponse::Retry(section_auth) => {
                 let section_auth = section_auth.into_state();
                 if !self.check_autority_provider(&section_auth, &self.relocate_details.dst) {
+                    trace!("failed to check authority");
                     return Ok(None);
                 }
 
                 if section_auth.section_key() == self.dst_section_key {
+                    trace!("equal destination section key");
                     return Ok(None);
                 }
 
@@ -168,6 +132,7 @@ impl JoiningAsRelocated {
                 // if we are relocating, and we didn't generate
                 // the relocation payload yet, we do it now
                 if self.relocate_payload.is_none() {
+                    trace!("builing relocate payload");
                     self.build_relocation_payload(&section_auth.prefix())?;
                 }
 
@@ -177,7 +142,8 @@ impl JoiningAsRelocated {
                 );
                 self.dst_section_key = section_auth.section_key();
 
-                let cmd = self.build_join_request_cmd(&new_recipients)?;
+                let cmd =
+                    self.build_join_request_cmd(&new_recipients, section_auth.prefix().name())?;
 
                 Ok(Some(cmd))
             }
@@ -222,7 +188,8 @@ impl JoiningAsRelocated {
                 );
                 self.dst_section_key = section_auth.section_key();
 
-                let cmd = self.build_join_request_cmd(&new_recipients)?;
+                let cmd =
+                    self.build_join_request_cmd(&new_recipients, section_auth.prefix().name())?;
 
                 Ok(Some(cmd))
             }
@@ -262,7 +229,7 @@ impl JoiningAsRelocated {
         Ok(())
     }
 
-    fn build_join_request_cmd(&self, recipients: &[Peer]) -> Result<Command> {
+    fn build_join_request_cmd(&self, recipients: &[Peer], dst_name: XorName) -> Result<Command> {
         let join_request = JoinAsRelocatedRequest {
             section_key: self.dst_section_key,
             relocate_payload: self.relocate_payload.clone(),
@@ -274,7 +241,7 @@ impl JoiningAsRelocated {
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
-                name: XorName::from(PublicKey::Bls(self.dst_section_key)),
+                name: dst_name,
                 section_pk: self.dst_section_key,
             },
             node_msg,

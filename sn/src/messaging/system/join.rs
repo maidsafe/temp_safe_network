@@ -7,8 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::agreement::SectionAuth;
-use crate::messaging::system::{NodeState, SigShare};
-use crate::messaging::{system::KeyedSig, SectionAuthorityProvider};
+use crate::messaging::{
+    system::{section::SectionPeers, KeyedSig, NodeState, SigShare},
+    SectionAuthorityProvider,
+};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;
@@ -78,6 +80,10 @@ pub enum JoinResponse {
         node_state: NodeState,
         /// SignatureShare of an elder over the NodeState
         sig_share: SigShare,
+        /// Section chain of the current section
+        section_chain: SecuredLinkedList,
+        /// Signed NodeState of section members
+        members: SectionPeers,
     },
     /// Message sent to joining peer containing the necessary
     /// info to become a member of the section.

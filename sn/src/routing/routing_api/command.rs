@@ -13,8 +13,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     core::Proposal,
-    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
-    node::Node,
+    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     Peer, UnnamedPeer, XorName,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -88,13 +87,6 @@ pub(crate) enum Command {
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
     /// command is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },
-    /// Relocation process is complete, switch to new section
-    HandleRelocationComplete {
-        /// New Node state and information
-        node: Node,
-        /// New section where we relocated
-        section: NetworkKnowledge,
-    },
     /// Attempt to set JoinsAllowed flag.
     SetJoinsAllowed(bool),
     /// Test peer's connectivity
@@ -148,9 +140,6 @@ impl fmt::Display for Command {
             Command::PrepareNodeMsgToSend { .. } => write!(f, "PrepareNodeMsgToSend"),
             Command::SendMessageDeliveryGroup { wire_msg, .. } => {
                 write!(f, "SendMessageDeliveryGroup {:?}", wire_msg.msg_id())
-            }
-            Command::HandleRelocationComplete { .. } => {
-                write!(f, "HandleRelocationComplete")
             }
             Command::SetJoinsAllowed(_) => write!(f, "SetJoinsAllowed"),
             Command::SendAcceptedOnlineShare { .. } => write!(f, "SendAcceptedOnlineShare"),

@@ -6,14 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Command, Event};
+use super::Command;
 use crate::messaging::{system::SystemMsg, DstLocation, EndUser, MsgKind, WireMsg};
 use crate::routing::{
     core::{Core, Proposal, SendStatus},
     error::Result,
     log_markers::LogMarker,
-    network_knowledge::NetworkKnowledge,
-    node::Node,
     Error, Peer,
 };
 use std::{sync::Arc, time::Duration};
@@ -259,10 +257,6 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Command::HandleRelocationComplete { node, section } => {
-                self.handle_relocation_complete(node, section).await?;
-                Ok(vec![])
-            }
             Command::SetJoinsAllowed(joins_allowed) => {
                 self.core.set_joins_allowed(joins_allowed).await
             }
@@ -372,27 +366,5 @@ impl Dispatcher {
             _ = time::sleep(duration) => Some(Command::HandleTimeout(token)),
             _ = cancel_rx.changed() => None,
         }
-    }
-
-    async fn handle_relocation_complete(
-        &self,
-        new_node: Node,
-        new_section: NetworkKnowledge,
-    ) -> Result<()> {
-        let previous_name = self.core.node.read().await.name();
-        let new_keypair = new_node.keypair.clone();
-        let age = new_node.age();
-        self.core.relocate(new_node, new_section).await?;
-
-        self.core
-            .send_event(Event::Relocated {
-                previous_name,
-                new_keypair,
-            })
-            .await;
-
-        info!("Relocated, our Age: {:?}", age);
-
-        Ok(())
     }
 }
