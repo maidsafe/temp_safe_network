@@ -83,7 +83,7 @@ pub(crate) async fn add_or_update_file_item(
         Err(err) => {
             processed_files.insert(
                 file_name.to_string(),
-                (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                (CONTENT_ERROR_SIGN.to_string(), format!("<{:?}>", err)),
             );
             info!("Skipping file \"{}\": {:?}", file_link.unwrap_or(""), err);
 
