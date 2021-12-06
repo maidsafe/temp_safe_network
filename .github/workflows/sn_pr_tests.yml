@@ -98,38 +98,38 @@ jobs:
       - name: Build all safe_network targets
         run: cd sn && cargo build --all-targets --release --features=always-joinable,test-utils
 
-      - name: run sn_cli unit tests (no running network is necessary)
-        run: cargo test --release --bin safe
+      # - name: run sn_cli unit tests (no running network is necessary)
+      #   run: cargo test --release --bin safe
 
-      - name: Run Data Types tests
-        if: steps.changes.outputs.types == 'true'
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- types
-        timeout-minutes: 10
+      # - name: Run Data Types tests
+      #   if: steps.changes.outputs.types == 'true'
+      #   run: cd sn && cargo test --release --features=always-joinable,test-utils -- types
+      #   timeout-minutes: 10
 
-      - name: Run DBs tests
-        if: steps.changes.outputs.dbs == 'true'
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- dbs
-        timeout-minutes: 5
+      # - name: Run DBs tests
+      #   if: steps.changes.outputs.dbs == 'true'
+      #   run: cd sn && cargo test --release --features=always-joinable,test-utils -- dbs
+      #   timeout-minutes: 5
 
-      - name: Run PrefixMap tests
-        if: steps.changes.outputs.prefix_map == 'true'
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- prefix_map
-        timeout-minutes: 5
+      # - name: Run PrefixMap tests
+      #   if: steps.changes.outputs.prefix_map == 'true'
+      #   run: cd sn && cargo test --release --features=always-joinable,test-utils -- prefix_map
+      #   timeout-minutes: 5
 
-      - name: Run Messaging tests
-        if: steps.changes.outputs.messaging == 'true'
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- messaging
-        timeout-minutes: 5
+      # - name: Run Messaging tests
+      #   if: steps.changes.outputs.messaging == 'true'
+      #   run: cd sn && cargo test --release --features=always-joinable,test-utils -- messaging
+      #   timeout-minutes: 5
 
-      - name: Run Node tests
-        if: steps.changes.outputs.node == 'true'
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- node
-        timeout-minutes: 5
+      # - name: Run Node tests
+      #   if: steps.changes.outputs.node == 'true'
+      #   run: cd sn && cargo test --release --features=always-joinable,test-utils -- node
+      #   timeout-minutes: 5
 
-      - name: Run Routing tests
-        if: steps.changes.outputs.routing == 'true'
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
-        timeout-minutes: 10
+      # - name: Run Routing tests
+      #   if: steps.changes.outputs.routing == 'true'
+      #   run: cd sn && cargo test --release --features=always-joinable,test-utils -- routing
+      #   timeout-minutes: 10
 
       - name: Start the network
         run: ./target/release/testnet
