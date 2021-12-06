@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{MembershipState, SectionAuth};
+use crate::messaging::system::{MembershipState, SectionAuth, SectionPeers as SectionPeersMsg};
 use crate::routing::{
     network_knowledge::{NodeState, SectionAuthorityProvider},
     Peer,
@@ -220,6 +220,25 @@ impl SectionPeers {
     /// Remove all members whose name does not match `prefix`.
     pub(crate) fn retain(&self, prefix: &Prefix) {
         self.members.retain(|name, _value| prefix.matches(name))
+    }
+
+    /// Create a message from the current state.
+    pub(crate) fn to_msg(&self) -> SectionPeersMsg {
+        let members = self
+            .members
+            .iter()
+            .map(|itr| itr.value().clone().into_authed_msg())
+            .collect();
+        SectionPeersMsg { members }
+    }
+
+    /// Construct from message.
+    pub(crate) fn from_msg(msg: SectionPeersMsg) -> Self {
+        SectionPeers::new(
+            msg.members
+                .into_iter()
+                .map(|member| member.into_authed_state()),
+        )
     }
 }
 

@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::SectionAuth, relocation::RelocatePayload, section::NodeState};
+use super::relocation::RelocatePayload;
 use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
-use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -32,16 +31,6 @@ pub enum JoinAsRelocatedResponse {
     /// containing the section authority provider of the section that is closer to the
     /// requested name. The `JoinAsRelocatedRequest` should be re-sent to these addresses.
     Redirect(SectionAuthorityProvider),
-    /// Message sent to joining peer containing the necessary
-    /// info to become a member of the section.
-    Approval {
-        /// Section Authority over this message for validation
-        section_auth: SectionAuth<SectionAuthorityProvider>,
-        /// info on current members of the section
-        node_state: SectionAuth<NodeState>,
-        /// The secured (signed) and verifiable section chain
-        section_chain: SecuredLinkedList,
-    },
     /// The requesting node is not externally reachable
     NodeNotReachable(SocketAddr),
 }
