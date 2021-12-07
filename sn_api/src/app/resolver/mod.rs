@@ -290,7 +290,7 @@ impl Safe {
     ) -> Result<Vec<SafeData>> {
         debug!(
             "Fetching URL: {} with content of type: {:?}, data type: {:?}",
-            input_url.to_string(),
+            input_url,
             input_url.content_type(),
             input_url.data_type()
         );

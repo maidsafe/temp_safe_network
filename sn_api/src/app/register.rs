@@ -63,16 +63,17 @@ impl Safe {
         &self,
         url: &Url,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
+        debug!("Fetching Register entries from {}", url);
         let result = match url.content_version() {
             Some(v) => {
-                debug!("Take entry with version hash");
                 let hash = v.entry_hash();
+                debug!("Take entry with version hash: {:?}", hash);
                 self.register_fetch_entry(url, hash)
                     .await
                     .map(|entry| vec![(hash, entry)].into_iter().collect())
             }
             None => {
-                debug!("No version so take latest entry");
+                debug!("No version so take latest entry from Register at: {}", url);
                 let address = self.get_register_address(url)?;
                 self.safe_client.read_register(address).await
             }
@@ -110,18 +111,6 @@ impl Safe {
         entry: Entry,
         parents: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {
-        /*
-        let safeurl = Safe::parse_url(url)?;
-        if safeurl.content_hash().is_some() {
-            // TODO: perhaps we can allow this, and that's how an
-            // application can specify the parent entry in the Register.
-            return Err(Error::InvalidInput(format!(
-                "The target URL cannot contain a content hash: {}",
-                url
-            )));
-        };
-        */
-
         let reg_url = self.parse_and_resolve_url(url).await?;
         let address = self.get_register_address(&reg_url)?;
         self.safe_client

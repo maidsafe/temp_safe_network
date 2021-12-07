@@ -17,14 +17,10 @@ impl Safe {
             .nrs_get(input_url.public_name(), input_url.content_version())
             .await
             .map_err(|e| {
-                warn!("NRS failed to resolve {}: {}", input_url.to_string(), e);
-                Error::ContentNotFound(format!("Content not found at {}", input_url.to_string()))
+                warn!("NRS failed to resolve {}: {}", input_url, e);
+                Error::ContentNotFound(format!("Content not found at {}", input_url))
             })?;
-        debug!(
-            "NRS Resolved {} => {}",
-            input_url.to_string(),
-            target_url.to_string()
-        );
+        debug!("NRS Resolved {} => {}", input_url, target_url);
 
         // concatenate paths
         let url_path = input_url.path_decoded()?;
@@ -35,8 +31,7 @@ impl Safe {
         let version = target_url.content_version().ok_or_else(|| {
             Error::ContentError(format!(
                 "Missing content version in Url: {} while resolving: {}",
-                &target_url.to_string(),
-                &input_url.to_string()
+                &target_url, &input_url
             ))
         })?;
         let mut nrs_url = input_url.clone();
@@ -172,7 +167,7 @@ impl Safe {
 
     pub(crate) async fn resolve_file_container(
         &self,
-        input_url: Url,
+        mut input_url: Url,
         resolve_path: bool,
     ) -> Result<SafeData> {
         ensure_no_subnames(&input_url, "file container")?;
@@ -181,7 +176,7 @@ impl Safe {
         let (version, files_map) = self.fetch_files_container(&input_url).await?;
         debug!(
             "Files container at {}, with version: {}, of data type: {}, containing: {:?}",
-            input_url.to_string(),
+            input_url,
             version,
             input_url.data_type(),
             files_map
@@ -189,44 +184,53 @@ impl Safe {
 
         // cd there if it is a dir
         let path = input_url.path_decoded()?;
-        let cd_files_map = if !resolve_path || path == "/" || path.is_empty() {
-            files_map
+        let (files_map, resolves_into, metadata) = if !resolve_path
+            || path == "/"
+            || path.is_empty()
+        {
+            debug!(
+                "Skipping path resolution for FilesContainer resolved with {}",
+                input_url
+            );
+            (files_map, None, None)
         } else {
-            files::file_map_for_path(files_map, &path).map_err(|e| Error::ContentError(
+            let files_map_for_path = files::file_map_for_path(files_map, &path).map_err(|e| Error::ContentError(
                 format!("Failed to obtain file map for path: {}, on FileContainer at: {}, because: {:?}",
                 &path,
-                input_url.to_string(),
+                input_url,
                 e.to_string()),
-            ))?
-        };
+            ))?;
 
-        // gather file link and metadata for a file, else: (None, None)
-        let (link, metadata) =
-            files::get_file_link_and_metadata(&cd_files_map, &path).map_err(|e| {
-                Error::ContentError(format!(
-                    "Failed to obtain file link or info on FileContainer at: {}: {}",
-                    input_url.to_string(),
-                    e.to_string(),
-                ))
-            })?;
-        let resolves_into = match link {
-            Some(l) => Some(Url::from_url(&l)?),
-            None => None,
+            // try to gather file link and metadata for a file
+            let (link, metadata) = files::get_file_link_and_metadata(&files_map_for_path, &path)
+                .map_err(|e| {
+                    Error::ContentError(format!(
+                        "Failed to obtain file link or info on FileContainer at: {}: {}",
+                        input_url,
+                        e.to_string(),
+                    ))
+                })?;
+
+            let resolves_into = match link {
+                Some(l) => Some(Url::from_url(&l)?),
+                None => None,
+            };
+
+            (files_map_for_path, resolves_into, metadata)
         };
 
         // We don't want the path just the FilesContainer XOR-URL and version
-        let mut in_url = input_url.clone();
-        in_url.set_path("");
+        input_url.set_path("");
         let safe_data = SafeData::FilesContainer {
-            xorurl: in_url.to_xorurl_string(),
-            xorname: in_url.xorname(),
-            type_tag: in_url.type_tag(),
+            xorurl: input_url.to_xorurl_string(),
+            xorname: input_url.xorname(),
+            type_tag: input_url.type_tag(),
             version,
-            files_map: cd_files_map,
-            data_type: in_url.data_type(),
+            files_map,
+            data_type: input_url.data_type(),
             metadata,
             resolves_into,
-            resolved_from: in_url.to_string(),
+            resolved_from: input_url.to_string(),
         };
 
         Ok(safe_data)
@@ -273,8 +277,7 @@ fn ensure_no_subnames(url: &Url, data_type: &str) -> Result<()> {
     if !url.sub_names_vec().is_empty() {
         let msg = format!(
             "Cannot resolve URL targetting {} as it contains subnames: {}",
-            data_type,
-            url.to_string()
+            data_type, url
         );
         debug!("{}", msg);
         return Err(Error::InvalidXorUrl(msg));
