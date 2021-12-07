@@ -2763,7 +2763,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "fix unknown issue"]
     async fn test_files_container_remove_path() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
@@ -2780,7 +2779,7 @@ mod tests {
 
         assert_ne!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT - 1);
+        assert_eq!(new_files_map.len(), TESTDATA_PUT_FILESMAP_COUNT - 1);
 
         let filepath = "/test.md";
         assert_eq!(new_processed_files[filepath].0, CONTENT_DELETED_SIGN);
@@ -2800,7 +2799,7 @@ mod tests {
         assert_eq!(new_processed_files.len(), 2);
         assert_eq!(
             new_files_map.len(),
-            TESTDATA_PUT_FILEITEM_COUNT - SUBFOLDER_PUT_FILEITEM_COUNT - 1
+            TESTDATA_PUT_FILESMAP_COUNT - SUBFOLDER_PUT_FILEITEM_COUNT - 1
         );
 
         let filename1 = "/subfolder/subexists.md";
