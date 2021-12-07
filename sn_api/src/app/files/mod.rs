@@ -160,6 +160,12 @@ impl Safe {
         safe_url: &Url,
     ) -> Result<(VersionHash, FilesMap)> {
         // fetch register entries and wrap errors
+        debug!(
+            "Fetching FilesContainer from {}, address type: {:?}",
+            safe_url,
+            safe_url.address()
+        );
+
         let entries = self
             .register_fetch_entries(safe_url)
             .await
@@ -195,8 +201,6 @@ impl Safe {
             return Ok((VersionHash::default(), FilesMap::default()));
         };
 
-        debug!("Files map retrieved.... v{:?}", &version);
-        // TODO: use RDF format and deserialise it
         // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
         let files_map_url = Url::from_xorurl(files_map_xorurl)?;
         let serialised_files_map = self.fetch_public_data(&files_map_url, None).await?;
@@ -206,6 +210,7 @@ impl Safe {
                 err
             ))
         })?;
+        debug!("Files map retrieved.... {:?}", &version);
 
         Ok((version, files_map))
     }
@@ -327,6 +332,7 @@ impl Safe {
         follow_links: bool,
         dry_run: bool,
     ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
+        debug!("Adding file to FilesContainer at {}", url);
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, source_file, url, update_nrs).await?;
 
@@ -2456,7 +2462,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "issue to be fixed around resolving a Register's Url"]
     async fn test_files_container_add_existing_name() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
@@ -2541,7 +2546,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "issue to be fixed around resolving a Register's Url"]
     async fn test_files_container_fail_add_or_sync_invalid_path() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
@@ -2609,7 +2613,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "issue to be fixed around resolving a Register's Url"]
     async fn test_files_container_add_a_url() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
@@ -2695,7 +2698,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "issue to be fixed around resolving a Register's Url"]
     async fn test_files_container_add_from_raw() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
@@ -2761,7 +2763,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "issue to be fixed around resolving a Register's Url"]
+    #[ignore = "fix unknown issue"]
     async fn test_files_container_remove_path() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
