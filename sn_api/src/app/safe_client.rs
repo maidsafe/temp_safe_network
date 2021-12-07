@@ -272,9 +272,9 @@ impl SafeAppClient {
     }
 
     /// Low level method to apply register operations batches and send them to the network
-    pub async fn apply_register_ops(&self, mut batch: RegisterWriteAheadLog) -> Result<()> {
+    pub async fn apply_register_ops(&self, batch: RegisterWriteAheadLog) -> Result<()> {
         let client = self.get_safe_client()?;
-        client.publish_register_ops(&mut batch).await?;
+        client.publish_register_ops(batch).await?;
         Ok(())
     }
 }
