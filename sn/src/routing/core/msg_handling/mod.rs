@@ -530,7 +530,7 @@ impl Core {
                                     })
                                     .await;
 
-                                    info!("Relocation: switched to new node");
+                                    trace!("{}", LogMarker::RelocateEnd);
                                 } else {
                                     warn!("Relocation:  self.relocate_state is not in Progress");
                                     return Ok(vec![]);
