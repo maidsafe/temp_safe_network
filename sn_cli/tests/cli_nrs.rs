@@ -524,6 +524,61 @@ fn nrs_add_should_return_an_error_if_an_invalid_link_is_specified() -> Result<()
     Ok(())
 }
 
+///
+/// `nrs remove` subcommand
+///
+#[test]
+fn nrs_remove_should_remove_a_subname() -> Result<()> {
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let test_md_file = tmp_data_path.child("test.md");
+    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path("test.md");
+
+    let test_name = get_random_nrs_string();
+    let public_name = format!("test.{}", &test_name);
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &url.to_string(),
+            "--create-top-name",
+        ],
+        Some(0),
+    )?;
+    safe_cmd(["nrs", "remove", &public_name], Some(0))?
+        .assert()
+        .stdout(predicate::str::contains("NRS Map updated"))
+        .stdout(predicate::str::contains("-"))
+        .stdout(predicate::str::contains(public_name));
+
+    Ok(())
+}
+
+#[test]
+fn nrs_remove_should_return_an_error_for_a_non_existent_topname() -> Result<()> {
+    let topname = get_random_nrs_string();
+    let public_name = format!("test.{}", &topname);
+    safe_cmd(["nrs", "remove", &public_name], Some(1))?
+        .assert()
+        .stderr(predicate::str::contains(format!(
+            "Failed to remove {}.",
+            public_name
+        )))
+        .stderr(predicate::str::contains(format!(
+            "The topname {} is likely not registered in Safe NRS",
+            topname
+        )))
+        .stderr(predicate::str::contains(format!(
+            "Try the command again or verify that {} is a registered topname.",
+            topname
+        )));
+    Ok(())
+}
+
 #[test]
 fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
     let (container_xorurl, _map) = upload_test_folder(true)?;

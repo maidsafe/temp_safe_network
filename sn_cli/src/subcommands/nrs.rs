@@ -8,12 +8,12 @@
 // Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, notice_dry_run, serialise_output},
+    helpers::{get_from_arg_or_stdin, serialise_output},
     OutputFmt,
 };
 use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
 use prettytable::{format::FormatBuilder, Table};
-use sn_api::Error::{InvalidInput, NrsNameAlreadyExists, UnversionedContentError};
+use sn_api::Error::{InvalidInput, NetDataError, NrsNameAlreadyExists, UnversionedContentError};
 use sn_api::{Safe, Url};
 use structopt::StructOpt;
 
@@ -86,23 +86,7 @@ pub async fn nrs_commander(
             .await
         }
         NrsSubCommands::Remove { name } => {
-            if dry_run && OutputFmt::Pretty == output_fmt {
-                notice_dry_run();
-            }
-
-            let url = safe.nrs_remove(&name, dry_run).await?;
-            let version = url
-                .content_version()
-                .ok_or_else(|| eyre!("Content version not set for returned NRS Url"))?
-                .to_string();
-            print_summary(
-                output_fmt,
-                &format!("NRS Map updated (version {})", version),
-                "".to_string(),
-                &url,
-                ("-", &name, ""),
-            );
-            Ok(())
+            run_remove_subcommand(name, safe, dry_run, output_fmt).await
         }
     }
 }
@@ -207,6 +191,49 @@ async fn run_add_subcommand(
         ("+", &name, &link),
     );
     Ok(())
+}
+
+async fn run_remove_subcommand(
+    name: String,
+    safe: &mut Safe,
+    dry_run: bool,
+    output_fmt: OutputFmt,
+) -> Result<()> {
+    match safe.nrs_remove(&name, dry_run).await {
+        Ok(url) => {
+            let version = url
+                .content_version()
+                .ok_or_else(|| eyre!("Content version not set for returned NRS Url"))?
+                .to_string();
+            print_summary(
+                output_fmt,
+                &format!("NRS Map updated (version {})", version),
+                "".to_string(),
+                &url,
+                ("-", &name, ""),
+            );
+            Ok(())
+        }
+        Err(error) => match error {
+            // This is the type of error returned when you supply a topname that doesn't exist.
+            // Although obviously, this error could occur due to a general connectivity issue,
+            // which is why the error message advises that the topname is "likely" not registered.
+            NetDataError(_) => {
+                let mut parts = name.split('.');
+                let topname = parts.next_back().unwrap();
+                Err(eyre!(error)
+                    .wrap_err(format!(
+                        "Failed to remove {}. The topname {} is likely not registered in Safe NRS.",
+                        name, topname
+                    ))
+                    .suggestion(format!(
+                        "Try the command again or verify that {} is a registered topname.",
+                        topname
+                    )))
+            }
+            _ => Err(eyre!(error)),
+        },
+    }
 }
 
 /// Determine if the link is a valid XorUrl *before* creating the topname.
