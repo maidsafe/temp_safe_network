@@ -89,35 +89,44 @@ impl Safe {
             None => (ProcessedFiles::default(), FilesMap::default()),
         };
 
-        let xorurl = if dry_run {
-            "".to_string()
+        // create a register for this files map
+        let (xorname, reg_op) = self
+            .safe_client
+            .create_register(None, FILES_CONTAINER_TYPE_TAG, None, false)
+            .await?;
+        let xor_url = Url::encode_register(
+            xorname,
+            FILES_CONTAINER_TYPE_TAG,
+            Scope::Public,
+            ContentType::FilesContainer,
+            self.xorurl_base,
+        )?;
+        if !dry_run {
+            self.safe_client.apply_register_ops(reg_op).await?;
+        }
+
+        // store files map on network
+        let files_map_xorurl = if !dry_run {
+            self.store_files_map(&files_map).await?
         } else {
-            // Store the serialised FilesMap in a Public Blob
-            let files_map_xorurl = self.store_files_map(&files_map).await?;
-
-            // Store the serialised FilesMap XOR-URL as the first entry value in the Register
-            let xorname = self
-                .safe_client
-                .create_register(None, FILES_CONTAINER_TYPE_TAG, None, false)
-                .await?;
-
-            let xorurl = Url::encode_register(
-                xorname,
-                FILES_CONTAINER_TYPE_TAG,
-                Scope::Public,
-                ContentType::FilesContainer,
-                self.xorurl_base,
-            )?;
-
-            let entry = files_map_xorurl.as_bytes().to_vec();
-            let entry_hash = &self
-                .register_write(&xorurl, entry, Default::default())
-                .await?;
-
-            let mut versioned_xorurl = Url::from_xorurl(&xorurl)?;
-            versioned_xorurl.set_content_version(Some(VersionHash::from(entry_hash)));
-            versioned_xorurl.to_string()
+            "".to_string()
         };
+
+        // write pointer to files map to our register
+        let mut reg_url = Url::from_xorurl(&xor_url)?;
+        let address = self.get_register_address(&reg_url)?;
+        let entry = files_map_xorurl.as_bytes().to_vec();
+        let (entry_hash, reg_op) = self
+            .safe_client
+            .write_to_register(address, entry, Default::default())
+            .await?;
+        if !dry_run {
+            self.safe_client.apply_register_ops(reg_op).await?;
+        }
+
+        // return versionned xorurl
+        reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));
+        let xorurl = reg_url.to_string();
 
         Ok((xorurl, processed_files, files_map))
     }
@@ -503,20 +512,19 @@ impl Safe {
         dry_run: bool,
         update_nrs: bool,
     ) -> Result<VersionHash> {
-        if dry_run {
-            return Err(Error::NotImplementedError(
-                "No dry run for append_version_to_files_container".to_string(),
-            ));
-        }
         // The FilesContainer is updated by adding an entry containing the link to
         // the Blob with the serialised new version of the FilesMap.
-        let files_map_xorurl = self.store_files_map(new_files_map).await?;
+        let files_map_xorurl = if !dry_run {
+            self.store_files_map(new_files_map).await?
+        } else {
+            "".to_string()
+        };
 
         // append entry to register
         let entry = files_map_xorurl.as_bytes().to_vec();
         let replace = current_version.iter().map(|e| e.entry_hash()).collect();
         let entry_hash = &self
-            .register_write(&safe_url.to_string(), entry, replace)
+            .register_write(&safe_url.to_string(), entry, replace, dry_run)
             .await?;
         let new_version: VersionHash = entry_hash.into();
 
@@ -526,7 +534,7 @@ impl Safe {
             safe_url.set_content_version(Some(new_version));
             let nrs_url = Url::from_url(url)?;
             let top_name = nrs_url.top_name();
-            let _ = self.nrs_associate(top_name, &safe_url, false).await?;
+            let _ = self.nrs_associate(top_name, &safe_url, dry_run).await?;
         }
 
         Ok(new_version)

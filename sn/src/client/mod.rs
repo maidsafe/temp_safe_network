@@ -32,7 +32,7 @@ mod errors;
 
 // Export public API.
 
-pub use client_api::Client;
+pub use client_api::{Client, RegisterWriteAheadLog};
 pub use config_handler::{ClientConfig, DEFAULT_AE_WAIT, DEFAULT_QUERY_TIMEOUT};
 pub use errors::ErrorMessage;
 pub use errors::{Error, Result};
