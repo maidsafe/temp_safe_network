@@ -164,7 +164,13 @@ async fn run_node() -> Result<()> {
         BOOTSTRAP_RETRY_TIME
     );
 
-    let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60);
+    let bootstrap_retry_duration = if cfg!(feature = "always-joinable") {
+        Duration::from_secs(BOOTSTRAP_RETRY_TIME)
+    }
+    else {
+        Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60)
+    };
+
     let (node, mut event_stream) = loop {
         match Node::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
