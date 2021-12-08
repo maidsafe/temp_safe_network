@@ -82,4 +82,7 @@ pub enum LogMarker {
     ConnectionOpened,
     ConnectionClosed,
     ConnectionReused,
+    // relocation
+    RelocateStart,
+    RelocateEnd,
 }

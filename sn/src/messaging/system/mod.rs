@@ -24,6 +24,7 @@ pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
 pub use section::MembershipState;
 pub use section::NodeState;
+pub use section::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 pub use signed::{KeyedSig, SigShare};

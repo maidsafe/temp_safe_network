@@ -20,7 +20,7 @@ use super::Core;
 use crate::routing::{
     log_markers::LogMarker,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::SectionPeers,
+    network_knowledge::{NetworkKnowledge, SectionPeers},
     relocation::RelocateState,
     routing_api::command::Command,
     Error, Event, MessageReceived, Peer, Result, UnnamedPeer, MIN_LEVEL_WHEN_FULL,
@@ -30,7 +30,10 @@ use crate::{
     messaging::{
         data::{ServiceMsg, StorageLevel},
         signature_aggregator::Error as AggregatorError,
-        system::{NodeCmd, NodeQuery, SystemMsg},
+        system::{
+            JoinRequest, JoinResponse, NodeCmd, NodeQuery, SectionAuth as SystemSectionAuth,
+            SystemMsg,
+        },
         AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority,
         SectionAuth, ServiceAuth, WireMsg,
     },
@@ -352,6 +355,8 @@ impl Core {
                     {
                         return Ok(vec![cmd]);
                     }
+                } else {
+                    error!("self.relocate_state is not in Progress");
                 }
 
                 Ok(vec![])
@@ -411,12 +416,146 @@ impl Core {
                 self.comm.regulate(sender.addr(), load_report).await;
                 Ok(vec![])
             }
+            // The AcceptedOnlineShare for relocation will be received here.
             SystemMsg::JoinResponse(join_response) => {
-                debug!(
-                    "Ignoring unexpected join response message: {:?}",
-                    join_response
-                );
-                Ok(vec![])
+                match *join_response {
+                    JoinResponse::ApprovalShare {
+                        node_state,
+                        sig_share,
+                        section_chain,
+                        members,
+                    } => {
+                        let serialized_details = bincode::serialize(&node_state)?;
+
+                        info!(
+                            "Relocation: Aggregating received ApprovalShare from {:?}",
+                            sender
+                        );
+                        match self
+                            .proposal_aggregator
+                            .add(&serialized_details, sig_share.clone())
+                            .await
+                        {
+                            Ok(sig) => {
+                                info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
+                                let mut commands = vec![];
+
+                                if let Some(RelocateState::InProgress(
+                                    ref mut joining_as_relocated,
+                                )) = *self.relocate_state.write().await
+                                {
+                                    let new_node = joining_as_relocated.node.clone();
+                                    let new_name = new_node.name();
+                                    let previous_name = self.node.read().await.name();
+                                    let new_keypair = new_node.keypair.clone();
+
+                                    info!(
+                                        "Relocation: switching from {:?} to {:?}",
+                                        previous_name, new_name
+                                    );
+
+                                    let genesis_key = *self.network_knowledge.genesis_key();
+                                    let prefix_map = self.network_knowledge.prefix_map().clone();
+
+                                    let (recipients, signed_sap) = if let Ok(sap) =
+                                        self.network_knowledge.section_by_name(&new_name)
+                                    {
+                                        if let Some(signed_sap) =
+                                            prefix_map.get_signed(&sap.prefix())
+                                        {
+                                            (sap.elders().cloned().collect(), signed_sap)
+                                        } else {
+                                            warn!(
+                                                "Relocation: cannot find signed_sap for {:?}",
+                                                sap.prefix()
+                                            );
+                                            return Ok(vec![]);
+                                        }
+                                    } else {
+                                        warn!("Relocation: cannot find recipients to send aggregated JoinApproval");
+                                        return Ok(vec![]);
+                                    };
+
+                                    let new_network_knowledge = NetworkKnowledge::new(
+                                        genesis_key,
+                                        section_chain,
+                                        signed_sap,
+                                        Some(prefix_map),
+                                    )?;
+                                    let _ = new_network_knowledge
+                                        .merge_members(SectionPeers::from_msg(members));
+
+                                    // TODO: confirm whether carry out the switch immediately here
+                                    //       or still using the Command pattern.
+                                    //       As the sending of the JoinRequest as notification
+                                    //       may require the `node` to be switched to new already.
+
+                                    self.relocate(new_node, new_network_knowledge).await?;
+
+                                    let section_key = sig_share.public_key_set.public_key();
+                                    let auth = SystemSectionAuth {
+                                        value: node_state,
+                                        sig,
+                                    };
+                                    let join_req = JoinRequest {
+                                        section_key,
+                                        resource_proof_response: None,
+                                        aggregated: Some(auth),
+                                    };
+
+                                    trace!(
+                                        "Relocation: Sending aggregated JoinRequest to {:?}",
+                                        recipients
+                                    );
+                                    // Resend the JoinRequest now that
+                                    // we have collected enough ApprovalShares from the Elders
+                                    let node_msg = SystemMsg::JoinRequest(Box::new(join_req));
+                                    let wire_msg = WireMsg::single_src(
+                                        &self.node.read().await.clone(),
+                                        DstLocation::Section {
+                                            name: new_name,
+                                            section_pk: section_key,
+                                        },
+                                        node_msg,
+                                        section_key,
+                                    )?;
+                                    commands.push(Command::SendMessage {
+                                        recipients,
+                                        wire_msg,
+                                    });
+
+                                    self.send_event(Event::Relocated {
+                                        previous_name,
+                                        new_keypair,
+                                    })
+                                    .await;
+
+                                    trace!("{}", LogMarker::RelocateEnd);
+                                } else {
+                                    warn!("Relocation:  self.relocate_state is not in Progress");
+                                    return Ok(vec![]);
+                                }
+
+                                Ok(commands)
+                            }
+                            Err(AggregatorError::NotEnoughShares) => Ok(vec![]),
+                            error => {
+                                warn!(
+                                    "Relocation: Error received as part of signature aggregation during join: {:?}",
+                                    error
+                                );
+                                Ok(vec![])
+                            }
+                        }
+                    }
+                    _ => {
+                        debug!(
+                            "Relocation: Ignoring unexpected join response message: {:?}",
+                            join_response
+                        );
+                        Ok(vec![])
+                    }
+                }
             }
             SystemMsg::DkgFailureAgreement(sig_set) => {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);

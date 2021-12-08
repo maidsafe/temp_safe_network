@@ -15,6 +15,7 @@ use crate::messaging::{
 use crate::routing::{
     core::{bootstrap::JoiningAsRelocated, Proposal},
     error::Result,
+    log_markers::LogMarker,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
     Event, Peer,
@@ -124,6 +125,7 @@ impl Core {
             }
             Some(RelocateState::Delayed(_)) => (),
             None => {
+                trace!("{}", LogMarker::RelocateStart);
                 self.send_event(Event::RelocationStarted {
                     previous_name: self.node.read().await.name(),
                 })
@@ -134,11 +136,18 @@ impl Core {
         // Create a new instance of JoiningAsRelocated to start the relocation
         // flow. This same instance will handle responses till relocation is complete.
         let genesis_key = *self.network_knowledge.genesis_key();
-        let bootstrap_addrs = self
+
+        let bootstrap_addrs = if let Ok(sap) = self
             .network_knowledge
-            .authority_provider()
-            .await
-            .addresses();
+            .section_by_name(&relocate_details.dst)
+        {
+            sap.addresses()
+        } else {
+            self.network_knowledge
+                .authority_provider()
+                .await
+                .addresses()
+        };
         let mut joining_as_relocated = JoiningAsRelocated::new(
             self.node.read().await.clone(),
             genesis_key,

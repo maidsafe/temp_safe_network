@@ -254,7 +254,10 @@ impl Core {
             .await
             .map_err(|_| Error::PermitAcquisitionFailed)?;
 
-        debug!("Received {:?} from {}", join_request, peer);
+        debug!(
+            "Received JoinAsRelocatedRequest {:?} from {}",
+            join_request, peer
+        );
         let relocate_payload = if let Some(relocate_payload) = join_request.relocate_payload {
             relocate_payload
         } else {
