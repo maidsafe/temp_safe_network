@@ -5,14 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.46.6 (2021-12-07)
+
+### Bug Fixes
+
+ - <csr-id-ddde0d6767f5230eca7a760423538fa5e4f640a2/> order of target length in ElderConn error corrected
+ - <csr-id-1ea33e0c63fead5097b57496b2fd997201a2c531/> keep trying even with connection error w/ always-joinable flag
+ - <csr-id-8e480e5eb5cd38f9bfb3b723aa1d0dd5e4be3122/> aovid overwrite pervious session by  accident
+ - <csr-id-fdc4ba6bb36dff85126c8273cdfc67f9b07e2175/> multiple fixes for DKG-AE
+   - discard DKG session info for older sessions
+   - skip DkgStart and DkgRetry messages for expired sessions
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 5 calendar days.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - order of target length in ElderConn error corrected ([`ddde0d6`](https://github.com/maidsafe/safe_network/commit/ddde0d6767f5230eca7a760423538fa5e4f640a2))
+    - keep trying even with connection error w/ always-joinable flag ([`1ea33e0`](https://github.com/maidsafe/safe_network/commit/1ea33e0c63fead5097b57496b2fd997201a2c531))
+    - aovid overwrite pervious session by  accident ([`8e480e5`](https://github.com/maidsafe/safe_network/commit/8e480e5eb5cd38f9bfb3b723aa1d0dd5e4be3122))
+    - clippy tidyup for rust 1.57 ([`05f6d98`](https://github.com/maidsafe/safe_network/commit/05f6d98cf21f0158f4b5161484c7c15a0561b6f4))
+    - multiple fixes for DKG-AE ([`fdc4ba6`](https://github.com/maidsafe/safe_network/commit/fdc4ba6bb36dff85126c8273cdfc67f9b07e2175))
+</details>
+
 ## v0.46.5 (2021-12-02)
 
 ### Bug Fixes
 
+<csr-id-01a5c961fc02f9ca8d6f60286306d5efba460e4e/>
+
  - <csr-id-fdc4ba6bb36dff85126c8273cdfc67f9b07e2175/> multiple fixes for DKG-AE
    - discard DKG session info for older sessions
-   - skip DkgStart and DkgRetry messages for expired sessions
- - <csr-id-01a5c961fc02f9ca8d6f60286306d5efba460e4e/> avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo
+- skip DkgStart and DkgRetry messages for expired sessions
 
 ### Commit Statistics
 
@@ -29,9 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - multiple fixes for DKG-AE ([`fdc4ba6`](https://github.com/maidsafe/safe_network/commit/fdc4ba6bb36dff85126c8273cdfc67f9b07e2175))
+    - safe_network-0.46.5 ([`8657784`](https://github.com/maidsafe/safe_network/commit/86577846e845c110c49e15c95c6bd5595db51773))
     - avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo ([`01a5c96`](https://github.com/maidsafe/safe_network/commit/01a5c961fc02f9ca8d6f60286306d5efba460e4e))
 </details>
+
+<csr-unknown>
+ avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo<csr-unknown/>
 
 ## v0.46.4 (2021-12-02)
 

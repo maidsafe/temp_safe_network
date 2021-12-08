@@ -134,7 +134,7 @@ impl Safe {
             DataAddress::Register(reg_address) => reg_address,
             other => {
                 return Err(Error::ContentError(format!(
-                    "The url {} has an {:?} address.\
+                    "The url {} has an {:?} address. \
                     To fetch register entries, this url must refer to a register.",
                     url, other
                 )))
