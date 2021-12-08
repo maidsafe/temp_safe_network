@@ -78,6 +78,7 @@ struct Join<'a> {
     signature_aggregators: BTreeMap<BlsPublicKey, SignatureAggregator>,
     node_state_serialized: Option<Vec<u8>>,
     backoff: ExponentialBackoff,
+    aggregated: bool,
 }
 
 impl<'a> Join<'a> {
@@ -101,6 +102,7 @@ impl<'a> Join<'a> {
                 max_elapsed_time: Some(Duration::from_secs(60)),
                 ..Default::default()
             },
+            aggregated: false,
         }
     }
 
@@ -234,6 +236,7 @@ impl<'a> Join<'a> {
                     match aggregator.add(&serialized_details, sig_share.clone()).await {
                         Ok(sig) => {
                             info!("Successfully aggregated ApprovalShares for joining the network");
+                            self.aggregated = true;
 
                             let section_key = sig_share.public_key_set.public_key();
                             let auth = SectionAuth {
@@ -337,6 +340,7 @@ impl<'a> Join<'a> {
                     // if it's not a new SAP, ignore response unless the expected age is different.
                     if self.node.age() != expected_age
                         && (self.node.age() > expected_age || self.node.age() <= MIN_ADULT_AGE)
+                        && !self.aggregated
                     {
                         // adjust our joining age to the expected by the network
                         trace!(
