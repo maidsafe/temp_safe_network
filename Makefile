@@ -72,12 +72,13 @@ safe_network-build-artifacts-for-deploy:
 		rm safe_network-$$arch.zip; \
 	done
 
-.ONESHELL:
-safe_network-package-version-artifacts-for-release:
+clean-deploy:
 	rm -f *.zip *.tar.gz
 	rm -rf ${DEPLOY_PATH}
 	mkdir -p ${DEPLOY_PROD_PATH}
 
+.ONESHELL:
+safe_network-package-version-artifacts-for-release:
 	declare -a architectures=( \
 		"x86_64-unknown-linux-musl" \
 		"x86_64-pc-windows-msvc" \
@@ -96,11 +97,7 @@ safe_network-package-version-artifacts-for-release:
 	mv *.zip ${DEPLOY_PROD_PATH}
 
 .ONESHELL:
-sn_cli-package-version-artifacts-for-deploy:
-	rm -f *.zip *.tar.gz
-	rm -rf ${DEPLOY_PATH}
-	mkdir -p ${DEPLOY_PROD_PATH}
-
+sn_cli-package-version-artifacts-for-release:
 	declare -a architectures=( \
 		"x86_64-unknown-linux-musl" \
 		"x86_64-pc-windows-msvc" \
