@@ -14,7 +14,7 @@ use predicates::prelude::*;
 use sn_api::resolver::{ContentType, DataType, Url};
 use sn_cmd_test_utilities::util::{
     create_and_get_keys, get_random_nrs_string, parse_files_container_output,
-    parse_files_put_or_sync_output, parse_nrs_create_output, safe_cmd, safe_cmd_stderr,
+    parse_files_put_or_sync_output, parse_nrs_register_output, safe_cmd, safe_cmd_stderr,
     safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
@@ -208,7 +208,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
         ["nrs", "create", &nrsurl, "-l", &container_xorurl, "--json"],
         Some(0),
     )?;
-    let (nrs_xorurl, _files_map) = parse_nrs_create_output(&output);
+    let (nrs_xorurl, _files_map) = parse_nrs_register_output(&output);
     let nrs_version = nrs_xorurl.content_version().unwrap();
 
     let nrsurl_with_path = format!("{}/test.md", nrsurl);

@@ -25,7 +25,7 @@ pub enum NrsSubCommands {
     Add {
         /// Specify the public name, which is the subname you wish to use, and the registered
         /// topname. For example, "new.topname". If the topname has not already been registered
-        /// with the `nrs create` command, use the `--create-top-name` flag to register it here.
+        /// with the `nrs register` command, use the `--register-top-name` flag to register it here.
         public_name: String,
         /// The safe:// URL to link to. Usually a FilesContainer for a website. This should be
         /// wrapped in double quotes on bash based systems. A link must be provided for a subname.
@@ -34,19 +34,20 @@ pub enum NrsSubCommands {
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
         /// Set this flag to register the topname if it hasn't already been registered.
-        #[structopt(short = "y", long = "create-top-name")]
-        create_top_name: bool,
+        #[structopt(short = "y", long = "register-top-name")]
+        register_top_name: bool,
         /// Set this flag to register this link as default for the topname when no subname is
         /// specified.
         #[structopt(long = "default")]
         default: bool,
     },
-    #[structopt(name = "create")]
-    /// Create/Register a new top name
-    Create {
-        /// The name to give site, eg 'safenetwork'
+    #[structopt(name = "register")]
+    /// Register a new top name in Safe NRS
+    Register {
+        /// The name of the new topname to register
         name: String,
-        /// The safe:// URL to map this to. Usually a FilesContainer for a website. This should be wrapped in double quotes on bash based systems.
+        /// Optional safe:// URL to link the topname to. Usually a FilesContainer for a website.
+        /// This should be wrapped in double quotes on bash based systems.
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
     },
@@ -65,19 +66,19 @@ pub async fn nrs_commander(
     safe: &mut Safe,
 ) -> Result<()> {
     match cmd {
-        NrsSubCommands::Create { name, link } => {
-            run_create_subcommand(name, link, safe, dry_run, output_fmt).await
+        NrsSubCommands::Register { name, link } => {
+            run_register_subcommand(name, link, safe, dry_run, output_fmt).await
         }
         NrsSubCommands::Add {
             public_name: name,
             link,
-            create_top_name,
+            register_top_name,
             default,
         } => {
             run_add_subcommand(
                 name,
                 link,
-                create_top_name,
+                register_top_name,
                 default,
                 safe,
                 dry_run,
@@ -91,7 +92,7 @@ pub async fn nrs_commander(
     }
 }
 
-async fn run_create_subcommand(
+async fn run_register_subcommand(
     name: String,
     link: Option<String>,
     safe: &mut Safe,
@@ -120,19 +121,19 @@ async fn run_create_subcommand(
         Err(error) => match error {
             InvalidInput(_) => Err(eyre!(error)
                 .wrap_err(
-                    "The create command can only create a topname, it cannot create subnames.",
+                    "The register command can only register a topname, it cannot add subnames.",
                 )
                 .suggestion(
-                    "Please use the nrs add command with the --create-top-name \
-                        argument to create a topname and add a subname at the same time.",
+                    "Please use the nrs add command with the --register-top-name \
+                        argument to register a topname and add a subname at the same time.",
                 )
                 .suggestion(
-                    "Alternatively, create the topname first with the create command, \
-                        then use the add command to create the subname.",
+                    "Alternatively, register the topname first with the register command, \
+                        then use the add command to add the subname.",
                 )),
             NrsNameAlreadyExists(_) => Err(eyre!(error)
                 .wrap_err(format!(
-                    "Could not create topname {}. That name is already taken.",
+                    "Could not register topname {}. That name is already taken.",
                     name
                 ))
                 .suggestion("Try the command again with a different name.")),
@@ -144,7 +145,7 @@ async fn run_create_subcommand(
 async fn run_add_subcommand(
     name: String,
     link: Option<String>,
-    create_top_name: bool,
+    register_top_name: bool,
     default: bool,
     safe: &mut Safe,
     dry_run: bool,
@@ -153,7 +154,7 @@ async fn run_add_subcommand(
     let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
     validate_target_link(&link)?;
     let link_url = Url::from_url(&link)?;
-    let (url, topname_was_registered) = if create_top_name {
+    let (url, topname_was_registered) = if register_top_name {
         add_public_name_for_url(&name, safe, &link_url, dry_run).await?
     } else {
         (
@@ -238,8 +239,8 @@ async fn run_remove_subcommand(
 
 /// Determine if the link is a valid XorUrl *before* creating the topname.
 ///
-/// Otherwise the user receives an error even though the topname was actually created, which is a
-/// potentially confusing experience: they may think the topname wasn't created.
+/// Otherwise the user receives an error even though the topname was actually registerd, which is a
+/// potentially confusing experience: they may think the topname wasn't registerd.
 fn validate_target_link(link: &str) -> Result<()> {
     Url::from_url(link)
         .wrap_err("The supplied link was not a valid XorUrl.")
@@ -250,7 +251,7 @@ fn validate_target_link(link: &str) -> Result<()> {
 /// Get the new NRS URL that's going to be displayed to the user.
 ///
 /// If no target link has been supplied, the URL is just going to be the one returned from the
-/// topname creation; otherwise, associate the link with the newly created topname, and return the
+/// topname creation; otherwise, associate the link with the newly registered topname, and return the
 /// URL generated from the association.
 async fn get_new_nrs_url_for_topname(
     name: &str,
@@ -280,7 +281,7 @@ async fn associate_url_with_public_name(
                 .wrap_err(
                     "The destination you're trying to link to is versionable content. \
                         When linking to versionable content, you must supply a version hash on the \
-                        XorUrl. The requested topname was not created.",
+                        XorUrl. The requested topname was not registered.",
                 )
                 .suggestion(
                     "Please run the command again with the version hash appended to the link. \
@@ -304,7 +305,7 @@ async fn add_public_name_for_url(
                 .wrap_err(
                     "The destination you're trying to link to is versionable content. \
                         When linking to versionable content, you must supply a version hash on the \
-                        XorUrl. The requested topname was not created.",
+                        XorUrl. The requested topname was not registered.",
                 )
                 .suggestion(
                     "Please run the command again with the version hash appended to the link. \

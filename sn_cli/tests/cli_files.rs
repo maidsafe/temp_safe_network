@@ -15,7 +15,7 @@ use sn_api::{Url, VersionHash};
 use sn_cmd_test_utilities::util::{
     get_directory_file_count, get_directory_len, get_file_len, get_random_nrs_string,
     mk_emptyfolder, parse_files_container_output, parse_files_put_or_sync_output,
-    parse_files_tree_output, parse_nrs_create_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout,
+    parse_files_tree_output, parse_nrs_register_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout,
     safeurl_from, test_symlinks_are_valid, upload_path, upload_test_symlinks_folder,
     upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
@@ -473,7 +473,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         ],
         Some(0),
     )?;
-    let (nrs_xorurl, _files_map) = parse_nrs_create_output(&output);
+    let (nrs_xorurl, _files_map) = parse_nrs_register_output(&output);
     let nrs_version = nrs_xorurl.content_version().unwrap();
 
     let empty_dir = tmp_data_dir.child("emptyfolder2");

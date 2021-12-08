@@ -89,7 +89,7 @@ pub mod util {
 
     pub fn create_nrs_link(name: &str, link: &str) -> Result<Url> {
         let nrs_creation = safe_cmd_stdout(["nrs", "create", name, "-l", link, "--json"], Some(0))?;
-        let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
+        let (nrs_map_xorurl, _change_map) = parse_nrs_register_output(&nrs_creation);
         Ok(nrs_map_xorurl)
     }
 
@@ -282,8 +282,8 @@ pub mod util {
         serde_json::from_str(output).expect("Failed to parse output of `safe files put/sync`")
     }
 
-    pub fn parse_nrs_create_output(output: &str) -> (Url, (String, String, String)) {
-        serde_json::from_str(output).expect("Failed to parse output of `safe nrs create`")
+    pub fn parse_nrs_register_output(output: &str) -> (Url, (String, String, String)) {
+        serde_json::from_str(output).expect("Failed to parse output of `safe nrs register`")
     }
 
     pub fn parse_wallet_create_output(output: &str) -> (String, String, Option<Keypair>) {
