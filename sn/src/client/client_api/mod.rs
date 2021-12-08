@@ -35,6 +35,8 @@ use tokio::{
 use tracing::{debug, info};
 use xor_name::XorName;
 
+pub use register_apis::RegisterWriteAheadLog;
+
 /// Client object
 #[derive(Clone, Debug)]
 pub struct Client {
