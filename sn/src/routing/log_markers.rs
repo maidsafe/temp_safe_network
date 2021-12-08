@@ -66,6 +66,7 @@ pub enum LogMarker {
     SendDirect,
     SendDirectToNodes,
     SendResourceProofChallenge,
+    SendApprovedAndAggregatedJoin,
     SendJoinRequest,
     SendJoinAsRelocatedResponse,
     SendJoinRejected,
@@ -76,6 +77,7 @@ pub enum LogMarker {
     SendJoinsDisallowed,
     SendDKGUnderway,
     SendNodeApproval,
+    HandlingNewNodeOnline,
     // approved to join
     ReceivedJoinApproved,
     // Connections

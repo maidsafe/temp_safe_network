@@ -258,7 +258,11 @@ impl<'a> Join<'a> {
                                 warn!("cannot find recipients to send aggregated JoinApproval");
                                 continue;
                             };
-                            trace!("Sending aggregated JoinRequest to {:?}", recipients);
+                            trace!(
+                                "{:?} to {:?}",
+                                LogMarker::SendApprovedAndAggregatedJoin,
+                                recipients
+                            );
                             // Resend the JoinRequest now that we have collected enough ApprovalShares from the Elders
                             self.send_join_requests(join_req, &recipients, section_key, false)
                                 .await?;
