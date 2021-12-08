@@ -13,7 +13,7 @@ pub mod util {
     use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use sn_api::{files::ProcessedFiles, resolver::SafeData, Keypair, Url};
+    use sn_api::{files::ProcessedFiles, resolver::SafeData, Keypair, SafeUrl};
     use std::{collections::BTreeMap, env, fs, path::Path, process};
     use tiny_keccak::{Hasher, Sha3};
     use walkdir::WalkDir;
@@ -86,7 +86,7 @@ pub mod util {
         Ok((xorurl, sk))
     }
 
-    pub fn create_nrs_link(name: &str, link: &str) -> Result<Url> {
+    pub fn create_nrs_link(name: &str, link: &str) -> Result<SafeUrl> {
         let nrs_creation = safe_cmd_stdout(["nrs", "create", name, "-l", link, "--json"], Some(0))?;
         let (nrs_map_xorurl, _change_map) = parse_nrs_register_output(&nrs_creation);
         Ok(nrs_map_xorurl)
@@ -262,8 +262,8 @@ pub mod util {
         thread_rng().sample_iter(&Alphanumeric).take(15).collect()
     }
 
-    pub fn safeurl_from(url: &str) -> Result<Url> {
-        Url::from_url(url).map_err(|e| eyre!("Failed to parse URL: {}", e))
+    pub fn safeurl_from(url: &str) -> Result<SafeUrl> {
+        SafeUrl::from_url(url).map_err(|e| eyre!("Failed to parse URL: {}", e))
     }
 
     pub fn parse_files_container_output(
@@ -281,7 +281,7 @@ pub mod util {
         serde_json::from_str(output).expect("Failed to parse output of `safe files put/sync`")
     }
 
-    pub fn parse_nrs_register_output(output: &str) -> (Url, (String, String, String)) {
+    pub fn parse_nrs_register_output(output: &str) -> (SafeUrl, (String, String, String)) {
         serde_json::from_str(output).expect("Failed to parse output of `safe nrs register`")
     }
 

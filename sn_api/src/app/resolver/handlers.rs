@@ -2,7 +2,7 @@ use super::{Range, SafeData};
 use crate::app::{
     files::{self, FileInfo},
     multimap::MultimapKeyValues,
-    DataType, Safe, Url,
+    DataType, Safe, SafeUrl,
 };
 use crate::{Error, Result};
 use bytes::Bytes;
@@ -11,7 +11,7 @@ use safe_network::types::BytesAddress;
 use std::collections::BTreeSet;
 
 impl Safe {
-    pub(crate) async fn resolve_nrs_map_container(&self, input_url: Url) -> Result<SafeData> {
+    pub(crate) async fn resolve_nrs_map_container(&self, input_url: SafeUrl) -> Result<SafeData> {
         // get NRS resolution
         let (mut target_url, nrs_map) = self
             .nrs_get(input_url.public_name(), input_url.content_version())
@@ -58,7 +58,7 @@ impl Safe {
 
     pub(crate) async fn resolve_multimap(
         &self,
-        input_url: Url,
+        input_url: SafeUrl,
         retrieve_data: bool,
     ) -> Result<SafeData> {
         let data: MultimapKeyValues = if retrieve_data {
@@ -89,7 +89,7 @@ impl Safe {
 
     pub(crate) async fn resolve_raw(
         &self,
-        input_url: Url,
+        input_url: SafeUrl,
         metadata: Option<FileInfo>,
         retrieve_data: bool,
         range: Range,
@@ -139,7 +139,7 @@ impl Safe {
 
     pub(crate) async fn resolve_mediatype(
         &self,
-        input_url: Url,
+        input_url: SafeUrl,
         metadata: Option<FileInfo>,
         retrieve_data: bool,
         range: Range,
@@ -167,7 +167,7 @@ impl Safe {
 
     pub(crate) async fn resolve_file_container(
         &self,
-        mut input_url: Url,
+        mut input_url: SafeUrl,
         resolve_path: bool,
     ) -> Result<SafeData> {
         ensure_no_subnames(&input_url, "file container")?;
@@ -212,7 +212,7 @@ impl Safe {
                 })?;
 
             let resolves_into = match link {
-                Some(l) => Some(Url::from_url(&l)?),
+                Some(l) => Some(SafeUrl::from_url(&l)?),
                 None => None,
             };
 
@@ -238,7 +238,7 @@ impl Safe {
 
     async fn retrieve_data(
         &self,
-        input_url: &Url,
+        input_url: &SafeUrl,
         retrieve_data: bool,
         media_type: Option<String>,
         metadata: &Option<FileInfo>,
@@ -272,8 +272,8 @@ impl Safe {
     }
 }
 
-// private helper to ensure the Url contains no subnames
-fn ensure_no_subnames(url: &Url, data_type: &str) -> Result<()> {
+// private helper to ensure the SafeUrl contains no subnames
+fn ensure_no_subnames(url: &SafeUrl, data_type: &str) -> Result<()> {
     if !url.sub_names_vec().is_empty() {
         let msg = format!(
             "Cannot resolve URL targetting {} as it contains subnames: {}",

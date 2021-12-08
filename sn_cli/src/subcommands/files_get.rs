@@ -19,7 +19,7 @@ use sn_api::{
     files::{FilesMap, GetAttr, ProcessedFiles},
     resolver::Range,
     resolver::SafeData,
-    DataType, Result as ApiResult, Safe, Url, XorUrl,
+    DataType, Result as ApiResult, Safe, SafeUrl, XorUrl,
 };
 use std::{
     fs,
@@ -445,7 +445,7 @@ async fn files_container_get_files(
     // Todo: This test will need to be modified once we support empty directories.
     let is_single_file = files_map.len() == 1;
 
-    let safeurl = Url::from_url(url)?;
+    let safeurl = SafeUrl::from_url(url)?;
     let urlpath = safeurl.path_decoded()?;
 
     let root = find_root_path(dirpath, &urlpath, is_single_file)?;
@@ -787,7 +787,7 @@ fn create_dir_all(dir_path: &Path) -> Result<()> {
 /// # Get Public or Private Blob
 /// Get immutable data blobs from the network.
 pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
-    match Url::from_url(url)?.data_type() {
+    match SafeUrl::from_url(url)?.data_type() {
         DataType::Bytes => {
             let pub_blob = safe.files_get_public_data(url, range).await?;
             Ok(pub_blob.chunk().to_vec())

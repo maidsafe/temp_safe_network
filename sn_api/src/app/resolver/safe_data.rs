@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-pub use super::{ContentType, DataType, Url, VersionHash, XorUrlBase};
+pub use super::{ContentType, DataType, SafeUrl, VersionHash, XorUrlBase};
 use crate::app::{
     files::{FileInfo, FilesMap},
     multimap::MultimapKeyValues,
@@ -37,7 +37,7 @@ pub enum SafeData {
         files_map: FilesMap,
         data_type: DataType,
         metadata: Option<FileInfo>,
-        resolves_into: Option<Url>,
+        resolves_into: Option<SafeUrl>,
         resolved_from: String,
     },
     PublicBlob {
@@ -56,7 +56,7 @@ pub enum SafeData {
         version: VersionHash,
         nrs_map: NrsMap,
         data_type: DataType,
-        resolves_into: Option<Url>,
+        resolves_into: Option<SafeUrl>,
         resolved_from: String,
     },
     Multimap {
@@ -109,7 +109,7 @@ impl SafeData {
         }
     }
 
-    pub fn resolves_into(&self) -> Option<Url> {
+    pub fn resolves_into(&self) -> Option<SafeUrl> {
         use SafeData::*;
         match self {
             SafeKey { .. }

@@ -8,7 +8,7 @@
 // Software.
 
 use super::register::EntryHash;
-use crate::url::{ContentType, Url, XorUrl};
+use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe, Scope};
 use log::debug;
 use safe_network::types::DataAddress;
@@ -46,7 +46,7 @@ impl Safe {
         } else {
             Scope::Public
         };
-        let xorurl = Url::encode_register(
+        let xorurl = SafeUrl::encode_register(
             xorname,
             type_tag,
             scope,
@@ -78,10 +78,10 @@ impl Safe {
     }
 
     // Return the value (by a provided key) of a Multimap on
-    // the network without resolving the Url
+    // the network without resolving the SafeUrl
     pub(crate) async fn fetch_multimap_value_by_key(
         &self,
-        safeurl: &Url,
+        safeurl: &SafeUrl,
         key: &[u8],
     ) -> Result<MultimapKeyValues> {
         let entries = self.fetch_multimap_values(safeurl).await?;
@@ -167,9 +167,12 @@ impl Safe {
     }
 
     // Crate's helper to return the value of a Multimap on
-    // the network without resolving the Url,
+    // the network without resolving the SafeUrl,
     // filtering by hash if a version is provided
-    pub(crate) async fn fetch_multimap_values(&self, safeurl: &Url) -> Result<MultimapKeyValues> {
+    pub(crate) async fn fetch_multimap_values(
+        &self,
+        safeurl: &SafeUrl,
+    ) -> Result<MultimapKeyValues> {
         let entries = match self.register_fetch_entries(safeurl).await {
             Ok(data) => {
                 debug!("Multimap retrieved...");
@@ -200,11 +203,11 @@ impl Safe {
     }
 
     // Crate's helper to return the value of a Multimap on
-    // the network without resolving the Url,
+    // the network without resolving the SafeUrl,
     // optionally filtering by hash and/or key.
     pub(crate) async fn fetch_multimap_value_by_hash(
         &self,
-        safeurl: &Url,
+        safeurl: &SafeUrl,
         hash: EntryHash,
     ) -> Result<MultimapKeyValue> {
         let entry = match self.register_fetch_entry(safeurl, hash).await {
