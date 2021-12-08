@@ -156,7 +156,7 @@ jobs:
         shell: bash
         # if: matrix.os == 'windows-latest'
         run: ./resources/scripts/network_is_ready_cli.sh
-        timeout-minutes: 60
+        timeout-minutes: 25
 
 
       - name: Run network asserts one by one
