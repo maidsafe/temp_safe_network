@@ -117,10 +117,10 @@ fn nrs_register_should_return_an_error_if_an_invalid_link_is_specified() -> Resu
     safe_cmd(["nrs", "register", &topname, "--link", "invalid"], Some(1))?
         .assert()
         .stderr(predicate::str::contains(
-            "The supplied link was not a valid XorUrl.",
+            "The supplied link was not a valid url.",
         ))
         .stderr(predicate::str::contains(
-            "Run the command again with a valid XorUrl for the --link argument.",
+            "Run the command again with a valid url for the --link argument.",
         ));
     Ok(())
 }
@@ -144,12 +144,12 @@ fn nrs_register_should_return_an_error_if_link_to_versioned_content_has_no_versi
     .assert()
     .stderr(predicate::str::contains(
         "The destination you're trying to link to is versionable content. \
-            When linking to versionable content, you must supply a version hash on the XorUrl. \
+            When linking to versionable content, you must supply a version hash on the url. \
             The requested topname was not registered.",
     ))
     .stderr(predicate::str::contains(
         "Please run the command again with the version hash appended to the link. \
-            The link should have the form safe://<xorurl>?v=<versionhash>.",
+            The link should have the form safe://<url>?v=<versionhash>.",
     ));
     Ok(())
 }
@@ -397,12 +397,12 @@ fn nrs_add_should_return_an_error_if_link_to_versioned_content_has_no_version() 
     .assert()
     .stderr(predicate::str::contains(
         "The destination you're trying to link to is versionable content. \
-            When linking to versionable content, you must supply a version hash on the XorUrl. \
+            When linking to versionable content, you must supply a version hash on the url. \
             The requested topname was not registered.",
     ))
     .stderr(predicate::str::contains(
         "Please run the command again with the version hash appended to the link. \
-            The link should have the form safe://<xorurl>?v=<versionhash>.",
+            The link should have the form safe://<url>?v=<versionhash>.",
     ));
     Ok(())
 }
@@ -436,12 +436,12 @@ fn nrs_add_with_register_top_name_should_return_an_error_if_link_to_versioned_co
     .assert()
     .stderr(predicate::str::contains(
         "The destination you're trying to link to is versionable content. \
-            When linking to versionable content, you must supply a version hash on the XorUrl. \
+            When linking to versionable content, you must supply a version hash on the url. \
             The requested topname was not registered.",
     ))
     .stderr(predicate::str::contains(
         "Please run the command again with the version hash appended to the link. \
-            The link should have the form safe://<xorurl>?v=<versionhash>.",
+            The link should have the form safe://<url>?v=<versionhash>.",
     ));
     Ok(())
 }
@@ -475,12 +475,12 @@ fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_
     .assert()
     .stderr(predicate::str::contains(
         "The destination you're trying to link to is versionable content. \
-            When linking to versionable content, you must supply a version hash on the XorUrl. \
+            When linking to versionable content, you must supply a version hash on the url. \
             The requested topname was not registered.",
     ))
     .stderr(predicate::str::contains(
         "Please run the command again with the version hash appended to the link. \
-            The link should have the form safe://<xorurl>?v=<versionhash>.",
+            The link should have the form safe://<url>?v=<versionhash>.",
     ));
     Ok(())
 }
@@ -493,10 +493,10 @@ fn nrs_add_should_return_an_error_if_an_invalid_link_is_specified() -> Result<()
     safe_cmd(["nrs", "add", &public_name, "--link", "invalid"], Some(1))?
         .assert()
         .stderr(predicate::str::contains(
-            "The supplied link was not a valid XorUrl.",
+            "The supplied link was not a valid url.",
         ))
         .stderr(predicate::str::contains(
-            "Run the command again with a valid XorUrl for the --link argument.",
+            "Run the command again with a valid url for the --link argument.",
         ));
     Ok(())
 }
