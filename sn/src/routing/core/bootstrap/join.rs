@@ -32,7 +32,7 @@ use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof;
 use std::collections::BTreeMap;
-use tokio::time::sleep;
+// use tokio::time::sleep;
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
@@ -494,16 +494,16 @@ impl<'a> Join<'a> {
     ) -> Result<()> {
         if should_backoff {
             // use exponential backoff here to delay our responses and avoid any intensive join reqs
-            let next_wait = self.backoff.next_backoff();
+            let _next_wait = self.backoff.next_backoff();
 
-            if let Some(wait) = next_wait {
-                sleep(wait).await;
-            } else {
-                error!("Waiting before attempting to join again");
+            // if let Some(wait) = next_wait {
+            //     sleep(wait).await;
+            // } else {
+            //     error!("Waiting before attempting to join again");
 
-                sleep(self.backoff.max_interval).await;
-                self.backoff.reset();
-            }
+            //     sleep(self.backoff.max_interval).await;
+            //     self.backoff.reset();
+            // }
         }
 
         info!("Sending {:?} to {:?}", join_request, recipients);
