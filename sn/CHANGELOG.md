@@ -5,22 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.46.6 (2021-12-07)
+## v0.47.0 (2021-12-08)
+
+### New Features
+
+ - <csr-id-fd31bd2ef5ccc9149f8f0a2844c52af60bff3840/> use Vec of DataCmd instead of wrapper struct
+ - <csr-id-84ebec0e1b2b3e1107d673734125aadbdb108472/> upgrade batch to write ahead log with index
 
 ### Bug Fixes
 
- - <csr-id-ddde0d6767f5230eca7a760423538fa5e4f640a2/> order of target length in ElderConn error corrected
- - <csr-id-1ea33e0c63fead5097b57496b2fd997201a2c531/> keep trying even with connection error w/ always-joinable flag
- - <csr-id-8e480e5eb5cd38f9bfb3b723aa1d0dd5e4be3122/> aovid overwrite pervious session by  accident
- - <csr-id-fdc4ba6bb36dff85126c8273cdfc67f9b07e2175/> multiple fixes for DKG-AE
-   - discard DKG session info for older sessions
-   - skip DkgStart and DkgRetry messages for expired sessions
+ - <csr-id-58bd78e8a4fc34e7f76a9f449301b9216cb6a1d4/> complete the relocation flow
+
+### New Features (BREAKING)
+
+ - <csr-id-565e57619557e2b63f028eb214b59fc69b77fc37/> register op batching
+
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 5 calendar days.
+ - 5 commits contributed to the release.
  - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -31,6 +36,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - use Vec of DataCmd instead of wrapper struct ([`fd31bd2`](https://github.com/maidsafe/safe_network/commit/fd31bd2ef5ccc9149f8f0a2844c52af60bff3840))
+    - upgrade batch to write ahead log with index ([`84ebec0`](https://github.com/maidsafe/safe_network/commit/84ebec0e1b2b3e1107d673734125aadbdb108472))
+    - register op batching ([`565e576`](https://github.com/maidsafe/safe_network/commit/565e57619557e2b63f028eb214b59fc69b77fc37))
+    - checking Relocation during CI ([`7eda276`](https://github.com/maidsafe/safe_network/commit/7eda2760da82b3079d5eee2f97e2d15ac8da0d57))
+    - complete the relocation flow ([`58bd78e`](https://github.com/maidsafe/safe_network/commit/58bd78e8a4fc34e7f76a9f449301b9216cb6a1d4))
+</details>
+
+## v0.46.6 (2021-12-07)
+
+### Bug Fixes
+
+ - <csr-id-ddde0d6767f5230eca7a760423538fa5e4f640a2/> order of target length in ElderConn error corrected
+ - <csr-id-1ea33e0c63fead5097b57496b2fd997201a2c531/> keep trying even with connection error w/ always-joinable flag
+ - <csr-id-8e480e5eb5cd38f9bfb3b723aa1d0dd5e4be3122/> aovid overwrite pervious session by  accident
+ - <csr-id-fdc4ba6bb36dff85126c8273cdfc67f9b07e2175/> multiple fixes for DKG-AE
+   - discard DKG session info for older sessions
+- skip DkgStart and DkgRetry messages for expired sessions
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 5 calendar days.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.46.6 ([`b5e9dcc`](https://github.com/maidsafe/safe_network/commit/b5e9dcc5b13b1eda711d4760d9feb8dc929a0c43))
     - order of target length in ElderConn error corrected ([`ddde0d6`](https://github.com/maidsafe/safe_network/commit/ddde0d6767f5230eca7a760423538fa5e4f640a2))
     - keep trying even with connection error w/ always-joinable flag ([`1ea33e0`](https://github.com/maidsafe/safe_network/commit/1ea33e0c63fead5097b57496b2fd997201a2c531))
     - aovid overwrite pervious session by  accident ([`8e480e5`](https://github.com/maidsafe/safe_network/commit/8e480e5eb5cd38f9bfb3b723aa1d0dd5e4be3122))
@@ -46,7 +85,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-fdc4ba6bb36dff85126c8273cdfc67f9b07e2175/> multiple fixes for DKG-AE
    - discard DKG session info for older sessions
-- skip DkgStart and DkgRetry messages for expired sessions
 
 ### Commit Statistics
 
@@ -68,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo<csr-unknown/>
+skip DkgStart and DkgRetry messages for expired sessions<csr-unknown/>
 
 ## v0.46.4 (2021-12-02)
 
