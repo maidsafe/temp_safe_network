@@ -49,6 +49,41 @@ impl Core {
     ) -> Result<Vec<Command>> {
         debug!("Received {:?} from {}", join_request, peer);
 
+        // To avoid existing elders hanving different view of section members,
+        // JoinRequest for resource_proofing and aggregated NodeState
+        // shall be handled immediately without any semaphore or age check.
+
+        // If the joining node has aggregated shares from enough elders,
+        // verify the produced auth and accept it into the network.
+        if let Some(response) = join_request.aggregated {
+            if response.verify(&self.section_chain().await) {
+                info!("Handling Online agreement of {:?}", peer);
+                return Ok(vec![Command::HandleNewNodeOnline(response)]);
+                // self
+                // .handle_online_agreement(response.value.clone(), response.sig.clone())
+                // .await;
+            }
+        }
+
+        // Require resource signed if joining as a new node.
+        if let Some(response) = join_request.resource_proof_response {
+            if !self
+                .validate_resource_proof_response(&peer.name(), response)
+                .await
+            {
+                debug!(
+                    "Ignoring JoinRequest from {} - invalid resource signed response",
+                    peer
+                );
+                return Ok(vec![]);
+            } else {
+                return Ok(vec![Command::SendAcceptedOnlineShare {
+                    peer,
+                    previous_name: None,
+                }]);
+            }
+        }
+
         let _permit = self
             .current_joins_semaphore
             .acquire()
@@ -192,54 +227,23 @@ impl Core {
             ]);
         }
 
-        // If the joining node has aggregated shares from enough elders,
-        // verify the produced auth and accept it into the network.
-        if let Some(response) = join_request.aggregated {
-            if response.verify(&self.section_chain().await) {
-                info!("Handling Online agreement of {:?}", peer);
-                return Ok(vec![Command::HandleNewNodeOnline(response)]);
-                // self
-                // .handle_online_agreement(response.value.clone(), response.sig.clone())
-                // .await;
-            }
-        }
+        // Do reachability check only for the initial join request
+        let cmd = if self.comm.is_reachable(&peer.addr()).await.is_err() {
+            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+                JoinRejectionReason::NodeNotReachable(peer.addr()),
+            )));
 
-        // Require resource signed if joining as a new node.
-        if let Some(response) = join_request.resource_proof_response {
-            if !self
-                .validate_resource_proof_response(&peer.name(), response)
-                .await
-            {
-                debug!(
-                    "Ignoring JoinRequest from {} - invalid resource signed response",
-                    peer
-                );
-                return Ok(vec![]);
-            }
+            trace!("{}", LogMarker::SendJoinRejected);
+
+            trace!("Sending {:?} to {}", node_msg, peer);
+            self.send_direct_message(peer, node_msg, our_section_key)
+                .await?
         } else {
-            // Do reachability check only for the initial join request
-            let cmd = if self.comm.is_reachable(&peer.addr()).await.is_err() {
-                let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                    JoinRejectionReason::NodeNotReachable(peer.addr()),
-                )));
+            // It's reachable, let's then send the proof challenge
+            self.send_resource_proof_challenge(peer).await?
+        };
 
-                trace!("{}", LogMarker::SendJoinRejected);
-
-                trace!("Sending {:?} to {}", node_msg, peer);
-                self.send_direct_message(peer, node_msg, our_section_key)
-                    .await?
-            } else {
-                // It's reachable, let's then send the proof challenge
-                self.send_resource_proof_challenge(peer).await?
-            };
-
-            return Ok(vec![cmd]);
-        }
-
-        Ok(vec![Command::SendAcceptedOnlineShare {
-            peer,
-            previous_name: None,
-        }])
+        Ok(vec![cmd])
     }
 
     pub(crate) async fn handle_join_as_relocated_request(
