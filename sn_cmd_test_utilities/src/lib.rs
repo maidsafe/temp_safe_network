@@ -103,10 +103,15 @@ pub mod util {
             String::from(path.as_ref().to_str().unwrap())
         };
 
-        let files_container = safe_cmd_stdout(
-            ["files", "put", &final_path, "--recursive", "--json"],
-            Some(0),
-        )?;
+        let path = Path::new(&final_path);
+        let files_container = if path.is_dir() {
+            safe_cmd_stdout(
+                ["files", "put", &final_path, "--recursive", "--json"],
+                Some(0),
+            )?
+        } else {
+            safe_cmd_stdout(["files", "put", &final_path, "--json"], Some(0))?
+        };
         let (container_xorurl, file_map) = parse_files_put_or_sync_output(&files_container);
         Ok((container_xorurl, file_map, final_path))
     }

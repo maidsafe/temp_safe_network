@@ -139,10 +139,9 @@ fn nrs_create_should_return_an_error_if_an_invalid_link_is_specified() -> Result
     let topname = get_random_nrs_string();
     safe_cmd(["nrs", "create", &topname, "--link", "invalid"], Some(1))?
         .assert()
-        .stderr(predicate::str::contains(format!(
-            "Could not create topname {}. The supplied link was not a valid XorUrl.",
-            topname
-        )))
+        .stderr(predicate::str::contains(
+            "The supplied link was not a valid XorUrl.",
+        ))
         .stderr(predicate::str::contains(
             "Run the command again with a valid XorUrl for the --link argument.",
         ));
@@ -194,53 +193,334 @@ fn nrs_create_should_return_an_error_if_the_topname_already_exists() -> Result<(
     Ok(())
 }
 
+///
+/// `nrs add` subcommand
+///
+/// Note: these tests will also not verify that correct content has been linked to, with the
+/// exception of one.
+
 #[test]
-fn calling_safe_nrs_add_with_y_but_name_already_exists() -> Result<()> {
+fn nrs_add_should_add_a_subname_to_versioned_content() -> Result<()> {
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let test_md_file = tmp_data_path.child("test.md");
+    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path("test.md");
+
     let test_name = get_random_nrs_string();
-    let fake_target = gen_fake_target()?;
-
+    let public_name = format!("test.{}", &test_name);
     safe_cmd(["nrs", "create", &test_name], Some(0))?;
-
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec![
-        "nrs",
-        "add",
-        &test_name,
-        "-l",
-        &fake_target,
-        "--create-top-name", // long for "-y"
-    ])
+    safe_cmd(
+        ["nrs", "add", &public_name, "--link", &url.to_string()],
+        Some(0),
+    )?
     .assert()
     .stdout(predicate::str::contains("Existing NRS Map updated"))
-    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(2))
-    .stdout(predicate::str::contains(fake_target).count(1))
-    .stdout(predicate::str::contains("+").count(1))
-    .success();
+    .stdout(predicate::str::contains("+"))
+    .stdout(predicate::str::contains(public_name))
+    .stdout(predicate::str::contains(url.to_string()));
 
     Ok(())
 }
 
 #[test]
-fn calling_safe_nrs_with_y_but_name_doesnt_exist() -> Result<()> {
-    let test_name = get_random_nrs_string();
-    let fake_target = gen_fake_target()?;
+fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let test_md_file = tmp_data_path.child("test.md");
+    let (_, processed_files, _) = upload_path(&test_md_file, false)?;
+    let test_md_entry = processed_files.iter().last().unwrap();
+    let test_md_blob_link = test_md_entry.1.to_owned().1;
+    let url = Url::from_url(&test_md_blob_link)?;
 
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec![
-        "nrs",
-        "add",
-        &test_name,
-        "-l",
-        &fake_target,
-        "--create-top-name", // long for "-y"
-    ])
+    let test_name = get_random_nrs_string();
+    let public_name = format!("test.{}", &test_name);
+    safe_cmd(["nrs", "create", &test_name], Some(0))?;
+    safe_cmd(
+        ["nrs", "add", &public_name, "--link", &url.to_string()],
+        Some(0),
+    )?
+    .assert()
+    .stdout(predicate::str::contains("Existing NRS Map updated"))
+    .stdout(predicate::str::contains("+"))
+    .stdout(predicate::str::contains(public_name))
+    .stdout(predicate::str::contains(url.to_string()));
+
+    Ok(())
+}
+
+#[test]
+fn nrs_add_should_add_a_subname_and_set_it_as_the_default_for_the_topname() -> Result<()> {
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let test_md_file = tmp_data_path.child("test.md");
+    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path("test.md");
+
+    let topname = get_random_nrs_string();
+    let public_name = format!("test.{}", &topname);
+    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &url.to_string(),
+            "--default",
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stdout(predicate::str::contains("Existing NRS Map updated"))
+    .stdout(predicate::str::contains(format!(
+        "This link was also set as the default location for {}",
+        topname
+    )))
+    .stdout(predicate::str::contains("+"))
+    .stdout(predicate::str::contains(&public_name))
+    .stdout(predicate::str::contains(url.to_string()));
+
+    // In this particular test, we will verify the content linked to, because it's the
+    // responsibility of the CLI to make sure the correct link is passed to associate the topname
+    // with that link.
+    let subname_output = safe_cmd(["cat", &public_name], Some(0))?;
+    let topname_output = safe_cmd(["cat", &topname], Some(0))?;
+    assert_eq!(subname_output, topname_output);
+
+    Ok(())
+}
+
+#[test]
+fn nrs_add_should_add_a_subname_and_a_new_topname() -> Result<()> {
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let test_md_file = tmp_data_path.child("test.md");
+    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path("test.md");
+
+    let test_name = get_random_nrs_string();
+    let public_name = format!("test.{}", &test_name);
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &url.to_string(),
+            "--create-top-name",
+        ],
+        Some(0),
+    )?
     .assert()
     .stdout(predicate::str::contains("New NRS Map created"))
-    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(2))
-    .stdout(predicate::str::contains(fake_target).count(1))
-    .stdout(predicate::str::contains("+").count(1))
-    .success();
+    .stdout(predicate::str::contains("+"))
+    .stdout(predicate::str::contains(public_name))
+    .stdout(predicate::str::contains(url.to_string()));
 
+    Ok(())
+}
+
+#[test]
+fn nrs_add_should_add_a_subname_and_behave_idempotently_for_existing_topname() -> Result<()> {
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let test_md_file = tmp_data_path.child("test.md");
+    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path("test.md");
+
+    let test_name = get_random_nrs_string();
+    let public_name = format!("test.{}", &test_name);
+    safe_cmd(["nrs", "create", &test_name], Some(0))?;
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &url.to_string(),
+            "--create-top-name",
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stdout(predicate::str::contains("Existing NRS Map updated"))
+    .stdout(predicate::str::contains("+"))
+    .stdout(predicate::str::contains(public_name))
+    .stdout(predicate::str::contains(url.to_string()));
+
+    Ok(())
+}
+
+#[test]
+fn nrs_add_should_update_an_existing_subname() -> Result<()> {
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let test_md_file = tmp_data_path.child("test.md");
+    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let mut test_md_url = Url::from_url(&files_container_xor)?;
+    test_md_url.set_path("test.md");
+    let mut another_md_url = Url::from_url(&files_container_xor)?;
+    another_md_url.set_path("another.md");
+
+    let test_name = get_random_nrs_string();
+    let public_name = format!("test.{}", &test_name);
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &test_md_url.to_string(),
+            "--create-top-name",
+        ],
+        Some(0),
+    )?;
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &another_md_url.to_string(),
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stdout(predicate::str::contains("Existing NRS Map updated"))
+    .stdout(predicate::str::contains("+"))
+    .stdout(predicate::str::contains(public_name))
+    .stdout(predicate::str::contains(another_md_url.to_string()));
+
+    Ok(())
+}
+
+#[test]
+fn nrs_add_should_return_an_error_if_link_to_versioned_content_has_no_version() -> Result<()> {
+    let with_trailing_slash = true;
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&tmp_data_path, with_trailing_slash)?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path("test.md");
+    url.set_content_version(None);
+
+    let topname = get_random_nrs_string();
+    let public_name = format!("test.{}", &topname);
+    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(
+        ["nrs", "add", &public_name, "--link", &url.to_string()],
+        Some(1),
+    )?
+    .assert()
+    .stderr(predicate::str::contains(
+        "The destination you're trying to link to is versionable content. \
+            When linking to versionable content, you must supply a version hash on the XorUrl. \
+            The requested topname was not created.",
+    ))
+    .stderr(predicate::str::contains(
+        "Please run the command again with the version hash appended to the link. \
+            The link should have the form safe://<xorurl>?v=<versionhash>.",
+    ));
+    Ok(())
+}
+
+#[test]
+fn nrs_add_with_create_top_name_should_return_an_error_if_link_to_versioned_content_has_no_version(
+) -> Result<()> {
+    let with_trailing_slash = true;
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&tmp_data_path, with_trailing_slash)?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path("test.md");
+    url.set_content_version(None);
+
+    let topname = get_random_nrs_string();
+    let public_name = format!("test.{}", &topname);
+    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &url.to_string(),
+            "--create-top-name",
+        ],
+        Some(1),
+    )?
+    .assert()
+    .stderr(predicate::str::contains(
+        "The destination you're trying to link to is versionable content. \
+            When linking to versionable content, you must supply a version hash on the XorUrl. \
+            The requested topname was not created.",
+    ))
+    .stderr(predicate::str::contains(
+        "Please run the command again with the version hash appended to the link. \
+            The link should have the form safe://<xorurl>?v=<versionhash>.",
+    ));
+    Ok(())
+}
+
+#[test]
+fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_no_version(
+) -> Result<()> {
+    let with_trailing_slash = true;
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&tmp_data_path, with_trailing_slash)?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path("test.md");
+    url.set_content_version(None);
+
+    let topname = get_random_nrs_string();
+    let public_name = format!("test.{}", &topname);
+    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &url.to_string(),
+            "--default",
+        ],
+        Some(1),
+    )?
+    .assert()
+    .stderr(predicate::str::contains(
+        "The destination you're trying to link to is versionable content. \
+            When linking to versionable content, you must supply a version hash on the XorUrl. \
+            The requested topname was not created.",
+    ))
+    .stderr(predicate::str::contains(
+        "Please run the command again with the version hash appended to the link. \
+            The link should have the form safe://<xorurl>?v=<versionhash>.",
+    ));
+    Ok(())
+}
+
+#[test]
+fn nrs_add_should_return_an_error_if_an_invalid_link_is_specified() -> Result<()> {
+    let topname = get_random_nrs_string();
+    let public_name = format!("test.{}", &topname);
+    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(["nrs", "add", &public_name, "--link", "invalid"], Some(1))?
+        .assert()
+        .stderr(predicate::str::contains(
+            "The supplied link was not a valid XorUrl.",
+        ))
+        .stderr(predicate::str::contains(
+            "Run the command again with a valid XorUrl for the --link argument.",
+        ));
     Ok(())
 }
 
