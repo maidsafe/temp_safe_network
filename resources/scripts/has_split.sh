@@ -20,12 +20,28 @@ prefix1_new_elder_nodes=$(rg "PromotedToElder: Prefix\(1\)" "$log_dir" -g "*.log
 prefix0_prior_elder_nodes=$(rg "StillElderAfterSplit: Prefix\(0\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
 prefix0_new_elder_nodes=$(rg "PromotedToElder: Prefix\(0\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
 split_count=$(rg "SplitSuccess" "$log_dir" -g "*.log.*"  -u -c | wc -l)
+relocation_start_nodes=$(rg "RelocateStart" "$log_dir" -g "*.log.*"  -u -c | wc -l)
+relocation_end_nodes=$(rg "RelocateEnd" "$log_dir" -g "*.log.*"  -u -c | wc -l)
 
 echo "Prefix(1) prior nodes found: $prefix1_prior_elder_nodes ."
 echo "Prefix(1) new nodes found: $prefix1_new_elder_nodes ."
 echo "Prefix(0) prior nodes found: $prefix0_prior_elder_nodes ."
 echo "Prefix(0) new nodes found: $prefix0_new_elder_nodes ."
+echo "Relocation start nodes found: $relocation_start_nodes ."
+echo "Relocation end nodes found: $relocation_end_nodes ."
 echo "split_count: $split_count ."
+
+# With ElderSize=7 and NetworkSize=33, high chance there will be no relocation happens
+# With ElderSize=7 and NetworkSize=45, high chance there will be relocation happens
+# With ElderSize=5 and NetworkSize=33, high chance there will be relocation happens
+# With ElderSize=5 and NetworkSize=45, high chance there will be relocation and split into prefix(XX)
+if ! [[ $relocation_start_nodes -eq $relocation_end_nodes ]]
+    then
+        echo "Some relocations were not completed successfully!"
+        exit 100
+    else
+        echo "All relocations completed successfully!"
+fi
 
 total_prefix0_elders=$(($prefix0_new_elder_nodes + $prefix0_prior_elder_nodes))
 total_prefix1_elders=$(($prefix1_new_elder_nodes + $prefix1_prior_elder_nodes))

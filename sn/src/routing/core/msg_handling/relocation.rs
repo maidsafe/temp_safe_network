@@ -15,6 +15,7 @@ use crate::messaging::{
 use crate::routing::{
     core::{bootstrap::JoiningAsRelocated, Proposal},
     error::Result,
+    log_markers::LogMarker,
     relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
     routing_api::command::Command,
     Event, Peer,
@@ -124,7 +125,7 @@ impl Core {
             }
             Some(RelocateState::Delayed(_)) => (),
             None => {
-                trace!("RelocationStarted");
+                trace!("{}", LogMarker::RelocateStart);
                 self.send_event(Event::RelocationStarted {
                     previous_name: self.node.read().await.name(),
                 })
