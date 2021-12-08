@@ -316,10 +316,16 @@ impl Core {
     }
 
     // Used to fetch the list of holders for a given chunk.
+    #[instrument(skip(self))]
     pub(crate) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
+        debug!("Getting chunk holders");
         let full_adults = self.full_adults().await;
+
+        debug!("Full adult count: {:?}", full_adults.len());
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults().await;
+
+        debug!("all adults len in general.... {:?}", adults.len());
 
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
