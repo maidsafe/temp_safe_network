@@ -13,7 +13,7 @@ use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::{resolver::ContentType, DataAddress, Scope, Url, XorUrlBase};
 use sn_cmd_test_utilities::util::{
-    get_random_nrs_string, parse_nrs_create_output, safe_cmd, safe_cmd_stdout, safeurl_from,
+    get_random_nrs_string, parse_nrs_register_output, safe_cmd, safe_cmd_stdout, safeurl_from,
     upload_path, upload_test_folder, CLI, SAFE_PROTOCOL,
 };
 use std::process::Command;
@@ -38,7 +38,7 @@ fn gen_fake_target() -> Result<String> {
 }
 
 ///
-/// `nrs create` subcommand
+/// `nrs register` subcommand
 ///
 /// Note: these CLI tests will *not* verify that NRS has linked to the correct content. For
 /// example, if you create an NRS link to <something>/README.md, we're not going to perform a `cat`
@@ -47,9 +47,9 @@ fn gen_fake_target() -> Result<String> {
 /// assumption in these tests that `nrs_associate` links to the correct content.
 
 #[test]
-fn nrs_create_should_create_a_topname() -> Result<()> {
+fn nrs_register_should_register_a_topname() -> Result<()> {
     let topname = get_random_nrs_string();
-    safe_cmd(["nrs", "create", &topname], Some(0))?
+    safe_cmd(["nrs", "register", &topname], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
             "New NRS Map created for \"safe://{}\"",
@@ -59,7 +59,7 @@ fn nrs_create_should_create_a_topname() -> Result<()> {
 }
 
 #[test]
-fn nrs_create_should_create_a_topname_with_a_versioned_content_link() -> Result<()> {
+fn nrs_register_should_register_a_topname_with_a_versioned_content_link() -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
@@ -70,7 +70,7 @@ fn nrs_create_should_create_a_topname_with_a_versioned_content_link() -> Result<
 
     let topname = get_random_nrs_string();
     safe_cmd(
-        ["nrs", "create", &topname, "--link", &url.to_string()],
+        ["nrs", "register", &topname, "--link", &url.to_string()],
         Some(0),
     )?
     .assert()
@@ -86,7 +86,7 @@ fn nrs_create_should_create_a_topname_with_a_versioned_content_link() -> Result<
 }
 
 #[test]
-fn nrs_create_should_create_a_topname_with_an_immutable_content_link() -> Result<()> {
+fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
@@ -99,7 +99,7 @@ fn nrs_create_should_create_a_topname_with_an_immutable_content_link() -> Result
 
     let topname = get_random_nrs_string();
     safe_cmd(
-        ["nrs", "create", &topname, "--link", &url.to_string()],
+        ["nrs", "register", &topname, "--link", &url.to_string()],
         Some(0),
     )?
     .assert()
@@ -115,29 +115,29 @@ fn nrs_create_should_create_a_topname_with_an_immutable_content_link() -> Result
 }
 
 #[test]
-fn nrs_create_should_return_an_error_if_a_subname_is_specified() -> Result<()> {
+fn nrs_register_should_return_an_error_if_a_subname_is_specified() -> Result<()> {
     let name = format!("a.{}", get_random_nrs_string());
-    safe_cmd(["nrs", "create", &name], Some(1))?
+    safe_cmd(["nrs", "register", &name], Some(1))?
         .assert()
         .stderr(predicate::str::contains(
-            "The create command can only create a topname, \
-            it cannot create subnames.",
+            "The register command can only register a topname, \
+            it cannot add subnames.",
         ))
         .stderr(predicate::str::contains(
-            "Please use the nrs add command with the --create-top-name \
-            argument to create a topname and add a subname at the same time.",
+            "Please use the nrs add command with the --register-top-name \
+            argument to register a topname and add a subname at the same time.",
         ))
         .stderr(predicate::str::contains(
-            "Alternatively, create the topname first with the create command, \
-            then use the add command to create the subname.",
+            "Alternatively, register the topname first with the register command, \
+            then use the add command to add the subname.",
         ));
     Ok(())
 }
 
 #[test]
-fn nrs_create_should_return_an_error_if_an_invalid_link_is_specified() -> Result<()> {
+fn nrs_register_should_return_an_error_if_an_invalid_link_is_specified() -> Result<()> {
     let topname = get_random_nrs_string();
-    safe_cmd(["nrs", "create", &topname, "--link", "invalid"], Some(1))?
+    safe_cmd(["nrs", "register", &topname, "--link", "invalid"], Some(1))?
         .assert()
         .stderr(predicate::str::contains(
             "The supplied link was not a valid XorUrl.",
@@ -149,7 +149,7 @@ fn nrs_create_should_return_an_error_if_an_invalid_link_is_specified() -> Result
 }
 
 #[test]
-fn nrs_create_should_return_an_error_if_link_to_versioned_content_has_no_version() -> Result<()> {
+fn nrs_register_should_return_an_error_if_link_to_versioned_content_has_no_version() -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
@@ -161,14 +161,14 @@ fn nrs_create_should_return_an_error_if_link_to_versioned_content_has_no_version
 
     let topname = get_random_nrs_string();
     safe_cmd(
-        ["nrs", "create", &topname, "--link", &url.to_string()],
+        ["nrs", "register", &topname, "--link", &url.to_string()],
         Some(1),
     )?
     .assert()
     .stderr(predicate::str::contains(
         "The destination you're trying to link to is versionable content. \
             When linking to versionable content, you must supply a version hash on the XorUrl. \
-            The requested topname was not created.",
+            The requested topname was not registered.",
     ))
     .stderr(predicate::str::contains(
         "Please run the command again with the version hash appended to the link. \
@@ -178,13 +178,13 @@ fn nrs_create_should_return_an_error_if_link_to_versioned_content_has_no_version
 }
 
 #[test]
-fn nrs_create_should_return_an_error_if_the_topname_already_exists() -> Result<()> {
+fn nrs_register_should_return_an_error_if_the_topname_already_exists() -> Result<()> {
     let topname = get_random_nrs_string();
-    safe_cmd(["nrs", "create", &topname], Some(0))?;
-    safe_cmd(["nrs", "create", &topname], Some(1))?
+    safe_cmd(["nrs", "register", &topname], Some(0))?;
+    safe_cmd(["nrs", "register", &topname], Some(1))?
         .assert()
         .stderr(predicate::str::contains(format!(
-            "Could not create topname {}. That name is already taken.",
+            "Could not register topname {}. That name is already taken.",
             topname
         )))
         .stderr(predicate::str::contains(
@@ -210,7 +210,7 @@ fn nrs_add_should_add_a_subname_to_versioned_content() -> Result<()> {
 
     let test_name = get_random_nrs_string();
     let public_name = format!("test.{}", &test_name);
-    safe_cmd(["nrs", "create", &test_name], Some(0))?;
+    safe_cmd(["nrs", "register", &test_name], Some(0))?;
     safe_cmd(
         ["nrs", "add", &public_name, "--link", &url.to_string()],
         Some(0),
@@ -236,7 +236,7 @@ fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
 
     let test_name = get_random_nrs_string();
     let public_name = format!("test.{}", &test_name);
-    safe_cmd(["nrs", "create", &test_name], Some(0))?;
+    safe_cmd(["nrs", "register", &test_name], Some(0))?;
     safe_cmd(
         ["nrs", "add", &public_name, "--link", &url.to_string()],
         Some(0),
@@ -261,7 +261,7 @@ fn nrs_add_should_add_a_subname_and_set_it_as_the_default_for_the_topname() -> R
 
     let topname = get_random_nrs_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(
         [
             "nrs",
@@ -311,7 +311,7 @@ fn nrs_add_should_add_a_subname_and_a_new_topname() -> Result<()> {
             &public_name,
             "--link",
             &url.to_string(),
-            "--create-top-name",
+            "--register-top-name",
         ],
         Some(0),
     )?
@@ -335,7 +335,7 @@ fn nrs_add_should_add_a_subname_and_behave_idempotently_for_existing_topname() -
 
     let test_name = get_random_nrs_string();
     let public_name = format!("test.{}", &test_name);
-    safe_cmd(["nrs", "create", &test_name], Some(0))?;
+    safe_cmd(["nrs", "register", &test_name], Some(0))?;
     safe_cmd(
         [
             "nrs",
@@ -343,7 +343,7 @@ fn nrs_add_should_add_a_subname_and_behave_idempotently_for_existing_topname() -
             &public_name,
             "--link",
             &url.to_string(),
-            "--create-top-name",
+            "--register-top-name",
         ],
         Some(0),
     )?
@@ -376,7 +376,7 @@ fn nrs_add_should_update_an_existing_subname() -> Result<()> {
             &public_name,
             "--link",
             &test_md_url.to_string(),
-            "--create-top-name",
+            "--register-top-name",
         ],
         Some(0),
     )?;
@@ -412,7 +412,7 @@ fn nrs_add_should_return_an_error_if_link_to_versioned_content_has_no_version() 
 
     let topname = get_random_nrs_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(
         ["nrs", "add", &public_name, "--link", &url.to_string()],
         Some(1),
@@ -421,7 +421,7 @@ fn nrs_add_should_return_an_error_if_link_to_versioned_content_has_no_version() 
     .stderr(predicate::str::contains(
         "The destination you're trying to link to is versionable content. \
             When linking to versionable content, you must supply a version hash on the XorUrl. \
-            The requested topname was not created.",
+            The requested topname was not registered.",
     ))
     .stderr(predicate::str::contains(
         "Please run the command again with the version hash appended to the link. \
@@ -431,7 +431,7 @@ fn nrs_add_should_return_an_error_if_link_to_versioned_content_has_no_version() 
 }
 
 #[test]
-fn nrs_add_with_create_top_name_should_return_an_error_if_link_to_versioned_content_has_no_version(
+fn nrs_add_with_register_top_name_should_return_an_error_if_link_to_versioned_content_has_no_version(
 ) -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -444,7 +444,7 @@ fn nrs_add_with_create_top_name_should_return_an_error_if_link_to_versioned_cont
 
     let topname = get_random_nrs_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(
         [
             "nrs",
@@ -452,7 +452,7 @@ fn nrs_add_with_create_top_name_should_return_an_error_if_link_to_versioned_cont
             &public_name,
             "--link",
             &url.to_string(),
-            "--create-top-name",
+            "--register-top-name",
         ],
         Some(1),
     )?
@@ -460,7 +460,7 @@ fn nrs_add_with_create_top_name_should_return_an_error_if_link_to_versioned_cont
     .stderr(predicate::str::contains(
         "The destination you're trying to link to is versionable content. \
             When linking to versionable content, you must supply a version hash on the XorUrl. \
-            The requested topname was not created.",
+            The requested topname was not registered.",
     ))
     .stderr(predicate::str::contains(
         "Please run the command again with the version hash appended to the link. \
@@ -483,7 +483,7 @@ fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_
 
     let topname = get_random_nrs_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(
         [
             "nrs",
@@ -499,7 +499,7 @@ fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_
     .stderr(predicate::str::contains(
         "The destination you're trying to link to is versionable content. \
             When linking to versionable content, you must supply a version hash on the XorUrl. \
-            The requested topname was not created.",
+            The requested topname was not registered.",
     ))
     .stderr(predicate::str::contains(
         "Please run the command again with the version hash appended to the link. \
@@ -512,7 +512,7 @@ fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_
 fn nrs_add_should_return_an_error_if_an_invalid_link_is_specified() -> Result<()> {
     let topname = get_random_nrs_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "create", &topname], Some(0))?;
+    safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(["nrs", "add", &public_name, "--link", "invalid"], Some(1))?
         .assert()
         .stderr(predicate::str::contains(
@@ -545,7 +545,7 @@ fn nrs_remove_should_remove_a_subname() -> Result<()> {
             &public_name,
             "--link",
             &url.to_string(),
-            "--create-top-name",
+            "--register-top-name",
         ],
         Some(0),
     )?;
@@ -580,6 +580,7 @@ fn nrs_remove_should_return_an_error_for_a_non_existent_topname() -> Result<()> 
 }
 
 #[test]
+#[ignore]
 fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
     let (container_xorurl, _map) = upload_test_folder(true)?;
     let container_url = Url::from_url(&container_xorurl)?;
@@ -588,7 +589,7 @@ fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
     let output = safe_cmd_stdout(
         [
             "nrs",
-            "create",
+            "register",
             nrs_url.public_name(),
             "-l",
             &container_url.to_string(),
@@ -601,7 +602,7 @@ fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
     assert!(output.contains('+'));
     assert!(output.contains(&nrs_url.public_name()));
 
-    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&output);
+    let (nrs_map_xorurl, _change_map) = parse_nrs_register_output(&output);
     let version = container_url.content_version().unwrap();
 
     let output = safe_cmd_stdout(["cat", &nrs_map_xorurl.to_string()], Some(0))?;
@@ -634,7 +635,7 @@ fn calling_safe_nrs_put_no_top_default_fetch() -> Result<()> {
     safeurl.set_path("/test.md");
     let link = safeurl.to_string();
     safe_cmd(
-        ["nrs", "create", &test_name1, "-l", &link, "--json"],
+        ["nrs", "register", &test_name1, "-l", &link, "--json"],
         Some(0),
     )?;
 
@@ -660,7 +661,7 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() -> Result<()> {
     let output = safe_cmd_stdout(
         [
             "nrs",
-            "create",
+            "register",
             nrs_url.public_name(),
             "-l",
             &container_xorurl.to_string(),
@@ -674,7 +675,7 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() -> Result<()> {
     assert!(output.contains('+'));
     assert!(output.contains(&nrs_url.public_name()));
 
-    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&output);
+    let (nrs_map_xorurl, _change_map) = parse_nrs_register_output(&output);
     let version = container_xorurl.content_version().unwrap();
 
     let output = safe_cmd_stdout(["cat", &nrs_map_xorurl.to_string()], Some(0))?;
@@ -704,7 +705,7 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
     let output = safe_cmd_stdout(
         [
             "nrs",
-            "create",
+            "register",
             nrs_url.public_name(),
             "-l",
             &container_xorurl,
@@ -718,7 +719,7 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
     assert!(output.contains('+'));
     assert!(output.contains(&nrs_url.public_name()));
 
-    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&output);
+    let (nrs_map_xorurl, _change_map) = parse_nrs_register_output(&output);
     let url = Url::from_url(&container_xorurl)?;
     let version = url.content_version().unwrap();
     let output = safe_cmd_stdout(["cat", &nrs_map_xorurl.to_string()], Some(0))?;
@@ -754,7 +755,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Resul
     safe_cmd(
         [
             "nrs",
-            "create",
+            "register",
             &test_name_w_sub,
             "-l",
             another_md_xor,
@@ -808,7 +809,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result
     safe_cmd(
         [
             "nrs",
-            "create",
+            "register",
             &test_name_w_sub,
             "-l",
             another_md_xor,
@@ -856,7 +857,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
     safe_cmd(
         [
             "nrs",
-            "create",
+            "register",
             &test_name_w_sub,
             "-l",
             another_md_xor,
