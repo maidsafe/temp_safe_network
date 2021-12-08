@@ -176,9 +176,8 @@ async fn run_add_subcommand(
     summary_header.push_str(&format!("Now at version {}. ", version));
 
     if default {
-        let mut parts = name.split('.');
-        let topname = parts.next_back().unwrap();
-        associate_url_with_public_name(topname, safe, &link_url, dry_run).await?;
+        let topname = get_topname_from_public_name(&name)?;
+        associate_url_with_public_name(&topname, safe, &link_url, dry_run).await?;
         summary_header.push_str(&format!(
             "This link was also set as the default location for {}.",
             topname
@@ -220,8 +219,7 @@ async fn run_remove_subcommand(
             // Although obviously, this error could occur due to a general connectivity issue,
             // which is why the error message advises that the topname is "likely" not registered.
             NetDataError(_) => {
-                let mut parts = name.split('.');
-                let topname = parts.next_back().unwrap();
+                let topname = get_topname_from_public_name(&name)?;
                 Err(eyre!(error)
                     .wrap_err(format!(
                         "Failed to remove {}. The topname {} is likely not registered in Safe NRS.",
@@ -237,14 +235,14 @@ async fn run_remove_subcommand(
     }
 }
 
-/// Determine if the link is a valid XorUrl *before* creating the topname.
+/// Determine if the link is a valid url *before* creating the topname.
 ///
 /// Otherwise the user receives an error even though the topname was actually registerd, which is a
 /// potentially confusing experience: they may think the topname wasn't registerd.
 fn validate_target_link(link: &str) -> Result<()> {
     Url::from_url(link)
-        .wrap_err("The supplied link was not a valid XorUrl.")
-        .suggestion("Run the command again with a valid XorUrl for the --link argument.")?;
+        .wrap_err("The supplied link was not a valid url.")
+        .suggestion("Run the command again with a valid url for the --link argument.")?;
     Ok(())
 }
 
@@ -281,11 +279,11 @@ async fn associate_url_with_public_name(
                 .wrap_err(
                     "The destination you're trying to link to is versionable content. \
                         When linking to versionable content, you must supply a version hash on the \
-                        XorUrl. The requested topname was not registered.",
+                        url. The requested topname was not registered.",
                 )
                 .suggestion(
                     "Please run the command again with the version hash appended to the link. \
-                            The link should have the form safe://<xorurl>?v=<versionhash>.",
+                            The link should have the form safe://<url>?v=<versionhash>.",
                 )),
             _ => Err(eyre!(error)),
         },
@@ -305,11 +303,11 @@ async fn add_public_name_for_url(
                 .wrap_err(
                     "The destination you're trying to link to is versionable content. \
                         When linking to versionable content, you must supply a version hash on the \
-                        XorUrl. The requested topname was not registered.",
+                        url. The requested topname was not registered.",
                 )
                 .suggestion(
                     "Please run the command again with the version hash appended to the link. \
-                            The link should have the form safe://<xorurl>?v=<versionhash>.",
+                            The link should have the form safe://<url>?v=<versionhash>.",
                 )),
             _ => Err(eyre!(error)),
         },
@@ -344,4 +342,18 @@ fn print_summary(
             serialise_output(&(nrs_url, processed_entry), output_fmt)
         );
     }
+}
+
+fn get_topname_from_public_name(public_name: &str) -> Result<String> {
+    let mut parts = public_name.split('.');
+    let topname = parts
+        .next_back()
+        .ok_or_else(|| {
+            eyre!(format!(
+                "Could not parse topname from public name {}",
+                public_name
+            ))
+        })?
+        .to_string();
+    Ok(topname)
 }
