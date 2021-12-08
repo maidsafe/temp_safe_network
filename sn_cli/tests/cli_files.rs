@@ -11,7 +11,7 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Report, Result};
 use predicates::prelude::*;
-use sn_api::{Url, VersionHash};
+use sn_api::{SafeUrl, VersionHash};
 use sn_cmd_test_utilities::util::{
     get_directory_file_count, get_directory_len, get_file_len, get_random_nrs_string,
     mk_emptyfolder, parse_files_container_output, parse_files_put_or_sync_output,
@@ -234,7 +234,7 @@ fn calling_safe_files_sync() -> Result<()> {
     let versioned_xorurl =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let mut url = Url::from_url(versioned_xorurl)?;
+    let mut url = SafeUrl::from_url(versioned_xorurl)?;
     url.set_content_version(None);
     let subfolder_dir = tmp_data_dir.child("subfolder");
     safe_cmd(
@@ -249,7 +249,7 @@ fn calling_safe_files_sync() -> Result<()> {
     )?;
 
     // The original content should be overwritten with the sync of the subfolder.
-    let mut url = Url::from_url(versioned_xorurl)?;
+    let mut url = SafeUrl::from_url(versioned_xorurl)?;
     url.set_path("/subexists.md");
     url.set_content_version(None);
     let output = safe_cmd_stdout(["cat", &url.to_string()], Some(0))?;
@@ -375,7 +375,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -
     let subexists_file_content = std::fs::read_to_string(subexists_file.path())?;
     std::fs::remove_file(subexists_file.path()).map_err(|e| eyre!(e.to_string()))?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     let output = safe_cmd_stdout(
         [
@@ -406,7 +406,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
     let (files_container_xor, processed_files, _) =
         upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     let version = url.content_version().unwrap();
     let orig_directory_file_count = get_directory_file_count(&tmp_data_dir)?;
     assert_eq!(processed_files.len(), orig_directory_file_count);
@@ -555,7 +555,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
     )?;
 
     // The current version should now only have the empty folder entry.
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     let output = safe_cmd_stdout(["cat", &url.to_string(), "--json"], Some(0))?;
     let (_, files_map) = parse_files_container_output(&output);

@@ -10,7 +10,7 @@
 use super::{Error, Result};
 use tracing::debug;
 use uhttp_uri::HttpUri;
-use url::Url as RustUrl;
+use url::Url;
 
 const URL_SCHEME: &str = "safe";
 
@@ -88,7 +88,7 @@ impl UrlParts {
         // (see below) we use a different parser to avoid normalization.
         // Parsing twice is inefficient, so there is room for improvement
         // later to standardize on a single parser.
-        let parsing_url = RustUrl::parse(url).map_err(|parse_err| {
+        let parsing_url = Url::parse(url).map_err(|parse_err| {
             let msg = format!("Problem parsing the URL \"{}\": {}", url, parse_err);
             Error::InvalidXorUrl(msg)
         })?;

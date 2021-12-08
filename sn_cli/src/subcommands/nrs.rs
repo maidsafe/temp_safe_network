@@ -14,7 +14,7 @@ use super::{
 use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
 use prettytable::{format::FormatBuilder, Table};
 use sn_api::Error::{InvalidInput, NetDataError, NrsNameAlreadyExists, UnversionedContentError};
-use sn_api::{Safe, Url};
+use sn_api::{Safe, SafeUrl};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -153,7 +153,7 @@ async fn run_add_subcommand(
 ) -> Result<()> {
     let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
     validate_target_link(&link)?;
-    let link_url = Url::from_url(&link)?;
+    let link_url = SafeUrl::from_url(&link)?;
     let (url, topname_was_registered) = if register_top_name {
         add_public_name_for_url(&name, safe, &link_url, dry_run).await?
     } else {
@@ -171,7 +171,7 @@ async fn run_add_subcommand(
     }
     let version = url
         .content_version()
-        .ok_or_else(|| eyre!("Content version not set for returned NRS Url"))?
+        .ok_or_else(|| eyre!("Content version not set for returned NRS SafeUrl"))?
         .to_string();
     summary_header.push_str(&format!("Now at version {}. ", version));
 
@@ -203,7 +203,7 @@ async fn run_remove_subcommand(
         Ok(url) => {
             let version = url
                 .content_version()
-                .ok_or_else(|| eyre!("Content version not set for returned NRS Url"))?
+                .ok_or_else(|| eyre!("Content version not set for returned NRS SafeUrl"))?
                 .to_string();
             print_summary(
                 output_fmt,
@@ -240,7 +240,7 @@ async fn run_remove_subcommand(
 /// Otherwise the user receives an error even though the topname was actually registerd, which is a
 /// potentially confusing experience: they may think the topname wasn't registerd.
 fn validate_target_link(link: &str) -> Result<()> {
-    Url::from_url(link)
+    SafeUrl::from_url(link)
         .wrap_err("The supplied link was not a valid url.")
         .suggestion("Run the command again with a valid url for the --link argument.")?;
     Ok(())
@@ -254,12 +254,12 @@ fn validate_target_link(link: &str) -> Result<()> {
 async fn get_new_nrs_url_for_topname(
     name: &str,
     safe: &mut Safe,
-    topname_url: Url,
+    topname_url: SafeUrl,
     link: Option<String>,
     dry_run: bool,
-) -> Result<(Url, String)> {
+) -> Result<(SafeUrl, String)> {
     if let Some(link) = link {
-        let url = Url::from_url(&link)?;
+        let url = SafeUrl::from_url(&link)?;
         let new_url = associate_url_with_public_name(name, safe, &url, dry_run).await?;
         return Ok((new_url, format!("The entry points to {}", link)));
     }
@@ -269,9 +269,9 @@ async fn get_new_nrs_url_for_topname(
 async fn associate_url_with_public_name(
     public_name: &str,
     safe: &mut Safe,
-    url: &Url,
+    url: &SafeUrl,
     dry_run: bool,
-) -> Result<Url> {
+) -> Result<SafeUrl> {
     match safe.nrs_associate(public_name, url, dry_run).await {
         Ok(new_url) => Ok(new_url),
         Err(error) => match error {
@@ -293,9 +293,9 @@ async fn associate_url_with_public_name(
 async fn add_public_name_for_url(
     public_name: &str,
     safe: &mut Safe,
-    url: &Url,
+    url: &SafeUrl,
     dry_run: bool,
-) -> Result<(Url, bool)> {
+) -> Result<(SafeUrl, bool)> {
     match safe.nrs_add(public_name, url, dry_run).await {
         Ok((new_url, topname_was_registered)) => Ok((new_url, topname_was_registered)),
         Err(error) => match error {
@@ -318,7 +318,7 @@ fn print_summary(
     output_fmt: OutputFmt,
     header: &str,
     summary: String,
-    nrs_url: &Url,
+    nrs_url: &SafeUrl,
     processed_entry: (&str, &str, &str),
 ) {
     if OutputFmt::Pretty == output_fmt {

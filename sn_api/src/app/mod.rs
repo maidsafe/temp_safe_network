@@ -30,7 +30,7 @@ pub mod multimap;
 pub mod nrs;
 pub mod register;
 pub mod resolver;
-pub use crate::url::*;
+pub use crate::safeurl::*;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use helpers::parse_tokens_amount;
 pub use xor_name::{XorName, XOR_NAME_LEN};
