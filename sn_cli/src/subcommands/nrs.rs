@@ -20,22 +20,26 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub enum NrsSubCommands {
     #[structopt(name = "add")]
-    /// Add a subname to an existing NRS name, or update its link if it already exists
+    /// Add a subname to a registered NRS name and link it to some content, or update an existing
+    /// subname with a new link.
     Add {
-        /// The name to add (or update if it already exists)
-        name: String,
-        /// The safe:// URL to map this to. Usually a FilesContainer for a website. This should be wrapped in double quotes on bash based systems.
+        /// Specify the public name, which is the subname you wish to use, and the registered
+        /// topname. For example, "new.topname". If the topname has not already been registered
+        /// with the `nrs create` command, use the `--create-top-name` flag to register it here.
+        public_name: String,
+        /// The safe:// URL to link to. Usually a FilesContainer for a website. This should be
+        /// wrapped in double quotes on bash based systems. A link must be provided for a subname.
+        /// If you don't provide it with this argument, you will be prompted to provide it
+        /// interactively.
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
-        /// Registers the topname for you if you didn't already register it with nrs create
+        /// Set this flag to register the topname if it hasn't already been registered.
         #[structopt(short = "y", long = "create-top-name")]
         create_top_name: bool,
-        /// Set the link as default for the top level NRS name as well
+        /// Set this flag to register this link as default for the topname when no subname is
+        /// specified.
         #[structopt(long = "default")]
         default: bool,
-        /// If --default is set, the default name is set using a direct link to the final destination that was provided with `--link`, rather than a link to the sub name being added (which is the default behaviour if this flag is not passed)
-        #[structopt(long = "direct")]
-        direct_link: bool,
     },
     #[structopt(name = "create")]
     /// Create/Register a new top name
@@ -61,47 +65,25 @@ pub async fn nrs_commander(
     safe: &mut Safe,
 ) -> Result<()> {
     match cmd {
-        NrsSubCommands::Create {
-            name,
-            link,
-        } => {
+        NrsSubCommands::Create { name, link } => {
             run_create_subcommand(name, link, safe, dry_run, output_fmt).await
         }
         NrsSubCommands::Add {
-            name,
+            public_name: name,
             link,
             create_top_name,
-            ..
-            // default,
-            // direct_link,
+            default,
         } => {
-            let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
-            if dry_run && OutputFmt::Pretty == output_fmt {
-                notice_dry_run();
-            }
-
-            let url = Url::from_url(&link)?;
-            let (url, did_register_topname) = match create_top_name {
-                true => safe.nrs_add(&name, &url, dry_run).await?,
-                false => (safe.nrs_associate(&name, &url, dry_run).await?, false),
-            };
-            let version = url
-                .content_version()
-                .ok_or_else(|| eyre!("Content version not set for returned NRS Url"))?
-                .to_string();
-            let msg = if did_register_topname {
-                format!("New NRS Map created (version {})", version)
-            } else {
-                format!("Existing NRS Map updated (version {})", version)
-            };
-            print_summary(
+            run_add_subcommand(
+                name,
+                link,
+                create_top_name,
+                default,
+                safe,
+                dry_run,
                 output_fmt,
-                &msg,
-                "".to_string(),
-                &url,
-                ("+", &name, &link),
-            );
-            Ok(())
+            )
+            .await
         }
         NrsSubCommands::Remove { name } => {
             if dry_run && OutputFmt::Pretty == output_fmt {
@@ -133,7 +115,7 @@ async fn run_create_subcommand(
     output_fmt: OutputFmt,
 ) -> Result<()> {
     if let Some(ref link) = link {
-        validate_target_link(link, &name)?;
+        validate_target_link(link)?;
     }
     match safe.nrs_create(&name, dry_run).await {
         Ok(topname_url) => {
@@ -175,16 +157,65 @@ async fn run_create_subcommand(
     }
 }
 
+async fn run_add_subcommand(
+    name: String,
+    link: Option<String>,
+    create_top_name: bool,
+    default: bool,
+    safe: &mut Safe,
+    dry_run: bool,
+    output_fmt: OutputFmt,
+) -> Result<()> {
+    let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
+    validate_target_link(&link)?;
+    let link_url = Url::from_url(&link)?;
+    let (url, topname_was_registered) = if create_top_name {
+        add_public_name_for_url(&name, safe, &link_url, dry_run).await?
+    } else {
+        (
+            associate_url_with_public_name(&name, safe, &link_url, dry_run).await?,
+            false,
+        )
+    };
+
+    let mut summary_header = String::new();
+    if topname_was_registered {
+        summary_header.push_str("New NRS Map created. ");
+    } else {
+        summary_header.push_str("Existing NRS Map updated. ");
+    }
+    let version = url
+        .content_version()
+        .ok_or_else(|| eyre!("Content version not set for returned NRS Url"))?
+        .to_string();
+    summary_header.push_str(&format!("Now at version {}. ", version));
+
+    if default {
+        let mut parts = name.split('.');
+        let topname = parts.next_back().unwrap();
+        associate_url_with_public_name(topname, safe, &link_url, dry_run).await?;
+        summary_header.push_str(&format!(
+            "This link was also set as the default location for {}.",
+            topname
+        ));
+    }
+    print_summary(
+        output_fmt,
+        &summary_header,
+        "".to_string(),
+        &url,
+        ("+", &name, &link),
+    );
+    Ok(())
+}
+
 /// Determine if the link is a valid XorUrl *before* creating the topname.
 ///
 /// Otherwise the user receives an error even though the topname was actually created, which is a
 /// potentially confusing experience: they may think the topname wasn't created.
-fn validate_target_link(link: &str, name: &str) -> Result<()> {
+fn validate_target_link(link: &str) -> Result<()> {
     Url::from_url(link)
-        .wrap_err(format!(
-            "Could not create topname {}. The supplied link was not a valid XorUrl.",
-            name
-        ))
+        .wrap_err("The supplied link was not a valid XorUrl.")
         .suggestion("Run the command again with a valid XorUrl for the --link argument.")?;
     Ok(())
 }
@@ -203,26 +234,58 @@ async fn get_new_nrs_url_for_topname(
 ) -> Result<(Url, String)> {
     if let Some(link) = link {
         let url = Url::from_url(&link)?;
-        match safe.nrs_associate(name, &url, dry_run).await {
-            Ok(new_url) => return Ok((new_url, format!("The entry points to {}", link))),
-            Err(error) => match error {
-                UnversionedContentError(_) => {
-                    return Err(eyre!(error).wrap_err(
-                        "The destination you're trying to link to is versionable content. \
-                            When linking to versionable content, you must supply a version hash on the \
-                            XorUrl. The requested topname was not created.",
-                    ).suggestion(
-                        "Please run the command again with the version hash appended to the link. \
-                            The link should have the form safe://<xorurl>?v=<versionhash>.",
-                    ));
-                }
-                _ => {
-                    return Err(eyre!(error));
-                }
-            },
-        }
+        let new_url = associate_url_with_public_name(name, safe, &url, dry_run).await?;
+        return Ok((new_url, format!("The entry points to {}", link)));
     }
     Ok((topname_url, "".to_string()))
+}
+
+async fn associate_url_with_public_name(
+    public_name: &str,
+    safe: &mut Safe,
+    url: &Url,
+    dry_run: bool,
+) -> Result<Url> {
+    match safe.nrs_associate(public_name, url, dry_run).await {
+        Ok(new_url) => Ok(new_url),
+        Err(error) => match error {
+            UnversionedContentError(_) => Err(eyre!(error)
+                .wrap_err(
+                    "The destination you're trying to link to is versionable content. \
+                        When linking to versionable content, you must supply a version hash on the \
+                        XorUrl. The requested topname was not created.",
+                )
+                .suggestion(
+                    "Please run the command again with the version hash appended to the link. \
+                            The link should have the form safe://<xorurl>?v=<versionhash>.",
+                )),
+            _ => Err(eyre!(error)),
+        },
+    }
+}
+
+async fn add_public_name_for_url(
+    public_name: &str,
+    safe: &mut Safe,
+    url: &Url,
+    dry_run: bool,
+) -> Result<(Url, bool)> {
+    match safe.nrs_add(public_name, url, dry_run).await {
+        Ok((new_url, topname_was_registered)) => Ok((new_url, topname_was_registered)),
+        Err(error) => match error {
+            UnversionedContentError(_) => Err(eyre!(error)
+                .wrap_err(
+                    "The destination you're trying to link to is versionable content. \
+                        When linking to versionable content, you must supply a version hash on the \
+                        XorUrl. The requested topname was not created.",
+                )
+                .suggestion(
+                    "Please run the command again with the version hash appended to the link. \
+                            The link should have the form safe://<xorurl>?v=<versionhash>.",
+                )),
+            _ => Err(eyre!(error)),
+        },
+    }
 }
 
 fn print_summary(
@@ -244,7 +307,7 @@ fn print_summary(
         table.add_row(row![change, top_name, url]);
         println!("{}", header);
         if !summary.is_empty() {
-            println!("{}", summary);
+            println!("{}", summary.trim());
         }
         table.printstd();
     } else {
