@@ -155,7 +155,7 @@ jobs:
       - name: Wait for a healthy network
         shell: bash
         # if: matrix.os == 'windows-latest'
-        run: ./resources/scripts/nodes_finished_joining.sh
+        run: ./resources/scripts/network_is_ready_cli.sh
         timeout-minutes: 60
 
 
