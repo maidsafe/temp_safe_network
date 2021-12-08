@@ -52,11 +52,11 @@ impl Node {
 
         let joining_timeout = if cfg!(feature = "always-joinable") {
             debug!(
-                ">>>Feature \"always-joinable\" is set. Running with join timeout: {:?}",
-                joining_timeout * 10
+                "Feature \"always-joinable\" is set. Running with join timeout: {:?}",
+                joining_timeout * 100
             );
             // arbitrarily long time, the join process should just loop w/ backoff until then
-            joining_timeout * 10
+            joining_timeout * 100
         } else {
             joining_timeout
         };
