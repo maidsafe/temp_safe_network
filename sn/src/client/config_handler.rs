@@ -219,6 +219,22 @@ mod tests {
             let _some_last_char = str_path.pop();
         }
 
+        let expected_query_timeout = std::env::var(SN_QUERY_TIMEOUT)
+            .map(|v| {
+                v.parse()
+                    .map(Duration::from_secs)
+                    .unwrap_or(DEFAULT_QUERY_TIMEOUT)
+            })
+            .unwrap_or(DEFAULT_QUERY_TIMEOUT);
+
+        let expected_standard_wait = std::env::var(SN_AE_WAIT)
+            .map(|v| {
+                v.parse()
+                    .map(Duration::from_secs)
+                    .unwrap_or(DEFAULT_AE_WAIT)
+            })
+            .unwrap_or(DEFAULT_AE_WAIT);
+
         let expected_config = ClientConfig {
             local_addr: (Ipv4Addr::UNSPECIFIED, 0).into(),
             root_dir: root_dir.clone(),
@@ -228,8 +244,8 @@ mod tests {
                 keep_alive_interval: Some(Duration::from_secs(30)),
                 ..Default::default()
             },
-            query_timeout: DEFAULT_QUERY_TIMEOUT,
-            standard_wait: DEFAULT_AE_WAIT,
+            query_timeout: expected_query_timeout,
+            standard_wait: expected_standard_wait,
         };
         assert_eq!(format!("{:?}", config), format!("{:?}", expected_config));
         assert_eq!(serialize(&config)?, serialize(&expected_config)?);
