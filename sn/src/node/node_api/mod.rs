@@ -51,7 +51,7 @@ impl Node {
         let used_space = UsedSpace::new(config.max_capacity());
 
         let joining_timeout = if cfg!(feature = "always-joinable") {
-            let joinable_timeout = joining_timeout * 60 * 100; // 60 to convert s to minutes
+            let joinable_timeout = joining_timeout;
             debug!(
                 "Feature \"always-joinable\" is set. Running with join timeout: {:?}",
                 joinable_timeout
