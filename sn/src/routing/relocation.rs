@@ -8,6 +8,7 @@
 
 //! Relocation related types and utilities.
 
+use crate::elder_count;
 use crate::messaging::{
     system::{RelocateDetails, RelocatePayload, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
@@ -17,9 +18,10 @@ use crate::routing::{
     ed25519::{self, Keypair, Verifier},
     error::Error,
     network_knowledge::{NetworkKnowledge, NodeState},
-    Peer,
+    recommended_section_size, Peer,
 };
 use async_trait::async_trait;
+use std::{cmp::min, collections::BTreeSet};
 use xor_name::XorName;
 
 /// Find all nodes to relocate after a churn event and create the relocate actions for them.
@@ -30,14 +32,22 @@ pub(crate) async fn actions(
 ) -> Vec<(NodeState, RelocateAction)> {
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
+    // Capped by criteria that cannot relocate too many node at once.
+    let joined_nodes = network_knowledge.members().joined();
 
-    let filtered = network_knowledge
-        .members()
-        .joined()
+    if joined_nodes.len() < recommended_section_size() {
+        return vec![];
+    }
+    let max_reloctions = elder_count() / 2;
+    let allowed_relocations = min(
+        joined_nodes.len() - recommended_section_size(),
+        max_reloctions,
+    );
+
+    let candidates: BTreeSet<_> = joined_nodes
         .into_iter()
-        .filter(|info| check(info.age(), churn_signature));
-
-    let candidates: Vec<_> = filtered.collect();
+        .filter(|info| check(info.age(), churn_signature))
+        .collect();
 
     let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
         age
@@ -56,6 +66,9 @@ pub(crate) async fn actions(
     }
 
     relocating_nodes
+        .into_iter()
+        .take(allowed_relocations)
+        .collect()
 }
 
 /// Details of a relocation: which node to relocate, where to relocate it to and what age it should
@@ -273,7 +286,7 @@ mod tests {
     proptest! {
         #[test]
         fn proptest_actions(
-            peers in arbitrary_unique_peers(2..elder_count() + 1, MIN_AGE..MAX_AGE),
+            peers in arbitrary_unique_peers(2..(recommended_section_size() + elder_count()), MIN_AGE..MAX_AGE),
             signature_trailing_zeros in 0..MAX_AGE,
             seed in any::<u64>().no_shrink())
         {
@@ -334,6 +347,12 @@ mod tests {
             .sorted_by_key(|action| *action.name())
             .collect();
 
+        let allowed_relocations = if peers.len() > recommended_section_size() {
+            min(elder_count() / 2, peers.len() - recommended_section_size())
+        } else {
+            0
+        };
+
         // Only the oldest matching peers should be relocated.
         let expected_relocated_age = peers
             .iter()
@@ -345,6 +364,7 @@ mod tests {
             .iter()
             .filter(|peer| Some(peer.age()) == expected_relocated_age)
             .sorted_by_key(|peer| peer.name())
+            .take(allowed_relocations)
             .collect();
 
         assert_eq!(expected_relocated_peers.len(), actions.len());
