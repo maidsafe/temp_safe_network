@@ -73,13 +73,6 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
 
-      - name: Run network asserts one by one
-        shell: bash
-        # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
-        timeout-minutes: 7
-        continue-on-error: true
-
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
@@ -265,6 +258,9 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
 
+      - name: Build all safe_network tests
+        run: cargo test --no-run -p safe_network --release --features=always-joinable,test-utils --lib
+
       - name: Run network asserts one by one
         shell: bash
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
@@ -415,20 +411,8 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Healthcheck
-        run: ./resources/scripts/has_split.sh
-        shell: bash
-        timeout-minutes: 1
-        continue-on-error: true
-
-      - name: Run network asserts one by one
-        shell: bash
-        # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
-        timeout-minutes: 7
-        continue-on-error: true
-
-
+      - name: Build all sn_api tests
+        run: cargo test --no-run -p sn_api --release --lib
 
       - name: Run sn_api tests
         shell: bash
