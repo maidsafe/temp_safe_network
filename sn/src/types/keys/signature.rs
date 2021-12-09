@@ -125,11 +125,21 @@ mod tests {
         Ok(())
     }
 
+    /// The new `from_bytes` mechanism for checking a signature, checks the value of the last byte
+    /// in the array passed in, and does a bitwise and operation on it. If that operation doesn't
+    /// result in 0, an error is returned. The only thing that makes sense to me is to keep trying
+    /// until you get a value it accepts. It doesn't seem to take very long.
     fn gen_ed25519_sig() -> Signature {
-        use rand::Rng;
-
-        let mut bytes = [0u8; ed25519_dalek::SIGNATURE_LENGTH];
-        rand::thread_rng().fill(&mut bytes);
-        Signature::Ed25519(ed25519_dalek::Signature::new(bytes))
+        let random_bytes: Vec<u8> = (0..ed25519::Signature::BYTE_SIZE)
+            .map(|_| rand::random::<u8>())
+            .collect();
+        let mut result = ed25519::Signature::from_bytes(&random_bytes);
+        while result.is_err() {
+            let random_bytes: Vec<u8> = (0..ed25519::Signature::BYTE_SIZE)
+                .map(|_| rand::random::<u8>())
+                .collect();
+            result = ed25519::Signature::from_bytes(&random_bytes);
+        }
+        Signature::Ed25519(result.unwrap())
     }
 }
