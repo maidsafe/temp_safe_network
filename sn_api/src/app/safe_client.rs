@@ -118,25 +118,23 @@ impl SafeAppClient {
         debug!("Attempting to fetch data from {:?}", address.name());
         let client = self.get_safe_client()?;
         let data = if let Some((start, end)) = range {
+            let start = start.map(|start_index| start_index as usize).unwrap_or(0);
             let len = end
-                .map(|end_index| end_index - start.unwrap_or(0))
-                .unwrap_or(0);
-            client
-                .read_from(
-                    address,
-                    start.map(|val| val as usize).unwrap_or(0),
-                    len as usize,
-                )
-                .await
+                .map(|end_index| end_index as usize - start)
+                .unwrap_or(usize::MAX);
+
+            client.read_from(address, start, len).await
         } else {
             client.read_bytes(address).await
         }
         .map_err(|e| Error::NetDataError(format!("Failed to GET Blob: {:?}", e)))?;
+
         debug!(
             "{} bytes of data successfully retrieved from: {:?}",
             data.len(),
             address.name()
         );
+
         Ok(data)
     }
 

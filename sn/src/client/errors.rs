@@ -172,9 +172,6 @@ pub enum Error {
     /// Could not chunk all the data required to encrypt the data. (Expected, Actual)
     #[error("Not all data was chunked! Required {}, but we have {}.)", _0, _1)]
     NotAllDataWasChunked(usize, usize),
-    /// InvalidPositionOrLength
-    #[error("Invalid position or length: {0}")]
-    InvalidPositionOrLength(String),
 }
 
 impl From<(CmdError, OperationId)> for Error {
