@@ -256,7 +256,7 @@ jobs:
 
       - name: Upload Node Logs to AWS
           # Upload artifacts.
-        run: aws s3 sync --include="*.log*" ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
+        run: aws s3 sync --exclude="*" --include="*.log*" ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
         if: failure()
         continue-on-error: true
 
