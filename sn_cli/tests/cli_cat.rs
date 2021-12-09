@@ -15,7 +15,8 @@ use sn_api::resolver::{ContentType, DataType, Url};
 use sn_cmd_test_utilities::util::{
     create_and_get_keys, get_random_nrs_string, parse_files_container_output,
     parse_files_put_or_sync_output, parse_nrs_register_output, safe_cmd, safe_cmd_stderr,
-    safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
+    safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_path,
+    upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
 const TEST_DATA: &str = "../resources/testdata/";
@@ -138,106 +139,58 @@ fn calling_safe_cat_hexdump() -> Result<()> {
 }
 
 #[test]
-#[ignore = "files sync url has bytes address issue"]
 fn calling_safe_cat_xorurl_with_version() -> Result<()> {
     let tmp_dir = assert_fs::TempDir::new()?;
-    let md_file1 = tmp_dir.child("test.md");
-    let md_file2 = tmp_dir.child("another.md");
-    md_file1.write_str("hello tests!")?;
-    md_file2.write_str("exists")?;
+    let md_file = tmp_dir.child("test.md");
+    md_file.write_str("hello tests!")?;
 
     let output = safe_cmd_stdout(
-        ["files", "put", md_file1.path().to_str().unwrap(), "--json"],
+        ["files", "put", md_file.path().to_str().unwrap(), "--json"],
         Some(0),
     )?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
-    let url = Url::from_url(&container_xorurl)?;
-    let version0 = url.content_version().unwrap();
+    let mut url = Url::from_url(&container_xorurl)?;
+    url.set_path("test.md");
 
-    // let's sync with another file so we get a new version, and a different content in the file
-    let mut safeurl = safeurl_from(&container_xorurl)?;
-    safeurl.set_path("/test.md");
-    safeurl.set_content_version(None);
-    let output = safe_cmd_stdout(
-        [
-            "files",
-            "sync",
-            md_file2.path().to_str().unwrap(),
-            &safeurl.to_string(),
-            "--json",
-        ],
-        Some(0),
-    )?;
-    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
-    let url = Url::from_url(&container_xorurl)?;
-    let version1 = url.content_version().unwrap();
-
-    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
-    let md_file2_content = std::fs::read_to_string(md_file2.path())?;
-    assert_eq!(output, md_file2_content);
-
-    safeurl.set_content_version(Some(version0));
-    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
-    let md_file1_content = std::fs::read_to_string(md_file1.path())?;
-    assert_eq!(output, md_file1_content);
-
-    safeurl.set_content_version(Some(version1));
-    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
-    assert_eq!(output, md_file2_content);
+    safe_cmd(["cat", &url.to_string()], Some(0))?
+        .assert()
+        .stdout(predicate::str::contains("hello tests!"));
 
     Ok(())
 }
 
 #[test]
-#[ignore = "files sync url issue"]
 fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
-    let tmp_dir = assert_fs::TempDir::new()?;
-    let md_file1 = tmp_dir.child("test.md");
-    let md_file2 = tmp_dir.child("another.md");
-    md_file1.write_str("hello tests!")?;
-    md_file2.write_str("exists")?;
+    let with_trailing_slash = true;
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&tmp_data_path, with_trailing_slash)?;
+    let mut url = Url::from_url(&files_container_xor)?;
+    url.set_path("test.md");
 
+    let public_name = format!("test.{}", get_random_nrs_string());
     let output = safe_cmd_stdout(
-        ["files", "put", md_file1.path().to_str().unwrap(), "--json"],
-        Some(0),
-    )?;
-    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
-
-    let nrsurl = get_random_nrs_string();
-    let output = safe_cmd_stdout(
-        ["nrs", "create", &nrsurl, "-l", &container_xorurl, "--json"],
-        Some(0),
-    )?;
-    let (nrs_xorurl, _files_map) = parse_nrs_register_output(&output);
-    let nrs_version = nrs_xorurl.content_version().unwrap();
-
-    let nrsurl_with_path = format!("{}/test.md", nrsurl);
-    safe_cmd(["cat", &nrsurl_with_path], Some(0))?;
-
-    // let's sync with another file so we get a new version, and a different content in the file
-    let mut safeurl = safeurl_from(&container_xorurl)?;
-    safeurl.set_path("/test.md");
-    safeurl.set_content_version(None);
-    safe_cmd(
         [
-            "files",
-            "sync",
-            md_file2.path().to_str().unwrap(),
-            &safeurl.to_string(),
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &url.to_string(), // to_string has the version on the url
+            "--register-top-name",
+            "--json",
         ],
         Some(0),
     )?;
 
-    // NRS name was not updated (with --updated-nrs) when doing files sync,
-    // so our file should not have been updated
-    let output = safe_cmd_stdout(["cat", &nrsurl_with_path], Some(0))?;
-    let md_file1_content = std::fs::read_to_string(md_file1.path())?;
-    assert_eq!(md_file1_content, output);
+    let (nrs_url, _files_map) = parse_nrs_register_output(&output);
+    let version = nrs_url.content_version();
 
-    // NRS name has only one version which is the first one, so using this should also fetch the file
-    let nrsurl_with_path_v0 = format!("{}/test.md?v={}", nrsurl, nrs_version.to_string());
-    let output = safe_cmd_stdout(["cat", &nrsurl_with_path_v0], Some(0))?;
-    assert_eq!(md_file1_content, output);
+    let mut nrs_url = Url::from_url(&format!("safe://{}", public_name))?;
+    nrs_url.set_content_version(version);
+    safe_cmd(["cat", &nrs_url.to_string()], Some(0))?
+        .assert()
+        .stdout(predicate::str::contains("hello tests!"));
 
     Ok(())
 }
