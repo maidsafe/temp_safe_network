@@ -88,10 +88,22 @@ impl Dispatcher {
     /// block progress until there are no tasks pending in this semaphore
     /// intended to allow us to wait for super high priority tasks before doing others...
     /// It should only be used after checking that no permits are held by a root cmd eg
-    async fn wait_for_priority_commands_to_finish(&self, semaphore: Arc<Semaphore>, count: usize) {
+    async fn wait_for_priority_commands_to_finish(
+        &self,
+        semaphore: Arc<Semaphore>,
+        count: usize,
+    ) -> Result<()> {
         // there's probably a neater way to do this
         debug!("available, permits {:?}", semaphore.available_permits());
+
+        let mut loop_count = 0;
         while semaphore.available_permits() != count {
+            loop_count += 1;
+
+            if loop_count > 500 {
+                return Err(Error::CouldNotGetPermitInTime);
+            }
+
             time::sleep(Duration::from_millis(500)).await;
             trace!(
                 "looping while we wait for available permits to be {:?}: {:?}",
@@ -99,6 +111,8 @@ impl Dispatcher {
                 semaphore.available_permits()
             );
         }
+
+        Ok(())
     }
 
     /// returns the root cmd priority if a permit already exists for that command
@@ -117,7 +131,7 @@ impl Dispatcher {
     }
 
     /// Based upon message priority will wait for any higher priority commands to be completed before continuing
-    async fn acquire_permit_or_wait(&self, prio: i32, cmd_id: CmdId) {
+    async fn acquire_permit_or_wait(&self, prio: i32, cmd_id: CmdId) -> Result<()> {
         debug!("{:?} start of acquire permit", cmd_id);
         let mut the_prio = prio;
         // if we already have a permit, increase our count and continue
@@ -152,10 +166,10 @@ impl Dispatcher {
                     self.join_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
 
                 if root_prio.is_some() {
-                    return;
+                    return Ok(());
                 }
 
                 Some(
@@ -175,15 +189,15 @@ impl Dispatcher {
                     self.join_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
 
                 if root_prio.is_some() {
-                    return;
+                    return Ok(());
                 }
 
                 Some(
@@ -203,17 +217,17 @@ impl Dispatcher {
                     self.join_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
                 self.wait_for_priority_commands_to_finish(self.ae_permits.clone(), SEMAPHORE_COUNT)
-                    .await;
+                    .await?;
 
                 if root_prio.is_some() {
-                    return;
+                    return Ok(());
                 }
 
                 Some(
@@ -233,22 +247,22 @@ impl Dispatcher {
                     self.join_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
                 self.wait_for_priority_commands_to_finish(self.ae_permits.clone(), SEMAPHORE_COUNT)
-                    .await;
+                    .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.infra_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
 
                 if root_prio.is_some() {
-                    return;
+                    return Ok(());
                 }
 
                 Some(
@@ -268,24 +282,24 @@ impl Dispatcher {
                     self.join_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
                 self.wait_for_priority_commands_to_finish(self.ae_permits.clone(), SEMAPHORE_COUNT)
-                    .await;
+                    .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.infra_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.node_data_permits.clone(),
                     SEMAPHORE_COUNT,
                 )
-                .await;
+                .await?;
 
                 None
             }
@@ -301,12 +315,16 @@ impl Dispatcher {
                     let mut permit_map_write_guard = permit_map.write().await;
                     let _old_permit = permit_map_write_guard.insert(root_cmd_id, (permit, 1, prio));
                     debug!("inserted permit");
+                    Ok(())
                 }
                 Err(error) => {
-                    // log error, it can only be permi acquisition here, so that's okay and we ignore it / drop command as we've bigger issues
-                    error!("{:?}", error)
+                    // log error, it can only be permit acquisition here, so that's okay and we ignore it / drop command as we've bigger issues
+                    error!("{:?}", error);
+                    Err(error)
                 }
             }
+        } else {
+            Ok(())
         }
     }
 
@@ -321,7 +339,7 @@ impl Dispatcher {
 
             if cfg!(feature = "unstable-command-prioritisation") {
                 self.acquire_permit_or_wait(command.priority()?, cmd_id.clone())
-                    .await;
+                    .await?;
             }
             self.handle_command_and_any_offshoots(command, cmd_id).await
         });
