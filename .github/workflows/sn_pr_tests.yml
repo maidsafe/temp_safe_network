@@ -164,6 +164,9 @@ jobs:
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
         timeout-minutes: 7
+        env:
+          RUST_LOG: "safe_network=trace,qp2p=trace"
+
         # continue-on-error: true
 
       # this is temporarily rbeing un before client_api tests, it shall be run after client tests
