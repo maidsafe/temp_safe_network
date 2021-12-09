@@ -253,13 +253,14 @@ jobs:
 
       - name: Upload Node Logs to AWS
           # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
+        run: aws s3 sync --include='*.log*' ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
         if: failure()
         continue-on-error: true
 
       - name: Upload Node Logs
           # Upload artifacts.
         uses: actions/upload-artifact@v2
+        continue-on-error: true
         with:
           name: sn_node_logs
           path: ~/.safe/node/local-test-network/**/*.log*
