@@ -24,6 +24,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    #[error("Permit was not retrieved in 500 loops")]
+    CouldNotGetPermitInTime,
     #[error("Node prioritisation semaphore was closed early.")]
     SemaphoreClosed,
     #[error("Only messages requiring auth accumulation should be sent via \"send_messages_to_all_nodes_or_directly_handle_for_accumulation\"")]
