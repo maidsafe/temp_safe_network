@@ -29,8 +29,8 @@ pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(90);
 pub const DEFAULT_AE_WAIT: Duration = Duration::from_secs(5);
 
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
-const SN_CLIENT_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
-const SN_CLIENT_AE_WAIT: &str = "SN_AE_WAIT";
+const SN_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
+const SN_AE_WAIT: &str = "SN_AE_WAIT";
 
 /// Configuration for sn_client.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -84,42 +84,46 @@ impl ClientConfig {
         let query_timeout = query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
         let standard_wait = standard_wait.unwrap_or(DEFAULT_AE_WAIT);
 
-        // if we have an env var for this, lets override
-        let query_timeout = match std::env::var(SN_CLIENT_QUERY_TIMEOUT) {
+        // if we have an env var for this, let's override
+        let query_timeout = match std::env::var(SN_QUERY_TIMEOUT) {
             Ok(timeout) => match timeout.parse() {
                 Ok(time) => {
                     warn!(
-                        "Query timeout set from env var {:?}",
-                        SN_CLIENT_QUERY_TIMEOUT
+                        "Query timeout set from env var {}: {}s",
+                        SN_QUERY_TIMEOUT, time
                     );
                     Duration::from_secs(time)
                 }
                 Err(error) => {
-                    warn!("There was an error parsing {:?} env var. Default or client configured query timeout will be used: {:?}", SN_CLIENT_QUERY_TIMEOUT, error);
+                    warn!("There was an error parsing {} env var value: '{}'. Default or client configured query timeout will be used: {:?}", SN_QUERY_TIMEOUT, timeout, error);
                     query_timeout
                 }
             },
             Err(_) => query_timeout,
         };
 
-        // if we have an env var for this, lets override
-        let standard_wait = match std::env::var(SN_CLIENT_AE_WAIT) {
+        // if we have an env var for this, let's override
+        let standard_wait = match std::env::var(SN_AE_WAIT) {
             Ok(timeout) => match timeout.parse() {
                 Ok(time) => {
                     warn!(
-                        "Client AE wait post-put set from env var {:?}",
-                        SN_CLIENT_AE_WAIT
+                        "Client AE wait post-put set from env var {}: {}s",
+                        SN_AE_WAIT, time
                     );
                     Duration::from_secs(time)
                 }
                 Err(error) => {
-                    warn!("There was an error parsing {:?} env var. Default or client configured query timeout will be used: {:?}", SN_CLIENT_AE_WAIT, error);
+                    warn!("There was an error parsing {} env var value: '{}'. Default or client configured query timeout will be used: {:?}", SN_AE_WAIT, timeout, error);
                     standard_wait
                 }
             },
             Err(_) => standard_wait,
         };
 
+        info!(
+            "Client set to use a query timeout of {:?}, and AE await post-put for {:?}",
+            query_timeout, standard_wait
+        );
         Self {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
             root_dir: root_dir.clone(),
