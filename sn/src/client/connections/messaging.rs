@@ -607,15 +607,14 @@ pub(crate) async fn write_data_to_path<T: Serialize>(data: &T, path: &Path) -> R
 
 #[instrument(skip_all, level = "trace")]
 pub(crate) async fn create_client_root_dir(client_pk: PublicKey) -> Result<PathBuf, Error> {
-    let mut root_dir = dirs_next::home_dir()
-        .ok_or_else(|| Error::Generic("Error opening home dir".to_string()))?;
+    let mut root_dir = dirs_next::home_dir().ok_or(Error::CouldNotReadHomeDir)?;
     root_dir.push(SAFE_CLIENT_DIR);
     root_dir.push(format!("sn_client-{}", client_pk));
 
     // Create `.safe/client` dir if not present
     tokio::fs::create_dir_all(root_dir.clone())
         .await
-        .map_err(|e| Error::Generic(format!("Error creating client root dir: {:?}", e)))?;
+        .map_err(|_| Error::CouldNotCreateRootDir)?;
 
     Ok(root_dir)
 }

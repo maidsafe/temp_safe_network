@@ -94,8 +94,7 @@ impl Client {
             }
         };
 
-        let home_dir = dirs_next::home_dir()
-            .ok_or_else(|| Error::Generic("Error opening home dir".to_string()))?;
+        let home_dir = dirs_next::home_dir().ok_or(Error::CouldNotReadHomeDir)?;
         let root_dir = &home_dir
             .join(SAFE_CLIENT_DIR)
             .join(format!("sn_client-{}", keypair.public_key()));
@@ -124,9 +123,7 @@ impl Client {
         };
 
         if config.genesis_key != prefix_map.genesis_key() {
-            return Err(Error::Generic(
-                "Genesis Key from the config and the PrefixMap mismatch".to_string(),
-            ));
+            return Err(Error::GenesisKeyMismatch);
         }
 
         // Incoming error notifiers

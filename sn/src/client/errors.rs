@@ -23,6 +23,15 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Genesis Key from the config and the PrefixMap mismatch
+    #[error("Genesis Key from the config and the PrefixMap mismatch. You may need to remove your prefixmap or update your config file.")]
+    GenesisKeyMismatch,
+    /// Error reading home dir for client
+    #[error("Error reading home dir for client")]
+    CouldNotReadHomeDir,
+    /// Error creating root dir for client
+    #[error("Error creating root dir for client")]
+    CouldNotCreateRootDir,
     /// Signature Aggregation Error
     #[error("Error on aggregating signatures from network")]
     Aggregation(String),
@@ -58,6 +67,18 @@ pub enum Error {
     /// Could not query elder.
     #[error("Problem receiving query via qp2p")]
     ReceivingQuery,
+    /// Cannot store empty bytes..
+    #[error("Cannot store empty bytes.")]
+    EmptyBytesProvided,
+    /// The provided bytes is too small to be a `Blob`.
+    #[error("The provided bytes is too small to be a `Blob`")]
+    TooSmallToBeBlob,
+    /// Encryption oversized the Spot, so it cannot be stored as a Spot and be encrypted
+    #[error("You might need to pad the `Spot` contents and then store it as a `Blob`, as the encryption has made it slightly too big")]
+    SpotPaddingNeeded,
+    /// The provided bytes is too large to be a `Spot`.
+    #[error("The provided bytes is too large to be a `Spot`")]
+    TooLargeToBeSpot,
     /// Could not send query to elder.
     #[error("Problem sending query via qp2p")]
     SendingQuery,
@@ -67,6 +88,9 @@ pub enum Error {
     /// Could not query elder.
     #[error("Problem receiving query internally in sn_client")]
     QueryReceiverError,
+    /// Could not get an encryption object.
+    #[error("Could not get an encryption object.")]
+    NoEncryptionObject,
     /// Could not query elder.
     #[error("Failed to obtain any response")]
     NoResponse,
@@ -142,9 +166,6 @@ pub enum Error {
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::dbs::Error),
-    /// Generic Error
-    #[error("Generic error")]
-    Generic(String),
     /// Could not retrieve all chunks required to decrypt the data. (Expected, Actual)
     #[error("Not enough chunks! Required {}, but we have {}.)", _0, _1)]
     NotEnoughChunks(usize, usize),

@@ -188,7 +188,7 @@ mod tests {
     async fn custom_config_path() -> Result<()> {
         init_test_logger();
 
-        let temp_dir = tempdir().map_err(|e| Error::Generic(e.to_string()))?;
+        let temp_dir = tempdir()?;
         let root_dir = temp_dir.path().to_path_buf();
         let cfg_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
         let config_filepath = root_dir.join(&cfg_filename);

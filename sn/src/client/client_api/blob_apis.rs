@@ -161,7 +161,7 @@ impl Client {
         let encryption = encryption(scope, public_key);
         let chunk = to_chunk(spot.bytes(), encryption.as_ref())?;
         if chunk.value().len() >= self_encryption::MIN_ENCRYPTABLE_BYTES {
-            return Err(Error::Generic("You might need to pad the `Spot` contents and then store it as a `Blob`, as the encryption has made it slightly too big".to_string()));
+            return Err(Error::SpotPaddingNeeded);
         }
         let name = *chunk.name();
         let address = if encryption.is_some() {
@@ -332,8 +332,7 @@ impl Client {
         if matches!(scope, Scope::Public) {
             Ok(chunk.value().clone())
         } else {
-            let owner = encryption(scope, self.public_key())
-                .ok_or_else(|| Error::Generic("Could not get an encryption object.".to_string()))?;
+            let owner = encryption(scope, self.public_key()).ok_or(Error::NoEncryptionObject)?;
             Ok(owner.decrypt(chunk.value().clone())?)
         }
     }
