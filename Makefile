@@ -17,6 +17,7 @@ gha-build-x86_64-unknown-linux-musl:
 	rustup target add x86_64-unknown-linux-musl
 	cargo build --release --target x86_64-unknown-linux-musl
 	find target/x86_64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+	rm -f artifacts/.cargo-lock
 
 gha-build-arm-unknown-linux-musleabi: arm-unknown-linux-musleabi
 gha-build-armv7-unknown-linux-musleabihf: armv7-unknown-linux-musleabihf
