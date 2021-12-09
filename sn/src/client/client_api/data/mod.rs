@@ -38,11 +38,9 @@ impl Spot {
     /// Enforces size > 0 and size < [`MIN_ENCRYPTABLE_BYTES`] bytes.
     pub(crate) fn new(bytes: Bytes) -> Result<Self> {
         if bytes.len() >= MIN_ENCRYPTABLE_BYTES {
-            Err(Error::Generic(
-                "The provided bytes is too large to be a `Spot`".to_string(),
-            ))
+            Err(Error::TooLargeToBeSpot)
         } else if bytes.is_empty() {
-            Err(Error::Generic("Cannot store empty bytes.".to_string()))
+            Err(Error::EmptyBytesProvided)
         } else {
             Ok(Self { bytes })
         }
@@ -58,9 +56,7 @@ impl Blob {
     /// Enforces size >= [`MIN_ENCRYPTABLE_BYTES`] bytes.
     pub(crate) fn new(bytes: Bytes) -> Result<Self> {
         if MIN_ENCRYPTABLE_BYTES > bytes.len() {
-            Err(Error::Generic(
-                "The provided bytes is too small to be a `Blob`".to_string(),
-            ))
+            Err(Error::TooSmallToBeBlob)
         } else {
             Ok(Self { bytes })
         }
