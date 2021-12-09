@@ -275,7 +275,7 @@ impl<'a> Join<'a> {
                                 error
                             );
 
-                            if sig_pk != section_key {
+                            // if sig_pk != section_key {
                                 // if we've have aggregation errors, we attempt a fresh join as there's likely been a key change
                                 let join_request = JoinRequest {
                                     section_key,
@@ -286,11 +286,11 @@ impl<'a> Join<'a> {
                                 self.send_join_requests(
                                     join_request,
                                     &recipients,
-                                    section_key,
+                                    sig_pk,
                                     true,
                                 )
                                 .await?;
-                            }
+                            // }
 
                             continue;
                         }
