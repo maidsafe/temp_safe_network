@@ -276,19 +276,14 @@ impl<'a> Join<'a> {
                             );
 
                             // if sig_pk != section_key {
-                                // if we've have aggregation errors, we attempt a fresh join as there's likely been a key change
-                                let join_request = JoinRequest {
-                                    section_key,
-                                    resource_proof_response: None,
-                                    aggregated: None,
-                                };
+                            // if we've have aggregation errors, we attempt a fresh join as there's likely been a key change
+                            let join_request = JoinRequest {
+                                section_key,
+                                resource_proof_response: None,
+                                aggregated: None,
+                            };
 
-                                self.send_join_requests(
-                                    join_request,
-                                    &recipients,
-                                    sig_pk,
-                                    true,
-                                )
+                            self.send_join_requests(join_request, &recipients, sig_pk, true)
                                 .await?;
                             // }
 
