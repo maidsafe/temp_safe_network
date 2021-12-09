@@ -96,10 +96,7 @@ pub(crate) async fn read_prefix_map_from_disk(path: &Path) -> Result<NetworkPref
                 })?;
             Ok(prefix_map)
         }
-        Err(e) => {
-            error!("Error reading PrefixMap from {:?}: {:?}", path, e);
-            Err(Error::FailedToParse(e.to_string()))
-        }
+        Err(e) => Err(Error::FailedToParse(e.to_string())),
     }
 }
 
