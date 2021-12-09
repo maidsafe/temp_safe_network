@@ -165,9 +165,8 @@ async fn run_node() -> Result<()> {
     );
 
     let bootstrap_retry_duration = if cfg!(feature = "always-joinable") {
-        Duration::from_secs(BOOTSTRAP_RETRY_TIME)
-    }
-    else {
+        Duration::from_secs(20)
+    } else {
         Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60)
     };
 
