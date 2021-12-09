@@ -99,7 +99,7 @@ impl<'a> Join<'a> {
             backoff: ExponentialBackoff {
                 initial_interval: Duration::from_millis(50),
                 max_interval: Duration::from_millis(750),
-                max_elapsed_time: Some(Duration::from_secs(60)),
+                max_elapsed_time: Some(Duration::from_secs(5)),
                 ..Default::default()
             },
             aggregated: false,
