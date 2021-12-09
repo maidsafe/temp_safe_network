@@ -85,8 +85,8 @@ impl Core {
                     .await
                 {
                     Ok(sig) => match proposal {
-                        Proposal::OurElders(_) => {
-                            commands.push(Command::HandleElderAgreement { proposal, sig })
+                        Proposal::NewElders(_) => {
+                            commands.push(Command::HandleNewEldersAgreement { proposal, sig })
                         }
                         _ => commands.push(Command::HandleAgreement { proposal, sig }),
                     },

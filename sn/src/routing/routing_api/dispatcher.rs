@@ -215,10 +215,10 @@ impl Dispatcher {
                     .handle_online_agreement(auth.value.into_state(), auth.sig)
                     .await
             }
-            Command::HandleElderAgreement { proposal, sig } => match proposal {
-                Proposal::OurElders(section_auth) => {
+            Command::HandleNewEldersAgreement { proposal, sig } => match proposal {
+                Proposal::NewElders(section_auth) => {
                     self.core
-                        .handle_our_elders_agreement(section_auth, sig)
+                        .handle_new_elders_agreement(section_auth, sig)
                         .await
                 }
                 _ => {

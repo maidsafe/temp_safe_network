@@ -35,7 +35,7 @@ impl Core {
             Proposal::SectionInfo(section_auth) => {
                 self.handle_section_info_agreement(section_auth, sig).await
             }
-            Proposal::OurElders(_) => {
+            Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
                 Ok(vec![])
             }
@@ -225,7 +225,7 @@ impl Core {
 
             self.send_proposal(
                 proposal_recipients,
-                Proposal::OurElders(signed_section_auth),
+                Proposal::NewElders(signed_section_auth),
             )
             .await
         } else {
@@ -240,12 +240,12 @@ impl Core {
     }
 
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn handle_our_elders_agreement(
+    pub(crate) async fn handle_new_elders_agreement(
         &self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
-        trace!("{}", LogMarker::HandlingElderAgreement);
+        trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let updates = self.split_barrier.write().await.process(
             &self.network_knowledge.prefix().await,
             signed_section_auth.clone(),
