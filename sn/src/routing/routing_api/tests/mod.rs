@@ -29,6 +29,7 @@ use crate::routing::{
         test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
     },
     node::Node,
+    recommended_section_size,
     relocation::{self, RelocatePayloadUtils},
     supermajority, Error, Event, Peer, Result as RoutingResult, UnnamedPeer, FIRST_SECTION_MAX_AGE,
     FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
@@ -1022,8 +1023,21 @@ enum RelocatedPeerRole {
 
 async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let prefix: Prefix = "0".parse().unwrap();
+    let section_size = match relocated_peer_role {
+        RelocatedPeerRole::Elder => elder_count(),
+        RelocatedPeerRole::NonElder => recommended_section_size(),
+    };
     let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+
+    let mut adults = section_size - elder_count();
+    while adults > 0 {
+        adults -= 1;
+        let non_elder_peer = create_peer(MIN_ADULT_AGE);
+        let node_state = NodeState::joined(non_elder_peer.clone(), None);
+        let node_state = section_signed(sk_set.secret_key(), node_state)?;
+        assert!(section.update_member(node_state).await);
+    }
 
     let non_elder_peer = create_peer(MIN_AGE);
     let node_state = NodeState::joined(non_elder_peer.clone(), None);
