@@ -20,7 +20,7 @@ use crate::{
 pub(crate) enum Proposal {
     Offline(NodeState),
     SectionInfo(SectionAuthorityProvider),
-    OurElders(SectionAuth<SectionAuthorityProvider>),
+    NewElders(SectionAuth<SectionAuthorityProvider>),
     JoinsAllowed(bool),
 }
 
@@ -44,7 +44,7 @@ impl Proposal {
         Ok(match self {
             Self::Offline(node_state) => bincode::serialize(node_state),
             Self::SectionInfo(info) => bincode::serialize(info),
-            Self::OurElders(info) => bincode::serialize(&info.sig.public_key),
+            Self::NewElders(info) => bincode::serialize(&info.sig.public_key),
             Self::JoinsAllowed(joins_allowed) => bincode::serialize(&joins_allowed),
         }?)
     }
@@ -58,7 +58,7 @@ impl Proposal {
         match self {
             Self::Offline(node_state) => ProposalMsg::Offline(node_state.to_msg()),
             Self::SectionInfo(sap) => ProposalMsg::SectionInfo(sap.to_msg()),
-            Self::OurElders(sap) => ProposalMsg::OurElders(sap.into_authed_msg()),
+            Self::NewElders(sap) => ProposalMsg::NewElders(sap.into_authed_msg()),
             Self::JoinsAllowed(allowed) => ProposalMsg::JoinsAllowed(allowed),
         }
     }
@@ -69,7 +69,7 @@ impl ProposalMsg {
         match self {
             Self::Offline(node_state) => Proposal::Offline(node_state.into_state()),
             Self::SectionInfo(sap) => Proposal::SectionInfo(sap.into_state()),
-            Self::OurElders(sap) => Proposal::OurElders(sap.into_authed_state()),
+            Self::NewElders(sap) => Proposal::NewElders(sap.into_authed_state()),
             Self::JoinsAllowed(allowed) => Proposal::JoinsAllowed(allowed),
         }
     }
@@ -92,11 +92,11 @@ mod tests {
         let proposal = Proposal::SectionInfo(section_auth.clone());
         verify_serialize_for_signing(&proposal, &section_auth)?;
 
-        // Proposal::OurElders
+        // Proposal::NewElders
         let new_sk = bls::SecretKey::random();
         let new_pk = new_sk.public_key();
         let section_signed_auth = dkg::test_utils::section_signed(&new_sk, section_auth)?;
-        let proposal = Proposal::OurElders(section_signed_auth);
+        let proposal = Proposal::NewElders(section_signed_auth);
         verify_serialize_for_signing(&proposal, &new_pk)?;
 
         Ok(())

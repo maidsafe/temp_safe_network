@@ -60,7 +60,7 @@ pub(crate) enum Command {
     /// Handle a new Node joining agreement.
     HandleNewNodeOnline(SectionAuth<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
-    HandleElderAgreement { proposal: Proposal, sig: KeyedSig },
+    HandleNewEldersAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
     /// the proposed new elders).
     HandleDkgOutcome {
@@ -117,7 +117,7 @@ impl fmt::Display for Command {
             }
             Command::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
             Command::HandleAgreement { .. } => write!(f, "HandleAgreement"),
-            Command::HandleElderAgreement { .. } => write!(f, "HandleElderAgreement"),
+            Command::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
             Command::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
             Command::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Command::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),

@@ -1228,7 +1228,7 @@ async fn handle_elders_update() -> Result<()> {
     let sk_set1 = SecretKeySet::random();
 
     let pk1 = sk_set1.secret_key().public_key();
-    // Create `HandleAgreement` command for an `OurElders` proposal. This will demote one of the
+    // Create `HandleAgreement` command for an `NewElders` proposal. This will demote one of the
     // current elders and promote the oldest peer.
     let sap1 = SectionAuthorityProvider::new(
         iter::once(node.peer())
@@ -1240,7 +1240,7 @@ async fn handle_elders_update() -> Result<()> {
     let elder_names1: BTreeSet<_> = sap1.names();
 
     let signed_sap1 = section_signed(sk_set1.secret_key(), sap1)?;
-    let proposal = Proposal::OurElders(signed_sap1);
+    let proposal = Proposal::NewElders(signed_sap1);
     let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
     let sig = KeyedSig {
         signature,
@@ -1270,7 +1270,10 @@ async fn handle_elders_update() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let commands = dispatcher
-        .handle_command(Command::HandleElderAgreement { proposal, sig }, "cmd-id")
+        .handle_command(
+            Command::HandleNewEldersAgreement { proposal, sig },
+            "cmd-id",
+        )
         .await?;
 
     let mut update_actual_recipients = HashSet::new();
@@ -1397,17 +1400,17 @@ async fn handle_demote_during_split() -> Result<()> {
 
     // Create agreement on `OurElder` for both sub-sections
     let create_our_elders_command = |signed_sap| -> Result<_> {
-        let proposal = Proposal::OurElders(signed_sap);
+        let proposal = Proposal::NewElders(signed_sap);
         let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
         let sig = KeyedSig {
             signature,
             public_key: sk_set_v0.public_keys().public_key(),
         };
 
-        Ok(Command::HandleElderAgreement { proposal, sig })
+        Ok(Command::HandleNewEldersAgreement { proposal, sig })
     };
 
-    // Handle agreement on `OurElders` for prefix-0.
+    // Handle agreement on `NewElders` for prefix-0.
     let section_auth = SectionAuthorityProvider::new(
         peers_a.iter().cloned().chain(iter::once(peer_c)),
         prefix0,
@@ -1420,7 +1423,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
     assert_matches!(&commands[..], &[]);
 
-    // Handle agreement on `OurElders` for prefix-1.
+    // Handle agreement on `NewElders` for prefix-1.
     let section_auth =
         SectionAuthorityProvider::new(peers_b.iter().cloned(), prefix1, sk_set_v1_p1.public_keys());
 
