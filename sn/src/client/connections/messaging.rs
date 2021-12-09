@@ -148,7 +148,7 @@ impl Session {
             // The max timeout is total_timeout / retry_factor, so we should get at least lowest_bound_count retries within the total time (if needed)
             self.standard_wait,
             async {
-                let example_ae: AeCacheEntry = (elders.clone(), section_pk.clone(), bytes.clone());
+                let example_ae: AeCacheEntry = (elders.clone(), section_pk, bytes.clone());
                 let mut retry_cache_guard = self.ae_retry_cache.write().await;
                 let mut redirect_cache_guard = self.ae_redirect_cache.write().await;
                 loop {
