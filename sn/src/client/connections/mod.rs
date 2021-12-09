@@ -34,7 +34,8 @@ pub(crate) struct QueryResult {
     pub(super) operation_id: OperationId,
 }
 
-pub(crate) type AeCache = LRUCache<(Vec<SocketAddr>, BlsPublicKey, Bytes), 100>;
+pub(crate) type AeCacheEntry = (Vec<SocketAddr>, BlsPublicKey, Bytes);
+pub(crate) type AeCache = LRUCache<AeCacheEntry, 100>;
 
 #[derive(Clone, Debug)]
 pub(super) struct Session {
