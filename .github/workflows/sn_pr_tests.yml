@@ -56,7 +56,7 @@ jobs:
 
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib
+        run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib --bins
 
       - name: Start the network
         run: ./target/release/testnet
@@ -248,7 +248,7 @@ jobs:
 
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib
+        run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib --bins
 
       - name: Start the network
         run: ./target/release/testnet
@@ -404,7 +404,7 @@ jobs:
 
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib
+        run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib --bins
 
       - name: Start the network
         run: ./target/release/testnet
