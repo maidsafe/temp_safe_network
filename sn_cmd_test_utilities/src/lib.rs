@@ -78,8 +78,7 @@ pub mod util {
     }
 
     pub fn create_and_get_keys() -> Result<(String, String)> {
-        let pk_command_result =
-            safe_cmd_stdout(["keys", "create", "--test-coins", "--json"], Some(0))?;
+        let pk_command_result = safe_cmd_stdout(["keys", "create", "--json"], Some(0))?;
 
         let (xorurl, (_pk, sk)): (String, (String, String)) =
             parse_keys_create_output(&pk_command_result);
