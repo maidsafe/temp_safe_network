@@ -167,6 +167,11 @@ jobs:
         timeout-minutes: 7
         continue-on-error: true
 
+      # this is temporarily rbeing un before client_api tests, it shall be run after client tests
+      - name: Run sn_api tests
+        shell: bash
+        run: ./resources/scripts/api_tests.sh
+        timeout-minutes: 70
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests...
@@ -223,11 +228,6 @@ jobs:
 
       # - name: Was there a section split?
       #   run: ./resources/scripts/has_split.sh
-
-      - name: Run sn_api tests
-        shell: bash
-        run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 50
 
       - name: Are nodes still running...?
         shell: bash

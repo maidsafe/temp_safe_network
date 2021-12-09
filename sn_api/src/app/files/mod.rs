@@ -63,10 +63,7 @@ impl Safe {
         follow_links: bool,
         dry_run: bool,
     ) -> Result<(XorUrl, ProcessedFiles, FilesMap)> {
-        // TODO: Enable source for funds / ownership
-        // Warn about ownership?
-
-        // Let's upload the files and generate the list of local files paths
+        // Let's upload the files (if not dry_run) and generate the list of local files paths
         let (processed_files, files_map) = match location {
             Some(path) => {
                 let mut processed_files =
@@ -74,7 +71,6 @@ impl Safe {
 
                 // The FilesContainer is stored on a Register
                 // and the link to the serialised FilesMap as the entry's value
-                // TODO: use RDF format
                 let files_map = files_map_create(
                     self,
                     &mut processed_files,
@@ -84,49 +80,50 @@ impl Safe {
                     dry_run,
                 )
                 .await?;
+
                 (processed_files, files_map)
             }
             None => (ProcessedFiles::default(), FilesMap::default()),
         };
 
-        // create a register for this files map
+        // Build a Register creation operation
         let (xorname, reg_op) = self
             .safe_client
             .create_register(None, FILES_CONTAINER_TYPE_TAG, None, false)
             .await?;
-        let xor_url = Url::encode_register(
-            xorname,
-            FILES_CONTAINER_TYPE_TAG,
-            Scope::Public,
-            ContentType::FilesContainer,
-            self.xorurl_base,
-        )?;
-        if !dry_run {
-            self.safe_client.apply_register_ops(reg_op).await?;
-        }
 
-        // store files map on network
-        let files_map_xorurl = if !dry_run {
-            self.store_files_map(&files_map).await?
+        let xorurl = if !dry_run {
+            // Send the Register creation op to the network
+            self.safe_client.apply_register_ops(reg_op).await?;
+
+            // Store files map on network
+            let files_map_xorurl = self.store_files_map(&files_map).await?;
+
+            let xorurl = Url::encode_register(
+                xorname,
+                FILES_CONTAINER_TYPE_TAG,
+                Scope::Public,
+                ContentType::FilesContainer,
+                self.xorurl_base,
+            )?;
+            let mut reg_url = Url::from_xorurl(&xorurl)?;
+
+            // Write pointer to files_map onto our register
+            let reg_address = self.get_register_address(&reg_url)?;
+            let entry = files_map_xorurl.as_bytes().to_vec();
+            let (entry_hash, reg_op) = self
+                .safe_client
+                .write_to_register(reg_address, entry, Default::default())
+                .await?;
+
+            self.safe_client.apply_register_ops(reg_op).await?;
+
+            // We return versioned xorurl
+            reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));
+            reg_url.to_string()
         } else {
             "".to_string()
         };
-
-        // write pointer to files map to our register
-        let mut reg_url = Url::from_xorurl(&xor_url)?;
-        let address = self.get_register_address(&reg_url)?;
-        let entry = files_map_xorurl.as_bytes().to_vec();
-        let (entry_hash, reg_op) = self
-            .safe_client
-            .write_to_register(address, entry, Default::default())
-            .await?;
-        if !dry_run {
-            self.safe_client.apply_register_ops(reg_op).await?;
-        }
-
-        // return versionned xorurl
-        reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));
-        let xorurl = reg_url.to_string();
 
         Ok((xorurl, processed_files, files_map))
     }
@@ -629,16 +626,17 @@ impl Safe {
     async fn store_files_map(&mut self, files_map: &FilesMap) -> Result<String> {
         // The FilesMapContainer is a Register where each NRS Map version is
         // an entry containing the XOR-URL of the Blob that contains the serialised NrsMap.
-        // TODO: use RDF format
         let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
             Error::Serialisation(format!(
                 "Couldn't serialise the FilesMap generated: {:?}",
                 err
             ))
         })?;
+
         let files_map_xorurl = self
             .store_public_bytes(Bytes::from(serialised_files_map), None, false)
             .await?;
+
         Ok(files_map_xorurl)
     }
 }
@@ -1618,7 +1616,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "fix dry run for files container"]
     async fn test_files_container_sync_dry_run() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, _) = new_files_container_from_testdata(&mut safe).await?;
@@ -2359,7 +2356,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "fix dry run for files container"]
     async fn test_files_container_add_dry_run() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
