@@ -214,7 +214,10 @@ async fn run_node() -> Result<()> {
                 exit(1);
             }
             Err(Error::JoinTimeout) => {
-                let message = format!("Encountered a timeout while trying to join the network. Retrying after {} minutes.", BOOTSTRAP_RETRY_TIME);
+                let message = format!(
+                    "Encountered a timeout while trying to join the network. Retrying after {:?}.",
+                    bootstrap_retry_duration
+                );
                 println!("{}", &message);
                 error!("{}", &message);
             }
