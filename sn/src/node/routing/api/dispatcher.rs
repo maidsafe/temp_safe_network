@@ -33,7 +33,7 @@ const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 // this doesn't realistically limit concurrency
 // the prioritisation will do that, preventing lower prio messages being kicked off when
 // high prio messages exist
-const SEMAPHORE_COUNT: usize = 10000;
+const SEMAPHORE_COUNT: usize = 100;
 
 // A command/subcommand id e.g. "963111461", "963111461.0"
 type CmdId = String;
