@@ -27,6 +27,8 @@ use tracing::debug;
 
 const DEFAULT_TIMEOUT_SECS: u64 = 60 * 10; //10 mins
 
+const SN_CLI_QUERY_TIMEOUT: &str = "SN_CLI_QUERY_TIMEOUT";
+
 #[derive(StructOpt, Debug)]
 /// Interact with the Safe Network
 #[structopt(global_settings(&[ColoredHelp]))]
@@ -52,10 +54,14 @@ pub struct CmdArgs {
 }
 
 pub async fn run() -> Result<()> {
-    let cli_timeout: u64 = match env::var("SN_CLI_QUERY_TIMEOUT") {
-        Ok(timeout) => timeout
-            .parse::<u64>()
-            .map_err(|_| eyre!("Could not parse \'SN_CLI_QUERY_TIMEOUT\' env var"))?,
+    let cli_timeout: u64 = match env::var(SN_CLI_QUERY_TIMEOUT) {
+        Ok(timeout) => timeout.parse::<u64>().map_err(|_| {
+            eyre!(
+                "Could not parse {} env var value: {}",
+                SN_CLI_QUERY_TIMEOUT,
+                timeout
+            )
+        })?,
         Err(_) => DEFAULT_TIMEOUT_SECS,
     };
 
