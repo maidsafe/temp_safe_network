@@ -40,7 +40,9 @@ jobs:
       - uses: actions/upload-artifact@master
         with:
           name: safe_network-${{ matrix.target }}
-          path: artifacts
+          path: |
+            artifacts
+            !artifacts/.cargo-lock
 
   gh_release:
     if: |
