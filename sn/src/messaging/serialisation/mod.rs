@@ -62,109 +62,47 @@ impl MessageType {
     pub fn priority(&self) -> i32 {
         match self {
             MessageType::System {
-                msg: SystemMsg::JoinResponse(_),
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::JoinAsRelocatedResponse(_),
+                msg: SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_),
                 ..
             } => JOIN_RESPONSE_PRIORITY,
             // DKG messages
             MessageType::System {
-                msg: SystemMsg::DkgStart { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::DkgSessionUnknown { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::DkgSessionInfo { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::DkgNotReady { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::DkgRetry { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::DkgMessage { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::DkgFailureObservation { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::DkgFailureAgreement(_),
+                msg:
+                    SystemMsg::DkgStart { .. }
+                    | SystemMsg::DkgSessionUnknown { .. }
+                    | SystemMsg::DkgSessionInfo { .. }
+                    | SystemMsg::DkgNotReady { .. }
+                    | SystemMsg::DkgRetry { .. }
+                    | SystemMsg::DkgMessage { .. }
+                    | SystemMsg::DkgFailureObservation { .. }
+                    | SystemMsg::DkgFailureAgreement(_),
                 ..
             } => DKG_MSG_PRIORITY,
 
             // Node messages for AE updates
             MessageType::System {
-                msg: SystemMsg::AntiEntropyRetry { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::AntiEntropyRedirect { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::AntiEntropyUpdate { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::AntiEntropyProbe(_),
-                ..
-            } => AE_MSG_PRIORITY,
-
-            MessageType::System {
-                msg: SystemMsg::BackPressure(_),
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::Relocate(_),
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::RelocatePromise(_),
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::JoinRequest(_),
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::JoinAsRelocatedRequest(_),
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::Propose { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::StartConnectivityTest(_),
+                msg:
+                    SystemMsg::AntiEntropyRetry { .. }
+                    | SystemMsg::AntiEntropyRedirect { .. }
+                    | SystemMsg::AntiEntropyUpdate { .. }
+                    | SystemMsg::AntiEntropyProbe(_)
+                    | SystemMsg::BackPressure(_)
+                    | SystemMsg::Relocate(_)
+                    | SystemMsg::RelocatePromise(_)
+                    | SystemMsg::JoinRequest(_)
+                    | SystemMsg::JoinAsRelocatedRequest(_)
+                    | SystemMsg::Propose { .. }
+                    | SystemMsg::StartConnectivityTest(_),
                 ..
             } => INFRASTRUCTURE_MSG_PRIORITY,
 
             // Inter-node comms related to processing client requests
             MessageType::System {
-                msg: SystemMsg::NodeCmd(_),
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::NodeQuery(_),
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::NodeQueryResponse { .. },
-                ..
-            }
-            | MessageType::System {
-                msg: SystemMsg::NodeMsgError { .. },
+                msg:
+                    SystemMsg::NodeCmd(_)
+                    | SystemMsg::NodeQuery(_)
+                    | SystemMsg::NodeQueryResponse { .. }
+                    | SystemMsg::NodeMsgError { .. },
                 ..
             } => NODE_DATA_MSG_PRIORITY,
 
