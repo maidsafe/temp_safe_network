@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.48.0 (2021-12-10)
+
+### New Features
+
+ - <csr-id-fd31bd2ef5ccc9149f8f0a2844c52af60bff3840/> use Vec of DataCmd instead of wrapper struct
+ - <csr-id-84ebec0e1b2b3e1107d673734125aadbdb108472/> upgrade batch to write ahead log with index
+
+### Bug Fixes
+
+ - <csr-id-661e994cb452242a1d7c831ab88b9a66a244faff/> avoid change name by mistake when Join
+ - <csr-id-58bd78e8a4fc34e7f76a9f449301b9216cb6a1d4/> complete the relocation flow
+
+### New Features (BREAKING)
+
+ - <csr-id-565e57619557e2b63f028eb214b59fc69b77fc37/> register op batching
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 9 commits contributed to the release over the course of 1 calendar day.
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - minor improvement to client log msgs related to configured timeouts ([`58632a2`](https://github.com/maidsafe/safe_network/commit/58632a27d271140fc4d777f25a76b0daea582426))
+    - remove Generic client error ([`0d4343c`](https://github.com/maidsafe/safe_network/commit/0d4343c8fa56749d3ec9390e298d1d6384573a67))
+    - avoid change name by mistake when Join ([`661e994`](https://github.com/maidsafe/safe_network/commit/661e994cb452242a1d7c831ab88b9a66a244faff))
+    - safe_network-0.47.0 ([`8570965`](https://github.com/maidsafe/safe_network/commit/85709655b0ce38246515658b956aa9b8f67cb55a))
+    - use Vec of DataCmd instead of wrapper struct ([`fd31bd2`](https://github.com/maidsafe/safe_network/commit/fd31bd2ef5ccc9149f8f0a2844c52af60bff3840))
+    - upgrade batch to write ahead log with index ([`84ebec0`](https://github.com/maidsafe/safe_network/commit/84ebec0e1b2b3e1107d673734125aadbdb108472))
+    - register op batching ([`565e576`](https://github.com/maidsafe/safe_network/commit/565e57619557e2b63f028eb214b59fc69b77fc37))
+    - checking Relocation during CI ([`7eda276`](https://github.com/maidsafe/safe_network/commit/7eda2760da82b3079d5eee2f97e2d15ac8da0d57))
+    - complete the relocation flow ([`58bd78e`](https://github.com/maidsafe/safe_network/commit/58bd78e8a4fc34e7f76a9f449301b9216cb6a1d4))
+</details>
+
 ## v0.47.0 (2021-12-08)
 
 ### New Features
@@ -20,29 +63,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-565e57619557e2b63f028eb214b59fc69b77fc37/> register op batching
 
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 5 commits contributed to the release.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - use Vec of DataCmd instead of wrapper struct ([`fd31bd2`](https://github.com/maidsafe/safe_network/commit/fd31bd2ef5ccc9149f8f0a2844c52af60bff3840))
-    - upgrade batch to write ahead log with index ([`84ebec0`](https://github.com/maidsafe/safe_network/commit/84ebec0e1b2b3e1107d673734125aadbdb108472))
-    - register op batching ([`565e576`](https://github.com/maidsafe/safe_network/commit/565e57619557e2b63f028eb214b59fc69b77fc37))
-    - checking Relocation during CI ([`7eda276`](https://github.com/maidsafe/safe_network/commit/7eda2760da82b3079d5eee2f97e2d15ac8da0d57))
-    - complete the relocation flow ([`58bd78e`](https://github.com/maidsafe/safe_network/commit/58bd78e8a4fc34e7f76a9f449301b9216cb6a1d4))
-</details>
-
 ## v0.46.6 (2021-12-07)
 
 ### Bug Fixes
@@ -52,7 +72,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-8e480e5eb5cd38f9bfb3b723aa1d0dd5e4be3122/> aovid overwrite pervious session by  accident
  - <csr-id-fdc4ba6bb36dff85126c8273cdfc67f9b07e2175/> multiple fixes for DKG-AE
    - discard DKG session info for older sessions
-- skip DkgStart and DkgRetry messages for expired sessions
 
 ### Commit Statistics
 
@@ -76,6 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - clippy tidyup for rust 1.57 ([`05f6d98`](https://github.com/maidsafe/safe_network/commit/05f6d98cf21f0158f4b5161484c7c15a0561b6f4))
     - multiple fixes for DKG-AE ([`fdc4ba6`](https://github.com/maidsafe/safe_network/commit/fdc4ba6bb36dff85126c8273cdfc67f9b07e2175))
 </details>
+
+<csr-unknown>
+skip DkgStart and DkgRetry messages for expired sessions<csr-unknown/>
 
 ## v0.46.5 (2021-12-02)
 
@@ -104,9 +126,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - safe_network-0.46.5 ([`8657784`](https://github.com/maidsafe/safe_network/commit/86577846e845c110c49e15c95c6bd5595db51773))
     - avoid network_knowledge loopup when sending DkgRetry or DkgSessionInfo ([`01a5c96`](https://github.com/maidsafe/safe_network/commit/01a5c961fc02f9ca8d6f60286306d5efba460e4e))
 </details>
-
-<csr-unknown>
-skip DkgStart and DkgRetry messages for expired sessions<csr-unknown/>
 
 ## v0.46.4 (2021-12-02)
 
