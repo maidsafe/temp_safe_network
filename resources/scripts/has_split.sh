@@ -55,4 +55,5 @@ if ! [[ $split_count -gt $((2*$ELDER_COUNT - 1)) ]]
         exit 100
     else
         echo "Successful split!"
+        exit 0;
 fi
