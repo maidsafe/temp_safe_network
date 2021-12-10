@@ -8,142 +8,18 @@
 // Software.
 
 mod handlers;
+mod safe_data;
 
-use super::{
-    files::{FileInfo, FilesMap},
-    multimap::MultimapKeyValues,
-    nrs::NrsMap,
-    register::{Entry, EntryHash},
-    Safe, XorName,
-};
+use super::{files::FileInfo, Safe};
 pub use super::{ContentType, DataType, Url, VersionHash, XorUrlBase};
 use crate::{Error, Result};
-use bytes::Bytes;
 use log::{debug, info};
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+pub use safe_data::SafeData;
 
 pub type Range = Option<(Option<u64>, Option<u64>)>;
 
 // Maximum number of indirections allowed when resolving a safe:// URL following links
 const INDIRECTION_LIMIT: usize = 10;
-
-/// SafeData contains the data types fetchable using the Safe Network resolver
-#[allow(clippy::large_enum_variant)]
-// FilesContainer is significantly larger than the other variants
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
-pub enum SafeData {
-    SafeKey {
-        xorurl: String,
-        xorname: XorName,
-        resolved_from: String,
-    },
-    FilesContainer {
-        xorurl: String,
-        xorname: XorName,
-        type_tag: u64,
-        version: VersionHash,
-        files_map: FilesMap,
-        data_type: DataType,
-        metadata: Option<FileInfo>,
-        resolves_into: Option<Url>,
-        resolved_from: String,
-    },
-    PublicBlob {
-        xorurl: String,
-        xorname: XorName,
-        data: Bytes,
-        media_type: Option<String>,
-        metadata: Option<FileInfo>,
-        resolved_from: String,
-    },
-    NrsMapContainer {
-        public_name: Option<String>,
-        xorurl: String,
-        xorname: XorName,
-        type_tag: u64,
-        version: VersionHash,
-        nrs_map: NrsMap,
-        data_type: DataType,
-        resolves_into: Option<Url>,
-        resolved_from: String,
-    },
-    Multimap {
-        xorurl: String,
-        xorname: XorName,
-        type_tag: u64,
-        data: MultimapKeyValues,
-        resolved_from: String,
-    },
-    PublicRegister {
-        xorurl: String,
-        xorname: XorName,
-        type_tag: u64,
-        data: BTreeSet<(EntryHash, Entry)>,
-        resolved_from: String,
-    },
-    PrivateRegister {
-        xorurl: String,
-        xorname: XorName,
-        type_tag: u64,
-        data: BTreeSet<(EntryHash, Entry)>,
-        resolved_from: String,
-    },
-}
-
-impl SafeData {
-    pub fn xorurl(&self) -> String {
-        use SafeData::*;
-        match self {
-            SafeKey { xorurl, .. }
-            | FilesContainer { xorurl, .. }
-            | PublicBlob { xorurl, .. }
-            | NrsMapContainer { xorurl, .. }
-            | Multimap { xorurl, .. }
-            | PublicRegister { xorurl, .. }
-            | PrivateRegister { xorurl, .. } => xorurl.clone(),
-        }
-    }
-
-    pub fn resolved_from(&self) -> String {
-        use SafeData::*;
-        match self {
-            SafeKey { resolved_from, .. }
-            | FilesContainer { resolved_from, .. }
-            | PublicBlob { resolved_from, .. }
-            | NrsMapContainer { resolved_from, .. }
-            | Multimap { resolved_from, .. }
-            | PublicRegister { resolved_from, .. }
-            | PrivateRegister { resolved_from, .. } => resolved_from.clone(),
-        }
-    }
-
-    pub fn resolves_into(&self) -> Option<Url> {
-        use SafeData::*;
-        match self {
-            SafeKey { .. }
-            | PublicBlob { .. }
-            | Multimap { .. }
-            | PublicRegister { .. }
-            | PrivateRegister { .. } => None,
-            FilesContainer { resolves_into, .. } | NrsMapContainer { resolves_into, .. } => {
-                resolves_into.clone()
-            }
-        }
-    }
-
-    pub fn metadata(&self) -> Option<FileInfo> {
-        use SafeData::*;
-        match self {
-            SafeKey { .. }
-            | Multimap { .. }
-            | PublicRegister { .. }
-            | PrivateRegister { .. }
-            | NrsMapContainer { .. } => None,
-            FilesContainer { metadata, .. } | PublicBlob { metadata, .. } => metadata.clone(),
-        }
-    }
-}
 
 impl Safe {
     /// Parses a string URL "safe://url" and returns a safe URL
@@ -297,29 +173,23 @@ impl Safe {
 
         let mut indirections_limit = INDIRECTION_LIMIT;
         let mut safe_data_vec = vec![];
-        let mut next_url = input_url;
+        let mut next_step = Some(input_url);
         let mut metadata = attached_metadata;
-        loop {
+        while let Some(next_url) = next_step {
             // fetch safe_data from URL
             let safe_data = self
                 .resolve_url(next_url, metadata, retrieve_data, range, resolve_path)
                 .await?;
 
-            let next_step = safe_data.resolves_into();
+            next_step = safe_data.resolves_into();
             metadata = safe_data.metadata();
             safe_data_vec.push(safe_data);
 
-            match next_step {
-                None => break,
-                Some(_) if indirections_limit == 0 => {
-                    return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
-                }
-                Some(url) => {
-                    // fetch next (and attach current metadata to it)
-                    next_url = url;
-                    indirections_limit -= 1;
-                }
+            if indirections_limit == 0 {
+                return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
             }
+
+            indirections_limit -= 1;
         }
 
         Ok(safe_data_vec)
@@ -375,6 +245,7 @@ mod tests {
     use super::*;
     use crate::{app::files, app::test_helpers::new_safe_instance, retry_loop, Scope, Url};
     use anyhow::{anyhow, bail, Context, Result};
+    use bytes::Bytes;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use safe_network::types::DataAddress;
     use std::io::Read;
@@ -594,7 +465,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "fix unknown issue"]
     async fn test_fetch_range_public_blob() -> Result<()> {
         let safe = new_safe_instance().await?;
         let saved_data = Bytes::from("Something super immutable");
@@ -607,8 +477,8 @@ mod tests {
         let fetch_first_half = Some((None, Some(size as u64 / 2)));
         let content = retry_loop!(safe.fetch(&xorurl, fetch_first_half));
 
-        if let SafeData::PublicBlob { data, .. } = &content {
-            assert_eq!(data.clone(), saved_data.slice(0..size / 2).to_vec());
+        if let SafeData::PublicBlob { data, .. } = content {
+            assert_eq!(data, saved_data.slice(0..size / 2));
         } else {
             bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
@@ -617,8 +487,8 @@ mod tests {
         let fetch_second_half = Some((Some(size as u64 / 2), Some(size as u64)));
         let content = safe.fetch(&xorurl, fetch_second_half).await?;
 
-        if let SafeData::PublicBlob { data, .. } = &content {
-            assert_eq!(data.clone(), saved_data[size / 2..size].to_vec());
+        if let SafeData::PublicBlob { data, .. } = content {
+            assert_eq!(data, saved_data[size / 2..]);
             Ok(())
         } else {
             Err(anyhow!(
@@ -629,7 +499,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "fix unknown issue"]
     async fn test_fetch_range_from_files_container() -> Result<()> {
         use std::fs::File;
         let mut safe = new_safe_instance().await?;
@@ -667,8 +536,8 @@ mod tests {
         // fetch first half and match
         let fetch_first_half = Some((Some(0), Some(file_size as u64 / 2)));
         let content = safe.fetch(&nrs_url, fetch_first_half).await?;
-        if let SafeData::PublicBlob { data, .. } = &content {
-            assert_eq!(data.clone(), file_data[0..file_size / 2].to_vec());
+        if let SafeData::PublicBlob { data, .. } = content {
+            assert_eq!(data, file_data[0..file_size / 2]);
         } else {
             bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
@@ -676,8 +545,8 @@ mod tests {
         // fetch second half and match
         let fetch_second_half = Some((Some(file_size as u64 / 2), Some(file_size as u64)));
         let content = safe.fetch(&nrs_url, fetch_second_half).await?;
-        if let SafeData::PublicBlob { data, .. } = &content {
-            assert_eq!(data.clone(), file_data[file_size / 2..file_size].to_vec());
+        if let SafeData::PublicBlob { data, .. } = content {
+            assert_eq!(data, file_data[file_size / 2..]);
         } else {
             bail!("Content fetched is not a PublicBlob: {:?}", content);
         }

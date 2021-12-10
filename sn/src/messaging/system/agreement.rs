@@ -103,7 +103,7 @@ pub enum Proposal {
     ///   4. the signature of the new key using the current key
     /// Which we can use to update the section section authority provider and the section chain at
     /// the same time as a single atomic operation without needing to cache anything.
-    OurElders(SectionAuth<SectionAuthorityProvider>),
+    NewElders(SectionAuth<SectionAuthorityProvider>),
     /// Proposal to change whether new nodes are allowed to join our section.
     JoinsAllowed(bool),
 }

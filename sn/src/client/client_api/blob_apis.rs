@@ -55,8 +55,10 @@ impl Client {
     /// multiple chunks in the network. This function invokes the self-encryptor and returns
     /// the data that was initially stored.
     ///
-    /// Takes `position` and `len` arguments which specify the start position
-    /// and the length of bytes to be read. Passing `0` to position reads the data from the beginning.
+    /// Takes `position` and `length` arguments which specify the start position
+    /// and the length of bytes to be read.
+    /// Passing `0` to position reads the data from the beginning,
+    /// and the `length` is just an upper limit.
     ///
     /// # Examples
     ///
@@ -81,7 +83,8 @@ impl Client {
 
         let chunk = self.get_chunk(address.name()).await?;
 
-        // first try to deserialize a blob, if it works, we go and seek it
+        // First try to deserialize a Blob, if it works, we go and seek it.
+        // If an error occurs, we consider it to be a Spot.
         if let Ok(data_map) = self
             .unpack_head_chunk(HeadChunk {
                 chunk: chunk.clone(),
@@ -92,21 +95,15 @@ impl Client {
             return self.seek(data_map, position, length).await;
         }
 
-        // if an error occurs, we consider its a spot
-        // the error above is ignored to avoid leaking the storage format detail of spots and blobs
-        // the basic idea is that we're trying to deserialize as one, and then the other.
-        // the cost of it is that some errors will not be seen without a refactor.
-        let bytes = self.get_bytes(chunk, address.scope())?;
+        // The error above is ignored to avoid leaking the storage format detail of Spots and Blobs.
+        // The basic idea is that we're trying to deserialize as one, and then the other.
+        // The cost of it is that some errors will not be seen without a refactor.
+        let mut bytes = self.get_bytes(chunk, address.scope())?;
 
-        let chunk_size = bytes.len();
-        if chunk_size < position + length {
-            return Err(Error::InvalidPositionOrLength(format!(
-                "slicing from chunk at: {:?} of size: {}, with position: {}, and length: {}",
-                &address, chunk_size, position, length
-            )));
-        }
+        let _ = bytes.split_to(position);
+        bytes.truncate(length);
 
-        Ok(bytes.slice(position..length))
+        Ok(bytes)
     }
 
     #[instrument(skip(self), level = "trace")]

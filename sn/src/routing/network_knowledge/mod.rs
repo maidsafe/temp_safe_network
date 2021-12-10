@@ -205,7 +205,11 @@ impl NetworkKnowledge {
     /// If we already have the signed SAP and section chain for the provided key and prefix
     /// we make them the current SAP and section chain, and if so, this returns 'true'.
     /// Note this function assumes we already have the key share for the provided section key.
-    pub(super) async fn set_current_sap(&self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
+    pub(super) async fn try_update_current_sap(
+        &self,
+        section_key: BlsPublicKey,
+        prefix: &Prefix,
+    ) -> bool {
         // Let's try to find the signed SAP corresponding to the provided prefix and section key
         match self.prefix_map.get_signed(prefix) {
             Some(signed_sap) if signed_sap.value.section_key() == section_key => {

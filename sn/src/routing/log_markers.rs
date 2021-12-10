@@ -51,7 +51,7 @@ pub enum LogMarker {
     DkgSessionComplete,
     DkgSessionAlreadyCompleted,
     HandlingDkgSuccessfulOutcome,
-    HandlingElderAgreement,
+    HandlingNewEldersAgreement,
     NewSignedSap,
     NewKeyShareStored,
     TriggeringPromotionAndDemotion,
