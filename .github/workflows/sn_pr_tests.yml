@@ -53,7 +53,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           cache-on-failure: true
-          sharedKey: ${{github.run_id}}
+          sharedKey: ${{github.run_id}}-splits
 
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
@@ -166,7 +166,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           cache-on-failure: true
-          sharedKey: ${{github.run_id}}
+          sharedKey: ${{github.run_id}}-units
 
       - name: Build all test targets
         # all = all crates in workspace, lib/bins targets, with these features...
@@ -237,7 +237,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           cache-on-failure: true
-          sharedKey: ${{github.run_id}}
+          sharedKey: ${{github.run_id}}-e2e
 
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
@@ -397,7 +397,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           cache-on-failure: true
-          sharedKey: ${{github.run_id}}
+          sharedKey: ${{github.run_id}}-api
 
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
