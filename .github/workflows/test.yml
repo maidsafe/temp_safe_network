@@ -1,0 +1,9 @@
+name: Testing
+on: [pull_request]
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - name: Step One
+        run: echo "Hello World"
