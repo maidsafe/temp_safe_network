@@ -14,7 +14,7 @@ mod realpath;
 
 use crate::{
     app::consts::*, app::nrs::VersionHash, resolver::Range, ContentType, DataType, Error, Result,
-    Safe, Scope, SafeUrl, XorUrl,
+    Safe, SafeUrl, Scope, XorUrl,
 };
 use bytes::{Buf, Bytes};
 use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
@@ -608,7 +608,11 @@ impl Safe {
     }
 
     /// Fetch an Blob from a SafeUrl without performing any type of URL resolution
-    pub(crate) async fn fetch_public_data(&self, safe_url: &SafeUrl, range: Range) -> Result<Bytes> {
+    pub(crate) async fn fetch_public_data(
+        &self,
+        safe_url: &SafeUrl,
+        range: Range,
+    ) -> Result<Bytes> {
         let data = match safe_url.data_type() {
             DataType::Bytes => {
                 self.safe_client
