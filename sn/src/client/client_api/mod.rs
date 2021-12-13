@@ -18,7 +18,7 @@ use crate::client::{
     ClientConfig,
 };
 use crate::messaging::data::{CmdError, DataQuery, RegisterRead, ServiceMsg};
-use crate::types::{RegisterAddress, Keypair, PublicKey};
+use crate::types::{Keypair, PublicKey, RegisterAddress};
 
 use crate::messaging::{ServiceAuth, WireMsg};
 use crate::prefix_map::NetworkPrefixMap;
@@ -168,7 +168,12 @@ impl Client {
         // Generate a random query to send a dummy message
         let random_dst_addr = XorName::random();
         let serialised_cmd = {
-            let msg = ServiceMsg::Query(DataQuery::Register(RegisterRead::Get(RegisterAddress::Public{name: random_dst_addr, tag: 1})));
+            let msg = ServiceMsg::Query(DataQuery::Register(RegisterRead::Get(
+                RegisterAddress::Public {
+                    name: random_dst_addr,
+                    tag: 1,
+                },
+            )));
             WireMsg::serialize_msg_payload(&msg)?
         };
         let signature = client.keypair.sign(&serialised_cmd);

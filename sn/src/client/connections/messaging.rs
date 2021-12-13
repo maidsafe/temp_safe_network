@@ -395,11 +395,7 @@ impl Session {
         // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
         let (elders_or_adults, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let mut nodes: Vec<_> = sap
-                    .elders()
-                    .map(|elder| elder.addr())
-                    .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-                    .collect();
+                let mut nodes: Vec<_> = sap.elders().map(|elder| elder.addr()).collect();
 
                 nodes.shuffle(&mut OsRng);
 
