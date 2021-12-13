@@ -138,7 +138,7 @@ jobs:
 
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib --bins
+        run: cargo build -p safe_network --release --features=always-joinable,test-utils
 
       - name: Start the network
         run: ./target/release/testnet
@@ -150,7 +150,7 @@ jobs:
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: Build all safe_network tests
-        run: cargo test --no-run -p safe_network --release --features=always-joinable,test-utils --lib
+        run: cargo test --no-run -p safe_network --release --features=always-joinable,test-utils
 
       - name: Run network asserts one by one
         shell: bash
