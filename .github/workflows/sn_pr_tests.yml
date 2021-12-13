@@ -166,14 +166,23 @@ jobs:
       # register api
       - name: Client reg tests against local network
         shell: bash
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --skip ae && sleep 5
         timeout-minutes: 10
 
-      # blob api unix
-      - name: Unix client blob tests against local network
+      # blob api
+      - name: client blob tests against local network
         shell: bash
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob && sleep 5
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob --skip ae  && sleep 5
         timeout-minutes: 10
+
+
+      # ae tests api
+      - name: client ae tests against local network
+        shell: bash
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- ae_checks  && sleep 5
+        timeout-minutes: 10
+        env:
+          SN_AE_WAIT: 10
 
       - name: Run example app for Blob API against local network
         timeout-minutes: 10
