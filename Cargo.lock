@@ -3200,7 +3200,8 @@ dependencies = [
 [[package]]
 name = "self_update"
 version = "0.27.0"
-source = "git+https://github.com/jacderida/self_update.git?branch=github_download_json_parsing#d3dc11142b207c89cc25cc0b099ac3cf54e6493c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fb85f1802f7b987237b8525c0fde86ea86f31c957c1875467c727d5b921179c"
 dependencies = [
  "either",
  "flate2",

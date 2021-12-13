@@ -15,7 +15,7 @@ use tracing::debug;
 const REPO_NAME: &str = "sn_cli";
 
 #[cfg(not(feature = "self-update"))]
-pub fn update_commander() -> Result<(), Box<dyn Error>> {
+pub fn update_commander(_no_confirm: bool) -> Result<(), Box<dyn Error>> {
     println!("Self updates are disabled.");
     Ok(())
 }
