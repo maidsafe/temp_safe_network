@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.49.0 (2021-12-13)
+
+### New Features
+
+ - <csr-id-35467d3e886d2824c4f9e4586666cab7a7960e54/> limit the relocations at one time
+
+### Bug Fixes
+
+ - <csr-id-8955fcf9d69e869725177340d1de6b6b1e7a203b/> read_from client API was incorrectly using provided length value as an end index
+   - Minor refactoring in sn_api moving the SafeData struct into its own file.
+   - Re-enabling the only two fetch API tests which are now passsing with this fix.
+
+### chore (BREAKING)
+
+ - <csr-id-88c78e8129e5092bd120d0fc6c9696673550be9d/> rename enum variants for improved clarity on flows
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 3 calendar days.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - replace use of deprecated dalek function ([`1a81c8f`](https://github.com/maidsafe/safe_network/commit/1a81c8f04f947d2b83d3cd726c00ad66927f5225))
+    - tidy up some log messages ([`a569474`](https://github.com/maidsafe/safe_network/commit/a569474a8be9c11ab73ec7ad1ad157f69827b4d3))
+    - read_from client API was incorrectly using provided length value as an end index ([`8955fcf`](https://github.com/maidsafe/safe_network/commit/8955fcf9d69e869725177340d1de6b6b1e7a203b))
+    - limit the relocations at one time ([`35467d3`](https://github.com/maidsafe/safe_network/commit/35467d3e886d2824c4f9e4586666cab7a7960e54))
+    - rename enum variants for improved clarity on flows ([`88c78e8`](https://github.com/maidsafe/safe_network/commit/88c78e8129e5092bd120d0fc6c9696673550be9d))
+</details>
+
 ## v0.48.0 (2021-12-10)
 
 ### New Features
@@ -21,13 +59,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-565e57619557e2b63f028eb214b59fc69b77fc37/> register op batching
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 1 calendar day.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits contributed to the release over the course of 1 calendar day.
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -37,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.48.0 ([`9eff035`](https://github.com/maidsafe/safe_network/commit/9eff03598ba09aa339180d7ecd57b50174180095))
     - minor improvement to client log msgs related to configured timeouts ([`58632a2`](https://github.com/maidsafe/safe_network/commit/58632a27d271140fc4d777f25a76b0daea582426))
     - remove Generic client error ([`0d4343c`](https://github.com/maidsafe/safe_network/commit/0d4343c8fa56749d3ec9390e298d1d6384573a67))
     - avoid change name by mistake when Join ([`661e994`](https://github.com/maidsafe/safe_network/commit/661e994cb452242a1d7c831ab88b9a66a244faff))
@@ -95,9 +133,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - clippy tidyup for rust 1.57 ([`05f6d98`](https://github.com/maidsafe/safe_network/commit/05f6d98cf21f0158f4b5161484c7c15a0561b6f4))
     - multiple fixes for DKG-AE ([`fdc4ba6`](https://github.com/maidsafe/safe_network/commit/fdc4ba6bb36dff85126c8273cdfc67f9b07e2175))
 </details>
-
-<csr-unknown>
-skip DkgStart and DkgRetry messages for expired sessions<csr-unknown/>
 
 ## v0.46.5 (2021-12-02)
 
