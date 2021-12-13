@@ -10,8 +10,6 @@ env:
   RUST_LOG: "safe_network=trace"
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
-  SN_QUERY_TIMEOUT: 20 # 20 secs
-  SN_AE_WAIT: 1 # 1 sec
   NODE_COUNT: 11
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
