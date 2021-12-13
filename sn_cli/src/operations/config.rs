@@ -373,21 +373,15 @@ impl Config {
 async fn retrieve_node_config(location: &str) -> Result<NodeConfig> {
     let is_remote_location = location.starts_with("http");
     let contacts_bytes = if is_remote_location {
-        #[cfg(feature = "self-update")]
-        {
-            // Fetch info from an HTTP/s location
-            let resp = reqwest::get(location).await.wrap_err_with(|| {
-                format!("Failed to fetch connection information from '{}'", location)
-            })?;
+        let resp = reqwest::get(location).await.wrap_err_with(|| {
+            format!("Failed to fetch connection information from '{}'", location)
+        })?;
 
-            let conn_info = resp.text().await.wrap_err_with(|| {
-                format!("Failed to fetch connection information from '{}'", location)
-            })?;
+        let conn_info = resp.text().await.wrap_err_with(|| {
+            format!("Failed to fetch connection information from '{}'", location)
+        })?;
 
-            conn_info.as_bytes().to_vec()
-        }
-        #[cfg(not(feature = "self-update"))]
-        eyre!("Self updates are disabled")
+        conn_info.as_bytes().to_vec()
     } else {
         // Fetch it from a local file then
         fs::read(location).wrap_err_with(|| {

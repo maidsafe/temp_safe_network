@@ -64,15 +64,13 @@ branch = "mpb-tick"
 version = "~0.11"
 default-features = false
 features = [ "rustls-tls" ]
-optional = true
 
 [dependencies.tokio]
 version = "1.6.0"
 features = [ "macros" ]
 
 [dependencies.self_update]
-git = "https://github.com/jacderida/self_update.git"
-branch = "github_download_json_parsing"
+version = "0.27.0"
 default-features = false
 features = [
     "rustls",
@@ -86,7 +84,7 @@ optional = true
 [features]
 default = [ "testing", "self-update" ]
 testing = [ "sn_api/testing" ]
-self-update = [ "reqwest", "self_update" ]
+self-update = [ "self_update" ]
 
 [dev-dependencies]
 assert_cmd = "~2.0"

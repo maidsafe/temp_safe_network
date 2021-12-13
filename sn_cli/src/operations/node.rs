@@ -65,8 +65,8 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
 }
 
 #[cfg(not(feature = "self-update"))]
-pub fn node_install(_vault_path: Option<PathBuf>, version: Option<String>) -> Result<()> {
-    eyre!("Self updates are disabled")
+pub fn node_install(_vault_path: Option<PathBuf>, _version: Option<String>) -> Result<()> {
+    Err(eyre!("Self updates are disabled"))
 }
 
 #[cfg(feature = "self-update")]
