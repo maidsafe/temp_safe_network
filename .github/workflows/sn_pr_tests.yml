@@ -63,18 +63,6 @@ jobs:
             prefix_map:
               - 'sn/src/prefix_map/**'
 
-      - name: Mac install ripgrep
-        if: matrix.os == 'macos-latest'
-        run: brew install ripgrep
-
-      - name: ubuntu install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
-
-      - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
-
       # Install Rust
       - name: Install Rust
         id: toolchain
@@ -133,18 +121,6 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
-
-      - name: Mac install ripgrep
-        if: matrix.os == 'macos-latest'
-        run: brew install ripgrep
-
-      - name: ubuntu install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
-
-      - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
 
       # Install Rust
       - name: Install Rust
@@ -287,18 +263,6 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
-
-      - name: Mac install ripgrep
-        if: matrix.os == 'macos-latest'
-        run: brew install ripgrep
-
-      - name: ubuntu install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
-
-      - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
 
       # Install Rust
       - name: Install Rust
