@@ -16,7 +16,6 @@ env:
   AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
-
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run all relevant unit test categories
