@@ -18,85 +18,6 @@ env:
   AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
-  # TODO: this can be removed once e2e is stable atop splits.
-  splits:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test Section Splits
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Mac install ripgrep
-        if: matrix.os == 'macos-latest'
-        run: brew install ripgrep
-
-      - name: ubuntu install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
-
-      - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
-
-      # Install Rust
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - uses: Swatinem/rust-cache@v1
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}-splits
-
-      - name: Build all safe_network targets
-        # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib --bins
-
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
-
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
-
-      - name: Healthcheck
-        run: ./resources/scripts/network_is_ready_cli.sh
-        shell: bash
-        timeout-minutes: 5
-
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure()
-        continue-on-error: true
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
-
-      - name: Upload Node Logs to AWS
-          # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure()
-        continue-on-error: true
-
-      - name: Upload Node Logs
-          # Upload artifacts.
-        uses: actions/upload-artifact@v2
-        with:
-          name: sn_node_logs
-          path: ~/.safe/node/local-test-network/**/*.log*
-        if: failure()
-        continue-on-error: true
-
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -252,12 +173,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Healthcheck
-        run: ./resources/scripts/network_is_ready_cli.sh
-        shell: bash
-        timeout-minutes: 5
-        # continue-on-error: true
-
       - name: Build all safe_network tests
         run: cargo test --no-run -p safe_network --release --features=always-joinable,test-utils --lib
 
@@ -412,10 +327,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Healthcheck
-        run: ./resources/scripts/network_is_ready_cli.sh
-        shell: bash
-        timeout-minutes: 5
 
       - name: Build all sn_api tests
         run: cargo test --no-run -p sn_api --release --lib
