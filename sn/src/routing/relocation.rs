@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 //! Relocation related types and utilities.
+//
 
 use crate::elder_count;
 use crate::messaging::{

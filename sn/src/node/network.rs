@@ -33,6 +33,10 @@ impl Network {
             network_config: config.network_config().clone(),
             ..Default::default()
         };
+        trace!(
+            "starting nodes with bootstrap list {:?}",
+            config.hard_coded_contacts
+        );
         if let Some(local_addr) = config.local_addr {
             routing_config.local_addr = local_addr;
         }
