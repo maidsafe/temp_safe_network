@@ -94,3 +94,17 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           action: 'destroy'
+
+  kill-if-fail:
+    name: Destroy Digital Ocean testnet on fail
+    runs-on: ubuntu-latest
+    if: ${{ always() && (needs.launch-testnet.result=='failure' || needs.run-client-tests.result=='failure') }}
+    needs: [launch-testnet, run-client-tests]
+    steps:
+      - name: Kill testnet
+        uses: maidsafe/sn_testnet_action@master
+        with:
+          do-token: ${{ secrets.DO_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          action: 'destroy'
