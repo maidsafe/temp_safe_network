@@ -78,6 +78,7 @@ impl Comm {
         config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> Result<(Self, UnnamedPeer)> {
+        trace!("bootstrap qp2p Endpoint to {:?}", bootstrap_nodes);
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
         let (endpoint, incoming_connections, bootstrap_peer) =
@@ -332,6 +333,11 @@ impl Comm {
 
         // TODO: more laid back retries with lower priority, more aggressive with higher
         let retries = self.back_pressure.get(&recipient.addr()).await;
+        trace!(
+            "Sending msg_id: {:?}) with retry policy {:?}",
+            msg_id,
+            retries,
+        );
 
         let mut reused_connection = true;
         let connection = recipient
@@ -339,6 +345,7 @@ impl Comm {
                 |connection| Some(connection.id()) != failed_connection_id,
                 |addr| {
                     reused_connection = false;
+                    trace!("starts connecting to {:?}", addr);
                     async move {
                         let (connection, connection_incoming) =
                             self.endpoint.connect_to(&addr).await?;
@@ -350,6 +357,11 @@ impl Comm {
                                 self.msg_count.clone(),
                             )
                             .in_current_span(),
+                        );
+                        trace!(
+                            "connected to {:?} with connection_id {:?}",
+                            addr,
+                            connection.id()
                         );
                         Ok(connection)
                     }

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 //! Relocation related types and utilities.
+//
 
 use super::{
     super::error::Error,

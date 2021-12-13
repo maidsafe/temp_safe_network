@@ -217,12 +217,17 @@ impl Peer {
             .and_then(|guard| RwLockReadGuard::try_map(guard, Option::as_ref).ok())
         {
             if is_valid(&guard) {
+                trace!("reuse via read lock");
                 return Ok(guard);
             }
         }
 
         // If we couldn't get the read lock synchronously, we conservatively take the write lock.
         // This will prevent anyone else from looking at the connection until we have set one.
+        trace!(
+            "fetching a write lock on connection_guard of {:?}",
+            self.addr
+        );
         let mut guard = self.connection.write().await;
 
         if let Some(connection) = guard.as_ref() {
@@ -232,6 +237,7 @@ impl Peer {
                 // We can't avoid an unwrap here, but we can be sure it will succeed because we hold
                 // the write lock (meaning no one else can fiddle with `self.connection`), and
                 // because we just tested that a connection is set.
+                trace!("reuse via write lock");
                 return Ok(RwLockReadGuard::try_map(guard.downgrade(), Option::as_ref)
                     .expect("write-locked value can't have changed"));
             }
@@ -240,8 +246,9 @@ impl Peer {
         // We now know the connection isn't set/valid, so we call `connect` and set it.
         // TODO: we could consider panicking here if `connect` breaks our invariant by returning an
         // connection with the wrong address.
+        trace!("connecting to {:?}", self.addr);
         *guard = Some(connect(self.addr).await?);
-
+        trace!("connected to {:?}", self.addr);
         // We can't avoid an unwrap here, but we can be sure it will succeed because we hold the
         // write lock (meaning no one else can fiddle with `self.connection`), and we just set a
         // connection above.

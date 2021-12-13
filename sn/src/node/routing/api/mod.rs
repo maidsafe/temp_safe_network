@@ -153,7 +153,7 @@ impl Routing {
             let node_name = ed25519::name(&keypair.public);
             info!("{} Bootstrapping a new node.", node_name);
 
-            let (comm, bootstrap_peer) = Comm::bootstrap(
+            let (comm, bootstrap_peer) = match Comm::bootstrap(
                 config.local_addr,
                 config
                     .bootstrap_nodes
@@ -164,7 +164,14 @@ impl Routing {
                 config.network_config,
                 connection_event_tx,
             )
-            .await?;
+            .await
+            {
+                Ok(result) => result,
+                Err(err) => {
+                    error!("failed to start bootstrap a comm with error {:?}", err);
+                    return Err(err);
+                }
+            };
             info!(
                 "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
                 node_name,

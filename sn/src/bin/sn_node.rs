@@ -119,7 +119,9 @@ async fn run_node() -> Result<()> {
         if config.json_logs {
             builder.json().init();
         } else {
-            builder.event_format(LogFormatter::default()).init();
+            builder
+            // .event_format(LogFormatter::default())
+            .init();
         }
 
         Some(guard)
@@ -165,8 +167,11 @@ async fn run_node() -> Result<()> {
         BOOTSTRAP_RETRY_TIME
     );
 
+    trace!("sn_node bin starting a node");
+
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60);
     let (node, mut event_stream) = loop {
+        trace!("sn_node bin looping");
         match Node::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
             Err(Error::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
@@ -188,6 +193,7 @@ async fn run_node() -> Result<()> {
                     "In 'always-joinable' mode. Continuing to try and join after error: {:?}",
                     err
                 );
+                trace!("sn_node bin starting a node failed with error {:?}", err);
                 continue;
             }
             Err(Error::TryJoinLater) => {

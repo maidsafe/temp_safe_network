@@ -37,6 +37,7 @@ impl Node {
         config: &NodeConfig,
         joining_timeout: Duration,
     ) -> Result<(Self, EventStream)> {
+        trace!("Node_api new constructor");
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
         tokio::fs::create_dir_all(root_dir).await?;
