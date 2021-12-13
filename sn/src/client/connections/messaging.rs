@@ -17,6 +17,7 @@ use crate::messaging::{
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::utils::write_data_to_disk;
 use crate::types::PublicKey;
+use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
 use itertools::Itertools;
@@ -446,11 +447,23 @@ impl Session {
         let mut outgoing_msg_rounds = 1;
         let mut last_start_pos = 0;
 
+        let mut backoff = ExponentialBackoff {
+            initial_interval: Duration::from_millis(1500),
+            max_interval: Duration::from_secs(25),
+            max_elapsed_time: Some(Duration::from_secs(60)),
+            ..Default::default()
+        };
+
+        let next_wait = backoff.next_backoff();
+
         // wait here to give a chance for AE responses to come in and be parsed
-        tokio::time::sleep(self.standard_wait).await;
+        if let Some(wait) = next_wait {
+            tokio::time::sleep(wait).await;
+        }
 
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
+            info!("On client startup, awaiting for some network knowledge");
             // wait until we have _some_ network knowledge
             while self
                 .network
@@ -491,11 +504,16 @@ impl Session {
                     )
                     .await?;
 
+                    let next_wait = backoff.next_backoff();
                     trace!(
                         "Awaiting a duration of {:?} before trying new nodes",
-                        self.standard_wait
+                        next_wait
                     );
-                    tokio::time::sleep(self.standard_wait).await;
+
+                    // wait here to give a chance for AE responses to come in and be parsed
+                    if let Some(wait) = next_wait {
+                        tokio::time::sleep(wait).await;
+                    }
                 }
             }
         }
