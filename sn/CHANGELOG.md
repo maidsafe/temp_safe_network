@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.49.3 (2021-12-14)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - set default AE_WAIT to be 0 ([`dd50d1d`](https://github.com/maidsafe/safe_network/commit/dd50d1d860aa4ca60b6c0d5a525b45d88ddf432e))
+    - adding a test for retrieving Blob with range over data length ([`edb8de8`](https://github.com/maidsafe/safe_network/commit/edb8de8b4d923e97d68eed40a7953f38461b0281))
+</details>
+
 ## v0.49.2 (2021-12-14)
 
 ### New Features
@@ -31,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - set default AE_WAIT to be 0 ([`dd50d1d`](https://github.com/maidsafe/safe_network/commit/dd50d1d860aa4ca60b6c0d5a525b45d88ddf432e))
+    - safe_network-0.49.2 ([`62d7479`](https://github.com/maidsafe/safe_network/commit/62d747969b739172910aabca6fcb273d2827fc8a))
     - set DEFAULT_QUERY_TIMEOUT to 120s ([`2e7bc0b`](https://github.com/maidsafe/safe_network/commit/2e7bc0b782da6231f54edc440fa555fa754d294c))
     - on initial contact put all known elders into the contact pool. ([`86ba423`](https://github.com/maidsafe/safe_network/commit/86ba4234a29137518c73b18becbf018993e104a8))
     - make contact via register get ([`99add55`](https://github.com/maidsafe/safe_network/commit/99add55c5ca5a3e3da2130797083dd449da2f7cd))
@@ -106,9 +127,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - limit the relocations at one time ([`35467d3`](https://github.com/maidsafe/safe_network/commit/35467d3e886d2824c4f9e4586666cab7a7960e54))
     - rename enum variants for improved clarity on flows ([`88c78e8`](https://github.com/maidsafe/safe_network/commit/88c78e8129e5092bd120d0fc6c9696673550be9d))
 </details>
-
-<csr-unknown>
-Re-enabling the only two fetch API tests which are now passsing with this fix.<csr-unknown/>
 
 ## v0.48.0 (2021-12-10)
 
