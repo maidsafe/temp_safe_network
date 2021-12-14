@@ -3039,7 +3039,7 @@ checksum = "3c9613b5a66ab9ba26415184cfc41156594925a9cf3a2057e57f31ff145f6568"
 
 [[package]]
 name = "safe_network"
-version = "0.49.1"
+version = "0.49.2"
 dependencies = [
  "assert_matches",
  "async-recursion",
