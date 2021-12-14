@@ -7,3 +7,5 @@ jobs:
     steps:
       - name: Who?
         run: whoami
+      - name: Sudo something
+        run: sudo apt update; sudo apt install cowsay
