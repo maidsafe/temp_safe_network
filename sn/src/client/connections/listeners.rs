@@ -47,30 +47,23 @@ impl Session {
         let _handle = tokio::spawn(async move {
             loop {
                 match Self::listen_for_incoming_message(src, &mut incoming_messages).await {
-                    Ok(msg) => match Self::handle_msg(msg, src, session.clone()).await {
-                        Ok(()) => {},
-                        Err(err) => {
+                    Ok(Some(msg)) => {
+                        if let Err(err) = Self::handle_msg(msg, src, session.clone()).await {
                             error!("Error while handling incoming message: {:?}. Listening for next message...", err);
                         }
                     },
-                    Err(error) => {
-                        match error {
-                            Error::IncomingMessages => {
-                                info!("IncomingMessages listener has closed.");
-                                break;
-                            }
-                            Error::QuicP2p(qp2p_err) => {
-                                  // TODO: Can we recover here?
-                                  info!("Error from Qp2p received, closing listener loop. {:?}", qp2p_err);
-                                  break;
-                            },
-                            error => {
-                                error!("Error while processing incoming message: {:?}. Listening for next message...", error);
-
-                            }
-                        }
+                    Ok(None) => {
+                        info!("IncomingMessages listener has closed for connection {}.", connection_id);
+                        break;
                     }
-
+                    Err(Error::QuicP2p(qp2p_err)) => {
+                          // TODO: Can we recover here?
+                          info!("Error from Qp2p received, closing listener loop. {:?}", qp2p_err);
+                          break;
+                    },
+                    Err(error) => {
+                        error!("Error while processing incoming message: {:?}. Listening for next message...", error);
+                    }
                 }
             }
 
@@ -83,14 +76,14 @@ impl Session {
     pub(crate) async fn listen_for_incoming_message(
         src: SocketAddr,
         incoming_messages: &mut ConnectionIncoming,
-    ) -> Result<MessageType, Error> {
+    ) -> Result<Option<MessageType>, Error> {
         if let Some(message) = incoming_messages.next().await? {
             trace!("Incoming message from {:?}", src);
             let msg_type = WireMsg::deserialize(message)?;
 
-            Ok(msg_type)
+            Ok(Some(msg_type))
         } else {
-            Err(Error::IncomingMessages)
+            Ok(None)
         }
     }
 

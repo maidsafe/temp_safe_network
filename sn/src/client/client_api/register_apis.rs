@@ -516,7 +516,10 @@ mod tests {
                 assert!(user_perms.is_allowed(Action::Read));
                 assert!(user_perms.is_allowed(Action::Write));
             }
-            Permissions::Public(_) => return Err(Error::IncorrectPermissions.into()),
+            Permissions::Public(_) => bail!(
+                "Incorrect user permissions were returned: {:?}",
+                permissions
+            ),
         }
 
         let other_user = gen_ed_keypair().public_key();
