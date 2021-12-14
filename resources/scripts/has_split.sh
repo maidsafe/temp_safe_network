@@ -3,7 +3,7 @@
 if ! command -v rg &> /dev/null
 then
     echo "ripgrep could not be found and is required"
-    exit
+    exit 1
 fi
 
 DEFAULT_ELDER_COUNT=7

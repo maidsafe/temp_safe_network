@@ -279,6 +279,17 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
       - name: Start the network
         run: ./target/release/testnet
         id: section-startup
@@ -380,6 +391,18 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
+
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
 
       # Install Rust
       - name: Install Rust
