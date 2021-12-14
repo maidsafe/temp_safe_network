@@ -136,6 +136,7 @@ jobs:
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
         run: cargo build -p safe_network --release --features=always-joinable,test-utils
+        timeout-minutes: 60
 
       - name: Start the network
         run: ./target/release/testnet
@@ -148,6 +149,7 @@ jobs:
 
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=always-joinable,test-utils
+        timeout-minutes: 60
 
       - name: Run network asserts one by one
         shell: bash
@@ -249,6 +251,7 @@ jobs:
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
         run: cargo build -p safe_network --release --features=always-joinable,test-utils
+        timeout-minutes: 60
 
       - name: Start the network
         run: ./target/release/testnet
@@ -261,6 +264,7 @@ jobs:
 
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=always-joinable,test-utils
+        timeout-minutes: 60
 
       - name: Healthcheck
         run: ./resources/scripts/network_is_ready_cli.sh
@@ -365,6 +369,7 @@ jobs:
       - name: Build all safe_network targets
         # all = all crates in workspace, lib/bins targets, with these features...
         run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib --bins
+        timeout-minutes: 60
 
       - name: Start the network
         run: ./target/release/testnet
