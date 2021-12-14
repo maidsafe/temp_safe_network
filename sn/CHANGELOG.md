@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.50.0 (2021-12-14)
+
+### New Features (BREAKING)
+
+ - <csr-id-134dfa29b3698fb233095194305d9bbbba2875c7/> different flavors of upload data API, with/without verifying successful upload
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - different flavors of upload data API, with/without verifying successful upload ([`134dfa2`](https://github.com/maidsafe/safe_network/commit/134dfa29b3698fb233095194305d9bbbba2875c7))
+    - set default AE_WAIT to be 0 ([`dd50d1d`](https://github.com/maidsafe/safe_network/commit/dd50d1d860aa4ca60b6c0d5a525b45d88ddf432e))
+</details>
+
 ## v0.49.3 (2021-12-14)
 
 ### Commit Statistics
@@ -22,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - set default AE_WAIT to be 0 ([`dd50d1d`](https://github.com/maidsafe/safe_network/commit/dd50d1d860aa4ca60b6c0d5a525b45d88ddf432e))
+    - safe_network-0.49.3 ([`36ca20e`](https://github.com/maidsafe/safe_network/commit/36ca20e606899ecbdea24d845c34ba11ab889cf7))
     - adding a test for retrieving Blob with range over data length ([`edb8de8`](https://github.com/maidsafe/safe_network/commit/edb8de8b4d923e97d68eed40a7953f38461b0281))
 </details>
 
