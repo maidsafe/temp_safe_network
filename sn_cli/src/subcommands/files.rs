@@ -24,7 +24,7 @@ use sn_api::{
     files::{FilesMap, ProcessedFiles},
     nrs::VersionHash,
     resolver::SafeData,
-    Safe, Url, XorUrl,
+    Safe, SafeUrl, XorUrl,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -282,7 +282,7 @@ pub async fn files_commander(
             if OutputFmt::Pretty == output_fmt {
                 let (table, success_count) = gen_processed_files_table(&processed_files, true);
                 if success_count > 0 {
-                    let url = match Url::from_url(&target) {
+                    let url = match SafeUrl::from_url(&target) {
                         Ok(mut safeurl) => {
                             safeurl.set_content_version(Some(version));
                             safeurl.set_path("");
@@ -483,7 +483,7 @@ fn print_serialized_output(
     processed_files: BTreeMap<String, (String, String)>,
     output_fmt: OutputFmt,
 ) {
-    let url = match Url::from_url(&xorurl) {
+    let url = match SafeUrl::from_url(&xorurl) {
         Ok(mut safeurl) => {
             safeurl.set_content_version(version);
             safeurl.to_string()
@@ -502,7 +502,7 @@ fn output_processed_files_list(
     if OutputFmt::Pretty == output_fmt {
         let (table, success_count) = gen_processed_files_table(&processed_files, true);
         if success_count > 0 {
-            let url = match Url::from_url(&target_url) {
+            let url = match SafeUrl::from_url(&target_url) {
                 Ok(mut safeurl) => {
                     safeurl.set_content_version(version);
                     safeurl.set_path("");

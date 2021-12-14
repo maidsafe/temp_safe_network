@@ -11,7 +11,7 @@ mod handlers;
 mod safe_data;
 
 use super::{files::FileInfo, Safe};
-pub use super::{ContentType, DataType, Url, VersionHash, XorUrlBase};
+pub use super::{ContentType, DataType, SafeUrl, VersionHash, XorUrlBase};
 use crate::{Error, Result};
 use log::{debug, info};
 pub use safe_data::SafeData;
@@ -24,7 +24,7 @@ const INDIRECTION_LIMIT: usize = 10;
 impl Safe {
     /// Parses a string URL "safe://url" and returns a safe URL
     /// Resolves until it reaches the final URL
-    pub async fn parse_and_resolve_url(&self, url: &str) -> Result<Url> {
+    pub async fn parse_and_resolve_url(&self, url: &str) -> Result<SafeUrl> {
         let safe_url = Safe::parse_url(url)?;
         let orig_path = safe_url.path_decoded()?;
 
@@ -40,8 +40,8 @@ impl Safe {
             .pop()
             .ok_or_else(|| Error::ContentNotFound(format!("Failed to resolve {}", url)))?;
 
-        // Set the original path so we return the Url with it
-        let mut new_safe_url = Url::from_url(&safe_data.xorurl())?;
+        // Set the original path so we return the SafeUrl with it
+        let mut new_safe_url = SafeUrl::from_url(&safe_data.xorurl())?;
         new_safe_url.set_path(&orig_path);
 
         Ok(new_safe_url)
@@ -95,7 +95,7 @@ impl Safe {
     /// # As opposed to 'fetch' function, the actual target content won't be fetched, and only
     /// # the URL will be inspected resolving it as necessary to find the target location.
     /// # This is helpful if you are interested in knowing about the target content,
-    /// # and/or each of the Url resolution steps taken to the target content, rather than
+    /// # and/or each of the SafeUrl resolution steps taken to the target content, rather than
     /// # trying to revieve the actual content.
     ///
     /// ## Examples
@@ -158,7 +158,7 @@ impl Safe {
     // Will need it if we allow infinite indirections though.
     async fn fully_resolve_url(
         &self,
-        input_url: Url,
+        input_url: SafeUrl,
         attached_metadata: Option<FileInfo>,
         retrieve_data: bool,
         range: Range,
@@ -199,7 +199,7 @@ impl Safe {
     // it stops at the first resolution
     async fn resolve_url(
         &self,
-        input_url: Url,
+        input_url: SafeUrl,
         attached_metadata: Option<FileInfo>,
         retrieve_data: bool,
         range: Range,
@@ -243,7 +243,7 @@ impl Safe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{app::files, app::test_helpers::new_safe_instance, retry_loop, Scope, Url};
+    use crate::{app::files, app::test_helpers::new_safe_instance, retry_loop, SafeUrl, Scope};
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -257,7 +257,7 @@ mod tests {
             .files_container_create(Some("./testdata/"), None, true, false, false)
             .await?;
 
-        let safe_url = Url::from_url(&fc_xorurl)?;
+        let safe_url = SafeUrl::from_url(&fc_xorurl)?;
         let content = retry_loop!(safe.fetch(&fc_xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&fc_xorurl));
 
@@ -312,7 +312,7 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         // link to an nrs map
-        let mut safe_url = Url::from_url(&xorurl)?;
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
         let _ = safe.nrs_add(&site_name, &safe_url, false).await?;
@@ -371,7 +371,7 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         // link to an nrs map
-        let mut safe_url = Url::from_url(&xorurl)?;
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let files_container_url = safe_url;
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
@@ -434,7 +434,7 @@ mod tests {
             .store_public_bytes(data.clone(), Some("text/plain"), false)
             .await?;
 
-        let safe_url = Url::from_url(&xorurl)?;
+        let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
@@ -511,7 +511,7 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         // map to nrs name
-        let mut safe_url = Url::from_url(&xorurl)?;
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
         let _ = safe.nrs_add(&site_name, &safe_url, false).await?;
@@ -559,7 +559,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let xorname = rand::random();
         let type_tag = 575_756_443;
-        let xorurl = Url::encode(
+        let xorurl = SafeUrl::encode(
             DataAddress::register(xorname, Scope::Public, type_tag),
             None,
             type_tag,
@@ -601,7 +601,7 @@ mod tests {
         let data = Bytes::from("Something super immutable");
         let xorurl = safe.store_public_bytes(data.clone(), None, false).await?;
 
-        let mut safe_url = Url::from_url(&xorurl)?;
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
         safe_url.set_path(path);
         match safe.fetch(&safe_url.to_string(), None).await {
@@ -620,7 +620,7 @@ mod tests {
             .store_public_bytes(data.clone(), Some("text/plain"), false)
             .await?;
 
-        let mut safe_url = Url::from_url(&xorurl)?;
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("/some_relative_filepath");
         let url_with_path = safe_url.to_string();
         match safe.fetch(&url_with_path, None).await {

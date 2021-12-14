@@ -9,7 +9,7 @@
 
 use bytes::Buf;
 use color_eyre::{eyre::eyre, Result};
-use sn_api::{resolver::SafeData, PublicKey, Safe, Url};
+use sn_api::{resolver::SafeData, PublicKey, Safe, SafeUrl};
 use std::{
     collections::BTreeSet, env::temp_dir, fs::File, io::Write, net::SocketAddr, path::PathBuf,
 };
@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
     // Using the FilesContainer XOR-URL we can construct the Safe-URL of
     // the file by post fixing it with its path name,
     // i.e. safe://<FilesContainer XOR-URL>/<file name>
-    let mut url = Url::from_url(&xorurl)?;
+    let mut url = SafeUrl::from_url(&xorurl)?;
     url.set_path(FILE_TO_UPLOAD);
     println!("\nRetrieving file from {} ...\n", url);
 

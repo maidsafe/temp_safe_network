@@ -10,7 +10,7 @@
 use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::Url;
+use sn_api::SafeUrl;
 use sn_cmd_test_utilities::util::{
     can_write_symlinks, create_absolute_symlinks_directory, create_nrs_link, create_symlink,
     digest_file, get_random_nrs_string, safe_cmd, safe_cmd_at, safe_cmd_stdout, safeurl_from,
@@ -448,7 +448,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let mut e = Url::from_url(&files_container_xor)?;
+    let mut e = SafeUrl::from_url(&files_container_xor)?;
     e.set_path("subfolder");
     let xor_url_with_path = e.to_string();
 
@@ -528,7 +528,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
         upload_path(&tmp_data_dir, with_trailing_slash)?;
 
     let container_folder_name = tmp_data_dir.path().file_name().unwrap().to_str().unwrap();
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path(container_folder_name);
 
     let tmp_data_nrs = get_random_nrs_string();
@@ -659,7 +659,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let url = Url::from_url(&files_container_xor)?;
+    let url = SafeUrl::from_url(&files_container_xor)?;
     let src = format!(
         "{}://{}/{}",
         url.scheme(),
@@ -856,7 +856,7 @@ fn files_get_src_path_is_invalid() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("/path/is/invalid");
     let src = url.to_string();
@@ -1013,7 +1013,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("testdata/");
     let src = url.to_string();
@@ -1140,7 +1140,7 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
     child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("testdata/");
     let src = url.to_string();
@@ -1200,7 +1200,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("testdata/");
     let src = url.to_string();
@@ -1263,7 +1263,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
     child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("testdata/");
     let src = url.to_string();
@@ -1326,7 +1326,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("noextension");
     let src = url.to_string();
@@ -1394,7 +1394,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("noextension");
     let src = url.to_string();
@@ -1459,7 +1459,7 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("noextension");
     let src = url.to_string();
@@ -1523,7 +1523,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("noextension");
     let src = url.to_string();
@@ -1589,7 +1589,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("noextension");
     let src = url.to_string();
@@ -1654,7 +1654,7 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     url.set_path("noextension");
     let src = url.to_string();

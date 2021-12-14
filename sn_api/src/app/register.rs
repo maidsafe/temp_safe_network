@@ -9,7 +9,7 @@
 
 pub use safe_network::types::register::{Entry, EntryHash};
 
-use crate::url::{ContentType, Url, XorUrl};
+use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 use log::debug;
 use safe_network::types::{DataAddress, RegisterAddress, Scope};
@@ -36,7 +36,7 @@ impl Safe {
             Scope::Public
         };
         let xorurl =
-            Url::encode_register(xorname, type_tag, scope, ContentType::Raw, self.xorurl_base)?;
+            SafeUrl::encode_register(xorname, type_tag, scope, ContentType::Raw, self.xorurl_base)?;
 
         if !dry_run {
             self.safe_client.apply_register_ops(op_batch).await?;
@@ -61,12 +61,12 @@ impl Safe {
         self.register_fetch_entry(&safeurl, hash).await
     }
 
-    /// Fetch a Register from a Url without performing any type of URL resolution
+    /// Fetch a Register from a SafeUrl without performing any type of URL resolution
     /// Supports version hashes:
     /// e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
     pub(crate) async fn register_fetch_entries(
         &self,
-        url: &Url,
+        url: &SafeUrl,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
         debug!("Fetching Register entries from {}", url);
         let result = match url.content_version() {
@@ -101,9 +101,13 @@ impl Safe {
         }
     }
 
-    /// Fetch a Register from a Url without performing any type of URL resolution
-    pub(crate) async fn register_fetch_entry(&self, url: &Url, hash: EntryHash) -> Result<Entry> {
-        // TODO: allow to specify the hash with the Url as well: safeurl.content_hash(),
+    /// Fetch a Register from a SafeUrl without performing any type of URL resolution
+    pub(crate) async fn register_fetch_entry(
+        &self,
+        url: &SafeUrl,
+        hash: EntryHash,
+    ) -> Result<Entry> {
+        // TODO: allow to specify the hash with the SafeUrl as well: safeurl.content_hash(),
         // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
         let address = self.get_register_address(url)?;
         self.safe_client.get_register_entry(address, hash).await
@@ -131,7 +135,7 @@ impl Safe {
         Ok(entry_hash)
     }
 
-    pub(crate) fn get_register_address(&self, url: &Url) -> Result<RegisterAddress> {
+    pub(crate) fn get_register_address(&self, url: &SafeUrl) -> Result<RegisterAddress> {
         let address = match url.address() {
             DataAddress::Register(reg_address) => reg_address,
             other => {

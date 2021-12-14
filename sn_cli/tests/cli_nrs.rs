@@ -11,7 +11,7 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use color_eyre::Result;
 use predicates::prelude::*;
-use sn_api::Url;
+use sn_api::SafeUrl;
 use sn_cmd_test_utilities::util::{get_random_nrs_string, safe_cmd, upload_path};
 
 ///
@@ -42,7 +42,7 @@ fn nrs_register_should_register_a_topname_with_a_versioned_content_link() -> Res
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let topname = get_random_nrs_string();
@@ -71,7 +71,7 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
         upload_path(&tmp_data_path, with_trailing_slash)?;
     let test_md_entry = processed_files.iter().last().unwrap();
     let test_md_blob_link = test_md_entry.1.to_owned().1;
-    let url = Url::from_url(&test_md_blob_link)?;
+    let url = SafeUrl::from_url(&test_md_blob_link)?;
     println!("processed_files = {:?}", processed_files);
 
     let topname = get_random_nrs_string();
@@ -132,7 +132,7 @@ fn nrs_register_should_return_an_error_if_link_to_versioned_content_has_no_versi
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
     url.set_content_version(None);
 
@@ -182,7 +182,7 @@ fn nrs_add_should_add_a_subname_to_versioned_content() -> Result<()> {
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
     let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let test_name = get_random_nrs_string();
@@ -209,7 +209,7 @@ fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
     let (_, processed_files, _) = upload_path(&test_md_file, false)?;
     let test_md_entry = processed_files.iter().last().unwrap();
     let test_md_blob_link = test_md_entry.1.to_owned().1;
-    let url = Url::from_url(&test_md_blob_link)?;
+    let url = SafeUrl::from_url(&test_md_blob_link)?;
 
     let test_name = get_random_nrs_string();
     let public_name = format!("test.{}", &test_name);
@@ -233,7 +233,7 @@ fn nrs_add_should_add_a_subname_and_set_it_as_the_default_for_the_topname() -> R
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
     let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let topname = get_random_nrs_string();
@@ -276,7 +276,7 @@ fn nrs_add_should_add_a_subname_and_a_new_topname() -> Result<()> {
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
     let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let test_name = get_random_nrs_string();
@@ -307,7 +307,7 @@ fn nrs_add_should_add_a_subname_and_behave_idempotently_for_existing_topname() -
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
     let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let test_name = get_random_nrs_string();
@@ -339,9 +339,9 @@ fn nrs_add_should_update_an_existing_subname() -> Result<()> {
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
     let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
-    let mut test_md_url = Url::from_url(&files_container_xor)?;
+    let mut test_md_url = SafeUrl::from_url(&files_container_xor)?;
     test_md_url.set_path("test.md");
-    let mut another_md_url = Url::from_url(&files_container_xor)?;
+    let mut another_md_url = SafeUrl::from_url(&files_container_xor)?;
     another_md_url.set_path("another.md");
 
     let test_name = get_random_nrs_string();
@@ -383,7 +383,7 @@ fn nrs_add_should_return_an_error_if_link_to_versioned_content_has_no_version() 
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
     url.set_content_version(None);
 
@@ -415,7 +415,7 @@ fn nrs_add_with_register_top_name_should_return_an_error_if_link_to_versioned_co
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
     url.set_content_version(None);
 
@@ -454,7 +454,7 @@ fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
     url.set_content_version(None);
 
@@ -510,7 +510,7 @@ fn nrs_remove_should_remove_a_subname() -> Result<()> {
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
     let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let test_name = get_random_nrs_string();

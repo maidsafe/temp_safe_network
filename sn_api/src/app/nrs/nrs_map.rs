@@ -7,17 +7,17 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{Error, Result, Url};
+use crate::{Error, Result, SafeUrl};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub(crate) type SubName = String;
 
-/// Mapping SubNames to Urls
+/// Mapping SubNames to SafeUrls
 /// For a given Top Name : "example"
 ///
-/// | SubName Key   | Full Name        | Url Value    |
+/// | SubName Key   | Full Name        | SafeUrl Value|
 /// |---------------|------------------|--------------|
 /// | ""            | "example"        | "safe://eg1" |
 /// | "sub"         | "sub.example"    | "safe://eg2" |
@@ -25,18 +25,18 @@ pub(crate) type SubName = String;
 ///
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
 pub struct NrsMap {
-    pub map: BTreeMap<SubName, Url>,
+    pub map: BTreeMap<SubName, SafeUrl>,
 }
 
 impl NrsMap {
-    /// Get the Url associated with the input public name in the NrsMap
-    pub fn get(&self, public_name: &str) -> Result<Url> {
+    /// Get the SafeUrl associated with the input public name in the NrsMap
+    pub fn get(&self, public_name: &str) -> Result<SafeUrl> {
         let subname = parse_out_subnames(public_name);
         self.get_for_subname(&subname)
     }
 
-    /// Get the Url associated with the input sub name in the NrsMap
-    pub fn get_for_subname(&self, sub_name: &str) -> Result<Url> {
+    /// Get the SafeUrl associated with the input sub name in the NrsMap
+    pub fn get_for_subname(&self, sub_name: &str) -> Result<SafeUrl> {
         match self.map.get(sub_name) {
             Some(link) => {
                 debug!("NRS: Subname resolution is: {} => {}", sub_name, link);

@@ -14,7 +14,7 @@ use super::{
 use color_eyre::Result;
 use sn_api::{
     resolver::{ContentType, SafeData},
-    Safe, Url,
+    Safe, SafeUrl,
 };
 use structopt::StructOpt;
 use tracing::debug;
@@ -59,7 +59,7 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
-                    let mut safeurl = Url::from_url(xorurl)?;
+                    let mut safeurl = SafeUrl::from_url(xorurl)?;
                     safeurl.set_content_type(ContentType::Raw)?;
                     println!("Native data XOR-URL: {}", safeurl.to_string());
                     print_nrs_map(nrs_map, public_name);
@@ -80,7 +80,7 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
-                    let mut safeurl = Url::from_url(xorurl)?;
+                    let mut safeurl = SafeUrl::from_url(xorurl)?;
                     safeurl.set_content_type(ContentType::Raw)?;
                     println!("Native data XOR-URL: {}", safeurl.to_string());
                 }

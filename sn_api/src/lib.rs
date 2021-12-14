@@ -19,7 +19,7 @@ mod authenticator;
 mod common;
 mod constants;
 mod errors;
-mod url;
+mod safeurl;
 
 // re-export these useful types from sn_data_types
 pub use safe_network::types::{
@@ -48,5 +48,4 @@ pub use common::{ed_sk_from_hex, sk_to_hex};
 
 pub use errors::{Error, Result};
 
-// use the local url module (in this crate) and not the external rust url crate
-pub use crate::url::*;
+pub use safeurl::*;

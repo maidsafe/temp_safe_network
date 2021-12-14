@@ -11,7 +11,7 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::resolver::{ContentType, DataType, Url};
+use sn_api::resolver::{ContentType, DataType, SafeUrl};
 use sn_cmd_test_utilities::util::{
     create_and_get_keys, get_random_nrs_string, parse_files_container_output,
     parse_files_put_or_sync_output, parse_nrs_register_output, safe_cmd, safe_cmd_stderr,
@@ -149,7 +149,7 @@ fn calling_safe_cat_xorurl_with_version() -> Result<()> {
         Some(0),
     )?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
-    let mut url = Url::from_url(&container_xorurl)?;
+    let mut url = SafeUrl::from_url(&container_xorurl)?;
     url.set_path("test.md");
 
     safe_cmd(["cat", &url.to_string()], Some(0))?
@@ -166,7 +166,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
-    let mut url = Url::from_url(&files_container_xor)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let public_name = format!("test.{}", get_random_nrs_string());
@@ -186,7 +186,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     let (nrs_url, _files_map) = parse_nrs_register_output(&output);
     let version = nrs_url.content_version();
 
-    let mut nrs_url = Url::from_url(&format!("safe://{}", public_name))?;
+    let mut nrs_url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
     nrs_url.set_content_version(version);
     safe_cmd(["cat", &nrs_url.to_string()], Some(0))?
         .assert()

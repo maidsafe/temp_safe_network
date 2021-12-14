@@ -9,7 +9,7 @@
 
 use super::ipc::IpcError;
 use super::nrs::NrsMap;
-use super::url::{Error as UrlError, Url};
+use super::safeurl::{Error as UrlError, SafeUrl};
 use safe_network::client::Error as ClientError;
 use thiserror::Error;
 
@@ -40,7 +40,7 @@ pub enum Error {
     AuthenticatorError(String),
     /// ConflictingNrsEntries
     #[error("ConflictingNrsEntries: {0}")]
-    ConflictingNrsEntries(String, Vec<(String, Url)>, NrsMap),
+    ConflictingNrsEntries(String, Vec<(String, SafeUrl)>, NrsMap),
     /// ConnectionError
     #[error("ConnectionError: {0}")]
     ConnectionError(String),
