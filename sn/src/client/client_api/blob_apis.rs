@@ -436,13 +436,33 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn seek_with_unknown_length() -> Result<()> {
+        init_test_logger();
+        let _outer_span = tracing::info_span!("seek_with_unknown_length").entered();
+        let client = create_test_client().await?;
+
+        // create content which is stored as Blob, i.e. its size is larger than MIN_BLOB_SIZE
+        let size = 2 * MIN_BLOB_SIZE;
+        let blob = Blob::new(random_bytes(size))?;
+
+        let address = store_for_seek(blob.clone(), &client).await?;
+
+        let pos = 512;
+        let read_data = get_for_seek(&blob, address, pos, usize::MAX, &client).await?;
+
+        assert_eq!(read_data.len(), size - pos);
+        compare(blob.bytes().split_off(pos), read_data)?;
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn seek_in_data() -> Result<()> {
         init_test_logger();
         let _outer_span = tracing::info_span!("seek_in_data").entered();
         let client = create_test_client().await?;
 
         for i in 1..5 {
-            // let _outer_span = tracing::info_span!("seek_in_data").entered();
             let size = i * MIN_BLOB_SIZE;
             let _outer_span = tracing::info_span!("size:", size).entered();
             for divisor in 2..5 {
@@ -455,13 +475,13 @@ mod tests {
                 // Read first part
                 let read_data_1 = {
                     let pos = 0;
-                    get_for_seek(blob.clone(), address, pos, len, &client).await?
+                    get_for_seek(&blob, address, pos, len, &client).await?
                 };
 
                 // Read second part
                 let read_data_2 = {
                     let pos = len;
-                    get_for_seek(blob.clone(), address, pos, len, &client).await?
+                    get_for_seek(&blob, address, pos, len, &client).await?
                 };
 
                 // Join parts
@@ -704,25 +724,27 @@ mod tests {
     }
 
     async fn store_for_seek(blob: Blob, client: &Client) -> Result<BytesAddress> {
-        let address = client.upload_blob(blob.clone(), Scope::Public).await?;
+        let length = blob.bytes().len();
+        let address = client.upload_blob(blob, Scope::Public).await?;
         // the larger the file, the longer we have to wait before we start querying
-        let delay = tokio::time::Duration::from_secs(usize::max(
-            1,
-            blob.bytes().len() / DELAY_DIVIDER,
-        ) as u64);
+        let delay = tokio::time::Duration::from_secs(usize::max(1, length / DELAY_DIVIDER) as u64);
         tokio::time::sleep(delay).await;
+
         Ok(address)
     }
 
     async fn get_for_seek(
-        blob: Blob,
+        blob: &Blob,
         address: BytesAddress,
         pos: usize,
         len: usize,
         client: &Client,
     ) -> Result<Bytes> {
         let read_data = client.read_from(address, pos, len).await?;
-        compare(blob.bytes().slice(pos..(pos + len)), read_data.clone())?;
+        let mut expected = blob.bytes();
+        let _ = expected.split_to(pos);
+        expected.truncate(len);
+        compare(expected, read_data.clone())?;
         Ok(read_data)
     }
 

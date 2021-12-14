@@ -484,7 +484,7 @@ mod tests {
         }
 
         // Fetch second half and match
-        let fetch_second_half = Some((Some(size as u64 / 2), Some(size as u64)));
+        let fetch_second_half = Some((Some(size as u64 / 2), None));
         let content = safe.fetch(&xorurl, fetch_second_half).await?;
 
         if let SafeData::PublicBlob { data, .. } = content {
