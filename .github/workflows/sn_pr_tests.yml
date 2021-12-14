@@ -108,7 +108,7 @@ jobs:
 
       - name: Build all test targets
         # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo test --no-run --all-targets --release --features=test-utils
+        run: cd sn && cargo test --no-run --release --features=test-utils
 
       - name: Run Data Types tests
         if: steps.changes.outputs.types == 'true'
