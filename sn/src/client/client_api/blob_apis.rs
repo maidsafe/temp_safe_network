@@ -11,7 +11,9 @@ use super::{
     Client,
 };
 use crate::{
-    client::{client_api::data::DataMapLevel, utils::encryption, Error, Result},
+    client::{
+        client_api::data::DataMapLevel, connections::QueryResult, utils::encryption, Error, Result,
+    },
     messaging::data::{DataCmd, DataQuery, QueryResponse},
     types::{BytesAddress, Chunk, ChunkAddress, Encryption, PublicKey, Scope},
 };
@@ -181,6 +183,25 @@ impl Client {
         }
     }
 
+    /// Directly writes a [`Blob`] to the network in the
+    /// form of immutable self encrypted chunks, without any batching.
+    /// It also attempts to verify the Blob was uploaded to the network before returning.
+    #[instrument(skip_all, level = "trace")]
+    async fn upload_and_verify(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
+        let address = self.upload(bytes, scope).await?;
+
+        // let's now try to retrieve it
+        let query = DataQuery::GetChunk(ChunkAddress(*address.name()));
+        match self.send_query(query).await {
+            Ok(QueryResult {
+                response: QueryResponse::GetChunk(Ok(_)),
+                ..
+            }) => Ok(address),
+            Ok(QueryResult { response, .. }) => Err(Error::UnexpectedQueryResponse(response)),
+            Err(err) => Err(err),
+        }
+    }
+
     /// Calculates a Blob's/Spot's address from self encrypted chunks,
     /// without storing them onto the network.
     #[instrument(skip(bytes), level = "debug")]
@@ -337,8 +358,6 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use super::Spot;
-
     use crate::client::utils::test_utils::create_test_client_with;
     use crate::client::{
         client_api::blob_apis::Blob,
@@ -445,10 +464,12 @@ mod tests {
         let size = 2 * MIN_BLOB_SIZE;
         let blob = Blob::new(random_bytes(size))?;
 
-        let address = store_for_seek(blob.clone(), &client).await?;
+        let address = client
+            .upload_and_verify(blob.bytes(), Scope::Public)
+            .await?;
 
         let pos = 512;
-        let read_data = get_for_seek(&blob, address, pos, usize::MAX, &client).await?;
+        let read_data = read_from_pos(&blob, address, pos, usize::MAX, &client).await?;
 
         assert_eq!(read_data.len(), size - pos);
         compare(blob.bytes().split_off(pos), read_data)?;
@@ -470,18 +491,20 @@ mod tests {
                 let len = size / divisor;
                 let blob = Blob::new(random_bytes(size))?;
 
-                let address = store_for_seek(blob.clone(), &client).await?;
+                let address = client
+                    .upload_and_verify(blob.bytes(), Scope::Public)
+                    .await?;
 
                 // Read first part
                 let read_data_1 = {
                     let pos = 0;
-                    get_for_seek(&blob, address, pos, len, &client).await?
+                    read_from_pos(&blob, address, pos, len, &client).await?
                 };
 
                 // Read second part
                 let read_data_2 = {
                     let pos = len;
-                    get_for_seek(&blob, address, pos, len, &client).await?
+                    read_from_pos(&blob, address, pos, len, &client).await?
                 };
 
                 // Join parts
@@ -504,22 +527,14 @@ mod tests {
 
         let _outer_span = tracing::info_span!("blob_network_assert").entered();
 
-        let network_assert_delay: u64 = std::env::var("NETWORK_ASSERT_DELAY")
-            .unwrap_or_else(|_| "0".to_string())
-            .parse()?;
-
         let bytes = random_bytes(MIN_BLOB_SIZE / 3);
         let client = create_test_client().await?;
 
         let mut the_logs = crate::testnet_grep::NetworkLogState::new()?;
 
-        let address = client.upload(bytes.clone(), Scope::Public).await?;
-
-        let delay = tokio::time::Duration::from_secs(network_assert_delay);
-
-        debug!("Running network asserts with delay of {:?}", delay);
-        // small delay to ensure logs have written
-        tokio::time::sleep(delay).await;
+        let address = client
+            .upload_and_verify(bytes.clone(), Scope::Public)
+            .await?;
 
         // 3 elders were chosen by the client (should only be 3 as even if client chooses adults, AE should kick in prior to them attempting any of this)
         the_logs
@@ -542,7 +557,7 @@ mod tests {
         let _ = client.read_bytes(address).await?;
 
         // small delay to ensure logs have written
-        tokio::time::sleep(delay).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         // client send msg to 3 elders
         the_logs
@@ -563,8 +578,12 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1kb() -> Result<()> {
-        store_and_read_spot(MIN_BLOB_SIZE / 3, Scope::Public).await?;
-        store_and_read_spot(MIN_BLOB_SIZE / 3, Scope::Private).await
+        init_test_logger();
+        let size = MIN_BLOB_SIZE / 3;
+        let _outer_span = tracing::info_span!("store_and_read_1kb_spot", size).entered();
+        let client = create_test_client().await?;
+        store_and_read(&client, size, Scope::Public).await?;
+        store_and_read(&client, size, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -572,8 +591,8 @@ mod tests {
         init_test_logger();
         let _outer_span = tracing::info_span!("store_and_read_1mb").entered();
         let client = create_test_client().await?;
-        store_and_read_blob(&client, 1024 * 1024, Scope::Public).await?;
-        store_and_read_blob(&client, 1024 * 1024, Scope::Private).await
+        store_and_read(&client, 1024 * 1024, Scope::Public).await?;
+        store_and_read(&client, 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -581,7 +600,7 @@ mod tests {
         init_test_logger();
         let _outer_span = tracing::info_span!("ae_checks_blob_test").entered();
         let client = create_test_client_with(None, None, false).await?;
-        store_and_read_blob(&client, 10 * 1024 * 1024, Scope::Private).await
+        store_and_read(&client, 10 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -589,16 +608,15 @@ mod tests {
         init_test_logger();
         let _outer_span = tracing::info_span!("store_and_read_10mb").entered();
         let client = create_test_client().await?;
-        store_and_read_blob(&client, 10 * 1024 * 1024, Scope::Private).await
+        store_and_read(&client, 10 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "too heavy for CI"]
     async fn store_and_read_20mb() -> Result<()> {
         init_test_logger();
         let _outer_span = tracing::info_span!("store_and_read_20mb").entered();
         let client = create_test_client().await?;
-        store_and_read_blob(&client, 20 * 1024 * 1024, Scope::Private).await
+        store_and_read(&client, 20 * 1024 * 1024, Scope::Private).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -607,7 +625,7 @@ mod tests {
         init_test_logger();
         let _outer_span = tracing::info_span!("store_and_read_40mb").entered();
         let client = create_test_client().await?;
-        store_and_read_blob(&client, 40 * 1024 * 1024, Scope::Private).await
+        store_and_read(&client, 40 * 1024 * 1024, Scope::Private).await
     }
 
     // Essentially a load test, seeing how much parallel batting the nodes can take.
@@ -665,75 +683,34 @@ mod tests {
         Ok(())
     }
 
-    async fn store_and_read_blob(client: &Client, size: usize, scope: Scope) -> Result<()> {
+    async fn store_and_read(client: &Client, size: usize, scope: Scope) -> Result<()> {
         // cannot use scope as var w/ macro
         let _outer_span = if scope == Scope::Public {
-            tracing::info_span!("store_and_read_public_blob", size).entered()
+            tracing::info_span!("store_and_read_public_bytes", size).entered()
         } else {
-            tracing::info_span!("store_and_read_private_blob", size).entered()
+            tracing::info_span!("store_and_read_private_bytes", size).entered()
         };
 
+        // create Blob with random bytes of requested size
         let blob_bytes = random_bytes(size);
-        let blob = Blob::new(blob_bytes.clone())?;
 
-        let expected_address = Client::calculate_address(blob_bytes, scope)?;
-        let address = client.upload_blob(blob.clone(), scope).await?;
+        // we'll also test we can calculate address offline using `calculate_address` API
+        let expected_address = Client::calculate_address(blob_bytes.clone(), scope)?;
+
+        // we use upload_and_verify since it uploads and also confirms it was uploaded
+        let address = client.upload_and_verify(blob_bytes.clone(), scope).await?;
         assert_eq!(address, expected_address);
-
-        // the larger the file, the longer we have to wait before we start querying
-        let delay = tokio::time::Duration::from_secs(usize::max(1, size / DELAY_DIVIDER) as u64);
-        tokio::time::sleep(delay).await;
-
-        // now that it was written to the network we should be able to retrieve it
-        let read_data = client.read_bytes(address).await?;
-        // then the content should be what we stored
-        compare(blob.bytes(), read_data)?;
-
-        Ok(())
-    }
-
-    async fn store_and_read_spot(size: usize, scope: Scope) -> Result<()> {
-        init_test_logger();
-        // cannot use scope as var w/ macro
-        let _outer_span = if scope == Scope::Public {
-            tracing::info_span!("store_and_read_public_spot", size).entered()
-        } else {
-            tracing::info_span!("store_and_read_private_spot", size).entered()
-        };
-
-        let spot_bytes = random_bytes(size);
-
-        let spot = Spot::new(spot_bytes.clone())?;
-        let client = create_test_client().await?;
-
-        let expected_address = Client::calculate_address(spot_bytes, scope)?;
-        let address = client.upload_spot(spot.clone(), scope).await?;
-        assert_eq!(address, expected_address);
-
-        // the larger the size, the longer we have to wait before we start querying
-        let delay = tokio::time::Duration::from_secs(usize::max(1, size / DELAY_DIVIDER) as u64);
-        tokio::time::sleep(delay).await;
 
         // now that it was written to the network we should be able to retrieve it
         let read_data = client.read_bytes(address).await?;
 
         // then the content should be what we stored
-        compare(spot.bytes(), read_data)?;
+        compare(blob_bytes, read_data)?;
 
         Ok(())
     }
 
-    async fn store_for_seek(blob: Blob, client: &Client) -> Result<BytesAddress> {
-        let length = blob.bytes().len();
-        let address = client.upload_blob(blob, Scope::Public).await?;
-        // the larger the file, the longer we have to wait before we start querying
-        let delay = tokio::time::Duration::from_secs(usize::max(1, length / DELAY_DIVIDER) as u64);
-        tokio::time::sleep(delay).await;
-
-        Ok(address)
-    }
-
-    async fn get_for_seek(
+    async fn read_from_pos(
         blob: &Blob,
         address: BytesAddress,
         pos: usize,

@@ -17,29 +17,46 @@ use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
 use tracing::{debug, info_span, Instrument};
 
+// We divide the total query timeout by this number to get a more reasonable starting timeout.
+// This also represents the max retries possible _if no backoff were present_, while still
+// staying within the max_timeout in practice (it's _probably_ one less than this value...)
+const MAX_RETRY_COUNT: f32 = 11.0;
+
 impl Client {
+    /// Send a Query to the network and await a response.
+    /// Queries are automatically retried using exponential backoff if the timeout is hit.
+    #[instrument(skip(self), level = "debug")]
+    pub async fn send_query(&self, query: DataQuery) -> Result<QueryResult, Error> {
+        self.send_query_with_retry_count(query, MAX_RETRY_COUNT)
+            .await
+    }
+
+    /// Send a Query to the network and await a response.
+    /// Queries are not retried if the timeout is hit.
+    #[instrument(skip(self), level = "debug")]
+    pub async fn send_query_without_retry(&self, query: DataQuery) -> Result<QueryResult, Error> {
+        self.send_query_with_retry_count(query, 1.0).await
+    }
+
     // Send a Query to the network and await a response.
     // Queries are automatically retried using exponential backoff if the timeout is hit
-    // This function is a helper private to this module.
+    // This function is a private helper.
     #[instrument(skip(self), level = "debug")]
-    pub(crate) async fn send_query(&self, query: DataQuery) -> Result<QueryResult, Error> {
+    async fn send_query_with_retry_count(
+        &self,
+        query: DataQuery,
+        retry_count: f32,
+    ) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
         let msg = ServiceMsg::Query(query.clone());
         let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
         let signature = self.keypair.sign(&serialised_query);
 
-        // we divide the total query timeout by this to get a more reasonable starting timeout
-        // this also represents the max retries possible _if no backoff were present_, while still staying within the max_timeout
-        // in practice it's _probably_ one less than this value
-        let max_retry_count = 11.0;
-
-        let starting_query_timeout = self.query_timeout.div_f32(max_retry_count);
+        let starting_query_timeout = self.query_timeout.div_f32(MAX_RETRY_COUNT);
         trace!(
             "Setting up query retry, initial interval is: {:?}",
             starting_query_timeout
         );
-
-        // TODO: Do we need to keep each one going? and return the first!?
 
         retry(
             || {
@@ -49,7 +66,8 @@ impl Client {
                         query, starting_query_timeout
                     );
                     let res = tokio::time::timeout(
-                        // The max timeout is total_timeout / retry_factor, so we should get at least lowest_bound_count retries within the total time (if needed)
+                        // The max timeout is total_timeout / retry_factor, so we should get
+                        // at least lowest_bound_count retries within the total time (if needed)
                         starting_query_timeout,
                         self.send_signed_query(
                             query.clone(),
@@ -61,15 +79,11 @@ impl Client {
                     .await;
 
                     match res {
-                        Ok(inner_result) => match inner_result {
-                            Ok(query_result) => Ok(Ok(query_result)),
-                            Err(error) => match error {
-                                Error::InsufficientElderConnections { .. } => {
-                                    Err(error).map_err(backoff::Error::Transient)
-                                }
-                                _ => Err(error).map_err(backoff::Error::Permanent),
-                            },
-                        },
+                        Ok(Ok(query_result)) => Ok(Ok(query_result)),
+                        Ok(Err(error @ Error::InsufficientElderConnections { .. })) => {
+                            Err(error).map_err(backoff::Error::Transient)
+                        }
+                        Ok(Err(other_error)) => Err(other_error).map_err(backoff::Error::Permanent),
                         Err(_elapsed) => {
                             Err(Error::QueryTimedOut).map_err(backoff::Error::Transient)
                         }
@@ -82,12 +96,15 @@ impl Client {
         )
         .await
         .map_err(|_| {
-            debug!("retries all failed for {:?}, returning no response", query);
+            debug!(
+                "Retries ({}) all failed returning no response for {:?}",
+                MAX_RETRY_COUNT, query
+            );
             Error::NoResponse
         })?
     }
 
-    /// Send a Query to the network and await a response
+    /// Send a Query to the network and await a response.
     /// This is to be part of a public API, for the user to
     /// provide the serialised and already signed query.
     pub(crate) async fn send_signed_query(

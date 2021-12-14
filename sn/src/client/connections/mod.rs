@@ -28,10 +28,9 @@ type QueryResponseSender = Sender<QueryResponse>;
 type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
 
 #[derive(Debug)]
-pub(crate) struct QueryResult {
-    pub(super) response: QueryResponse,
-    // TODO: unify this
-    pub(super) operation_id: OperationId,
+pub struct QueryResult {
+    pub response: QueryResponse,
+    pub operation_id: OperationId,
 }
 
 pub(crate) type AeCache = LRUCache<(Vec<SocketAddr>, BlsPublicKey, Bytes), 100>;
