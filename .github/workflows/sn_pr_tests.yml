@@ -16,6 +16,37 @@ env:
   AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
+  build:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Build sn bins
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+      # Install Rust
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+
+      - name: Build sn bins
+        # all = all crates in workspace, lib/bins targets, with these features...
+        run: cargo build -p safe_network --release --features=test-utils,always-joinable --bins
+        timeout-minutes: 60
+
+
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run all relevant unit test categories
@@ -70,13 +101,14 @@ jobs:
           override: true
 
       - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
         with:
           cache-on-failure: true
-          sharedKey: ${{github.run_id}}-units
+          sharedKey: ${{github.run_id}}
 
       - name: Build all test targets
         # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo test --no-run --all-targets --release --features=test-utils
+        run: cd sn && cargo test --no-run --release --features=test-utils
 
       - name: Run Data Types tests
         if: steps.changes.outputs.types == 'true'
@@ -112,6 +144,7 @@ jobs:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run e2e tests
     runs-on: ${{ matrix.os }}
+    needs: ["build"]
     strategy:
       fail-fast: false
       matrix:
@@ -129,13 +162,10 @@ jobs:
           override: true
 
       - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
         with:
           cache-on-failure: true
-          sharedKey: ${{github.run_id}}-e2e
-
-      - name: Build all safe_network targets
-        # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=always-joinable,test-utils
+          sharedKey: ${{github.run_id}}
 
       - name: Start the network
         run: ./target/release/testnet
@@ -148,6 +178,7 @@ jobs:
 
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=always-joinable,test-utils
+        timeout-minutes: 60
 
       - name: Run network asserts one by one
         shell: bash
@@ -189,38 +220,6 @@ jobs:
         shell: bash
         run: cd sn && cargo run  --release  --features=always-joinable,test-utils --example client_blob
 
-
-      # - name: Kill the current network (not needed for next test)
-      #   if: matrix.os != 'windows-latest'
-      #   run: |
-      #     killall sn_node
-      #     rm -rf ~/.safe/node
-      #   shell: bash
-
-      # - name: Kill the current network (not needed for next test)
-      #   if: matrix.os == 'windows-latest'
-      #   run: |
-      #     taskkill /IM sn_node /F
-      #     rd /s /q %USERPROFILE%\.safe\node
-      #   shell: cmd
-
-      # - name: Remove node dir and logs for next test
-      #   if: matrix.os == 'windows-latest'
-      #   run: rd /s /q %USERPROFILE%\.safe\node
-      #   shell: cmd
-
-      # - name: Remove node dir and logs for next test
-      #   if: matrix.os != 'windows-latest'
-      #   run: rm -rf ~/.safe/node
-
-      # - name: Run example of split and chunk check
-      #   shell: bash
-      #   run: cargo run --release  --features=always-joinable,test-utils --example network_split
-      #   timeout-minutes: 5
-
-      # - name: Was there a section split?
-      #   run: ./resources/scripts/has_split.sh
-
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
@@ -229,14 +228,6 @@ jobs:
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
-
-      - name: Kill the current network (not needed for next test)
-        if: matrix.os == 'windows-latest'
-        continue-on-error: true
-        run: |
-          taskkill /IM sn_node /F
-          rd /s /q %USERPROFILE%\.safe\node
-        shell: cmd
 
       - name: Print Network Log Stats
         shell: bash
@@ -259,9 +250,11 @@ jobs:
         if: failure()
         continue-on-error: true
 
+
   api:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run api tests
+    needs: ["build"]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -280,13 +273,10 @@ jobs:
           override: true
 
       - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
         with:
           cache-on-failure: true
-          sharedKey: ${{github.run_id}}-api
-
-      - name: Build all safe_network targets
-        # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=always-joinable,test-utils --lib --bins
+          sharedKey: ${{github.run_id}}
 
       - name: Start the network
         run: ./target/release/testnet
@@ -296,7 +286,6 @@ jobs:
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
-
 
       - name: Build all sn_api tests
         run: cargo test --no-run -p sn_api --release --lib
@@ -318,14 +307,6 @@ jobs:
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
-
-      - name: Kill the current network (not needed for next test)
-        if: matrix.os == 'windows-latest'
-        continue-on-error: true
-        run: |
-          taskkill /IM sn_node /F
-          rd /s /q %USERPROFILE%\.safe\node
-        shell: cmd
 
       - name: Print Network Log Stats
         shell: bash
