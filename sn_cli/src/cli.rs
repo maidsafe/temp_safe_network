@@ -162,7 +162,7 @@ fn get_config() -> Result<Config> {
     let mut cli_config_path = config_path.clone();
     cli_config_path.push("cli");
     cli_config_path.push("config.json");
-    let mut node_config_path = config_path.clone();
+    let mut node_config_path = config_path;
     node_config_path.push("node");
     node_config_path.push("node_connection_info.config");
     Config::new(cli_config_path, node_config_path)
