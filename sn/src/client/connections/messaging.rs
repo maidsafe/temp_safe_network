@@ -113,9 +113,10 @@ impl Session {
         let msg_id = MessageId::new();
 
         if elders.len() < targets_count {
-            return Err(Error::InsufficientElderConnections(
+            return Err(Error::InsufficientElderKnowledge(
                 elders.len(),
                 targets_count,
+                section_pk,
             ));
         }
 
@@ -299,12 +300,12 @@ impl Session {
         }
 
         let send_failures = *failed_sends.lock().await;
-        if send_failures >= 2 {
-            let successful_connections = 3 - send_failures;
+        if send_failures >= NUM_OF_ELDERS_SUBSET_FOR_QUERIES / 2 {
+            let successful_connections = NUM_OF_ELDERS_SUBSET_FOR_QUERIES - send_failures;
             error!("Could not send query to enough elders");
-            return Err(Error::InsufficientElderConnections(
+            return Err(Error::FailedToSendSufficentQuery(
                 successful_connections,
-                3,
+                NUM_OF_ELDERS_SUBSET_FOR_QUERIES,
             ));
         }
 
@@ -599,14 +600,9 @@ pub(super) async fn send_message(
 
     let successful_sends = *successes.read().await;
     if failures > successful_sends {
-        error!("More send errors than success on send_message");
-        Err(Error::InsufficientElderConnections(
-            successful_sends,
-            elders.len(),
-        ))
-    } else {
-        Ok(())
+        error!("More errors when sending a message than successess");
     }
+    Ok(())
 }
 
 #[instrument(skip_all, level = "trace")]
