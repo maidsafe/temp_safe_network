@@ -17,6 +17,8 @@ use std::{
     path::PathBuf,
 };
 
+const BASE_DOWNLOAD_URL: &str = "https://github.com/maidsafe/safe_network/releases/download";
+
 pub fn download_and_install_github_release_asset(
     target_path: PathBuf,
     exec_file_name: &str,
@@ -38,7 +40,7 @@ pub fn download_and_install_github_release_asset(
     let release;
     if let Some(version) = version {
         release = updater
-            .get_release_version(format!("v{}", version).as_str())
+            .get_release_version(format!("safe_network-v{}", version).as_str())
             .wrap_err(format!(
                 "The maidsafe/{} repository has no release at version {}",
                 repo_name, version
@@ -70,11 +72,8 @@ fn download_and_install_bin(
     release: self_update::update::Release,
     exec_file_name: &str,
 ) -> Result<String> {
-    println!(
-        "Latest release found: {} v{}",
-        release.name, release.version
-    );
-    // get the corresponding asset from the release
+    let version = get_version_from_release_version(&release.version)?;
+    println!("Found release: {} {}", release.name, version);
     let asset = release.asset_for(target).ok_or_else(|| {
         eyre!(
             "No asset found in latest release for the target platform {}",
@@ -90,8 +89,9 @@ fn download_and_install_bin(
         )
     })?;
 
-    println!("Downloading {}...", asset.download_url);
-    self_update::Download::from_url(&asset.download_url)
+    let download_url = get_download_url(&version);
+    println!("Downloading {}...", download_url);
+    self_update::Download::from_url(&download_url)
         .show_progress(true)
         .download_to(&tmp_tarball)
         .wrap_err_with(|| format!("Error downloading release asset '{}'", asset.download_url))?;
@@ -166,4 +166,32 @@ fn set_exec_perms(file_path: PathBuf) -> Result<()> {
     })?;
 
     Ok(())
+}
+
+/// Gets the version number from the full version number string.
+///
+/// The `release_version` input is in the form "safe_network-v0.49.1". This function will return
+/// the "v0.49.1" part.
+fn get_version_from_release_version(release_version: &str) -> Result<String> {
+    let mut parts = release_version.split('-');
+    let version = parts
+        .next_back()
+        .ok_or_else(|| {
+            eyre!(format!(
+                "Could not parse version number from {}",
+                release_version
+            ))
+        })?
+        .to_string();
+    Ok(version)
+}
+
+fn get_download_url(version: &str) -> String {
+    let version_sans_v = &version[1..];
+    let target = get_target();
+    let url = format!(
+        "{}/safe_network-{}/sn_node-{}-{}.tar.gz",
+        BASE_DOWNLOAD_URL, version, version_sans_v, target
+    );
+    url
 }

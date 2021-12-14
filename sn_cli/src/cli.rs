@@ -21,6 +21,7 @@ use crate::{
 use color_eyre::{eyre::eyre, Result};
 use sn_api::{Safe, XorUrlBase};
 use std::env;
+use std::path::PathBuf;
 use std::time::Duration;
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use tracing::debug;
@@ -144,16 +145,25 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
     result
 }
 
+/// Gets the configuration, which is used by various parts of the application.
+///
+/// The SN_CLI_CONFIG_PATH allows the user to define a custom location as an alternative to
+/// ~/.safe, but this has mainly been added to enable integration tests to use a temporary location
+/// for the config files, and you can then use assert_fs to to assert against those temp files.
+/// Using a temporary location also means the test suites don't manipulate the current user's home
+/// directory.
 fn get_config() -> Result<Config> {
-    let mut config_path =
+    let mut default_config_path =
         dirs_next::home_dir().ok_or_else(|| eyre!("Couldn't find user's home directory"))?;
-    config_path.push(".safe");
-    config_path.push("cli");
-    config_path.push("config.json");
-    let mut node_config_path =
-        dirs_next::home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
-    node_config_path.push(".safe");
+    default_config_path.push(".safe");
+    let config_path =
+        std::env::var("SN_CLI_CONFIG_PATH").map_or(default_config_path, PathBuf::from);
+
+    let mut cli_config_path = config_path.clone();
+    cli_config_path.push("cli");
+    cli_config_path.push("config.json");
+    let mut node_config_path = config_path.clone();
     node_config_path.push("node");
     node_config_path.push("node_connection_info.config");
-    Config::new(config_path, node_config_path)
+    Config::new(cli_config_path, node_config_path)
 }

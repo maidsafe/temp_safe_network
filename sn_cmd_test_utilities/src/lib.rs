@@ -14,10 +14,12 @@ pub mod util {
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use sn_api::{files::ProcessedFiles, resolver::SafeData, Keypair, SafeUrl};
-    use std::{collections::BTreeMap, env, fs, path::Path, process};
+    use std::path::Path;
+    use std::{collections::BTreeMap, env, fs, process};
     use tiny_keccak::{Hasher, Sha3};
     use walkdir::WalkDir;
 
+    const GITHUB_API_URL: &str = "https://api.github.com";
     pub const CLI: &str = "safe";
     pub const SAFE_PROTOCOL: &str = "safe://";
 
@@ -29,6 +31,24 @@ pub mod util {
     #[ctor::ctor]
     fn init() {
         let _ = color_eyre::install();
+    }
+
+    pub fn get_sn_node_latest_released_version() -> Result<String> {
+        let latest_release_url = format!(
+            "{}/repos/maidsafe/safe_network/releases/latest",
+            GITHUB_API_URL
+        );
+        let response = reqwest::blocking::Client::new()
+            .get(latest_release_url)
+            .header(reqwest::header::USER_AGENT, "sn_cmd_test_utilities")
+            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+            .send()?;
+        let response_json = response.json::<serde_json::Value>()?;
+        let tag_name = response_json["tag_name"]
+            .as_str()
+            .ok_or_else(|| eyre!("Failed to parse the tag_name field from the response"))?;
+        let version = get_version_from_release_version(tag_name)?;
+        Ok(version)
     }
 
     pub fn get_directory_file_count(directory_path: impl AsRef<Path>) -> Result<usize> {
@@ -407,5 +427,19 @@ pub mod util {
             Ok(meta) => Ok(meta.file_type().is_symlink()),
             Err(e) => Err(eyre!("{:?}", e)),
         }
+    }
+
+    fn get_version_from_release_version(release_version: &str) -> Result<String> {
+        let mut parts = release_version.split('-');
+        let version = parts
+            .next_back()
+            .ok_or_else(|| {
+                eyre!(format!(
+                    "Could not parse version number from {}",
+                    release_version
+                ))
+            })?
+            .to_string();
+        Ok(version)
     }
 }

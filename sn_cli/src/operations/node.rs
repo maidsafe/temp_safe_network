@@ -65,15 +65,27 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
 }
 
 #[cfg(not(feature = "self-update"))]
-pub fn node_install(_vault_path: Option<PathBuf>, _version: Option<String>) -> Result<()> {
+pub fn node_install(
+    _node_config_dir_path: PathBuf,
+    _node_override_dir_path: Option<PathBuf>,
+    _version: Option<String>,
+) -> Result<()> {
     Err(eyre!("Self updates are disabled"))
 }
 
 #[cfg(feature = "self-update")]
-pub fn node_install(node_path: Option<PathBuf>, version: Option<String>) -> Result<()> {
-    let target_path = get_node_bin_path(node_path)?;
+pub fn node_install(
+    node_config_dir_path: PathBuf,
+    node_override_dir_path: Option<PathBuf>,
+    version: Option<String>,
+) -> Result<()> {
+    let target_dir_path = if let Some(override_dir_path) = node_override_dir_path {
+        override_dir_path
+    } else {
+        node_config_dir_path
+    };
     let _ = download_and_install_github_release_asset(
-        target_path,
+        target_dir_path,
         SN_NODE_EXECUTABLE,
         "safe_network",
         version,
