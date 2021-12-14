@@ -25,10 +25,12 @@ pub enum NodeSubCommands {
         node_path: Option<PathBuf>,
     },
     #[structopt(name = "install")]
-    /// Install latest sn_node released version in the system
+    /// Install an sn_node binary
     Install {
-        #[structopt(long = "node-path")]
-        /// Path where to install sn_node executable (default ~/.safe/node/). The SN_NODE_PATH env var can also be used to set the path
+        /// Optional destination directory path for the installation. The SN_NODE_PATH environment
+        /// variable can also be used to supply this path. If this argument is not used, the
+        /// binary will be installed at ~/.safe/node/sn_node, or the equivalent user directory
+        /// path on Windows.
         #[structopt(long = "node-path", env = "SN_NODE_PATH")]
         node_path: Option<PathBuf>,
         /// Specify the version of sn_node to install. If not supplied, the latest version will be
@@ -144,7 +146,9 @@ pub async fn node_commander(
         Some(NodeSubCommands::Install { node_path, version }) => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
-            let handler = std::thread::spawn(|| node_install(node_path, version));
+            let mut node_config_path = config.node_config_path.clone();
+            node_config_path.pop();
+            let handler = std::thread::spawn(|| node_install(node_config_path, node_path, version));
             handler
                 .join()
                 .map_err(|err| eyre!("Failed to run self update: {:?}", err))?
