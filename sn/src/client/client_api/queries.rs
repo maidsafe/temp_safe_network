@@ -81,6 +81,8 @@ impl Client {
                     match res {
                         Ok(Ok(query_result)) => Ok(Ok(query_result)),
                         Ok(Err(error @ Error::InsufficientElderConnections { .. })) => {
+                            warn!("Insufficient elder connections during a query attempt");
+
                             Err(error).map_err(backoff::Error::Transient)
                         }
                         Ok(Err(other_error)) => Err(other_error).map_err(backoff::Error::Permanent),
