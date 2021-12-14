@@ -3,7 +3,7 @@ on: [pull_request]
 
 jobs:
   test:
-    runs-on: [self-hosted, ubuntu]
+    runs-on: self-hosted
     steps:
       - name: APT update
         run: apt update
