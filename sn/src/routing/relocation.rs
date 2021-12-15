@@ -256,11 +256,11 @@ fn trailing_zeros(bytes: &[u8]) -> u32 {
 mod tests {
     use super::*;
     use crate::elder_count;
-    use crate::routing::{
-        dkg::test_utils::section_signed,
-        network_knowledge::SectionAuthorityProvider, routing_api::tests::SecretKeySet, MIN_AGE,
-    };
     use crate::peer::test_utils::arbitrary_unique_peers;
+    use crate::routing::{
+        dkg::test_utils::section_signed, network_knowledge::SectionAuthorityProvider,
+        routing_api::tests::SecretKeySet, MIN_AGE,
+    };
     use assert_matches::assert_matches;
     use eyre::Result;
     use itertools::Itertools;

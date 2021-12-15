@@ -603,6 +603,7 @@ async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm
 mod tests {
     use super::*;
     use crate::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
+    use crate::peer::UnnamedPeer;
     use crate::routing::{
         dkg::test_utils::*,
         error::Error as RoutingError,
@@ -610,7 +611,6 @@ mod tests {
         network_knowledge::{test_utils::*, NodeState},
         MIN_ADULT_AGE,
     };
-    use crate::peer::UnnamedPeer;
     use crate::{elder_count, init_test_logger};
 
     use crate::types::PublicKey;

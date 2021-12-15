@@ -18,11 +18,11 @@ use crate::client::{
     ClientConfig,
 };
 use crate::messaging::data::{CmdError, DataQuery, RegisterRead, ServiceMsg};
-use crate::types::{Keypair, PublicKey, RegisterAddress};
-
 use crate::messaging::{ServiceAuth, WireMsg};
+use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::utils::read_prefix_map_from_disk;
+use crate::types::{Keypair, PublicKey, RegisterAddress};
 use itertools::Itertools;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
@@ -150,7 +150,7 @@ impl Client {
             err_sender,
             config.local_addr,
             config.standard_wait,
-            prefix_map,
+            prefix_map.clone(),
         )
         .await?;
 
@@ -182,7 +182,19 @@ impl Client {
             signature,
         };
 
-        let bootstrap_nodes = bootstrap_nodes.iter().copied().collect_vec();
+        // either use our known prefixmap elders, or fallback to plain node config file
+        let bootstrap_nodes = {
+            if let Some(sap) = prefix_map.closest_or_opposite(&XorName::random(), None) {
+                sap.elders_vec()
+            } else {
+                // these peers will be nonsense peers, and dropped after we connect. Reaplced by whatever SectionAuthorityProvider peers we have received
+                bootstrap_nodes
+                    .iter()
+                    .copied()
+                    .map(|socket| Peer::new(XorName::random(), socket))
+                    .collect_vec()
+            }
+        };
 
         // TODO: check for the initial msg id and DO NOT RESEND in ae retry.
         // Send the dummy message to probe the network for it's infrastructure details.
