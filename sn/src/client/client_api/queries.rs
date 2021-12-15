@@ -82,13 +82,10 @@ impl Client {
                         Ok(Ok(query_result)) => Ok(Ok(query_result)),
                         Ok(Err(error @ Error::InsufficientElderConnections { .. })) => {
                             warn!("Insufficient elder connections during a query attempt");
-
-                            Err(error).map_err(backoff::Error::Transient)
+                            Err(backoff::Error::Transient(error))
                         }
-                        Ok(Err(other_error)) => Err(other_error).map_err(backoff::Error::Permanent),
-                        Err(_elapsed) => {
-                            Err(Error::QueryTimedOut).map_err(backoff::Error::Transient)
-                        }
+                        Ok(Err(other_error)) => Err(backoff::Error::Permanent(other_error)),
+                        Err(_elapsed) => Err(backoff::Error::Transient(Error::QueryTimedOut)),
                     }
                 }
                 .instrument(info_span!("Attempting a query"))
@@ -107,9 +104,9 @@ impl Client {
     }
 
     /// Send a Query to the network and await a response.
-    /// This is to be part of a public API, for the user to
+    /// This is part of a public API, for the user to
     /// provide the serialised and already signed query.
-    pub(crate) async fn send_signed_query(
+    pub async fn send_signed_query(
         &self,
         query: DataQuery,
         client_pk: PublicKey,
