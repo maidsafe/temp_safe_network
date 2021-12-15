@@ -198,7 +198,7 @@ impl Client {
     /// form of immutable self encrypted chunks, without any batching.
     /// It also attempts to verify the Blob was uploaded to the network before returning.
     #[instrument(skip_all, level = "trace")]
-    async fn upload_and_verify(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
+    pub async fn upload_and_verify(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
         let address = self.upload(bytes, scope).await?;
 
         // let's now try to retrieve it
