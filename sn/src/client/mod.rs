@@ -25,8 +25,6 @@
 //!
 //! TODO: update once data types are crdt compliant
 //!
-#![recursion_limit = "256"]
-
 mod config_handler;
 mod connections;
 mod errors;
