@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.50.0 (2021-12-14)
+## v0.51.0 (2021-12-15)
 
 ### New Features (BREAKING)
 
@@ -27,7 +27,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - add in distinct client errors for comms failure ([`7c34940`](https://github.com/maidsafe/safe_network/commit/7c34940401b0115105d9b818b9f93c39d7669eed))
     - different flavors of upload data API, with/without verifying successful upload ([`134dfa2`](https://github.com/maidsafe/safe_network/commit/134dfa29b3698fb233095194305d9bbbba2875c7))
+</details>
+
+## v0.50.0 (2021-12-14)
+
+### New Features (BREAKING)
+
+ - <csr-id-134dfa29b3698fb233095194305d9bbbba2875c7/> different flavors of upload data API, with/without verifying successful upload
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.50.0 ([`653f653`](https://github.com/maidsafe/safe_network/commit/653f653a775a101679904ab75c8012a72dfdedfb))
     - set default AE_WAIT to be 0 ([`dd50d1d`](https://github.com/maidsafe/safe_network/commit/dd50d1d860aa4ca60b6c0d5a525b45d88ddf432e))
 </details>
 
