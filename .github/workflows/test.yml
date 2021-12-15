@@ -3,9 +3,7 @@ on: [pull_request]
 
 jobs:
   test:
-    runs-on: self-hosted
+    runs-on: self-hosted-windows
     steps:
-      - name: Who?
-        run: whoami
-      - name: Sudo something
-        run: sudo apt update; sudo apt install cowsay
+      - name: Step One
+        run: echo "Hello"
