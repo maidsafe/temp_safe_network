@@ -31,9 +31,10 @@ use crate::routing::{
     node::Node,
     recommended_section_size,
     relocation::{self, RelocatePayloadUtils},
-    supermajority, Error, Event, Peer, Result as RoutingResult, UnnamedPeer, FIRST_SECTION_MAX_AGE,
+    supermajority, Error, Event, Peer, Result as RoutingResult, FIRST_SECTION_MAX_AGE,
     FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
+use crate::peer::UnnamedPeer;
 use crate::{elder_count, init_test_logger};
 
 use crate::types::{Keypair, PublicKey};

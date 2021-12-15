@@ -15,12 +15,13 @@ use crate::messaging::{
     },
     WireMsg,
 };
+use crate::peer::Peer;
 use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
-    Peer, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
+    SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
 };
 use bls::PublicKey as BlsPublicKey;
 use std::vec;
