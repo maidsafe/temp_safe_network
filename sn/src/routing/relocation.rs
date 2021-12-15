@@ -258,9 +258,9 @@ mod tests {
     use crate::elder_count;
     use crate::routing::{
         dkg::test_utils::section_signed,
-        network_knowledge::peer::test_utils::arbitrary_unique_peers,
         network_knowledge::SectionAuthorityProvider, routing_api::tests::SecretKeySet, MIN_AGE,
     };
+    use crate::peer::test_utils::arbitrary_unique_peers;
     use assert_matches::assert_matches;
     use eyre::Result;
     use itertools::Itertools;

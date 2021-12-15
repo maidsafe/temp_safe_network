@@ -15,6 +15,7 @@ use crate::messaging::{
     },
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
+use crate::peer::{Peer, UnnamedPeer};
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     core::{Comm, ConnectionEvent, SendStatus},
@@ -25,7 +26,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    Peer, UnnamedPeer, MIN_ADULT_AGE,
+    MIN_ADULT_AGE,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -607,8 +608,9 @@ mod tests {
         error::Error as RoutingError,
         messages::WireMsgUtils,
         network_knowledge::{test_utils::*, NodeState},
-        UnnamedPeer, MIN_ADULT_AGE,
+        MIN_ADULT_AGE,
     };
+    use crate::peer::UnnamedPeer;
     use crate::{elder_count, init_test_logger};
 
     use crate::types::PublicKey;

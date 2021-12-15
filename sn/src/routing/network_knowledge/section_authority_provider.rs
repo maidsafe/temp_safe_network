@@ -10,7 +10,8 @@ use super::ElderCandidates;
 use crate::messaging::{
     system::SectionAuth, SectionAuthorityProvider as SectionAuthorityProviderMsg,
 };
-use crate::routing::{Peer, Prefix, XorName};
+use crate::peer::Peer;
+use crate::routing::{Prefix, XorName};
 use bls::{PublicKey, PublicKeySet};
 use std::{
     collections::{BTreeMap, BTreeSet},

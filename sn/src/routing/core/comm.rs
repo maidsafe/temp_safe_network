@@ -8,11 +8,12 @@
 
 use super::{msg_count::MsgCount, BackPressure};
 use crate::messaging::{system::LoadReport, MessageId, WireMsg};
+use crate::peer::{Peer, UnnamedPeer};
 use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
-    Peer, UnnamedPeer,
 };
+
 use bytes::Bytes;
 use futures::{
     future::TryFutureExt,

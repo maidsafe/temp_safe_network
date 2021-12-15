@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{capacity::CHUNK_COPY_COUNT, Command, Core, Prefix, Result};
+use crate::peer::Peer;
 use crate::routing::log_markers::LogMarker;
-use crate::routing::{error::convert_to_error_message, Error, Peer};
+use crate::routing::{error::convert_to_error_message, Error};
 use crate::types::{Chunk, PublicKey};
 use crate::{
     messaging::{

@@ -31,9 +31,8 @@ use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
     messages::WireMsgUtils,
-    network_knowledge::SectionAuthorityProvider,
     node::Node,
-    Peer, MIN_ADULT_AGE,
+    MIN_ADULT_AGE,
 };
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 
@@ -306,45 +305,6 @@ impl Routing {
     /// Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
         self.dispatcher.core.is_elder().await
-    }
-
-    /// Returns the information of all the current section elders.
-    pub async fn our_elders(&self) -> Vec<Peer> {
-        self.dispatcher
-            .core
-            .network_knowledge()
-            .authority_provider()
-            .await
-            .elders_vec()
-    }
-
-    /// Returns the elders of our section sorted by their distance to `name` (closest first).
-    pub async fn our_elders_sorted_by_distance_to(&self, name: &XorName) -> Vec<Peer> {
-        self.our_elders()
-            .await
-            .into_iter()
-            .sorted_by(|lhs, rhs| name.cmp_distance(&lhs.name(), &rhs.name()))
-            .collect()
-    }
-
-    /// Returns the information of all the current section adults.
-    pub async fn our_adults(&self) -> Vec<Peer> {
-        self.dispatcher.core.network_knowledge().adults().await
-    }
-
-    /// Returns the adults of our section sorted by their distance to `name` (closest first).
-    /// If we are not elder or if there are no adults in the section, returns empty vec.
-    pub async fn our_adults_sorted_by_distance_to(&self, name: &XorName) -> Vec<Peer> {
-        self.our_adults()
-            .await
-            .into_iter()
-            .sorted_by(|lhs, rhs| name.cmp_distance(&lhs.name(), &rhs.name()))
-            .collect()
-    }
-
-    /// Returns the info about the section matching the name.
-    pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.dispatcher.core.matching_section(name).await
     }
 
     /// Builds a WireMsg signed by this Node

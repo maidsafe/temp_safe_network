@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::system::{MembershipState, NodeState as NodeStateMsg, SectionAuth};
-use crate::routing::{error::Error, Peer};
+use crate::peer::Peer;
+use crate::routing::error::Error;
 use std::net::SocketAddr;
 use xor_name::XorName;
 
