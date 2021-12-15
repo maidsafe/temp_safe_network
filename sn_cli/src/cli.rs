@@ -26,7 +26,7 @@ use std::time::Duration;
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use tracing::debug;
 
-const DEFAULT_TIMEOUT_SECS: u64 = 60 * 10; //10 mins
+const DEFAULT_TIMEOUT_SECS: u64 = 120; // 120s
 
 const SN_CLI_QUERY_TIMEOUT: &str = "SN_CLI_QUERY_TIMEOUT";
 
