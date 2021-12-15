@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted]
+        os: [self-hosted-windows]
     steps:
       - uses: actions/checkout@v2
       - name: Mac install ripgrep
@@ -39,7 +39,7 @@ jobs:
         run: sudo apt-get -y install ripgrep
 
       - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         run: choco install ripgrep
 
       # Install Rust
@@ -67,7 +67,7 @@ jobs:
       - name: Print Network Log Stats at start
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'self-hosted-windows'
 
       - name: Healthcheck
         run: ./resources/scripts/network_is_ready_cli.sh
@@ -152,7 +152,7 @@ jobs:
         run: sudo apt-get -y install ripgrep
 
       - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         run: choco install ripgrep
 
       # Install Rust
@@ -223,7 +223,7 @@ jobs:
         run: sudo apt-get -y install ripgrep
 
       - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         run: choco install ripgrep
 
       # Install Rust
@@ -251,7 +251,7 @@ jobs:
       - name: Print Network Log Stats at start
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'self-hosted-windows'
 
       - name: Healthcheck
         run: ./resources/scripts/network_is_ready_cli.sh
@@ -295,26 +295,26 @@ jobs:
 
 
       # - name: Kill the current network (not needed for next test)
-      #   if: matrix.os != 'windows-latest'
+      #   if: matrix.os != 'self-hosted-windows'
       #   run: |
       #     killall sn_node
       #     rm -rf ~/.safe/node
       #   shell: bash
 
       # - name: Kill the current network (not needed for next test)
-      #   if: matrix.os == 'windows-latest'
+      #   if: matrix.os == 'self-hosted-windows'
       #   run: |
       #     taskkill /IM sn_node /F
       #     rd /s /q %USERPROFILE%\.safe\node
       #   shell: cmd
 
       # - name: Remove node dir and logs for next test
-      #   if: matrix.os == 'windows-latest'
+      #   if: matrix.os == 'self-hosted-windows'
       #   run: rd /s /q %USERPROFILE%\.safe\node
       #   shell: cmd
 
       # - name: Remove node dir and logs for next test
-      #   if: matrix.os != 'windows-latest'
+      #   if: matrix.os != 'self-hosted-windows'
       #   run: rm -rf ~/.safe/node
 
       # - name: Run example of split and chunk check
@@ -328,14 +328,14 @@ jobs:
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os != 'windows-latest'
+        if: failure() && matrix.os != 'self-hosted-windows'
         continue-on-error: true
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
       - name: Kill the current network (not needed for next test)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         continue-on-error: true
         run: |
           taskkill /IM sn_node /F
@@ -346,7 +346,7 @@ jobs:
         shell: bash
         continue-on-error: true
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
+        if: steps.section-startup.outcome == 'success' &&  matrix.os != 'self-hosted-windows'
 
       - name: Upload Node Logs to AWS
           # Upload artifacts.
@@ -383,7 +383,7 @@ jobs:
         run: sudo apt-get -y install ripgrep
 
       - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         run: choco install ripgrep
 
       # Install Rust
@@ -411,7 +411,7 @@ jobs:
       - name: Print Network Log Stats at start
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'self-hosted-windows'
 
       - name: Healthcheck
         run: ./resources/scripts/network_is_ready_cli.sh
@@ -435,7 +435,7 @@ jobs:
           ls $HOME/.safe/node/local-test-network
 
       - name: Kill the current network (not needed for next test)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         continue-on-error: true
         run: |
           taskkill /IM sn_node /F
