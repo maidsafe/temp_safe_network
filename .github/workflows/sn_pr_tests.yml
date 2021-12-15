@@ -35,7 +35,7 @@ jobs:
         run: brew install ripgrep
 
       - name: ubuntu install ripgrep
-        if: matrix.os == 'self-hosted'
+        if: matrix.os == 'self-hosted-ubuntu'
         run: sudo apt-get -y install ripgrep
 
       - name: windows install ripgrep
@@ -106,7 +106,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted]
+        os: [self-hosted-windows]
     steps:
       - uses: actions/checkout@v2
       - uses: dorny/paths-filter@v2
@@ -148,7 +148,7 @@ jobs:
         run: brew install ripgrep
 
       - name: ubuntu install ripgrep
-        if: matrix.os == 'self-hosted'
+        if: matrix.os == 'self-hosted-ubuntu'
         run: sudo apt-get -y install ripgrep
 
       - name: windows install ripgrep
@@ -210,7 +210,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted]
+        os: [self-hosted-windows]
     steps:
       - uses: actions/checkout@v2
 
@@ -219,7 +219,7 @@ jobs:
         run: brew install ripgrep
 
       - name: ubuntu install ripgrep
-        if: matrix.os == 'self-hosted'
+        if: matrix.os == 'self-hosted-ubuntu'
         run: sudo apt-get -y install ripgrep
 
       - name: windows install ripgrep
@@ -370,7 +370,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted]
+        os: [self-hosted-windows]
     steps:
       - uses: actions/checkout@v2
 
@@ -379,7 +379,7 @@ jobs:
         run: brew install ripgrep
 
       - name: ubuntu install ripgrep
-        if: matrix.os == 'self-hosted'
+        if: matrix.os == 'self-hosted-ubuntu'
         run: sudo apt-get -y install ripgrep
 
       - name: windows install ripgrep
