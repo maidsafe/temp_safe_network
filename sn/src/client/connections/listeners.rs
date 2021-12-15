@@ -17,6 +17,7 @@ use crate::messaging::{
     DstLocation, MessageId, MessageType, MsgKind, WireMsg,
 };
 use crate::messaging::{AuthorityProof, ServiceAuth};
+use crate::peer::Peer;
 use crate::routing::{log_markers::LogMarker, SectionAuthorityProvider};
 use crate::types::utils::write_data_to_disk;
 use bytes::Bytes;
@@ -384,7 +385,7 @@ impl Session {
     ) -> Result<
         Option<(
             MessageId,
-            Vec<SocketAddr>,
+            Vec<Peer>,
             ServiceMsg,
             DstLocation,
             AuthorityProof<ServiceAuth>,
@@ -441,11 +442,11 @@ impl Session {
         // We normally have received auth when we're in AE-Redirect (where we could not trust enough to update our prefixmap)
         let mut target_elders: Vec<_> = if let Some(auth) = received_auth {
             target_public_key = auth.section_key();
-            auth.elders()
+            auth.elders_vec()
+                .into_iter()
                 .sorted_by(|lhs, rhs| {
                     dst_address_of_bounced_msg.cmp_distance(&lhs.name(), &rhs.name())
                 })
-                .map(|elder| elder.addr())
                 .take(target_count)
                 .collect()
         } else {
@@ -457,10 +458,7 @@ impl Session {
             {
                 target_public_key = sap.section_key();
 
-                sap.elders()
-                    .map(|elder| elder.addr())
-                    .take(target_count)
-                    .collect()
+                sap.elders_vec().into_iter().take(target_count).collect()
             } else {
                 error!("Cannot resend {:?}, no 'received auth' provided, and nothing relevant in session network prefixmap", msg_id);
                 return Ok(None);

@@ -23,7 +23,7 @@ use xor_name::{XorName, XOR_NAME_LEN};
 /// being physically connected at the network layer, which is indicated by the optional `connection`
 /// field.
 #[derive(Clone)]
-pub(crate) struct Peer {
+pub struct Peer {
     name: XorName,
     addr: SocketAddr,
 

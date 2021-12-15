@@ -14,6 +14,7 @@ use crate::messaging::{
 use crate::types::Error as DtError;
 use bls::PublicKey;
 use std::io;
+use std::net::SocketAddr;
 use thiserror::Error;
 
 /// Specialisation of `std::Result` for Client.
@@ -57,6 +58,9 @@ pub enum Error {
         "Problem finding sufficient elders. A supermajority of responses is unobtainable. {0} were known in this section, {1} needed."
     )]
     InsufficientElderKnowledge(usize, usize, PublicKey),
+    /// Peer connection retrieval failed
+    #[error("Error with Peer's connection: {0:?}")]
+    PeerConnection(SocketAddr),
     /// Cannot store empty bytes..
     #[error("Cannot store empty bytes.")]
     EmptyBytesProvided,
@@ -117,6 +121,9 @@ pub enum Error {
     /// QuicP2p error.
     #[error(transparent)]
     QuicP2p(#[from] qp2p::RpcError),
+    /// QuicP2p Connection error.
+    #[error(transparent)]
+    QuicP2pConnection(#[from] qp2p::ConnectionError),
     /// Bincode error
     #[error(transparent)]
     Serialisation(#[from] Box<bincode::ErrorKind>),
