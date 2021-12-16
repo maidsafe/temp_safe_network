@@ -202,7 +202,7 @@ impl Client {
         let address = self.upload(bytes, scope).await?;
 
         // let's now try to retrieve it
-        let _ = self.get_chunk(address.name()).await?;
+        let _bytes = self.read_bytes(address).await?;
 
         Ok(address)
     }
