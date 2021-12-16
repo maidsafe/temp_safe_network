@@ -37,7 +37,12 @@ use xor_name::XorName;
 
 pub use register_apis::RegisterWriteAheadLog;
 
-type ChunksCache = LRUCache<Chunk, 50>;
+// Maximum amount of Chunks to keep in our cal Chunks cache.
+// Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
+const CHUNK_CACHE_SIZE: usize = 50;
+
+// LRU cache to keep the Chunks we retrieve.
+type ChunksCache = LRUCache<Chunk, CHUNK_CACHE_SIZE>;
 
 /// Client object
 #[derive(Clone, Debug)]
