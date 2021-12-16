@@ -1,12 +1,11 @@
 [package]
 name = "sn_cli"
-version = "0.38.0"
+version = "0.39.0"
 description = "Safe CLI"
 authors = [
   "bochaco <gabrielviganotti@gmail.com>",
   "Josh Wilson <joshuef@gmail.com>"
 ]
-publish = false
 license = "MIT OR BSD-3-Clause"
 default-run = "safe"
 repository = "https://github.com/maidsafe/sn_cli"
