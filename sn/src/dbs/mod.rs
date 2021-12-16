@@ -12,8 +12,7 @@ mod event_store;
 mod kv_store;
 
 pub(crate) use encoding::{deserialise, serialise};
-pub(crate) use errors::Result;
-pub(crate) use errors::{convert_to_error_message, Error};
+pub(crate) use errors::{convert_to_error_message, Error, Result};
 pub(crate) use event_store::EventStore;
 pub use kv_store::used_space::UsedSpace;
 pub(crate) use kv_store::{to_db_key::ToDbKey, KvStore};

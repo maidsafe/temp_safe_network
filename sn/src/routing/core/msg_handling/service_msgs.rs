@@ -317,7 +317,7 @@ impl Core {
     }
 
     // Used to fetch the list of holders for a given chunk.
-    pub(crate) async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
+    pub(crate) async fn get_adults_holding_chunk(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults().await;
@@ -330,6 +330,7 @@ impl Core {
             .filter(|peer| !full_adults.contains(peer))
             .take(CHUNK_COPY_COUNT)
             .collect::<BTreeSet<_>>();
+
         trace!(
             "Chunk holders of {:?} are empty adults: {:?} and full adults: {:?}",
             target,
@@ -356,6 +357,34 @@ impl Core {
         };
 
         candidates.extend(close_full_adults);
+        candidates
+    }
+
+    // Used to fetch the list of holders for a given chunk.
+    pub(crate) async fn get_adults_who_should_store_chunk(
+        &self,
+        target: &XorName,
+    ) -> BTreeSet<XorName> {
+        let full_adults = self.full_adults().await;
+        // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
+        let adults = self.network_knowledge().adults().await;
+
+        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
+
+        let candidates = adults_names
+            .into_iter()
+            .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
+            .filter(|peer| !full_adults.contains(peer))
+            .take(CHUNK_COPY_COUNT)
+            .collect::<BTreeSet<_>>();
+
+        trace!(
+            "Target chunk holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
+            target,
+            candidates,
+            full_adults
+        );
+
         candidates
     }
 
