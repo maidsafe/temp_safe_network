@@ -465,7 +465,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
     let output = safe_cmd_stdout(
         [
             "nrs",
-            "create",
+            "register",
             &nrsurl,
             "-l",
             &files_container_xor,
@@ -530,7 +530,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
     safe_cmd(
         [
             "nrs",
-            "create",
+            "register",
             &nrsurl,
             "-l",
             &files_container_xor,
@@ -800,7 +800,7 @@ fn calling_files_ls_on_nrs_with_path() -> Result<()> {
     safe_cmd(
         [
             "nrs",
-            "create",
+            "register",
             &nrsurl,
             "-l",
             &files_container_xor,
