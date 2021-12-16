@@ -39,7 +39,7 @@ jobs:
 
       - name: windows install ripgrep
         if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
+        run: choco install ripgrep -y
 
       # Install Rust
       - name: Install Rust
@@ -152,7 +152,7 @@ jobs:
 
       - name: windows install ripgrep
         if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
+        run: choco install ripgrep -y
 
       # Install Rust
       - name: Install Rust
@@ -223,7 +223,7 @@ jobs:
 
       - name: windows install ripgrep
         if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
+        run: choco install ripgrep -y
 
       # Install Rust
       - name: Install Rust
@@ -383,7 +383,7 @@ jobs:
 
       - name: windows install ripgrep
         if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
+        run: choco install ripgrep -y
 
       # Install Rust
       - name: Install Rust
