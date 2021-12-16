@@ -54,7 +54,6 @@ impl Core {
             event_tx,
             used_space,
             root_storage_dir,
-            true,
         )
         .await
     }

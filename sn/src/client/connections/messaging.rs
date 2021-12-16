@@ -16,7 +16,6 @@ use crate::messaging::{
 };
 use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::utils::write_data_to_disk;
 use crate::types::PublicKey;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
@@ -25,8 +24,7 @@ use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
-use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{
@@ -42,9 +40,6 @@ pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
 // Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
 pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
-
-// Root directory for Clients
-pub(crate) const SAFE_CLIENT_DIR: &str = ".safe/client";
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
@@ -62,12 +57,6 @@ impl Session {
 
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
 
-        // Create client's root dir
-        let root_dir = create_client_root_dir(client_pk).await?;
-
-        // Write our PrefixMap to disk in our root dir
-        write_data_to_path(&prefix_map, &root_dir.join("prefix_map")).await?;
-
         let session = Session {
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
@@ -78,7 +67,6 @@ impl Session {
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             standard_wait,
-            root_dir,
         };
 
         Ok(session)
@@ -564,31 +552,20 @@ pub(super) async fn send_message(
 
     let successful_sends = *successes.read().await;
     if failures > successful_sends {
-        error!("More errors when sending a message than successess");
+        error!("More errors when sending a message than successes");
     }
     Ok(())
 }
 
 #[instrument(skip_all, level = "trace")]
-pub(crate) async fn write_data_to_path<T: Serialize>(data: &T, path: &Path) -> Result<(), Error> {
-    // Write our PrefixMap to root dir
-    if let Err(e) = write_data_to_disk(data, path).await {
-        error!("Error writing data for Client at dir {:?}: {:?}", path, e);
-    }
-
-    Ok(())
-}
-
-#[instrument(skip_all, level = "trace")]
-pub(crate) async fn create_client_root_dir(client_pk: PublicKey) -> Result<PathBuf, Error> {
+pub(crate) async fn create_safe_dir() -> Result<PathBuf, Error> {
     let mut root_dir = dirs_next::home_dir().ok_or(Error::CouldNotReadHomeDir)?;
-    root_dir.push(SAFE_CLIENT_DIR);
-    root_dir.push(format!("sn_client-{}", client_pk));
+    root_dir.push(".safe");
 
     // Create `.safe/client` dir if not present
     tokio::fs::create_dir_all(root_dir.clone())
         .await
-        .map_err(|_| Error::CouldNotCreateRootDir)?;
+        .map_err(|_| Error::CouldNotCreateSafeDir)?;
 
     Ok(root_dir)
 }

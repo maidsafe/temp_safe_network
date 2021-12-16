@@ -192,7 +192,6 @@ impl Routing {
                 event_tx,
                 used_space.clone(),
                 root_storage_dir.to_path_buf(),
-                false,
             )
             .await?;
             info!("{} Joined the network!", core.node.read().await.name());

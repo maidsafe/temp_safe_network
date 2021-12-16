@@ -19,7 +19,7 @@ use crate::messaging::{
 };
 use crate::node::routing::SectionAuthorityProvider;
 use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, utils::write_data_to_disk};
+use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk};
 use crate::{at_least_one_correct_elder, elder_count};
 
 use bytes::Bytes;
@@ -348,9 +348,7 @@ impl Session {
                     sap.prefix()
                 );
                 // Update the PrefixMap on disk
-                if let Err(e) =
-                    write_data_to_disk(&session.network, &session.root_dir.join("prefix_map")).await
-                {
+                if let Err(e) = compare_and_write_prefix_map_to_disk(&session.network).await {
                     error!(
                         "Error writing freshly updated PrefixMap to client dir: {:?}",
                         e

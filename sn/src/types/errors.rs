@@ -48,6 +48,9 @@ pub enum Error {
     /// Error creating File at given path
     #[error("File Creation error: {0}")]
     FileHandling(String),
+    /// Error creating Directory  at given path
+    #[error("Directory Creation error: {0}")]
+    DirectoryHandling(String),
     /// Entry already exists. Contains the current entry Key.
     #[error("Entry already exists {0}")]
     EntryExists(u8),

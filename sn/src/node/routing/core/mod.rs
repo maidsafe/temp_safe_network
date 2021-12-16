@@ -50,7 +50,7 @@ use crate::messaging::{
 };
 
 use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, utils::write_data_to_disk, Cache};
+use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache};
 use crate::UsedSpace;
 
 use backoff::ExponentialBackoff;
@@ -112,11 +112,9 @@ pub(crate) struct Core {
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: Arc<RwLock<bool>>,
     current_joins_semaphore: Arc<Semaphore>,
-    is_genesis_node: bool,
     resource_proof: ResourceProof,
     pub(super) register_storage: RegisterStorage,
     pub(super) chunk_storage: ChunkStore,
-    root_storage_dir: PathBuf,
     capacity: Capacity,
     liveness: Liveness,
     pending_chunk_queries: Arc<Cache<XorName, Peer>>,
@@ -134,7 +132,6 @@ impl Core {
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
-        is_genesis_node: bool,
     ) -> Result<Self> {
         let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
 
@@ -161,13 +158,11 @@ impl Core {
             event_tx,
             joins_allowed: Arc::new(RwLock::new(true)),
             current_joins_semaphore: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
-            is_genesis_node,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             register_storage,
             chunk_storage,
             capacity,
             liveness: adult_liveness,
-            root_storage_dir,
             pending_chunk_queries: Arc::new(Cache::with_expiry_duration(CHUNK_QUERY_TIMEOUT)),
             ae_backoff_cache: AeBackoffCache::default(),
         })
@@ -217,26 +212,11 @@ impl Core {
         // TODO: Make this serialization human readable
 
         let prefix_map = self.network_knowledge.prefix_map().clone();
-        let storage_dir = self.root_storage_dir.join("prefix_map");
-        let is_genesis_node = self.is_genesis_node;
 
         let _ = tokio::spawn(async move {
-            // Write to the node's root dir
-            if let Err(e) = write_data_to_disk(&prefix_map, &storage_dir).await {
-                error!("Error writing PrefixMap to root dir: {:?}", e);
-            }
-
-            // If we are genesis Node, write to `~/.safe` dir
-            if is_genesis_node {
-                if let Some(mut safe_dir) = dirs_next::home_dir() {
-                    safe_dir.push(".safe");
-                    safe_dir.push("prefix_map");
-                    if let Err(e) = write_data_to_disk(&prefix_map, &safe_dir).await {
-                        error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
-                    }
-                } else {
-                    error!("Could not write PrefixMap in SAFE dir: Home directory not found");
-                }
+            // Compare and write Prefix to `~/.safe/prefix_maps` dir
+            if let Err(e) = compare_and_write_prefix_map_to_disk(&prefix_map).await {
+                error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
             }
         });
     }
