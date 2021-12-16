@@ -122,7 +122,7 @@ pub enum FilesSubCommands {
         #[structopt(short = "e", long = "exists", possible_values = &["ask", "preserve", "overwrite"], default_value="ask")]
         exists: FileExistsAction,
         /// How to display progress.
-        #[structopt(short = "i", long = "progress", possible_values = &["bars", "text", "none"], default_value="bars")]
+        #[structopt(short = "i", long = "progress", possible_values = &["text", "none"], default_value="text")]
         progress: ProgressIndicator,
         /// Preserves modification times, access times, and modes from the original file
         #[structopt(short = "p", long = "preserve")]

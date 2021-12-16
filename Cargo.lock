@@ -1748,17 +1748,6 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.14.0"
-source = "git+https://github.com/mibac138/indicatif?branch=mpb-tick#564c518e8ddea3f1468cd82e054d596fbf4b4e2a"
-dependencies = [
- "console 0.15.0",
- "lazy_static",
- "number_prefix",
- "regex",
-]
-
-[[package]]
-name = "indicatif"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7baab56125e25686df467fe470785512329883aab42696d661247aca2a2896e4"
@@ -3185,7 +3174,7 @@ dependencies = [
  "either",
  "flate2",
  "hyper",
- "indicatif 0.15.0",
+ "indicatif",
  "log",
  "quick-xml",
  "regex",
@@ -3206,7 +3195,7 @@ dependencies = [
  "either",
  "flate2",
  "hyper",
- "indicatif 0.15.0",
+ "indicatif",
  "log",
  "quick-xml",
  "regex",
@@ -3466,7 +3455,6 @@ dependencies = [
  "ed25519-dalek",
  "hex 0.4.3",
  "human-panic",
- "indicatif 0.14.0",
  "isatty",
  "multibase 0.6.0",
  "num-traits",
