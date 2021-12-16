@@ -671,7 +671,11 @@ impl Core {
             SystemMsg::NodeCmd(NodeCmd::StoreChunk { chunk, .. }) => {
                 info!("Processing chunk write with MessageId: {:?}", msg_id);
                 // There is no point in verifying a sig from a sender A or B here.
+
+                // This may return a DatabasFull error... but we should have reported storage increase
+                // well before this
                 let level_report = self.chunk_storage.store(&chunk).await?;
+                info!("Storage level report: {:?}", level_report);
                 return Ok(self.record_if_any(level_report).await);
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk)) => {

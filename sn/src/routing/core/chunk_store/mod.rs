@@ -68,6 +68,7 @@ impl ChunkStore {
         NodeQueryResponse::GetChunk(self.get_chunk(address).map_err(convert_to_error_message))
     }
 
+    #[instrument(skip_all)]
     pub(super) async fn store(&self, data: &Chunk) -> Result<Option<StorageLevel>> {
         trace!("{:?}", LogMarker::StoringChunk);
         if self.db.has(data.address())? {
@@ -88,6 +89,7 @@ impl ChunkStore {
             let used_space = self.db.used_space_ratio().await;
             // every level represents 10 percentage points
             if (10.0 * used_space) as u8 >= next_level.value() {
+                debug!("Next level for storage has been reached");
                 *self.last_recorded_level.write().await = next_level;
                 return Ok(Some(next_level));
             }
