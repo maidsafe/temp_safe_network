@@ -14,7 +14,6 @@ use super::{
 use bytes::Buf;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use console::Term;
-use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, TickTimeLimit};
 use sn_api::{
     files::{FilesMap, GetAttr, ProcessedFiles},
     resolver::Range,
@@ -25,7 +24,6 @@ use std::{
     fs,
     io::{BufWriter, Write},
     path::Path,
-    time::Duration,
 };
 use tracing::{debug, info, trace, warn};
 
@@ -77,7 +75,6 @@ impl std::str::FromStr for FileExistsAction {
 // What type of Progress Indicator to display.
 #[derive(Debug)]
 pub enum ProgressIndicator {
-    Bars,
     Text,
     None,
 }
@@ -87,7 +84,6 @@ impl std::str::FromStr for ProgressIndicator {
     type Err = String;
     fn from_str(str: &str) -> Result<Self, String> {
         match str {
-            "bars" => Ok(Self::Bars),
             "text" => Ok(Self::Text),
             "none" => Ok(Self::None),
             other => Err(format!(
@@ -98,10 +94,9 @@ impl std::str::FromStr for ProgressIndicator {
     }
 }
 
-/// Default progress indicator is Bars
 impl Default for ProgressIndicator {
     fn default() -> Self {
-        ProgressIndicator::Bars
+        ProgressIndicator::Text
     }
 }
 
@@ -133,8 +128,6 @@ pub async fn process_get_command(
 ) -> Result<()> {
     let str_path = dest.unwrap_or_else(|| ".".to_string());
     let path = Path::new(&str_path);
-
-    let (mp, bars) = create_progress_bars();
 
     let mut overwrites: u64 = 0;
     let mut preserves: u64 = 0;
@@ -203,9 +196,6 @@ pub async fn process_get_command(
             }
             if overwrite {
                 match progress {
-                    ProgressIndicator::Bars => {
-                        update_progress_bars(&mp, &bars, &mystatus);
-                    }
                     ProgressIndicator::Text => {
                         print_status(status);
                     }
@@ -290,95 +280,6 @@ fn print_status(status: &FilesGetStatus) {
             1.0
         ) * 100.0
     );
-}
-
-// Update the progress bars.
-// Called once before each file starts downloading,
-// and again after each chunk until it finishes.
-// Current state can be determined by
-//    checking transfer_bvtes_written and file_bytes_written
-fn update_progress_bars(m: &MultiProgress, bars: &[ProgressBar], status: &FilesGetStatus) {
-    let b_onefile = status.file_size == status.total_transfer_bytes;
-
-    // do some setup if the transfer is just starting.
-    if status.transfer_bytes_written == 0 {
-        // Hide bar1 if we are only downloading 1 file in this transfer.
-        if b_onefile {
-            bars[1].finish_and_clear();
-        }
-    }
-
-    // set bar 1 length and reset elapsed time when starting a new file.
-    if status.file_bytes_written == 0 {
-        bars[0].set_length(status.file_size);
-        bars[0].reset();
-
-        // We re-set this for each file because it can change if a pre-existing file is preserved.
-        bars[2].set_length(status.total_transfer_bytes);
-
-        if !b_onefile {
-            bars[1].set_length(status.file_size);
-            bars[1].reset();
-        }
-    }
-
-    let msg = format!(
-        "File [{} of {}]: {}",
-        status.current_file,
-        status.total_files,
-        status.path_remote.display().to_string().trim_matches('/')
-    );
-
-    // set bar 0 message, and set position for all 3 bars.
-    bars[0].set_message(&msg);
-    bars[0].set_position(status.file_bytes_written);
-    bars[1].set_position(status.file_bytes_written);
-    bars[2].set_position(status.transfer_bytes_written);
-
-    // finish bars 0 and 1 when current file has been downloaded.
-    if status.file_size == status.file_bytes_written {
-        bars[0].finish_at_current_pos();
-        bars[1].finish_at_current_pos();
-    }
-
-    // Hide bars 0 and 1 when transfer is done.
-    if status.total_transfer_bytes == status.transfer_bytes_written {
-        bars[0].finish_and_clear();
-        bars[1].finish_and_clear();
-        bars[2].finish_at_current_pos();
-    }
-    // tell bar to update/display.
-    m.tick(TickTimeLimit::Timeout(Duration::from_millis(50)))
-        .unwrap_or(());
-}
-
-// Creates and inits the progress bars.
-// We use 3. The first just reports the path.
-// The 2nd and 3rd represent File progress and Transfer progress respectively.
-fn create_progress_bars() -> (MultiProgress, Vec<ProgressBar>) {
-    let m = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_nohz());
-    let sty_file = ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})  File")
-        .progress_chars("##-");
-    let sty_transfer = ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})  Transfer")
-        .progress_chars("##-");
-    let sty_path = ProgressStyle::default_bar().template("{msg}");
-
-    // first bar just prints path of file downloading.
-    // second bar is for single file progress, in bytes.
-    // third bar is for entire transfer progress, in bytes.
-    let b1 = m.add(ProgressBar::new(100));
-    let b2 = m.add(ProgressBar::new(100));
-    let b3 = m.add(ProgressBar::new(100));
-
-    b1.set_style(sty_path);
-    b2.set_style(sty_file);
-    b3.set_style(sty_transfer);
-
-    let bars = vec![b1, b2, b3];
-
-    (m, bars)
 }
 
 // Prompts user for [Y/n] input.

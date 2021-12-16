@@ -56,10 +56,6 @@ features = [ "serde" ]
 version = "1.0.1"
 features = [ "serde" ]
 
-[dependencies.indicatif]
-git = "https://github.com/mibac138/indicatif"
-branch = "mpb-tick"
-
 [dependencies.reqwest]
 version = "~0.11"
 default-features = false
