@@ -19,13 +19,13 @@ jobs:
             target: x86_64-pc-windows-msvc
           - os: macos-latest
             target: x86_64-apple-darwin
-          - os: ubuntu-latest
+          - os: self-hosted-ubuntu
             target: x86_64-unknown-linux-musl
-          - os: ubuntu-latest
+          - os: self-hosted-ubuntu
             target: arm-unknown-linux-musleabi
-          - os: ubuntu-latest
+          - os: self-hosted-ubuntu
             target: armv7-unknown-linux-musleabihf
-          - os: ubuntu-latest
+          - os: self-hosted-ubuntu
             target: aarch64-unknown-linux-musl
     steps:
       - uses: actions/checkout@v2
