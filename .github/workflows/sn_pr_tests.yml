@@ -293,12 +293,11 @@ jobs:
       - name: Run sn_api tests
         shell: bash
         run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 50
+        timeout-minutes: 15
         env:
           # these api tests realy heavily on retry_loop at the moment
           # TODO: Remove that dependency
           SN_QUERY_TIMEOUT: 20 # 20 secs
-          SN_AE_WAIT: 1 # 1 sec
 
       - name: Are nodes still running...?
         shell: bash
