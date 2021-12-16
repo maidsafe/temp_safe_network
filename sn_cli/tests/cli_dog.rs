@@ -22,7 +22,10 @@ fn calling_safe_dog_files_container_nrsurl() -> Result<()> {
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = get_random_nrs_string();
-    safe_cmd(["nrs", "create", &nrsurl, "-l", &container_xorurl], Some(0))?;
+    safe_cmd(
+        ["nrs", "register", &nrsurl, "-l", &container_xorurl],
+        Some(0),
+    )?;
 
     let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--json"], Some(0))?;
     let (url, mut content): (String, Vec<SafeData>) =
@@ -43,7 +46,10 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() -> Result<()> {
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = get_random_nrs_string();
-    safe_cmd(["nrs", "create", &nrsurl, "-l", &container_xorurl], Some(0))?;
+    safe_cmd(
+        ["nrs", "register", &nrsurl, "-l", &container_xorurl],
+        Some(0),
+    )?;
 
     let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--output=jsoncompact"], Some(0))?;
     let (url, mut content): (String, Vec<SafeData>) =
@@ -64,7 +70,10 @@ fn calling_safe_dog_files_container_nrsurl_yaml() -> Result<()> {
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = get_random_nrs_string();
-    let _ = safe_cmd_stdout(["nrs", "create", &nrsurl, "-l", &container_xorurl], Some(0))?;
+    let _ = safe_cmd_stdout(
+        ["nrs", "register", &nrsurl, "-l", &container_xorurl],
+        Some(0),
+    )?;
     let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--output=yaml"], Some(0))?;
     let (url, mut content): (String, Vec<SafeData>) =
         serde_yaml::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
@@ -84,7 +93,7 @@ fn calling_safe_dog_safekey_nrsurl() -> Result<()> {
     let (safekey_xorurl, _sk) = create_and_get_keys()?;
 
     let nrsurl = get_random_nrs_string();
-    safe_cmd(["nrs", "create", &nrsurl, "-l", &safekey_xorurl], Some(0))?;
+    safe_cmd(["nrs", "register", &nrsurl, "-l", &safekey_xorurl], Some(0))?;
     let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--json"], Some(0))?;
     let (url, mut content): (String, Vec<SafeData>) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
@@ -105,7 +114,7 @@ fn calling_safe_dog_nrs_url_with_subnames() -> Result<()> {
 
     let pub_name = get_random_nrs_string();
     let nrsurl = format!("subname.{}", pub_name);
-    safe_cmd(["nrs", "create", &nrsurl, "-l", &safekey_xorurl], Some(0))?;
+    safe_cmd(["nrs", "register", &nrsurl, "-l", &safekey_xorurl], Some(0))?;
 
     // let's check the output with NRS-URL first
     let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--json"], Some(0))?;

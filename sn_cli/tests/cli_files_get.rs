@@ -385,7 +385,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
     safe_cmd(
-        ["nrs", "create", &nrs_name, "-l", &files_container_xor],
+        ["nrs", "register", &nrs_name, "-l", &files_container_xor],
         Some(0),
     )?;
 

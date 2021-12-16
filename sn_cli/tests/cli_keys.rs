@@ -18,7 +18,7 @@ const PRETTY_KEYS_CREATION_RESPONSE: &str = "New SafeKey created:";
 #[test]
 fn calling_safe_keys_create_pretty() -> Result<()> {
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["keys", "create", "--test-coins"])
+    cmd.args(&vec!["keys", "create"])
         .assert()
         .stdout(predicate::str::contains(PRETTY_KEYS_CREATION_RESPONSE))
         .stdout(predicate::str::contains(SAFE_PROTOCOL).from_utf8())
@@ -29,7 +29,7 @@ fn calling_safe_keys_create_pretty() -> Result<()> {
 #[test]
 fn calling_safe_keys_create() -> Result<()> {
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["keys", "create", "--test-coins", "--json"])
+    cmd.args(&vec!["keys", "create", "--json"])
         .assert()
         .stdout(predicate::str::contains(PRETTY_KEYS_CREATION_RESPONSE).count(0))
         .stdout(predicate::str::contains(SAFE_PROTOCOL).from_utf8())

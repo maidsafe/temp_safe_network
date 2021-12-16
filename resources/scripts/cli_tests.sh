@@ -5,11 +5,9 @@
 # they're all independent of one another.
 exit=0
 
-export SN_CLI_QUERY_TIMEOUT=1
 export RUST_BACKTRACE=full
 
 cargo run --package sn_cli --release -- keys create --for-cli || ((exit++))
-cd sn_cli
 cargo test --release --test cli_node || ((exit++))
 cargo test --release --test cli_cat -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_dog -- --test-threads=1 || ((exit++))
