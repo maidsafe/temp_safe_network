@@ -5,12 +5,120 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.43.0 (2021-11-25)
+## v0.46.0 (2021-12-16)
+
+### New Features (BREAKING)
+
+ - <csr-id-18879590ddfcf125133a6b2b8f3f372e8683be42/> rename Url to SafeUrl
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 10 commits contributed to the release over the course of 2 calendar days.
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.51.1 ([`dcbb67f`](https://github.com/maidsafe/safe_network/commit/dcbb67fc699d7cb1f3a2c4632bcb8a5738916091))
+    - safe_network-0.51.0 ([`c685838`](https://github.com/maidsafe/safe_network/commit/c685838d8f9c10b0f4e7541fe201862bb84e8555))
+    - safe_network-0.50.0 ([`653f653`](https://github.com/maidsafe/safe_network/commit/653f653a775a101679904ab75c8012a72dfdedfb))
+    - safe_network-0.49.3 ([`36ca20e`](https://github.com/maidsafe/safe_network/commit/36ca20e606899ecbdea24d845c34ba11ab889cf7))
+    - fmt ([`d30aa0c`](https://github.com/maidsafe/safe_network/commit/d30aa0cb7440b9f3a44fefc3b6b9f7855480958c))
+    - rename Url to SafeUrl ([`1887959`](https://github.com/maidsafe/safe_network/commit/18879590ddfcf125133a6b2b8f3f372e8683be42))
+    - adding a test for retrieving Blob with range over data length ([`edb8de8`](https://github.com/maidsafe/safe_network/commit/edb8de8b4d923e97d68eed40a7953f38461b0281))
+    - safe_network-0.49.2 ([`62d7479`](https://github.com/maidsafe/safe_network/commit/62d747969b739172910aabca6fcb273d2827fc8a))
+    - safe_network-0.49.1 ([`69ae8c2`](https://github.com/maidsafe/safe_network/commit/69ae8c20e91dd9959ebfa5456efdf9c218a9d66f))
+    - safe_network-0.49.0 ([`6f5516d`](https://github.com/maidsafe/safe_network/commit/6f5516d8bb677462ea6def46aa65a1094767d68c))
+</details>
+
+## v0.44.0 (2021-12-10)
+
+### New Features
+
+ - <csr-id-fd31bd2ef5ccc9149f8f0a2844c52af60bff3840/> use Vec of DataCmd instead of wrapper struct
+ - <csr-id-544cfd21b2ede036615ac00673470f43f0399526/> dry run for NRS Multimaps Registers and FileContainers
+ - <csr-id-da5136e3995307d71c11192769ad167b56962f26/> return nrs map on register fork, ignore fork errors of get for another subname
+ - <csr-id-e2869c21b5b6c1c93f1a11cbad5c40b94b5e04ea/> improve register fork, fix dups issue, cleanup
+ - <csr-id-9428700e5dec7aaabeaf078a8537d678aa0e5c4c/> Nrs with multimaps, resurected multimap tombstones
+ - <csr-id-24f1aa0208e3e474862c18b21ea9f048cb6abf25/> expose API for calculate Blob/Spot address without a network connection
+
+### Bug Fixes
+
+ - <csr-id-8955fcf9d69e869725177340d1de6b6b1e7a203b/> read_from client API was incorrectly using provided length value as an end index
+   - Minor refactoring in sn_api moving the SafeData struct into its own file.
+   - Re-enabling the only two fetch API tests which are now passsing with this fix.
+ - <csr-id-b26833d80cf88b9a2dc1bb8478e74d9e37d6dc51/> files_container_create API was trying to send Register op to the network in dry-run
+ - <csr-id-15dc3bd46686d25f679c21f85de091578d5f42eb/> files container resolver was resolving path even when signaled to not to
 
 ### New Features (BREAKING)
 
  - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
 
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 34 commits contributed to the release over the course of 15 calendar days.
+ - 33 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - feat(sn_cli)!: `nrs create` only creates topnames ([`c284f07`](https://github.com/maidsafe/safe_network/commit/c284f0787afe0d079e53b79b3a9d74cad04c4b0e))
+    - read_from client API was incorrectly using provided length value as an end index ([`8955fcf`](https://github.com/maidsafe/safe_network/commit/8955fcf9d69e869725177340d1de6b6b1e7a203b))
+    - safe_network-0.48.0 ([`9eff035`](https://github.com/maidsafe/safe_network/commit/9eff03598ba09aa339180d7ecd57b50174180095))
+    - files_container_create API was trying to send Register op to the network in dry-run ([`b26833d`](https://github.com/maidsafe/safe_network/commit/b26833d80cf88b9a2dc1bb8478e74d9e37d6dc51))
+    - safe_network-0.47.0 ([`8570965`](https://github.com/maidsafe/safe_network/commit/85709655b0ce38246515658b956aa9b8f67cb55a))
+    - re-enable fetch API tests to run in CI ([`66dc068`](https://github.com/maidsafe/safe_network/commit/66dc0682edb53c64a0660b3622bdc1a646114dee))
+    - adapting test_files_container_remove_path test to new behavior ([`2b7c72c`](https://github.com/maidsafe/safe_network/commit/2b7c72c3f87f34051ea301250d1af258f9d310cb))
+    - files container resolver was resolving path even when signaled to not to ([`15dc3bd`](https://github.com/maidsafe/safe_network/commit/15dc3bd46686d25f679c21f85de091578d5f42eb))
+    - use Vec of DataCmd instead of wrapper struct ([`fd31bd2`](https://github.com/maidsafe/safe_network/commit/fd31bd2ef5ccc9149f8f0a2844c52af60bff3840))
+    - dry run for NRS Multimaps Registers and FileContainers ([`544cfd2`](https://github.com/maidsafe/safe_network/commit/544cfd21b2ede036615ac00673470f43f0399526))
+    - safe_network-0.46.6 ([`b5e9dcc`](https://github.com/maidsafe/safe_network/commit/b5e9dcc5b13b1eda711d4760d9feb8dc929a0c43))
+    - refactoring files API tests ([`bb7abce`](https://github.com/maidsafe/safe_network/commit/bb7abce7330a432884e80baa2aa158409e9734d0))
+    - return nrs map on register fork, ignore fork errors of get for another subname ([`da5136e`](https://github.com/maidsafe/safe_network/commit/da5136e3995307d71c11192769ad167b56962f26))
+    - fmt ([`1120c99`](https://github.com/maidsafe/safe_network/commit/1120c99868a0a97e8e25a7611fea31838fe9f6f6))
+    - improve register fork, fix dups issue, cleanup ([`e2869c2`](https://github.com/maidsafe/safe_network/commit/e2869c21b5b6c1c93f1a11cbad5c40b94b5e04ea))
+    - fmt clippy ([`9afcb8b`](https://github.com/maidsafe/safe_network/commit/9afcb8b2776c39de1925742ccb19e36e9f3fec55))
+    - Nrs with multimaps, resurected multimap tombstones ([`9428700`](https://github.com/maidsafe/safe_network/commit/9428700e5dec7aaabeaf078a8537d678aa0e5c4c))
+    - clippy tidyup for rust 1.57 ([`05f6d98`](https://github.com/maidsafe/safe_network/commit/05f6d98cf21f0158f4b5161484c7c15a0561b6f4))
+    - safe_network-0.46.5 ([`8657784`](https://github.com/maidsafe/safe_network/commit/86577846e845c110c49e15c95c6bd5595db51773))
+    - safe_network-0.46.4 ([`de3051e`](https://github.com/maidsafe/safe_network/commit/de3051e7e809a8f75507c54f3cf053a4244fdf19))
+    - safe_network-0.46.3 ([`69e9be2`](https://github.com/maidsafe/safe_network/commit/69e9be2a1567bfa211af7e9d7595381d9a0a3b38))
+    - safe_network-0.46.2 ([`260eaab`](https://github.com/maidsafe/safe_network/commit/260eaabd2d1b0c26dec9febc963929e65d7ec912))
+    - safe_network-0.46.1 ([`bf55f9b`](https://github.com/maidsafe/safe_network/commit/bf55f9b7e3b96319de4423e19333bf3b16fd1c78))
+    - safe_network-0.46.0 ([`8ea9498`](https://github.com/maidsafe/safe_network/commit/8ea94983b37b1d559358a62d6ca075b97c193f0d))
+    - safe_network-0.45.0 ([`a7e0585`](https://github.com/maidsafe/safe_network/commit/a7e058536ae6ae27228bd2254ea6465c5eface35))
+    - expose API for calculate Blob/Spot address without a network connection ([`24f1aa0`](https://github.com/maidsafe/safe_network/commit/24f1aa0208e3e474862c18b21ea9f048cb6abf25))
+    - safe_network-0.44.5 ([`aaab10b`](https://github.com/maidsafe/safe_network/commit/aaab10b3a5a44d9ec844757c71ac091016f51fd1))
+    - safe_network-0.44.4 ([`984c5f8`](https://github.com/maidsafe/safe_network/commit/984c5f83e3f4d889dc4e0583b09571e540357cf9))
+    - safe_network-0.44.3 ([`ec3dd49`](https://github.com/maidsafe/safe_network/commit/ec3dd4991535bb22235e2d1d413dd93489b8aedf))
+    - safe_network-0.44.2 ([`51b0f00`](https://github.com/maidsafe/safe_network/commit/51b0f0068c9a279da9a1edf45509cf80a90e663d))
+    - safe_network-0.44.1 ([`14c84c9`](https://github.com/maidsafe/safe_network/commit/14c84c9db23557626e4889eff0ff403a574dccad))
+    - safe_network-0.44.0 ([`75a4b53`](https://github.com/maidsafe/safe_network/commit/75a4b537573d4e5e8767e38fa7d1b1126dffe148))
+    - safe_network-0.43.0 ([`c78f470`](https://github.com/maidsafe/safe_network/commit/c78f4703a970e8b7466b091ad331d0f2233aa9a3))
+    - move Url to sn_api ([`3fe9d7a`](https://github.com/maidsafe/safe_network/commit/3fe9d7a6624fe5503f80395f6ed11426b131d3b1))
+</details>
+
+## v0.43.0 (2021-11-25)
+
+### New Features (BREAKING)
+
+ - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
 
 ### Commit Statistics
 
@@ -27,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - move Url to sn_api ([`3fe9d7a`](https://github.com/maidsafe/safe_network/commit/3fe9d7a6624fe5503f80395f6ed11426b131d3b1))
+    - safe_network-0.42.0/sn_api-0.43.0 ([`ca21d1e`](https://github.com/maidsafe/safe_network/commit/ca21d1e97fcd28ca351887636affffff78e3aeb3))
 </details>
 
 ## v0.42.0 (2021-11-25)
