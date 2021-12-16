@@ -11,30 +11,8 @@
 pub mod test_utils;
 
 use crate::types::{Encryption, PublicKey, Result as TypesResult, Scope};
-use backoff::ExponentialBackoff;
 use bytes::Bytes;
-use futures::Future;
 use rand::{self, distributions::Alphanumeric, rngs::OsRng, Rng};
-use std::time::Duration;
-
-pub(crate) fn retry<R, E, Fn, Fut>(
-    op: Fn,
-    initial_interval: Duration,
-    max_elapsed_time: Duration,
-) -> impl Future<Output = Result<R, E>>
-where
-    Fn: FnMut() -> Fut,
-    Fut: Future<Output = Result<R, backoff::Error<E>>>,
-{
-    let backoff = ExponentialBackoff {
-        initial_interval,
-        max_interval: max_elapsed_time,
-        max_elapsed_time: Some(max_elapsed_time),
-        ..Default::default()
-    };
-
-    backoff::future::retry(backoff, op)
-}
 
 struct DummyEncryption {
     public_key: PublicKey,

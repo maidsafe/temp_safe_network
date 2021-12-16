@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
-use crate::client::utils::retry;
 use crate::client::{connections::QueryResult, errors::Error};
 use crate::messaging::{
     data::{DataQuery, ServiceMsg},
@@ -15,12 +14,11 @@ use crate::messaging::{
 };
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
-use tracing::{debug, info_span, Instrument};
+use tracing::{debug, info_span};
 
-// We divide the total query timeout by this number to get a more reasonable starting timeout.
-// This also represents the max retries possible _if no backoff were present_, while still
-// staying within the max_timeout in practice (it's _probably_ one less than this value...)
-const MAX_RETRY_COUNT: f32 = 11.0;
+// We divide the total query timeout by this number.
+// This also represents the max retries possible, while still staying within the max_timeout.
+const MAX_RETRY_COUNT: f32 = 5.0;
 
 impl Client {
     /// Send a Query to the network and await a response.
@@ -39,7 +37,7 @@ impl Client {
     }
 
     // Send a Query to the network and await a response.
-    // Queries are automatically retried using exponential backoff if the timeout is hit
+    // Queries are automatically retried if the timeout is hit
     // This function is a private helper.
     #[instrument(skip(self), level = "debug")]
     async fn send_query_with_retry_count(
@@ -52,55 +50,41 @@ impl Client {
         let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
         let signature = self.keypair.sign(&serialised_query);
 
-        let starting_query_timeout = self.query_timeout.div_f32(MAX_RETRY_COUNT);
-        trace!(
-            "Setting up query retry, initial interval is: {:?}",
-            starting_query_timeout
-        );
+        let attempt_timeout = self.query_timeout.div_f32(MAX_RETRY_COUNT + 1.0);
+        trace!("Setting up query retry, interval is: {:?}", attempt_timeout);
 
-        retry(
-            || {
-                async {
-                    debug!(
-                        "Attempting {:?} with a query timeout of {:?}",
-                        query, starting_query_timeout
-                    );
-                    let res = tokio::time::timeout(
-                        // The max timeout is total_timeout / retry_factor, so we should get
-                        // at least lowest_bound_count retries within the total time (if needed)
-                        starting_query_timeout,
-                        self.send_signed_query(
-                            query.clone(),
-                            client_pk,
-                            serialised_query.clone(),
-                            signature.clone(),
-                        ),
-                    )
-                    .await;
-
-                    match res {
-                        Ok(Ok(query_result)) => Ok(Ok(query_result)),
-                        Ok(Err(error @ Error::InsufficientElderConnections { .. })) => {
-                            warn!("Insufficient elder connections during a query attempt");
-                            Err(backoff::Error::Transient(error))
-                        }
-                        Ok(Err(other_error)) => Err(backoff::Error::Permanent(other_error)),
-                        Err(_elapsed) => Err(backoff::Error::Transient(Error::QueryTimedOut)),
-                    }
-                }
-                .instrument(info_span!("Attempting a query"))
-            },
-            starting_query_timeout,
-            self.query_timeout,
-        )
-        .await
-        .map_err(|_| {
+        let span = info_span!("Attempting a query");
+        let _ = span.enter();
+        let mut attempt = 1.0;
+        loop {
             debug!(
-                "Retries ({}) all failed returning no response for {:?}",
-                MAX_RETRY_COUNT, query
+                "Attempting {:?} (attempt #{}) with a query timeout of {:?}",
+                query, attempt, attempt_timeout
             );
-            Error::NoResponse
-        })?
+
+            let res = tokio::time::timeout(
+                attempt_timeout,
+                self.send_signed_query(
+                    query.clone(),
+                    client_pk,
+                    serialised_query.clone(),
+                    signature.clone(),
+                ),
+            )
+            .await;
+
+            if let Ok(Ok(query_result)) = res {
+                break Ok(query_result);
+            } else if attempt > MAX_RETRY_COUNT {
+                debug!(
+                    "Retries ({}) all failed returning no response for {:?}",
+                    MAX_RETRY_COUNT, query
+                );
+                break Err(Error::NoResponse);
+            }
+
+            attempt += 1.0;
+        }
     }
 
     /// Send a Query to the network and await a response.

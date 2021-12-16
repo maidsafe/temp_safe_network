@@ -9,11 +9,12 @@
 #[cfg(test)]
 mod test_client;
 
-use super::retry;
 use crate::client::Error;
 use crate::types::{Keypair, PublicKey};
+use backoff::ExponentialBackoff;
 use dirs_next::home_dir;
 use eyre::{eyre, Context, Result};
+use std::time::Duration;
 use std::{
     collections::BTreeSet, fs::File, future::Future, io::BufReader, net::SocketAddr, path::Path,
 };
@@ -42,6 +43,25 @@ where
     } else {
         res
     }
+}
+
+fn retry<R, E, Fn, Fut>(
+    op: Fn,
+    initial_interval: Duration,
+    max_elapsed_time: Duration,
+) -> impl Future<Output = Result<R, E>>
+where
+    Fn: FnMut() -> Fut,
+    Fut: Future<Output = Result<R, backoff::Error<E>>>,
+{
+    let backoff = ExponentialBackoff {
+        initial_interval,
+        max_interval: max_elapsed_time,
+        max_elapsed_time: Some(max_elapsed_time),
+        ..Default::default()
+    };
+
+    backoff::future::retry(backoff, op)
 }
 
 // Relative path from $HOME where to read the genesis node connection information from
