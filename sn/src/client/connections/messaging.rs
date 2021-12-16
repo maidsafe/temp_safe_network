@@ -538,6 +538,8 @@ pub(super) async fn send_message(
             Ok(send_result) => {
                 if send_result.is_err() {
                     error!("Error during {:?} send: {:?}", msg_id, send_result);
+                } else {
+                    *successes.write().await += 1;
                 }
             }
             Err(join_error) => {
