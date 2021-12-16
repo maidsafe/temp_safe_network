@@ -15,6 +15,7 @@ use crate::messaging::{
     },
     DstLocation, MsgKind, WireMsg,
 };
+use crate::peer::{Peer, UnnamedPeer};
 use crate::routing::{
     core::{Proposal, StateSnapshot},
     dkg::DkgSessionIdUtils,
@@ -24,8 +25,8 @@ use crate::routing::{
     network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
     relocation::RelocateState,
     routing_api::command::Command,
-    Peer, UnnamedPeer,
 };
+
 use bls::PublicKey as BlsPublicKey;
 use xor_name::{Prefix, XorName};
 

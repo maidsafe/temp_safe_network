@@ -11,11 +11,13 @@ use crate::messaging::{
     system::{DkgFailureSigSet, KeyedSig, NodeState, SystemMsg},
     DstLocation, MessageId, NodeMsgAuthority, WireMsg,
 };
+use crate::peer::{Peer, UnnamedPeer};
 use crate::routing::{
     core::Proposal,
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
-    Peer, UnnamedPeer, XorName,
+    XorName,
 };
+
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use custom_debug::Debug;

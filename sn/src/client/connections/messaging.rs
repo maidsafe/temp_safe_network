@@ -14,12 +14,13 @@ use crate::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
 };
+use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::utils::write_data_to_disk;
 use crate::types::PublicKey;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
-use futures::{future::join_all, stream::FuturesUnordered, TryFutureExt};
+use futures::future::join_all;
 use itertools::Itertools;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
 use rand::rngs::OsRng;
@@ -33,7 +34,7 @@ use tokio::{
     sync::RwLock,
     task::JoinHandle,
 };
-use tracing::{debug, error, trace, warn, Instrument};
+use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
 // Number of Elders subset to send queries to
@@ -98,11 +99,7 @@ impl Session {
         // Get DataSection elders details.
         let (elders, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let sap_elders: Vec<_> = sap
-                    .elders()
-                    .map(|elder| elder.addr())
-                    .take(targets_count)
-                    .collect();
+                let sap_elders: Vec<_> = sap.elders_vec().into_iter().take(targets_count).collect();
 
                 trace!("{:?} SAP elders found", sap_elders);
                 (sap_elders, sap.section_key())
@@ -113,9 +110,10 @@ impl Session {
         let msg_id = MessageId::new();
 
         if elders.len() < targets_count {
-            return Err(Error::InsufficientElderConnections(
+            return Err(Error::InsufficientElderKnowledge(
                 elders.len(),
                 targets_count,
+                section_pk,
             ));
         }
 
@@ -174,15 +172,15 @@ impl Session {
         // Get DataSection elders details. Resort to own section if DataSection is not available.
         let sap = self.network.closest_or_opposite(&dst, None);
         let (section_pk, elders) = if let Some(sap) = &sap {
-            (sap.section_key(), sap.elders())
+            (sap.section_key(), sap.elders_vec())
         } else {
             return Err(Error::NoNetworkKnowledge);
         };
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders: Vec<_> = elders
+            .into_iter()
             .sorted_by(|lhs, rhs| dst.cmp_distance(&lhs.name(), &rhs.name()))
-            .map(|elder| elder.addr())
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
             .collect();
 
@@ -205,8 +203,6 @@ impl Session {
             chosen_elders
         );
 
-        // We send the same message to all Elders concurrently
-        let tasks = FuturesUnordered::new();
         let (sender, mut receiver) = channel::<QueryResponse>(7);
 
         let pending_queries_for_thread = pending_queries.clone();
@@ -225,56 +221,21 @@ impl Session {
             warn!("No op_id found for query");
         }
 
-        let failed_sends = std::sync::Arc::new(tokio::sync::Mutex::new(0_usize));
-
         let dst_location = DstLocation::Section {
             name: dst,
             section_pk,
         };
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
-        let priority = wire_msg.msg_kind().priority();
-        let msg_bytes = wire_msg.serialize()?;
 
-        // Set up response listeners
-        for socket in chosen_elders.clone() {
-            let endpoint = endpoint.clone();
-            let msg_bytes = msg_bytes.clone();
-            let counter_clone = failed_sends.clone();
-
-            let task_handle = tokio::spawn({
-                let session = self.clone();
-                async move {
-                    trace!("queueing query send task to: {:?}", &socket);
-                    let result = endpoint
-                        .connect_to(&socket)
-                        .err_into()
-                        .and_then(|(connection, connection_incoming)| async move {
-                            Self::spawn_message_listener_thread(
-                                session,
-                                connection.id(),
-                                connection.remote_address(),
-                                connection_incoming,
-                            );
-
-                            connection.send_with(msg_bytes, priority, None).await
-                        })
-                        .await;
-                    match &result {
-                        Err(err) => {
-                            error!("Error sending Query to elder: {:?} ", err);
-                            let mut a = counter_clone.lock().await;
-                            *a += 1;
-                        }
-                        Ok(()) => trace!("ServiceMsg with id: {:?}, sent to {}", &msg_id, &socket),
-                    }
-                    result
-                }
-                .instrument(tracing::debug_span!("sending query message"))
-            });
-
-            tasks.push(task_handle);
-        }
+        send_message(
+            self.clone(),
+            chosen_elders,
+            wire_msg,
+            endpoint.clone(),
+            msg_id,
+        )
+        .await?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -287,26 +248,6 @@ impl Session {
         // from byzantine nodes, however for mutable data (non-Chunk responses) we will
         // have to review the approach.
         let mut discarded_responses: usize = 0;
-
-        // Send all queries concurrently
-        let results = join_all(tasks).await;
-
-        for result in results {
-            if let Err(err) = result {
-                error!("Error spawning task to send query: {:?} ", err);
-                discarded_responses += 1;
-            }
-        }
-
-        let send_failures = *failed_sends.lock().await;
-        if send_failures >= 2 {
-            let successful_connections = 3 - send_failures;
-            error!("Could not send query to enough elders");
-            return Err(Error::InsufficientElderConnections(
-                successful_connections,
-                3,
-            ));
-        }
 
         let response = loop {
             let mut error_response = None;
@@ -385,7 +326,7 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn make_contact_with_nodes(
         &self,
-        nodes: Vec<SocketAddr>,
+        nodes: Vec<Peer>,
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
@@ -395,7 +336,7 @@ impl Session {
         // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
         let (elders_or_adults, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let mut nodes: Vec<_> = sap.elders().map(|elder| elder.addr()).collect();
+                let mut nodes: Vec<_> = sap.elders_vec();
 
                 nodes.shuffle(&mut OsRng);
 
@@ -424,9 +365,9 @@ impl Session {
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let initial_contacts = elders_or_adults
-            .iter()
+            .clone()
+            .into_iter()
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
-            .copied()
             .collect();
         send_message(
             self.clone(),
@@ -521,7 +462,7 @@ impl Session {
 #[instrument(skip_all, level = "trace")]
 pub(super) async fn send_message(
     session: Session,
-    elders: Vec<SocketAddr>,
+    elders: Vec<Peer>,
     wire_msg: WireMsg,
     endpoint: Endpoint,
     msg_id: MessageId,
@@ -534,37 +475,58 @@ pub(super) async fn send_message(
 
     let successes = Arc::new(RwLock::new(0));
 
+    // let contactable_elders = elders.clone();
     // clone elders as we want to update them in this process
-    for socket in elders.clone() {
-        let successes_clone = successes.clone();
+    for peer in elders.clone() {
+        let session = session.clone();
         let msg_bytes_clone = msg_bytes.clone();
         let endpoint = endpoint.clone();
-        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn({
-            let session = session.clone();
-            async move {
-                // trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
-                endpoint
-                    .connect_to(&socket)
-                    .err_into()
-                    .and_then(|(connection, connection_incoming)| async move {
+
+        let mut reused_connection = true;
+
+        let connection = peer
+            .ensure_connection(
+                // TODO: log any connections that failed's IDs and then check if that conn is valid here
+                // `is_valid = |connection| connection.id() != last_connection_id`).
+                |_| true,
+                |addr| {
+                    reused_connection = false;
+                    async move {
+                        let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
+                        let conn_id = connection.id();
                         Session::spawn_message_listener_thread(
-                            session,
-                            connection.id(),
-                            connection.remote_address(),
+                            session.clone(),
+                            conn_id,
+                            addr,
                             connection_incoming,
                         );
-                        connection.send_with(msg_bytes_clone, priority, None).await
-                    })
-                    .await?;
+                        Ok(connection)
+                    }
+                },
+            )
+            .await;
 
-                *successes_clone.write().await += 1;
+        if let (true, Ok(connection)) = (reused_connection, connection) {
+            trace!(
+                connection_id = connection.id(),
+                src = %connection.remote_address(),
+                "Client::ConnectionReused",
+            );
+        }
 
-                trace!("Sent msg with MsgId {:?} to {:?}", msg_id, &socket);
-                Ok(())
+        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
+            let connection = peer.connection().await;
+            if let Some(connection) = connection {
+                connection
+                    .send_with(msg_bytes_clone, priority, None)
+                    .await
+                    .map_err(Error::from)
+            } else {
+                error!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
+                Err(Error::PeerConnection(peer.addr()))
             }
-            .instrument(tracing::trace_span!("sending message"))
-            .in_current_span()
         });
+
         tasks.push(task_handle);
     }
 
@@ -599,14 +561,9 @@ pub(super) async fn send_message(
 
     let successful_sends = *successes.read().await;
     if failures > successful_sends {
-        error!("More send errors than success on send_message");
-        Err(Error::InsufficientElderConnections(
-            successful_sends,
-            elders.len(),
-        ))
-    } else {
-        Ok(())
+        error!("More errors when sending a message than successess");
     }
+    Ok(())
 }
 
 #[instrument(skip_all, level = "trace")]

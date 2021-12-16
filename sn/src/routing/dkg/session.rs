@@ -10,6 +10,7 @@ use crate::messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
 };
+use crate::peer::Peer;
 use crate::routing::{
     dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
     ed25519,
@@ -19,7 +20,6 @@ use crate::routing::{
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
     routing_api::command::{next_timer_token, Command},
-    Peer,
 };
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;

@@ -12,7 +12,9 @@ use crate::messaging::{
     Error as MessagingError,
 };
 use crate::types::Error as DtError;
+use bls::PublicKey;
 use std::io;
+use std::net::SocketAddr;
 use thiserror::Error;
 
 /// Specialisation of `std::Result` for Client.
@@ -41,11 +43,24 @@ pub enum Error {
     /// qp2p's IncomingMessages errores
     #[error("An error was returned from IncomingMessages on one of our connections")]
     IncomingMessages,
+    /// Could not send queries to sufficient elder to retrieve reliable responses.
+    #[error(
+        "Failed to send messages to sufficent elders. A supermajority of responses is unobtainable. {0} were connected to, {1} needed."
+    )]
+    FailedToSendSufficentQuery(usize, usize),
     /// Could not connect to sufficient elder to retrieve reliable responses.
     #[error(
         "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. {0} were connected to, {1} needed."
     )]
     InsufficientElderConnections(usize, usize),
+    /// Did not know of sufficient elders in the desired section to get supermajority of repsonses.
+    #[error(
+        "Problem finding sufficient elders. A supermajority of responses is unobtainable. {0} were known in this section, {1} needed."
+    )]
+    InsufficientElderKnowledge(usize, usize, PublicKey),
+    /// Peer connection retrieval failed
+    #[error("Error with Peer's connection: {0:?}")]
+    PeerConnection(SocketAddr),
     /// Cannot store empty bytes..
     #[error("Cannot store empty bytes.")]
     EmptyBytesProvided,
@@ -106,6 +121,9 @@ pub enum Error {
     /// QuicP2p error.
     #[error(transparent)]
     QuicP2p(#[from] qp2p::RpcError),
+    /// QuicP2p Connection error.
+    #[error(transparent)]
+    QuicP2pConnection(#[from] qp2p::ConnectionError),
     /// Bincode error
     #[error(transparent)]
     Serialisation(#[from] Box<bincode::ErrorKind>),

@@ -112,32 +112,32 @@ jobs:
 
       - name: Run Data Types tests
         if: steps.changes.outputs.types == 'true'
-        run: cargo test --lib --release --features=test-utils -- types
+        run: cd sn && cargo test --release --features=test-utils -- types
         timeout-minutes: 10
 
       - name: Run DBs tests
         if: steps.changes.outputs.dbs == 'true'
-        run: cargo test --lib --release --features=test-utils -- dbs
+        run: cd sn && cargo test --release --features=test-utils -- dbs
         timeout-minutes: 5
 
       - name: Run PrefixMap tests
         if: steps.changes.outputs.prefix_map == 'true'
-        run: cargo test --lib --release --features=test-utils -- prefix_map
+        run: cd sn && cargo test --release --features=test-utils -- prefix_map
         timeout-minutes: 5
 
       - name: Run Messaging tests
         if: steps.changes.outputs.messaging == 'true'
-        run: cargo test --lib --release --features=test-utils -- messaging
+        run: cd sn && cargo test --release --features=test-utils -- messaging
         timeout-minutes: 5
 
       - name: Run Node tests
         if: steps.changes.outputs.node == 'true'
-        run: cargo test --lib --release --features=test-utils -- node
+        run: cd sn && cargo test --release --features=test-utils -- node
         timeout-minutes: 5
 
       - name: Run Routing tests
         if: steps.changes.outputs.routing == 'true'
-        run: cargo test --lib --release --features=test-utils -- routing
+        run: cd sn && cargo test --release --features=test-utils -- routing
         timeout-minutes: 10
 
   e2e:

@@ -15,6 +15,7 @@ use crate::messaging::{
     },
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
+use crate::peer::{Peer, UnnamedPeer};
 use crate::prefix_map::NetworkPrefixMap;
 use crate::routing::{
     core::{Comm, ConnectionEvent, SendStatus},
@@ -25,7 +26,7 @@ use crate::routing::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     node::Node,
-    Peer, UnnamedPeer, MIN_ADULT_AGE,
+    MIN_ADULT_AGE,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -602,12 +603,13 @@ async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm
 mod tests {
     use super::*;
     use crate::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
+    use crate::peer::UnnamedPeer;
     use crate::routing::{
         dkg::test_utils::*,
         error::Error as RoutingError,
         messages::WireMsgUtils,
         network_knowledge::{test_utils::*, NodeState},
-        UnnamedPeer, MIN_ADULT_AGE,
+        MIN_ADULT_AGE,
     };
     use crate::{elder_count, init_test_logger};
 

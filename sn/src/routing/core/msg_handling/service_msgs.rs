@@ -13,9 +13,10 @@ use crate::messaging::{
     system::{NodeQueryResponse, SystemMsg},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, NodeAuth, ServiceAuth, WireMsg,
 };
+use crate::peer::Peer;
 use crate::routing::{
     core::capacity::CHUNK_COPY_COUNT, error::Result, log_markers::LogMarker,
-    routing_api::command::Command, Peer,
+    routing_api::command::Command,
 };
 use crate::types::{ChunkAddress, PublicKey};
 use itertools::Itertools;

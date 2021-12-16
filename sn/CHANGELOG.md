@@ -5,12 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.50.0 (2021-12-14)
+## v0.51.1 (2021-12-15)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - add recursion limit for clippy ([`e52a0c0`](https://github.com/maidsafe/safe_network/commit/e52a0c063f747e0be1525f07f8f759f4b9d042a7))
+    - feat(sn/client): Use Peers to ensure connection reuse ([`591ce5f`](https://github.com/maidsafe/safe_network/commit/591ce5f6dfa14143114fbd16c1d632a8dbe4a2d1))
+    - move Peer to root of sn ([`df87fcf`](https://github.com/maidsafe/safe_network/commit/df87fcf42c46dc28e6926394c120fbf2c715e54a))
+    - add in distinct client errors for comms failure ([`7c34940`](https://github.com/maidsafe/safe_network/commit/7c34940401b0115105d9b818b9f93c39d7669eed))
+</details>
+
+## v0.51.0 (2021-12-15)
 
 ### New Features (BREAKING)
 
  - <csr-id-134dfa29b3698fb233095194305d9bbbba2875c7/> different flavors of upload data API, with/without verifying successful upload
-
 
 ### Commit Statistics
 
@@ -27,7 +49,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.51.0 ([`c685838`](https://github.com/maidsafe/safe_network/commit/c685838d8f9c10b0f4e7541fe201862bb84e8555))
     - different flavors of upload data API, with/without verifying successful upload ([`134dfa2`](https://github.com/maidsafe/safe_network/commit/134dfa29b3698fb233095194305d9bbbba2875c7))
+</details>
+
+## v0.50.0 (2021-12-14)
+
+### New Features (BREAKING)
+
+ - <csr-id-134dfa29b3698fb233095194305d9bbbba2875c7/> different flavors of upload data API, with/without verifying successful upload
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.50.0 ([`653f653`](https://github.com/maidsafe/safe_network/commit/653f653a775a101679904ab75c8012a72dfdedfb))
     - set default AE_WAIT to be 0 ([`dd50d1d`](https://github.com/maidsafe/safe_network/commit/dd50d1d860aa4ca60b6c0d5a525b45d88ddf432e))
 </details>
 

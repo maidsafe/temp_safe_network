@@ -25,7 +25,6 @@
 //!
 //! TODO: update once data types are crdt compliant
 //!
-
 mod config_handler;
 mod connections;
 mod errors;

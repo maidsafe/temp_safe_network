@@ -6,6 +6,7 @@
 // modified, or distributed except according to those terms. Please review the Licences for the
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
+#![recursion_limit = "256"]
 
 mod cli;
 mod operations;
