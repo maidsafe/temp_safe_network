@@ -884,7 +884,8 @@ impl Core {
     // Locate ideal chunk holders for this chunk, line up wiremsgs for those to instruct them to store the chunk
     async fn republish_chunk(&self, chunk: Chunk) -> Result<Vec<Command>> {
         if self.is_elder().await {
-            let target_holders = self.get_chunk_holder_adults(chunk.name()).await;
+            let target_holders = self.get_adults_for_storage_closer_to(chunk.name()).await;
+
             info!(
                 "Republishing chunk {:?} to holders {:?}",
                 chunk.name(),

@@ -89,7 +89,7 @@ impl Core {
             origin: EndUser(origin.name()),
         });
 
-        let targets = self.get_chunk_holder_adults(&target).await;
+        let targets = self.get_adults_for_storage_closer_to(&target).await;
 
         let aggregation = false;
 
@@ -102,6 +102,25 @@ impl Core {
 
         self.send_node_msg_to_targets(msg, targets, aggregation)
             .await
+    }
+
+    // Picks adults who are non-full and closer to the given target
+    pub(crate) async fn get_adults_for_storage_closer_to(
+        &self,
+        target: &XorName,
+    ) -> BTreeSet<XorName> {
+        let full_adults = self.full_adults().await;
+        // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
+        let adults = self.network_knowledge().adults().await;
+
+        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
+
+        adults_names
+            .into_iter()
+            .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
+            .filter(|peer| !full_adults.contains(peer))
+            .take(CHUNK_COPY_COUNT)
+            .collect::<BTreeSet<_>>()
     }
 
     pub(crate) async fn send_error(
