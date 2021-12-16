@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.51.5 (2021-12-16)
+
+### New Features
+
+ - <csr-id-1078e59be3a58ffedcd3c1460385b4bf00f18f6b/> use upload_and_verify by default in safe_client
+ - <csr-id-3e91a43676e1252a872a24872db8f91c729bfb15/> keeping Chunks wich were retrieved in a local client cache
+
+### Bug Fixes
+
+ - <csr-id-d8ad6a9b1d6a530b7f597bccf6a6bed6d8546ac0/> populate client sender success counter
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - attempt to retrieve all bytes during upload_and_verify ([`9cf7c72`](https://github.com/maidsafe/safe_network/commit/9cf7c72a94386f2cbe6f803be970c6debfbcb99b))
+    - use upload_and_verify by default in safe_client ([`1078e59`](https://github.com/maidsafe/safe_network/commit/1078e59be3a58ffedcd3c1460385b4bf00f18f6b))
+    - populate client sender success counter ([`d8ad6a9`](https://github.com/maidsafe/safe_network/commit/d8ad6a9b1d6a530b7f597bccf6a6bed6d8546ac0))
+    - defining a const for Chunks cache size ([`92cdb53`](https://github.com/maidsafe/safe_network/commit/92cdb53391652651bfe9a47c5a0261ba10f38148))
+    - keeping Chunks wich were retrieved in a local client cache ([`3e91a43`](https://github.com/maidsafe/safe_network/commit/3e91a43676e1252a872a24872db8f91c729bfb15))
+</details>
+
 ## v0.51.4 (2021-12-16)
 
 ### New Features
@@ -19,8 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -30,9 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - populate client sender success counter ([`d8ad6a9`](https://github.com/maidsafe/safe_network/commit/d8ad6a9b1d6a530b7f597bccf6a6bed6d8546ac0))
-    - defining a const for Chunks cache size ([`92cdb53`](https://github.com/maidsafe/safe_network/commit/92cdb53391652651bfe9a47c5a0261ba10f38148))
-    - keeping Chunks wich were retrieved in a local client cache ([`3e91a43`](https://github.com/maidsafe/safe_network/commit/3e91a43676e1252a872a24872db8f91c729bfb15))
+    - safe_network-0.51.4 ([`17d7906`](https://github.com/maidsafe/safe_network/commit/17d7906656bec401d6b39cc3551141112a3d77c4))
 </details>
 
 ## v0.51.3 (2021-12-16)
