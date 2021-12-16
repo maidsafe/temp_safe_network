@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.51.4 (2021-12-16)
+
+### New Features
+
+ - <csr-id-3e91a43676e1252a872a24872db8f91c729bfb15/> keeping Chunks wich were retrieved in a local client cache
+
+### Bug Fixes
+
+ - <csr-id-d8ad6a9b1d6a530b7f597bccf6a6bed6d8546ac0/> populate client sender success counter
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - populate client sender success counter ([`d8ad6a9`](https://github.com/maidsafe/safe_network/commit/d8ad6a9b1d6a530b7f597bccf6a6bed6d8546ac0))
+    - defining a const for Chunks cache size ([`92cdb53`](https://github.com/maidsafe/safe_network/commit/92cdb53391652651bfe9a47c5a0261ba10f38148))
+    - keeping Chunks wich were retrieved in a local client cache ([`3e91a43`](https://github.com/maidsafe/safe_network/commit/3e91a43676e1252a872a24872db8f91c729bfb15))
+</details>
+
+## v0.51.3 (2021-12-16)
+
+### New Features
+
+ - <csr-id-3e91a43676e1252a872a24872db8f91c729bfb15/> keeping Chunks wich were retrieved in a local client cache
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.51.3/sn_api-0.46.1 ([`9be440b`](https://github.com/maidsafe/safe_network/commit/9be440b36db07e1c04ab688b44ef91e4a56ed576))
+    - add more logs regarding storage levels ([`f522d9a`](https://github.com/maidsafe/safe_network/commit/f522d9aad0071cd3b47b1a3e4c178b0100ec71d6))
+</details>
+
 ## v0.51.2 (2021-12-16)
 
 ### Commit Statistics
@@ -22,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - add more logs regarding storage levels ([`f522d9a`](https://github.com/maidsafe/safe_network/commit/f522d9aad0071cd3b47b1a3e4c178b0100ec71d6))
+    - safe_network-0.51.2 ([`595541b`](https://github.com/maidsafe/safe_network/commit/595541b83284a5c5b60fbc00e47b1146117d7613))
     - add recursion limit for clippy ([`e52a0c0`](https://github.com/maidsafe/safe_network/commit/e52a0c063f747e0be1525f07f8f759f4b9d042a7))
     - feat(sn/client): Use Peers to ensure connection reuse ([`591ce5f`](https://github.com/maidsafe/safe_network/commit/591ce5f6dfa14143114fbd16c1d632a8dbe4a2d1))
     - move Peer to root of sn ([`df87fcf`](https://github.com/maidsafe/safe_network/commit/df87fcf42c46dc28e6926394c120fbf2c715e54a))

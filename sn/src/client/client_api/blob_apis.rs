@@ -11,9 +11,7 @@ use super::{
     Client,
 };
 use crate::{
-    client::{
-        client_api::data::DataMapLevel, connections::QueryResult, utils::encryption, Error, Result,
-    },
+    client::{client_api::data::DataMapLevel, utils::encryption, Error, Result},
     messaging::data::{DataCmd, DataQuery, QueryResponse},
     types::{BytesAddress, Chunk, ChunkAddress, Encryption, PublicKey, Scope},
 };
@@ -110,6 +108,17 @@ impl Client {
 
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn get_chunk(&self, name: &XorName) -> Result<Chunk> {
+        // first check it's not already in our Chunks' cache
+        if let Some(chunk) = self
+            .chunks_cache
+            .write()
+            .await
+            .find(|c| c.address().name() == name)
+        {
+            trace!("Chunk retrieved from local cache: {:?}", name);
+            return Ok(chunk.clone());
+        }
+
         let res = self
             .send_query(DataQuery::GetChunk(ChunkAddress(*name)))
             .await?;
@@ -119,8 +128,10 @@ impl Client {
             QueryResponse::GetChunk(result) => {
                 result.map_err(|err| Error::from((err, operation_id)))
             }
-            _ => return Err(Error::ReceivedUnexpectedEvent),
+            response => return Err(Error::UnexpectedQueryResponse(response)),
         }?;
+
+        let _ = self.chunks_cache.write().await.insert(chunk.clone());
 
         Ok(chunk)
     }
@@ -191,15 +202,9 @@ impl Client {
         let address = self.upload(bytes, scope).await?;
 
         // let's now try to retrieve it
-        let query = DataQuery::GetChunk(ChunkAddress(*address.name()));
-        match self.send_query(query).await {
-            Ok(QueryResult {
-                response: QueryResponse::GetChunk(Ok(_)),
-                ..
-            }) => Ok(address),
-            Ok(QueryResult { response, .. }) => Err(Error::UnexpectedQueryResponse(response)),
-            Err(err) => Err(err),
-        }
+        let _ = self.get_chunk(address.name()).await?;
+
+        Ok(address)
     }
 
     /// Calculates a Blob's/Spot's address from self encrypted chunks,
@@ -251,11 +256,12 @@ impl Client {
     // ---------- Private helpers -----------------
     // --------------------------------------------
 
-    // Gets and decrypts chunks from the network using nothing else but the data map, then returns the raw data.
+    // Gets and decrypts chunks from the network using nothing else but the data map,
+    // then returns the raw data.
     async fn read_all(&self, data_map: DataMap) -> Result<Bytes> {
-        let encrypted_chunks = Self::try_get_chunks(self.clone(), data_map.infos()).await?;
-        self_encryption::decrypt_full_set(&data_map, &encrypted_chunks)
-            .map_err(Error::SelfEncryption)
+        let encrypted_chunks = Self::try_get_chunks(self, data_map.infos()).await?;
+        let bytes = self_encryption::decrypt_full_set(&data_map, &encrypted_chunks)?;
+        Ok(bytes)
     }
 
     // Gets a subset of chunks from the network, decrypts and
@@ -267,7 +273,7 @@ impl Client {
         let all_infos = data_map.infos();
 
         let encrypted_chunks = Self::try_get_chunks(
-            self.clone(),
+            self,
             (range.start..range.end + 1)
                 .clone()
                 .map(|i| all_infos[i].clone())
@@ -275,28 +281,33 @@ impl Client {
         )
         .await?;
 
-        self_encryption::decrypt_range(&data_map, &encrypted_chunks, info.relative_pos, len)
-            .map_err(Error::SelfEncryption)
+        let bytes =
+            self_encryption::decrypt_range(&data_map, &encrypted_chunks, info.relative_pos, len)?;
+
+        Ok(bytes)
     }
 
     #[instrument(skip_all, level = "trace")]
-    async fn try_get_chunks(reader: Client, keys: Vec<ChunkInfo>) -> Result<Vec<EncryptedChunk>> {
-        let expected_count = keys.len();
+    async fn try_get_chunks(
+        client: &Client,
+        chunks_info: Vec<ChunkInfo>,
+    ) -> Result<Vec<EncryptedChunk>> {
+        let expected_count = chunks_info.len();
 
-        let tasks = keys.into_iter().map(|key| {
-            let reader = reader.clone();
+        let tasks = chunks_info.into_iter().map(|chunk_info| {
+            let client = client.clone();
             task::spawn(async move {
-                match reader.get_chunk(&key.dst_hash).await {
-                    Ok(chunk) => Some(EncryptedChunk {
-                        index: key.index,
+                match client.get_chunk(&chunk_info.dst_hash).await {
+                    Ok(chunk) => Ok(EncryptedChunk {
+                        index: chunk_info.index,
                         content: chunk.value().clone(),
                     }),
-                    Err(e) => {
+                    Err(err) => {
                         warn!(
                             "Reading chunk {} from network, resulted in error {:?}.",
-                            &key.dst_hash, e
+                            chunk_info.dst_hash, err
                         );
-                        None
+                        Err(err)
                     }
                 }
             })
@@ -374,7 +385,6 @@ mod tests {
     use tracing::Instrument;
 
     const MIN_BLOB_SIZE: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
-    const DELAY_DIVIDER: usize = 500_000;
 
     #[test]
     fn deterministic_chunking() -> Result<()> {
@@ -411,14 +421,9 @@ mod tests {
         let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
 
         // Store private blob
-        let private_address = client.upload_blob(blob.clone(), Scope::Private).await?;
-
-        // the larger the file, the longer we have to wait before we start querying
-        let delay = tokio::time::Duration::from_secs(usize::max(
-            1,
-            blob.bytes().len() / DELAY_DIVIDER,
-        ) as u64);
-        tokio::time::sleep(delay).await;
+        let private_address = client
+            .upload_and_verify(blob.bytes(), Scope::Private)
+            .await?;
 
         // Assert that the blob is stored.
         let read_data = client.read_bytes(private_address).await?;
