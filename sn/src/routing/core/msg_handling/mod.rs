@@ -17,6 +17,7 @@ mod service_msgs;
 mod update_section;
 
 use super::Core;
+use crate::dbs::Error as DatabaseError;
 use crate::peer::{Peer, UnnamedPeer};
 use crate::routing::{
     log_markers::LogMarker,
@@ -672,11 +673,30 @@ impl Core {
                 info!("Processing chunk write with MessageId: {:?}", msg_id);
                 // There is no point in verifying a sig from a sender A or B here.
 
-                // This may return a DatabasFull error... but we should have reported storage increase
+                // This may return a DatabaseFull error... but we should have reported storage increase
                 // well before this
-                let level_report = self.chunk_storage.store(&chunk).await?;
-                info!("Storage level report: {:?}", level_report);
-                return Ok(self.record_if_any(level_report).await);
+                match self.chunk_storage.store(&chunk).await {
+                    Ok(level_report) => {
+                        info!("Storage level report: {:?}", level_report);
+                        return Ok(self.record_if_any(level_report).await);
+                    }
+                    Err(error) => {
+                        error!("Error storing chunk: {:?}", error);
+                        let mut commands = vec![];
+
+                        // if the error was DbFull
+                        if matches!(error, DatabaseError::NotEnoughSpace) {
+                            warn!("Db errored as full. Informing elders");
+                            let level = StorageLevel::from(10)?;
+                            commands.extend(self.record_if_any(Some(level)).await);
+                        }
+
+                        let msg = SystemMsg::NodeCmd(NodeCmd::RepublishChunk(chunk));
+                        commands.push(self.send_message_to_our_elders(msg).await?);
+
+                        Ok(commands)
+                    }
+                }
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk)) => {
                 info!(
@@ -884,7 +904,7 @@ impl Core {
     // Locate ideal chunk holders for this chunk, line up wiremsgs for those to instruct them to store the chunk
     async fn republish_chunk(&self, chunk: Chunk) -> Result<Vec<Command>> {
         if self.is_elder().await {
-            let target_holders = self.get_chunk_holder_adults(chunk.name()).await;
+            let target_holders = self.get_adults_who_should_store_chunk(chunk.name()).await;
             info!(
                 "Republishing chunk {:?} to holders {:?}",
                 chunk.name(),
