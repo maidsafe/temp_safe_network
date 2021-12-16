@@ -5,19 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.46.0 (2021-12-16)
-
-### New Features (BREAKING)
-
- - <csr-id-18879590ddfcf125133a6b2b8f3f372e8683be42/> rename Url to SafeUrl
-
+## v0.46.1 (2021-12-16)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 10 commits contributed to the release over the course of 2 calendar days.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +22,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.51.2 ([`595541b`](https://github.com/maidsafe/safe_network/commit/595541b83284a5c5b60fbc00e47b1146117d7613))
+</details>
+
+## v0.46.0 (2021-12-16)
+
+### New Features (BREAKING)
+
+ - <csr-id-18879590ddfcf125133a6b2b8f3f372e8683be42/> rename Url to SafeUrl
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 11 commits contributed to the release over the course of 2 calendar days.
+ - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_api-0.46.0 ([`634a8f9`](https://github.com/maidsafe/safe_network/commit/634a8f9f307598c51305067444514b43c85f196d))
     - safe_network-0.51.1 ([`dcbb67f`](https://github.com/maidsafe/safe_network/commit/dcbb67fc699d7cb1f3a2c4632bcb8a5738916091))
     - safe_network-0.51.0 ([`c685838`](https://github.com/maidsafe/safe_network/commit/c685838d8f9c10b0f4e7541fe201862bb84e8555))
     - safe_network-0.50.0 ([`653f653`](https://github.com/maidsafe/safe_network/commit/653f653a775a101679904ab75c8012a72dfdedfb))
@@ -52,16 +72,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+<csr-id-b26833d80cf88b9a2dc1bb8478e74d9e37d6dc51/>
+<csr-id-15dc3bd46686d25f679c21f85de091578d5f42eb/>
+
  - <csr-id-8955fcf9d69e869725177340d1de6b6b1e7a203b/> read_from client API was incorrectly using provided length value as an end index
    - Minor refactoring in sn_api moving the SafeData struct into its own file.
-   - Re-enabling the only two fetch API tests which are now passsing with this fix.
- - <csr-id-b26833d80cf88b9a2dc1bb8478e74d9e37d6dc51/> files_container_create API was trying to send Register op to the network in dry-run
- - <csr-id-15dc3bd46686d25f679c21f85de091578d5f42eb/> files container resolver was resolving path even when signaled to not to
+- Re-enabling the only two fetch API tests which are now passsing with this fix.
 
 ### New Features (BREAKING)
 
  - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
-
 
 ### Commit Statistics
 
@@ -113,6 +133,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - safe_network-0.43.0 ([`c78f470`](https://github.com/maidsafe/safe_network/commit/c78f4703a970e8b7466b091ad331d0f2233aa9a3))
     - move Url to sn_api ([`3fe9d7a`](https://github.com/maidsafe/safe_network/commit/3fe9d7a6624fe5503f80395f6ed11426b131d3b1))
 </details>
+
+<csr-unknown>
+ files_container_create API was trying to send Register op to the network in dry-run files container resolver was resolving path even when signaled to not to<csr-unknown/>
 
 ## v0.43.0 (2021-11-25)
 
