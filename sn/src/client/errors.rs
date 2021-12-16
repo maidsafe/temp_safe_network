@@ -127,8 +127,8 @@ pub enum Error {
     /// Bincode error
     #[error(transparent)]
     Serialisation(#[from] Box<bincode::ErrorKind>),
-    /// Could not retrieve all chunks required to decrypt the data. (Expected, Actual)
-    #[error("Not enough chunks! Required {}, but we have {}.)", _0, _1)]
+    /// Could not retrieve all chunks required to decrypt the data. (expected, error)
+    #[error("Not all chunks were retrieved, required {}: {}.)", _0, _1)]
     NotEnoughChunks(usize, usize),
     /// Could not chunk all the data required to encrypt the data. (Expected, Actual)
     #[error("Not all data was chunked! Required {}, but we have {}.)", _0, _1)]

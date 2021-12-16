@@ -21,8 +21,7 @@ use crate::messaging::data::{CmdError, DataQuery, RegisterRead, ServiceMsg};
 use crate::messaging::{ServiceAuth, WireMsg};
 use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::utils::read_prefix_map_from_disk;
-use crate::types::{Keypair, PublicKey, RegisterAddress};
+use crate::types::{utils::read_prefix_map_from_disk, Chunk, Keypair, PublicKey, RegisterAddress};
 use itertools::Itertools;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
@@ -33,9 +32,17 @@ use tokio::{
     time::Duration,
 };
 use tracing::{debug, info};
+use uluru::LRUCache;
 use xor_name::XorName;
 
 pub use register_apis::RegisterWriteAheadLog;
+
+// Maximum amount of Chunks to keep in our cal Chunks cache.
+// Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
+const CHUNK_CACHE_SIZE: usize = 50;
+
+// LRU cache to keep the Chunks we retrieve.
+type ChunksCache = LRUCache<Chunk, CHUNK_CACHE_SIZE>;
 
 /// Client object
 #[derive(Clone, Debug)]
@@ -45,6 +52,7 @@ pub struct Client {
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
     pub(crate) query_timeout: Duration,
+    chunks_cache: Arc<RwLock<ChunksCache>>,
 }
 
 /// Easily manage connections to/from The Safe Network with the client and its APIs.
@@ -159,6 +167,7 @@ impl Client {
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: config.query_timeout,
+            chunks_cache: Arc::new(RwLock::new(ChunksCache::default())),
         };
 
         // TODO: The message being sent below is a temporary solution to fetch network info for
