@@ -19,7 +19,7 @@ use tokio::sync::RwLock;
 
 // The number of separate copies of a chunk which should be maintained.
 pub(crate) const CHUNK_COPY_COUNT: usize = 4;
-pub(crate) const MIN_LEVEL_WHEN_FULL: u8 = 9; // considered full when >= 90 %.
+pub(crate) const MIN_LEVEL_WHEN_FULL: u8 = 5; // considered full when >= 50 %.
 
 /// A util for sharing the
 /// info on data capacity among the

@@ -104,7 +104,7 @@ impl Core {
             .await
     }
 
-    // Picks adults who are non-full and closer to the given target
+    // Picks adults who are non-full and are closer to the given target
     pub(crate) async fn get_adults_for_storage_closer_to(
         &self,
         target: &XorName,
