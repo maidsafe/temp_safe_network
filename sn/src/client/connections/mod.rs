@@ -8,21 +8,22 @@
 
 mod listeners;
 mod messaging;
+
 use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
     MessageId,
 };
-use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 pub(crate) use messaging::SAFE_CLIENT_DIR;
 use qp2p::Endpoint;
 use std::path::PathBuf;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{mpsc::Sender, RwLock};
 use tokio::time::Duration;
 use uluru::LRUCache;
+
 type QueryResponseSender = Sender<QueryResponse>;
 type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
 
@@ -32,7 +33,7 @@ pub struct QueryResult {
     pub operation_id: OperationId,
 }
 
-pub(crate) type AeCache = LRUCache<(Vec<Peer>, BlsPublicKey, Bytes), 100>;
+pub(crate) type AeCache = LRUCache<(Vec<SocketAddr>, BlsPublicKey, Bytes), 100>;
 
 #[derive(Clone, Debug)]
 pub(super) struct Session {
