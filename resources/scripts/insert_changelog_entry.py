@@ -16,6 +16,8 @@ def get_changelog_entry(changelog_path, version):
     return sn_changelog_content[start:end].strip()
 
 def insert_changelog_entry(entry, pattern):
+    if not entry.strip():
+        entry = "No changes for this release"
     release_description = ""
     with open("release_description.md", "r") as file:
         release_description = file.read()

@@ -168,6 +168,7 @@ release_description=$(sed "s/SN_TAR_MACOS_CHECKSUM/$sn_tar_macos_checksum/g" <<<
 release_description=$(sed "s/SN_TAR_WIN_CHECKSUM/$sn_tar_win_checksum/g" <<< "$release_description")
 release_description=$(sed "s=SN_TAR_ARM_CHECKSUM=$sn_tar_arm_checksum=g" <<< "$release_description")
 release_description=$(sed "s=SN_TAR_ARMv7_CHECKSUM=$sn_tar_armv7_checksum=g" <<< "$release_description")
+release_description=$(sed "s=SN_TAR_AARCH64_CHECKSUM=$sn_tar_aarch64_checksum=g" <<< "$release_description")
 
 release_description=$(sed "s/SN_CLI_ZIP_LINUX_CHECKSUM/$sn_cli_zip_linux_checksum/g" <<< "$release_description")
 release_description=$(sed "s/SN_CLI_ZIP_MACOS_CHECKSUM/$sn_cli_zip_macos_checksum/g" <<< "$release_description")
@@ -180,7 +181,6 @@ release_description=$(sed "s/SN_CLI_TAR_MACOS_CHECKSUM/$sn_cli_tar_macos_checksu
 release_description=$(sed "s/SN_CLI_TAR_WIN_CHECKSUM/$sn_cli_tar_win_checksum/g" <<< "$release_description")
 release_description=$(sed "s=SN_CLI_TAR_ARM_CHECKSUM=$sn_cli_tar_arm_checksum=g" <<< "$release_description")
 release_description=$(sed "s=SN_CLI_TAR_ARMv7_CHECKSUM=$sn_cli_tar_armv7_checksum=g" <<< "$release_description")
-release_description=$(sed "s=SN_CLI_TAR_AARCH64_CHECKSUM=$sn_cli_tar_aarch64_checksum=g" <<< "$release_description")
 release_description=$(sed "s=SN_CLI_TAR_AARCH64_CHECKSUM=$sn_cli_tar_aarch64_checksum=g" <<< "$release_description")
 
 echo "$release_description"
