@@ -23,7 +23,7 @@ use xor_name::{XorName, XOR_NAME_LEN};
 /// being physically connected at the network layer, which is indicated by the optional `connection`
 /// field.
 #[derive(Clone)]
-pub(crate) struct Peer {
+pub struct Peer {
     name: XorName,
     addr: SocketAddr,
 
@@ -111,7 +111,7 @@ impl PartialOrd for Peer {
 
 impl Peer {
     /// Creates a new `Peer` given `Name`, `SocketAddr`.
-    pub(crate) fn new(name: XorName, addr: SocketAddr) -> Self {
+    pub fn new(name: XorName, addr: SocketAddr) -> Self {
         Self {
             name,
             addr,
@@ -120,17 +120,17 @@ impl Peer {
     }
 
     /// Returns the `XorName` of the peer.
-    pub(crate) fn name(&self) -> XorName {
+    pub fn name(&self) -> XorName {
         self.name
     }
 
     /// Returns the `SocketAddr`.
-    pub(crate) fn addr(&self) -> SocketAddr {
+    pub fn addr(&self) -> SocketAddr {
         self.addr
     }
 
     /// Returns the age.
-    pub(crate) fn age(&self) -> u8 {
+    pub fn age(&self) -> u8 {
         self.name[XOR_NAME_LEN - 1]
     }
 

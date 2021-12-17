@@ -18,14 +18,14 @@ mod update_section;
 
 use super::Core;
 use crate::dbs::Error as DatabaseError;
-use crate::peer::{Peer, UnnamedPeer};
+
 use crate::routing::{
     log_markers::LogMarker,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::{NetworkKnowledge, SectionPeers},
     relocation::RelocateState,
     routing_api::command::Command,
-    Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
+    Error, Event, MessageReceived, Peer, Result, UnnamedPeer, MIN_LEVEL_WHEN_FULL,
 };
 use crate::types::{Chunk, Keypair, PublicKey};
 use crate::{

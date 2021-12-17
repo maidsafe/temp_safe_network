@@ -14,7 +14,6 @@ use crate::messaging::{
     },
     AuthorityProof, DstLocation, SectionAuth, WireMsg,
 };
-use crate::peer::Peer;
 use crate::routing::{
     ed25519,
     error::{Error, Result},
@@ -23,8 +22,8 @@ use crate::routing::{
     node::Node,
     relocation::RelocatePayloadUtils,
     routing_api::command::Command,
+    Peer,
 };
-
 use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;

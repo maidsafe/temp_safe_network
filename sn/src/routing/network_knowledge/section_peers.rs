@@ -7,8 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::system::{MembershipState, SectionAuth, SectionPeers as SectionPeersMsg};
-use crate::peer::Peer;
-use crate::routing::network_knowledge::{NodeState, SectionAuthorityProvider};
+use crate::routing::{
+    network_knowledge::{NodeState, SectionAuthorityProvider},
+    Peer,
+};
 use dashmap::{mapref::entry::Entry, DashMap};
 use itertools::Itertools;
 use std::{

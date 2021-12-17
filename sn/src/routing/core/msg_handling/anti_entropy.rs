@@ -11,13 +11,13 @@ use crate::messaging::{
     system::{KeyedSig, SectionAuth, SystemMsg},
     MessageId, MessageType, SrcLocation, WireMsg,
 };
-use crate::peer::Peer;
 use crate::routing::{
     error::{Error, Result},
     log_markers::LogMarker,
     messages::WireMsgUtils,
     network_knowledge::{SectionAuthorityProvider, SectionPeers},
     routing_api::command::Command,
+    Peer,
 };
 use crate::types::PublicKey;
 use backoff::{backoff::Backoff, ExponentialBackoff};

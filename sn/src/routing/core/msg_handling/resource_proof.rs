@@ -8,13 +8,12 @@
 
 use super::Core;
 use crate::messaging::system::{JoinResponse, ResourceProofResponse, SystemMsg};
-use crate::peer::Peer;
 use crate::routing::{
     core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     ed25519,
     log_markers::LogMarker,
     routing_api::command::Command,
-    Error, Result,
+    Error, Peer, Result,
 };
 use ed25519_dalek::Verifier;
 use xor_name::XorName;

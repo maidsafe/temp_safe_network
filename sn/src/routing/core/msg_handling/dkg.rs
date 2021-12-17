@@ -9,7 +9,6 @@
 use super::super::Core;
 use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg};
 use crate::messaging::DstLocation;
-use crate::peer::Peer;
 use crate::routing::{
     core::{msg_handling::WireMsg, Proposal},
     dkg::DkgFailureSigSetUtils,
@@ -18,8 +17,8 @@ use crate::routing::{
     messages::WireMsgUtils,
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     routing_api::command::Command,
+    Peer,
 };
-
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use std::{

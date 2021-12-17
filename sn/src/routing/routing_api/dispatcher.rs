@@ -8,12 +8,11 @@
 
 use super::Command;
 use crate::messaging::{system::SystemMsg, DstLocation, EndUser, MsgKind, WireMsg};
-use crate::peer::Peer;
 use crate::routing::{
     core::{Core, Proposal, SendStatus},
     error::Result,
     log_markers::LogMarker,
-    Error,
+    Error, Peer,
 };
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;

@@ -19,7 +19,6 @@ use crate::messaging::{
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
-use crate::peer::UnnamedPeer;
 use crate::routing::{
     core::{ConnectionEvent, Proposal, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     create_test_used_space_and_root_storage,
@@ -27,7 +26,8 @@ use crate::routing::{
     ed25519,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::{
-        test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
+        peer::UnnamedPeer, test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider,
+        SectionKeyShare,
     },
     node::Node,
     recommended_section_size,

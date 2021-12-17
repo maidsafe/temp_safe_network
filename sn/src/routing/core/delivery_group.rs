@@ -8,11 +8,10 @@
 
 use crate::elder_count;
 use crate::messaging::DstLocation;
-use crate::peer::Peer;
 use crate::routing::{
     error::{Error, Result},
     network_knowledge::NetworkKnowledge,
-    supermajority,
+    supermajority, Peer,
 };
 use itertools::Itertools;
 use std::{cmp, iter};

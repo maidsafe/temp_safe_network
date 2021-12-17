@@ -36,7 +36,6 @@ use crate::dbs::UsedSpace;
 use crate::messaging::signature_aggregator::SignatureAggregator;
 use crate::messaging::system::{DkgSessionId, SystemMsg};
 use crate::messaging::{AuthorityProof, SectionAuth};
-use crate::peer::Peer;
 use crate::routing::{
     dkg::DkgVoter,
     error::Result,
@@ -45,7 +44,7 @@ use crate::routing::{
     node::Node,
     relocation::RelocateState,
     routing_api::command::Command,
-    Elders, Event, NodeElderChange,
+    Elders, Event, NodeElderChange, Peer,
 };
 use crate::types::{utils::write_data_to_disk, Cache};
 use backoff::ExponentialBackoff;

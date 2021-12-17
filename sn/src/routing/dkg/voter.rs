@@ -11,7 +11,6 @@ use crate::messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     WireMsg,
 };
-use crate::peer::Peer;
 use crate::routing::{
     dkg::session::Session,
     ed25519,
@@ -20,9 +19,8 @@ use crate::routing::{
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
-    supermajority,
+    supermajority, Peer,
 };
-
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use dashmap::DashMap;

@@ -43,7 +43,6 @@ extern crate tracing;
 
 pub mod client;
 mod dbs;
-mod peer;
 
 #[cfg(test)]
 /// Helpers for analysis of testnet logs

@@ -8,10 +8,10 @@
 
 mod elder_candidates;
 pub(super) mod node_state;
+pub(super) mod peer;
 pub(crate) mod section_authority_provider;
 pub(super) mod section_keys;
 mod section_peers;
-use crate::peer::Peer;
 
 #[cfg(test)]
 pub(crate) use self::section_authority_provider::test_utils;
@@ -30,6 +30,7 @@ use crate::routing::{
 use bls::PublicKey as BlsPublicKey;
 pub(crate) use elder_candidates::ElderCandidates;
 pub(crate) use node_state::NodeState;
+use peer::Peer;
 pub(crate) use section_authority_provider::SectionAuthorityProvider;
 pub(crate) use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;

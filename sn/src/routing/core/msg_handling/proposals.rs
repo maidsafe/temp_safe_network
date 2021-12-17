@@ -9,8 +9,7 @@
 use super::Core;
 
 use crate::messaging::{signature_aggregator::Error as AggregatorError, MessageId};
-use crate::peer::Peer;
-use crate::routing::{core::Proposal, dkg::SigShare, routing_api::command::Command, Result};
+use crate::routing::{core::Proposal, dkg::SigShare, routing_api::command::Command, Peer, Result};
 
 // Decisions
 impl Core {

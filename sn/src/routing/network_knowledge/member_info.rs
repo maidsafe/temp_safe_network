@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::node::{MemberInfo, PeerState};
-use crate::peer::Peer;
+use crate::messaging::node::{MemberInfo, Peer, PeerState};
 use crate::routing::routing_api::{error::Error, peer::PeerUtils};
 use xor_name::XorName;
 

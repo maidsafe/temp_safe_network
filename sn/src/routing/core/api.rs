@@ -10,7 +10,6 @@ use super::{delivery_group, Comm, Core};
 use crate::dbs::UsedSpace;
 use crate::messaging::system::{JoinResponse, MembershipState, NodeState, SigShare, SystemMsg};
 use crate::messaging::WireMsg;
-use crate::peer::Peer;
 use crate::routing::{
     core::Proposal,
     error::Result,
@@ -18,7 +17,7 @@ use crate::routing::{
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     node::Node,
     routing_api::command::Command,
-    Event,
+    Event, Peer,
 };
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
