@@ -149,7 +149,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted-ubuntu, windows-latest, macos-latest]
+        os: [self-hosted, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -260,7 +260,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted-ubuntu, windows-latest, macos-latest]
+        os: [self-hosted, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -379,7 +379,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted-ubuntu, windows-latest, macos-latest]
+        os: [self-hosted, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
