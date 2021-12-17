@@ -7,9 +7,9 @@ function build_release_name() {
 }
 
 function build_release_tag_name() {
-    gh_release_tag_name="v$sn_version-"
-    gh_release_tag_name="v$sn_api_version-"
-    gh_release_tag_name="v$sn_cli_version"
+    gh_release_tag_name="$sn_version-"
+    gh_release_tag_name="${gh_release_tag_name}$sn_api_version-"
+    gh_release_tag_name="${gh_release_tag_name}$sn_cli_version"
 }
 
 function output_version_info() {
