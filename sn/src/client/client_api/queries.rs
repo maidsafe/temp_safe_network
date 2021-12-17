@@ -18,7 +18,7 @@ use tracing::{debug, info_span};
 
 // We divide the total query timeout by this number.
 // This also represents the max retries possible, while still staying within the max_timeout.
-const MAX_RETRY_COUNT: f32 = 5.0;
+const MAX_RETRY_COUNT: f32 = 11.0;
 
 impl Client {
     /// Send a Query to the network and await a response.
@@ -50,7 +50,7 @@ impl Client {
         let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
         let signature = self.keypair.sign(&serialised_query);
 
-        let attempt_timeout = self.query_timeout.div_f32(MAX_RETRY_COUNT + 1.0);
+        let attempt_timeout = self.query_timeout.div_f32(retry_count + 1.0);
         trace!("Setting up query retry, interval is: {:?}", attempt_timeout);
 
         let span = info_span!("Attempting a query");
