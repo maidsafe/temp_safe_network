@@ -130,7 +130,7 @@ macro_rules! retry_loop {
                 Ok(val) => break val,
                 Err(_) if retries > 0 => {
                     retries -= 1;
-                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(20)).await;
                 }
                 Err(e) => anyhow::bail!("Failed after {} retries: {:?}", $n, e),
             }
@@ -152,7 +152,7 @@ macro_rules! retry_loop_for_pattern {
                 $pattern $(if $cond)? => break result,
                 Ok(_) | Err(_) if retries > 0 => {
                     retries -= 1;
-                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(20)).await;
                 },
                 Err(e) => anyhow::bail!("Failed after {} retries: {:?}", $n, e),
                 Ok(_) => anyhow::bail!("Failed to match pattern after {} retries", $n),
