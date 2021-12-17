@@ -7,8 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-#![cfg(feature = "self-update")]
-
 use color_eyre::{eyre::eyre, eyre::WrapErr, Result};
 #[cfg(not(target_os = "windows"))]
 use std::os::unix::fs::PermissionsExt;

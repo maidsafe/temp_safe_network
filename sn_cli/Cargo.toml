@@ -74,12 +74,11 @@ features = [
     "compression-flate2",
     "compression-zip-deflate"
 ]
-optional = true
 
 [features]
 default = [ "testing", "self-update" ]
 testing = [ "sn_api/testing" ]
-self-update = [ "self_update" ]
+self-update = []
 
 [dev-dependencies]
 assert_cmd = "~2.0"

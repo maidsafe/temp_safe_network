@@ -7,7 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-#[cfg(feature = "self-update")]
 use super::helpers::download_and_install_github_release_asset;
 use crate::operations::config::NetworkLauncher;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
@@ -64,16 +63,6 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
     }
 }
 
-#[cfg(not(feature = "self-update"))]
-pub fn node_install(
-    _node_config_dir_path: PathBuf,
-    _node_override_dir_path: Option<PathBuf>,
-    _version: Option<String>,
-) -> Result<()> {
-    Err(eyre!("Self updates are disabled"))
-}
-
-#[cfg(feature = "self-update")]
 pub fn node_install(
     node_config_dir_path: PathBuf,
     node_override_dir_path: Option<PathBuf>,
