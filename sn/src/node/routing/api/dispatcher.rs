@@ -41,8 +41,6 @@ type PermitInfo = (OwnedSemaphorePermit, SubcommandsCount, Priority);
 type SubcommandsCount = usize;
 type Priority = i32;
 
-static COMMAND_LIMIT: usize = 1000;
-
 fn get_root_cmd_id(cmd_id: &str) -> CmdId {
     let mut root_cmd_id = cmd_id.to_string();
     root_cmd_id.truncate(cmd_id.find('.').unwrap_or_else(|| cmd_id.len()));
@@ -60,6 +58,7 @@ pub(super) struct Dispatcher {
     infra_permits: Arc<Semaphore>,
     node_data_permits: Arc<Semaphore>,
     dkg_permits: Arc<Semaphore>,
+    service_msg_permits: Arc<Semaphore>,
     // root cmd id to semaphore and a count of processes using it, and the root priority
     cmd_permit_map: Arc<RwLock<BTreeMap<CmdId, PermitInfo>>>,
 }
@@ -82,6 +81,7 @@ impl Dispatcher {
             ae_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
             infra_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
             dkg_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
+            service_msg_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
             node_data_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
             cmd_permit_map: Arc::new(RwLock::new(BTreeMap::default())),
         }
@@ -142,16 +142,11 @@ impl Dispatcher {
         let commands_len = permit_map.read().await.len();
         debug!("Commands in flight (root permit len): {:?}", commands_len);
 
-
         let root_prio = self.a_root_cmd_permit_exists(root_cmd_id.clone()).await;
 
         if let Some(prio) = root_prio {
             // use the root priority for all subsequent commands
             the_prio = prio;
-        }
-        // if there's no root cmd, and we're at the limit we just drop the command.
-        else if commands_len == COMMAND_LIMIT {
-                return Err(Error::AtMaxCommandThroughput)
         }
 
         // now, no matter the command/root, we wait for anything higher prio than the _root_ priority
@@ -280,6 +275,7 @@ impl Dispatcher {
                         .map_err(|_| Error::SemaphoreClosed),
                 )
             }
+            // service msgs...
             _ => {
                 trace!(
                     "{:?} Awaiting Data/Infra/AE/Join/DKG Completion before continuing msg",
@@ -308,7 +304,16 @@ impl Dispatcher {
                 )
                 .await?;
 
-                None
+                match self.service_msg_permits.clone().try_acquire_owned() {
+                    Ok(permit) => Some(Ok(permit)),
+                    Err(error) => {
+                        error!(
+                            "Could not acquire service msg permit, dropping the command {:?} {:?}",
+                            cmd_id, error
+                        );
+                        Some(Err(Error::AtMaxServiceCommandThroughput))
+                    }
+                }
             }
         };
 
