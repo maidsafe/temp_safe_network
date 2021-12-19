@@ -41,6 +41,8 @@ type PermitInfo = (OwnedSemaphorePermit, SubcommandsCount, Priority);
 type SubcommandsCount = usize;
 type Priority = i32;
 
+static COMMAND_LIMIT: usize = 1000;
+
 fn get_root_cmd_id(cmd_id: &str) -> CmdId {
     let mut root_cmd_id = cmd_id.to_string();
     root_cmd_id.truncate(cmd_id.find('.').unwrap_or_else(|| cmd_id.len()));
@@ -137,14 +139,19 @@ impl Dispatcher {
         // if we already have a permit, increase our count and continue
         let root_cmd_id = get_root_cmd_id(&cmd_id);
         let permit_map = self.cmd_permit_map.clone();
-        let len = permit_map.read().await.len();
-        debug!("Permits issued: {:?}", len);
+        let commands_len = permit_map.read().await.len();
+        debug!("Commands in flight (root permit len): {:?}", commands_len);
+
 
         let root_prio = self.a_root_cmd_permit_exists(root_cmd_id.clone()).await;
 
         if let Some(prio) = root_prio {
             // use the root priority for all subsequent commands
             the_prio = prio;
+        }
+        // if there's no root cmd, and we're at the limit we just drop the command.
+        else if commands_len == COMMAND_LIMIT {
+                return Err(Error::AtMaxCommandThroughput)
         }
 
         // now, no matter the command/root, we wait for anything higher prio than the _root_ priority

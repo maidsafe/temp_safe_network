@@ -24,6 +24,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    #[error("Max amount of commands being handled, dropping msg")]
+    AtMaxCommandThroughput,
     #[error("Permit was not retrieved in 500 loops")]
     CouldNotGetPermitInTime,
     #[error("Node prioritisation semaphore was closed early.")]
