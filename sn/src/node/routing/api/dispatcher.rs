@@ -90,27 +90,27 @@ impl Dispatcher {
     /// It should only be used after checking that no permits are held by a root cmd eg
     async fn wait_for_priority_commands_to_finish(
         &self,
-        semaphore: Arc<Semaphore>,
-        count: usize,
+        _semaphore: Arc<Semaphore>,
+        _count: usize,
     ) -> Result<()> {
         // there's probably a neater way to do this
-        debug!("available, permits {:?}", semaphore.available_permits());
+        // debug!("available, permits {:?}", semaphore.available_permits());
 
-        let mut loop_count = 0;
-        while semaphore.available_permits() != count {
-            loop_count += 1;
+        // let mut loop_count = 0;
+        // while semaphore.available_permits() != count {
+        //     loop_count += 1;
 
-            if loop_count > 500 {
-                return Err(Error::CouldNotGetPermitInTime);
-            }
+        //     if loop_count > 500 {
+        //         return Err(Error::CouldNotGetPermitInTime);
+        //     }
 
-            time::sleep(Duration::from_millis(500)).await;
-            trace!(
-                "looping while we wait for available permits to be {:?}: {:?}",
-                count,
-                semaphore.available_permits()
-            );
-        }
+        //     time::sleep(Duration::from_millis(500)).await;
+        //     trace!(
+        //         "looping while we wait for available permits to be {:?}: {:?}",
+        //         count,
+        //         semaphore.available_permits()
+        //     );
+        // }
 
         Ok(())
     }
