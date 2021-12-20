@@ -257,11 +257,12 @@ impl Core {
             correlation_id,
         };
 
-        let origin = if let Some(origin) = self.pending_chunk_queries.get(&user.0).await {
+        let origin = if let Some(origin) = self.pending_chunk_queries.remove(&user.0).await {
             origin
         } else {
             warn!(
-                "Dropping chunk query response from {} for unknown origin: {}",
+                "Dropping chunk query response from {}. We might have already responded to them or \
+                have not registered this requester: {}",
                 sending_nodes_pk, user.0
             );
             return Ok(commands);
@@ -274,6 +275,11 @@ impl Core {
 
         let dst = DstLocation::EndUser(EndUser(origin.name()));
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
+
+        trace!(
+            "Responding with the first chunk query response to {:?}",
+            dst
+        );
 
         let command = Command::SendMessage {
             recipients: vec![origin],
