@@ -204,7 +204,7 @@ jobs:
       - name: client blob tests against local network
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 --skip ae  && sleep 5
-        timeout-minutes: 10
+        timeout-minutes: 15
 
 
       # ae tests api
