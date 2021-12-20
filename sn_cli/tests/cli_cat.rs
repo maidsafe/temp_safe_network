@@ -34,7 +34,7 @@ fn calling_safe_cat_using_spot_file() -> Result<()> {
         Some(0),
     )?;
 
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
+    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &map["../resources/testdata/test.md"].1])
         .assert()
@@ -65,7 +65,7 @@ fn calling_safe_cat_using_blob_file() -> Result<()> {
     )?;
 
     let content = std::fs::read_to_string("../resources/testdata/large_markdown_file.md")?;
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&output);
+    let (_container_xorurl, map) = parse_files_put_or_sync_output(&output)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec![
         "cat",
@@ -91,10 +91,10 @@ fn calling_safe_cat_subfolders() -> Result<()> {
         Some(0),
     )?;
 
-    let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
+    let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
     let content = safe_cmd_stdout(["cat", &container_xorurl, "--json"], Some(0))?;
-    let (_xorurl, filesmap) = parse_files_container_output(&content);
+    let (_xorurl, filesmap) = parse_files_container_output(&content)?;
 
     assert_eq!(filesmap["/emptyfolder"]["type"], "inode/directory");
     assert_eq!(filesmap["/emptyfolder"]["size"], "0");
@@ -107,7 +107,7 @@ fn calling_safe_cat_subfolders() -> Result<()> {
 fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
 
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
+    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
 
     let relative_url = format!("{}/something_relative.wasm", &map[TEST_FILE].1);
@@ -122,7 +122,7 @@ fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
 fn calling_safe_cat_hexdump() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
 
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
+    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", "--hexdump", &map[TEST_FILE].1])
         .assert()
@@ -145,10 +145,15 @@ fn calling_safe_cat_xorurl_with_version() -> Result<()> {
     md_file.write_str("hello tests!")?;
 
     let output = safe_cmd_stdout(
-        ["files", "put", md_file.path().to_str().unwrap(), "--json"],
+        [
+            "files",
+            "put",
+            &md_file.path().display().to_string(),
+            "--json",
+        ],
         Some(0),
     )?;
-    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output);
+    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output)?;
     let mut url = SafeUrl::from_url(&container_xorurl)?;
     url.set_path("test.md");
 
@@ -183,7 +188,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
         Some(0),
     )?;
 
-    let (nrs_url, _files_map) = parse_nrs_register_output(&output);
+    let (nrs_url, _files_map) = parse_nrs_register_output(&output)?;
     let version = nrs_url.content_version();
 
     let mut nrs_url = SafeUrl::from_url(&format!("safe://{}", public_name))?;

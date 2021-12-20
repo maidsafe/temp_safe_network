@@ -55,8 +55,8 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -64,7 +64,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
             "files",
             "get",
             src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -73,10 +73,15 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
 
     // Assert
     let mut dest_pb = PathBuf::from(dest);
-    dest_pb.push(tmp_data_path.path().file_name().unwrap());
+    dest_pb.push(tmp_data_path.path().file_name().ok_or_else(|| {
+        eyre!(
+            "failed to read file name from path: {}",
+            tmp_data_path.path().display()
+        )
+    })?);
     assert_eq!(
         sum_tree(TEST_FOLDER)?,
-        sum_tree(dest_pb.as_path().to_str().unwrap())?
+        sum_tree(&dest_pb.as_path().display().to_string())?
     );
 
     Ok(())
@@ -114,8 +119,8 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -123,7 +128,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
             "files",
             "get",
             src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -131,7 +136,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -163,14 +168,14 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
 fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
-    let tmp_data_path = assert_fs::TempDir::new().unwrap();
+    let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     safe_cmd_at(
@@ -182,12 +187,12 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
             "--exists=overwrite",
             "--progress=none",
         ],
-        dest,
+        &dest,
         Some(0),
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -219,24 +224,24 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
 fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
-    let tmp_data_path = assert_fs::TempDir::new().unwrap();
+    let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     safe_cmd_at(
         ["files", "get", src, "--exists=overwrite", "--progress=none"],
-        dest,
+        &dest,
         Some(0),
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -301,7 +306,7 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
 fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
-    let tmp_data_path = assert_fs::TempDir::new().unwrap();
+    let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
@@ -312,7 +317,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     pb.pop();
 
     let src = &files_container_xor;
-    let dest = pb.as_path().to_str().unwrap();
+    let dest = pb.as_path().display().to_string();
 
     // Act
     let output = safe_cmd(
@@ -320,7 +325,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
             "files",
             "get",
             src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -328,13 +333,13 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(output.status.code().unwrap(), 0);
-    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(dest)?);
+    assert_eq!(output.status.code(), Some(0));
+    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
     subfolder_file.assert(predicate::path::is_file());
     subfolder_file.assert(predicate::str::contains("existing text file"));
 
-    assert!(Path::new(dest).join("test.md").is_file());
-    assert!(Path::new(dest).join("another.md").is_file());
+    assert!(Path::new(&dest).join("test.md").is_file());
+    assert!(Path::new(&dest).join("another.md").is_file());
 
     // Disabled for now because the warning is disabled by sn_cli if TTY
     // not detected.  So it doesn't appear in our output.  Perhaps later
@@ -372,7 +377,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
-    let tmp_data_path = assert_fs::TempDir::new().unwrap();
+    let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
@@ -390,8 +395,8 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     )?;
 
     let src = format!("safe://{}", &nrs_name);
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     safe_cmd_at(
@@ -402,12 +407,12 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
             "--exists=overwrite",
             "--progress=none",
         ],
-        dest,
+        &dest,
         Some(0),
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -443,7 +448,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
 fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
-    let tmp_data_dir = assert_fs::TempDir::new().unwrap();
+    let tmp_data_dir = assert_fs::TempDir::new()?;
     tmp_data_dir.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_dir, with_trailing_slash)?;
@@ -465,8 +470,8 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     )?;
 
     let src = format!("safe://{}/sub2.md", &nrs_name);
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     safe_cmd_at(
@@ -477,7 +482,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
             "--exists=overwrite",
             "--progress=none",
         ],
-        dest,
+        &dest,
         Some(0),
     )?;
 
@@ -522,26 +527,37 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
-    let tmp_data_dir = assert_fs::TempDir::new().unwrap();
+    let tmp_data_dir = assert_fs::TempDir::new()?;
     tmp_data_dir.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let container_folder_name = tmp_data_dir.path().file_name().unwrap().to_str().unwrap();
+    let container_folder_name = tmp_data_dir
+        .path()
+        .file_name()
+        .and_then(|f| f.to_str())
+        .ok_or_else(|| {
+            eyre!(
+                "failed to read file name from path: {}",
+                tmp_data_dir.path().display()
+            )
+        })?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path(container_folder_name);
 
     let tmp_data_nrs = get_random_nrs_string();
     let tmp_data_nrs_url = create_nrs_link(&tmp_data_nrs, &url.to_string())?;
-    let version = tmp_data_nrs_url.content_version().unwrap();
+    let version = tmp_data_nrs_url
+        .content_version()
+        .ok_or_else(|| eyre!("failed to read content version from xorurl"))?;
 
     let src = format!(
         "safe://{}/subfolder?v={}",
         tmp_data_nrs,
         version.to_string()
     );
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -549,7 +565,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
             "files",
             "get",
             &src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -599,8 +615,8 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -608,7 +624,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
             "files",
             "get",
             src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -617,8 +633,8 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
 
     // Assert
     assert_eq!(
-        sum_tree(tmp_data_path.path().to_str().unwrap())?,
-        sum_tree(dest)?
+        sum_tree(&tmp_data_path.path().display().to_string())?,
+        sum_tree(&dest)?
     );
 
     Ok(())
@@ -674,7 +690,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
             "files",
             "get",
             &src,
-            dest.path().to_str().unwrap(),
+            &dest.path().display().to_string(),
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -730,7 +746,7 @@ fn files_get_exists_preserve() -> Result<()> {
     test_md_file.write_str("some markdown content")?;
     let mut dest_pb = PathBuf::from(test_md_file.path());
     dest_pb.pop();
-    let dest = dest_pb.as_path().to_str().unwrap();
+    let dest = dest_pb.as_path().display().to_string();
 
     // Act
     safe_cmd(
@@ -738,7 +754,7 @@ fn files_get_exists_preserve() -> Result<()> {
             "files",
             "get",
             src,
-            dest,
+            &dest,
             "--exists=preserve",
             "--progress=none",
         ],
@@ -748,7 +764,7 @@ fn files_get_exists_preserve() -> Result<()> {
     // Assert
     test_md_file.assert(predicate::path::is_file());
     test_md_file.assert(predicate::str::contains("some markdown content"));
-    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(dest)?);
+    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
     assert!(Path::new(&dest).join("another.md").is_file());
 
     Ok(())
@@ -795,7 +811,7 @@ fn files_get_exists_overwrite() -> Result<()> {
     test_md_file.write_str("some markdown content")?;
     let mut dest_pb = PathBuf::from(test_md_file.path());
     dest_pb.pop();
-    let dest = dest_pb.as_path().to_str().unwrap();
+    let dest = dest_pb.as_path().display().to_string();
 
     // Act
     safe_cmd(
@@ -803,7 +819,7 @@ fn files_get_exists_overwrite() -> Result<()> {
             "files",
             "get",
             src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -811,7 +827,7 @@ fn files_get_exists_overwrite() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
     assert!(Path::new(&dest).join("another.md").is_file());
     assert_eq!(
         std::fs::read_to_string(Path::new(&format!("{}/test.md", dest)))?,
@@ -861,8 +877,8 @@ fn files_get_src_path_is_invalid() -> Result<()> {
     url.set_path("/path/is/invalid");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     let output = safe_cmd(
@@ -870,7 +886,7 @@ fn files_get_src_path_is_invalid() -> Result<()> {
             "files",
             "get",
             &src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -934,7 +950,7 @@ fn files_get_dest_parent_does_not_exist() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(output.status.code().unwrap(), 1);
+    assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr)
         .into_owned()
         .contains("No such directory:"));
@@ -1018,10 +1034,10 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     url.set_path("testdata/");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
+    let dest = assert_fs::TempDir::new()?;
     let child = dest.child("testdata");
     child.create_dir_all()?;
-    let dest = format!("{}/testdata", child.path().to_str().unwrap());
+    let dest = format!("{}/testdata", child.path().display());
 
     // Act
     safe_cmd(
@@ -1082,10 +1098,10 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
         url.public_name(),
         "testdata/",
     );
-    let dest = assert_fs::TempDir::new().unwrap();
+    let dest = assert_fs::TempDir::new()?;
     let child = dest.child("testdata");
     child.write_str("some file content")?;
-    let dest = format!("{}/testdata", child.path().to_str().unwrap());
+    let dest = format!("{}/testdata", child.path().display());
 
     // Act
     let output = safe_cmd(
@@ -1103,7 +1119,7 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
     // Assert
     // So this command does fail as expected, but currently the error message isn't very helpful:
     // "No such directory". We should definitely adjust that to something more accurate.
-    assert_eq!(output.status.code().unwrap(), 1);
+    assert_eq!(output.status.code(), Some(1));
 
     Ok(())
 }
@@ -1145,8 +1161,8 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
     url.set_path("testdata/");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = format!("{}/testdata", dest.path().to_str().unwrap());
+    let dest = assert_fs::TempDir::new()?;
+    let dest = format!("{}/testdata", dest.path().display());
 
     // Act
     safe_cmd(
@@ -1205,10 +1221,10 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     url.set_path("testdata/");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
+    let dest = assert_fs::TempDir::new()?;
     let child = dest.child("newname");
     child.create_dir_all()?;
-    let dest = format!("{}/testdata", child.path().to_str().unwrap());
+    let dest = format!("{}/testdata", child.path().display());
 
     // Act
     safe_cmd(
@@ -1268,10 +1284,10 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
     url.set_path("testdata/");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
+    let dest = assert_fs::TempDir::new()?;
     let child = dest.child("newname");
     child.write_str("some file contents")?;
-    let dest = child.path().to_str().unwrap();
+    let dest = child.path().display().to_string();
 
     // Act
     let output = safe_cmd(
@@ -1279,7 +1295,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
             "files",
             "get",
             &src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1331,10 +1347,10 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
+    let dest = assert_fs::TempDir::new()?;
     let child = dest.child("noextension");
     child.create_dir_all()?;
-    let dest = child.path().to_str().unwrap();
+    let dest = child.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1342,7 +1358,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
             "files",
             "get",
             &src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1399,10 +1415,10 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
+    let dest = assert_fs::TempDir::new()?;
     let child = dest.child("noextension");
     child.write_str("noextension is an existing file with some content")?;
-    let dest = child.path().to_str().unwrap();
+    let dest = child.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1410,7 +1426,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
             "files",
             "get",
             &src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1420,7 +1436,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(dest)?
+        digest_file(&dest)?
     );
 
     Ok(())
@@ -1464,8 +1480,8 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = dest.path().to_str().unwrap();
+    let dest = assert_fs::TempDir::new()?;
+    let dest = dest.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1473,7 +1489,7 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
             "files",
             "get",
             &src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1528,10 +1544,10 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
+    let dest = assert_fs::TempDir::new()?;
     let child = dest.child("newname");
     child.create_dir_all()?;
-    let dest = child.path().to_str().unwrap();
+    let dest = child.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1539,7 +1555,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
             "files",
             "get",
             &src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1594,10 +1610,10 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
+    let dest = assert_fs::TempDir::new()?;
     let child = dest.child("newname");
     child.write_str("this file will be overwritten")?;
-    let dest = child.path().to_str().unwrap();
+    let dest = child.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1605,7 +1621,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
             "files",
             "get",
             &src,
-            dest,
+            &dest,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1615,7 +1631,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(dest)?
+        digest_file(&dest)?
     );
 
     Ok(())
@@ -1659,8 +1675,8 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = format!("{}/newname", dest.path().to_str().unwrap());
+    let dest = assert_fs::TempDir::new()?;
+    let dest = format!("{}/newname", dest.path().display());
 
     // Act
     safe_cmd(
@@ -1723,8 +1739,8 @@ fn files_get_symlinks_relative() -> Result<()> {
         upload_path("../resources/test_symlinks", with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = format!("{}/newname", dest.path().to_str().unwrap());
+    let dest = assert_fs::TempDir::new()?;
+    let dest = format!("{}/newname", dest.path().display());
 
     // Act
     safe_cmd(
@@ -1783,8 +1799,8 @@ fn files_get_symlinks_absolute() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = format!("{}/newname", dest.path().to_str().unwrap());
+    let dest = assert_fs::TempDir::new()?;
+    let dest = format!("{}/newname", dest.path().display());
 
     // Act
     safe_cmd(
@@ -1801,7 +1817,7 @@ fn files_get_symlinks_absolute() -> Result<()> {
 
     // Assert
     assert_eq!(
-        sum_tree(tmp_data_path.path().to_str().unwrap())?,
+        sum_tree(&tmp_data_path.path().display().to_string())?,
         sum_tree(&dest)?
     );
 
@@ -1864,15 +1880,15 @@ fn files_get_symlinks_after_sync() -> Result<()> {
         [
             "files",
             "sync",
-            &format!("{}/", tmp_data_path.path().to_str().unwrap()),
+            &format!("{}/", tmp_data_path.path().display()),
             &safeurl.to_string(),
         ],
         Some(0),
     )?;
 
     let src = &safeurl.to_string();
-    let dest = assert_fs::TempDir::new().unwrap();
-    let dest = format!("{}/newname", dest.path().to_str().unwrap());
+    let dest = assert_fs::TempDir::new()?;
+    let dest = format!("{}/newname", dest.path().display());
 
     // Act
     safe_cmd(
@@ -1889,7 +1905,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
 
     // Assert
     assert_eq!(
-        sum_tree(tmp_data_path.path().to_str().unwrap())?,
+        sum_tree(&tmp_data_path.path().display().to_string())?,
         sum_tree(&dest)?
     );
 

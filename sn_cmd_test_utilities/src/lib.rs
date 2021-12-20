@@ -101,14 +101,14 @@ pub mod util {
         let pk_command_result = safe_cmd_stdout(["keys", "create", "--json"], Some(0))?;
 
         let (xorurl, (_pk, sk)): (String, (String, String)) =
-            parse_keys_create_output(&pk_command_result);
+            parse_keys_create_output(&pk_command_result)?;
 
         Ok((xorurl, sk))
     }
 
     pub fn create_nrs_link(name: &str, link: &str) -> Result<SafeUrl> {
         let nrs_creation = safe_cmd_stdout(["nrs", "create", name, "-l", link, "--json"], Some(0))?;
-        let (nrs_map_xorurl, _change_map) = parse_nrs_register_output(&nrs_creation);
+        let (nrs_map_xorurl, _change_map) = parse_nrs_register_output(&nrs_creation)?;
         Ok(nrs_map_xorurl)
     }
 
@@ -119,7 +119,7 @@ pub mod util {
         let final_path = if add_trailing_slash {
             format!("{}/", path.as_ref().display())
         } else {
-            String::from(path.as_ref().to_str().unwrap())
+            format!("{}", path.as_ref().display())
         };
 
         let path = Path::new(&final_path);
@@ -131,7 +131,7 @@ pub mod util {
         } else {
             safe_cmd_stdout(["files", "put", &final_path, "--json"], Some(0))?
         };
-        let (container_xorurl, file_map) = parse_files_put_or_sync_output(&files_container);
+        let (container_xorurl, file_map) = parse_files_put_or_sync_output(&files_container)?;
         Ok((container_xorurl, file_map, final_path))
     }
 
@@ -286,47 +286,55 @@ pub mod util {
         SafeUrl::from_url(url).map_err(|e| eyre!("Failed to parse URL: {}", e))
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn parse_files_container_output(
         output: &str,
-    ) -> (String, BTreeMap<String, BTreeMap<String, String>>) {
+    ) -> Result<(String, BTreeMap<String, BTreeMap<String, String>>)> {
+        serde_json::from_str(output).map_err(|_| {
+            eyre!(
+                "Failed to parse output of `safe cat` on FilesContainer: {}",
+                output
+            )
+        })
+    }
+
+    pub fn parse_files_tree_output(output: &str) -> Result<serde_json::Value> {
         serde_json::from_str(output)
-            .expect("Failed to parse output of `safe cat` on FilesContainer")
+            .map_err(|_| eyre!("Failed to parse output of `safe tree`: {}", output))
     }
 
-    pub fn parse_files_tree_output(output: &str) -> serde_json::Value {
-        serde_json::from_str(output).expect("Failed to parse output of `safe tree`")
+    pub fn parse_files_put_or_sync_output(output: &str) -> Result<(String, ProcessedFiles)> {
+        serde_json::from_str(output).map_err(|_| {
+            eyre!(
+                "Failed to parse output of `safe files put/sync`: {}",
+                output
+            )
+        })
     }
 
-    pub fn parse_files_put_or_sync_output(output: &str) -> (String, ProcessedFiles) {
-        serde_json::from_str(output).expect("Failed to parse output of `safe files put/sync`")
+    pub fn parse_nrs_register_output(output: &str) -> Result<(SafeUrl, (String, String, String))> {
+        serde_json::from_str(output)
+            .map_err(|_| eyre!("Failed to parse output of `safe nrs register`: {}", output))
     }
 
-    pub fn parse_nrs_register_output(output: &str) -> (SafeUrl, (String, String, String)) {
-        serde_json::from_str(output).expect("Failed to parse output of `safe nrs register`")
+    pub fn parse_wallet_create_output(output: &str) -> Result<(String, String, Option<Keypair>)> {
+        serde_json::from_str(output)
+            .map_err(|_| eyre!("Failed to parse output of `safe wallet create`: {}", output))
     }
 
-    pub fn parse_wallet_create_output(output: &str) -> (String, String, Option<Keypair>) {
-        serde_json::from_str(output).expect("Failed to parse output of `safe wallet create`")
+    pub fn parse_xorurl_output(output: &str) -> Result<Vec<(String, String)>> {
+        serde_json::from_str(output)
+            .map_err(|_| eyre!("Failed to parse output of `safe xorurl`: {}", output))
     }
 
-    pub fn parse_xorurl_output(output: &str) -> Vec<(String, String)> {
-        serde_json::from_str(output).expect("Failed to parse output of `safe xorurl`")
+    pub fn parse_dog_output(output: &str) -> Result<(String, Vec<SafeData>)> {
+        serde_json::from_str(output)
+            .map_err(|_| eyre!("Failed to parse output of `safe dog`: {}", output))
     }
 
-    pub fn parse_seq_store_output(output: &str) -> String {
-        serde_json::from_str(output).expect("Failed to parse output of `safe seq store`")
-    }
-
-    pub fn parse_cat_seq_output(output: &str) -> (String, Vec<u8>) {
-        serde_json::from_str(output).expect("Failed to parse output of `safe cat seq`")
-    }
-
-    pub fn parse_dog_output(output: &str) -> (String, Vec<SafeData>) {
-        serde_json::from_str(output).expect("Failed to parse output of `safe dog`")
-    }
-
-    pub fn parse_keys_create_output(output: &str) -> (String, (String, String)) {
-        serde_json::from_str(output).expect("Failed to parse output of `safe keys create`")
+    pub fn parse_keys_create_output(output: &str) -> Result<(String, (String, String))> {
+        serde_json::from_str(output)
+            .map_err(|_| eyre!("Failed to parse output of `safe keys create`: {}", output))
     }
 
     /// Runs safe with the arguments specified, with the option to assert on the exit code.

@@ -218,8 +218,12 @@ impl Config {
         match &net_info {
             NetworkInfo::NodeConfig(_) => {}
             NetworkInfo::ConnInfoLocation(location) => {
-                let result = url::Url::parse(location);
-                if result.is_err() || !result.unwrap().has_host() {
+                let is_invalid_location = match url::Url::parse(location) {
+                    Err(_) => true,
+                    Ok(location) => !location.has_host(),
+                };
+
+                if is_invalid_location {
                     // The location is not a valid URL, so try and parse it as a file.
                     let pb = PathBuf::from(Path::new(&location));
                     if !pb.is_file() {
@@ -495,9 +499,9 @@ mod constructor {
             NetworkInfo::NodeConfig((_, contacts)) => {
                 assert_eq!(contacts.len(), 2);
 
-                let node: SocketAddr = "127.0.0.1:12000".parse().unwrap();
+                let node: SocketAddr = "127.0.0.1:12000".parse()?;
                 assert_eq!(contacts.get(&node), Some(&node));
-                let node: SocketAddr = "127.0.0.2:12000".parse().unwrap();
+                let node: SocketAddr = "127.0.0.2:12000".parse()?;
                 assert_eq!(contacts.get(&node), Some(&node));
             }
             NetworkInfo::ConnInfoLocation(_) => {
@@ -556,7 +560,7 @@ mod read_current_node_config {
         assert_eq!(node_config_file.path(), node_config_path);
         assert_eq!(nodes.len(), 11);
 
-        let node: SocketAddr = "127.0.0.1:33314".parse().unwrap();
+        let node: SocketAddr = "127.0.0.1:33314".parse()?;
         assert_eq!(nodes.get(&node), Some(&node));
 
         Ok(())
@@ -655,7 +659,10 @@ mod add_network {
         assert!(result.is_ok());
         new_network_file.assert(predicate::path::is_file());
 
-        let network = config.networks_iter().next().unwrap();
+        let network = config
+            .networks_iter()
+            .next()
+            .ok_or_else(|| eyre!("failed to read network from config"))?;
         let network_name = network.0;
         let network_info = network.1;
         assert_eq!(network_name, "new_network");
@@ -703,9 +710,9 @@ mod add_network {
 
         let result = config.add_network(
             "new_network",
-            Some(NetworkInfo::ConnInfoLocation(String::from(
-                node_config_file.path().to_str().unwrap(),
-            ))),
+            Some(NetworkInfo::ConnInfoLocation(
+                node_config_file.path().display().to_string(),
+            )),
         );
 
         assert!(result.is_ok());
@@ -713,7 +720,10 @@ mod add_network {
 
         assert_eq!(config.networks_iter().count(), 1);
 
-        let network = config.networks_iter().next().unwrap();
+        let network = config
+            .networks_iter()
+            .next()
+            .ok_or_else(|| eyre!("failed to read network from config"))?;
         let network_name = network.0;
         let network_info = network.1;
         assert_eq!(network_name, "new_network");
@@ -722,10 +732,7 @@ mod add_network {
                 eyre!("node config doesn't apply to this test");
             }
             NetworkInfo::ConnInfoLocation(path) => {
-                assert_eq!(
-                    *path,
-                    String::from(node_config_file.path().to_str().unwrap())
-                );
+                assert_eq!(*path, node_config_file.path().display().to_string());
             }
         }
         Ok(())
@@ -744,9 +751,9 @@ mod add_network {
 
         let result = config.add_network(
             "new_network",
-            Some(NetworkInfo::ConnInfoLocation(String::from(
-                node_config_file.path().to_str().unwrap(),
-            ))),
+            Some(NetworkInfo::ConnInfoLocation(
+                node_config_file.path().display().to_string(),
+            )),
         );
 
         assert!(result.is_err());
@@ -776,9 +783,9 @@ mod add_network {
 
         let result = config.add_network(
             "new_network",
-            Some(NetworkInfo::ConnInfoLocation(String::from(
-                node_config_file.path().to_str().unwrap(),
-            ))),
+            Some(NetworkInfo::ConnInfoLocation(
+                node_config_file.path().display().to_string(),
+            )),
         );
 
         assert!(result.is_err());
@@ -811,7 +818,10 @@ mod add_network {
 
         assert_eq!(config.networks_iter().count(), 1);
 
-        let network = config.networks_iter().next().unwrap();
+        let network = config
+            .networks_iter()
+            .next()
+            .ok_or_else(|| eyre!("failed to read network from config"))?;
         let network_name = network.0;
         let network_info = network.1;
         assert_eq!(network_name, "new_network");
@@ -875,7 +885,10 @@ mod add_network {
         assert!(result.is_ok());
         assert_eq!(config.networks_iter().count(), 1);
 
-        let network = config.networks_iter().next().unwrap();
+        let network = config
+            .networks_iter()
+            .next()
+            .ok_or_else(|| eyre!("failed to read network from config"))?;
         let network_name = network.0;
         let network_info = network.1;
         assert_eq!(network_name, "existing_network");
@@ -883,9 +896,9 @@ mod add_network {
             NetworkInfo::NodeConfig(node_config) => {
                 assert_eq!(node_config.1.len(), 2);
 
-                let node: SocketAddr = "10.0.0.1:12000".parse().unwrap();
+                let node: SocketAddr = "10.0.0.1:12000".parse()?;
                 assert_eq!(node_config.1.get(&node), Some(&node));
-                let node: SocketAddr = "10.0.0.2:12000".parse().unwrap();
+                let node: SocketAddr = "10.0.0.2:12000".parse()?;
                 assert_eq!(node_config.1.get(&node), Some(&node));
 
                 let public_key = node_config.0;
@@ -945,7 +958,10 @@ mod add_network {
         assert!(result.is_ok());
         assert_eq!(config.networks_iter().count(), 2);
 
-        let network = config.networks_iter().nth(1).unwrap();
+        let network = config
+            .networks_iter()
+            .nth(1)
+            .ok_or_else(|| eyre!("failed to read network from config"))?;
         let network_name = network.0;
         let network_info = network.1;
         assert_eq!(network_name, "new_network");
@@ -953,9 +969,9 @@ mod add_network {
             NetworkInfo::NodeConfig(node_config) => {
                 assert_eq!(node_config.1.len(), 2);
 
-                let node: SocketAddr = "10.0.0.1:12000".parse().unwrap();
+                let node: SocketAddr = "10.0.0.1:12000".parse()?;
                 assert_eq!(node_config.1.get(&node), Some(&node));
-                let node: SocketAddr = "10.0.0.2:12000".parse().unwrap();
+                let node: SocketAddr = "10.0.0.2:12000".parse()?;
                 assert_eq!(node_config.1.get(&node), Some(&node));
 
                 let public_key = node_config.0;
@@ -1015,16 +1031,19 @@ mod add_network {
         // Act
         let result = config.add_network(
             "new_network",
-            Some(NetworkInfo::ConnInfoLocation(String::from(
-                existing_node_config_file.path().to_str().unwrap(),
-            ))),
+            Some(NetworkInfo::ConnInfoLocation(
+                existing_node_config_file.path().display().to_string(),
+            )),
         );
 
         // Assert
         assert!(result.is_ok());
         assert_eq!(config.networks_iter().count(), 2);
 
-        let network = config.networks_iter().nth(1).unwrap();
+        let network = config
+            .networks_iter()
+            .nth(1)
+            .ok_or_else(|| eyre!("failed to read network from config"))?;
         let network_name = network.0;
         let network_info = network.1;
         assert_eq!(network_name, "new_network");
@@ -1035,7 +1054,7 @@ mod add_network {
             NetworkInfo::ConnInfoLocation(path) => {
                 assert_eq!(
                     *path,
-                    String::from(existing_node_config_file.path().to_str().unwrap())
+                    existing_node_config_file.path().display().to_string()
                 );
             }
         }

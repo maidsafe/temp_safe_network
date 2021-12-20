@@ -336,11 +336,11 @@ mod run_command {
 
         assert!(launcher.launch_args.iter().any(|x| x == "--node-path"));
         assert!(launcher.launch_args.iter().any(|x| x
-            == custom_node_dir
+            == &custom_node_dir
                 .path()
                 .join(SN_NODE_EXECUTABLE)
-                .to_str()
-                .unwrap()));
+                .display()
+                .to_string()));
 
         Ok(())
     }
@@ -374,10 +374,12 @@ mod run_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--node-path"));
-        assert!(launcher
-            .launch_args
-            .iter()
-            .any(|x| x == node_dir.path().join(SN_NODE_EXECUTABLE).to_str().unwrap()));
+        assert!(launcher.launch_args.iter().any(|x| x
+            == &node_dir
+                .path()
+                .join(SN_NODE_EXECUTABLE)
+                .display()
+                .to_string()));
 
         Ok(())
     }
@@ -411,10 +413,12 @@ mod run_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--nodes-dir"));
-        assert!(launcher
-            .launch_args
-            .iter()
-            .any(|x| x == node_dir.path().join(NODES_DATA_DIR_NAME).to_str().unwrap()));
+        assert!(launcher.launch_args.iter().any(|x| x
+            == &node_dir
+                .path()
+                .join(NODES_DATA_DIR_NAME)
+                .display()
+                .to_string()));
 
         Ok(())
     }
@@ -447,11 +451,11 @@ mod run_command {
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--nodes-dir"));
         assert!(launcher.launch_args.iter().any(|x| x
-            == custom_node_dir
+            == &custom_node_dir
                 .path()
                 .join(NODES_DATA_DIR_NAME)
-                .to_str()
-                .unwrap()));
+                .display()
+                .to_string()));
 
         Ok(())
     }
@@ -658,7 +662,10 @@ mod run_command {
         assert_eq!(config.networks_iter().count(), 1);
         baby_fleming_config_file.assert(predicates::path::is_file());
 
-        let (network_name, network_info) = config.networks_iter().next().unwrap();
+        let (network_name, network_info) = config
+            .networks_iter()
+            .next()
+            .ok_or_else(|| eyre!("failed to read network from config"))?;
         assert_eq!(network_name, "baby-fleming");
         match network_info {
             NetworkInfo::NodeConfig(_) => {
@@ -794,11 +801,11 @@ mod join_command {
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--node-path"));
         assert!(launcher.launch_args.iter().any(|x| x
-            == custom_node_dir
+            == &custom_node_dir
                 .path()
                 .join(SN_NODE_EXECUTABLE)
-                .to_str()
-                .unwrap()));
+                .display()
+                .to_string()));
         Ok(())
     }
 
@@ -838,10 +845,12 @@ mod join_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--nodes-dir"));
-        assert!(launcher
-            .launch_args
-            .iter()
-            .any(|x| x == node_dir.path().join(LOCAL_NODE_DIR_NAME).to_str().unwrap()));
+        assert!(launcher.launch_args.iter().any(|x| x
+            == &node_dir
+                .path()
+                .join(LOCAL_NODE_DIR_NAME)
+                .display()
+                .to_string()));
         Ok(())
     }
 
@@ -883,11 +892,11 @@ mod join_command {
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--nodes-dir"));
         assert!(launcher.launch_args.iter().any(|x| x
-            == custom_node_dir
+            == &custom_node_dir
                 .path()
                 .join(LOCAL_NODE_DIR_NAME)
-                .to_str()
-                .unwrap()));
+                .display()
+                .to_string()));
         Ok(())
     }
 

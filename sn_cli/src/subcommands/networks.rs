@@ -187,9 +187,9 @@ mod networks_set_command {
             NetworkInfo::NodeConfig((public_key, contacts)) => {
                 assert_eq!(contacts.len(), 2);
 
-                let node: SocketAddr = "127.0.0.1:12000".parse().unwrap();
+                let node: SocketAddr = "127.0.0.1:12000".parse()?;
                 assert_eq!(contacts.get(&node), Some(&node));
-                let node: SocketAddr = "127.0.0.2:12000".parse().unwrap();
+                let node: SocketAddr = "127.0.0.2:12000".parse()?;
                 assert_eq!(contacts.get(&node), Some(&node));
 
                 assert_eq!(hex::encode(public_key.to_bytes()), genesis_key);
