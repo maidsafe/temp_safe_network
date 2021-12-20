@@ -5,12 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.51.6 (2021-12-17)
+## v0.51.7 (2021-12-20)
 
 ### Bug Fixes
 
+ - <csr-id-44e57667f48b1fd9bce154652ae2108603a35c11/> send_query_with_retry_count now uses that retry count in its calculations
 
- - <csr-id-f083ea9200a1fccfc7bd21117f34c118702a7a70/>  fix: adult choice per chunk and handling db errors
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - reduce query attempts ([`07e19b5`](https://github.com/maidsafe/safe_network/commit/07e19b53cd8eaa777f4c83369d2ee1076c75fe4f))
+    - send_query_with_retry_count now uses that retry count in its calculations ([`44e5766`](https://github.com/maidsafe/safe_network/commit/44e57667f48b1fd9bce154652ae2108603a35c11))
+    - removing exponential backoff when retrying queries ([`069013b`](https://github.com/maidsafe/safe_network/commit/069013b032b7fd8d8a58ca0d75f6ea357abf5593))
+</details>
+
+## v0.51.6 (2021-12-17)
+
+### New Features
+
+ - <csr-id-1078e59be3a58ffedcd3c1460385b4bf00f18f6b/> use upload_and_verify by default in safe_client
+
+### Bug Fixes
+
+ - <csr-id-f083ea9200a1fccfc7bd21117f34c118702a7a70/> fix: adult choice per chunk and handling db errors
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.51.6 ([`79b2d0a`](https://github.com/maidsafe/safe_network/commit/79b2d0a3f52de0335323773936dee9bdbe12a0cf))
+    - adult choice per chunk and handling db errors ([`f083ea9`](https://github.com/maidsafe/safe_network/commit/f083ea9200a1fccfc7bd21117f34c118702a7a70))
+    - attempt to retrieve all bytes during upload_and_verify ([`9cf7c72`](https://github.com/maidsafe/safe_network/commit/9cf7c72a94386f2cbe6f803be970c6debfbcb99b))
+    - use upload_and_verify by default in safe_client ([`1078e59`](https://github.com/maidsafe/safe_network/commit/1078e59be3a58ffedcd3c1460385b4bf00f18f6b))
+</details>
 
 ## v0.51.5 (2021-12-16)
 
@@ -27,8 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -38,8 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - attempt to retrieve all bytes during upload_and_verify ([`9cf7c72`](https://github.com/maidsafe/safe_network/commit/9cf7c72a94386f2cbe6f803be970c6debfbcb99b))
-    - use upload_and_verify by default in safe_client ([`1078e59`](https://github.com/maidsafe/safe_network/commit/1078e59be3a58ffedcd3c1460385b4bf00f18f6b))
+    - safe_network-0.51.5 ([`45df3d7`](https://github.com/maidsafe/safe_network/commit/45df3d71cc4b3185602b9d27b8cb0f5bf65a4b43))
     - populate client sender success counter ([`d8ad6a9`](https://github.com/maidsafe/safe_network/commit/d8ad6a9b1d6a530b7f597bccf6a6bed6d8546ac0))
     - defining a const for Chunks cache size ([`92cdb53`](https://github.com/maidsafe/safe_network/commit/92cdb53391652651bfe9a47c5a0261ba10f38148))
     - keeping Chunks wich were retrieved in a local client cache ([`3e91a43`](https://github.com/maidsafe/safe_network/commit/3e91a43676e1252a872a24872db8f91c729bfb15))
