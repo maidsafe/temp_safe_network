@@ -84,77 +84,77 @@ tar.gz: SN_CLI_TAR_AARCH64_CHECKSUM
 EOF
 
 sn_zip_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-x86_64-unknown-linux-musl.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-unknown-linux-musl.zip" | \
     awk '{ print $1 }')
 sn_zip_macos_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-x86_64-apple-darwin.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 sn_zip_win_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-x86_64-pc-windows-msvc.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 sn_zip_arm_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-arm-unknown-linux-musleabi.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-arm-unknown-linux-musleabi.zip" | \
     awk '{ print $1 }')
 sn_zip_armv7_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-armv7-unknown-linux-musleabihf.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-armv7-unknown-linux-musleabihf.zip" | \
     awk '{ print $1 }')
 sn_zip_aarch64_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-aarch64-unknown-linux-musl.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-aarch64-unknown-linux-musl.zip" | \
     awk '{ print $1 }')
 sn_tar_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-x86_64-unknown-linux-musl.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_macos_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-x86_64-apple-darwin.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-apple-darwin.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_win_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-x86_64-pc-windows-msvc.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-pc-windows-msvc.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_arm_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-arm-unknown-linux-musleabi.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-arm-unknown-linux-musleabi.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_armv7_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-armv7-unknown-linux-musleabihf.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-armv7-unknown-linux-musleabihf.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_aarch64_checksum=$(sha256sum \
-    "./deploy/prod/sn_node-$sn_version-aarch64-unknown-linux-musl.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_version-aarch64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 
 sn_cli_zip_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-x86_64-unknown-linux-musl.zip" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-x86_64-unknown-linux-musl.zip" | \
     awk '{ print $1 }')
 sn_cli_zip_macos_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-x86_64-apple-darwin.zip" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 sn_cli_zip_win_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-x86_64-pc-windows-msvc.zip" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 sn_cli_zip_arm_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-arm-unknown-linux-musleabi.zip" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-arm-unknown-linux-musleabi.zip" | \
     awk '{ print $1 }')
 sn_cli_zip_armv7_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-armv7-unknown-linux-musleabihf.zip" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-armv7-unknown-linux-musleabihf.zip" | \
     awk '{ print $1 }')
 sn_cli_zip_aarch64_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-aarch64-unknown-linux-musl.zip" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-aarch64-unknown-linux-musl.zip" | \
     awk '{ print $1 }')
 sn_cli_tar_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-x86_64-unknown-linux-musl.tar.gz" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-x86_64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 sn_cli_tar_macos_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-x86_64-apple-darwin.tar.gz" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-x86_64-apple-darwin.tar.gz" | \
     awk '{ print $1 }')
 sn_cli_tar_win_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-x86_64-pc-windows-msvc.tar.gz" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-x86_64-pc-windows-msvc.tar.gz" | \
     awk '{ print $1 }')
 sn_cli_tar_arm_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-arm-unknown-linux-musleabi.tar.gz" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-arm-unknown-linux-musleabi.tar.gz" | \
     awk '{ print $1 }')
 sn_cli_tar_armv7_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-armv7-unknown-linux-musleabihf.tar.gz" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-armv7-unknown-linux-musleabihf.tar.gz" | \
     awk '{ print $1 }')
 sn_cli_tar_aarch64_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$sn_cli_version-aarch64-unknown-linux-musl.tar.gz" | \
+    "./deploy/prod/safe/sn_cli-$sn_cli_version-aarch64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 
 release_description=$(sed "s/SN_ZIP_LINUX_CHECKSUM/$sn_zip_linux_checksum/g" <<< "$release_description")

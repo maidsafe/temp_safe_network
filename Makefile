@@ -81,10 +81,11 @@ safe_network-build-artifacts-for-deploy:
 		rm safe_network-$$arch.zip; \
 	done
 
-clean-deploy:
+deploy-directories:
 	rm -f *.zip *.tar.gz
 	rm -rf ${DEPLOY_PATH}
-	mkdir -p ${DEPLOY_PROD_PATH}
+	mkdir -p ${DEPLOY_PROD_PATH}/safe
+	mkdir -p ${DEPLOY_PROD_PATH}/sn_node
 
 .ONESHELL:
 safe_network-package-version-artifacts-for-release:
@@ -102,8 +103,8 @@ safe_network-package-version-artifacts-for-release:
 		tar -C artifacts/prod/$$arch/release -zcvf sn_node-${SN_NODE_VERSION}-$$arch.tar.gz $$bin_name; \
 	done
 
-	mv *.tar.gz ${DEPLOY_PROD_PATH}
-	mv *.zip ${DEPLOY_PROD_PATH}
+	mv *.tar.gz ${DEPLOY_PROD_PATH}/sn_node
+	mv *.zip ${DEPLOY_PROD_PATH}/sn_node
 
 .ONESHELL:
 sn_cli-package-version-artifacts-for-release:
@@ -118,13 +119,11 @@ sn_cli-package-version-artifacts-for-release:
 	for arch in "$${architectures[@]}" ; do \
 		if [[ $$arch == *"windows"* ]]; then bin_name="safe.exe"; else bin_name="safe"; fi; \
 		zip -j sn_cli-${SN_CLI_VERSION}-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
-		zip -j sn_cli-latest-$$arch.zip artifacts/prod/$$arch/release/$$bin_name; \
 		tar -C artifacts/prod/$$arch/release -zcvf sn_cli-${SN_CLI_VERSION}-$$arch.tar.gz $$bin_name; \
-		tar -C artifacts/prod/$$arch/release -zcvf sn_cli-latest-$$arch.tar.gz $$bin_name; \
 	done
 
-	mv *.tar.gz ${DEPLOY_PROD_PATH}
-	mv *.zip ${DEPLOY_PROD_PATH}
+	mv *.tar.gz ${DEPLOY_PROD_PATH}/safe
+	mv *.zip ${DEPLOY_PROD_PATH}/safe
 
 .ONESHELL:
 upload-sn_node-musl-to-s3:

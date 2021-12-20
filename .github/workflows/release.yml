@@ -52,9 +52,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build]
     env:
-      AWS_ACCESS_KEY_ID: AKIAVVODCRMSJ5MV63VB
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: eu-west-2
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v2
@@ -84,8 +81,9 @@ jobs:
           path: artifacts/prod/aarch64-unknown-linux-musl/release
 
       - shell: bash
+        name: package artifacts for release
         run: |
-          make clean-deploy
+          make deploy-directories
           make safe_network-package-version-artifacts-for-release
           make sn_cli-package-version-artifacts-for-release
 
@@ -126,179 +124,38 @@ jobs:
           prerelease: false
           body_path: release_description.md
 
-      #
-      # sn_node assets
-      #
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-unknown-linux-musl.zip
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-unknown-linux-musl.zip
-          asset_content_type: application/zip
+      # There's an action you can use for uploading an asset to a release, but because there are so
+      # many assets, using the 'gh' CLI is much more concise. The 'gh' tool should be on an Actions
+      # build agent by default.
+      - name: upload artifacts as assets
+        shell: bash
+        run: |
+          (
+            cd deploy/prod/sn_node
+            ls | xargs gh release upload ${{ steps.versioning.outputs.gh_release_tag_name }}
+          )
+          (
+            cd deploy/prod/safe
+            ls | xargs gh release upload ${{ steps.versioning.outputs.gh_release_tag_name }}
+          )
 
-      - uses: actions/upload-release-asset@v1.0.1
+      - uses: shallwefootball/s3-upload-action@master
+        name: upload sn_node artifacts to s3
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-pc-windows-msvc.zip
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-pc-windows-msvc.zip
-          asset_content_type: application/zip
+          aws_key_id: AKIAVVODCRMSJ5MV63VB
+          aws_secret_access_key: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
+          aws_bucket: sn-node
+          source_dir: deploy/prod/sn_node
+          destination_dir: ''
 
-      - uses: actions/upload-release-asset@v1.0.1
+      - uses: shallwefootball/s3-upload-action@master
+        name: upload safe artifacts to s3
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-apple-darwin.zip
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-apple-darwin.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-arm-unknown-linux-musleabi.zip
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-arm-unknown-linux-musleabi.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-armv7-unknown-linux-musleabihf.zip
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-armv7-unknown-linux-musleabihf.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-aarch64-unknown-linux-musl.zip
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-aarch64-unknown-linux-musl.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-unknown-linux-musl.tar.gz
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-unknown-linux-musl.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-pc-windows-msvc.tar.gz
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-pc-windows-msvc.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-apple-darwin.tar.gz
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-x86_64-apple-darwin.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-arm-unknown-linux-musleabi.tar.gz
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-arm-unknown-linux-musleabi.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-armv7-unknown-linux-musleabihf.tar.gz
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-armv7-unknown-linux-musleabihf.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.sn_version }}-aarch64-unknown-linux-musl.tar.gz
-          asset_name: sn_node-${{ steps.versioning.outputs.sn_version }}-aarch64-unknown-linux-musl.tar.gz
-          asset_content_type: application/zip
-
-      #
-      # safe assets
-      #
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-unknown-linux-musl.zip
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-unknown-linux-musl.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-pc-windows-msvc.zip
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-pc-windows-msvc.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-apple-darwin.zip
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-apple-darwin.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-arm-unknown-linux-musleabi.zip
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-arm-unknown-linux-musleabi.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-armv7-unknown-linux-musleabihf.zip
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-armv7-unknown-linux-musleabihf.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-aarch64-unknown-linux-musl.zip
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-aarch64-unknown-linux-musl.zip
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-unknown-linux-musl.tar.gz
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-unknown-linux-musl.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-pc-windows-msvc.tar.gz
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-pc-windows-msvc.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-apple-darwin.tar.gz
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-x86_64-apple-darwin.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-arm-unknown-linux-musleabi.tar.gz
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-arm-unknown-linux-musleabi.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-armv7-unknown-linux-musleabihf.tar.gz
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-armv7-unknown-linux-musleabihf.tar.gz
-          asset_content_type: application/zip
-
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-aarch64-unknown-linux-musl.tar.gz
-          asset_name: sn_cli-${{ steps.versioning.outputs.sn_cli_version }}-aarch64-unknown-linux-musl.tar.gz
-          asset_content_type: application/zip
+          aws_key_id: AKIAVVODCRMSJ5MV63VB
+          aws_secret_access_key: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
+          aws_bucket: sn-cli
+          source_dir: deploy/prod/safe
+          destination_dir: ''
 
   # At first glance, it seems like it would be possible to check the commit message in the `if` condition
   # for the presence of the crate name, by using `contains`. However, this doesn't work, so the commit
