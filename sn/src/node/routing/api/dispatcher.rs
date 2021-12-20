@@ -92,27 +92,32 @@ impl Dispatcher {
     /// It should only be used after checking that no permits are held by a root cmd eg
     async fn wait_for_priority_commands_to_finish(
         &self,
-        _semaphore: Arc<Semaphore>,
-        _count: usize,
+        semaphore: Arc<Semaphore>,
+        count: usize,
     ) -> Result<()> {
+        if !cfg!(feature = "unstable-command-prioritisation") {
+            // then we don't wait.
+            return Ok(());
+        }
+
         // there's probably a neater way to do this
-        // debug!("available, permits {:?}", semaphore.available_permits());
+        debug!("available, permits {:?}", semaphore.available_permits());
 
-        // let mut loop_count = 0;
-        // while semaphore.available_permits() != count {
-        //     loop_count += 1;
+        let mut loop_count = 0;
+        while semaphore.available_permits() != count {
+            loop_count += 1;
 
-        //     if loop_count > 500 {
-        //         return Err(Error::CouldNotGetPermitInTime);
-        //     }
+            if loop_count > 500 {
+                return Err(Error::CouldNotGetPermitInTime);
+            }
 
-        //     time::sleep(Duration::from_millis(500)).await;
-        //     trace!(
-        //         "looping while we wait for available permits to be {:?}: {:?}",
-        //         count,
-        //         semaphore.available_permits()
-        //     );
-        // }
+            time::sleep(Duration::from_millis(500)).await;
+            trace!(
+                "looping while we wait for available permits to be {:?}: {:?}",
+                count,
+                semaphore.available_permits()
+            );
+        }
 
         Ok(())
     }
@@ -349,10 +354,9 @@ impl Dispatcher {
         let _ = tokio::spawn(async {
             let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
 
-            if cfg!(feature = "unstable-command-prioritisation") {
-                self.acquire_permit_or_wait(command.priority()?, cmd_id.clone())
-                    .await?;
-            }
+            self.acquire_permit_or_wait(command.priority()?, cmd_id.clone())
+                .await?;
+
             self.handle_command_and_any_offshoots(command, cmd_id).await
         });
         Ok(())

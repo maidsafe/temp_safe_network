@@ -43,7 +43,7 @@ jobs:
 
       - name: Build sn bins
         # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=test-utils,always-joinable,unstable-command-prioritisation --bins
+        run: cargo build -p safe_network --release --features=test-utils,always-joinable --bins
         timeout-minutes: 60
 
 
