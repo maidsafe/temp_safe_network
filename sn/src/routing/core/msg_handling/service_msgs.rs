@@ -261,12 +261,15 @@ impl Core {
             origin
         } else {
             warn!(
-                "Dropping chunk query response from {}. We might have already responded to them or \
-                have not registered this requester: {}",
+                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or \
+                have not registered the client: {}",
                 sending_nodes_pk, user.0
             );
             return Ok(commands);
         };
+
+        // Clear expired queries from the cache.
+        self.pending_chunk_queries.remove_expired().await;
 
         // FIXME: define which signature/authority this message should really carry,
         // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
