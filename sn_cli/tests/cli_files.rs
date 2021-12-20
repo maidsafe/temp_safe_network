@@ -71,7 +71,7 @@ fn calling_safe_files_put_dry_run() -> Result<()> {
         Some(0),
     )?;
 
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
+    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &map[TEST_FILE_RANDOM_CONTENT].1])
         .assert()
@@ -221,7 +221,7 @@ fn calling_safe_files_sync() -> Result<()> {
         [
             "files",
             "put",
-            tmp_data_dir.path().to_str().unwrap(),
+            &tmp_data_dir.path().display().to_string(),
             "--recursive",
         ],
         Some(0),
@@ -241,7 +241,7 @@ fn calling_safe_files_sync() -> Result<()> {
         [
             "files",
             "sync",
-            &format!("{}/", subfolder_dir.path().to_str().unwrap()),
+            &format!("{}/", subfolder_dir.path().display()),
             &url.to_string(),
             "--recursive",
         ],
@@ -264,7 +264,7 @@ fn calling_safe_files_sync() -> Result<()> {
 #[ignore = "dry-run issue"]
 fn calling_safe_files_sync_dry_run() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FOLDER, "--json"], Some(0))?;
-    let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
+    let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
     let mut target = safeurl_from(&container_xorurl)?;
     target.set_content_version(None);
 
@@ -281,7 +281,7 @@ fn calling_safe_files_sync_dry_run() -> Result<()> {
         ],
         Some(0),
     )?;
-    let (_, map) = parse_files_put_or_sync_output(&sync_content);
+    let (_, map) = parse_files_put_or_sync_output(&sync_content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["cat", &map[TEST_FILE_RANDOM_CONTENT].1])
         .assert()
@@ -298,7 +298,7 @@ fn calling_safe_files_removed_sync() -> Result<()> {
     )?;
     let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(|e| eyre!(e.to_string()))?;
     let (files_container_xor, processed_files) =
-        parse_files_put_or_sync_output(&files_container_output);
+        parse_files_put_or_sync_output(&files_container_output)?;
     assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
     // let's first try with --dry-run and they should not be removed
@@ -322,12 +322,12 @@ fn calling_safe_files_removed_sync() -> Result<()> {
         "uuxdihpgutnitqsniozdgfimosfmylfmnqsbvnuozwkgxiirwwyph",
     )?));
     let files_container_v1 = safeurl.to_string();
-    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output_dry_run);
+    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output_dry_run)?;
     assert_eq!(target, files_container_v1);
     assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
     let synced_file_cat = safe_cmd_stdout(["cat", &files_container_xor, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&synced_file_cat);
+    let (xorurl, files_map) = parse_files_container_output(&synced_file_cat)?;
     assert_eq!(xorurl, files_container_xor);
     assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
 
@@ -348,14 +348,14 @@ fn calling_safe_files_removed_sync() -> Result<()> {
     // cleanup
     std::fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| eyre!(e.to_string()))?;
 
-    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
+    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output)?;
     assert_eq!(target, files_container_v1);
     assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
     // now all file items should be gone
     safeurl.set_content_version(None);
     let synced_file_cat = safe_cmd_stdout(["cat", &files_container_xor, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&synced_file_cat);
+    let (xorurl, files_map) = parse_files_container_output(&synced_file_cat)?;
     assert_eq!(xorurl, safeurl.to_string());
     assert_eq!(files_map.len(), 0);
     Ok(())
@@ -381,7 +381,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -
         [
             "files",
             "sync",
-            &format!("{}/", tmp_data_dir.path().to_str().unwrap()),
+            &format!("{}/", tmp_data_dir.path().display()),
             &url.to_string(),
             "--recursive",
         ],
@@ -407,7 +407,9 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
         upload_path(&tmp_data_dir, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
-    let version = url.content_version().unwrap();
+    let version = url
+        .content_version()
+        .ok_or_else(|| eyre!("failed to get content version from xorurl"))?;
     let orig_directory_file_count = get_directory_file_count(&tmp_data_dir)?;
     assert_eq!(processed_files.len(), orig_directory_file_count);
 
@@ -418,7 +420,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
         [
             "files",
             "sync",
-            empty_dir.path().to_str().unwrap(),
+            &empty_dir.path().display().to_string(),
             &url.to_string(),
             "--recursive",
             "--delete",
@@ -426,7 +428,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
         ],
         Some(0),
     )?;
-    let (files_container_xor, processed_files) = parse_files_put_or_sync_output(&output);
+    let (files_container_xor, processed_files) = parse_files_put_or_sync_output(&output)?;
     assert_eq!(
         processed_files.len(),
         get_directory_file_count(&tmp_data_dir)?
@@ -434,14 +436,14 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
 
     // Now the new version of the FilesContainer will only contain the empty folder.
     let output = safe_cmd_stdout(["cat", &files_container_xor, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&output);
+    let (xorurl, files_map) = parse_files_container_output(&output)?;
     assert_eq!(xorurl, files_container_xor);
     assert_eq!(files_map.len(), 1);
 
     // First version of the FilesContainer should still have the original files.
     url.set_content_version(Some(version));
     let output = safe_cmd_stdout(["cat", &url.to_string(), "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&output);
+    let (xorurl, files_map) = parse_files_container_output(&output)?;
     assert_eq!(xorurl, url.to_string());
     assert_eq!(files_map.len(), orig_directory_file_count);
     Ok(())
@@ -473,8 +475,10 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         ],
         Some(0),
     )?;
-    let (nrs_xorurl, _files_map) = parse_nrs_register_output(&output);
-    let nrs_version = nrs_xorurl.content_version().unwrap();
+    let (nrs_xorurl, _files_map) = parse_nrs_register_output(&output)?;
+    let nrs_version = nrs_xorurl
+        .content_version()
+        .ok_or_else(|| eyre!("failed to get content version from xorurl"))?;
 
     let empty_dir = tmp_data_dir.child("emptyfolder2");
     empty_dir.create_dir_all()?;
@@ -482,7 +486,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         [
             "files",
             "sync",
-            empty_dir.path().to_str().unwrap(),
+            &empty_dir.path().display().to_string(),
             &nrsurl,
             "--recursive",
             "--delete",
@@ -492,7 +496,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         Some(0),
     )?;
 
-    let (target, processed_files) = parse_files_put_or_sync_output(&output);
+    let (target, processed_files) = parse_files_put_or_sync_output(&output)?;
     assert_eq!(target, nrsurl);
     assert_eq!(
         processed_files.len(),
@@ -501,7 +505,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
 
     // With the use of --update-nrs, now there will only be the `emptyfolder2` entry.
     let output = safe_cmd_stdout(["cat", &nrsurl, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&output);
+    let (xorurl, files_map) = parse_files_container_output(&output)?;
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), 1);
 
@@ -509,7 +513,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
     //// where all files should still be there
     let versioned_nrsurl = format!("{}?v={}", nrsurl, nrs_version.to_string());
     let output = safe_cmd_stdout(["cat", &versioned_nrsurl, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&output);
+    let (xorurl, files_map) = parse_files_container_output(&output)?;
     assert_eq!(xorurl, versioned_nrsurl);
     assert_eq!(files_map.len(), 12);
     Ok(())
@@ -545,7 +549,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
         [
             "files",
             "sync",
-            empty_dir.path().to_str().unwrap(),
+            &empty_dir.path().display().to_string(),
             &nrsurl,
             "--recursive",
             "--delete",
@@ -558,13 +562,13 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
     let output = safe_cmd_stdout(["cat", &url.to_string(), "--json"], Some(0))?;
-    let (_, files_map) = parse_files_container_output(&output);
+    let (_, files_map) = parse_files_container_output(&output)?;
     assert_eq!(files_map.len(), 1);
 
     // but the NRS name should still link to version 0 of the FilesContainer
     // where all files should still be there
     let output = safe_cmd_stdout(["cat", &nrsurl, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&output);
+    let (xorurl, files_map) = parse_files_container_output(&output)?;
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), orig_directory_file_count);
     Ok(())
@@ -578,7 +582,7 @@ fn calling_safe_files_add() -> Result<()> {
     )?;
 
     let (files_container_xor, _processed_files) =
-        parse_files_put_or_sync_output(&files_container_output);
+        parse_files_put_or_sync_output(&files_container_output)?;
 
     let mut safeurl = safeurl_from(&files_container_xor)?;
     safeurl.set_content_version(None);
@@ -605,7 +609,7 @@ fn calling_safe_files_add_dry_run() -> Result<(), Report> {
         ["files", "put", TEST_FOLDER, "--recursive", "--json"],
         Some(0),
     )?;
-    let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container_output);
+    let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container_output)?;
     let mut safeurl = safeurl_from(&files_container_xor)?;
     safeurl.set_content_version(None);
     safe_cmd(
@@ -635,7 +639,7 @@ fn calling_safe_files_add_a_url() -> Result<()> {
     )?;
 
     let (files_container_xor, processed_files) =
-        parse_files_put_or_sync_output(&files_container_output);
+        parse_files_put_or_sync_output(&files_container_output)?;
 
     let mut safeurl = safeurl_from(&files_container_xor)?;
     safeurl.set_content_version(None);
@@ -664,7 +668,7 @@ fn calling_files_ls() -> Result<()> {
         Some(0),
     )?;
     let (files_container_xor, processed_files) =
-        parse_files_put_or_sync_output(&files_container_output);
+        parse_files_put_or_sync_output(&files_container_output)?;
 
     let mut safeurl = safeurl_from(&files_container_xor)?;
     safeurl.set_content_version(None);
@@ -688,7 +692,7 @@ fn calling_files_ls() -> Result<()> {
     // 27    2020-05-20T19:55:26Z  2020-05-20T19:55:26Z  subfolder/
     // 12    2020-05-20T19:55:26Z  2020-05-20T19:55:26Z  test.md
 
-    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    let (xorurl, files_map) = parse_files_container_output(&files_ls_output)?;
     assert_eq!(xorurl, container_xorurl_no_version);
     assert_eq!(files_map.len(), 8);
     assert_eq!(
@@ -716,7 +720,7 @@ fn calling_files_ls() -> Result<()> {
 
     // now listing subfolder should show less files
     let files_ls_output = safe_cmd_stdout(["files", "ls", &subfolder_path, "--json"], Some(0))?;
-    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    let (xorurl, files_map) = parse_files_container_output(&files_ls_output)?;
     assert_eq!(xorurl, subfolder_path);
     assert_eq!(files_map.len(), 2);
     assert_eq!(
@@ -773,7 +777,7 @@ fn calling_files_ls_on_single_file() -> Result<()> {
 
     let files_ls_output = safe_cmd_stdout(["files", "ls", &single_file_url, "--json"], Some(0))?;
 
-    let (_xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    let (_xorurl, files_map) = parse_files_container_output(&files_ls_output)?;
     let subexists_len = get_file_len(&format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
     assert_eq!(files_map.len(), 1);
     assert_eq!(files_map["subexists.md"]["size"], subexists_len.to_string());
@@ -813,7 +817,7 @@ fn calling_files_ls_on_nrs_with_path() -> Result<()> {
         ["files", "ls", &format!("{}/subfolder", nrsurl), "--json"],
         Some(0),
     )?;
-    let (_xorurl, files_map) = parse_files_container_output(&output);
+    let (_xorurl, files_map) = parse_files_container_output(&output)?;
     let sub2_len: u64 = files_map["sub2.md"]["size"].parse()?;
     assert_eq!(files_map.len(), 2); // 2 files in the subfolder
     assert_eq!(sub2_len, sub2_file.metadata()?.len());
@@ -857,7 +861,7 @@ fn calling_files_ls_with_symlinks() -> Result<()> {
     // 34    2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  sub/
     // 10    2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  sub2/
 
-    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    let (xorurl, files_map) = parse_files_container_output(&files_ls_output)?;
     assert_eq!(xorurl, files_container_xor);
     assert_eq!(files_map.len(), 12);
     assert!(files_map.contains_key("absolute_links.txt"));
@@ -889,9 +893,15 @@ fn calling_files_tree() -> Result<()> {
         Some(0),
     )?;
 
-    let root = parse_files_tree_output(&files_tree_output);
+    let root = parse_files_tree_output(&files_tree_output)?;
     assert_eq!(root["name"], container_xorurl_no_version);
-    assert_eq!(root["sub"].as_array().unwrap().len(), 8);
+    assert_eq!(
+        root["sub"]
+            .as_array()
+            .ok_or_else(|| eyre!("failed to read 'sub' array from files tree output"))?
+            .len(),
+        8
+    );
     assert_eq!(root["sub"][0]["name"], ".hidden.txt");
     assert_eq!(root["sub"][1]["name"], ".subhidden");
     assert_eq!(root["sub"][1]["sub"][0]["name"], "test.md");
@@ -940,9 +950,15 @@ fn calling_files_tree() -> Result<()> {
         Some(0),
     )?;
 
-    let root = parse_files_tree_output(&files_tree_output);
+    let root = parse_files_tree_output(&files_tree_output)?;
     assert_eq!(root["name"], container_xorurl_no_version);
-    assert_eq!(root["sub"].as_array().unwrap().len(), 8);
+    assert_eq!(
+        root["sub"]
+            .as_array()
+            .ok_or_else(|| eyre!("failed to read 'sub' array from files tree output"))?
+            .len(),
+        8
+    );
     assert_eq!(root["sub"][0]["name"], ".hidden.txt");
     assert_eq!(root["sub"][0]["details"]["type"], "text/plain");
     assert_eq!(root["sub"][1]["name"], ".subhidden");

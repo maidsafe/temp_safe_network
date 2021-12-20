@@ -33,7 +33,10 @@ fn node_install_should_install_the_latest_version() -> Result<()> {
         .arg("install")
         .assert()
         .success()
-        .stdout(predicate::str::is_match(format!("Found release:.*{}", latest_version)).unwrap());
+        .stdout(predicate::str::is_match(format!(
+            "Found release:.*{}",
+            latest_version
+        ))?);
     node_bin_path.assert(predicate::path::is_file());
     Ok(())
 }
@@ -54,7 +57,10 @@ fn node_install_should_install_a_specific_version() -> Result<()> {
         .arg(&version)
         .assert()
         .success()
-        .stdout(predicate::str::is_match(format!("Found release:.*{}", version)).unwrap());
+        .stdout(predicate::str::is_match(format!(
+            "Found release:.*{}",
+            version
+        ))?);
     node_bin_path.assert(predicate::path::is_file());
     Ok(())
 }
@@ -72,12 +78,15 @@ fn node_install_should_install_to_a_specific_location() -> Result<()> {
     cmd.arg("node")
         .arg("install")
         .arg("--node-path")
-        .arg(node_dir_path.path().as_os_str().to_str().unwrap())
+        .arg(&node_dir_path.path().display().to_string())
         .arg("--version")
         .arg(&version)
         .assert()
         .success()
-        .stdout(predicate::str::is_match(format!("Found release:.*{}", version)).unwrap());
+        .stdout(predicate::str::is_match(format!(
+            "Found release:.*{}",
+            version
+        ))?);
     node_bin_path.assert(predicate::path::is_file());
     Ok(())
 }

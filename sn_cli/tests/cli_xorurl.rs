@@ -50,7 +50,7 @@ fn calling_safe_xorurl_decode() -> Result<()> {
         .read()
         .map_err(|e| eyre!(e.to_string()))?;
 
-    let xorurls = parse_xorurl_output(&content);
+    let xorurls = parse_xorurl_output(&content)?;
     let file_xorurl = &xorurls[0].1;
     let safeurl = safeurl_from(file_xorurl)?;
 

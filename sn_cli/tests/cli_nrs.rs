@@ -9,7 +9,7 @@
 
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::SafeUrl;
 use sn_cmd_test_utilities::util::{get_random_nrs_string, safe_cmd, upload_path};
@@ -69,7 +69,10 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (_files_container_xor, processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
-    let test_md_entry = processed_files.iter().last().unwrap();
+    let test_md_entry = processed_files
+        .iter()
+        .last()
+        .ok_or_else(|| eyre!("list of processed files unexpectedly empty"))?;
     let test_md_blob_link = test_md_entry.1.to_owned().1;
     let url = SafeUrl::from_url(&test_md_blob_link)?;
     println!("processed_files = {:?}", processed_files);
@@ -208,7 +211,10 @@ fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
     let (_, processed_files, _) = upload_path(&test_md_file, false)?;
-    let test_md_entry = processed_files.iter().last().unwrap();
+    let test_md_entry = processed_files
+        .iter()
+        .last()
+        .ok_or_else(|| eyre!("list of processed files unexpectedly empty"))?;
     let test_md_blob_link = test_md_entry.1.to_owned().1;
     let url = SafeUrl::from_url(&test_md_blob_link)?;
 
