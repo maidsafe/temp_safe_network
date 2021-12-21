@@ -33,10 +33,9 @@ fn node_install_should_install_the_latest_version() -> Result<()> {
         .arg("install")
         .assert()
         .success()
-        .stdout(predicate::str::is_match(format!(
-            "Found release:.*{}",
-            latest_version
-        ))?);
+        .stdout(
+            predicate::str::is_match(format!("Downloading sn_node version:.*{}", latest_version))?
+        );
     node_bin_path.assert(predicate::path::is_file());
     Ok(())
 }
@@ -47,7 +46,7 @@ fn node_install_should_install_a_specific_version() -> Result<()> {
     let safe_dir = temp_dir.child(".safe");
     safe_dir.create_dir_all()?;
     let node_bin_path = safe_dir.child(format!("node/{}", SN_NODE_BIN_NAME));
-    let version = "0.49.0";
+    let version = "0.51.6";
 
     let mut cmd = Command::cargo_bin("safe")?;
     cmd.env("SN_CLI_CONFIG_PATH", safe_dir.path())
@@ -57,10 +56,9 @@ fn node_install_should_install_a_specific_version() -> Result<()> {
         .arg(&version)
         .assert()
         .success()
-        .stdout(predicate::str::is_match(format!(
-            "Found release:.*{}",
-            version
-        ))?);
+        .stdout(
+            predicate::str::is_match(format!("Downloading sn_node version:.*{}", version))?
+        );
     node_bin_path.assert(predicate::path::is_file());
     Ok(())
 }
@@ -72,7 +70,7 @@ fn node_install_should_install_to_a_specific_location() -> Result<()> {
     safe_dir.create_dir_all()?;
     let node_dir_path = safe_dir.child("node");
     let node_bin_path = node_dir_path.child(SN_NODE_BIN_NAME);
-    let version = "0.49.0";
+    let version = "0.51.6";
 
     let mut cmd = Command::cargo_bin("safe")?;
     cmd.arg("node")
@@ -83,10 +81,9 @@ fn node_install_should_install_to_a_specific_location() -> Result<()> {
         .arg(&version)
         .assert()
         .success()
-        .stdout(predicate::str::is_match(format!(
-            "Found release:.*{}",
-            version
-        ))?);
+        .stdout(
+            predicate::str::is_match(format!("Downloading sn_node version:.*{}", version))?
+        );
     node_bin_path.assert(predicate::path::is_file());
     Ok(())
 }
