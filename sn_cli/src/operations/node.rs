@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::download_and_install_github_release_asset;
+use super::helpers::download_and_install_node;
 use crate::operations::config::NetworkLauncher;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use sn_api::NodeConfig;
@@ -73,12 +73,8 @@ pub fn node_install(
     } else {
         node_config_dir_path
     };
-    let _ = download_and_install_github_release_asset(
-        target_dir_path,
-        SN_NODE_EXECUTABLE,
-        "safe_network",
-        version,
-    )?;
+    let _ =
+        download_and_install_node(target_dir_path, SN_NODE_EXECUTABLE, "safe_network", version)?;
     Ok(())
 }
 

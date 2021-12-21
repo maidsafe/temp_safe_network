@@ -15,9 +15,18 @@ use std::{
     path::PathBuf,
 };
 
-const BASE_DOWNLOAD_URL: &str = "https://github.com/maidsafe/safe_network/releases/download";
+const BASE_DOWNLOAD_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
 
-pub fn download_and_install_github_release_asset(
+/// Downloads and installs either the latest sn_node binary or a specific version.
+///
+/// The self update crate is used to query the Github API to find the latest version number.
+/// After we have the version (or if it was optionally supplied by the user), we download the
+/// compressed tar archive from S3 and extract it. We just do this by convention, based on the
+/// version number and the current target platform.
+///
+/// It happens to be the case that the self update crate also provides some generic functions for
+/// downloading and extracting archives from any source, so we use that code here.
+pub fn download_and_install_node(
     target_path: PathBuf,
     exec_file_name: &str,
     repo_name: &str,
@@ -35,20 +44,15 @@ pub fn download_and_install_github_release_asset(
             "Error fetching list of releases for maidsafe/{} repository",
             repo_name
         ))?;
-    let release;
-    if let Some(version) = version {
-        release = updater
-            .get_release_version(format!("safe_network-v{}", version).as_str())
-            .wrap_err(format!(
-                "The maidsafe/{} repository has no release at version {}",
-                repo_name, version
-            ))?;
+    let version = if let Some(version) = version {
+        version
     } else {
-        release = updater
+        let release = updater
             .get_latest_release()
-            .wrap_err("Failed to find a release available to install")?;
-    }
-    download_and_install_bin(target_path, &target, release, exec_file_name)
+            .wrap_err("Failed to obtain the latest release from Github")?;
+        get_version_from_release_version(&release.version)?
+    };
+    download_and_install_bin(target_path, &target, &version, exec_file_name)
 }
 
 // Private helpers
@@ -67,19 +71,13 @@ fn get_target() -> String {
 fn download_and_install_bin(
     target_path: PathBuf,
     target: &str,
-    release: self_update::update::Release,
+    version: &str,
     exec_file_name: &str,
 ) -> Result<String> {
-    let version = get_version_from_release_version(&release.version)?;
-    println!("Found release: {} {}", release.name, version);
-    let asset = release.asset_for(target).ok_or_else(|| {
-        eyre!(
-            "No asset found in latest release for the target platform {}",
-            target
-        )
-    })?;
+    println!("Downloading sn_node version: {}", version);
     let tmp_dir = std::env::temp_dir();
-    let tmp_tarball_path = tmp_dir.join(&asset.name);
+    let archive_file_name = format!("sn_node-{}-{}.tar.gz", version, target);
+    let tmp_tarball_path = tmp_dir.join(&archive_file_name);
     let tmp_tarball = File::create(&tmp_tarball_path).wrap_err_with(|| {
         format!(
             "Error creating temp file ('{}') for downloading the release",
@@ -87,12 +85,12 @@ fn download_and_install_bin(
         )
     })?;
 
-    let download_url = get_download_url(&version);
+    let download_url = format!("{}/{}", BASE_DOWNLOAD_URL, archive_file_name);
     println!("Downloading {}...", download_url);
     self_update::Download::from_url(&download_url)
         .show_progress(true)
         .download_to(&tmp_tarball)
-        .wrap_err_with(|| format!("Error downloading release asset '{}'", asset.download_url))?;
+        .wrap_err_with(|| format!("Error downloading release from '{}'", download_url))?;
 
     if !target_path.exists() {
         println!("Creating '{}' folder", target_path.display());
@@ -168,12 +166,12 @@ fn set_exec_perms(file_path: PathBuf) -> Result<()> {
 
 /// Gets the version number from the full version number string.
 ///
-/// The `release_version` input is in the form "safe_network-v0.49.1". This function will return
-/// the "v0.49.1" part.
+/// The `release_version` input is in the form "0.51.6-0.46.2-0.39.1", which is the safe_network,
+/// sn_api, sn_cli versions, respectively. This function will return the safe_network part.
 fn get_version_from_release_version(release_version: &str) -> Result<String> {
     let mut parts = release_version.split('-');
     let version = parts
-        .next_back()
+        .next()
         .ok_or_else(|| {
             eyre!(format!(
                 "Could not parse version number from {}",
@@ -182,14 +180,4 @@ fn get_version_from_release_version(release_version: &str) -> Result<String> {
         })?
         .to_string();
     Ok(version)
-}
-
-fn get_download_url(version: &str) -> String {
-    let version_sans_v = &version[1..];
-    let target = get_target();
-    let url = format!(
-        "{}/safe_network-{}/sn_node-{}-{}.tar.gz",
-        BASE_DOWNLOAD_URL, version, version_sans_v, target
-    );
-    url
 }

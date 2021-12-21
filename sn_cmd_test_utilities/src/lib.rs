@@ -440,7 +440,7 @@ pub mod util {
     fn get_version_from_release_version(release_version: &str) -> Result<String> {
         let mut parts = release_version.split('-');
         let version = parts
-            .next_back()
+            .next()
             .ok_or_else(|| {
                 eyre!(format!(
                     "Could not parse version number from {}",
