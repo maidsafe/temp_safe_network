@@ -81,7 +81,9 @@ safe_network-build-artifacts-for-deploy:
 		rm safe_network-$$arch.zip; \
 	done
 
-deploy-directories:
+prepare-deploy:
+	find artifacts/ -name safe -exec chmod +x '{}' \;
+	find artifacts/ -name sn_node -exec chmod +x '{}' \;
 	rm -f *.zip *.tar.gz
 	rm -rf ${DEPLOY_PATH}
 	mkdir -p ${DEPLOY_PROD_PATH}/safe
