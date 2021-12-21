@@ -14,7 +14,7 @@ sn_cli_install_dir() {
   fi
 }
 
-get_download_url() {
+get_download_url_for_latest_version() {
   local platform="$1"
   local download_url=$(curl -s "https://api.github.com/repos/maidsafe/safe_network/releases/latest" \
     | grep "sn_cli.*-$platform.tar.gz" \
@@ -26,7 +26,6 @@ get_download_url() {
 
 sn_cli_download() {
   if cmd_has "curl"; then
-    echo "in here"
     curl -L --compressed -q "$@"
   elif cmd_has "wget"; then
     # Emulate curl with wget
@@ -127,8 +126,13 @@ sn_cli_install() {
       exit 1
   esac
 
-  cli_package_url=$(get_download_url "$arch-$platform")
-  archive_file_name=$(awk -F '/' '{ print $9 }' <<< $cli_package_url)
+  if [ -z $safe_version ]; then
+    cli_package_url=$(get_download_url_for_latest_version "$arch-$platform")
+    archive_file_name=$(awk -F '/' '{ print $9 }' <<< $cli_package_url)
+  else
+    cli_package_url="https://sn-cli.s3.eu-west-2.amazonaws.com/sn_cli-$safe_version-$arch-$platform.tar.gz"
+    archive_file_name=$(awk -F '/' '{ print $3 }' <<< $cli_package_url)
+  fi
   tmp_dir=$(mktemp -d)
   tmp_archive_path=$tmp_dir/$archive_file_name
 
@@ -196,6 +200,37 @@ sn_cli_reset() {
     cmd_has sn_cli_detect_profile \
     sn_cli_profile_is_bash_or_zsh sn_cli_install
 }
+
+usage() {
+    printf "Usage: $0 [-v=<version> or --version=<version>]\n\n"
+    printf "To install a specific version of safe, you can optionally supply a version number.\n"
+    printf "You should supply it without the 'v' prefix.\n\n"
+    printf "Example: ./install.sh --version=0.33.0\n\n"
+    printf "If no version number is supplied, the latest version will be installed.\n"
+    exit 1
+}
+
+# It would have been nice to wrap the argument parsing in a little function, but
+# unfortunately it seems to be the case that you can't consume "$@" inside a
+# function.
+
+# The reason for doing this manually and not using getopts or getopt, is because
+# macOS doesn't have a getopts install and the version of getopt it has by
+# default is not the GNU one, so the behaviour will be different on macOS and
+# Linux. For that reason, we just parse them 'manually'.
+safe_version=""
+for arg in "$@"; do
+    case $arg in
+        -v=*|--version=*)
+            safe_version="${arg#*=}"
+            shift
+            ;;
+        *)
+            printf "The %s argument is not supported\n\n" "$arg"
+            usage
+            ;;
+    esac
+done
 
 sn_cli_install
 
