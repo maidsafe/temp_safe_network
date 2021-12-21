@@ -83,7 +83,7 @@ jobs:
       - shell: bash
         name: package artifacts for release
         run: |
-          make deploy-directories
+          make prepare-deploy
           make safe_network-package-version-artifacts-for-release
           make sn_cli-package-version-artifacts-for-release
 
