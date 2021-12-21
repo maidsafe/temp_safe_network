@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.39.2 (2021-12-21)
+
+This is a manually generated changelog, as `smart-release` seemed to have some issue detecting a change in the `sn_cli` crate.
+
+* refactor: use s3 as download source for sn_node
+* chore: remove `self-update` feature from `node install`
+
 ## v0.39.1 (2021-12-16)
 
 ### Commit Statistics
