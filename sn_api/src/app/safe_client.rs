@@ -98,20 +98,19 @@ impl SafeAppClient {
     // Blob operations
     //
     pub async fn store_bytes(&self, bytes: Bytes, dry_run: bool) -> Result<XorName> {
-        let xorname = if dry_run {
+        let address = if dry_run {
             debug!(
                 "Calculating network address for {} bytes of data",
                 bytes.len()
             );
-            let address = Client::calculate_address(bytes, Scope::Public)?;
-            *address.name()
+            Client::calculate_address(bytes, Scope::Public)?
         } else {
             debug!("Storing {} bytes of data", bytes.len());
             let client = self.get_safe_client()?;
-            let address = client.upload_and_verify(bytes, Scope::Public).await?;
-            *address.name()
+            client.upload_and_verify(bytes, Scope::Public).await?
         };
-        Ok(xorname)
+
+        Ok(*address.name())
     }
 
     pub async fn get_bytes(&self, address: BytesAddress, range: Range) -> Result<Bytes> {
@@ -148,16 +147,23 @@ impl SafeAppClient {
         tag: u64,
         _permissions: Option<String>,
         private: bool,
+        dry_run: bool,
     ) -> Result<(XorName, RegisterWriteAheadLog)> {
         debug!(
-            "Storing {} Register data with tag type: {}, xorname: {:?}",
+            "Storing {} Register data with tag type: {}, xorname: {:?}, dry_run: {}",
             if private { "Private" } else { "Public" },
             tag,
-            name
+            name,
+            dry_run
         );
 
-        let client = self.get_safe_client()?;
         let xorname = name.unwrap_or_else(rand::random);
+
+        if dry_run {
+            return Ok((xorname, RegisterWriteAheadLog::default()));
+        }
+
+        let client = self.get_safe_client()?;
         info!("Xorname for new Register storage: {:?}", &xorname);
 
         // The Register's owner will be the client's public key

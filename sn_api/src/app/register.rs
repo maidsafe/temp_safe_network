@@ -27,7 +27,7 @@ impl Safe {
     ) -> Result<XorUrl> {
         let (xorname, op_batch) = self
             .safe_client
-            .create_register(name, type_tag, None, private)
+            .create_register(name, type_tag, None, private, dry_run)
             .await?;
 
         let scope = if private {
