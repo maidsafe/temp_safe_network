@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.40.0 (2021-12-22)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 6 calendar days.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_cli-v0.39.2 ([`f6ffbdb`](https://github.com/maidsafe/safe_network/commit/f6ffbdb5d999f84e3531a6dcd9dcdbacefd50d18))
+    - re-introduce version arg for cli install script ([`d201f7e`](https://github.com/maidsafe/safe_network/commit/d201f7e3480a8a12f488e2a54886cca942904a18))
+    - use s3 as download source for sn_node ([`dffcd4e`](https://github.com/maidsafe/safe_network/commit/dffcd4e3dd07f99dd3a4f4330637cab9380db9c3))
+    - remove `self-update` feature from `node install` ([`f59ec2c`](https://github.com/maidsafe/safe_network/commit/f59ec2c6da30b13fc2606d2834fad108a56c3621))
+    - replacing calls to unwrap() and expect(...) with proper Result handling ([`b6f0c3f`](https://github.com/maidsafe/safe_network/commit/b6f0c3f193e8116bcd08126b949eb1a2e9b5aaa5))
+    - re-enable CLI tests in CI ([`8aeca3d`](https://github.com/maidsafe/safe_network/commit/8aeca3dffdf92341d34e1f6856160cff57cf0d6a))
+    - reduce default query timeout for cli ([`7dce30c`](https://github.com/maidsafe/safe_network/commit/7dce30c10262573362e6f60c284a51696de36d01))
+</details>
+
 ## v0.39.2 (2021-12-21)
 
 This is a manually generated changelog, as `smart-release` seemed to have some issue detecting a change in the `sn_cli` crate.
@@ -17,8 +43,8 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -28,6 +54,7 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_cli-0.39.1 ([`943166a`](https://github.com/maidsafe/safe_network/commit/943166ab6d88266909ec6cd8a8e98bbbf21ec18d))
     - sn_api-0.46.2 ([`6df94b1`](https://github.com/maidsafe/safe_network/commit/6df94b1d1fb017c9b02e566ca22a518f885397c8))
 </details>
 
@@ -44,7 +71,6 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
 * The 'self update' feature of the CLI has been disabled for the time being
 * The CLI is now compatible with various API updates that have been made
  - <csr-id-18879590ddfcf125133a6b2b8f3f372e8683be42/> rename Url to SafeUrl
-
 
 ### Commit Statistics
 
@@ -81,10 +107,9 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
     - minor improvement to client log msgs related to configured timeouts ([`58632a2`](https://github.com/maidsafe/safe_network/commit/58632a27d271140fc4d777f25a76b0daea582426))
 </details>
 
-<csr-unknown>
-Please use the --help arguments on the commands for further details as to their usage. The README for the CLI will be updated shortly to contain more details, but in the mean time, we’ve put some more elaborate descriptions directly into each of the commands on the CLI.<csr-unknown/>
-
 ## v0.38.0 (2021-12-08)
+
+<csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/>
 
 ### ⚠ BREAKING CHANGES
 
@@ -102,11 +127,9 @@ This was tested against v0.33.12 of `safe_network`.
 
  - <csr-id-7ffda3021fb36533f22538b1100acfa71b13cd81/> nrs get with versions, nrs_map always returned
 
-
 ### New Features (BREAKING)
 
  - <csr-id-8787f07281e249a344a217d7d5b0e732a7dd7959/> easy to use nrs_add and rigorous nrs_create
-
 
 ### chore (BREAKING)
 
@@ -155,8 +178,6 @@ This was tested against v0.33.12 of `safe_network`.
  - <csr-id-56e076b74747ad4e9f82a7df7e82f1c97e2b4496/> add visual c++ libs to windows requirements
    Testing has shown that without the VS C++ redistribution package installed we get the error `error while loading shared libraries: api-ms-win-crt-locale-l1-1-0.dll: cannot open shared object file: No such file or directory`
  - <csr-id-f5c3106834b6e0033adf19ea631e8d2fc5c2ed1e/> add notes for sn_fs
-
-## [0.37.0](https://github.com/maidsafe/sn_cli/compare/v0.36.0...v0.37.0) (2021-10-05)
 
 ### ⚠ BREAKING CHANGES
 
@@ -270,19 +291,20 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * Remove Use of Fork and Temp Branch ([201271f](https://github.com/maidsafe/sn_cli/commit/201271fd827eda42e933e5e0b66326de7abee876))
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.33.4](https://github.com/maidsafe/sn_cli/compare/v0.33.3...v0.33.4) (2021-07-29)
 
@@ -318,19 +340,20 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * **deploy:** Only Package Binary File ([5e6b281](https://github.com/maidsafe/sn_cli/commit/5e6b281679ee29152588ab9069ba9f30b2f89e8e))
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### ⚠ BREAKING CHANGES
 
@@ -383,37 +406,39 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * update launch tool for new log locations ([4213661](https://github.com/maidsafe/sn_cli/commit/4213661b8ee884433359ccc6d2fc8afc829d5c8e))
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.29.1](https://github.com/maidsafe/sn_cli/compare/v0.29.0...v0.29.1) (2021-06-17)
 
 ### Bug Fixes
+
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
 
 * tie tokio to 1.6 for stability ([2642c3b](https://github.com/maidsafe/sn_cli/commit/2642c3b7c0cd2925639e49cea77adff46636dfc6))
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### ⚠ BREAKING CHANGES
 
@@ -447,19 +472,20 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * **self_update:** switch self_update to run from new sn_cli repo ([d0efea0](https://github.com/maidsafe/sn_cli/commit/d0efea0584c33a880da37d99517af15aaa0c7958))
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.26.3](https://github.com/maidsafe/sn_cli/compare/v0.26.2...v0.26.3) (2021-05-21)
 
@@ -524,6 +550,15 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * ***api*** change stack size to 8mb for Windows builds
 * ***cli*** change stack size to 8mb for Windows builds
 * ***authd*** change stack size to 8mb for Windows builds
@@ -531,18 +566,19 @@ like files with 0 bytes in them any more.
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.23.1](https://github.com/maidsafe/sn_api/compare/v0.23.0...v0.23.1) (2021-04-13)
 
 ### Bug Fixes
+
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
 
 * ***api*** upgrading sn_client to v0.52.10
 * ***cli*** enhance CLI 'networks switch' command message explaining how to restart authd
@@ -550,14 +586,6 @@ like files with 0 bytes in them any more.
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.23.0](https://github.com/maidsafe/sn_api/compare/v0.22.0...v0.23.0) (2021-04-08)
 
@@ -567,19 +595,20 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * ***cli*** node join command was not passing multiple peers addresses correctly to launch tool
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.22.0](https://github.com/maidsafe/sn_api/compare/v0.21.0...v0.22.0) (2021-04-07)
 
@@ -599,20 +628,21 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * ***api*** fix API tests by retrying some operations when network is not fully in sync
 * ***cli*** add instructions to CLI User Guide to install VS C++ redistribution package as Windows requirements
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.20.0](https://github.com/maidsafe/sn_api/compare/v0.19.1...v0.20.0) (2021-03-04)
 
@@ -644,20 +674,21 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * ***cli*** remove short option used for dry run
 * ***cli*** ignore error when listing networks and current network is not set in the system
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.18.0](https://github.com/maidsafe/sn_api/compare/v0.17.2...v0.18.0) (2021-02-04)
 
@@ -680,19 +711,20 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * ***api & authd*** Adds a new error for when Map Entry is not found.
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.17.1](https://github.com/maidsafe/sn_api/compare/v0.17.0...v0.17.1) (2021-01-11)
 
@@ -702,6 +734,15 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * ***api*** keypair API now returns a new randomly create Ed25519 key pair
 * ***api*** support transfers to Ed25519 public keys in addition to using a Wallet or SafeKey URLs
 * ***cli*** fix failing CLI build for MUSL targets
@@ -709,14 +750,6 @@ like files with 0 bytes in them any more.
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.17.0](https://github.com/maidsafe/sn_api/compare/v0.16.0...v0.17.0) (2020-12-23)
 
@@ -726,6 +759,15 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * ***api*** known issue in authorising CLI, as reported in last week's dev update, was solved: https://github.com/maidsafe/sn_api/pull/659
 * ***cli*** fix `$ safe update` command as it was not looking up in the correct URL: https://github.com/maidsafe/sn_api/pull/660
 * ***cli*** install script had an issue for Mac users: https://github.com/maidsafe/sn_api/pull/661
@@ -733,14 +775,6 @@ like files with 0 bytes in them any more.
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.16.0](https://github.com/maidsafe/sn_api/compare/v0.15.0...v0.16.0) (2020-12-17)
 
@@ -768,6 +802,15 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * ***api*** store Blob API was returning the wrong xorname
 * ***api*** keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
 * ***api*** ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
@@ -777,14 +820,6 @@ like files with 0 bytes in them any more.
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### [0.15.0](https://github.com/maidsafe/sn_api/compare/v0.14.0...v0.15.0) (2020-07-16)
 
@@ -804,20 +839,21 @@ like files with 0 bytes in them any more.
 
 ### Bug Fixes
 
+<csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/>
+<csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/>
+<csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/>
+<csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/>
+<csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/>
+<csr-id-8a77fef8c67178000f86c29e964578b99f83562d/>
+<csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/>
+<csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/>
+
 * ***cli*** XOR-URL of a resolved NRS Container was displaying subnames as part of the output of the dog cmd ([bb9b15c](https://github.com/maidsafe/safe-api/commit/bb9b15cbd252ebd23b34253317535315d3d81f74))
 * ***api*** return an error when resolving a URL which contains subnames but targetting content non supporting subnames ([f1a9c60](https://github.com/maidsafe/safe-api/commit/f1a9c600ff05fca1481f13fe51358afe18819d01))
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-acb34489f91a0b327bcf13f68cfa679b41162523/> CLI update command was looking up in the wrong URL
    - Changing the default number of nodes launched by `node run-baby-fleming` command to 11.
- - <csr-id-f2589e047a5ac68834f6d0d3ce49a32a0e7ddab0/> keypair API now returns a new randomly create Ed25519 key pair
- - <csr-id-241692b88a6a078682b17a87b37cfd5bd66764f9/> fix failing CLI build for MUSL targets
- - <csr-id-723b52fba9d536f411dbbb7c62b160dcebde711a/> remove short option used for dry run
- - <csr-id-859f51cf13372bacc3380bbd37c70a66e27e0927/> ignore error when listing networks and current network is not set in the system
- - <csr-id-ca0d9eb5b103bcd591b55c1ddd3ac779d6a1aef7/> node join command was not passing multiple peers addresses correctly to launch tool
- - <csr-id-8a77fef8c67178000f86c29e964578b99f83562d/> remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
- - <csr-id-d91150d8f46003cc0fa7813e4ae907b187379de8/> change node_path arg of 'node bin-path' command to node-path
- - <csr-id-497ab1b68b4053e519740335d8e8d28e07ef30f7/> files get command to query each file with a single query rather than in chunks
 
 ### Commit Statistics
 
@@ -990,7 +1026,7 @@ like files with 0 bytes in them any more.
 </details>
 
 <csr-unknown>
-https://github.com/maidsafe/sn_cli/compare/v0.31.2...v0.32.00.32.0 (2021-07-15)https://github.com/maidsafe/sn_cli/compare/v0.28.1...v0.29.00.29.0 (2021-06-17)<csr-unknown/>
+https://github.com/maidsafe/sn_cli/compare/v0.36.0...v0.37.00.37.0 (2021-10-05) keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks<csr-unknown/>
 
 ## 0.14.0 (2020-06-11)
 

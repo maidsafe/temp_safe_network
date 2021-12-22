@@ -940,7 +940,7 @@ async fn files_map_add_link(
         Err(err) => {
             processed_files.insert(
                 file_link.to_string(),
-                (CONTENT_ERROR_SIGN.to_string(), format!("<{:?}>", err)),
+                (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
             );
             info!("Skipping file \"{}\". {}", file_link, err);
             Ok((processed_files, files_map, success_count))
