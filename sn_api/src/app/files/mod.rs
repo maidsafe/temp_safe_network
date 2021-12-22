@@ -17,15 +17,19 @@ use crate::{
     Safe, SafeUrl, Scope, XorUrl,
 };
 use bytes::{Buf, Bytes};
-use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
+use file_system::{
+    file_system_dir_walk, file_system_single_file, normalise_path_separator, upload_file_to_net,
+};
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
 use safe_network::types::BytesAddress;
-use std::collections::{BTreeMap, HashSet};
-use std::iter::FromIterator;
-use std::str;
-use std::{fs, path::Path};
+use std::{
+    collections::{BTreeMap, HashSet},
+    iter::FromIterator,
+    path::Path,
+    str,
+};
 
 pub(crate) use files_map::{file_map_for_path, get_file_link_and_metadata};
 pub(crate) use metadata::FileMeta;
@@ -89,23 +93,26 @@ impl Safe {
         // Build a Register creation operation
         let (xorname, reg_op) = self
             .safe_client
-            .create_register(None, FILES_CONTAINER_TYPE_TAG, None, false)
+            .create_register(None, FILES_CONTAINER_TYPE_TAG, None, false, dry_run)
             .await?;
 
-        let xorurl = if !dry_run {
+        let xorurl = SafeUrl::encode_register(
+            xorname,
+            FILES_CONTAINER_TYPE_TAG,
+            Scope::Public,
+            ContentType::FilesContainer,
+            self.xorurl_base,
+        )?;
+
+        if dry_run {
+            Ok((xorurl.to_string(), processed_files, files_map))
+        } else {
             // Send the Register creation op to the network
             self.safe_client.apply_register_ops(reg_op).await?;
 
             // Store files map on network
             let files_map_xorurl = self.store_files_map(&files_map).await?;
 
-            let xorurl = SafeUrl::encode_register(
-                xorname,
-                FILES_CONTAINER_TYPE_TAG,
-                Scope::Public,
-                ContentType::FilesContainer,
-                self.xorurl_base,
-            )?;
             let mut reg_url = SafeUrl::from_xorurl(&xorurl)?;
 
             // Write pointer to files_map onto our register
@@ -120,12 +127,9 @@ impl Safe {
 
             // We return versioned xorurl
             reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));
-            reg_url.to_string()
-        } else {
-            "".to_string()
-        };
 
-        Ok((xorurl, processed_files, files_map))
+            Ok((reg_url.to_string(), processed_files, files_map))
+        }
     }
 
     /// # Fetch an existing FilesContainer.
@@ -576,13 +580,14 @@ impl Safe {
             },
         )?;
 
-        // TODO: do we want ownership from other PKs yet?
         let xorname = self.safe_client.store_bytes(bytes.clone(), dry_run).await?;
-        Ok(SafeUrl::encode_bytes(
+        let xorurl = SafeUrl::encode_bytes(
             BytesAddress::Public(xorname),
             content_type,
             self.xorurl_base,
-        )?)
+        )?;
+
+        Ok(xorurl)
     }
 
     /// # Get a Public Blob
@@ -1089,30 +1094,6 @@ fn files_map_remove_path(
     };
 
     Ok((processed_files, new_files_map, success_count))
-}
-
-// Upload a files to the Network as a Public Blob
-async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Result<XorUrl> {
-    let data = fs::read(path).map_err(|err| {
-        Error::InvalidInput(format!("Failed to read file from local location: {}", err))
-    })?;
-    let data = Bytes::from(data);
-
-    let mime_type = mime_guess::from_path(&path);
-    match safe
-        .store_public_bytes(data.to_owned(), mime_type.first_raw(), dry_run)
-        .await
-    {
-        Ok(xorurl) => Ok(xorurl),
-        Err(err) => {
-            // Let's then upload it and set media-type to be simply raw content
-            if let Error::InvalidMediaType(_) = err {
-                safe.store_public_bytes(data, None, dry_run).await
-            } else {
-                Err(err)
-            }
-        }
-    }
 }
 
 // From the provided list of local files paths and corresponding files XOR-URLs,
