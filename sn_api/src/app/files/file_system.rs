@@ -122,7 +122,7 @@ pub(crate) async fn file_system_dir_walk(
                             Err(err) => {
                                 processed_files.insert(
                                     normalised_path.clone(),
-                                    (CONTENT_ERROR_SIGN.to_string(), format!("<{:?}>", err)),
+                                    (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
                                 );
                                 info!("Skipping file \"{}\". {}", normalised_path, err);
                             }
@@ -132,7 +132,7 @@ pub(crate) async fn file_system_dir_walk(
                 Err(err) => {
                     processed_files.insert(
                         normalised_path.clone(),
-                        (CONTENT_ERROR_SIGN.to_string(), format!("<{:?}>", err)),
+                        (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
                     );
                     info!(
                         "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
@@ -190,7 +190,7 @@ pub(crate) async fn file_system_single_file(
             Err(err) => {
                 processed_files.insert(
                     normalised_path.clone(),
-                    (CONTENT_ERROR_SIGN.to_string(), format!("{:?}>", err)),
+                    (CONTENT_ERROR_SIGN.to_string(), format!("{}>", err)),
                 );
                 info!("Skipping file \"{}\". {}", normalised_path, err);
             }

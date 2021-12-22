@@ -43,21 +43,28 @@ pub enum Error {
     /// qp2p's IncomingMessages errores
     #[error("An error was returned from IncomingMessages on one of our connections")]
     IncomingMessages,
-    /// Could not send queries to sufficient elder to retrieve reliable responses.
-    #[error(
-        "Failed to send messages to sufficent elders. A supermajority of responses is unobtainable. {0} were connected to, {1} needed."
-    )]
-    FailedToSendSufficentQuery(usize, usize),
     /// Could not connect to sufficient elder to retrieve reliable responses.
     #[error(
-        "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. {0} were connected to, {1} needed."
+        "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. {connections} were connected to, {required} needed."
     )]
-    InsufficientElderConnections(usize, usize),
+    InsufficientElderConnections {
+        /// Number of existing connections to Elders
+        connections: usize,
+        /// Minimum number of connections to Elders required for the operation
+        required: usize,
+    },
     /// Did not know of sufficient elders in the desired section to get supermajority of repsonses.
     #[error(
-        "Problem finding sufficient elders. A supermajority of responses is unobtainable. {0} were known in this section, {1} needed."
+        "Problem finding sufficient elders. A supermajority of responses is unobtainable. {connections} were known in this section, {required} needed. Section pk: {section_pk:?}"
     )]
-    InsufficientElderKnowledge(usize, usize, PublicKey),
+    InsufficientElderKnowledge {
+        /// Number of existing connections to Elders
+        connections: usize,
+        /// Minimum number of connections to Elders required for the operation
+        required: usize,
+        /// Public key of the target section
+        section_pk: PublicKey,
+    },
     /// Peer connection retrieval failed
     #[error("Error with Peer's connection: {0:?}")]
     PeerConnection(SocketAddr),
@@ -128,11 +135,21 @@ pub enum Error {
     #[error(transparent)]
     Serialisation(#[from] Box<bincode::ErrorKind>),
     /// Could not retrieve all chunks required to decrypt the data. (expected, error)
-    #[error("Not all chunks were retrieved, required {}: {}.)", _0, _1)]
-    NotEnoughChunks(usize, usize),
+    #[error("Not all chunks were retrieved, expected {expected}, retrieved {retrieved}.")]
+    NotEnoughChunksRetrieved {
+        /// Number of Chunks expected to be retrieved
+        expected: usize,
+        /// Number of Chunks retrieved
+        retrieved: usize,
+    },
     /// Could not chunk all the data required to encrypt the data. (Expected, Actual)
-    #[error("Not all data was chunked! Required {}, but we have {}.)", _0, _1)]
-    NotAllDataWasChunked(usize, usize),
+    #[error("Not all data was chunked, expected {expected}, but we have {chunked}.)")]
+    NotAllDataWasChunked {
+        /// Number of Chunks expected to be generated
+        expected: usize,
+        /// Number of Chunks generated
+        chunked: usize,
+    },
 }
 
 impl From<(CmdError, OperationId)> for Error {
