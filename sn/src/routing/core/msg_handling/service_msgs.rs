@@ -257,15 +257,19 @@ impl Core {
             correlation_id,
         };
 
-        let origin = if let Some(origin) = self.pending_chunk_queries.get(&user.0).await {
+        let origin = if let Some(origin) = self.pending_chunk_queries.remove(&user.0).await {
             origin
         } else {
             warn!(
-                "Dropping chunk query response from {} for unknown origin: {}",
+                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or \
+                have not registered the client: {}",
                 sending_nodes_pk, user.0
             );
             return Ok(commands);
         };
+
+        // Clear expired queries from the cache.
+        self.pending_chunk_queries.remove_expired().await;
 
         // FIXME: define which signature/authority this message should really carry,
         // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
@@ -274,6 +278,11 @@ impl Core {
 
         let dst = DstLocation::EndUser(EndUser(origin.name()));
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
+
+        trace!(
+            "Responding with the first chunk query response to {:?}",
+            dst
+        );
 
         let command = Command::SendMessage {
             recipients: vec![origin],
