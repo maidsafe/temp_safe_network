@@ -324,10 +324,10 @@ impl Client {
             .collect_vec();
 
         if expected_count > encrypted_chunks.len() {
-            Err(Error::NotEnoughChunks(
-                expected_count,
-                encrypted_chunks.len(),
-            ))
+            Err(Error::NotEnoughChunksRetrieved {
+                expected: expected_count,
+                retrieved: encrypted_chunks.len(),
+            })
         } else {
             Ok(encrypted_chunks)
         }

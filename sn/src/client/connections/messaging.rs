@@ -110,11 +110,11 @@ impl Session {
         let msg_id = MessageId::new();
 
         if elders.len() < targets_count {
-            return Err(Error::InsufficientElderKnowledge(
-                elders.len(),
-                targets_count,
+            return Err(Error::InsufficientElderKnowledge {
+                connections: elders.len(),
+                required: targets_count,
                 section_pk,
-            ));
+            });
         }
 
         debug!(
@@ -186,10 +186,10 @@ impl Session {
 
         let elders_len = chosen_elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES && elders_len > 1 {
-            return Err(Error::InsufficientElderConnections(
-                elders_len,
-                NUM_OF_ELDERS_SUBSET_FOR_QUERIES,
-            ));
+            return Err(Error::InsufficientElderConnections {
+                connections: elders_len,
+                required: NUM_OF_ELDERS_SUBSET_FOR_QUERIES,
+            });
         }
 
         let msg_id = MessageId::new();
