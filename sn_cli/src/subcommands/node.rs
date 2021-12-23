@@ -199,7 +199,7 @@ pub async fn node_commander(
                 println!("{}", msg);
                 config.get_network_info(&name).await?
             } else {
-                let (_, node_config) = config.read_current_node_config()?;
+                let (_, node_config) = config.read_current_node_config().await?;
                 node_config
             };
 
@@ -244,7 +244,7 @@ pub async fn node_commander(
                 &num_of_nodes.to_string(),
                 ip,
             )?;
-            config.add_network("baby-fleming", None)?;
+            config.add_network("baby-fleming", None).await?;
             Ok(())
         }
         Some(NodeSubCommands::Killall { node_path }) => node_shutdown(node_path),
@@ -317,7 +317,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -357,7 +358,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -396,7 +398,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -433,7 +436,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -473,7 +477,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -506,7 +511,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -540,7 +546,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -574,7 +581,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -608,7 +616,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -643,7 +652,8 @@ mod run_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -722,9 +732,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -776,9 +787,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -821,9 +833,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -867,9 +880,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -912,9 +926,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -954,9 +969,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -994,9 +1010,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -1037,9 +1054,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -1076,9 +1094,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -1115,9 +1134,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -1177,9 +1197,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -1231,9 +1252,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -1271,9 +1293,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });
@@ -1322,9 +1345,10 @@ mod join_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        config.add_network("baby-fleming", None)?;
+        config.add_network("baby-fleming", None).await?;
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
         });

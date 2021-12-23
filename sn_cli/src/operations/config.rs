@@ -15,13 +15,13 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     default::Default,
     fmt,
-    fs::{self, remove_file},
     net::SocketAddr,
     path::{Path, PathBuf},
     thread,
     time::Duration,
 };
 use structopt::StructOpt;
+use tokio::fs;
 use tracing::debug;
 
 const CONFIG_NETWORKS_DIRNAME: &str = "networks";
@@ -114,20 +114,20 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(cli_config_path: PathBuf, node_config_path: PathBuf) -> Result<Config> {
+    pub async fn new(cli_config_path: PathBuf, node_config_path: PathBuf) -> Result<Config> {
         let mut pb = cli_config_path.clone();
         pb.pop();
-        std::fs::create_dir_all(pb.as_path())?;
+        fs::create_dir_all(pb.as_path()).await?;
 
         let settings: Settings;
         if cli_config_path.exists() {
-            let file = fs::File::open(&cli_config_path).wrap_err_with(|| {
+            let content = fs::read(&cli_config_path).await.wrap_err_with(|| {
                 format!(
-                    "Error opening config file from '{}'",
+                    "Error reading config file from '{}'",
                     cli_config_path.display(),
                 )
             })?;
-            settings = serde_json::from_reader(file).wrap_err_with(|| {
+            settings = serde_json::from_slice(&content).wrap_err_with(|| {
                 format!(
                     "Format of the config file at '{}' is not valid and couldn't be parsed",
                     cli_config_path.display()
@@ -151,14 +151,14 @@ impl Config {
             cli_config_path: cli_config_path.clone(),
             node_config_path,
         };
-        config.write_settings_to_file().wrap_err_with(|| {
+        config.write_settings_to_file().await.wrap_err_with(|| {
             format!("Unable to create config at '{}'", cli_config_path.display())
         })?;
         Ok(config)
     }
 
-    pub fn read_current_node_config(&self) -> Result<(PathBuf, NodeConfig)> {
-        let current_conn_info = fs::read(&self.node_config_path).wrap_err_with(|| {
+    pub async fn read_current_node_config(&self) -> Result<(PathBuf, NodeConfig)> {
+        let current_conn_info = fs::read(&self.node_config_path).await.wrap_err_with(|| {
             eyre!("There doesn't seem to be any node configuration setup in your system.")
                 .suggestion(
                     "A node config will be created if you join a network or launch your own.",
@@ -197,7 +197,7 @@ impl Config {
         self.settings.networks.iter()
     }
 
-    pub fn add_network(
+    pub async fn add_network(
         &mut self,
         name: &str,
         net_info: Option<NetworkInfo>,
@@ -206,8 +206,8 @@ impl Config {
             info
         } else {
             // Cache current network connection info
-            let (_, node_config) = self.read_current_node_config()?;
-            let cache_path = self.cache_node_config(name, &node_config)?;
+            let (_, node_config) = self.read_current_node_config().await?;
+            let cache_path = self.cache_node_config(name, &node_config).await?;
             println!(
                 "Caching current network connection information into '{}'",
                 cache_path.display()
@@ -232,11 +232,14 @@ impl Config {
                                 "Please choose an existing file with a network configuration.",
                             ));
                     }
-                    deserialise_node_config(&fs::read(pb.as_path())?).wrap_err_with(|| {
-                        eyre!("The file must contain a valid network configuration.").suggestion(
-                            "Please choose another file with a valid network configuration.",
-                        )
-                    })?;
+                    deserialise_node_config(&fs::read(pb.as_path()).await?).wrap_err_with(
+                        || {
+                            eyre!("The file must contain a valid network configuration.")
+                                .suggestion(
+                                "Please choose another file with a valid network configuration.",
+                            )
+                        },
+                    )?;
                 }
             }
         }
@@ -244,16 +247,16 @@ impl Config {
             .networks
             .insert(name.to_string(), net_info.clone());
 
-        self.write_settings_to_file()?;
+        self.write_settings_to_file().await?;
 
         debug!("Network '{}' added to settings: {}", name, net_info);
         Ok(net_info)
     }
 
-    pub fn remove_network(&mut self, name: &str) -> Result<()> {
+    pub async fn remove_network(&mut self, name: &str) -> Result<()> {
         match self.settings.networks.remove(name) {
             Some(NetworkInfo::ConnInfoLocation(location)) => {
-                self.write_settings_to_file()?;
+                self.write_settings_to_file().await?;
                 debug!("Network '{}' removed from config", name);
                 println!("Network '{}' was removed from the config", name);
                 let mut config_local_path = self.cli_config_path.clone();
@@ -265,7 +268,7 @@ impl Config {
                         location
                     );
 
-                    if let Err(err) = remove_file(&location) {
+                    if let Err(err) = fs::remove_file(&location).await {
                         println!(
                             "Failed to remove cached network connection information from '{}': {}",
                             location, err
@@ -274,7 +277,7 @@ impl Config {
                 }
             }
             Some(NetworkInfo::NodeConfig(_)) => {
-                self.write_settings_to_file()?;
+                self.write_settings_to_file().await?;
                 debug!("Network '{}' removed from config", name);
                 println!("Network '{}' was removed from the config", name);
             }
@@ -284,9 +287,9 @@ impl Config {
         Ok(())
     }
 
-    pub fn clear(&mut self) -> Result<()> {
+    pub async fn clear(&mut self) -> Result<()> {
         self.settings = Settings::default();
-        self.write_settings_to_file()
+        self.write_settings_to_file().await
     }
 
     pub async fn switch_to_network(&self, name: &str) -> Result<()> {
@@ -298,25 +301,28 @@ impl Config {
                 "Creating '{}' folder for network connection info",
                 base_path.display()
             );
-            std::fs::create_dir_all(&base_path)
+            fs::create_dir_all(&base_path)
+                .await
                 .wrap_err("Couldn't create folder for network connection info")?;
         }
 
         let contacts = self.get_network_info(name).await?;
         let conn_info = serialise_node_config(&contacts)?;
-        fs::write(&self.node_config_path, conn_info).wrap_err_with(|| {
-            format!(
-                "Unable to write network connection info in '{}'",
-                base_path.display(),
-            )
-        })
+        fs::write(&self.node_config_path, conn_info)
+            .await
+            .wrap_err_with(|| {
+                format!(
+                    "Unable to write network connection info in '{}'",
+                    base_path.display(),
+                )
+            })
     }
 
     pub async fn print_networks(&self) {
         let mut table = Table::new();
         table.add_row(row![bFg->"Networks"]);
         table.add_row(row![bFg->"Current", bFg->"Network name", bFg->"Connection info"]);
-        let current_node_config = match self.read_current_node_config() {
+        let current_node_config = match self.read_current_node_config().await {
             Ok((_, current_conn_info)) => Some(current_conn_info),
             Err(_) => None, // we simply ignore the error, none of the networks is currently active/set in the system
         };
@@ -337,7 +343,11 @@ impl Config {
     //
     // Private helpers
     //
-    fn cache_node_config(&self, network_name: &str, node_config: &NodeConfig) -> Result<PathBuf> {
+    async fn cache_node_config(
+        &self,
+        network_name: &str,
+        node_config: &NodeConfig,
+    ) -> Result<PathBuf> {
         let mut pb = self.cli_config_path.clone();
         pb.pop();
         pb.push(CONFIG_NETWORKS_DIRNAME);
@@ -346,25 +356,28 @@ impl Config {
                 "Creating '{}' folder for networks connection info cache",
                 pb.display()
             );
-            std::fs::create_dir_all(&pb)
+            fs::create_dir_all(&pb)
+                .await
                 .wrap_err("Couldn't create folder for networks information cache")?;
         }
 
         pb.push(format!("{}_node_connection_info.config", network_name));
         let conn_info = serialise_node_config(node_config)?;
-        fs::write(&pb, conn_info)?;
+        fs::write(&pb, conn_info).await?;
         Ok(pb)
     }
 
-    fn write_settings_to_file(&self) -> Result<()> {
+    async fn write_settings_to_file(&self) -> Result<()> {
         let serialised_settings = serde_json::to_string(&self.settings)
             .wrap_err("Failed to serialise config settings")?;
-        fs::write(&self.cli_config_path, serialised_settings.as_bytes()).wrap_err_with(|| {
-            format!(
-                "Unable to write config settings to '{}'",
-                self.cli_config_path.display()
-            )
-        })?;
+        fs::write(&self.cli_config_path, serialised_settings.as_bytes())
+            .await
+            .wrap_err_with(|| {
+                format!(
+                    "Unable to write config settings to '{}'",
+                    self.cli_config_path.display()
+                )
+            })?;
         debug!(
             "Config settings at '{}' updated with: {:?}",
             self.cli_config_path.display(),
@@ -388,7 +401,7 @@ async fn retrieve_node_config(location: &str) -> Result<NodeConfig> {
         conn_info.as_bytes().to_vec()
     } else {
         // Fetch it from a local file then
-        fs::read(location).wrap_err_with(|| {
+        fs::read(location).await.wrap_err_with(|| {
             format!("Unable to read connection information from '{}'", location)
         })?
     };
@@ -419,8 +432,8 @@ mod constructor {
     use std::net::SocketAddr;
     use std::path::PathBuf;
 
-    #[test]
-    fn fields_should_be_set_to_correct_values() -> Result<()> {
+    #[tokio::test]
+    async fn fields_should_be_set_to_correct_values() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
@@ -428,7 +441,8 @@ mod constructor {
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
             PathBuf::from(node_config_file.path()),
-        )?;
+        )
+        .await?;
 
         assert_eq!(config.cli_config_path, cli_config_file.path());
         assert_eq!(config.node_config_path, node_config_file.path());
@@ -436,8 +450,8 @@ mod constructor {
         Ok(())
     }
 
-    #[test]
-    fn cli_config_directory_should_be_created() -> Result<()> {
+    #[tokio::test]
+    async fn cli_config_directory_should_be_created() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_dir = tmp_dir.child(".safe/cli");
         let cli_config_file = cli_config_dir.child("config.json");
@@ -446,29 +460,31 @@ mod constructor {
         let _ = Config::new(
             PathBuf::from(cli_config_file.path()),
             PathBuf::from(node_config_file.path()),
-        )?;
+        )
+        .await?;
 
         cli_config_dir.assert(predicate::path::is_dir());
         Ok(())
     }
 
-    #[test]
-    fn given_config_file_does_not_exist_then_it_should_be_created() -> Result<()> {
+    #[tokio::test]
+    async fn given_config_file_does_not_exist_then_it_should_be_created() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
         let _ = Config::new(
             PathBuf::from(cli_config_file.path()),
             PathBuf::from(node_config_file.path()),
-        )?;
+        )
+        .await?;
 
         cli_config_file.assert(predicate::path::exists());
 
         Ok(())
     }
 
-    #[test]
-    fn given_config_file_exists_then_the_settings_should_be_read() -> Result<()> {
+    #[tokio::test]
+    async fn given_config_file_exists_then_the_settings_should_be_read() -> Result<()> {
         let serialized_config = r#"
         {
             "networks": {
@@ -487,7 +503,8 @@ mod constructor {
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
             PathBuf::from(node_config_file.path()),
-        )?;
+        )
+        .await?;
 
         let (network_name, network_info) = config
             .networks_iter()
@@ -521,8 +538,8 @@ mod read_current_node_config {
     use std::net::SocketAddr;
     use std::path::PathBuf;
 
-    #[test]
-    fn given_existing_node_config_then_it_should_be_read() -> Result<()> {
+    #[tokio::test]
+    async fn given_existing_node_config_then_it_should_be_read() -> Result<()> {
         let genesis_key_hex = "89505bbfcac9335a7639a1dca9ed027b98be46b03953e946e53695f678c827f18f6fc22dc888de2bce9078f3fce55095";
         let serialized_node_config = r#"
         [
@@ -549,9 +566,10 @@ mod read_current_node_config {
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
             PathBuf::from(node_config_file.path()),
-        )?;
+        )
+        .await?;
 
-        let (node_config_path, node_config) = config.read_current_node_config()?;
+        let (node_config_path, node_config) = config.read_current_node_config().await?;
 
         let genesis_key = node_config.0;
         let retrieved_genesis_key_hex = hex::encode(genesis_key.to_bytes());
@@ -566,17 +584,18 @@ mod read_current_node_config {
         Ok(())
     }
 
-    #[test]
-    fn given_no_existing_node_config_file_the_result_should_be_an_error() -> Result<()> {
+    #[tokio::test]
+    async fn given_no_existing_node_config_file_the_result_should_be_an_error() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
             PathBuf::from(node_config_file.path()),
-        )?;
+        )
+        .await?;
 
-        let result = config.read_current_node_config();
+        let result = config.read_current_node_config().await;
 
         assert!(result.is_err());
         assert_eq!(
@@ -587,8 +606,8 @@ mod read_current_node_config {
         Ok(())
     }
 
-    #[test]
-    fn given_node_config_path_points_to_non_node_config_file_the_result_should_be_an_error(
+    #[tokio::test]
+    async fn given_node_config_path_points_to_non_node_config_file_the_result_should_be_an_error(
     ) -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
@@ -597,9 +616,10 @@ mod read_current_node_config {
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
             PathBuf::from(node_config_file.path()),
-        )?;
+        )
+        .await?;
 
-        let result = config.read_current_node_config();
+        let result = config.read_current_node_config().await;
 
         assert!(result.is_err());
         assert_eq!(
@@ -623,8 +643,9 @@ mod add_network {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::path::{Path, PathBuf};
 
-    #[test]
-    fn given_network_info_not_supplied_then_current_network_config_will_be_cached() -> Result<()> {
+    #[tokio::test]
+    async fn given_network_info_not_supplied_then_current_network_config_will_be_cached(
+    ) -> Result<()> {
         let serialized_node_config = r#"
         [
             "89505bbfcac9335a7639a1dca9ed027b98be46b03953e946e53695f678c827f18f6fc22dc888de2bce9078f3fce55095",
@@ -652,9 +673,10 @@ mod add_network {
         let mut config = Config::new(
             PathBuf::from(cli_config_file.path()),
             PathBuf::from(node_config_file.path()),
-        )?;
+        )
+        .await?;
 
-        let result = config.add_network("new_network", None);
+        let result = config.add_network("new_network", None).await;
 
         assert!(result.is_ok());
         new_network_file.assert(predicate::path::is_file());
@@ -678,8 +700,8 @@ mod add_network {
         Ok(())
     }
 
-    #[test]
-    fn given_no_pre_existing_config_and_a_file_path_is_used_then_a_network_should_be_saved(
+    #[tokio::test]
+    async fn given_no_pre_existing_config_and_a_file_path_is_used_then_a_network_should_be_saved(
     ) -> Result<()> {
         let existing_node_config = r#"
         [
@@ -706,14 +728,17 @@ mod add_network {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        let result = config.add_network(
-            "new_network",
-            Some(NetworkInfo::ConnInfoLocation(
-                node_config_file.path().display().to_string(),
-            )),
-        );
+        let result = config
+            .add_network(
+                "new_network",
+                Some(NetworkInfo::ConnInfoLocation(
+                    node_config_file.path().display().to_string(),
+                )),
+            )
+            .await;
 
         assert!(result.is_ok());
         cli_config_file.assert(predicate::path::is_file());
@@ -738,8 +763,8 @@ mod add_network {
         Ok(())
     }
 
-    #[test]
-    fn given_no_pre_existing_config_and_a_non_existent_file_path_is_used_then_the_result_should_be_an_error(
+    #[tokio::test]
+    async fn given_no_pre_existing_config_and_a_non_existent_file_path_is_used_then_the_result_should_be_an_error(
     ) -> Result<()> {
         let config_dir = assert_fs::TempDir::new()?.into_persistent();
         let cli_config_file = config_dir.child(".safe/cli/config.json");
@@ -747,14 +772,17 @@ mod add_network {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        let result = config.add_network(
-            "new_network",
-            Some(NetworkInfo::ConnInfoLocation(
-                node_config_file.path().display().to_string(),
-            )),
-        );
+        let result = config
+            .add_network(
+                "new_network",
+                Some(NetworkInfo::ConnInfoLocation(
+                    node_config_file.path().display().to_string(),
+                )),
+            )
+            .await;
 
         assert!(result.is_err());
         assert_eq!(
@@ -765,8 +793,8 @@ mod add_network {
         Ok(())
     }
 
-    #[test]
-    fn given_no_pre_existing_config_and_a_file_that_is_not_a_network_config_is_used_then_the_result_should_be_an_error(
+    #[tokio::test]
+    async fn given_no_pre_existing_config_and_a_file_that_is_not_a_network_config_is_used_then_the_result_should_be_an_error(
     ) -> Result<()> {
         let config_dir = assert_fs::TempDir::new()?;
         let cli_config_file = config_dir.child(".safe/cli/config.json");
@@ -779,14 +807,17 @@ mod add_network {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
-        let result = config.add_network(
-            "new_network",
-            Some(NetworkInfo::ConnInfoLocation(
-                node_config_file.path().display().to_string(),
-            )),
-        );
+        let result = config
+            .add_network(
+                "new_network",
+                Some(NetworkInfo::ConnInfoLocation(
+                    node_config_file.path().display().to_string(),
+                )),
+            )
+            .await;
 
         assert!(result.is_err());
         assert_eq!(
@@ -796,22 +827,25 @@ mod add_network {
         Ok(())
     }
 
-    #[test]
-    fn given_no_pre_existing_config_and_a_url_is_used_then_a_network_should_be_saved() -> Result<()>
-    {
+    #[tokio::test]
+    async fn given_no_pre_existing_config_and_a_url_is_used_then_a_network_should_be_saved(
+    ) -> Result<()> {
         let config_dir = assert_fs::TempDir::new()?;
         let cli_config_file = config_dir.child(".safe/cli/config.json");
         let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
         let url = "https://sn-node.s3.eu-west-2.amazonaws.com/config/node_connection_info.config";
 
-        let result = config.add_network(
-            "new_network",
-            Some(NetworkInfo::ConnInfoLocation(String::from(url))),
-        );
+        let result = config
+            .add_network(
+                "new_network",
+                Some(NetworkInfo::ConnInfoLocation(String::from(url))),
+            )
+            .await;
 
         assert!(result.is_ok());
         cli_config_file.assert(predicate::path::is_file());
@@ -836,8 +870,8 @@ mod add_network {
         Ok(())
     }
 
-    #[test]
-    fn given_a_pre_existing_config_and_a_network_with_the_same_name_exists_then_the_existing_network_should_be_overwritten(
+    #[tokio::test]
+    async fn given_a_pre_existing_config_and_a_network_with_the_same_name_exists_then_the_existing_network_should_be_overwritten(
     ) -> Result<()> {
         // Arrange
         // Setup existing config.
@@ -859,7 +893,8 @@ mod add_network {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         // Setup new network info.
         let secret_key = bls::SecretKey::random();
@@ -875,10 +910,12 @@ mod add_network {
         ));
 
         // Act
-        let result = config.add_network(
-            "existing_network",
-            Some(NetworkInfo::NodeConfig((secret_key.public_key(), nodes))),
-        );
+        let result = config
+            .add_network(
+                "existing_network",
+                Some(NetworkInfo::NodeConfig((secret_key.public_key(), nodes))),
+            )
+            .await;
 
         // Assert
         // We still only have 1 network, but the node config was overwritten.
@@ -912,8 +949,8 @@ mod add_network {
         Ok(())
     }
 
-    #[test]
-    fn given_a_pre_existing_config_and_a_new_node_config_is_specified_then_a_new_network_should_be_added(
+    #[tokio::test]
+    async fn given_a_pre_existing_config_and_a_new_node_config_is_specified_then_a_new_network_should_be_added(
     ) -> Result<()> {
         let serialized_config = r#"
         {
@@ -933,7 +970,8 @@ mod add_network {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         // Setup new network info.
         let secret_key = bls::SecretKey::random();
@@ -949,10 +987,12 @@ mod add_network {
         ));
 
         // Act
-        let result = config.add_network(
-            "new_network",
-            Some(NetworkInfo::NodeConfig((secret_key.public_key(), nodes))),
-        );
+        let result = config
+            .add_network(
+                "new_network",
+                Some(NetworkInfo::NodeConfig((secret_key.public_key(), nodes))),
+            )
+            .await;
 
         // Assert
         assert!(result.is_ok());
@@ -985,8 +1025,8 @@ mod add_network {
         Ok(())
     }
 
-    #[test]
-    fn given_a_pre_existing_config_and_a_conn_info_location_is_specified_then_a_new_network_should_be_added(
+    #[tokio::test]
+    async fn given_a_pre_existing_config_and_a_conn_info_location_is_specified_then_a_new_network_should_be_added(
     ) -> Result<()> {
         // Arrange
         let serialized_config = r#"
@@ -1026,15 +1066,18 @@ mod add_network {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         // Act
-        let result = config.add_network(
-            "new_network",
-            Some(NetworkInfo::ConnInfoLocation(
-                existing_node_config_file.path().display().to_string(),
-            )),
-        );
+        let result = config
+            .add_network(
+                "new_network",
+                Some(NetworkInfo::ConnInfoLocation(
+                    existing_node_config_file.path().display().to_string(),
+                )),
+            )
+            .await;
 
         // Assert
         assert!(result.is_ok());

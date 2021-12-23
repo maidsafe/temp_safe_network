@@ -94,8 +94,10 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
     debug!("Processing command: {:?}", args);
 
     let result = match args.cmd {
-        Some(SubCommands::Config { cmd }) => config_commander(cmd, &mut get_config()?).await,
-        Some(SubCommands::Networks { cmd }) => networks_commander(cmd, &mut get_config()?).await,
+        Some(SubCommands::Config { cmd }) => config_commander(cmd, &mut get_config().await?).await,
+        Some(SubCommands::Networks { cmd }) => {
+            networks_commander(cmd, &mut get_config().await?).await
+        }
         Some(SubCommands::Update { no_confirm }) => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
@@ -118,7 +120,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
         }) => xorurl_commander(cmd, location, recursive, follow_links, output_fmt, safe).await,
         Some(SubCommands::Node { cmd }) => {
             let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
-            node_commander(cmd, &mut get_config()?, &mut launcher).await
+            node_commander(cmd, &mut get_config().await?, &mut launcher).await
         }
         Some(other) => {
             // We treat these commands separatelly since we use the credentials if they are
@@ -126,7 +128,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
             // otherwise the connection created  will be with read-only access and some
             // of these commands will fail if they require write access.
             if !args.dry {
-                connect(safe, get_config()?).await?;
+                connect(safe, get_config().await?).await?;
             }
 
             match other {
@@ -152,7 +154,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
 /// for the config files, and you can then use assert_fs to to assert against those temp files.
 /// Using a temporary location also means the test suites don't manipulate the current user's home
 /// directory.
-fn get_config() -> Result<Config> {
+async fn get_config() -> Result<Config> {
     let mut default_config_path =
         dirs_next::home_dir().ok_or_else(|| eyre!("Couldn't find user's home directory"))?;
     default_config_path.push(".safe");
@@ -165,5 +167,5 @@ fn get_config() -> Result<Config> {
     let mut node_config_path = config_path;
     node_config_path.push("node");
     node_config_path.push("node_connection_info.config");
-    Config::new(cli_config_path, node_config_path)
+    Config::new(cli_config_path, node_config_path).await
 }
