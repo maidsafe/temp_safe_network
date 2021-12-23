@@ -109,11 +109,11 @@ pub async fn create_test_client() -> Result<Client> {
 /// If no keypair is provided, a check is run that a balance has been generated for the client
 pub async fn create_test_client_with(
     optional_keypair: Option<Keypair>,
-    timeout: Option<u64>,
+    query_timeout: Option<u64>,
     read_prefix_map: bool,
 ) -> Result<Client> {
     let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
-    let timeout = timeout.map(Duration::from_secs);
+    let query_timeout = query_timeout.map(Duration::from_secs);
     let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
 
     let standard_wait = if read_prefix_map {
@@ -129,7 +129,7 @@ pub async fn create_test_client_with(
         None,
         genesis_key,
         None,
-        timeout,
+        query_timeout,
         standard_wait,
     )
     .await;
