@@ -70,6 +70,8 @@ impl Client {
             .batch_up_pay_write_register_to_network(priv_register)
             .await?;
 
+        trace!("store private to address {:?} of {:?}", address, name);
+
         Ok((address, batch))
     }
 
@@ -100,6 +102,8 @@ impl Client {
             .batch_up_pay_write_register_to_network(pub_register)
             .await?;
 
+        trace!("store public to address {:?} of {:?}", address, name);
+
         Ok((address, batch))
     }
 
@@ -114,6 +118,8 @@ impl Client {
         let cmd = DataCmd::Register(RegisterWrite::Delete(address));
 
         let batch = vec![cmd];
+
+        trace!("delete address {:?}", address);
 
         Ok(batch)
     }
@@ -145,6 +151,7 @@ impl Client {
         // Finally we package the mutation for the network's replicas (its now ready to be sent)
         let cmd = DataCmd::Register(RegisterWrite::Edit(op));
         let batch = vec![cmd];
+        trace!("writen to address {:?} with entry {:?}", address, hash);
         Ok((hash, batch))
     }
 
@@ -204,7 +211,10 @@ impl Client {
         let register = self.get_register(address).await?;
         let entry = register
             .get(hash, None)?
-            .ok_or_else(|| Error::from(crate::types::Error::NoSuchEntry))?;
+            .ok_or_else(|| {
+                trace!("failed to get entry {:?} from address {:?}", hash, address);
+                Error::from(crate::types::Error::NoSuchEntry)
+            })?;
 
         Ok(entry.to_owned())
     }
