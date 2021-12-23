@@ -382,7 +382,7 @@ mod tests {
     use futures::future::join_all;
     use rand::rngs::OsRng;
     use tokio::time::Instant;
-    use tracing::Instrument;
+    use tracing::{instrument::Instrumented, Instrument};
 
     const MIN_BLOB_SIZE: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
 
@@ -522,6 +522,58 @@ mod tests {
             }
         }
 
+        Ok(())
+    }
+
+    // Test storing and reading min size blob. Try and read from many clients and ensure we do not overwelm nodes.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "Currently nodes will not cope with this."]
+    async fn store_and_read_5mb_from_many_clients() -> Result<()> {
+        init_test_logger();
+        let _start_span = tracing::info_span!("store_and_read_3kb_from_many_clients").entered();
+
+        let client = create_test_client().await?;
+        // create Blob with random bytes 5mb
+        let blob_bytes = random_bytes(5 * 1024 * 1024);
+        let blob = Blob::new(blob_bytes)?;
+
+        // Store blob
+        let address = client
+            .upload_and_verify(blob.bytes(), Scope::Public)
+            .await?;
+
+        // Assert that the blob is stored.
+        let read_data = client.read_bytes(address).await?;
+
+        compare(blob.bytes(), read_data)?;
+
+        let mut tasks = vec![];
+
+        for i in 1..100 {
+            debug!("starting client on thread #{:?}", i);
+            let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
+                tokio::spawn(async move {
+                    debug!("started client #{:?}", i);
+                    // use a fresh client
+                    let client = create_test_client().await?;
+                    // to grab that data
+                    let _read_data = client.read_bytes(address).await?;
+
+                    debug!("client #{:?} finished", i);
+                    Ok(())
+                })
+                .in_current_span();
+
+            tasks.push(handle);
+        }
+        let responses = join_all(tasks).await;
+
+        for res in responses {
+            debug!("a response is done");
+            let _ok = res??;
+        }
+
+        // TODO: we need to use the node log analysis to check the mem usage across nodes does not exceed X
         Ok(())
     }
 
