@@ -1312,7 +1312,7 @@ mod tests {
             .files_container_create(Some(TEST_DATA_FOLDER), None, true, false, true)
             .await?;
 
-        assert!(xorurl.is_empty());
+        assert!(!xorurl.is_empty());
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILESMAP_COUNT);
 
