@@ -69,8 +69,7 @@ pub(crate) async fn add_or_update_file_item(
                 file_name.to_string(),
                 (
                     content_added_sign,
-                    // note: files have link property,
-                    //       dirs and symlinks do not
+                    // note: files have link property, dirs and symlinks do not
                     new_file_item
                         .get(PREDICATE_LINK)
                         .unwrap_or(&String::default())
@@ -83,7 +82,7 @@ pub(crate) async fn add_or_update_file_item(
         Err(err) => {
             processed_files.insert(
                 file_name.to_string(),
-                (CONTENT_ERROR_SIGN.to_string(), format!("<{:?}>", err)),
+                (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
             );
             info!("Skipping file \"{}\": {:?}", file_link.unwrap_or(""), err);
 

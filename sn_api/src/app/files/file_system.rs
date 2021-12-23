@@ -11,6 +11,7 @@ use super::{metadata::get_metadata, ProcessedFiles};
 use crate::{app::consts::*, Error, Result, Safe, XorUrl};
 use bytes::Bytes;
 use log::info;
+use safe_network::client::Error as ClientError;
 use std::{collections::BTreeMap, fs, path::Path};
 use walkdir::{DirEntry, WalkDir};
 
@@ -27,20 +28,31 @@ pub(crate) async fn upload_file_to_net(
     })?;
     let data = Bytes::from(data);
 
-    let mime_type = mime_guess::from_path(&path);
-    match safe
-        .store_public_bytes(data.to_owned(), mime_type.first_raw(), dry_run)
+    let mut mime_type_for_xorurl = mime_guess::from_path(&path).first_raw();
+    let result = match safe
+        .store_public_bytes(data.to_owned(), mime_type_for_xorurl, dry_run)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
-        Err(err) => {
+        Err(Error::InvalidMediaType(_)) => {
             // Let's then upload it and set media-type to be simply raw content
-            if let Error::InvalidMediaType(_) = err {
-                safe.store_public_bytes(data, None, dry_run).await
-            } else {
-                Err(err)
-            }
+            mime_type_for_xorurl = None;
+            safe.store_public_bytes(data.clone(), mime_type_for_xorurl, dry_run)
+                .await
         }
+        other_err => other_err,
+    };
+
+    // If the upload verification failed, the file could still have been uploaded successfully,
+    // thus let's report the error but providing the xorurl for the user to be aware of.
+    if let Err(Error::ClientError(ClientError::NotEnoughChunksRetrieved { .. })) = result {
+        // let's obtain the xorurl with using dry-run mode
+        let xorurl = safe
+            .store_public_bytes(data, mime_type_for_xorurl, true)
+            .await?;
+        Err(Error::ContentUploadVerificationFailed(xorurl))
+    } else {
+        result
     }
 }
 
@@ -122,7 +134,7 @@ pub(crate) async fn file_system_dir_walk(
                             Err(err) => {
                                 processed_files.insert(
                                     normalised_path.clone(),
-                                    (CONTENT_ERROR_SIGN.to_string(), format!("<{:?}>", err)),
+                                    (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
                                 );
                                 info!("Skipping file \"{}\". {}", normalised_path, err);
                             }
@@ -132,7 +144,7 @@ pub(crate) async fn file_system_dir_walk(
                 Err(err) => {
                     processed_files.insert(
                         normalised_path.clone(),
-                        (CONTENT_ERROR_SIGN.to_string(), format!("<{:?}>", err)),
+                        (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
                     );
                     info!(
                         "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
@@ -190,7 +202,7 @@ pub(crate) async fn file_system_single_file(
             Err(err) => {
                 processed_files.insert(
                     normalised_path.clone(),
-                    (CONTENT_ERROR_SIGN.to_string(), format!("{:?}>", err)),
+                    (CONTENT_ERROR_SIGN.to_string(), format!("{}>", err)),
                 );
                 info!("Skipping file \"{}\". {}", normalised_path, err);
             }
