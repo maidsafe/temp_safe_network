@@ -63,18 +63,20 @@ pub async fn config_commander(cmd: Option<ConfigSubCommands>, config: &mut Confi
             network_name,
             config_location,
         })) => {
-            config.add_network(
-                &network_name,
-                config_location.map(NetworkInfo::ConnInfoLocation),
-            )?;
+            config
+                .add_network(
+                    &network_name,
+                    config_location.map(NetworkInfo::ConnInfoLocation),
+                )
+                .await?;
         }
         // Some(ConfigSubCommands::Add(SettingAddCmd::Contact { name, safeid })) => {}
         Some(ConfigSubCommands::Remove(SettingRemoveCmd::Network { network_name })) => {
-            config.remove_network(&network_name)?
+            config.remove_network(&network_name).await?
         }
         // Some(ConfigSubCommands::Remove(SettingRemoveCmd::Contact { name })) => {}
         Some(ConfigSubCommands::Clear) => {
-            config.clear()?;
+            config.clear().await?;
             debug!("Config settings cleared out");
         }
         None => config.print_networks().await,

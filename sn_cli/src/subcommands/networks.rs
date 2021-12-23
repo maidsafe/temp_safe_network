@@ -72,7 +72,7 @@ pub async fn networks_commander(
         }
         Some(NetworksSubCommands::Check {}) => {
             println!("Checking current setup network connection information...");
-            let (node_config_path, current_node_config) = config.read_current_node_config()?;
+            let (node_config_path, current_node_config) = config.read_current_node_config().await?;
             let mut matched_network = None;
             for (network_name, network_info) in config.networks_iter() {
                 if network_info.matches(&current_node_config).await {
@@ -94,10 +94,12 @@ pub async fn networks_commander(
             network_name,
             config_location,
         }) => {
-            let net_info = config.add_network(
-                &network_name,
-                config_location.map(NetworkInfo::ConnInfoLocation),
-            )?;
+            let net_info = config
+                .add_network(
+                    &network_name,
+                    config_location.map(NetworkInfo::ConnInfoLocation),
+                )
+                .await?;
             println!(
                 "Network '{}' was added to the list. Connection information is located at '{}'",
                 network_name, net_info
@@ -119,17 +121,19 @@ pub async fn networks_commander(
             let genesis_key = PublicKey::bls_from_hex(&genesis_key_hex)?
                 .bls()
                 .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
-            let net_info = config.add_network(
-                &network_name,
-                Some(NetworkInfo::NodeConfig((genesis_key, set))),
-            )?;
+            let net_info = config
+                .add_network(
+                    &network_name,
+                    Some(NetworkInfo::NodeConfig((genesis_key, set))),
+                )
+                .await?;
             println!(
                 "Network '{}' was added to the list. Contacts: '{}'",
                 network_name, net_info
             );
         }
         Some(NetworksSubCommands::Remove { network_name }) => {
-            config.remove_network(&network_name)?
+            config.remove_network(&network_name).await?
         }
         None => config.print_networks().await,
     }
@@ -167,7 +171,8 @@ mod networks_set_command {
         let mut config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-        )?;
+        )
+        .await?;
 
         // Act
         let result = networks_commander(Some(cmd), &mut config).await;
