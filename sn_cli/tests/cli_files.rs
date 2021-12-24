@@ -77,7 +77,7 @@ fn calling_safe_files_put_dry_run() -> Result<()> {
         "cat",
         processed_files[Path::new(TEST_FILE_RANDOM_CONTENT)]
             .link()
-            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
     ])
     .assert()
     .failure();
@@ -89,7 +89,7 @@ fn calling_safe_files_put_recursive() -> Result<()> {
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["files", "put", TEST_FOLDER, "--recursive", "--json"])
         .assert()
-        .stdout(predicate::str::contains(r#"+"#).count(12))
+        .stdout(predicate::str::contains(r#"Added"#).count(12))
         .stdout(predicate::str::contains("../resources/testdata/test.md").count(1))
         .stdout(predicate::str::contains("../resources/testdata/another.md").count(1))
         .stdout(predicate::str::contains("../resources/testdata/subfolder/subexists.md").count(1))
@@ -292,7 +292,7 @@ fn calling_safe_files_sync_dry_run() -> Result<()> {
         "cat",
         processed_files[Path::new(TEST_FILE_RANDOM_CONTENT)]
             .link()
-            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
     ])
     .assert()
     .failure();
@@ -656,7 +656,7 @@ fn calling_safe_files_add_a_url() -> Result<()> {
     safeurl.set_path("/new_test.md");
     let link = processed_files[Path::new(TEST_FILE)]
         .link()
-        .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?;
+        .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?;
     safe_cmd(
         ["files", "add", link, &safeurl.to_string(), "--json"],
         Some(0),

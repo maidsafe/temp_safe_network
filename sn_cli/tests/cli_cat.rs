@@ -41,7 +41,7 @@ fn calling_safe_cat_using_spot_file() -> Result<()> {
         "cat",
         processed_files[Path::new("../resources/testdata/test.md")]
             .link()
-            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
     ])
     .assert()
     .stdout(predicate::str::contains(TEST_FILE_CONTENT))
@@ -50,7 +50,7 @@ fn calling_safe_cat_using_spot_file() -> Result<()> {
     let safeurl = safeurl_from(
         processed_files[Path::new("../resources/testdata/test.md")]
             .link()
-            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
     )?;
     assert_eq!(
         safeurl.content_type(),
@@ -81,7 +81,7 @@ fn calling_safe_cat_using_blob_file() -> Result<()> {
         "cat",
         processed_files[Path::new("../resources/testdata/large_markdown_file.md")]
             .link()
-            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
     ])
     .assert()
     .stdout(predicate::str::contains(content))
@@ -90,7 +90,7 @@ fn calling_safe_cat_using_blob_file() -> Result<()> {
     let safeurl = safeurl_from(
         processed_files[Path::new("../resources/testdata/large_markdown_file.md")]
             .link()
-            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
     )?;
     assert_eq!(
         safeurl.content_type(),
@@ -130,7 +130,7 @@ fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
         "{}/something_relative.wasm",
         &processed_files[Path::new(TEST_FILE)]
             .link()
-            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?
     );
     cmd.args(&vec!["cat", &relative_url])
         .assert()
@@ -150,7 +150,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
         "--hexdump",
         processed_files[Path::new(TEST_FILE)]
             .link()
-            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
     ])
     .assert()
     .stdout(predicate::str::contains(TEST_FILE_HEXDUMP_CONTENT))
@@ -159,7 +159,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
     let safeurl = safeurl_from(
         processed_files[Path::new(TEST_FILE)]
             .link()
-            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
     )?;
     assert_eq!(
         safeurl.content_type(),

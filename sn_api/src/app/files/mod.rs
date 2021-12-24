@@ -860,7 +860,7 @@ async fn files_map_sync(
 
                         processed_files.insert(
                             local_file_name.to_path_buf(),
-                            FilesMapChange::Failed(format!("<{}>", err_type)),
+                            FilesMapChange::Failed(format!("{}", err_type)),
                         );
                         info!("Skipping file \"{}\" since a file named \"{}\" with {} content already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name.display(), normalised_file_name, comp_str);
                     }
@@ -945,7 +945,7 @@ async fn files_map_add_link(
             info!("Skipping file \"{}\". {}", file_link, err);
             processed_files.insert(
                 PathBuf::from(file_link),
-                FilesMapChange::Failed(format!("<{}>", err)),
+                FilesMapChange::Failed(format!("{}", err)),
             );
             Ok((processed_files, files_map, success_count))
         }
@@ -2489,7 +2489,7 @@ mod tests {
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_matches!(
             &new_processed_files[filename1],
-            FilesMapChange::Failed(msg) if msg == &format!("<{}>", Error::FileAlreadyExists("/sub2.md".to_string()))
+            FilesMapChange::Failed(msg) if msg == &format!("{}", Error::FileAlreadyExists("/sub2.md".to_string()))
         );
         assert_eq!(files_map, new_files_map);
 
@@ -2509,7 +2509,7 @@ mod tests {
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_matches!(
             &new_processed_files[filename2],
-            FilesMapChange::Failed(msg) if msg == &format!("<{}>", Error::FileNameConflict("/sub2.md".to_string()))
+            FilesMapChange::Failed(msg) if msg == &format!("{}", Error::FileNameConflict("/sub2.md".to_string()))
         );
         assert_eq!(files_map, new_files_map);
 

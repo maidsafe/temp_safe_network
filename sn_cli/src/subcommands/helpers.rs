@@ -148,10 +148,7 @@ pub fn gen_processed_files_table(
         if show_change_sign {
             table.add_row(row![change_sign, file_name.display(), link]);
         } else {
-            table.add_row(row![
-                file_name.display(),
-                change.link().unwrap_or(&String::default())
-            ]);
+            table.add_row(row![file_name.display(), link]);
         }
     }
     (table, success_count)

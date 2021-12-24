@@ -11,7 +11,7 @@ use super::{
     files_get::{process_get_command, FileExistsAction, ProgressIndicator},
     helpers::{
         gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, if_tty, notice_dry_run,
-        parse_stdin_arg, pluralize, processed_files_err_report, serialise_output,
+        parse_stdin_arg, pluralize, serialise_output,
     },
     OutputFmt,
 };
@@ -21,7 +21,7 @@ use color_eyre::{eyre::bail, eyre::eyre, Result};
 use prettytable::{format::FormatBuilder, Table};
 use serde::Serialize;
 use sn_api::{
-    files::{FilesMap, FilesMapChange, ProcessedFiles},
+    files::{FilesMap, ProcessedFiles},
     nrs::VersionHash,
     resolver::SafeData,
     Safe, SafeUrl, XorUrl,
@@ -217,7 +217,7 @@ pub async fn files_commander(
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
-            let (files_, processed_files, _) = safe
+            let (files_container_xorurl, processed_files, _) = safe
                 .files_container_create(
                     Some(&location),
                     dest.as_deref(),
@@ -232,34 +232,13 @@ pub async fn files_commander(
                 if dry_run {
                     println!("FilesContainer not created since running in dry-run mode");
                 } else {
-                    println!("FilesContainer created at: \"{}\"", files_);
+                    println!("FilesContainer created at: \"{}\"", files_container_xorurl);
                 }
-                let mut table = Table::new();
-                let format = FormatBuilder::new()
-                    .column_separator(' ')
-                    .padding(0, 1)
-                    .build();
-                table.set_format(format);
-                for (file_name, change) in processed_files.iter() {
-                    match change {
-                        FilesMapChange::Failed(err) => {
-                            let (change_sign, msg) = processed_files_err_report(err);
-                            table.add_row(row![change_sign, file_name.display(), msg])
-                        }
-                        FilesMapChange::Added(link) => {
-                            table.add_row(row!["+", file_name.display(), link])
-                        }
-                        FilesMapChange::Updated(link) => {
-                            table.add_row(row!["*", file_name.display(), link])
-                        }
-                        FilesMapChange::Removed(link) => {
-                            table.add_row(row!["-", file_name.display(), link])
-                        }
-                    };
-                }
+
+                let (table, _) = gen_processed_files_table(&processed_files, true);
                 table.printstd();
             } else {
-                print_serialized_output(files_, None, &processed_files, output_fmt);
+                print_serialized_output(files_container_xorurl, None, &processed_files, output_fmt);
             }
 
             Ok(())
@@ -490,13 +469,15 @@ async fn process_tree_command(
 
 fn print_serialized_output(
     xorurl: XorUrl,
-    version: Option<VersionHash>,
+    change_version: Option<VersionHash>,
     processed_files: &ProcessedFiles,
     output_fmt: OutputFmt,
 ) {
     let url = match SafeUrl::from_url(&xorurl) {
         Ok(mut safeurl) => {
-            safeurl.set_content_version(version);
+            if change_version.is_some() {
+                safeurl.set_content_version(change_version);
+            }
             safeurl.to_string()
         }
         Err(_) => xorurl,

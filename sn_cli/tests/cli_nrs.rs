@@ -77,7 +77,7 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
         .1
         .to_owned()
         .link()
-        .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?;
+        .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?;
     let url = SafeUrl::from_url(test_md_blob_link)?;
     println!("processed_files = {:?}", processed_files);
 
@@ -223,7 +223,7 @@ fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
         .1
         .to_owned()
         .link()
-        .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?;
+        .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?;
     let url = SafeUrl::from_url(test_md_blob_link)?;
 
     let test_name = get_random_nrs_string();
