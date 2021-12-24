@@ -18,7 +18,8 @@ use sn_cmd_test_utilities::util::{
     safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_path,
     upload_test_symlinks_folder, CLI,
 };
-use std::process::Command;
+use std::{path::Path, process::Command};
+
 const TEST_DATA: &str = "../resources/testdata/";
 const TEST_FILE: &str = "../resources/testdata/test.md";
 const TEST_FILE_CONTENT: &str = "hello tests!";
@@ -34,14 +35,23 @@ fn calling_safe_cat_using_spot_file() -> Result<()> {
         Some(0),
     )?;
 
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content)?;
+    let (_, processed_files) = parse_files_put_or_sync_output(&content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &map["../resources/testdata/test.md"].1])
-        .assert()
-        .stdout(predicate::str::contains(TEST_FILE_CONTENT))
-        .success();
+    cmd.args(&vec![
+        "cat",
+        processed_files[Path::new("../resources/testdata/test.md")]
+            .link()
+            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+    ])
+    .assert()
+    .stdout(predicate::str::contains(TEST_FILE_CONTENT))
+    .success();
 
-    let safeurl = safeurl_from(&map["../resources/testdata/test.md"].1)?;
+    let safeurl = safeurl_from(
+        processed_files[Path::new("../resources/testdata/test.md")]
+            .link()
+            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+    )?;
     assert_eq!(
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
@@ -65,17 +75,23 @@ fn calling_safe_cat_using_blob_file() -> Result<()> {
     )?;
 
     let content = std::fs::read_to_string("../resources/testdata/large_markdown_file.md")?;
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&output)?;
+    let (_, processed_files) = parse_files_put_or_sync_output(&output)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec![
         "cat",
-        &map["../resources/testdata/large_markdown_file.md"].1,
+        processed_files[Path::new("../resources/testdata/large_markdown_file.md")]
+            .link()
+            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
     ])
     .assert()
     .stdout(predicate::str::contains(content))
     .success();
 
-    let safeurl = safeurl_from(&map["../resources/testdata/large_markdown_file.md"].1)?;
+    let safeurl = safeurl_from(
+        processed_files[Path::new("../resources/testdata/large_markdown_file.md")]
+            .link()
+            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+    )?;
     assert_eq!(
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
@@ -107,10 +123,15 @@ fn calling_safe_cat_subfolders() -> Result<()> {
 fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
 
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content)?;
+    let (_, processed_files) = parse_files_put_or_sync_output(&content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
 
-    let relative_url = format!("{}/something_relative.wasm", &map[TEST_FILE].1);
+    let relative_url = format!(
+        "{}/something_relative.wasm",
+        &processed_files[Path::new(TEST_FILE)]
+            .link()
+            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?
+    );
     cmd.args(&vec!["cat", &relative_url])
         .assert()
         .stderr(predicate::str::contains(ID_RELATIVE_FILE_ERROR))
@@ -122,14 +143,24 @@ fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
 fn calling_safe_cat_hexdump() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
 
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content)?;
+    let (_, processed_files) = parse_files_put_or_sync_output(&content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", "--hexdump", &map[TEST_FILE].1])
-        .assert()
-        .stdout(predicate::str::contains(TEST_FILE_HEXDUMP_CONTENT))
-        .success();
+    cmd.args(&vec![
+        "cat",
+        "--hexdump",
+        processed_files[Path::new(TEST_FILE)]
+            .link()
+            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+    ])
+    .assert()
+    .stdout(predicate::str::contains(TEST_FILE_HEXDUMP_CONTENT))
+    .success();
 
-    let safeurl = safeurl_from(&map[TEST_FILE].1)?;
+    let safeurl = safeurl_from(
+        processed_files[Path::new(TEST_FILE)]
+            .link()
+            .ok_or_else(|| eyre!("Missing xorurl link or uploaded test file"))?,
+    )?;
     assert_eq!(
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
@@ -153,7 +184,7 @@ fn calling_safe_cat_xorurl_with_version() -> Result<()> {
         ],
         Some(0),
     )?;
-    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&output)?;
+    let (container_xorurl, _) = parse_files_put_or_sync_output(&output)?;
     let mut url = SafeUrl::from_url(&container_xorurl)?;
     url.set_path("test.md");
 
@@ -188,7 +219,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
         Some(0),
     )?;
 
-    let (nrs_url, _files_map) = parse_nrs_register_output(&output)?;
+    let (nrs_url, _) = parse_nrs_register_output(&output)?;
     let version = nrs_url.content_version();
 
     let mut nrs_url = SafeUrl::from_url(&format!("safe://{}", public_name))?;

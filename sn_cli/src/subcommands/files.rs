@@ -11,7 +11,7 @@ use super::{
     files_get::{process_get_command, FileExistsAction, ProgressIndicator},
     helpers::{
         gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, if_tty, notice_dry_run,
-        parse_stdin_arg, pluralize, serialise_output,
+        parse_stdin_arg, pluralize, processed_files_err_report, serialise_output,
     },
     OutputFmt,
 };
@@ -21,14 +21,14 @@ use color_eyre::{eyre::bail, eyre::eyre, Result};
 use prettytable::{format::FormatBuilder, Table};
 use serde::Serialize;
 use sn_api::{
-    files::{FilesMap, ProcessedFiles},
+    files::{FilesMap, FilesMapChange, ProcessedFiles},
     nrs::VersionHash,
     resolver::SafeData,
     Safe, SafeUrl, XorUrl,
 };
 use std::{
     collections::{BTreeMap, HashMap},
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
 };
 use structopt::StructOpt;
 use tracing::debug;
@@ -104,7 +104,7 @@ pub enum FilesSubCommands {
         /// The source file/folder local path
         location: String,
         /// The destination path (in the FilesContainer) for the uploaded files and folders (default is '/')
-        dest: Option<String>,
+        dest: Option<PathBuf>,
         /// Recursively upload folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
@@ -217,7 +217,7 @@ pub async fn files_commander(
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
-            let (files_container_xorurl, processed_files, _files_map) = safe
+            let (files_, processed_files, _) = safe
                 .files_container_create(
                     Some(&location),
                     dest.as_deref(),
@@ -232,7 +232,7 @@ pub async fn files_commander(
                 if dry_run {
                     println!("FilesContainer not created since running in dry-run mode");
                 } else {
-                    println!("FilesContainer created at: \"{}\"", files_container_xorurl);
+                    println!("FilesContainer created at: \"{}\"", files_);
                 }
                 let mut table = Table::new();
                 let format = FormatBuilder::new()
@@ -240,15 +240,26 @@ pub async fn files_commander(
                     .padding(0, 1)
                     .build();
                 table.set_format(format);
-                for (file_name, (change, link)) in processed_files.iter() {
-                    table.add_row(row![change, file_name, link]);
+                for (file_name, change) in processed_files.iter() {
+                    match change {
+                        FilesMapChange::Failed(err) => {
+                            let (change_sign, msg) = processed_files_err_report(err);
+                            table.add_row(row![change_sign, file_name.display(), msg])
+                        }
+                        FilesMapChange::Added(link) => {
+                            table.add_row(row!["+", file_name.display(), link])
+                        }
+                        FilesMapChange::Updated(link) => {
+                            table.add_row(row!["*", file_name.display(), link])
+                        }
+                        FilesMapChange::Removed(link) => {
+                            table.add_row(row!["-", file_name.display(), link])
+                        }
+                    };
                 }
                 table.printstd();
             } else {
-                println!(
-                    "{}",
-                    serialise_output(&(files_container_xorurl, processed_files), output_fmt)
-                );
+                print_serialized_output(files_, None, &processed_files, output_fmt);
             }
 
             Ok(())
@@ -266,7 +277,7 @@ pub async fn files_commander(
                 notice_dry_run();
             }
             // Update the FilesContainer on the Network
-            let (version, processed_files, _files_map) = safe
+            let (version, processed_files, _) = safe
                 .files_container_sync(
                     &location,
                     &target,
@@ -279,8 +290,8 @@ pub async fn files_commander(
                 .await?;
 
             // Now let's just print out a list of the files synced/processed
+            let (table, success_count) = gen_processed_files_table(&processed_files, true);
             if OutputFmt::Pretty == output_fmt {
-                let (table, success_count) = gen_processed_files_table(&processed_files, true);
                 if success_count > 0 {
                     let url = match SafeUrl::from_url(&target) {
                         Ok(mut safeurl) => {
@@ -306,7 +317,7 @@ pub async fn files_commander(
                     println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
                 }
             } else {
-                print_serialized_output(target, Some(version), processed_files, output_fmt);
+                print_serialized_output(target, Some(version), &processed_files, output_fmt);
             }
             Ok(())
         }
@@ -330,7 +341,7 @@ pub async fn files_commander(
                 notice_dry_run();
             }
 
-            let (version, processed_files, _files_map) =
+            let (version, processed_files, _) =
                 // If location is empty then we read arg from STDIN, which can still be a safe:// URL
                 if location.is_empty() {
                     let file_content = get_from_stdin(Some("...awaiting file's content to add from STDIN"))?;
@@ -342,7 +353,7 @@ pub async fn files_commander(
                 };
 
             // Now let's just print out a list of the files synced/processed
-            output_processed_files_list(output_fmt, processed_files, Some(version), target_url);
+            output_processed_files_list(output_fmt, &processed_files, Some(version), target_url);
             Ok(())
         }
         FilesSubCommands::Rm {
@@ -358,12 +369,12 @@ pub async fn files_commander(
             }
 
             // Update the FilesContainer on the Network
-            let (version, processed_files, _files_map) = safe
+            let (version, processed_files, _) = safe
                 .files_container_remove_path(&target_url, recursive, update_nrs, dry_run)
                 .await?;
 
             // Now let's just print out a list of the files removed
-            output_processed_files_list(output_fmt, processed_files, Some(version), target_url);
+            output_processed_files_list(output_fmt, &processed_files, Some(version), target_url);
             Ok(())
         }
         FilesSubCommands::Ls { target } => {
@@ -480,7 +491,7 @@ async fn process_tree_command(
 fn print_serialized_output(
     xorurl: XorUrl,
     version: Option<VersionHash>,
-    processed_files: BTreeMap<String, (String, String)>,
+    processed_files: &ProcessedFiles,
     output_fmt: OutputFmt,
 ) {
     let url = match SafeUrl::from_url(&xorurl) {
@@ -495,12 +506,12 @@ fn print_serialized_output(
 
 fn output_processed_files_list(
     output_fmt: OutputFmt,
-    processed_files: ProcessedFiles,
+    processed_files: &ProcessedFiles,
     version: Option<VersionHash>,
     target_url: String,
 ) {
     if OutputFmt::Pretty == output_fmt {
-        let (table, success_count) = gen_processed_files_table(&processed_files, true);
+        let (table, success_count) = gen_processed_files_table(processed_files, true);
         if success_count > 0 {
             let url = match SafeUrl::from_url(&target_url) {
                 Ok(mut safeurl) => {

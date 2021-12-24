@@ -13,11 +13,11 @@ use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use num_traits::Float;
 use prettytable::{format::FormatBuilder, Table};
 use serde::ser::Serialize;
-use sn_api::nrs::NrsMap;
-use std::{
-    collections::BTreeMap,
-    io::{stdin, stdout, Read, Write},
+use sn_api::{
+    files::{FilesMapChange, ProcessedFiles},
+    nrs::NrsMap,
 };
+use std::io::{stdin, stdout, Read, Write};
 use tracing::debug;
 use xor_name::XorName;
 
@@ -118,8 +118,12 @@ pub fn get_secret_key(key_xorurl: &str, sk: Option<String>, msg: &str) -> Result
     Ok(sk)
 }
 
+pub fn processed_files_err_report<T: std::fmt::Display>(err: &T) -> (String, String) {
+    ("E".to_string(), format!("<{}>", err))
+}
+
 pub fn gen_processed_files_table(
-    processed_files: &BTreeMap<String, (String, String)>,
+    processed_files: &ProcessedFiles,
     show_change_sign: bool,
 ) -> (Table, u64) {
     let mut table = Table::new();
@@ -129,14 +133,25 @@ pub fn gen_processed_files_table(
         .build();
     table.set_format(format);
     let mut success_count = 0;
-    for (file_name, (change, link)) in processed_files.iter() {
-        if change != "E" {
+    for (file_name, change) in processed_files.iter() {
+        if change.is_success() {
             success_count += 1;
         }
+
+        let (change_sign, link) = match change {
+            FilesMapChange::Failed(err) => processed_files_err_report(&err),
+            FilesMapChange::Added(link) => ("+".to_string(), link.clone()),
+            FilesMapChange::Updated(link) => ("*".to_string(), link.clone()),
+            FilesMapChange::Removed(link) => ("-".to_string(), link.clone()),
+        };
+
         if show_change_sign {
-            table.add_row(row![change, file_name, link]);
+            table.add_row(row![change_sign, file_name.display(), link]);
         } else {
-            table.add_row(row![file_name, link]);
+            table.add_row(row![
+                file_name.display(),
+                change.link().unwrap_or(&String::default())
+            ]);
         }
     }
     (table, success_count)
