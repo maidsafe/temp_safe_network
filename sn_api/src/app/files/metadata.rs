@@ -37,8 +37,8 @@ pub(crate) struct FileMeta {
 
 impl FileMeta {
     // Instantiates FileMeta from a local filesystem path.
-    pub(crate) fn from_path(path: &str, follow_links: bool) -> Result<Self> {
-        let (metadata, file_type) = get_metadata(Path::new(path), follow_links)?;
+    pub(crate) fn from_path(path: &Path, follow_links: bool) -> Result<Self> {
+        let (metadata, file_type) = get_metadata(path, follow_links)?;
 
         // created and modified may not be available on all platforms/filesystems.
         let original_created = if let Ok(time) = metadata.created() {

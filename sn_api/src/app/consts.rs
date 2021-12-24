@@ -12,11 +12,6 @@ use crate::safeurl::XorUrlBase;
 // Default base encoding used for XOR URLs
 pub const DEFAULT_XORURL_BASE: XorUrlBase = XorUrlBase::Base32z;
 
-pub const CONTENT_ADDED_SIGN: &str = "+";
-pub const CONTENT_UPDATED_SIGN: &str = "*";
-pub const CONTENT_DELETED_SIGN: &str = "-";
-pub const CONTENT_ERROR_SIGN: &str = "E";
-
 pub const PREDICATE_LINK: &str = "link";
 pub const PREDICATE_TYPE: &str = "type";
 pub const PREDICATE_SIZE: &str = "size";

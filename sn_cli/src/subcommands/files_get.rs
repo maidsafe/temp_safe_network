@@ -8,19 +8,20 @@
 // Software.
 
 use super::{
-    helpers::{div_or, pluralize, prompt_user},
+    helpers::{div_or, pluralize, processed_files_err_report, prompt_user},
     OutputFmt,
 };
 use bytes::Buf;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use console::Term;
 use sn_api::{
-    files::{FilesMap, GetAttr, ProcessedFiles},
+    files::{FilesMap, GetAttr},
     resolver::Range,
     resolver::SafeData,
     DataType, Result as ApiResult, Safe, SafeUrl, XorUrl,
 };
 use std::{
+    collections::BTreeMap,
     fs,
     io::{BufWriter, Write},
     path::Path,
@@ -236,7 +237,12 @@ fn path_contains_file(path: &Path) -> Option<&Path> {
 }
 
 // prints results/summary of GET transfer
-fn print_results(processed_files: &ProcessedFiles, path: &Path, overwrites: u64, preserves: u64) {
+fn print_results(
+    processed_files: &BTreeMap<String, (String, String)>,
+    path: &Path,
+    overwrites: u64,
+    preserves: u64,
+) {
     if overwrites > 0 || preserves > 0 {
         println!(
             "Done. Retrieved {} {} to {}.\n  pre-existing: {}   (overwritten: {}  preserved: {})",
@@ -317,7 +323,7 @@ async fn files_container_get_files(
     url: &str,
     dirpath: &str,
     callback: impl FnMut(&FilesGetStatus) -> bool,
-) -> Result<(String, ProcessedFiles)> {
+) -> Result<(String, BTreeMap<String, (String, String)>)> {
     // Rather than returning a VersionHash, a String is returned, because there doesn't seem to be
     // a representation of an empty VersionHash just now. Not sure that it makes sense here to
     // generate a new one, since the version that's returned by this function is not used by the
@@ -446,12 +452,12 @@ async fn files_map_get_files(
     files_map: &FilesMap,
     dirpath: &str,
     mut callback: impl FnMut(&FilesGetStatus) -> bool,
-) -> Result<ProcessedFiles> {
+) -> Result<BTreeMap<String, (String, String)>> {
     trace!("Fetching files from FilesMap");
 
     let dpath = Path::new(dirpath);
 
-    let mut processed_files = ProcessedFiles::new();
+    let mut processed_files = BTreeMap::new();
     let mut transfer_bytes_written = 0;
 
     // We need to calc total_transfer_bytes in advance for status callback
@@ -532,7 +538,7 @@ async fn files_map_get_files(
         // Download file
         match download_file_from_net(safe, xorurl, abspath.as_path(), size).await {
             Ok(file_bytes_written) => {
-                processed_files.insert(path.to_string(), ("+".to_string(), (*xorurl).to_string()));
+                processed_files.insert(path.to_string(), ("+".to_string(), xorurl.to_string()));
                 transfer_bytes_written += file_bytes_written;
                 status.transfer_bytes_written = transfer_bytes_written;
                 status.file_bytes_written = file_bytes_written;
@@ -541,7 +547,7 @@ async fn files_map_get_files(
                 callback(&status);
             }
             Err(err) => {
-                processed_files.insert(path.to_string(), ("E".to_string(), format!("<{}>", err)));
+                processed_files.insert(path.to_string(), processed_files_err_report(&err));
                 info!("Skipping file \"{}\". {}", path, err);
             }
         };

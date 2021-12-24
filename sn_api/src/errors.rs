@@ -72,9 +72,12 @@ pub enum Error {
     /// EntryNotFound
     #[error("EntryNotFound: {0}")]
     EntryNotFound(String),
-    /// EntryExists
-    #[error("EntryExists: {0}")]
-    EntryExists(String),
+    /// A file with same name already exists on target FilesContainer with same link"
+    #[error("File named \"{0}\" already exists on target with same link.")]
+    FileAlreadyExists(String),
+    /// A file with same name already exists on target FilesContainer with same link"
+    #[error("File named \"{0}\" already exists on target. Use the 'force' flag to replace it.")]
+    FileNameConflict(String),
     /// InvalidAmount
     #[error("InvalidAmount: {0}")]
     InvalidAmount(String),

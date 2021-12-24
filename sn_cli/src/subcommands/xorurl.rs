@@ -12,7 +12,7 @@ use super::{
     OutputFmt,
 };
 use color_eyre::{eyre::eyre, Result};
-use sn_api::{PublicKey, Safe, SafeUrl, XorName};
+use sn_api::{files::FilesMapChange, PublicKey, Safe, SafeUrl, XorName};
 use structopt::StructOpt;
 
 // Defines subcommands of 'xorurl'
@@ -94,7 +94,7 @@ pub async fn xorurl_commander(
                 get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
 
             // Do a dry-run on the location
-            let (_version, processed_files, _files_map) = safe
+            let (_version, processed_files, _) = safe
                 .files_container_create(Some(&location), None, recursive, follow_symlinks, true)
                 .await?;
 
@@ -109,8 +109,15 @@ pub async fn xorurl_commander(
                 }
             } else {
                 let mut list = Vec::<(String, String)>::new();
-                for (file_name, (_change, link)) in processed_files {
-                    list.push((file_name, link));
+                for (file_name, change) in processed_files {
+                    let link = match change {
+                        FilesMapChange::Failed(err) => format!("<{}>", err),
+                        FilesMapChange::Added(link)
+                        | FilesMapChange::Updated(link)
+                        | FilesMapChange::Removed(link) => link,
+                    };
+
+                    list.push((file_name.display().to_string(), link));
                 }
                 println!("{}", serialise_output(&list, output_fmt));
             }
