@@ -139,7 +139,7 @@ pub(crate) async fn file_system_dir_walk(
                                 info!("Skipping file \"{}\". {}", normalised_path.display(), err);
                                 processed_files.insert(
                                     normalised_path,
-                                    FilesMapChange::Failed(format!("<{}>", err)),
+                                    FilesMapChange::Failed(format!("{}", err)),
                                 );
                             }
                         }
@@ -149,10 +149,8 @@ pub(crate) async fn file_system_dir_walk(
                     info!(
                         "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
                         normalised_path.display(), err);
-                    processed_files.insert(
-                        normalised_path,
-                        FilesMapChange::Failed(format!("<{}>", err)),
-                    );
+                    processed_files
+                        .insert(normalised_path, FilesMapChange::Failed(format!("{}", err)));
                 }
             }
         }
@@ -205,10 +203,7 @@ pub(crate) async fn file_system_single_file(
             }
             Err(err) => {
                 info!("Skipping file \"{}\". {}", normalised_path.display(), err);
-                processed_files.insert(
-                    normalised_path,
-                    FilesMapChange::Failed(format!("<{}>", err)),
-                );
+                processed_files.insert(normalised_path, FilesMapChange::Failed(format!("{}", err)));
             }
         };
         Ok(processed_files)

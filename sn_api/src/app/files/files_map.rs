@@ -127,7 +127,7 @@ pub(crate) async fn add_or_update_file_item(
             info!("Skipping file \"{}\": {:?}", file_link.unwrap_or(""), err);
             processed_files.insert(
                 file_name.to_path_buf(),
-                FilesMapChange::Failed(format!("<{}>", err)),
+                FilesMapChange::Failed(format!("{}", err)),
             );
 
             false
